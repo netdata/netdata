@@ -1735,7 +1735,7 @@ netdataDashboard.context = {
     'portcheck.error': {
         valueRange: "[0, 3]",
         info: 'The <code>Error</code> is returned by the plugin when it could not connect to the host/port. It is one of: ' +
-        '<code>0</code> (connection successful), <code>1</code> (port closed), <code>2</code> (host or port timeout), <code>3</code> (hostname lookup failed). ' +
+        '<code>0</code> (connection successful), <code>5</code> (port closed), <code>10</code> (host or port timeout), <code>15</code> (hostname lookup failed). ' +
         'The error code is most useful for 3rd-party apps and alarms.'
     },
 

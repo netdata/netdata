@@ -24,9 +24,12 @@ CHARTS = {
         ]}
 }
 
-CONNECTION_FAILED = 1
-CONNECTION_TIMED_OUT = 2
-SOCKET_FAILED = 3
+# The higher the error code, the "more severe" it is.
+# We use steps of 5, which allows future fine-grained error codes, should we need it (fill the blanks where
+# appropriate).
+CONNECTION_FAILED = 5
+CONNECTION_TIMED_OUT = 10
+SOCKET_FAILED = 15
 
 TCP_DIMENSION_CONNECT_PREFIX = 'tcp_connect_'
 TCP_DIMENSION_ERROR_PREFIX = 'tcp_error_'
