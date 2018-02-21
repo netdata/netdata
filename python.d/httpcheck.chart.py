@@ -36,10 +36,14 @@ CHARTS = {
         ]}
 }
 
-CONTENT_MISMATCH = 1
-STATUS_NOT_ACCEPTED = 2
-CONNECTION_TIMED_OUT = 3
-CONNECTION_FAILED = 4
+# The higher the error code, the "more severe" it is. E.g. an unreachable host is probably much worse than a regex
+# mismatch (maybe the web service just has a new design that doesn't match the regex anymore).
+# We use steps of 5, which allows future fine-grained error codes, should we need it (fill the blanks where
+# appropriate).
+CONTENT_MISMATCH = 3
+STATUS_NOT_ACCEPTED = 5
+CONNECTION_TIMED_OUT = 10
+CONNECTION_FAILED = 15
 
 
 class Service(UrlService):
