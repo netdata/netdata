@@ -1472,6 +1472,75 @@ Configuration is not needed.
 
 ---
 
+# ntpd
+
+Module monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`.
+
+**Requirements:**
+ * Version of `ntpd` must be 2.0+
+ * Local interrogation allowed in `/etc/ntp.conf` (default):
+
+```
+# Local users may interrogate the ntp server more closely.
+restrict 127.0.0.1
+restrict ::1
+```
+
+It produces:
+
+1. system
+ * offset
+ * jitter
+ * frequency
+ * delay
+ * dispersion
+ * stratum
+ * tc
+ * precision
+
+2. peers
+ * offset
+ * delay
+ * dispersion
+ * jitter
+ * rootdelay
+ * rootdispersion
+ * stratum
+ * hmode
+ * pmode
+ * hpoll
+ * ppoll
+ * precision
+
+**configuration**
+
+Sample:
+
+```yaml
+update_every: 10
+
+host: 'localhost'
+port: '123'
+show_peers: yes
+peer_filter: '(127\..*)|(192\.168\..*)'
+```
+
+Sample (multiple jobs):
+
+Note: `ntp.conf` on host `otherhost` must be configured to allow queries from our local host by including a line like `restrict <IP> nomodify notrap nopeer`.
+
+```yaml
+local:
+    host: 'localhost'
+
+otherhost:
+    host: 'otherhost'
+```
+
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `show_peers: yes` to also show the charts for configured peers. Local peers (127.*) are hidden by default, use `peer_filter: ''` to show all.
+
+---
+
 # ovpn_status_log
 
 Module monitor openvpn-status log file. 

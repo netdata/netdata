@@ -41,6 +41,7 @@ dist_python_DATA = \
     nginx.chart.py \
     nginx_plus.chart.py \
     nsd.chart.py \
+    ntpd.chart.py \
     ovpn_status_log.chart.py \
     phpfpm.chart.py \
     postfix.chart.py \
