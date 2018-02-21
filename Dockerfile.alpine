@@ -12,7 +12,7 @@ WORKDIR /opt/netdata.git
 
 # Install source
 RUN chmod +x ./netdata-installer.sh && \
-    sync && \
+    sync && sleep 1 && \
     ./netdata-installer.sh --dont-wait --dont-start-it
 
 ################################################################################
