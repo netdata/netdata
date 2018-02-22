@@ -316,10 +316,10 @@ class Plugin(object):
                 job.checked = True
                 continue
             if not job.is_autodetect() or ok is None:
-                job.error('check() => [FAILED]')
+                job.info('check() => [FAILED]')
                 self.delete_job(job)
             else:
-                job.error('check() => [RECHECK] (autodetection_retry: {0})'.format(job.recheck_every))
+                job.info('check() => [RECHECK] (autodetection_retry: {0})'.format(job.recheck_every))
 
     def run_create(self):
         for job in self.jobs:

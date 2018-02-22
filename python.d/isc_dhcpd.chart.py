@@ -74,7 +74,7 @@ class DhcpdLeasesFile:
                         result[address]['ends'] = row[5:-1]
                     elif row.startswith('binding state'):
                         result[address]['state'] = row[14:-1]
-                return result
+                return dict((k, v) for k, v in result.items() if len(v) == 2)
         except (OSError, IOError):
             return None
 
