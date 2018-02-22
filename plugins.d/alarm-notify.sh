@@ -233,6 +233,7 @@ SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
+SEND_IRC="YES"
 SEND_CUSTOM="YES"
 
 # slack configs
@@ -315,6 +316,13 @@ EMAIL_SENDER=
 DEFAULT_RECIPIENT_EMAIL="root"
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 declare -A role_recipients_email=()
+
+# irc configs
+IRC_NICKNAME=
+IRC_REALNAME=
+DEFAULT_RECIPIENT_IRC=
+DEFAULT_IRC_NETWORK="irc.freenode.net"
+declare -A role_recipients_irc=()
 
 # load the user configuration
 # this will overwrite the variables above
@@ -407,6 +415,7 @@ declare -A arr_email=()
 declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
+declare -A arr_irc=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -519,6 +528,14 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
+    
+    # irc
+    a="${role_recipients_irc[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
+    done
 
     # custom
     a="${role_recipients_custom[${x}]}"
@@ -591,6 +608,9 @@ do
 done
 [ -z "${to_email}" ] && SEND_EMAIL="NO"
 
+# build the list of irc recipients (channels)
+to_irc="${!arr_irc[*]}"
+[ -z "${to_irc}" ] && SEND_IRC="NO"
 
 # -----------------------------------------------------------------------------
 # verify the delivery methods supported
@@ -631,6 +651,9 @@ done
 # check kafka
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
+# check irc
+[ -z "${DEFAULT_IRC_NETWORK}" -o -z "${IRC_CHANNEL}" ] && SEND_IRC="NO"
+
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
 # https://www.pagerduty.com/docs/guides/agent-install-guide/
@@ -659,7 +682,8 @@ if [ \( \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
-    \) -a -z "${curl}" ]
+        -o "${SEND_IRC}"         = "YES" \
+        \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
@@ -678,6 +702,7 @@ if [ \( \
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
         SEND_CUSTOM="NO"
+        SEND_IRC="NO"
     fi
 fi
 
@@ -708,6 +733,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
+    -a "${SEND_IRC}"            != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1443,6 +1469,39 @@ EOF
     return 1
 }
 
+# -----------------------------------------------------------------------------
+# irc sender
+
+send_irc() {
+    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" httpcode sent=0 channel color
+
+    case "${status}" in
+        WARNING)  color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
+    esac
+
+    if ["${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}"]
+    then
+        for channel in ${CHANNELS}
+        do
+            httpcode=$(echo -e "USER ${NICKNAME} guest ${REALNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \| nc ${NETWORK} 6667)  
+            if [ "${httpcode}" = "200" ]
+            then
+                info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+            fi
+        done
+    fi
+    
+    [ ${sent} -gt 0 ] && return 0
+    
+    return 1
+}
+
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
@@ -1657,6 +1716,16 @@ SENT_KAFKA=$?
 send_pd "${to_pd}"
 SENT_PD=$?
 
+# -----------------------------------------------------------------------------
+# send the irc message
+
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${DEFAULT_IRC_NETWORK}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+${info}"
+
+SENT_IRC=$?
 
 # -----------------------------------------------------------------------------
 # send the custom message
@@ -1830,6 +1899,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
+    -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
     ]
     then
