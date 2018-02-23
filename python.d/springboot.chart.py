@@ -96,23 +96,20 @@ class Service(UrlService):
         return data or None
 
     def _setup_charts(self):
-        order = []
-        definitions = {}
+        self.order = []
+        self.definitions = {}
         defaults = self.configuration.get('defaults', {})
 
         for chart in DEFAULT_ORDER:
             if defaults.get(chart, True):
-                order.append(chart)
-                definitions[chart] = DEFAULT_CHARTS[chart]
+                self.order.append(chart)
+                self.definitions[chart] = DEFAULT_CHARTS[chart]
 
         for extra in self.configuration.get('extras', []):
-            self._add_extra_chart(definitions, extra)
-            order.append(extra['id'])
+            self._add_extra_chart(extra)
+            self.order.append(extra['id'])
 
-        self.order = order
-        self.definitions = definitions
-
-    def _add_extra_chart(self, charts, chart):
+    def _add_extra_chart(self, chart):
         chart_id  = chart.get('id',      None) or die('id is not defined in extra chart')
         options   = chart.get('options', None) or die('option is not defined in extra chart: %s' % chart_id)
         lines     = chart.get('lines',   None) or die('lines is not defined in extra chart: %s' % chart_id)
@@ -129,14 +126,14 @@ class Service(UrlService):
         }
 
         for line in lines:
-            dimension  = line.get('dimension',  None) or self.die('dimension is missing: %s' chart_id)
+            dimension  = line.get('dimension',  None) or die('dimension is missing: %s' % chart_id)
             name       = line.get('name',       dimension)
             algorithm  = line.get('algorithm',  'absolute')
             multiplier = line.get('multiplier', 1)
             divisor    = line.get('divisor',    1)
             result['lines'].append([dimension, name, algorithm, multiplier, divisor])
 
-        charts[chart_id] = result
+        self.definitions[chart_id] = result
 
     @classmethod
     def die(error_message):
