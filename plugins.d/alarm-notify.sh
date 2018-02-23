@@ -683,7 +683,7 @@ if [ \( \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
         -o "${SEND_IRC}"         = "YES" \
-        \) -a -z "${curl}" ]
+    \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
@@ -1482,17 +1482,17 @@ send_irc() {
         *)        color="#777777" ;;
     esac
 
-    if ["${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}"]
+    if ["${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}" -a ! -z "${servername}"]
     then
         for channel in ${CHANNELS}
         do
-            httpcode=$(echo -e "USER ${NICKNAME} guest ${REALNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \| nc ${NETWORK} 6667)  
-            if [ "${httpcode}" = "200" ]
+            sentcheck=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)  
+            if [ $(echo ${sentcheck} | grep --fixed-strings --count ":${nickname} MODE ${nickname} :+i") -gt 0 ]
             then
-                info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
                 sent=$((sent + 1))
             else
-                error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
             fi
         done
     fi
@@ -1719,7 +1719,7 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send the irc message
 
-send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${DEFAULT_IRC_NETWORK}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${DEFAULT_IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
