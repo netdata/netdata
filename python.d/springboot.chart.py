@@ -86,11 +86,9 @@ class Service(UrlService):
                 data['resp.' + key] = 0
             for key, value in data.iteritems():
                 if 'counter.status.' in key:
-                    try:
-                        status_type = key[15:16] + 'xx'
-                    except:
+                    status_type = key[15:16] + 'xx'
+                    if status_type[0] not in '12345':
                         status_type = 'other'
-
                     data['resp.' + status_type] += value
 
         return data or None
