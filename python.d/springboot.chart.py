@@ -117,8 +117,8 @@ class Service(UrlService):
         options   = chart.get('options', None) or die('option is not defined in extra chart: %s' % chart_id)
         lines     = chart.get('lines',   None) or die('lines is not defined in extra chart: %s' % chart_id)
 
-        title     = options.get('title', None) or die('title is missing: %s' chart_id)
-        units     = options.get('units', None) or die('units is missing: %s' chart_id)
+        title     = options.get('title', None) or die('title is missing: %s' % chart_id)
+        units     = options.get('units', None) or die('units is missing: %s' % chart_id)
         family    = options.get('family',    title)
         context   = options.get('context',   'springboot.' + title)
         charttype = options.get('charttype', 'line')
