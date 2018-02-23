@@ -47,7 +47,8 @@ RUN \
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \
-    chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin /usr/local/bin/fping && \
+    chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
+    chmod 4755 /usr/local/bin/fping && \
     chmod 0750 /var/lib/netdata /var/cache/netdata && \
     # Link log files to stdout
     ln -sf /dev/stdout /var/log/netdata/access.log && \
@@ -57,5 +58,3 @@ RUN \
 EXPOSE 19999
 
 CMD [ "/usr/sbin/netdata" , "-D", "-s", "/host", "-p", "19999"]
-
-USER netdata:netdata
