@@ -78,7 +78,7 @@ class Service(UrlService):
         if raw_data:
             try:
                 data = json.loads(raw_data)
-            except:
+            except Excepton:
                 self.debug('%s is not a vaild JSON page' % self.url)
                 return None
 
@@ -113,12 +113,12 @@ class Service(UrlService):
         self.definitions = definitions
 
     def _add_extra_chart(self, charts, chart):
-        chart_id  = chart.get('id',      None) or self.die('id is not defined in extra chart')
-        options   = chart.get('options', None) or self.die('option is not defined in extra chart: %s' % chart_id)
-        lines     = chart.get('lines',   None) or self.die('lines is not defined in extra chart: %s' % chart_id)
+        chart_id  = chart.get('id',      None) or die('id is not defined in extra chart')
+        options   = chart.get('options', None) or die('option is not defined in extra chart: %s' % chart_id)
+        lines     = chart.get('lines',   None) or die('lines is not defined in extra chart: %s' % chart_id)
 
-        title     = options.get('title', None) or self.die('title is missing: %s', chart_id)
-        units     = options.get('units', None) or self.die('units is missing: %s', chart_id)
+        title     = options.get('title', None) or die('title is missing: %s' chart_id)
+        units     = options.get('units', None) or die('units is missing: %s' chart_id)
         family    = options.get('family',    title)
         context   = options.get('context',   'springboot.' + title)
         charttype = options.get('charttype', 'line')
@@ -129,7 +129,7 @@ class Service(UrlService):
         }
 
         for line in lines:
-            dimension  = line.get('dimension',  None) or self.die('dimension is missing: %s', chart_id)
+            dimension  = line.get('dimension',  None) or self.die('dimension is missing: %s' chart_id)
             name       = line.get('name',       dimension)
             algorithm  = line.get('algorithm',  'absolute')
             multiplier = line.get('multiplier', 1)
@@ -138,5 +138,6 @@ class Service(UrlService):
 
         charts[chart_id] = result
 
-    def die(self, error_message):
+    @classmethod
+    def die(error_message):
         raise Exception(error_message)
