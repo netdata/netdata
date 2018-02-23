@@ -44,9 +44,8 @@ RUN \
     adduser -S -H -s /bin/sh -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
     # Apply the permissions as described in
     # https://github.com/firehol/netdata/wiki/netdata-security#netdata-directories
-    find /usr/share/netdata -type f -exec chmod 0644 -- {} + && \
-    chown -R root:netdata /usr/share/netdata /etc/netdata && \
-    chown -R netdata:netdata /var/cache/netdata /var/lib/netdata && \
+    chown -R root:netdata /etc/netdata && \
+    chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin /usr/local/bin/fping && \
     chmod 0750 /var/lib/netdata /var/cache/netdata && \
