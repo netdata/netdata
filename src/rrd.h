@@ -232,7 +232,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
     RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
     RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9  // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HIDDEN           = 1 << 10, // if set, do not show this chart on the dashboard, but use it for backends
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -648,7 +649,7 @@ extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_backends(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database
