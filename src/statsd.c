@@ -259,6 +259,7 @@ static struct statsd {
     size_t max_private_charts_hard;
     RRD_MEMORY_MODE private_charts_memory_mode;
     long private_charts_rrd_history_entries;
+    int private_charts_hidden;
 
     STATSD_APP *apps;
     size_t recvmmsg_size;
@@ -274,6 +275,7 @@ static struct statsd {
         .enabled = 1,
         .max_private_charts = 200,
         .max_private_charts_hard = 1000,
+        .private_charts_hidden = 0,
         .recvmmsg_size = 10,
         .decimal_detail = STATSD_DECIMAL_DETAIL,
 
@@ -1449,6 +1451,10 @@ static inline RRDSET *statsd_private_rrdset_create(
             , history         // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+
+    if(statsd.private_charts_hidden)
+        rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+
     // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
     return st;
 }
@@ -2099,6 +2105,7 @@ void *statsd_main(void *ptr) {
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (size_t)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
     statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);
+    statsd.private_charts_hidden = (int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
 
     statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
