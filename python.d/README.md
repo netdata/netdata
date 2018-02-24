@@ -1553,16 +1553,14 @@ Module monitors one or more remote ports per host.
 Following charts are drawn per host:
 
 1. **Latency** ms
- * For each port: TCP socket opening and closing time when connecting.
-   Displays latency in 0.1 ms resolution and 0.1ms will be the minimum.
-   If it is 0.0ms, the connection failed with error code >0 (useful for API)
+ * TCP socket opening and closing time when connecting.
+   Displays latency in 0.1 ms resolution. If the connection failed, the value is missing.
 
-2. **Error code** int
- * For each port: One of:
-   - 0: Connection successful
-   - 1: Could not create socket (dns name not resolved?)
-   - 2: Connection refused (port not listening or blocked)
-   - 3: Connection timed out (host unreachable?)
+2. **Error** int
+ * Connection successful: value = 1 otherwise 0
+ * Could not create socket: possible DNS problems (value = 1, otherwise 0) 
+ * Connection refused: port not listening or blocked (value = 1, otherwise 0)
+ * Connection timed out: host or port unreachable (value = 1, otherwise 0)
 
 
 ### configuration

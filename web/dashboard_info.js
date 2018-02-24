@@ -1733,10 +1733,10 @@ netdataDashboard.context = {
     },
 
     'portcheck.error': {
-        valueRange: "[0, 3]",
-        info: 'The <code>Error</code> is returned by the plugin when it could not connect to the host/port. It is one of: ' +
-        '<code>0</code> (connection successful), <code>5</code> (port closed), <code>10</code> (host or port timeout), <code>15</code> (hostname lookup failed). ' +
-        'The error code is most useful for 3rd-party apps and alarms.'
+        valueRange: "[0, 1]",
+        info: 'The <code>error</code> codes are returned by the plugin when it could verify the availability of the service. ' +
+        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is always <code>1</code> on successful connects.' +
+        'The error code is most useful for alarms and third-party apps.'
     },
 
     // ------------------------------------------------------------------------
