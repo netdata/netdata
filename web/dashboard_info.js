@@ -707,7 +707,7 @@ netdataDashboard.context = {
     },
 
     'mem.hugepages': {
-        info: 'Dedicated (or Direct) HugePages is memory reserved for applications configured to utilize huge pages.'
+        info: 'Dedicated (or Direct) HugePages is memory reserved for applications configured to utilize huge pages. Hugepages are <b>used</b> memory, even if there are free hugepages available.'
     },
 
     'mem.transparent_hugepages': {
