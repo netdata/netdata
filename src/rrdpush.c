@@ -86,7 +86,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the chart
     buffer_sprintf(
             host->rrdpush_sender_buffer
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\" \"%s\" \"%s\"\n"
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , st->name
             , st->title
@@ -99,6 +99,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
             , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
             , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+            , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
             , (st->plugin_name)?st->plugin_name:""
             , (st->module_name)?st->module_name:""
     );
