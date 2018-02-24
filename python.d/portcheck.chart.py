@@ -10,29 +10,29 @@ from bases.FrameworkServices.SimpleService import SimpleService
 priority = 60000
 retries = 60
 
+PORT_CONNECT = 'connect'
+
+PORT_SUCCESS = 'success'
+PORT_TIMEOUT = 'timeout'
+PORT_FAILED = 'failed'
+
 ORDER = ['latency', 'error']
 
 CHARTS = {
     'latency': {
         'options': [None, 'TCP connect latency', 'ms', 'latency', 'portcheck.latency', 'line'],
-        'lines': []
+        'lines': [
+            [PORT_CONNECT, 'connect', 'absolute', 100, 1000]
+        ]
     },
     'error': {
         'options': [None, 'Portcheck error code', 'code', 'error', 'portcheck.error', 'line'],
         'lines': [
-
+            [PORT_SUCCESS, 'success', 'absolute'],
+            [PORT_TIMEOUT, 'timeout', 'absolute'],
+            [PORT_FAILED, 'failed', 'absolute']
         ]}
 }
-
-# The higher the error code, the "more severe" it is.
-# We use steps of 5, which allows future fine-grained error codes, should we need it (fill the blanks where
-# appropriate).
-CONNECTION_FAILED = 5
-CONNECTION_TIMED_OUT = 10
-SOCKET_FAILED = 15
-
-TCP_DIMENSION_CONNECT_PREFIX = 'tcp_connect_'
-TCP_DIMENSION_ERROR_PREFIX = 'tcp_error_'
 
 
 class Service(SimpleService):
@@ -42,7 +42,7 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.chart_name = ""
         self.host = self.configuration.get('host', None)
-        self.ports = self.configuration.get('ports', None)
+        self.port = self.configuration.get('port', None)
         self.timeout = self.configuration.get('timeout', 1)
 
     def check(self):
@@ -50,24 +50,16 @@ class Service(SimpleService):
         Parse configuration, check if configuration is available, and dynamically create chart lines data
         :return: boolean
         """
-        if self.host is None or self.ports is None:
-            self.error("Host and/or ports missing")
+        if self.host is None or self.port is None:
+            self.error("Host or port missing")
             return False
-        if not isinstance(self.ports, list):
-            self.error('"ports" is not defined as a list. Specify a PyYaml compatible list.')
+        if not isinstance(self.port, int):
+            self.error('"port" is not an integer. Specify a numerical value, not service name.')
             return False
 
-        for port in self.ports:
-            if not isinstance(port, int):
-                self.error("{port} is not an integer. Disabling plugin.".format(port=port))
-                return False
-            self.debug("Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s".format(
-                host=self.host, port=port, update=self.update_every, timeout=self.timeout
-            ))
-            self.definitions['latency']['lines'].append(
-                [TCP_DIMENSION_CONNECT_PREFIX + str(port), port, 'absolute', 100, 1000])
-            self.definitions['error']['lines'].append(
-                [TCP_DIMENSION_ERROR_PREFIX + str(port), port, 'absolute'])
+        self.info("Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s".format(
+            host=self.host, port=self.port, update=self.update_every, timeout=self.timeout
+        ))
         # We will accept any (valid-ish) configuration, even if initial connection fails (a service might be down from
         # the beginning)
         return True
@@ -79,25 +71,28 @@ class Service(SimpleService):
         """
         data = dict()
 
-        for port in self.ports:
-            success = False
-            try:
-                for socket_config in socket.getaddrinfo(self.host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
-                    # use first working socket
-                    sock = self._create_socket(socket_config)
-                    if sock is not None:
-                        self._connect2socket(data, socket_config, sock)
-                        self._disconnect(sock)
-                        success = True
-                        break
-            except socket.gaierror:
-                success = False
-                pass
+        data[PORT_SUCCESS] = 0
+        data[PORT_TIMEOUT] = 0
+        data[PORT_FAILED] = 0
 
-            # We could not connect
-            if not success:
-                data[TCP_DIMENSION_CONNECT_PREFIX + str(port)] = 0
-                data[TCP_DIMENSION_ERROR_PREFIX + str(port)] = SOCKET_FAILED
+        success = False
+        try:
+            for socket_config in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                # use first working socket
+                sock = self._create_socket(socket_config)
+                if sock is not None:
+                    self._connect2socket(data, socket_config, sock)
+                    self._disconnect(sock)
+                    success = True
+                    break
+        except socket.gaierror as error:
+            self.debug('Failed to connect to "{host}:{port}", error: {error}'.format(
+                host=self.host, port=self.port, error=error
+            ))
+
+        # We could not connect
+        if not success:
+            data[PORT_FAILED] = 1
 
         return data
 
@@ -122,8 +117,6 @@ class Service(SimpleService):
 
         af, sock_type, proto, canon_name, sa = socket_config
         port = str(sa[1])
-        data[TCP_DIMENSION_CONNECT_PREFIX + port] = 0
-        data[TCP_DIMENSION_ERROR_PREFIX + port] = 0
         try:
             self.debug('Connecting socket to "{address}", port {port}'.format(address=sa[0], port=port))
             start = time.time()
@@ -133,19 +126,20 @@ class Service(SimpleService):
                 address=sa[0], port=port, latency=diff
             ))
             # we will set it at least 0.1 ms. 0.0 would mean failed connection (handy for 3rd-party-APIs)
-            data[TCP_DIMENSION_CONNECT_PREFIX + port] = max(round(diff * 10000), 1)
+            data[PORT_CONNECT] = max(round(diff * 10000), 1)
+            data[PORT_SUCCESS] = 1
 
         except socket.timeout as error:
             self.debug('Socket timed out on "{address}", port {port}, error: {error}'.format(
                 address=sa[0], port=port, error=error
             ))
-            data[TCP_DIMENSION_ERROR_PREFIX + port] = CONNECTION_TIMED_OUT
+            data[PORT_TIMEOUT] = 1
 
         except socket.error as error:
             self.debug('Failed to connect to "{address}", port {port}, error: {error}'.format(
                 address=sa[0], port=port, error=error
             ))
-            data[TCP_DIMENSION_ERROR_PREFIX + port] = CONNECTION_FAILED
+            data[PORT_FAILED] = 1
 
     def _disconnect(self, sock):
         """
