@@ -18,8 +18,15 @@ except AttributeError:
 priority = 60000
 retries = 60
 
-HTTP_RESPONSE_TIME = 'http_responsetime'
-HTTP_ERROR = 'http_error'
+# Latency
+HTTP_RESPONSE_TIME = 'response_time'
+
+# Error dimensions
+HTTP_SUCCESS = 'success'
+HTTP_UNEXPECTED_CONTENT = 'unexpected_content'
+HTTP_UNEXPECTED_STATUS = 'unexpected_status'
+HTTP_TIMEOUT = 'timeout'
+HTTP_FAILED = 'failed'
 
 ORDER = ['responsetime', 'error']
 
@@ -32,18 +39,13 @@ CHARTS = {
     'error': {
         'options': [None, 'HTTP check error code', 'code', 'error', 'httpcheck.error', 'line'],
         'lines': [
-            [HTTP_ERROR, 'error', 'absolute']
+            [HTTP_SUCCESS, 'success', 'absolute'],
+            [HTTP_UNEXPECTED_CONTENT, 'unexpected content', 'absolute'],
+            [HTTP_UNEXPECTED_STATUS, 'unexpected status', 'absolute'],
+            [HTTP_TIMEOUT, 'timeout', 'absolute'],
+            [HTTP_FAILED, 'failed', 'absolute']
         ]}
 }
-
-# The higher the error code, the "more severe" it is. E.g. an unreachable host is probably much worse than a regex
-# mismatch (maybe the web service just has a new design that doesn't match the regex anymore).
-# We use steps of 5, which allows future fine-grained error codes, should we need it (fill the blanks where
-# appropriate).
-CONTENT_MISMATCH = 3
-STATUS_NOT_ACCEPTED = 5
-CONNECTION_TIMED_OUT = 10
-CONNECTION_FAILED = 15
 
 
 class Service(UrlService):
@@ -83,13 +85,17 @@ class Service(UrlService):
         """
         data = dict()
         data[HTTP_RESPONSE_TIME] = 0
-        data[HTTP_ERROR] = 0
+        data[HTTP_SUCCESS] = 0
+        data[HTTP_UNEXPECTED_CONTENT] = 0
+        data[HTTP_UNEXPECTED_STATUS] = 0
+        data[HTTP_TIMEOUT] = 0
+        data[HTTP_FAILED] = 0
         url = self.url
         try:
-            retries = 1 if self.follow_redirect else False
+            retr = 1 if self.follow_redirect else False
             start = time.time()
             response = self._manager.request(
-                method='GET', url=url, timeout=self.request_timeout, retries=retries, headers=self._manager.headers,
+                method='GET', url=url, timeout=self.request_timeout, retries=retr, headers=self._manager.headers,
                 redirect=self.follow_redirect
             )
             diff = time.time() - start
@@ -103,17 +109,23 @@ class Service(UrlService):
                 self.debug('Content: \n\n{content}\n'.format(content=content))
                 if self.regex.search(content) is None:
                     self.debug('No match for regex \'{regex}\' found'.format(regex=self.regex.pattern))
-                    data[HTTP_ERROR] = CONTENT_MISMATCH
+                    data[HTTP_UNEXPECTED_CONTENT] = 1
+                else:
+                    data[HTTP_SUCCESS] = 1
             else:
-                data[HTTP_ERROR] = STATUS_NOT_ACCEPTED
+                data[HTTP_UNEXPECTED_STATUS] = 1
+
+        except urllib3.exceptions.NewConnectionError as error:
+            self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
+            data[HTTP_FAILED] = 1
 
         except (urllib3.exceptions.TimeoutError, urllib3.exceptions.PoolError) as error:
             self.debug("Connection timed out: {url}. Error: {error}".format(url=url, error=error))
-            data[HTTP_ERROR] = CONNECTION_TIMED_OUT
+            data[HTTP_TIMEOUT] = 1
 
         except urllib3.exceptions.HTTPError as error:
             self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
-            data[HTTP_ERROR] = CONNECTION_FAILED
+            data[HTTP_FAILED] = 1
 
         except (TypeError, AttributeError) as error:
             self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
