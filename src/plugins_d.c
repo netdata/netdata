@@ -331,6 +331,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 else
                     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
 
+                if(strstr(options, "hidden"))
+                    rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
+                else
+                    rrdset_flag_clear(st, RRDSET_FLAG_HIDDEN);
+
                 if(strstr(options, "store_first"))
                     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
                 else
