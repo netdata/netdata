@@ -652,7 +652,7 @@ to_irc="${!arr_irc[*]}"
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
 # check irc
-[ -z "${DEFAULT_IRC_NETWORK}" -o -z "${IRC_CHANNEL}" ] && SEND_IRC="NO"
+[ -z "${DEFAULT_IRC_NETWORK}" -o -z "${DEFAULT_RECIPIENT_IRC}" ] && SEND_IRC="NO"
 
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
