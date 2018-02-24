@@ -1548,12 +1548,12 @@ Without configuration, module attempts to connect to `http://localhost/status`
 
 # portcheck
 
-Module monitors one or more remote ports per host.
+Module monitors a remote TCP service.
 
 Following charts are drawn per host:
 
 1. **Latency** ms
- * TCP socket opening and closing time when connecting.
+ * Time required to connect to a TCP port.
    Displays latency in 0.1 ms resolution. If the connection failed, the value is missing.
 
 2. **Error** int
@@ -1568,22 +1568,17 @@ Following charts are drawn per host:
 ```yaml
 server:
   host: 'dns or ip'     # required
-  ports:                # required
-    - 22
+  port: 22              # required
   timeout: 1            # optional
   update_every: 1       # optional
 ```
 
 ### notes
 
- * The error code chart is intended for health check or for access via API.
+ * The error chart is intended for alarms or for access via API.
  * A system/service/firewall might block netdata's access if a portscan or
    similar is detected.
- * Each port check is executed in sequence. E.g. if port 22 times out after 3s and
-   port 80 takes 200ms, the whole check requires 3.2 seconds. You may want
-   to decrease the `timeout` and/or increase `update_every` in order to get
-   regular results (e.g. `'update_every' = 'number-of-ports-to-check' * 'timeout'`
-   will result in regular, though longer intervals.
+ * Currently, the accuracy of the latency is low and should be used as reference only.
 
 ---
 
