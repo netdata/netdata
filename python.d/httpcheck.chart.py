@@ -84,7 +84,6 @@ class Service(UrlService):
         :return: dict
         """
         data = dict()
-        data[HTTP_RESPONSE_TIME] = 0
         data[HTTP_SUCCESS] = 0
         data[HTTP_UNEXPECTED_CONTENT] = 0
         data[HTTP_UNEXPECTED_STATUS] = 0

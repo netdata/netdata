@@ -1136,15 +1136,15 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // HTTP check
 
-    'httpcheck.latency': {
-        info: 'The <code>Latency</code> describes the time passed between request and response. ' +
-        'A response time of <code>0.0 ms</code> indicates a connection error.'
+    'httpcheck.responsetime': {
+        info: 'The <code>response time</code> describes the time passed between request and response. ' +
+        'Currently, the accuracy of the response time is low and should be used as reference only.'
     },
 
     'httpcheck.error': {
         valueRange: "[0, 1]",
         info: 'The <code>error</code> codes are returned by the plugin when it could verify the availability of the webserver. ' +
-        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is always <code>1</code> on successful requests.' +
+        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> if all constraints are satisfied.' +
         'This chart is most useful for alarms or third-party apps.'
     },
 
