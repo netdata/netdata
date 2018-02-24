@@ -1142,11 +1142,10 @@ netdataDashboard.context = {
     },
 
     'httpcheck.error': {
-        valueRange: "[0, 3]",
-        info: 'The <code>Error</code> is returned by the plugin when it could not connect to the webserver. It is one of: ' +
-        '<code>0</code> (connection successful), <code>3</code> (unexpected response content), <code>5</code> (unexpected status code), ' +
-        '<code>10</code> (port unreachable), <code>15</code> (host unreachable). ' +
-        'The higher the error code, the "more severe" it is. The error code is most useful for 3rd-party apps and alarms.'
+        valueRange: "[0, 1]",
+        info: 'The <code>error</code> codes are returned by the plugin when it could verify the availability of the webserver. ' +
+        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is always <code>1</code> on successful requests.' +
+        'This chart is most useful for alarms or third-party apps.'
     },
 
     // ------------------------------------------------------------------------
