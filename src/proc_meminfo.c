@@ -4,7 +4,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
-    static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1;
+    static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1, do_hugepages = -1, do_transparent_hugepages = -1;
 
     static ARL_BASE *arl_base = NULL;
     static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL;
@@ -44,12 +44,13 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             //VmallocTotal = 0,
             VmallocUsed = 0,
             //VmallocChunk = 0,
-            //AnonHugePages = 0,
-            //HugePages_Total = 0,
-            //HugePages_Free = 0,
-            //HugePages_Rsvd = 0,
-            //HugePages_Surp = 0,
-            //Hugepagesize = 0,
+            AnonHugePages = 0,
+            ShmemHugePages = 0,
+            HugePages_Total = 0,
+            HugePages_Free = 0,
+            HugePages_Rsvd = 0,
+            HugePages_Surp = 0,
+            Hugepagesize = 0,
             //DirectMap4k = 0,
             //DirectMap2M = 0,
             HardwareCorrupted = 0;
@@ -62,6 +63,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         do_writeback    = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
         do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
         do_slab         = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
+        do_hugepages    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hugepages", CONFIG_BOOLEAN_AUTO);
+        do_transparent_hugepages = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "transparent hugepages", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("meminfo", NULL, 60);
         arl_expect(arl_base, "MemTotal", &MemTotal);
@@ -99,12 +102,13 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_expect(arl_base, "VmallocUsed", &VmallocUsed);
         //arl_expect(arl_base, "VmallocChunk", &VmallocChunk);
         arl_hwcorrupted = arl_expect(arl_base, "HardwareCorrupted", &HardwareCorrupted);
-        //arl_expect(arl_base, "AnonHugePages", &AnonHugePages);
-        //arl_expect(arl_base, "HugePages_Total", &HugePages_Total);
-        //arl_expect(arl_base, "HugePages_Free", &HugePages_Free);
-        //arl_expect(arl_base, "HugePages_Rsvd", &HugePages_Rsvd);
-        //arl_expect(arl_base, "HugePages_Surp", &HugePages_Surp);
-        //arl_expect(arl_base, "Hugepagesize", &Hugepagesize);
+        arl_expect(arl_base, "AnonHugePages", &AnonHugePages);
+        arl_expect(arl_base, "ShmemHugePages", &ShmemHugePages);
+        arl_expect(arl_base, "HugePages_Total", &HugePages_Total);
+        arl_expect(arl_base, "HugePages_Free", &HugePages_Free);
+        arl_expect(arl_base, "HugePages_Rsvd", &HugePages_Rsvd);
+        arl_expect(arl_base, "HugePages_Surp", &HugePages_Surp);
+        arl_expect(arl_base, "Hugepagesize", &Hugepagesize);
         //arl_expect(arl_base, "DirectMap4k", &DirectMap4k);
         //arl_expect(arl_base, "DirectMap2M", &DirectMap2M);
     }
@@ -425,6 +429,84 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_mem_slab, rd_unreclaimable, SUnreclaim);
 
         rrdset_done(st_mem_slab);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_hugepages == CONFIG_BOOLEAN_YES || (do_hugepages == CONFIG_BOOLEAN_AUTO && Hugepagesize != 0 && HugePages_Total != 0)) {
+        do_hugepages = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_mem_hugepages = NULL;
+        static RRDDIM *rd_used = NULL, *rd_free = NULL, *rd_rsvd = NULL, *rd_surp = NULL;
+
+        if(unlikely(!st_mem_hugepages)) {
+            st_mem_hugepages = rrdset_create_localhost(
+                    "mem"
+                    , "hugepages"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Dedicated HugePages Memory"
+                    , "MB"
+                    , "proc"
+                    , "meminfo"
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES + 1
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st_mem_hugepages, RRDSET_FLAG_DETAIL);
+
+            rd_free = rrddim_add(st_mem_hugepages, "free",     NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_used = rrddim_add(st_mem_hugepages, "used",     NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_surp = rrddim_add(st_mem_hugepages, "surplus",  NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_rsvd = rrddim_add(st_mem_hugepages, "reserved", NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st_mem_hugepages);
+
+        rrddim_set_by_pointer(st_mem_hugepages, rd_used, HugePages_Total - HugePages_Free - HugePages_Rsvd);
+        rrddim_set_by_pointer(st_mem_hugepages, rd_free, HugePages_Free);
+        rrddim_set_by_pointer(st_mem_hugepages, rd_rsvd, HugePages_Rsvd);
+        rrddim_set_by_pointer(st_mem_hugepages, rd_surp, HugePages_Surp);
+
+        rrdset_done(st_mem_hugepages);
+    }
+
+    // --------------------------------------------------------------------
+
+    if(do_transparent_hugepages == CONFIG_BOOLEAN_YES || (do_transparent_hugepages == CONFIG_BOOLEAN_AUTO && (AnonHugePages != 0 || ShmemHugePages != 0))) {
+        do_transparent_hugepages = CONFIG_BOOLEAN_YES;
+
+        static RRDSET *st_mem_transparent_hugepages = NULL;
+        static RRDDIM *rd_anonymous = NULL, *rd_shared = NULL;
+
+        if(unlikely(!st_mem_transparent_hugepages)) {
+            st_mem_transparent_hugepages = rrdset_create_localhost(
+                    "mem"
+                    , "transparent_hugepages"
+                    , NULL
+                    , "hugepages"
+                    , NULL
+                    , "Transparent HugePages Memory"
+                    , "MB"
+                    , "proc"
+                    , "meminfo"
+                    , NETDATA_CHART_PRIO_MEM_HUGEPAGES
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st_mem_transparent_hugepages, RRDSET_FLAG_DETAIL);
+
+            rd_anonymous = rrddim_add(st_mem_transparent_hugepages, "anonymous",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_shared    = rrddim_add(st_mem_transparent_hugepages, "shmem",      NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st_mem_transparent_hugepages);
+
+        rrddim_set_by_pointer(st_mem_transparent_hugepages, rd_anonymous, AnonHugePages);
+        rrddim_set_by_pointer(st_mem_transparent_hugepages, rd_shared, ShmemHugePages);
+
+        rrdset_done(st_mem_transparent_hugepages);
     }
 
     return 0;
