@@ -63,8 +63,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         do_writeback    = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
         do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
         do_slab         = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
-        do_hugepages    = config_get_boolean("plugin:proc:/proc/meminfo", "hugepages", CONFIG_BOOLEAN_AUTO);
-        do_transparent_hugepages = config_get_boolean("plugin:proc:/proc/meminfo", "transparent hugepages", CONFIG_BOOLEAN_AUTO);
+        do_hugepages    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hugepages", CONFIG_BOOLEAN_AUTO);
+        do_transparent_hugepages = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "transparent hugepages", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("meminfo", NULL, 60);
         arl_expect(arl_base, "MemTotal", &MemTotal);
