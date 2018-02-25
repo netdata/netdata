@@ -1138,6 +1138,7 @@ netdataDashboard.context = {
 
     'httpcheck.responsetime': {
         info: 'The <code>response time</code> describes the time passed between request and response. ' +
+        'The minimum is <code>0.1 ms</code> except on errors, where it will be <code>0.0 ms</code> ' +
         'Currently, the accuracy of the response time is low and should be used as reference only.'
     },
 
