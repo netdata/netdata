@@ -372,6 +372,12 @@ static inline int health_parse_db_lookup(
         else if(!strcasecmp(key, "unaligned")) {
             *options |= RRDR_OPTION_NOT_ALIGNED;
         }
+        else if(!strcasecmp(key, "match-ids") || !strcasecmp(key, "match_ids")) {
+            *options |= RRDR_OPTION_MATCH_IDS;
+        }
+        else if(!strcasecmp(key, "match-names") || !strcasecmp(key, "match_names")) {
+            *options |= RRDR_OPTION_MATCH_NAMES;
+        }
         else if(!strcasecmp(key, "of")) {
             if(*s && strcasecmp(s, "all") != 0)
                 *dimensions = strdupz(s);
