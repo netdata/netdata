@@ -87,6 +87,7 @@ dist_healthconfig_DATA = \
     health.d/entropy.conf \
     health.d/fping.conf \
     health.d/haproxy.conf \
+    health.d/httpcheck.conf \
     health.d/ipc.conf \
     health.d/ipfs.conf \
     health.d/ipmi.conf \

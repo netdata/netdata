@@ -18,32 +18,38 @@ except AttributeError:
 priority = 60000
 retries = 60
 
-# Latency
-HTTP_RESPONSE_TIME = 'response_time'
+# Response
+HTTP_RESPONSE_TIME = 'time'
+HTTP_RESPONSE_LENGTH = 'length'
 
-# Error dimensions
+# Status dimensions
 HTTP_SUCCESS = 'success'
-HTTP_UNEXPECTED_CONTENT = 'unexpected_content'
-HTTP_UNEXPECTED_STATUS = 'unexpected_status'
+HTTP_BAD_CONTENT = 'bad_content'
+HTTP_BAD_STATUS = 'bad_status'
 HTTP_TIMEOUT = 'timeout'
-HTTP_FAILED = 'failed'
+HTTP_NO_CONNECTION = 'no_connection'
 
-ORDER = ['responsetime', 'error']
+ORDER = ['response_time', 'response_length', 'status']
 
 CHARTS = {
-    'responsetime': {
-        'options': [None, 'HTTP response time', 'ms', 'response time', 'httpcheck.responsetime', 'line'],
+    'response_time': {
+        'options': [None, 'HTTP response time', 'ms', 'response', 'httpcheck.responsetime', 'line'],
         'lines': [
-            [HTTP_RESPONSE_TIME, 'response time', 'absolute', 100, 1000]
+            [HTTP_RESPONSE_TIME, 'time', 'absolute', 100, 1000]
         ]},
-    'error': {
-        'options': [None, 'HTTP check error code', 'yes/no', 'error', 'httpcheck.error', 'line'],
+    'response_length': {
+        'options': [None, 'HTTP response body length', 'characters', 'response', 'httpcheck.responselength', 'line'],
+        'lines': [
+            [HTTP_RESPONSE_LENGTH, 'length', 'absolute']
+        ]},
+    'status': {
+        'options': [None, 'HTTP status', 'flag', 'status', 'httpcheck.status', 'line'],
         'lines': [
             [HTTP_SUCCESS, 'success', 'absolute'],
-            [HTTP_UNEXPECTED_CONTENT, 'unexpected content', 'absolute'],
-            [HTTP_UNEXPECTED_STATUS, 'unexpected status', 'absolute'],
+            [HTTP_BAD_CONTENT, 'bad content', 'absolute'],
+            [HTTP_BAD_STATUS, 'bad status', 'absolute'],
             [HTTP_TIMEOUT, 'timeout', 'absolute'],
-            [HTTP_FAILED, 'failed', 'absolute']
+            [HTTP_NO_CONNECTION, 'no connection', 'absolute']
         ]}
 }
 
@@ -84,12 +90,11 @@ class Service(UrlService):
         :return: dict
         """
         data = dict()
-        data[HTTP_RESPONSE_TIME] = 0
         data[HTTP_SUCCESS] = 0
-        data[HTTP_UNEXPECTED_CONTENT] = 0
-        data[HTTP_UNEXPECTED_STATUS] = 0
+        data[HTTP_BAD_CONTENT] = 0
+        data[HTTP_BAD_STATUS] = 0
         data[HTTP_TIMEOUT] = 0
-        data[HTTP_FAILED] = 0
+        data[HTTP_NO_CONNECTION] = 0
         url = self.url
         try:
             retr = 1 if self.follow_redirect else False
@@ -98,26 +103,26 @@ class Service(UrlService):
                 method='GET', url=url, timeout=self.request_timeout, retries=retr, headers=self._manager.headers,
                 redirect=self.follow_redirect
             )
+            content = response.data
             diff = time.time() - start
-            data[HTTP_RESPONSE_TIME] = max(round(diff * 10000), 1)
+            data[HTTP_RESPONSE_TIME] = max(round(diff * 10000), 0)
+            data[HTTP_RESPONSE_LENGTH] = len(content)
             self.debug('Url: {url}. Host responded with status code {code} in {diff} s'.format(
                 url=url, code=response.status, diff=diff
             ))
-
+            self.debug('Content: \n\n{content}\n'.format(content=content))
             if response.status in self.status_codes_accepted:
-                content = response.data
-                self.debug('Content: \n\n{content}\n'.format(content=content))
                 if self.regex.search(content) is None:
                     self.debug('No match for regex \'{regex}\' found'.format(regex=self.regex.pattern))
-                    data[HTTP_UNEXPECTED_CONTENT] = 1
+                    data[HTTP_BAD_CONTENT] = 1
                 else:
                     data[HTTP_SUCCESS] = 1
             else:
-                data[HTTP_UNEXPECTED_STATUS] = 1
+                data[HTTP_BAD_STATUS] = 1
 
         except urllib3.exceptions.NewConnectionError as error:
             self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
-            data[HTTP_FAILED] = 1
+            data[HTTP_NO_CONNECTION] = 1
 
         except (urllib3.exceptions.TimeoutError, urllib3.exceptions.PoolError) as error:
             self.debug("Connection timed out: {url}. Error: {error}".format(url=url, error=error))
@@ -125,7 +130,7 @@ class Service(UrlService):
 
         except urllib3.exceptions.HTTPError as error:
             self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
-            data[HTTP_FAILED] = 1
+            data[HTTP_NO_CONNECTION] = 1
 
         except (TypeError, AttributeError) as error:
             self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
