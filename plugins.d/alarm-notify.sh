@@ -1471,7 +1471,7 @@ EOF
 # irc sender
 
 send_irc() {
-    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" sent=0 channel color send_alarm reply_codes
+    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" sent=0 channel color send_alarm reply_codes error
 
     case "${status}" in
         WARNING)  color="warning" ;;
@@ -1484,18 +1484,23 @@ send_irc() {
     then
         for channel in ${CHANNELS}
         do
+            error=0
             send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)  
             reply_codes=$(echo ${send_alarm} | cut -d ' ' -f 2 | grep -o '[0-9]*')
             for code in ${reply_codes}
             do
                 if [ "${code}" -ge 400 -a "${code}" -le 599 ]
                 then
-                    info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-                    sent=$((sent + 1))
-                else
                     error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with error code ${code}."
+                    error=1
                 fi
             done
+            
+            if [ ${error} -eq 0 ]
+            then
+                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+                sent=$((sent + 1))
+            fi
         done
     fi
     
