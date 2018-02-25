@@ -1138,14 +1138,17 @@ netdataDashboard.context = {
 
     'httpcheck.responsetime': {
         info: 'The <code>response time</code> describes the time passed between request and response. ' +
-        'The minimum is <code>0.1 ms</code> except on errors, where it will be <code>0.0 ms</code>. ' +
         'Currently, the accuracy of the response time is low and should be used as reference only.'
     },
 
-    'httpcheck.error': {
+    'httpcheck.responselength': {
+        info: 'The <code>response length</code> counts the number of characters in the response body. For static pages, this should be mostly constant.'
+    },
+
+    'httpcheck.status': {
         valueRange: "[0, 1]",
-        info: 'The <code>error</code> codes are returned by the plugin when it could verify the availability of the webserver. ' +
-        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> if all constraints are satisfied.' +
+        info: 'This chart verifies the response of the webserver. Each status dimension will have a value of <code>1</code> if triggered. ' +
+        'Dimension <code>success</code> is <code>1</code> only if all constraints are satisfied.' +
         'This chart is most useful for alarms or third-party apps.'
     },
 
