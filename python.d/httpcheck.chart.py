@@ -37,7 +37,7 @@ CHARTS = {
             [HTTP_RESPONSE_TIME, 'response time', 'absolute', 100, 1000]
         ]},
     'error': {
-        'options': [None, 'HTTP check error code', 'code', 'error', 'httpcheck.error', 'line'],
+        'options': [None, 'HTTP check error code', 'yes/no', 'error', 'httpcheck.error', 'line'],
         'lines': [
             [HTTP_SUCCESS, 'success', 'absolute'],
             [HTTP_UNEXPECTED_CONTENT, 'unexpected content', 'absolute'],
@@ -84,6 +84,7 @@ class Service(UrlService):
         :return: dict
         """
         data = dict()
+        data[HTTP_RESPONSE_TIME] = 0
         data[HTTP_SUCCESS] = 0
         data[HTTP_UNEXPECTED_CONTENT] = 0
         data[HTTP_UNEXPECTED_STATUS] = 0
