@@ -321,7 +321,7 @@ declare -A role_recipients_email=()
 IRC_NICKNAME=
 IRC_REALNAME=
 DEFAULT_RECIPIENT_IRC=
-DEFAULT_IRC_NETWORK="irc.freenode.net"
+IRC_NETWORK=
 declare -A role_recipients_irc=()
 
 # load the user configuration
@@ -652,7 +652,7 @@ to_irc="${!arr_irc[*]}"
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
 # check irc
-[ -z "${DEFAULT_IRC_NETWORK}" -o -z "${DEFAULT_RECIPIENT_IRC}" ] && SEND_IRC="NO"
+[ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
@@ -682,7 +682,6 @@ if [ \( \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
-        -o "${SEND_IRC}"         = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -702,7 +701,6 @@ if [ \( \
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
         SEND_CUSTOM="NO"
-        SEND_IRC="NO"
     fi
 fi
 
@@ -1473,7 +1471,7 @@ EOF
 # irc sender
 
 send_irc() {
-    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" httpcode sent=0 channel color
+    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" sent=0 channel color send_alarm reply_codes
 
     case "${status}" in
         WARNING)  color="warning" ;;
@@ -1486,14 +1484,18 @@ send_irc() {
     then
         for channel in ${CHANNELS}
         do
-            sentcheck=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)  
-            if [ $(echo ${sentcheck} | grep --fixed-strings --count ":${nickname} MODE ${nickname} :+i") -gt 0 ]
-            then
-                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-            fi
+            send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)  
+            reply_codes=$(echo ${send_alarm} | cut -d ' ' -f 2 | grep -o '[0-9]*')
+            for code in ${reply_codes}
+            do
+                if [ "${code}" -ge 400 -a "${code}" -le 599 ]
+                then
+                    info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+                    sent=$((sent + 1))
+                else
+                    error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with error code ${code}."
+                fi
+            done
         done
     fi
     
@@ -1719,7 +1721,7 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send the irc message
 
-send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${DEFAULT_IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
