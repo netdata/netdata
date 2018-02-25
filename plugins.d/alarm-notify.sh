@@ -1472,16 +1472,16 @@ EOF
 
 send_irc() {
     local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" sent=0 channel color send_alarm reply_codes error
-
-    case "${status}" in
-        WARNING)  color="warning" ;;
-        CRITICAL) color="danger" ;;
-        CLEAR)    color="good" ;;
-        *)        color="#777777" ;;
-    esac
-
-    if ["${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}" -a ! -z "${servername}"]
+    
+    if [ "${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}" -a ! -z "${servername}" ]
     then
+        case "${status}" in
+            WARNING)  color="warning" ;;
+            CRITICAL) color="danger" ;;
+            CLEAR)    color="good" ;;
+            *)        color="#777777" ;;
+        esac
+
         for channel in ${CHANNELS}
         do
             error=0
@@ -1489,17 +1489,15 @@ send_irc() {
             reply_codes=$(echo ${send_alarm} | cut -d ' ' -f 2 | grep -o '[0-9]*')
             for code in ${reply_codes}
             do
-                if [ "${code}" -ge 400 -a "${code}" -le 599 ]
-                then
-                    error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with error code ${code}."
-                    error=1
-                fi
+                [ "${code}" -ge 400 -a "${code}" -le 599 ] && error=1 && break
             done
-            
-            if [ ${error} -eq 0 ]
+
+            if [ "${error}" -eq 0 ]
             then
                 info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
                 sent=$((sent + 1))
+            else
+                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with error code ${code}." 
             fi
         done
     fi
