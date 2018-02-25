@@ -13,17 +13,14 @@ WORKDIR /opt/netdata.git
 # Install source
 RUN chmod +x ./netdata-installer.sh && \
     sync && sleep 1 && \
-    ./netdata-installer.sh --dont-wait --dont-start-it && \
-    sync && sleep 1 && \
-# Compile fping
-    /usr/libexec/netdata/plugins.d/fping.plugin install
+    ./netdata-installer.sh --dont-wait --dont-start-it
 
 ################################################################################
 FROM alpine:edge
 
 # Reinstall some prerequisites
 RUN apk --no-cache add lm_sensors nodejs libuuid python py-mysqldb \
-                       py-psycopg2 py-yaml netcat-openbsd jq curl
+                       py-psycopg2 py-yaml netcat-openbsd jq curl fping
 
 # Copy files over
 COPY --from=builder /usr/share/netdata   /usr/share/netdata
@@ -32,12 +29,14 @@ COPY --from=builder /var/cache/netdata   /var/cache/netdata
 COPY --from=builder /var/lib/netdata     /var/lib/netdata
 COPY --from=builder /usr/sbin/netdata    /usr/sbin/netdata
 COPY --from=builder /etc/netdata         /etc/netdata
-COPY --from=builder /usr/local/bin/fping /usr/local/bin/fping
 
 ARG NETDATA_UID=101
 ARG NETDATA_GID=101
 
 RUN \
+    # fping from alpine apk is on a different location. Moving it.
+    mv /usr/sbin/fping /usr/local/bin/fping && \
+    chmod 4755 /usr/local/bin/fping && \
     mkdir -p /var/log/netdata && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S netdata && \
@@ -48,7 +47,6 @@ RUN \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
-    chmod 4755 /usr/local/bin/fping && \
     chmod 0750 /var/lib/netdata /var/cache/netdata && \
     # Link log files to stdout
     ln -sf /dev/stdout /var/log/netdata/access.log && \
