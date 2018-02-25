@@ -14,9 +14,9 @@ PORT_LATENCY = 'connect'
 
 PORT_SUCCESS = 'success'
 PORT_TIMEOUT = 'timeout'
-PORT_FAILED = 'failed'
+PORT_FAILED = 'no_connection'
 
-ORDER = ['latency', 'error']
+ORDER = ['latency', 'status']
 
 CHARTS = {
     'latency': {
@@ -25,12 +25,12 @@ CHARTS = {
             [PORT_LATENCY, 'connect', 'absolute', 100, 1000]
         ]
     },
-    'error': {
-        'options': [None, 'Portcheck error code', 'yes/no', 'error', 'portcheck.error', 'line'],
+    'status': {
+        'options': [None, 'Portcheck status', 'flag', 'status', 'portcheck.status', 'line'],
         'lines': [
             [PORT_SUCCESS, 'success', 'absolute'],
             [PORT_TIMEOUT, 'timeout', 'absolute'],
-            [PORT_FAILED, 'failed', 'absolute']
+            [PORT_FAILED, 'no connection', 'absolute']
         ]}
 }
 
@@ -70,7 +70,6 @@ class Service(SimpleService):
         :return: dict
         """
         data = dict()
-        data[PORT_LATENCY] = 0
         data[PORT_SUCCESS] = 0
         data[PORT_TIMEOUT] = 0
         data[PORT_FAILED] = 0
@@ -126,7 +125,7 @@ class Service(SimpleService):
                 address=sa[0], port=port, latency=diff
             ))
             # we will set it at least 0.1 ms. 0.0 would mean failed connection (handy for 3rd-party-APIs)
-            data[PORT_LATENCY] = max(round(diff * 10000), 1)
+            data[PORT_LATENCY] = max(round(diff * 10000), 0)
             data[PORT_SUCCESS] = 1
 
         except socket.timeout as error:

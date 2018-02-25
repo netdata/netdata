@@ -1729,15 +1729,14 @@ netdataDashboard.context = {
 
     'portcheck.latency': {
         info: 'The <code>latency</code> describes the time spent connecting to a TCP port. No data is sent or received. ' +
-        'The minimum is <code>0.1 ms</code> except on errors, where it will be <code>0.0 ms</code>. ' +
         'Currently, the accuracy of the latency is low and should be used as reference only.'
     },
 
-    'portcheck.error': {
+    'portcheck.status': {
         valueRange: "[0, 1]",
-        info: 'The <code>error</code> codes are returned by the plugin when it could verify the availability of the service. ' +
-        'Each error dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is always <code>1</code> if connection could be established.' +
-        'The error code is most useful for alarms and third-party apps.'
+        info: 'The <code>status</code> chart verifies the availability of the service. ' +
+        'Each status dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> only if connection could be established.' +
+        'This chart is most useful for alarms and third-party apps.'
     },
 
     // ------------------------------------------------------------------------
