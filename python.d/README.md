@@ -864,12 +864,12 @@ Following charts are drawn per job:
    it will be at least 0.1 ms, even if the measured time is lower than 0.1 ms.
    If the connection failed, the value is missing.
 
-2. **Error** int
- * Connection successful: value = 1 otherwise 0
- * Unexpected content: No Regex match found in the response (value = 1, otherwise 0) 
- * Unexpected status code: Do we get 500 errors? (value = 1, otherwise 0)
- * Connection failed: port not listening or blocked (value = 1, otherwise 0)
- * Connection timed out: host or port unreachable (value = 1, otherwise 0)
+2. **Error** boolean
+ * Connection successful
+ * Unexpected content: No Regex match found in the response
+ * Unexpected status code: Do we get 500 errors?
+ * Connection failed: port not listening or blocked
+ * Connection timed out: host or port unreachable
 
 ### configuration
 
@@ -888,7 +888,7 @@ server:
 
 ### notes
 
- * The error code chart is intended for health check or for access via API.
+ * The status chart is primarily intended for alarms, badges or for access via API.
  * A system/service/firewall might block netdata's access if a portscan or
    similar is detected.
  * This plugin is meant for simple use cases. Currently, the accuracy of the
