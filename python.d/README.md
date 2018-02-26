@@ -1945,6 +1945,11 @@ It produces following charts:
 4. **Heap Mmeory Usage** in KB
  * used
  * committed
+
+### configuration
+
+Please see the [Monitoring Java Spring Boot Applications](https://github.com/firehol/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
+
 ---
 
 # squid
