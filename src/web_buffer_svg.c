@@ -270,7 +270,7 @@ double verdana11_widths[256] = {
 
 // find the width of the string using the verdana 11points font
 // re-write the string in place, skiping zero-length characters
-static inline int verdana11_width(char *s) {
+static inline double verdana11_width(char *s) {
     double w = 0.0;
     char *d = s;
 
@@ -290,7 +290,7 @@ static inline int verdana11_width(char *s) {
     *d = '\0';
     w -= VERDANA_KERNING;
     w += VERDANA_PADDING;
-    return (int)ceil(w);
+    return w;
 }
 
 static inline size_t escape_xmlz(char *dst, const char *src, size_t len) {
@@ -752,7 +752,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, uint32_t options) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -761,7 +761,9 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             , label_color_escaped[COLOR_STRING_SIZE + 1]
             , value_color_escaped[COLOR_STRING_SIZE + 1];
 
-    int label_width, value_width, total_width;
+    double label_width, value_width, total_width, height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
+
+    if(scale < 100) scale = 100;
 
     if(unlikely(!label_color || !*label_color))
         label_color = "#555";
@@ -786,35 +788,45 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 
     wb->contenttype = CT_IMAGE_SVG_XML;
 
+    total_width  = total_width * scale / 100.0;
+    height       = height      * scale / 100.0;
+    font_size    = font_size   * scale / 100.0;
+    text_offset  = text_offset * scale / 100.0;
+    label_width  = label_width * scale / 100.0;
+    value_width  = value_width * scale / 100.0;
+    round_corner = round_corner * scale / 100.0;
+
     // svg template from:
     // https://raw.githubusercontent.com/badges/shields/master/templates/flat-template.svg
     buffer_sprintf(wb,
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%d\" height=\"20\">"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%0.2f\" height=\"%0.2f\">"
             "<linearGradient id=\"smooth\" x2=\"0\" y2=\"100%%\">"
                 "<stop offset=\"0\" stop-color=\"#bbb\" stop-opacity=\".1\"/>"
                 "<stop offset=\"1\" stop-opacity=\".1\"/>"
             "</linearGradient>"
             "<mask id=\"round\">"
-                "<rect width=\"%d\" height=\"20\" rx=\"3\" fill=\"#fff\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect width=\"%d\" height=\"20\" fill=\"%s\"/>"
-                "<rect x=\"%d\" width=\"%d\" height=\"20\" fill=\"%s\"/>"
-                "<rect width=\"%d\" height=\"20\" fill=\"url(#smooth)\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
             "</g>"
-            "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">"
-                "<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%d\" y=\"14\">%s</text>"
-                "<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%d\" y=\"14\">%s</text>"
+            "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"%0.2f\">"
+                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
             "</g>"
         "</svg>",
-        total_width, total_width,
-        label_width, label_color_escaped,
-        label_width, value_width, value_color_escaped,
-        total_width,
-        label_width / 2, label_escaped,
-        label_width / 2, label_escaped,
-        label_width + value_width / 2 -1, value_escaped,
-        label_width + value_width / 2 -1, value_escaped);
+        total_width, height,
+        total_width, height, round_corner,
+        label_width, height, label_color_escaped,
+        label_width, value_width, height, value_color_escaped,
+        total_width, height,
+        font_size,
+        label_width / 2, ceil(height - text_offset), label_escaped,
+        label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped);
 }

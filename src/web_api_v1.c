@@ -361,6 +361,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *value_color = NULL
     , *refresh_str = NULL
     , *precision_str = NULL
+    , *scale_str = NULL
     , *alarm = NULL;
 
     int group = GROUP_AVERAGE;
@@ -404,6 +405,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "divide")) divide_str = value;
         else if(!strcmp(name, "refresh")) refresh_str = value;
         else if(!strcmp(name, "precision")) precision_str = value;
+        else if(!strcmp(name, "scale")) scale_str = value;
         else if(!strcmp(name, "alarm")) alarm = value;
     }
 
@@ -413,11 +415,13 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         goto cleanup;
     }
 
+    int scale = (scale_str && *scale_str)?str2i(scale_str):100;
+
     RRDSET *st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, 0);
+        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0);
         ret = 200;
         goto cleanup;
     }
@@ -428,7 +432,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, 0);
+            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0);
             ret = 200;
             goto cleanup;
         }
@@ -545,6 +549,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 label_color,
                 value_color,
                 precision,
+                scale,
                 options
         );
         ret = 200;
@@ -581,6 +586,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 label_color,
                 value_color,
                 precision,
+                scale,
                 options
         );
     }
