@@ -144,6 +144,6 @@ class Service(UrlService):
 
         self.definitions[chart_id] = result
 
-    @classmethod
+    @staticmethod
     def die(error_message):
         raise ExtraChartError(error_message)
