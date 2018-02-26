@@ -17,50 +17,53 @@ DEFAULT_CHARTS = {
     'response_code': {
         'options': [None, "Response Codes", "requests/s", "response", "springboot.response_code", "stacked"],
         'lines': [
-            ["resp.other",  'Other', 'incremental'],
-            ["resp.1xx",    '1xx',   'incremental'],
-            ["resp.2xx",    '2xx',   'incremental'],
-            ["resp.3xx",    '3xx',   'incremental'],
-            ["resp.4xx",    '4xx',   'incremental'],
-            ["resp.5xx",    '5xx',   'incremental'],
+            ["resp_other",  'Other', 'incremental'],
+            ["resp_1xx",    '1xx',   'incremental'],
+            ["resp_2xx",    '2xx',   'incremental'],
+            ["resp_3xx",    '3xx',   'incremental'],
+            ["resp_4xx",    '4xx',   'incremental'],
+            ["resp_5xx",    '5xx',   'incremental'],
         ]},
     'threads': {
         'options': [None, "Threads", "current threads", "threads", "springboot.threads", "area"],
         'lines': [
-            ["threads.daemon", 'daemon', 'absolute'],
+            ["threads_daemon", 'daemon', 'absolute'],
             ["threads", 'total', 'absolute'],
         ]},
     'gc_time': {
-        'options': [None, "GC Time", "milliseconds", "garbage collection", "springboot.gc_time", "area"],
+        'options': [None, "GC Time", "milliseconds", "garbage collection", "springboot.gc_time", "stacked"],
         'lines': [
-            ["gc.copy.time",                'Copy',                 'incremental'],
-            ["gc.marksweepcompact.time",    'MarkSweepCompact',     'incremental'],
-            ["gc.parnew.time",              'ParNew',               'incremental'],
-            ["gc.concurrentmarksweep.time", 'ConcurrentMarkSweep',  'incremental'],
-            ["gc.ps_scavenge.time",         'PS Scavenge',          'incremental'],
-            ["gc.ps_marksweep.time",        'PS MarkSweep',         'incremental'],
-            ["gc.g1_young_generation.time", 'G1 Young Generation',  'incremental'],
-            ["gc.g1_old_generation.time",   'G1 Old Generation',    'incremental'],
+            ["gc_copy_time",                'Copy',                 'incremental'],
+            ["gc_marksweepcompact_time",    'MarkSweepCompact',     'incremental'],
+            ["gc_parnew_time",              'ParNew',               'incremental'],
+            ["gc_concurrentmarksweep_time", 'ConcurrentMarkSweep',  'incremental'],
+            ["gc_ps_scavenge_time",         'PS Scavenge',          'incremental'],
+            ["gc_ps_marksweep_time",        'PS MarkSweep',         'incremental'],
+            ["gc_g1_young_generation_time", 'G1 Young Generation',  'incremental'],
+            ["gc_g1_old_generation_time",   'G1 Old Generation',    'incremental'],
         ]},
     'gc_ope': {
-        'options': [None, "GC Operations", "operations/s", "garbage collection", "springboot.gc_ope", "area"],
+        'options': [None, "GC Operations", "operations/s", "garbage collection", "springboot.gc_ope", "stacked"],
         'lines': [
-            ["gc.copy.count",                'Copy',                 'incremental'],
-            ["gc.marksweepcompact.count",    'MarkSweepCompact',     'incremental'],
-            ["gc.parnew.count",              'ParNew',               'incremental'],
-            ["gc.concurrentmarksweep.count", 'ConcurrentMarkSweep',  'incremental'],
-            ["gc.ps_scavenge.count",         'PS Scavenge',          'incremental'],
-            ["gc.ps_marksweep.count",        'PS MarkSweep',         'incremental'],
-            ["gc.g1_young_generation.count", 'G1 Young Generation',  'incremental'],
-            ["gc.g1_old_generation.count",   'G1 Old Generation',    'incremental'],
+            ["gc_copy_count",                'Copy',                 'incremental'],
+            ["gc_marksweepcompact_count",    'MarkSweepCompact',     'incremental'],
+            ["gc_parnew_count",              'ParNew',               'incremental'],
+            ["gc_concurrentmarksweep_count", 'ConcurrentMarkSweep',  'incremental'],
+            ["gc_ps_scavenge_count",         'PS Scavenge',          'incremental'],
+            ["gc_ps_marksweep_count",        'PS MarkSweep',         'incremental'],
+            ["gc_g1_young_generation_count", 'G1 Young Generation',  'incremental'],
+            ["gc_g1_old_generation_count",   'G1 Old Generation',    'incremental'],
         ]},
     'heap': {
         'options': [None, "Heap Memory Usage", "KB", "heap memory", "springboot.heap", "area"],
         'lines': [
-            ["heap.committed", 'committed', "absolute"],
-            ["heap.used", 'used', "absolute"],
+            ["heap_committed", 'committed', "absolute"],
+            ["heap_used", 'used', "absolute"],
         ]},
 }
+
+class ExtraChartError(ValueError):
+    pass
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -74,24 +77,32 @@ class Service(UrlService):
         :return: dict
         """
         data = None
+        result = {
+            'resp_1xx':   0,
+            'resp_2xx':   0,
+            'resp_3xx':   0,
+            'resp_4xx':   0,
+            'resp_5xx':   0,
+            'resp_other': 0,
+        }
         raw_data = self._get_raw_data()
         if raw_data:
             try:
                 data = json.loads(raw_data)
-            except Excepton:
+            except ValueError:
                 self.debug('%s is not a vaild JSON page' % self.url)
                 return None
 
-            for key in ['1xx', '2xx', '3xx', '4xx', '5xx', 'other']:
-                data['resp.' + key] = 0
             for key, value in data.iteritems():
                 if 'counter.status.' in key:
                     status_type = key[15:16] + 'xx'
                     if status_type[0] not in '12345':
                         status_type = 'other'
-                    data['resp.' + status_type] += value
+                    result['resp_' + status_type] += value
+                else:
+                    result[key.replace('.', '_')] = value
 
-        return data or None
+        return result or None
 
     def _setup_charts(self):
         self.order = []
@@ -135,4 +146,4 @@ class Service(UrlService):
 
     @classmethod
     def die(error_message):
-        raise Exception(error_message)
+        raise ExtraChartError(error_message)
