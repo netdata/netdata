@@ -1556,11 +1556,11 @@ Following charts are drawn per host:
  * Time required to connect to a TCP port.
    Displays latency in 0.1 ms resolution. If the connection failed, the value is missing.
 
-2. **Error** int
- * Connection successful: value = 1 otherwise 0
- * Could not create socket: possible DNS problems (value = 1, otherwise 0) 
- * Connection refused: port not listening or blocked (value = 1, otherwise 0)
- * Connection timed out: host or port unreachable (value = 1, otherwise 0)
+2. **Status** boolean
+ * Connection successful
+ * Could not create socket: possible DNS problems
+ * Connection refused: port not listening or blocked
+ * Connection timed out: host or port unreachable
 
 
 ### configuration
@@ -1575,7 +1575,7 @@ server:
 
 ### notes
 
- * The error chart is intended for alarms or for access via API.
+ * The error chart is intended for alarms, badges or for access via API.
  * A system/service/firewall might block netdata's access if a portscan or
    similar is detected.
  * Currently, the accuracy of the latency is low and should be used as reference only.
