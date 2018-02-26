@@ -43,7 +43,7 @@ CHARTS = {
             [HTTP_RESPONSE_LENGTH, 'length', 'absolute']
         ]},
     'status': {
-        'options': [None, 'HTTP status', 'flag', 'status', 'httpcheck.status', 'line'],
+        'options': [None, 'HTTP status', 'boolean', 'status', 'httpcheck.status', 'line'],
         'lines': [
             [HTTP_SUCCESS, 'success', 'absolute'],
             [HTTP_BAD_CONTENT, 'bad content', 'absolute'],
