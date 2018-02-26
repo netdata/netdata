@@ -864,7 +864,7 @@ Following charts are drawn per job:
    it will be at least 0.1 ms, even if the measured time is lower than 0.1 ms.
    If the connection failed, the value is missing.
 
-2. **Error** boolean
+2. **Status** boolean
  * Connection successful
  * Unexpected content: No Regex match found in the response
  * Unexpected status code: Do we get 500 errors?
