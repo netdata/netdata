@@ -86,6 +86,7 @@ dist_healthconfig_DATA = \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/fping.conf \
+    health.d/fronius.conf \
     health.d/haproxy.conf \
     health.d/ipc.conf \
     health.d/ipfs.conf \
@@ -109,6 +110,7 @@ dist_healthconfig_DATA = \
     health.d/retroshare.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
+    health.d/stiebeleltron.conf \
     health.d/swap.conf \
     health.d/tcp_conn.conf \
     health.d/tcp_listen.conf \
