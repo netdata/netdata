@@ -292,7 +292,9 @@ struct pid_stat {
     kernel_uint_t status_rssfile;
     kernel_uint_t status_rssshmem;
     kernel_uint_t status_vmswap;
+#ifndef __FreeBSD__
     ARL_BASE *status_arl;
+#endif
 
     kernel_uint_t io_logical_bytes_read_raw;
     kernel_uint_t io_logical_bytes_written_raw;
@@ -696,7 +698,9 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
+#ifndef __FreeBSD__
     arl_free(p->status_arl);
+#endif
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
