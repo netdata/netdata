@@ -60,7 +60,7 @@ class Service(UrlService):
         self.url = self.configuration.get('url', None)
         self.regex = re.compile(self.configuration.get('regex', '.*'))
         self.status_codes_accepted = self.configuration.get('status_accepted', [200])
-        self.follow_redirect = self.configuration.get('redirect', False)
+        self.follow_redirect = self.configuration.get('redirect', True)
         self.order = ORDER
         self.definitions = CHARTS
         self._manager = None

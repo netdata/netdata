@@ -860,8 +860,7 @@ Module monitors remote http server for availability and response time.
 Following charts are drawn per job:
 
 1. **Response time** ms
- * Time in 0.1 ms resolution in which the server responds. When connection is successful,
-   it will be at least 0.1 ms, even if the measured time is lower than 0.1 ms.
+ * Time in 0.1 ms resolution in which the server responds.
    If the connection failed, the value is missing.
 
 2. **Status** boolean
