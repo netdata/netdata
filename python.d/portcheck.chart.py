@@ -26,7 +26,7 @@ CHARTS = {
         ]
     },
     'status': {
-        'options': [None, 'Portcheck status', 'flag', 'status', 'portcheck.status', 'line'],
+        'options': [None, 'Portcheck status', 'boolean', 'status', 'portcheck.status', 'line'],
         'lines': [
             [PORT_SUCCESS, 'success', 'absolute'],
             [PORT_TIMEOUT, 'timeout', 'absolute'],
