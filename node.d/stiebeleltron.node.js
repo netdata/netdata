@@ -116,7 +116,7 @@ var stiebeleltron = {
             title: chartDefinition.title,
             units: chartDefinition.unit,
             family: context.category.name,
-            context: 'stiebeleltron.' + context.category.id + '.' + chartId,
+            context: 'stiebeleltron.' + context.category.id + '.' + chartDefinition.id,
             type: chartDefinition.type,
             priority: stiebeleltron.base_priority + chartDefinition.prio,// the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
