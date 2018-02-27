@@ -263,6 +263,9 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // ------------------------------------------------------------------------
     // find the disk sector size
 
+    /*
+     * sector size is always 512 bytes inside the kernel #3481
+     *
     {
         char tf[FILENAME_MAX + 1], *t;
         strncpyz(tf, d->device, FILENAME_MAX);
@@ -294,6 +297,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         }
         else error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
     }
+    */
 
     return d;
 }
