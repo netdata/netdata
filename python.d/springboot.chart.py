@@ -76,7 +76,16 @@ class Service(UrlService):
         Format data received from http request
         :return: dict
         """
-        data = None
+        raw_data = self._get_raw_data()
+        if not raw_data:
+            return None
+
+        try:
+            data = json.loads(raw_data)
+        except ValueError:
+            self.debug('%s is not a vaild JSON page' % self.url)
+            return None
+
         result = {
             'resp_1xx':   0,
             'resp_2xx':   0,
@@ -85,22 +94,15 @@ class Service(UrlService):
             'resp_5xx':   0,
             'resp_other': 0,
         }
-        raw_data = self._get_raw_data()
-        if raw_data:
-            try:
-                data = json.loads(raw_data)
-            except ValueError:
-                self.debug('%s is not a vaild JSON page' % self.url)
-                return None
 
-            for key, value in data.iteritems():
-                if 'counter.status.' in key:
-                    status_type = key[15:16] + 'xx'
-                    if status_type[0] not in '12345':
-                        status_type = 'other'
-                    result['resp_' + status_type] += value
-                else:
-                    result[key.replace('.', '_')] = value
+        for key, value in data.iteritems():
+            if 'counter.status.' in key:
+                status_type = key[15:16] + 'xx'
+                if status_type[0] not in '12345':
+                    status_type = 'other'
+                result['resp_' + status_type] += value
+            else:
+                result[key.replace('.', '_')] = value
 
         return result or None
 
