@@ -3,7 +3,12 @@
 # Original Author: ccremer (github.com/ccremer)
 
 import socket
-import time
+
+try:
+    from time import monotonic as time
+except ImportError:
+    from time import time
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
@@ -35,14 +40,14 @@ CHARTS = {
 }
 
 
+# Not deriving from SocketService, too much is different
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.chart_name = ""
-        self.host = self.configuration.get('host', None)
-        self.port = self.configuration.get('port', None)
+        self.host = self.configuration.get('host')
+        self.port = self.configuration.get('port')
         self.timeout = self.configuration.get('timeout', 1)
 
     def check(self):
@@ -57,7 +62,7 @@ class Service(SimpleService):
             self.error('"port" is not an integer. Specify a numerical value, not service name.')
             return False
 
-        self.info("Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s".format(
+        self.debug("Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s".format(
             host=self.host, port=self.port, update=self.update_every, timeout=self.timeout
         ))
         # We will accept any (valid-ish) configuration, even if initial connection fails (a service might be down from
@@ -118,9 +123,9 @@ class Service(SimpleService):
         port = str(sa[1])
         try:
             self.debug('Connecting socket to "{address}", port {port}'.format(address=sa[0], port=port))
-            start = time.time()
+            start = time()
             sock.connect(sa)
-            diff = time.time() - start
+            diff = time() - start
             self.debug('Connected to "{address}", port {port}, latency {latency}'.format(
                 address=sa[0], port=port, latency=diff
             ))
@@ -150,5 +155,5 @@ class Service(SimpleService):
                 self.debug('Closing socket')
                 sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 sock.close()
-            except Exception:
+            except socket.error:
                 pass
