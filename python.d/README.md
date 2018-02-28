@@ -880,7 +880,7 @@ server:
   status_accepted:              # optional
     - 200
   timeout: 1                    # optional, supports decimals (e.g. 0.2)
-  update_every: 1               # optional
+  update_every: 3               # optional
   regex: '.*'                   # optional
   redirect: yes                 # optional
 ```
