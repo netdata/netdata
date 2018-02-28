@@ -85,13 +85,36 @@ progress "Add user netdata to required user groups"
 
 NETDATA_USER="root"
 NETDATA_GROUP="root"
-add_netdata_user_and_group
+add_netdata_user_and_group "/opt/netdata"
 if [ $? -eq 0 ]
     then
     NETDATA_USER="netdata"
     NETDATA_GROUP="netdata"
 else
     run_failed "Failed to add netdata user and group"
+fi
+
+
+# -----------------------------------------------------------------------------
+progress "Check SSL certificates paths"
+
+if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]
+then
+    if [ ! -f /opt/netdata/.curlrc ]
+    then
+        cacert=
+
+        # CentOS
+        [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
+
+        if [ ! -z "${cacert}" ]
+        then
+            echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
+            echo >/opt/netdata/.curlrc "cacert=${cacert}"
+        else
+            run_failed "Failed to find /etc/ssl/certs/ca-certificates.crt"
+        fi
+    fi
 fi
 
 
