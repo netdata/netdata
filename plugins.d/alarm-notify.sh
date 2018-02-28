@@ -1471,9 +1471,9 @@ EOF
 # irc sender
 
 send_irc() {
-    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" MESSAGE="${5}" sent=0 channel color send_alarm reply_codes error
+    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
     
-    if [ "${SEND_IRC}" = "YES" -a ! -z "${nickname}" -a ! -z "${realname}" -a ! -z "${channels}" -a ! -z "${network}" -a ! -z "${servername}" ]
+    if [ "${SEND_IRC}" = "YES" -a ! -z "${NICKNAME}" -a ! -z "${REALNAME}" -a ! -z "${CHANNELS}" -a ! -z "${NETWORK}" -a ! -z "${SERVERNAME}" ]
     then
         case "${status}" in
             WARNING)  color="warning" ;;
@@ -1482,10 +1482,10 @@ send_irc() {
             *)        color="#777777" ;;
         esac
 
-        for channel in ${CHANNELS}
+        for CHANNEL in ${CHANNELS}
         do
             error=0
-            send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL}> :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)  
+            send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL} :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)
             reply_codes=$(echo ${send_alarm} | cut -d ' ' -f 2 | grep -o '[0-9]*')
             for code in ${reply_codes}
             do
@@ -1494,10 +1494,10 @@ send_irc() {
 
             if [ "${error}" -eq 0 ]
             then
-                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}'"
                 sent=$((sent + 1))
             else
-                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with error code ${code}." 
+                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}." 
             fi
         done
     fi
