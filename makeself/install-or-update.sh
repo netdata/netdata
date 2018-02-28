@@ -85,13 +85,40 @@ progress "Add user netdata to required user groups"
 
 NETDATA_USER="root"
 NETDATA_GROUP="root"
-add_netdata_user_and_group
+add_netdata_user_and_group "/opt/netdata"
 if [ $? -eq 0 ]
     then
     NETDATA_USER="netdata"
     NETDATA_GROUP="netdata"
 else
     run_failed "Failed to add netdata user and group"
+fi
+
+[ ~netdata = / ] && cat <<USERMOD
+
+The netdata user has its home directory set to /
+You may want to change it, using this command:
+
+# usermod -m -d /opt/netdata netdata
+
+USERMOD
+
+
+# -----------------------------------------------------------------------------
+progress "Check SSL certificates paths"
+
+if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]
+then
+    if [ ! -f /opt/netdata/.curlrc ]
+    then
+        # CentOS
+        if [ -f "/etc/ssl/certs/ca-bundle.crt" ]
+        then
+            echo >/opt/netdata/.curlrc "cacert=/etc/ssl/certs/ca-bundle.crt"
+        else
+            run_failed "Failed to find /etc/ssl/certs/ca-certificates.crt"
+        fi
+    fi
 fi
 
 
