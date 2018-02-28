@@ -94,15 +94,6 @@ else
     run_failed "Failed to add netdata user and group"
 fi
 
-[ ~netdata = / ] && cat <<USERMOD
-
-The netdata user has its home directory set to /
-You may want to change it, using this command:
-
-# usermod -m -d /opt/netdata netdata
-
-USERMOD
-
 
 # -----------------------------------------------------------------------------
 progress "Check SSL certificates paths"
@@ -111,10 +102,15 @@ if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]
 then
     if [ ! -f /opt/netdata/.curlrc ]
     then
+        cacert=
+
         # CentOS
-        if [ -f "/etc/ssl/certs/ca-bundle.crt" ]
+        [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
+
+        if [ ! -z "${cacert}" ]
         then
-            echo >/opt/netdata/.curlrc "cacert=/etc/ssl/certs/ca-bundle.crt"
+            echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
+            echo >/opt/netdata/.curlrc "cacert=${cacert}"
         else
             run_failed "Failed to find /etc/ssl/certs/ca-certificates.crt"
         fi

@@ -817,6 +817,15 @@ add_netdata_user_and_group() {
         portable_add_user_to_group proxy    netdata && NETDATA_ADDED_TO_PROXY=1
         portable_add_user_to_group squid    netdata && NETDATA_ADDED_TO_SQUID=1
         portable_add_user_to_group ceph     netdata && NETDATA_ADDED_TO_CEPH=1
+
+        [ ~netdata = / ] && cat <<USERMOD
+
+The netdata user has its home directory set to /
+You may want to change it, using this command:
+
+# usermod -d "${homedir}" netdata
+
+USERMOD
         return 0
     fi
 
