@@ -278,31 +278,33 @@ portable_check_user_in_group() {
 }
 
 portable_add_user() {
-    local username="${1}"
+    local username="${1}" homedir="${2}"
+
+    [ -z "${homedir}" ] && homedir="/tmp"
 
     portable_check_user_exists "${username}"
     [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
-    echo >&2 "Adding ${username} user account ..."
+    echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
     local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
     # Linux
     if check_cmd useradd
     then
-        run useradd -r -g "${username}" -c "${username}" -s "${nologin}" -d / "${username}" && return 0
+        run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
     fi
 
     # FreeBSD
     if check_cmd pw
     then
-        run pw useradd "${username}" -d / -g "${username}" -s "${nologin}" && return 0
+        run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
     fi
 
     # BusyBox
     if check_cmd adduser
     then
-        run adduser -D -G "${username}" "${username}" && return 0
+        run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
     fi
 
     echo >&2 "Failed to add ${username} user account !"
@@ -800,10 +802,12 @@ NETDATA_ADDED_TO_PROXY=0
 NETDATA_ADDED_TO_SQUID=0
 NETDATA_ADDED_TO_CEPH=0
 add_netdata_user_and_group() {
+    local homedir="${1}"
+
     if [ ${UID} -eq 0 ]
         then
         portable_add_group netdata || return 1
-        portable_add_user netdata  || return 1
+        portable_add_user netdata "${homedir}"  || return 1
         portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
         portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
         portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
