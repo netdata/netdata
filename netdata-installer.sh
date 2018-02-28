@@ -642,7 +642,7 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-homedir="${NETDATA_LIB_DIR}"
+homedir="${NETDATA_PREFIX}/var/lib/netdata"
 [ ! -z "${NETDATA_PREFIX}" ] && homedir="${NETDATA_PREFIX}"
 add_netdata_user_and_group "${homedir}" || run_failed "The installer does not run as root."
 
