@@ -56,15 +56,12 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.regex = self._compile(self.configuration.get('regex'))
+        pattern = self.configuration.get('regex')
+        self.regex = re.compile(pattern) if pattern else None
         self.status_codes_accepted = self.configuration.get('status_accepted', [200])
         self.follow_redirect = self.configuration.get('redirect', True)
         self.order = ORDER
         self.definitions = CHARTS
-
-    @staticmethod
-    def _compile(pattern=None):
-        return None if pattern is None else re.compile(pattern)
 
     def _get_data(self):
         """
@@ -111,7 +108,7 @@ class Service(UrlService):
         data[HTTP_RESPONSE_LENGTH] = len(content)
         self.debug('Content: \n\n{content}\n'.format(content=content))
         if status in self.status_codes_accepted:
-            if self.regex is not None and self.regex.search(content) is None:
+            if self.regex and self.regex.search(content) is None:
                 self.debug("No match for regex '{regex}' found".format(regex=self.regex.pattern))
                 data[HTTP_BAD_CONTENT] = 1
             else:
