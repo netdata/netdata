@@ -881,7 +881,7 @@ server:
     - 200
   timeout: 1                    # optional, supports decimals (e.g. 0.2)
   update_every: 3               # optional
-  regex: '.*'                   # optional
+  regex: 'REGULAR_EXPRESSION'   # optional, see https://docs.python.org/3/howto/regex.html
   redirect: yes                 # optional
 ```
 
