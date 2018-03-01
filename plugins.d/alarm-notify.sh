@@ -112,6 +112,13 @@ docurl() {
         return 1
     fi
 
+    if [ "${curl_insecure}" = "yes" ]
+        then
+        insecure='--insecure'
+    else
+        insecure=''
+    fi
+
     if [ "${debug}" = "1" ]
         then
         echo >&2 "--- BEGIN curl command ---"
@@ -120,7 +127,7 @@ docurl() {
         echo >&2 "--- END curl command ---"
 
         local out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
-        local code=$(${curl} --insecure --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
+        local code=$(${curl} ${insecure} --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
         local ret=$?
         echo >&2 "--- BEGIN received response ---"
         cat >&2 "${out}"
@@ -132,7 +139,7 @@ docurl() {
         return ${ret}
     fi
 
-    ${curl} --insecure --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
+    ${curl} ${insecure} --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
     return $?
 }
 
