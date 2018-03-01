@@ -76,13 +76,14 @@ class UrlService(SimpleService):
         """
         try:
             status, data = self._get_raw_data_with_status(url, manager)
-            if status == 200:
-                return data
-            else:
-                self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
-                return None
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
             self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
+            return None
+
+        if status == 200:
+            return data
+        else:
+            self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
             return None
 
     def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True):
