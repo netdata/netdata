@@ -14,8 +14,12 @@ inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->contenttype = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "You are not allowed to access this resource.");
-    w->response.code = 403;
-    return 403;
+    if(!(w->flags & WEB_CLIENT_FLAG_AUTHENTICATED)) {
+        buffer_sprintf(w->response.header, "WWW-Authenticate: Basic realm=\"netdata\"\r\n");
+        w->response.code = 401;
+    } else
+        w->response.code = 403;
+    return w->response.code;
 }
 
 static inline int web_client_crock_socket(struct web_client *w) {
@@ -693,6 +697,9 @@ const char *web_response_code_to_string(int code) {
         case 400:
             return "Bad Request";
 
+        case 401:
+            return "Unauthorized";
+
         case 403:
             return "Forbidden";
 
@@ -723,13 +730,15 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0,
+            hash_authorization = 0;
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
         hash_accept_encoding = simple_uhash("Accept-Encoding");
         hash_donottrack = simple_uhash("DNT");
+        hash_authorization = simple_uhash("Authorization");
     }
 
     char *e = s;
@@ -771,6 +780,10 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
     else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
         if(*v == '0') web_client_disable_donottrack(w);
         else if(*v == '1') web_client_enable_donottrack(w);
+    }
+    else if(hash == hash_authorization && !strcasecmp(s, "Authorization")) {
+        if(web_server_basic_auth.len > 0)
+            web_server_authorize_with_basic_auth(w, v, ve - v);
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {

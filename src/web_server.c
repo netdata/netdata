@@ -1,4 +1,5 @@
 #include "common.h"
+#include "modp_b64.h"
 
 // this file includes 3 web servers:
 //
@@ -73,7 +74,8 @@ SIMPLE_PATTERN *web_allow_badges_from = NULL;
 static void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
 
-    if(!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
+    if((!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
+            && web_server_basic_auth.len == 0)
         w->acl |= WEB_CLIENT_ACL_DASHBOARD;
 
     if(!web_allow_registry_from || simple_pattern_matches(web_allow_registry_from, w->client_ip))
@@ -81,6 +83,92 @@ static void web_client_update_acl_matches(struct web_client *w) {
 
     if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
         w->acl |= WEB_CLIENT_ACL_BADGE;
+}
+
+
+// --------------------------------------------------------------------------------------
+// authentication
+
+WEB_SERVER_BASIC_AUTH web_server_basic_auth = { NULL, 0 };
+
+// Given an `auth_spec` string containing an Authorization header
+// value (in the format of "Basic QWxhZGRpbjpPcGVuU2VzYW1l"),
+// decodes the base64 part of the string and parses it into
+// a username and password component.
+//
+// The temporary decoded string is placed in `buffer`, which
+// must be of at least `modp_b64_decode_len(auth_spec_len) + 1)`
+// bytes.
+//
+// The resulting username and password shall point to a subset
+// of `buffer` and shall be null-terminated.
+static int decode_http_basic_auth_spec(const char *encoded_auth_spec, size_t encoded_auth_spec_len,
+        char *decoded_auth_spec, size_t decoded_auth_spec_bufsize, size_t *decoded_auth_spec_len) {
+
+    if(unlikely(decoded_auth_spec_bufsize < modp_b64_decode_len(encoded_auth_spec_len) + 1)) {
+        fatal("Bug: decode_http_basic_auth_spec() decoding buffer size too small");
+        return 0;
+    }
+    if(encoded_auth_spec_len > NETDATA_HTTP_BASIC_AUTH_SIZE) {
+        debug(D_WEB_CLIENT, "%llu: error parsing Authorization header: value too large", w->id);
+        return 0;
+    }
+    if(strncmp(encoded_auth_spec, "Basic ", 6)) {
+        debug(D_WEB_CLIENT, "%llu: rejecting non-Basic authentication type", w->id);
+        return 0;
+    }
+
+    // skip past the "Basic " part so that we're only left with the base64 data
+    encoded_auth_spec += sizeof("Basic ") - 1;
+    encoded_auth_spec_len -= sizeof("Basic ") - 1;
+
+    // decode base64 data into `decoded_auth_spec`
+    *decoded_auth_spec_len = modp_b64_decode(decoded_auth_spec,
+        encoded_auth_spec, encoded_auth_spec_len);
+    if(*decoded_auth_spec_len == -1) {
+        debug(D_WEB_CLIENT, "%llu: error base64-decoding Authorization header", w->id);
+        return 0;
+    }
+
+    // null-terminate string just in case
+    decoded_auth_spec[*decoded_auth_spec_len] = '\0';
+}
+
+// A string comparison function which does not terminate early.
+// Early termination (like strcmp() does) would open us up to timing attacks.
+// http://blog.jasonmooberry.com/2010/10/constant-time-string-comparison/
+// See also Rails's ActiveSupport::MessageVerifier#secure_compare.
+static int constant_time_strcmp(const char *a, size_t a_size,
+        const char *b, size_t b_size) {
+    if(a_size != b_size)
+        return 0;
+
+    const char *end = a + a_size;
+    int result = 0;
+
+    while(a < end) {
+        result |= *a ^ *b;
+        a++;
+        b++;
+    }
+
+    return result == 0;
+}
+
+void web_server_authorize_with_basic_auth(struct web_client *w,
+        const char *encoded_auth_spec, size_t encoded_auth_spec_len) {
+    char decoded_auth_spec[modp_b64_decode_len(encoded_auth_spec_len) + 1];
+    size_t decoded_auth_spec_len;
+
+    if(!decode_http_basic_auth_spec(encoded_auth_spec, encoded_auth_spec_len,
+            decoded_auth_spec, sizeof(decoded_auth_spec), &decoded_auth_spec_len))
+        return;
+
+    if(constant_time_strcmp(web_server_basic_auth.spec, web_server_basic_auth.len,
+            decoded_auth_spec, decoded_auth_spec_len)) {
+        w->acl |= WEB_CLIENT_ACL_DASHBOARD;
+        w->flags |= WEB_CLIENT_FLAG_AUTHENTICATED;
+    }
 }
 
 
@@ -340,6 +428,9 @@ static void web_client_initialize_connection(struct web_client *w) {
         error("%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
+
+    if(web_server_basic_auth.len == 0)
+        w->flags |= WEB_CLIENT_FLAG_AUTHENTICATED;
 
     w->origin[0] = '*'; w->origin[1] = '\0';
     web_client_enable_wait_receive(w);

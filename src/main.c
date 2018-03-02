@@ -106,6 +106,9 @@ void web_server_config_options(void) {
     web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
+    web_server_basic_auth.spec = config_get(CONFIG_SECTION_WEB, "basic authentication", "");
+    web_server_basic_auth.len = strlen(web_server_basic_auth.spec);
+
     web_allow_connections_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
     web_allow_dashboard_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
     web_allow_badges_from      = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
