@@ -76,6 +76,7 @@ netdata_SOURCES = \
 	log.h \
 	main.c \
 	main.h \
+	modp_b64.c \
 	plugin_checks.c \
 	plugin_checks.h \
 	plugin_idlejitter.c \
