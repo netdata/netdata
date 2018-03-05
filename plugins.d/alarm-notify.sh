@@ -213,6 +213,9 @@ fi
 # This can be overwritten at the configuration file.
 images_base_url="https://registry.my-netdata.io"
 
+# curl options to use
+curl_options=
+
 # needed commands
 # if empty they will be searched in the system path
 curl=
