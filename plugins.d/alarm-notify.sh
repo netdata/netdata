@@ -120,7 +120,7 @@ docurl() {
         echo >&2 "--- END curl command ---"
 
         local out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
-        local code=$(${curl} --insecure --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
+        local code=$(${curl} ${curl_options} --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
         local ret=$?
         echo >&2 "--- BEGIN received response ---"
         cat >&2 "${out}"
@@ -132,7 +132,7 @@ docurl() {
         return ${ret}
     fi
 
-    ${curl} --insecure --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
+    ${curl} ${curl_options} --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
     return $?
 }
 
