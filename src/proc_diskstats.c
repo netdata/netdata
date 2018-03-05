@@ -34,6 +34,7 @@ static struct disk {
 
     int device_is_bcache;
 
+    char *bcache_filename_congested;
     char *bcache_filename_readahead;
     char *bcache_filename_dirty_data;
     char *bcache_filename_writeback_rate;
@@ -97,6 +98,7 @@ static struct disk {
     RRDDIM *rd_bcache_bypass_misses;
 
     RRDSET *st_bcache_rates;
+    RRDDIM *rd_bcache_rate_congested;
     RRDDIM *rd_bcache_rate_readahead;
     RRDDIM *rd_bcache_rate_writeback;
 
@@ -508,6 +510,12 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         d->device_is_bcache = 1;
 
         char buffer2[FILENAME_MAX + 1];
+
+        snprintfz(buffer2, FILENAME_MAX, "%s/congested", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_congested = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/readahead", buffer);
         if(access(buffer2, R_OK) == 0)
@@ -1066,11 +1074,15 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     cache_miss_collisions = 0,
                     cache_misses = 0,
                     cache_available_percent = 0,
+                    congested = 0,
                     readahead = 0,
                     dirty_data = 0,
                     writeback_rate = 0;
 
             // read the bcache values
+
+            if(d->bcache_filename_congested)
+                congested = bcache_read_number_with_units(d->bcache_filename_congested);
 
             if(d->bcache_filename_readahead)
                 readahead = bcache_read_number_with_units(d->bcache_filename_readahead);
@@ -1122,11 +1134,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_bcache_rate_readahead = rrddim_add(d->st_bcache_rates, "readahead", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
                     d->rd_bcache_rate_writeback = rrddim_add(d->st_bcache_rates, "writeback", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_bcache_rate_congested = rrddim_add(d->st_bcache_rates, "congested", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(d->st_bcache_rates);
 
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_writeback, writeback_rate);
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_readahead, readahead);
+                rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_congested, congested);
                 rrdset_done(d->st_bcache_rates);
             }
 
@@ -1313,6 +1327,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 last->next = d = d->next;
             }
 
+            freez(t->bcache_filename_congested);
+            freez(t->bcache_filename_readahead);
             freez(t->bcache_filename_dirty_data);
             freez(t->bcache_filename_writeback_rate);
             freez(t->bcache_filename_stats_total_cache_available_percent);
@@ -1321,7 +1337,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->bcache_filename_stats_total_cache_miss_collisions);
             freez(t->bcache_filename_stats_total_cache_bypass_hits);
             freez(t->bcache_filename_stats_total_cache_bypass_misses);
-            freez(t->bcache_filename_readahead);
 
             freez(t->disk);
             freez(t->device);
