@@ -1172,7 +1172,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache_hit_ratio"
-                            , "Block Cache I/O Hit Ratio"
+                            , "BCache Cache Hit Ratio"
                             , "percentage"
                             , "proc"
                             , "diskstats"
@@ -1204,7 +1204,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache_rates"
-                            , "Block Cache I/O Rates"
+                            , "BCache Rates"
                             , "KB/s"
                             , "proc"
                             , "diskstats"
@@ -1231,7 +1231,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache_size"
-                            , "Block Cache Sizes"
+                            , "BCache Cache Sizes"
                             , "MB"
                             , "proc"
                             , "diskstats"
@@ -1256,7 +1256,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache_usage"
-                            , "Block Cache Usage"
+                            , "BCache Cache Usage"
                             , "percent"
                             , "proc"
                             , "diskstats"
@@ -1282,7 +1282,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache"
-                            , "Block Cache I/O"
+                            , "BCache Cache I/O Operations"
                             , "operations/s"
                             , "proc"
                             , "diskstats"
@@ -1295,8 +1295,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     d->rd_bcache_hits            = rrddim_add(d->st_bcache, "hits",       NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_misses          = rrddim_add(d->st_bcache, "misses",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    d->rd_bcache_readaheads      = rrddim_add(d->st_bcache, "readaheads", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_miss_collisions = rrddim_add(d->st_bcache, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    d->rd_bcache_readaheads      = rrddim_add(d->st_bcache, "readaheads", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(d->st_bcache);
 
@@ -1316,7 +1316,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->disk
                             , family
                             , "disk.bcache_bypass"
-                            , "Block Cache Bypass I/O"
+                            , "BCache Cache Bypass I/O Operations"
                             , "operations/s"
                             , "proc"
                             , "diskstats"
