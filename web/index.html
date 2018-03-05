@@ -2188,10 +2188,14 @@
                 function alarm_to_html(alarm, full) {
                     var chart = options.data.charts[alarm.chart];
                     if(typeof(chart) === 'undefined') {
-                        // this means the charts loaded are incomplete
-                        // probably netdata was restarted and more charts
-                        // are now available.
-                        return '';
+                        chart = options.data.charts_by_name[alarm.chart];
+                        if (typeof(chart) === 'undefined') {
+                            // this means the charts loaded are incomplete
+                            // probably netdata was restarted and more alarms
+                            // are now available.
+                            console.log('Cannot find chart ' + alarm.chart + ', you probably need to refresh the page.');
+                            return '';
+                        }
                     }
 
                     var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
