@@ -34,7 +34,7 @@ static struct disk {
 
     int device_is_bcache;
 
-    char *bcache_filename_congested;
+    char *bcache_filename_cache_congested;
     char *bcache_filename_readahead;
     char *bcache_filename_dirty_data;
     char *bcache_filename_writeback_rate;
@@ -511,9 +511,9 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
         char buffer2[FILENAME_MAX + 1];
 
-        snprintfz(buffer2, FILENAME_MAX, "%s/congested", buffer);
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/congested", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_congested = strdupz(buffer2);
+            d->bcache_filename_cache_congested = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
@@ -1081,8 +1081,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             // read the bcache values
 
-            if(d->bcache_filename_congested)
-                congested = bcache_read_number_with_units(d->bcache_filename_congested);
+            if(d->bcache_filename_cache_congested)
+                congested = bcache_read_number_with_units(d->bcache_filename_cache_congested);
 
             if(d->bcache_filename_readahead)
                 readahead = bcache_read_number_with_units(d->bcache_filename_readahead);
@@ -1327,7 +1327,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 last->next = d = d->next;
             }
 
-            freez(t->bcache_filename_congested);
+            freez(t->bcache_filename_cache_congested);
             freez(t->bcache_filename_readahead);
             freez(t->bcache_filename_dirty_data);
             freez(t->bcache_filename_writeback_rate);
