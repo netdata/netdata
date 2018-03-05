@@ -34,14 +34,16 @@ static struct disk {
 
     int device_is_bcache;
 
+    char *bcache_filename_readahead;
     char *bcache_filename_dirty_data;
-    char *bcache_filename_cache_available_percent;
-    char *bcache_filename_cache_hits;
-    char *bcache_filename_cache_misses;
-    char *bcache_filename_cache_miss_collisions;
-    char *bcache_filename_cache_bypass_hits;
-    char *bcache_filename_cache_bypass_misses;
-    char *bcache_filename_cache_readaheads;
+    char *bcache_filename_writeback_rate;
+
+    char *bcache_filename_stats_total_cache_available_percent;
+    char *bcache_filename_stats_total_cache_hits;
+    char *bcache_filename_stats_total_cache_misses;
+    char *bcache_filename_stats_total_cache_miss_collisions;
+    char *bcache_filename_stats_total_cache_bypass_hits;
+    char *bcache_filename_stats_total_cache_bypass_misses;
 
     RRDSET *st_io;
     RRDDIM *rd_io_reads;
@@ -94,8 +96,9 @@ static struct disk {
     RRDDIM *rd_bcache_bypass_hits;
     RRDDIM *rd_bcache_bypass_misses;
 
-    RRDSET *st_bcache_readaheads;
-    RRDDIM *rd_bcache_readaheads;
+    RRDSET *st_bcache_rates;
+    RRDDIM *rd_bcache_rate_readahead;
+    RRDDIM *rd_bcache_rate_writeback;
 
     struct disk *next;
 } *disk_root = NULL;
@@ -129,6 +132,32 @@ static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         global_cleanup_removed_disks = 1;
 
 static SIMPLE_PATTERN *excluded_disks = NULL;
+
+static unsigned long long int bcache_read_number_with_units(const char *filename) {
+    char buffer[50 + 1];
+    if(read_file(filename, buffer, 50) == 0) {
+        static int unknown_units_error = 10;
+
+        char *end = NULL;
+        long double value = str2ld(buffer, &end);
+        if(end && *end) {
+            if(*end == 'k')
+                return (unsigned long long int)(value * 1024.0);
+            else if(*end == 'M')
+                return (unsigned long long int)(value * 1024.0 * 1024.0);
+            else if(*end == 'G')
+                return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0);
+            else if(unknown_units_error > 0) {
+                error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
+                unknown_units_error--;
+            }
+        }
+
+        return (unsigned long long int)value;
+    }
+
+    return 0;
+}
 
 static inline int is_major_enabled(int major) {
     static int8_t *major_configs = NULL;
@@ -480,51 +509,57 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
         char buffer2[FILENAME_MAX + 1];
 
+        snprintfz(buffer2, FILENAME_MAX, "%s/readahead", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_readahead = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
         snprintfz(buffer2, FILENAME_MAX, "%s/dirty_data", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_dirty_data = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
+        snprintfz(buffer2, FILENAME_MAX, "%s/writeback_rate", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_writeback_rate = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache_available_percent", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_available_percent = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_available_percent = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_hits", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_hits = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_hits = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_misses", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_misses = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_misses = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_hits", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_bypass_hits = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_bypass_hits = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_misses", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_bypass_misses = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_bypass_misses = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_miss_collisions", buffer);
         if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_miss_collisions = strdupz(buffer2);
-        else
-            error("bcache file '%s' cannot be read.", buffer2);
-
-        snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_readaheads", buffer);
-        if(access(buffer2, R_OK) == 0)
-            d->bcache_filename_cache_readaheads = strdupz(buffer2);
+            d->bcache_filename_stats_total_cache_miss_collisions = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
     }
@@ -1030,57 +1065,70 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     cache_hits = 0,
                     cache_miss_collisions = 0,
                     cache_misses = 0,
-                    cache_readaheads = 0,
-                    dirty_size = 0,
-                    cache_available_percent = 0;
+                    cache_available_percent = 0,
+                    readahead = 0,
+                    dirty_data = 0,
+                    writeback_rate = 0;
 
             // read the bcache values
 
-            if(d->bcache_filename_dirty_data) {
-                char buffer[50 + 1];
-                if(read_file(d->bcache_filename_dirty_data, buffer, 50) == 0) {
-                    static int unknown_units_error = 10;
+            if(d->bcache_filename_readahead)
+                readahead = bcache_read_number_with_units(d->bcache_filename_readahead);
 
-                    char *end = NULL;
-                    long double value = str2ld(buffer, &end);
-                    if(end && *end) {
-                        if(*end == 'k' || *end == 'K')
-                            dirty_size = (unsigned long long int)(value * 1024.0);
-                        else if(*end == 'M')
-                            dirty_size = (unsigned long long int)(value * 1024.0 * 1024.0);
-                        else if(*end == 'G' || *end == 'g')
-                            dirty_size = (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0);
-                        else if(unknown_units_error > 0) {
-                            error("bcache provides value '%s' with unknown units '%s'", buffer, end);
-                            unknown_units_error--;
-                        }
-                    }
-                }
-            }
+            if(d->bcache_filename_dirty_data)
+                dirty_data = bcache_read_number_with_units(d->bcache_filename_dirty_data);
 
-            if(d->bcache_filename_cache_available_percent)
-                read_single_number_file(d->bcache_filename_cache_available_percent, &cache_available_percent);
+            if(d->bcache_filename_writeback_rate)
+                writeback_rate = bcache_read_number_with_units(d->bcache_filename_writeback_rate);
 
-            if(d->bcache_filename_cache_hits)
-                read_single_number_file(d->bcache_filename_cache_hits, &cache_hits);
+            if(d->bcache_filename_stats_total_cache_available_percent)
+                read_single_number_file(d->bcache_filename_stats_total_cache_available_percent, &cache_available_percent);
 
-            if(d->bcache_filename_cache_misses)
-                read_single_number_file(d->bcache_filename_cache_misses, &cache_misses);
+            if(d->bcache_filename_stats_total_cache_hits)
+                read_single_number_file(d->bcache_filename_stats_total_cache_hits, &cache_hits);
 
-            if(d->bcache_filename_cache_miss_collisions)
-                read_single_number_file(d->bcache_filename_cache_miss_collisions, &cache_miss_collisions);
+            if(d->bcache_filename_stats_total_cache_misses)
+                read_single_number_file(d->bcache_filename_stats_total_cache_misses, &cache_misses);
 
-            if(d->bcache_filename_cache_bypass_hits)
-                read_single_number_file(d->bcache_filename_cache_bypass_hits, &cache_bypass_hits);
+            if(d->bcache_filename_stats_total_cache_miss_collisions)
+                read_single_number_file(d->bcache_filename_stats_total_cache_miss_collisions, &cache_miss_collisions);
 
-            if(d->bcache_filename_cache_bypass_misses)
-                read_single_number_file(d->bcache_filename_cache_bypass_misses, &cache_bypass_misses);
+            if(d->bcache_filename_stats_total_cache_bypass_hits)
+                read_single_number_file(d->bcache_filename_stats_total_cache_bypass_hits, &cache_bypass_hits);
 
-            if(d->bcache_filename_cache_readaheads)
-                read_single_number_file(d->bcache_filename_cache_readaheads, &cache_readaheads);
+            if(d->bcache_filename_stats_total_cache_bypass_misses)
+                read_single_number_file(d->bcache_filename_stats_total_cache_bypass_misses, &cache_bypass_misses);
 
 
             // update the charts
+
+            {
+
+                if(unlikely(!d->st_bcache_rates)) {
+                    d->st_bcache_rates = rrdset_create_localhost(
+                            "disk_bcache_rates"
+                            , d->device
+                            , d->disk
+                            , family
+                            , "disk.bcache_rates"
+                            , "Block Cache I/O Rates"
+                            , "KB/s"
+                            , "proc"
+                            , "diskstats"
+                            , 2120
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
+
+                    d->rd_bcache_rate_readahead = rrddim_add(d->st_bcache_rates, "readahead", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_bcache_rate_writeback = rrddim_add(d->st_bcache_rates, "writeback", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                }
+                else rrdset_next(d->st_bcache_rates);
+
+                rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_writeback, writeback_rate);
+                rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_readahead, readahead);
+                rrdset_done(d->st_bcache_rates);
+            }
 
             {
                 if(unlikely(!d->st_bcache_size)) {
@@ -1094,7 +1142,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "MB"
                             , "proc"
                             , "diskstats"
-                            , 2120
+                            , 2121
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1103,7 +1151,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 }
                 else rrdset_next(d->st_bcache_size);
 
-                rrddim_set_by_pointer(d->st_bcache_size, d->rd_bcache_dirty_size, dirty_size);
+                rrddim_set_by_pointer(d->st_bcache_size, d->rd_bcache_dirty_size, dirty_data);
                 rrdset_done(d->st_bcache_size);
             }
 
@@ -1119,7 +1167,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "percent"
                             , "proc"
                             , "diskstats"
-                            , 2121
+                            , 2122
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1147,7 +1195,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "operations/s"
                             , "proc"
                             , "diskstats"
-                            , 2122
+                            , 2123
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1179,7 +1227,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "operations/s"
                             , "proc"
                             , "diskstats"
-                            , 2123
+                            , 2124
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1194,34 +1242,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_hits, cache_bypass_hits);
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_misses, cache_bypass_misses);
                 rrdset_done(d->st_bcache_bypass);
-            }
-
-            if(d->do_bcache == CONFIG_BOOLEAN_YES || (d->do_bcache == CONFIG_BOOLEAN_AUTO && cache_readaheads != 0)) {
-
-                if(unlikely(!d->st_bcache_readaheads)) {
-                    d->st_bcache_readaheads = rrdset_create_localhost(
-                            "disk_bcache_readahead"
-                            , d->device
-                            , d->disk
-                            , family
-                            , "disk.bcache_readahead"
-                            , "Block Cache Readaheads"
-                            , "events/s"
-                            , "proc"
-                            , "diskstats"
-                            , 2124
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(d->st_bcache_readaheads, RRDSET_FLAG_DETAIL);
-
-                    d->rd_bcache_readaheads = rrddim_add(d->st_bcache_readaheads, "readaheads", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(d->st_bcache_readaheads);
-
-                rrddim_set_by_pointer(d->st_bcache_readaheads, d->rd_bcache_readaheads, cache_readaheads);
-                rrdset_done(d->st_bcache_readaheads);
             }
         }
     }
@@ -1281,7 +1301,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_obsolete_and_pointer_null(d->st_util);
             rrdset_obsolete_and_pointer_null(d->st_bcache);
             rrdset_obsolete_and_pointer_null(d->st_bcache_bypass);
-            rrdset_obsolete_and_pointer_null(d->st_bcache_readaheads);
+            rrdset_obsolete_and_pointer_null(d->st_bcache_rates);
             rrdset_obsolete_and_pointer_null(d->st_bcache_size);
             rrdset_obsolete_and_pointer_null(d->st_bcache_usage);
 
@@ -1294,13 +1314,14 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             }
 
             freez(t->bcache_filename_dirty_data);
-            freez(t->bcache_filename_cache_available_percent);
-            freez(t->bcache_filename_cache_hits);
-            freez(t->bcache_filename_cache_misses);
-            freez(t->bcache_filename_cache_miss_collisions);
-            freez(t->bcache_filename_cache_bypass_hits);
-            freez(t->bcache_filename_cache_bypass_misses);
-            freez(t->bcache_filename_cache_readaheads);
+            freez(t->bcache_filename_writeback_rate);
+            freez(t->bcache_filename_stats_total_cache_available_percent);
+            freez(t->bcache_filename_stats_total_cache_hits);
+            freez(t->bcache_filename_stats_total_cache_misses);
+            freez(t->bcache_filename_stats_total_cache_miss_collisions);
+            freez(t->bcache_filename_stats_total_cache_bypass_hits);
+            freez(t->bcache_filename_stats_total_cache_bypass_misses);
+            freez(t->bcache_filename_readahead);
 
             freez(t->disk);
             freez(t->device);
