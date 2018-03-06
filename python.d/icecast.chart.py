@@ -16,7 +16,7 @@ ORDER = ['listeners']
 CHARTS = {
     'listeners': {
         'options': [None, 'Number Of Listeners', 'listeners',
-                    'listeners', 'listeners.listeners', 'line'],
+                    'listeners', 'icecast.listeners', 'line'],
         'lines': [
         ]}
 }
