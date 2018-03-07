@@ -24,15 +24,9 @@ CHARTS = {
 
 class Source:
     def __init__(self, idx, data):
-        self.id = idx
         self.name = 'source_{0}'.format(idx)
-        self.data = data
-
-    def is_active(self):
-        return self.data.get('stream_start') and self.data.get('server_name')
-
-    def listeners(self):
-        return self.data['listeners']
+        self.is_active = data.get('stream_start') and data.get('server_name')
+        self.listeners = data['listeners']
 
 
 class Service(UrlService):
@@ -54,7 +48,7 @@ class Service(UrlService):
 
         active_sources = 0
         for idx, raw_source in enumerate(sources):
-            if Source(idx, raw_source).is_active():
+            if Source(idx, raw_source).is_active:
                 active_sources += 1
                 dim_id = 'source_{0}'.format(idx)
                 dim = 'source {0}'.format(idx)
@@ -75,7 +69,7 @@ class Service(UrlService):
 
         for idx, raw_source in enumerate(sources):
             source = Source(idx, raw_source)
-            data[source.name] = source.listeners()
+            data[source.name] = source.listeners
 
         return data
 
