@@ -25,6 +25,11 @@
 
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 
+typedef enum {
+    RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
+    RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
+} RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
+
 int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
@@ -687,6 +692,35 @@ static void log_stream_connection(const char *client_ip, const char *client_port
     log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
 
+static RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY get_multiple_connections_strategy(struct config *c, const char *section, const char *name, RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY def) {
+    char *value;
+    switch(def) {
+        default:
+        case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
+            value = "allow";
+            break;
+
+        case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
+            value = "deny";
+            break;
+    }
+
+    value = appconfig_get(c, section, name, value);
+
+    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY ret = def;
+
+    if(strcasecmp(value, "allow") == 0 || strcasecmp(value, "permit") == 0 || strcasecmp(value, "accept") == 0)
+        ret = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
+
+    else if(strcasecmp(value, "deny") == 0 || strcasecmp(value, "reject") == 0 || strcasecmp(value, "block") == 0)
+        ret = RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW;
+
+    else
+        error("Invalid stream config value at section [%s], setting '%s', value '%s'", section, name, value);
+
+    return ret;
+}
+
 static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *timezone, const char *tags, int update_every, char *client_ip, char *client_port) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
@@ -696,6 +730,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
     time_t alarms_delay = 60;
+    RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
@@ -721,6 +756,9 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
+
+    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, key, "multiple connections", rrdpush_multiple_connections_strategy);
+    rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, machine_guid, "multiple connections", rrdpush_multiple_connections_strategy);
 
     tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
@@ -805,8 +843,20 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     }
 
     rrdhost_wrlock(host);
-    if(host->connected_senders > 0)
-        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. If multiple netdata are pushing metrics for the same charts, at the same time, the result is unexpected.", host->hostname, client_ip, client_port);
+    if(host->connected_senders > 0) {
+        switch(rrdpush_multiple_connections_strategy) {
+            case RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW:
+                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. If multiple netdata are pushing metrics for the same charts, at the same time, the result is unexpected.", host->hostname, client_ip, client_port);
+                break;
+
+            case RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW:
+                rrdhost_unlock(host);
+                log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "REJECTED - ALREADY CONNECTED");
+                info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", host->hostname, client_ip, client_port);
+                fclose(fp);
+                return 0;
+        }
+    }
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
