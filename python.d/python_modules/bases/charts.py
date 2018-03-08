@@ -217,6 +217,12 @@ class Chart:
 
         safe_print(chart + dimensions + variables)
 
+    def can_be_updated(self, data):
+        for dim in self.dimensions:
+            if dim.get_value(data) is not None:
+                return True
+        return False
+
     def update(self, data, interval):
         updated_dimensions, updated_variables = str(), str()
 
