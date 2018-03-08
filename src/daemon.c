@@ -275,14 +275,16 @@ static void sched_setscheduler_set(void) {
                     priority = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
 
 #ifdef HAVE_SCHED_GET_PRIORITY_MIN
+                errno = 0;
                 if(priority < sched_get_priority_min(policy)) {
-                    error("scheduler %s priority %d is below the minimum %d. Using the minimum.", name, priority, sched_get_priority_min(policy));
+                    error("scheduler %s (%d) priority %d is below the minimum %d. Using the minimum.", name, policy, priority, sched_get_priority_min(policy));
                     priority = sched_get_priority_min(policy);
                 }
 #endif
 #ifdef HAVE_SCHED_GET_PRIORITY_MAX
+                errno = 0;
                 if(priority > sched_get_priority_max(policy)) {
-                    error("scheduler %s priority %d is above the maximum %d. Using the maximum.", name, priority, sched_get_priority_max(policy));
+                    error("scheduler %s (%d) priority %d is above the maximum %d. Using the maximum.", name, policy, priority, sched_get_priority_max(policy));
                     priority = sched_get_priority_max(policy);
                 }
 #endif
@@ -299,12 +301,13 @@ static void sched_setscheduler_set(void) {
                 .sched_priority = priority
         };
 
+        errno = 0;
         i = sched_setscheduler(0, policy, &param);
         if(i != 0) {
-            error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice", name, policy, priority);
+            error("Cannot adjust netdata scheduling policy to %s (%d), with priority %d. Falling back to nice.", name, policy, priority);
         }
         else {
-            debug(D_SYSTEM, "Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
+            info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
             if(!(flags & SCHED_FLAG_USE_NICE))
                 return;
         }
