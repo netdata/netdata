@@ -265,6 +265,7 @@ static void sched_setscheduler_set(void) {
         for(i = 0 ; scheduler_defaults[i].name ; i++) {
             if(!strcmp(name, scheduler_defaults[i].name)) {
                 found = 1;
+                policy = scheduler_defaults[i].policy;
                 priority = scheduler_defaults[i].priority;
                 flags = scheduler_defaults[i].flags;
 
@@ -293,7 +294,7 @@ static void sched_setscheduler_set(void) {
         }
 
         if(!found) {
-            error("Unknown scheduling policy %s - falling back to nice()", name);
+            error("Unknown scheduling policy '%s' - falling back to nice", name);
             goto fallback;
         }
 
