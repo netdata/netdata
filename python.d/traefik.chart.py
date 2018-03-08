@@ -91,7 +91,11 @@ class Service(UrlService):
         self.data = {
             'successful_requests': 0, 'redirects': 0, 'bad_requests': 0,
             'server_errors': 0, 'other_requests': 0, '1xx': 0, '2xx': 0,
-            '3xx': 0, '4xx': 0, '5xx': 0, 'other': 0}
+            '3xx': 0, '4xx': 0, '5xx': 0, 'other': 0,
+            'average_response_time_per_iteration_sec': 0
+        }
+        self.last_total_response_time = 0
+        self.last_total_count = 0
 
     def _get_data(self):
         data = self._get_raw_data()
@@ -109,8 +113,13 @@ class Service(UrlService):
 
         self.data.update(fetch_data_(raw_data=data, metrics=HEALTH_STATS))
 
-        self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] * 1000000) / data['total_count']
         self.data['average_response_time_sec'] *= 1000000
+        if data['total_count'] != self.last_total_count:
+            self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] - self.last_total_response_time) * 1000000 / (data['total_count'] - self.last_total_count)
+        else:
+            self.data['average_response_time_per_iteration_sec']  = 0
+        self.last_total_response_time = data['total_response_time_sec']
+        self.last_total_count = data['total_count']
 
         return self.data or None
 
