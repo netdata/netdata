@@ -216,7 +216,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
         for chart in self.charts:
             if chart.flags.obsoleted:
-                continue
+                if chart.can_be_updated(data):
+                    chart.refresh()
+                else:
+                    continue
             elif self.charts.cleanup and chart.penalty >= self.charts.cleanup:
                 chart.obsolete()
                 self.error("chart '{0}' was suppressed due to non updating".format(chart.name))
