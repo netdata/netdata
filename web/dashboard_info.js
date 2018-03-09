@@ -1068,6 +1068,13 @@ netdataDashboard.context = {
         '</ul>' +
         'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#SYNCHRONOUS-REPLICATION" target="_blank">Synchronous Replication</a>.'
     },
+    'postgres.replication_slot': {
+        info: 'Replication slot files.<ul>' +
+        '<li><strong>wal_keeped:</strong> WAL files retained by each replication slots.</li>' +
+        '<li><strong>pg_replslot_files:</strong> files present in pg_replslot.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
+    },
 
 
     // ------------------------------------------------------------------------

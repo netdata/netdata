@@ -44,6 +44,7 @@ METRICS = dict(
     WAL=['written_wal',
          'recycled_wal',
          'total_wal'],
+    WAL_WRITES=['wal_writes'],
     ARCHIVE=['ready_count',
              'done_count',
              'file_count'],
@@ -72,7 +73,10 @@ METRICS = dict(
     STANDBY_DELTA=['sent_delta',
                        'write_delta',
                        'flush_delta',
-                       'replay_delta']
+                       'replay_delta'],
+    REPSLOT_FILES=['replslot_wal_keep',
+                   'replslot_files']
+
 )
 
 QUERIES = dict(
@@ -173,6 +177,10 @@ FROM pg_stat_replication
 WHERE application_name IS NOT NULL
 GROUP BY application_name;
 """,
+    FIND_REPLICATION_SLOT="""
+SELECT slot_name
+FROM pg_replication_slots;
+""",
     STANDBY_DELTA="""
 SELECT application_name,
   pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , sent_{1}) AS sent_delta,
@@ -181,6 +189,28 @@ SELECT application_name,
   pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , replay_{1}) AS replay_delta
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
+""",
+    REPSLOT_FILES="""
+WITH wal_size AS (
+    SELECT current_setting('wal_block_size')::INT * setting::INT AS val
+    FROM pg_settings
+    WHERE name = 'wal_segment_size'
+)
+SELECT slot_name, slot_type, replslot_wal_keep, count(slot_file) AS replslot_files
+FROM (
+  SELECT slot.slot_name, CASE WHEN slot_file <> 'state' THEN 1 END AS slot_file , slot_type,
+    COALESCE (floor((pg_wal_lsn_diff (pg_current_wal_lsn (),
+              slot.restart_lsn) - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)),
+            0) AS replslot_wal_keep
+  FROM pg_replication_slots slot
+  LEFT JOIN (
+    SELECT slot2.slot_name,
+           pg_ls_dir('pg_replslot/' || slot2.slot_name) AS slot_file
+      FROM pg_replication_slots slot2
+    ) files (slot_name, slot_file)
+   ON slot.slot_name = files.slot_name
+  CROSS JOIN wal_size s) AS d
+GROUP BY slot_name, slot_type, replslot_wal_keep;
 """,
     IF_SUPERUSER="""
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
@@ -199,7 +229,11 @@ SELECT
   count(*) FILTER (WHERE query LIKE  'autovacuum: BRIN summarize%%') AS brin_summarize
 FROM pg_stat_activity
 WHERE query NOT LIKE '%%pg_stat_activity%%';
+""",
+    DIFF_LSN="""
+SELECT pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END, '0/0') as wal_writes ;
 """
+
 )
 
 
@@ -209,11 +243,11 @@ QUERY_STATS = {
     QUERIES['LOCKS']: METRICS['LOCKS']
 }
 
-ORDER = ['db_stat_temp_bytes', 'db_stat_temp_files', 'db_stat_blks', 'db_stat_tuple_returned', 'db_stat_tuple_write',
+ORDER = ['db_stat_temp_files', 'db_stat_temp_bytes', 'db_stat_blks', 'db_stat_tuple_returned', 'db_stat_tuple_write',
          'db_stat_transactions','db_stat_connections', 'database_size', 'backend_process', 'index_count', 'index_size',
-         'table_count', 'table_size', 'wal', 'archive_wal', 'checkpointer', 'stat_bgwriter_alloc', 'stat_bgwriter_checkpoint',
+         'table_count', 'table_size', 'wal', 'wal_writes', 'archive_wal', 'checkpointer', 'stat_bgwriter_alloc', 'stat_bgwriter_checkpoint',
          'stat_bgwriter_backend', 'stat_bgwriter_backend_fsync' , 'stat_bgwriter_bgwriter', 'stat_bgwriter_maxwritten',
-         'standby_delta','autovacuum']
+         'replication_slot', 'standby_delta', 'autovacuum']
 
 CHARTS = {
     'db_stat_transactions': {
@@ -298,6 +332,11 @@ CHARTS = {
             ['recycled_wal', 'recycled', 'absolute'],
             ['total_wal', 'total', 'absolute']
         ]},
+    'wal_writes': {
+        'options': [None, 'Write-Ahead Logs', 'kilobytes/s', 'wal_writes', 'postgres.wal_writes', 'line'],
+        'lines': [
+            ['wal_writes', 'writes', 'incremental', 1, 1024]
+        ]},
     'archive_wal': {
         'options': [None, 'Archive Write-Ahead Logs', 'files/s', 'archive wal', 'postgres.archive_wal', 'line'],
         'lines': [
@@ -314,17 +353,17 @@ CHARTS = {
     'stat_bgwriter_alloc': {
         'options': [None, 'Buffers allocated', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_alloc', 'line'],
         'lines': [
-            ['buffers_alloc', 'alloc', 'incremental', 8, 1024]
+            ['buffers_alloc', 'alloc', 'incremental', 1, 1024]
         ]},
     'stat_bgwriter_checkpoint': {
         'options': [None, 'Buffers written during checkpoints', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_checkpoint', 'line'],
         'lines': [
-            ['buffers_checkpoint', 'checkpoint', 'incremental', 8, 1024]
+            ['buffers_checkpoint', 'checkpoint', 'incremental', 1, 1024]
         ]},
     'stat_bgwriter_backend': {
         'options': [None, 'Buffers written directly by a backend', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_backend', 'line'],
         'lines': [
-            ['buffers_backend', 'backend', 'incremental', 8, 1024]
+            ['buffers_backend', 'backend', 'incremental', 1, 1024]
         ]},
     'stat_bgwriter_backend_fsync': {
         'options': [None, 'Fsync by backend', 'times', 'bgwriter', 'postgres.stat_bgwriter_backend_fsync', 'line'],
@@ -334,7 +373,7 @@ CHARTS = {
     'stat_bgwriter_bgwriter': {
         'options': [None, 'Buffers written by the background writer', 'kilobytes/s', 'bgwriter', 'postgres.bgwriter_bgwriter', 'line'],
         'lines': [
-            ['buffers_clean', 'clean', 'incremental', 8, 1024]
+            ['buffers_clean', 'clean', 'incremental', 1, 1024]
         ]},
     'stat_bgwriter_maxwritten': {
         'options': [None, 'Too many buffers written', 'times', 'bgwriter', 'postgres.stat_bgwriter_maxwritten', 'line'],
@@ -357,6 +396,12 @@ CHARTS = {
             ['write_delta', 'write delta', 'absolute', 1, 1024],
             ['flush_delta', 'flush delta', 'absolute', 1, 1024],
             ['replay_delta', 'replay delta', 'absolute', 1, 1024]
+        ]},
+     'replication_slot': {
+        'options': [None, 'Replication slot files', 'files', 'replication slot', 'postgres.replication_slot', 'line'],
+        'lines': [
+            ['replslot_wal_keep', 'wal keeped', 'absolute'],
+            ['replslot_files', 'pg_replslot files', 'absolute']
         ]}
 }
 
@@ -376,6 +421,7 @@ class Service(SimpleService):
         self.locks_zeroed = dict()
         self.databases = list()
         self.secondaries = list()
+        self.replication_slots = list()
         self.queries = QUERY_STATS.copy()
 
     def _connect(self):
@@ -411,6 +457,8 @@ class Service(SimpleService):
             is_superuser = check_if_superuser_(cursor, QUERIES['IF_SUPERUSER'])
             self.secondaries = discover_secondaries_(cursor, QUERIES['FIND_STANDBY'])
             self.server_version = detect_server_version(cursor, QUERIES['DETECT_SERVER_VERSION'])
+            if self.server_version >= 94000:
+                self.replication_slots = discover_replication_slots_(cursor, QUERIES['FIND_REPLICATION_SLOT'])
             cursor.close()
 
             if self.database_poll and isinstance(self.database_poll, str):
@@ -433,8 +481,8 @@ class Service(SimpleService):
         else:
             wal = 'xlog'
             lsn = 'location'
-
         self.queries[QUERIES['BGWRITER']] = METRICS['BGWRITER']
+        self.queries[QUERIES['DIFF_LSN'].format(wal,lsn)] = METRICS['WAL_WRITES']
         self.queries[QUERIES['STANDBY_DELTA'].format(wal,lsn)] = METRICS['STANDBY_DELTA']
 
         if self.index_stats:
@@ -445,6 +493,8 @@ class Service(SimpleService):
             self.queries[QUERIES['ARCHIVE'].format(wal)] = METRICS['ARCHIVE']
             if self.server_version >= 90400:
                 self.queries[QUERIES['WAL'].format(wal,lsn)] = METRICS['WAL']
+            if self.server_version >= 100000:
+                self.queries[QUERIES['REPSLOT_FILES']] = METRICS['REPSLOT_FILES']
         if self.server_version >= 90400:
             self.queries[QUERIES['AUTOVACUUM']] = METRICS['AUTOVACUUM']
 
@@ -462,6 +512,11 @@ class Service(SimpleService):
         for application_name in self.secondaries[::-1]:
               add_replication_delta_chart_(order=self.order, definitions=self.definitions,
                                        name='standby_delta', application_name=application_name)
+
+        for slot_name in self.replication_slots[::-1]:
+              add_replication_slot_chart_(order=self.order, definitions=self.definitions,
+                                       name='replication_slot', slot_name=slot_name)
+
 
 
     def _get_data(self):
@@ -491,6 +546,8 @@ class Service(SimpleService):
                     dimension_id = '_'.join([row['database_name'], metric])
                 elif 'application_name' in row:
                     dimension_id = '_'.join([row['application_name'], metric])
+                elif 'slot_name' in row:
+                    dimension_id = '_'.join([row['slot_name'], metric])
                 else:
                     dimension_id = metric
                 if metric in row:
@@ -515,6 +572,13 @@ def discover_secondaries_(cursor, query):
             result.append(sc)
     return result
 
+def discover_replication_slots_(cursor, query):
+    cursor.execute(query)
+    result = list()
+    for slot in [replication_slot[0] for replication_slot in cursor]:
+        if slot not in result:
+            result.append(slot)
+    return result
 
 def check_if_superuser_(cursor, query):
     cursor.execute(query)
@@ -583,3 +647,20 @@ def add_replication_delta_chart_(order, definitions, name, application_name):
     definitions[chart_name] = {
                'options': [name, title + ': ' + application_name,  units, 'replication delta', context,  chart_type],
                'lines': create_lines(application_name, chart_template['lines'])}
+
+def add_replication_slot_chart_(order, definitions, name, slot_name):
+    def create_lines(slot, lines):
+        result = list()
+        for line in lines:
+            new_line = ['_'.join([slot, line[0]])] + line[1:]
+            result.append(new_line)
+        return result
+
+    chart_template = CHARTS[name]
+    chart_name = '_'.join([slot_name, name])
+    position = order.index('database_size')
+    order.insert(position, chart_name)
+    name, title, units, family, context, chart_type = chart_template['options']
+    definitions[chart_name] = {
+               'options': [name, title + ': ' + slot_name,  units, 'replication slot files', context,  chart_type],
+               'lines': create_lines(slot_name, chart_template['lines'])}
