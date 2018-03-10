@@ -83,8 +83,8 @@ SELECT
   count(*) FILTER (WHERE type = 'written') AS written_wal
 FROM
   (SELECT wal.name,
-     pg_{0}file_name(pg_current_{0}_{1}()),
-     CASE WHEN wal.name > pg_{0}file_name(pg_current_{0}_{1}()) THEN 'recycled'
+     pg_{0}file_name(CASE pg_is_in_recovery() WHEN true THEN NULL ELSE pg_current_{0}_{1}() END ),
+     CASE WHEN wal.name > pg_{0}file_name(CASE pg_is_in_recovery() WHEN true THEN NULL ELSE pg_current_{0}_{1}() END ) THEN 'recycled'
        ELSE 'written'
      END AS type
   FROM pg_catalog.pg_ls_dir('pg_{0}') AS wal(name)
@@ -175,12 +175,12 @@ GROUP BY application_name;
 """,
     STANDBY_DELTA="""
 SELECT application_name,
-  pg_{0}_{1}_diff(pg_current_{0}_{1}() , sent_{1}) AS sent_delta,
-  pg_{0}_{1}_diff(pg_current_{0}_{1}() , write_{1}) AS write_delta,
-  pg_{0}_{1}_diff(pg_current_{0}_{1}() , flush_{1}) AS flush_delta,
-  pg_{0}_{1}_diff(pg_current_{0}_{1}() , replay_{1}) AS replay_delta
+  pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , sent_{1}) AS sent_delta,
+  pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , write_{1}) AS write_delta,
+  pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , flush_{1}) AS flush_delta,
+  pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , replay_{1}) AS replay_delta
 FROM pg_stat_replication
-WHERE application_name IS NOT NULL
+WHERE application_name IS NOT NULL;
 """,
     IF_SUPERUSER="""
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
