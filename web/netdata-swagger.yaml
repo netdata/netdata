@@ -2,7 +2,7 @@ swagger: '2.0'
 info:
   title: NetData API
   description: 'Real time data collection and graphs...'
-  version: 1.5.1_rolling
+  version: 1.9.11_rolling
 host: registry.my-netdata.io
 schemes:
   - http
@@ -258,6 +258,13 @@ paths:
           type: number
           format: integer
           allowEmptyValue: true
+        - name: scale
+          in: query
+          description: 'set the scale of the badge (greater or equal to 100)'
+          required: false
+          type: number
+          format: integer
+          allowEmptyValue: true
       responses:
         '200':
           description: 'The call was successful. The response should be an SVG image.'
@@ -277,8 +284,55 @@ paths:
           description: 'The format of the response to be returned'
           required: true
           type: string
-          enum: [ 'shell', 'prometheus' ]
+          enum: [ 'shell', 'prometheus', 'prometheus_all_hosts', 'json' ]
           default: 'shell'
+        - name: help
+          in: query
+          description: 'enable or disable HELP lines in prometheus output'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'no'
+        - name: types
+          in: query
+          description: 'enable or disable TYPE lines in prometheus output'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'no'
+        - name: timestamps
+          in: query
+          description: 'enable or disable timestamps in prometheus output'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
+        - name: names
+          in: query
+          description: 'When enabled netdata will report dimension names. When disabled netdata will report dimension IDs. The default is controlled in netdata.conf.'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
+        - name: server
+          in: query
+          description: 'Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.'
+          required: false
+          type: string
+          format: 'any text'
+        - name: prefix
+          in: query
+          description: 'Prefix all prometheus metrics with this string.'
+          required: false
+          type: string
+          format: 'any text'
+        - name: data
+          in: query
+          description: 'Select the prometheus response data source. The default is controlled in netdata.conf'
+          required: false
+          type: string
+          enum: [ 'as-collected', 'average', 'sum' ]
+          default: 'average'
       responses:
         '200':
           description: 'All the metrics returned in the format requested'
