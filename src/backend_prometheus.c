@@ -102,7 +102,7 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable)
 #define PROMETHEUS_ELEMENT_MAX 256
 #define PROMETHEUS_LABELS_MAX 1024
 
-static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, uint32_t options, time_t after, time_t before, int allhosts, int help, int types, int names) {
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, uint32_t options, time_t after, time_t before, int allhosts, int help, int types, int names, int timestamps) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -207,18 +207,31 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                                , t
                                 );
 
-                            buffer_sprintf(wb
-                                           , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , dimension
-                                           , labels
-                                           , rd->last_collected_value
-                                           , timeval_msec(&rd->last_collected_time)
-                            );
+                            if(timestamps)
+                                buffer_sprintf(wb
+                                               , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                               , prefix
+                                               , context
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , dimension
+                                               , labels
+                                               , rd->last_collected_value
+                                               , timeval_msec(&rd->last_collected_time)
+                                );
+                            else
+                                buffer_sprintf(wb
+                                               , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT "\n"
+                                               , prefix
+                                               , context
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , dimension
+                                               , labels
+                                               , rd->last_collected_value
+                                );
                         }
                         else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -253,18 +266,31 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                                , t
                                 );
 
-                            buffer_sprintf(wb
-                                           , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , dimension
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , labels
-                                           , rd->last_collected_value
-                                           , timeval_msec(&rd->last_collected_time)
-                            );
+                            if(timestamps)
+                                buffer_sprintf(wb
+                                               , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                               , prefix
+                                               , context
+                                               , dimension
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , labels
+                                               , rd->last_collected_value
+                                               , timeval_msec(&rd->last_collected_time)
+                                );
+                            else
+                                buffer_sprintf(wb
+                                               , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT "\n"
+                                               , prefix
+                                               , context
+                                               , dimension
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , labels
+                                               , rd->last_collected_value
+                                );
                         }
                     }
                     else {
@@ -302,18 +328,31 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                                , suffix
                                 );
 
-                            buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , units
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , dimension
-                                           , labels
-                                           , value
-                                           , last_t * MSEC_PER_SEC
-                            );
+                            if(timestamps)
+                                buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                                               , prefix
+                                               , context
+                                               , units
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , dimension
+                                               , labels
+                                               , value
+                                               , last_t * MSEC_PER_SEC
+                                );
+                            else
+                                buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT "\n"
+                                               , prefix
+                                               , context
+                                               , units
+                                               , suffix
+                                               , chart
+                                               , family
+                                               , dimension
+                                               , labels
+                                               , value
+                                );
                         }
                     }
                 }
@@ -374,16 +413,16 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
     return after;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names, int timestamps) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
     time_t after = prometheus_preparation(host, wb, options, server, before, help);
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 0, help, types, names);
+    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 0, help, types, names, timestamps);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names, int timestamps) {
     time_t before = now_realtime_sec();
 
     // we start at the point we had stopped before
@@ -391,7 +430,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 1, help, types, names);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 1, help, types, names, timestamps);
     }
     rrd_unlock();
 }

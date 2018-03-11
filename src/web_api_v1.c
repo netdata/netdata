@@ -254,7 +254,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
-    int help = 0, types = 0, names = backend_send_names; // prometheus options
+    int help = 0, types = 0, timestamps = 1, names = backend_send_names; // prometheus options
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_options = backend_options;
     const char *prometheus_prefix = backend_prefix;
@@ -297,6 +297,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             else
                 names = 0;
         }
+        else if(!strcmp(name, "timestamps")) {
+            if(!strcmp(value, "yes"))
+                timestamps = 1;
+            else
+                timestamps = 0;
+        }
         else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
@@ -324,12 +330,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
             return 200;
 
         default:
