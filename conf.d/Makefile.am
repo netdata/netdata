@@ -58,6 +58,7 @@ dist_pythonconfig_DATA = \
     python.d/ntpd.conf \
     python.d/ovpn_status_log.conf \
     python.d/phpfpm.conf \
+    python.d/portcheck.conf \
     python.d/postfix.conf \
     python.d/postgres.conf \
     python.d/powerdns.conf \
@@ -107,6 +108,7 @@ dist_healthconfig_DATA = \
     health.d/netfilter.conf \
     health.d/nginx.conf \
     health.d/nginx_plus.conf \
+    health.d/portcheck.conf \
     health.d/postgres.conf \
     health.d/qos.conf \
     health.d/ram.conf \

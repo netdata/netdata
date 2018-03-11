@@ -225,6 +225,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
     },
 
+    'portcheck': {
+        title: 'Port Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Service availability and latency monitoring using port checks.'
+    },
+
     'postfix': {
         title: 'postfix',
         icon: '<i class="fas fa-envelope"></i>',
@@ -1822,6 +1828,21 @@ netdataDashboard.context = {
         commonMin: true,
         commonMax: true,
         valueRange: "[0, null]"
+    },
+
+    // ------------------------------------------------------------------------
+    // Port check
+
+    'portcheck.latency': {
+        info: 'The <code>latency</code> describes the time spent connecting to a TCP port. No data is sent or received. ' +
+        'Currently, the accuracy of the latency is low and should be used as reference only.'
+    },
+
+    'portcheck.status': {
+        valueRange: "[0, 1]",
+        info: 'The <code>status</code> chart verifies the availability of the service. ' +
+        'Each status dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> only if connection could be established.' +
+        'This chart is most useful for alarms and third-party apps.'
     },
 
     // ------------------------------------------------------------------------
