@@ -1,683 +1,771 @@
 {
-    "swagger": "2.0",
-    "info": {
-        "title": "NetData API",
-        "description": "Real time data collection and graphs...",
-        "version": "1.5.1_rolling"
-    },
-    "host": "registry.my-netdata.io",
-    "schemes": [
-        "http"
-    ],
-    "basePath": "/api/v1",
-    "produces": [
-        "application/json"
-    ],
-    "paths": {
-        "/charts": {
-            "get": {
-                "summary": "Get a list of all charts available at the server",
-                "description": "The charts endpoint returns a summary about all charts stored in the netdata server.",
-                "responses": {
-                    "200": {
-                        "description": "An array of charts",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/chart_summary"
-                            }
-                        }
-                    }
-                }
+  "swagger": "2.0",
+  "info": {
+    "title": "NetData API",
+    "description": "Real time data collection and graphs...",
+    "version": "1.9.11_rolling"
+  },
+  "host": "registry.my-netdata.io",
+  "schemes": [
+    "http"
+  ],
+  "basePath": "/api/v1",
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/charts": {
+      "get": {
+        "summary": "Get a list of all charts available at the server",
+        "description": "The charts endpoint returns a summary about all charts stored in the netdata server.",
+        "responses": {
+          "200": {
+            "description": "An array of charts",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/chart_summary"
+              }
             }
-        },
-        "/chart": {
-            "get": {
-                "summary": "Get info about a specific chart",
-                "description": "The Chart endpoint returns detailed information about a chart.",
-                "parameters": [
-                    {
-                        "name": "chart",
-                        "in": "query",
-                        "description": "The id of the chart as returned by the /charts call.",
-                        "required": true,
-                        "type": "string",
-                        "format": "as returned by /charts",
-                        "default": "system.cpu"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "A javascript object with detailed information about the chart.",
-                        "schema": {
-                            "$ref": "#/definitions/chart"
-                        }
-                    },
-                    "404": {
-                        "description": "No chart with the given id is found."
-                    }
-                }
-            }
-        },
-        "/data": {
-            "get": {
-                "summary": "Get collected data for a specific chart",
-                "description": "The Data endpoint returns data stored in the round robin database of a chart.\n",
-                "parameters": [
-                    {
-                        "name": "chart",
-                        "in": "query",
-                        "description": "The id of the chart as returned by the /charts call.",
-                        "required": true,
-                        "type": "string",
-                        "format": "as returned by /charts",
-                        "allowEmptyValue": false,
-                        "default": "system.cpu"
-                    },
-                    {
-                        "name": "dimension",
-                        "in": "query",
-                        "description": "zero, one or more dimension ids, as returned by the /chart call.",
-                        "required": false,
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "collectionFormat": "pipes",
-                            "format": "as returned by /charts"
-                        },
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "after",
-                        "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
-                        "required": true,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": false,
-                        "default": -600
-                    },
-                    {
-                        "name": "before",
-                        "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is zero (i.e. the timestamp of the last value collected).",
-                        "required": false,
-                        "type": "number",
-                        "format": "integer",
-                        "default": 0
-                    },
-                    {
-                        "name": "points",
-                        "in": "query",
-                        "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration will be returned.",
-                        "required": true,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": false,
-                        "default": 20
-                    },
-                    {
-                        "name": "group",
-                        "in": "query",
-                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
-                        "required": true,
-                        "type": "string",
-                        "enum": [
-                            "min",
-                            "max",
-                            "average",
-                            "sum",
-                            "incremental-sum"
-                        ],
-                        "default": "average",
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "gtime",
-                        "in": "query",
-                        "description": "The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).",
-                        "required": false,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": false,
-                        "default": 0
-                    },
-                    {
-                        "name": "format",
-                        "in": "query",
-                        "description": "The format of the data to be returned.",
-                        "required": true,
-                        "type": "string",
-                        "enum": [
-                            "json",
-                            "jsonp",
-                            "csv",
-                            "tsv",
-                            "tsv-excel",
-                            "ssv",
-                            "ssvcomma",
-                            "datatable",
-                            "datasource",
-                            "html",
-                            "array",
-                            "csvjsonarray"
-                        ],
-                        "default": "json",
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "options",
-                        "in": "query",
-                        "description": "Options that affect data generation.",
-                        "required": false,
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "nonzero",
-                                "flip",
-                                "jsonwrap",
-                                "min2max",
-                                "seconds",
-                                "milliseconds",
-                                "abs",
-                                "absolute",
-                                "absolute-sum",
-                                "null2zero",
-                                "objectrows",
-                                "google_json",
-                                "percentage",
-                                "unaligned",
-                                "match-ids",
-                                "match-names"
-                            ],
-                            "collectionFormat": "pipes"
-                        },
-                        "default": [
-                            "seconds",
-                            "jsonwrap"
-                        ],
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "callback",
-                        "in": "query",
-                        "description": "For JSONP responses, the callback function name.",
-                        "required": false,
-                        "type": "string",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "filename",
-                        "in": "query",
-                        "description": "Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.",
-                        "required": false,
-                        "type": "string",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "tqx",
-                        "in": "query",
-                        "description": "[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.",
-                        "required": false,
-                        "type": "string",
-                        "allowEmptyValue": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The call was successful. The response should include the data.",
-                        "schema": {
-                            "$ref": "#/definitions/chart"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request - the body will include a message stating what is wrong."
-                    },
-                    "404": {
-                        "description": "No chart with the given id is found."
-                    },
-                    "500": {
-                        "description": "Internal server error. This usually means the server is out of memory."
-                    }
-                }
-            }
-        },
-        "/badge.svg": {
-            "get": {
-                "summary": "Generate a SVG image for a chart (or dimension)",
-                "description": "Successful responses are SVG images\n",
-                "parameters": [
-                    {
-                        "name": "chart",
-                        "in": "query",
-                        "description": "The id of the chart as returned by the /charts call.",
-                        "required": true,
-                        "type": "string",
-                        "format": "as returned by /charts",
-                        "allowEmptyValue": false,
-                        "default": "system.cpu"
-                    },
-                    {
-                        "name": "alarm",
-                        "in": "query",
-                        "description": "the name of an alarm linked to the chart",
-                        "required": false,
-                        "type": "string",
-                        "format": "any text",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "dimension",
-                        "in": "query",
-                        "description": "zero, one or more dimension ids or names, as returned by the /chart call, separated with comma or pipe. Netdata simple patterns are supported.",
-                        "required": false,
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "collectionFormat": "pipes",
-                            "format": "as returned by /charts"
-                        },
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "after",
-                        "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
-                        "required": true,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": false,
-                        "default": -600
-                    },
-                    {
-                        "name": "before",
-                        "in": "query",
-                        "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
-                        "required": false,
-                        "type": "number",
-                        "format": "integer",
-                        "default": 0
-                    },
-                    {
-                        "name": "group",
-                        "in": "query",
-                        "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
-                        "required": true,
-                        "type": "string",
-                        "enum": [
-                            "min",
-                            "max",
-                            "average",
-                            "sum",
-                            "incremental-sum"
-                        ],
-                        "default": "average",
-                        "allowEmptyValue": false
-                    },
-                    {
-                        "name": "options",
-                        "in": "query",
-                        "description": "Options that affect data generation.",
-                        "required": false,
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "abs",
-                                "absolute",
-                                "display-absolute",
-                                "absolute-sum",
-                                "null2zero",
-                                "percentage",
-                                "unaligned"
-                            ],
-                            "collectionFormat": "pipes"
-                        },
-                        "default": [
-                            "absolute"
-                        ],
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "label",
-                        "in": "query",
-                        "description": "a text to be used as the label",
-                        "required": false,
-                        "type": "string",
-                        "format": "any text",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "units",
-                        "in": "query",
-                        "description": "a text to be used as the units",
-                        "required": false,
-                        "type": "string",
-                        "format": "any text",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "label_color",
-                        "in": "query",
-                        "description": "a color to be used for the background of the label",
-                        "required": false,
-                        "type": "string",
-                        "format": "any text",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "value_color",
-                        "in": "query",
-                        "description": "a color to be used for the background of the label. You can set multiple using a pipe with a condition each, like this: color<value|color>value|color:null The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists).",
-                        "required": false,
-                        "type": "string",
-                        "format": "any text",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "multiply",
-                        "in": "query",
-                        "description": "multiply the value with this number for rendering it at the image (integer value required)",
-                        "required": false,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": true
-                    },
-                    {
-                        "name": "divide",
-                        "in": "query",
-                        "description": "divide the value with this number for rendering it at the image (integer value required)",
-                        "required": false,
-                        "type": "number",
-                        "format": "integer",
-                        "allowEmptyValue": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The call was successful. The response should be an SVG image."
-                    },
-                    "400": {
-                        "description": "Bad request - the body will include a message stating what is wrong."
-                    },
-                    "404": {
-                        "description": "No chart with the given id is found."
-                    },
-                    "500": {
-                        "description": "Internal server error. This usually means the server is out of memory."
-                    }
-                }
-            }
-        },
-        "/allmetrics": {
-            "get": {
-                "summary": "Get a value of all the metrics maintained by netdata",
-                "description": "The charts endpoint returns the latest value of all charts and dimensions stored in the netdata server.",
-                "parameters": [
-                    {
-                        "name": "format",
-                        "in": "query",
-                        "description": "The format of the response to be returned",
-                        "required": true,
-                        "type": "string",
-                        "enum": [
-                            "shell",
-                            "prometheus"
-                        ],
-                        "default": "shell"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "All the metrics returned in the format requested"
-                    },
-                    "400": {
-                        "description": "The format requested is not supported"
-                    }
-                }
-            }
+          }
         }
+      }
     },
-    "definitions": {
-        "chart_summary": {
-            "type": "object",
-            "properties": {
-                "hostname": {
-                    "type": "string",
-                    "description": "The hostname of the netdata server."
-                },
-                "version": {
-                    "type": "string",
-                    "description": "netdata version of the server."
-                },
-                "os": {
-                    "type": "string",
-                    "description": "The netdata server host operating system.",
-                    "enum": [
-                        "macos",
-                        "linux",
-                        "freebsd"
-                    ]
-                },
-                "history": {
-                    "type": "number",
-                    "description": "The duration, in seconds, of the round robin database maintained by netdata."
-                },
-                "update_every": {
-                    "type": "number",
-                    "description": "The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this."
-                },
-                "charts": {
-                    "type": "object",
-                    "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
-                    "properties": {
-                        "key": {
-                            "$ref": "#/definitions/chart"
-                        }
-                    }
-                },
-                "charts_count": {
-                    "type": "number",
-                    "description": "The number of charts."
-                },
-                "dimensions_count": {
-                    "type": "number",
-                    "description": "The total number of dimensions."
-                },
-                "alarms_count": {
-                    "type": "number",
-                    "description": "The number of alarms."
-                },
-                "rrd_memory_bytes": {
-                    "type": "number",
-                    "description": "The size of the round robin database in bytes."
-                }
+    "/chart": {
+      "get": {
+        "summary": "Get info about a specific chart",
+        "description": "The Chart endpoint returns detailed information about a chart.",
+        "parameters": [
+          {
+            "name": "chart",
+            "in": "query",
+            "description": "The id of the chart as returned by the /charts call.",
+            "required": true,
+            "type": "string",
+            "format": "as returned by /charts",
+            "default": "system.cpu"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A javascript object with detailed information about the chart.",
+            "schema": {
+              "$ref": "#/definitions/chart"
             }
-        },
-        "chart": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "description": "The unique id of the chart"
-                },
-                "name": {
-                    "type": "string",
-                    "description": "The name of the chart"
-                },
-                "type": {
-                    "type": "string",
-                    "description": "The type of the chart. Types are not handled by netdata. You can use this field for anything you like."
-                },
-                "family": {
-                    "type": "string",
-                    "description": "The family of the chart. Families are not handled by netdata. You can use this field for anything you like."
-                },
-                "title": {
-                    "type": "string",
-                    "description": "The title of the chart."
-                },
-                "priority": {
-                    "type": "string",
-                    "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
-                },
-                "enabled": {
-                    "type": "boolean",
-                    "description": "True when the chart is enabled. Disabled charts do not currently collect values, but they may have historical values available."
-                },
-                "units": {
-                    "type": "string",
-                    "description": "The unit of measurement for the values of all dimensions of the chart."
-                },
-                "data_url": {
-                    "type": "string",
-                    "description": "The absolute path to get data values for this chart. You are expected to use this path as the base when constructing the URL to fetch data values for this chart."
-                },
-                "chart_type": {
-                    "type": "string",
-                    "description": "The chart type.",
-                    "enum": [
-                        "line",
-                        "area",
-                        "stacked"
-                    ]
-                },
-                "duration": {
-                    "type": "number",
-                    "description": "The duration, in seconds, of the round robin database maintained by netdata."
-                },
-                "first_entry": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database."
-                },
-                "last_entry": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the latest entry in the round robin database."
-                },
-                "update_every": {
-                    "type": "number",
-                    "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database."
-                },
-                "dimensions": {
-                    "type": "object",
-                    "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.",
-                    "properties": {
-                        "key": {
-                            "$ref": "#/definitions/dimension"
-                        }
-                    }
-                },
-                "green": {
-                    "type": "number",
-                    "description": "Chart health green threshold"
-                },
-                "red": {
-                    "type": "number",
-                    "description": "Chart health red trheshold"
-                }
-            }
-        },
-        "dimension": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "The name of the dimension"
-                }
-            }
-        },
-        "json_wrap": {
-            "type": "object",
-            "properties": {
-                "api": {
-                    "type": "number",
-                    "description": "The API version this conforms to, currently 1"
-                },
-                "id": {
-                    "type": "string",
-                    "description": "The unique id of the chart"
-                },
-                "name": {
-                    "type": "string",
-                    "description": "The name of the chart"
-                },
-                "update_every": {
-                    "type": "number",
-                    "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
-                },
-                "view_update_every": {
-                    "type": "number",
-                    "description": "The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this."
-                },
-                "first_entry": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
-                },
-                "last_entry": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
-                },
-                "after": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the first entry (the oldest) returned in this response."
-                },
-                "before": {
-                    "type": "number",
-                    "description": "The UNIX timestamp of the latest entry returned in this response."
-                },
-                "min": {
-                    "type": "number",
-                    "description": "The minimum value returned in the current view. This can be used to size the y-series of the chart."
-                },
-                "max": {
-                    "type": "number",
-                    "description": "The maximum value returned in the current view. This can be used to size the y-series of the chart."
-                },
-                "dimension_names": {
-                    "description": "The dimension names of the chart as returned in the current view.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "dimension_ids": {
-                    "description": "The dimension IDs of the chart as returned in the current view.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "latest_values": {
-                    "description": "The latest values collected for the chart (indepedently of the current view).",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "view_latest_values": {
-                    "description": "The latest values returned with this response.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "dimensions": {
-                    "type": "number",
-                    "description": "The number of dimensions returned."
-                },
-                "points": {
-                    "type": "number",
-                    "description": "The number of rows / points returned."
-                },
-                "format": {
-                    "type": "string",
-                    "description": "The format of the result returned."
-                },
-                "result": {
-                    "description": "The result requested, in the format requested."
-                }
-            }
+          },
+          "404": {
+            "description": "No chart with the given id is found."
+          }
         }
+      }
+    },
+    "/data": {
+      "get": {
+        "summary": "Get collected data for a specific chart",
+        "description": "The Data endpoint returns data stored in the round robin database of a chart.\n",
+        "parameters": [
+          {
+            "name": "chart",
+            "in": "query",
+            "description": "The id of the chart as returned by the /charts call.",
+            "required": true,
+            "type": "string",
+            "format": "as returned by /charts",
+            "allowEmptyValue": false,
+            "default": "system.cpu"
+          },
+          {
+            "name": "dimension",
+            "in": "query",
+            "description": "zero, one or more dimension ids or names, as returned by the /chart call, separated with comma or pipe. Netdata simple patterns are supported.",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "collectionFormat": "pipes",
+              "format": "as returned by /charts"
+            },
+            "allowEmptyValue": false
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
+            "required": true,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": false,
+            "default": -600
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is zero (i.e. the timestamp of the last value collected).",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "default": 0
+          },
+          {
+            "name": "points",
+            "in": "query",
+            "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration will be returned.",
+            "required": true,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": false,
+            "default": 20
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "min",
+              "max",
+              "average",
+              "sum",
+              "incremental-sum"
+            ],
+            "default": "average",
+            "allowEmptyValue": false
+          },
+          {
+            "name": "gtime",
+            "in": "query",
+            "description": "The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": false,
+            "default": 0
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "The format of the data to be returned.",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "json",
+              "jsonp",
+              "csv",
+              "tsv",
+              "tsv-excel",
+              "ssv",
+              "ssvcomma",
+              "datatable",
+              "datasource",
+              "html",
+              "array",
+              "csvjsonarray"
+            ],
+            "default": "json",
+            "allowEmptyValue": false
+          },
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "nonzero",
+                "flip",
+                "jsonwrap",
+                "min2max",
+                "seconds",
+                "milliseconds",
+                "abs",
+                "absolute",
+                "absolute-sum",
+                "null2zero",
+                "objectrows",
+                "google_json",
+                "percentage",
+                "unaligned",
+                "match-ids",
+                "match-names"
+              ],
+              "collectionFormat": "pipes"
+            },
+            "default": [
+              "seconds",
+              "jsonwrap"
+            ],
+            "allowEmptyValue": false
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "description": "For JSONP responses, the callback function name.",
+            "required": false,
+            "type": "string",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "description": "Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.",
+            "required": false,
+            "type": "string",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "tqx",
+            "in": "query",
+            "description": "[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.",
+            "required": false,
+            "type": "string",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The call was successful. The response should include the data.",
+            "schema": {
+              "$ref": "#/definitions/chart"
+            }
+          },
+          "400": {
+            "description": "Bad request - the body will include a message stating what is wrong."
+          },
+          "404": {
+            "description": "No chart with the given id is found."
+          },
+          "500": {
+            "description": "Internal server error. This usually means the server is out of memory."
+          }
+        }
+      }
+    },
+    "/badge.svg": {
+      "get": {
+        "summary": "Generate a SVG image for a chart (or dimension)",
+        "description": "Successful responses are SVG images\n",
+        "parameters": [
+          {
+            "name": "chart",
+            "in": "query",
+            "description": "The id of the chart as returned by the /charts call.",
+            "required": true,
+            "type": "string",
+            "format": "as returned by /charts",
+            "allowEmptyValue": false,
+            "default": "system.cpu"
+          },
+          {
+            "name": "alarm",
+            "in": "query",
+            "description": "the name of an alarm linked to the chart",
+            "required": false,
+            "type": "string",
+            "format": "any text",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "dimension",
+            "in": "query",
+            "description": "zero, one or more dimension ids, as returned by the /chart call.",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "collectionFormat": "pipes",
+              "format": "as returned by /charts"
+            },
+            "allowEmptyValue": false
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
+            "required": true,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": false,
+            "default": -600
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "default": 0
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "min",
+              "max",
+              "average",
+              "sum",
+              "incremental-sum"
+            ],
+            "default": "average",
+            "allowEmptyValue": false
+          },
+          {
+            "name": "options",
+            "in": "query",
+            "description": "Options that affect data generation.",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "abs",
+                "absolute",
+                "display-absolute",
+                "absolute-sum",
+                "null2zero",
+                "percentage",
+                "unaligned"
+              ],
+              "collectionFormat": "pipes"
+            },
+            "default": [
+              "absolute"
+            ],
+            "allowEmptyValue": true
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "description": "a text to be used as the label",
+            "required": false,
+            "type": "string",
+            "format": "any text",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "description": "a text to be used as the units",
+            "required": false,
+            "type": "string",
+            "format": "any text",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "label_color",
+            "in": "query",
+            "description": "a color to be used for the background of the label",
+            "required": false,
+            "type": "string",
+            "format": "any text",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "value_color",
+            "in": "query",
+            "description": "a color to be used for the background of the label. You can set multiple using a pipe with a condition each, like this: color<value|color>value|color:null The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists).",
+            "required": false,
+            "type": "string",
+            "format": "any text",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "multiply",
+            "in": "query",
+            "description": "multiply the value with this number for rendering it at the image (integer value required)",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "divide",
+            "in": "query",
+            "description": "divide the value with this number for rendering it at the image (integer value required)",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": true
+          },
+          {
+            "name": "scale",
+            "in": "query",
+            "description": "set the scale of the badge (greater or equal to 100)",
+            "required": false,
+            "type": "number",
+            "format": "integer",
+            "allowEmptyValue": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The call was successful. The response should be an SVG image."
+          },
+          "400": {
+            "description": "Bad request - the body will include a message stating what is wrong."
+          },
+          "404": {
+            "description": "No chart with the given id is found."
+          },
+          "500": {
+            "description": "Internal server error. This usually means the server is out of memory."
+          }
+        }
+      }
+    },
+    "/allmetrics": {
+      "get": {
+        "summary": "Get a value of all the metrics maintained by netdata",
+        "description": "The charts endpoint returns the latest value of all charts and dimensions stored in the netdata server.",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "The format of the response to be returned",
+            "required": true,
+            "type": "string",
+            "enum": [
+              "shell",
+              "prometheus",
+              "prometheus_all_hosts",
+              "json"
+            ],
+            "default": "shell"
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "description": "enable or disable HELP lines in prometheus output",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "no"
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "enable or disable TYPE lines in prometheus output",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "no"
+          },
+          {
+            "name": "timestamps",
+            "in": "query",
+            "description": "enable or disable timestamps in prometheus output",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "names",
+            "in": "query",
+            "description": "When enabled netdata will report dimension names. When disabled netdata will report dimension IDs. The default is controlled in netdata.conf.",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.",
+            "required": false,
+            "type": "string",
+            "format": "any text"
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "Prefix all prometheus metrics with this string.",
+            "required": false,
+            "type": "string",
+            "format": "any text"
+          },
+          {
+            "name": "data",
+            "in": "query",
+            "description": "Select the prometheus response data source. The default is controlled in netdata.conf",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "as-collected",
+              "average",
+              "sum"
+            ],
+            "default": "average"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All the metrics returned in the format requested"
+          },
+          "400": {
+            "description": "The format requested is not supported"
+          }
+        }
+      }
     }
+  },
+  "definitions": {
+    "chart_summary": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "description": "The hostname of the netdata server."
+        },
+        "version": {
+          "type": "string",
+          "description": "netdata version of the server."
+        },
+        "os": {
+          "type": "string",
+          "description": "The netdata server host operating system.",
+          "enum": [
+            "macos",
+            "linux",
+            "freebsd"
+          ]
+        },
+        "history": {
+          "type": "number",
+          "description": "The duration, in seconds, of the round robin database maintained by netdata."
+        },
+        "update_every": {
+          "type": "number",
+          "description": "The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this."
+        },
+        "charts": {
+          "type": "object",
+          "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart"
+            }
+          }
+        },
+        "charts_count": {
+          "type": "number",
+          "description": "The number of charts."
+        },
+        "dimensions_count": {
+          "type": "number",
+          "description": "The total number of dimensions."
+        },
+        "alarms_count": {
+          "type": "number",
+          "description": "The number of alarms."
+        },
+        "rrd_memory_bytes": {
+          "type": "number",
+          "description": "The size of the round robin database in bytes."
+        }
+      }
+    },
+    "chart": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique id of the chart"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the chart"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of the chart. Types are not handled by netdata. You can use this field for anything you like."
+        },
+        "family": {
+          "type": "string",
+          "description": "The family of the chart. Families are not handled by netdata. You can use this field for anything you like."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the chart."
+        },
+        "priority": {
+          "type": "string",
+          "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "True when the chart is enabled. Disabled charts do not currently collect values, but they may have historical values available."
+        },
+        "units": {
+          "type": "string",
+          "description": "The unit of measurement for the values of all dimensions of the chart."
+        },
+        "data_url": {
+          "type": "string",
+          "description": "The absolute path to get data values for this chart. You are expected to use this path as the base when constructing the URL to fetch data values for this chart."
+        },
+        "chart_type": {
+          "type": "string",
+          "description": "The chart type.",
+          "enum": [
+            "line",
+            "area",
+            "stacked"
+          ]
+        },
+        "duration": {
+          "type": "number",
+          "description": "The duration, in seconds, of the round robin database maintained by netdata."
+        },
+        "first_entry": {
+          "type": "number",
+          "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database."
+        },
+        "last_entry": {
+          "type": "number",
+          "description": "The UNIX timestamp of the latest entry in the round robin database."
+        },
+        "update_every": {
+          "type": "number",
+          "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database."
+        },
+        "dimensions": {
+          "type": "object",
+          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/dimension"
+            }
+          }
+        },
+        "green": {
+          "type": "number",
+          "description": "Chart health green threshold"
+        },
+        "red": {
+          "type": "number",
+          "description": "Chart health red trheshold"
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the dimension"
+        }
+      }
+    },
+    "json_wrap": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "type": "number",
+          "description": "The API version this conforms to, currently 1"
+        },
+        "id": {
+          "type": "string",
+          "description": "The unique id of the chart"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the chart"
+        },
+        "update_every": {
+          "type": "number",
+          "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
+        },
+        "view_update_every": {
+          "type": "number",
+          "description": "The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this."
+        },
+        "first_entry": {
+          "type": "number",
+          "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
+        },
+        "last_entry": {
+          "type": "number",
+          "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
+        },
+        "after": {
+          "type": "number",
+          "description": "The UNIX timestamp of the first entry (the oldest) returned in this response."
+        },
+        "before": {
+          "type": "number",
+          "description": "The UNIX timestamp of the latest entry returned in this response."
+        },
+        "min": {
+          "type": "number",
+          "description": "The minimum value returned in the current view. This can be used to size the y-series of the chart."
+        },
+        "max": {
+          "type": "number",
+          "description": "The maximum value returned in the current view. This can be used to size the y-series of the chart."
+        },
+        "dimension_names": {
+          "description": "The dimension names of the chart as returned in the current view.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dimension_ids": {
+          "description": "The dimension IDs of the chart as returned in the current view.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latest_values": {
+          "description": "The latest values collected for the chart (indepedently of the current view).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "view_latest_values": {
+          "description": "The latest values returned with this response.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dimensions": {
+          "type": "number",
+          "description": "The number of dimensions returned."
+        },
+        "points": {
+          "type": "number",
+          "description": "The number of rows / points returned."
+        },
+        "format": {
+          "type": "string",
+          "description": "The format of the result returned."
+        },
+        "result": {
+          "description": "The result requested, in the format requested."
+        }
+      }
+    }
+  }
 }
