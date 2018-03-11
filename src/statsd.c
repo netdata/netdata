@@ -1466,14 +1466,20 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "gauge", RRD_ID_LENGTH_MAX);
 
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_gauge.%s", m->name);
+
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for gauge %s", m->name);
+
         m->st = statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
                 , "gauges"      // family (submenu)
-                , m->name       // context
-                , m->name       // title
+                , context       // context
+                , title         // title
                 , "value"       // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
@@ -1502,14 +1508,20 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
 
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", dim, m->name);
+
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
+
         m->st = statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
                 , family        // family (submenu)
-                , m->name       // context
-                , m->name       // title
+                , context       // context
+                , title         // title
                 , "events/s"    // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
@@ -1538,14 +1550,20 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "set", RRD_ID_LENGTH_MAX);
 
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_set.%s", m->name);
+
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for set %s", m->name);
+
         m->st = statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
                 , "sets"        // family (submenu)
-                , m->name       // context
-                , m->name       // title
+                , context       // context
+                , title         // title
                 , "entries"     // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
@@ -1574,14 +1592,20 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
 
+        char context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(context, RRD_ID_LENGTH_MAX, "statsd_%s.%s", dim, m->name);
+
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(title, RRD_ID_LENGTH_MAX, "statsd private chart for %s %s", dim, m->name);
+
         m->st = statsd_private_rrdset_create(
                 m
                 , type
                 , id
                 , NULL          // name
                 , family        // family (submenu)
-                , m->name       // context
-                , m->name       // title
+                , context       // context
+                , title         // title
                 , units         // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
