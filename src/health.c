@@ -348,7 +348,6 @@ static void health_main_cleanup(void *ptr) {
 }
 
 void *health_main(void *ptr) {
-    BUFFER *wb = buffer_create(100);
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
@@ -421,7 +420,7 @@ void *health_main(void *ptr) {
                     int value_is_null = 0;
 
                     int ret = rrdset2value_api_v1(rc->rrdset
-                                                  , wb
+                                                  , NULL
                                                   , &rc->value
                                                   , rc->dimensions
                                                   , 1
@@ -732,8 +731,6 @@ void *health_main(void *ptr) {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
 
     } // forever
-
-    buffer_free(wb);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

@@ -432,6 +432,8 @@ struct rrdhost {
     char *cache_dir;                                // the directory to save RRD cache files
     char *varlib_dir;                               // the directory to save health log
 
+    char *program_name;                             // the program name that collects metrics for this host
+    char *program_version;                          // the program version that collects metrics for this host
 
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush
@@ -557,6 +559,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *os
         , const char *timezone
         , const char *tags
+        , const char *program_name
+        , const char *program_version
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode

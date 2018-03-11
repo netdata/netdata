@@ -142,6 +142,8 @@ void web_client_request_done(struct web_client *w) {
     w->origin[0] = '*';
     w->origin[1] = '\0';
 
+    freez(w->user_agent); w->user_agent = NULL;
+
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     w->tcp_cork = 0;
@@ -722,14 +724,15 @@ const char *web_response_code_to_string(int code) {
     }
 }
 
-static inline char *http_header_parse(struct web_client *w, char *s) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0;
+static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0;
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
         hash_accept_encoding = simple_uhash("Accept-Encoding");
         hash_donottrack = simple_uhash("DNT");
+        hash_useragent = simple_uhash("User-Agent");
     }
 
     char *e = s;
@@ -771,6 +774,9 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
     else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
         if(*v == '0') web_client_disable_donottrack(w);
         else if(*v == '1') web_client_enable_donottrack(w);
+    }
+    else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
+        w->user_agent = strdupz(v);
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -871,7 +877,9 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             }
 
             // another header line
-            s = http_header_parse(w, s);
+            s = http_header_parse(w, s,
+                    (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
+            );
         }
     }
 

@@ -110,12 +110,15 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if(allhosts) {
+        buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"}\n", hostname, host->program_name, host->program_version);
         if(host->tags && *(host->tags))
             buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
 
         snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
     }
     else {
+        buffer_sprintf(wb, "netdata_info{application=\"%s\",version=\"%s\"}\n", host->program_name, host->program_version);
+
         if(host->tags && *(host->tags))
             buffer_sprintf(wb, "netdata_host_tags{%s} 1 %llu\n", host->tags, now_realtime_usec() / USEC_PER_MS);
     }

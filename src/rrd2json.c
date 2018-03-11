@@ -128,7 +128,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
         ",\n\t\"custom_info\": \"%s\""
         ",\n\t\"charts\": {"
         , host->hostname
-        , program_version
+        , host->program_version
         , host->os
         , host->timezone
         , host->rrd_update_every
@@ -1849,10 +1849,12 @@ int rrdset2value_api_v1(
         return 400;
     }
 
-    if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
-        buffer_no_cacheable(wb);
-    else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
-        buffer_cacheable(wb);
+    if(wb) {
+        if (r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+            buffer_no_cacheable(wb);
+        else if (r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+            buffer_cacheable(wb);
+    }
 
     options = rrdr_check_options(r, options, dimensions);
 
