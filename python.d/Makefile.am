@@ -33,6 +33,7 @@ dist_python_DATA = \
     haproxy.chart.py \
     hddtemp.chart.py \
     httpcheck.chart.py \
+    icecast.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
     mdstat.chart.py \
