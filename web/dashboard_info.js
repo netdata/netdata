@@ -177,6 +177,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'httpcheck': {
+        title: 'Http Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Web Service availability and latency monitoring using HTTP checks. This plugin is a specialized version of the port check plugin.'
+    },
+
     'memcached': {
         title: 'memcached',
         icon: '<i class="fas fa-database"></i>',
@@ -1206,6 +1212,25 @@ netdataDashboard.context = {
         mainheads: [
             netdataDashboard.gaugeChart('Requests', '12%', '', NETDATA.colors[0])
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // HTTP check
+
+    'httpcheck.responsetime': {
+        info: 'The <code>response time</code> describes the time passed between request and response. ' +
+        'Currently, the accuracy of the response time is low and should be used as reference only.'
+    },
+
+    'httpcheck.responselength': {
+        info: 'The <code>response length</code> counts the number of characters in the response body. For static pages, this should be mostly constant.'
+    },
+
+    'httpcheck.status': {
+        valueRange: "[0, 1]",
+        info: 'This chart verifies the response of the webserver. Each status dimension will have a value of <code>1</code> if triggered. ' +
+        'Dimension <code>success</code> is <code>1</code> only if all constraints are satisfied.' +
+        'This chart is most useful for alarms or third-party apps.'
     },
 
     // ------------------------------------------------------------------------

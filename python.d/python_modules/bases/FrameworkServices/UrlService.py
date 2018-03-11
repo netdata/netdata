@@ -75,20 +75,31 @@ class UrlService(SimpleService):
         :return: str
         """
         try:
-            url = url or self.url
-            manager = manager or self._manager
-            response = manager.request(method='GET',
-                                       url=url,
-                                       timeout=self.request_timeout,
-                                       retries=1,
-                                       headers=manager.headers)
+            status, data = self._get_raw_data_with_status(url, manager)
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
             self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
             return None
-        if response.status == 200:
-            return response.data.decode()
-        self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=response.status))
-        return None
+
+        if status == 200:
+            return data
+        else:
+            self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
+            return None
+
+    def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True):
+        """
+        Get status and response body content from http request. Does not catch exceptions
+        :return: int, str
+        """
+        url = url or self.url
+        manager = manager or self._manager
+        response = manager.request(method='GET',
+                                   url=url,
+                                   timeout=self.request_timeout,
+                                   retries=retries,
+                                   headers=manager.headers,
+                                   redirect=redirect)
+        return response.status, response.data.decode()
 
     def check(self):
         """
