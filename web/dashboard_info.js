@@ -1989,7 +1989,7 @@ netdataDashboard.context = {
     },
 
     'ntpd.sys_rootdelay': {
-        info: 'The rootdelay is the roundtrip delay to the primary reference clock, similar to the delay shown by the <code>ping</code> command. A lower delay should result in a (possibly exponentially) lower clock offset.',
+        info: 'The rootdelay is the round-trip delay to the primary reference clock, similar to the delay shown by the <code>ping</code> command. A lower delay should result in a lower clock offset.',
         colors: NETDATA.colors[1]
     },
 
@@ -2006,6 +2006,56 @@ netdataDashboard.context = {
 
     'ntpd.sys_precision': {
         colors: NETDATA.colors[6],
+        height: 0.2
+    },
+
+    'ntpd.peer_offset': {
+        info: 'The offset of the peer clock relative to the system clock in milliseconds. Smaller values here weight peers more heavily for selection after the initial synchronization of the local clock. For a system providing time service to other systems, these should be as low as possible.'
+    },
+
+    'ntpd.peer_delay': {
+        info: 'The round-trip time (RTT) for communication with the peer, similar to the delay shown by the <code>ping</code> command. Not as critical as either the offset or jitter, but still factored into the selection algorithm (because as a general rule, lower delay means more accurate time). In most cases, it should be below 100ms.'
+    },
+
+    'ntpd.peer_dispersion': {
+        info: 'This is a measure of the estimated error between the peer and the local system. Lower values here are better.'
+    },
+
+    'ntpd.peer_jitter': {
+        info: 'This is essentially a remote estimate of the peer\'s <code>system_jitter</code> value. Lower values here weight highly in favor of peer selection, and this is a good indicator of overall quality of a given time server (good servers will have values not exceeding single digit milliseconds here, with high quality stratum one servers regularly having sub-millisecond jitter).'
+    },
+
+    'ntpd.peer_xleave': {
+        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html">NTP Interleaved Modes</a>.'
+    },
+
+    'ntpd.peer_rootdelay': {
+        info: 'For a stratum 1 server, this is the access latency for the reference clock. For lower stratum servers, it is the sum of the <code>peer_delay</code> and <code>peer_rootdelay</code> for the system they are syncing off of. Similarly to <code>peer_delay</code>, lower values here are technically better, but have limited influence in peer selection.'
+    },
+
+    'ntpd.peer_rootdisp': {
+        info: 'Is the same as <code>peer_rootdelay</code>, but measures accumulated <code>peer_dispersion</code> instead of accumulated <code>peer_delay</code>.'
+    },
+
+    'ntpd.peer_hmode': {
+        info: 'The <code>peer_hmode</code> and <code>peer_pmode</code> variables give info about what mode the packets being sent to and received from a given peer are. Mode 1 is symmetric active (both the local system and the remote peer have each other declared as peers in <code>/etc/ntp.conf</code>), Mode 2 is symmetric passive (only one side has the other declared as a peer), Mode 3 is client, Mode 4 is server, and Mode 5 is broadcast (also used for multicast and manycast operation).',
+        height: 0.2
+    },
+
+    'ntpd.peer_pmode': {
+        height: 0.2
+    },
+
+    'ntpd.peer_hpoll': {
+        info: 'The <code>peer_hpoll</code> and <code>peer_ppoll</code> variables are log2 representations of the polling interval in seconds.',
+        height: 0.5
+    },
+
+    'ntpd.peer_ppoll': {
+        height: 0.5
+    },
+
+    'ntpd.peer_precision': {
         height: 0.2
     }
 
