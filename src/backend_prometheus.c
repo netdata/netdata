@@ -2,23 +2,29 @@
 
 // ----------------------------------------------------------------------------
 // PROMETHEUS
-// /api/v1/allmetrics?format=prometheus
+// /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
 
 static struct prometheus_server {
     const char *server;
     uint32_t hash;
+    RRDHOST *host;
     time_t last_access;
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
-static inline time_t prometheus_server_last_access(const char *server, time_t now) {
+static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
+
+static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now) {
     uint32_t hash = simple_hash(server);
 
+    netdata_mutex_lock(&prometheus_server_root_mutex);
+    
     struct prometheus_server *ps;
     for(ps = prometheus_server_root; ps ;ps = ps->next) {
-        if (hash == ps->hash && !strcmp(server, ps->server)) {
+        if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
             time_t last = ps->last_access;
             ps->last_access = now;
+            netdata_mutex_unlock(&prometheus_server_root_mutex);
             return last;
         }
     }
@@ -26,10 +32,12 @@ static inline time_t prometheus_server_last_access(const char *server, time_t no
     ps = callocz(1, sizeof(struct prometheus_server));
     ps->server = strdupz(server);
     ps->hash = hash;
+    ps->host = host;
     ps->last_access = now;
     ps->next = prometheus_server_root;
     prometheus_server_root = ps;
 
+    netdata_mutex_unlock(&prometheus_server_root_mutex);
     return 0;
 }
 
@@ -111,6 +119,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if(allhosts) {
         buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"}\n", hostname, host->program_name, host->program_version);
+
         if(host->tags && *(host->tags))
             buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
 
@@ -371,7 +380,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t options, const char *server, time_t now, int help) {
     if(!server || !*server) server = "default";
 
-    time_t after  = prometheus_server_last_access(server, now);
+    time_t after  = prometheus_server_last_access(server, host, now);
 
     int first_seen = 0;
     if(!after) {
