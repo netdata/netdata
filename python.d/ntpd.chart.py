@@ -225,7 +225,6 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = dict(CHARTS)
-        self.definitions.update(PEER_CHARTS)
 
         self.port = 'ntp'
         self.dgram_socket = True
@@ -235,6 +234,9 @@ class Service(SocketService):
         self.retries = 0
         self.show_peers = self.configuration.get('show_peers', False)
         self.peer_rescan = self.configuration.get('peer_rescan', 60)
+
+        if self.show_peers:
+            self.definitions.update(PEER_CHARTS)
 
     def check(self):
         """
