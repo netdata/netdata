@@ -12,13 +12,13 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
-static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
-
 static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now) {
+    static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
+
     uint32_t hash = simple_hash(server);
 
     netdata_mutex_lock(&prometheus_server_root_mutex);
-    
+
     struct prometheus_server *ps;
     for(ps = prometheus_server_root; ps ;ps = ps->next) {
         if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
