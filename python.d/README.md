@@ -2181,7 +2181,7 @@ It produces:
  * redirect (3xx except 304)  
  * bad (4xx)  
  * other (all other responses)  
- 
+
 2. **Responses** by codes  
  * 2xx (successful)  
  * 5xx (internal server errors)  
@@ -2189,7 +2189,7 @@ It produces:
  * 4xx (bad)  
  * 1xx (informational)  
  * other (non-standart responses)  
- 
+
 3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
 
 4. **Requests**/s   
@@ -2197,7 +2197,7 @@ It produces:
 
 5. **Total response time**  
  * sum of all response time  
- 
+
 6. **Average response time**  
 
 7. **Average response time per iteration**  
