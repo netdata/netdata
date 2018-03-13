@@ -55,7 +55,7 @@ CHARTS = {
     'total_response_time': {
         'options': [None, 'Total response time', 'seconds', 'timings', 'traefik.total_response_time', 'line'],
         'lines': [
-            ['total_response_time_sec', 'response', 'absolute']
+            ['total_response_time_sec', 'response', 'absolute', 1, 10000]
         ]},
     'average_response_time': {
         'options': [None, 'Average response time', 'milliseconds', 'timings', 'traefik.average_response_time', 'line'],
@@ -65,7 +65,7 @@ CHARTS = {
     'average_response_time_per_iteration': {
         'options': [None, 'Average response time per iteration', 'milliseconds', 'timings', 'traefik.average_response_time_per_iteration', 'line'],
         'lines': [
-            ['average_response_time_per_iteration_sec', 'response', 'incremental', 1, 1000]
+            ['average_response_time_per_iteration_sec', 'response', 'incremental', 1, 10000]
         ]},
     'uptime': {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
@@ -114,6 +114,7 @@ class Service(UrlService):
         self.data.update(fetch_data_(raw_data=data, metrics=HEALTH_STATS))
 
         self.data['average_response_time_sec'] *= 1000000
+        self.data['total_response_time_sec'] *= 10000
         if data['total_count'] != self.last_total_count:
             self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] - self.last_total_response_time) * 1000000 / (data['total_count'] - self.last_total_count)
         else:
