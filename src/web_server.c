@@ -106,6 +106,8 @@ static void web_client_zero(struct web_client *w) {
     buffer_flush(b2);
     buffer_flush(b3);
 
+    freez(w->user_agent);
+
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
@@ -119,6 +121,7 @@ static void web_client_free(struct web_client *w) {
     buffer_free(w->response.header_output);
     buffer_free(w->response.header);
     buffer_free(w->response.data);
+    freez(w->user_agent);
     freez(w);
 }
 
@@ -342,6 +345,9 @@ static void web_client_initialize_connection(struct web_client *w) {
     web_client_update_acl_matches(w);
 
     w->origin[0] = '*'; w->origin[1] = '\0';
+    w->cookie1[0] = '\0'; w->cookie2[0] = '\0';
+    freez(w->user_agent); w->user_agent = NULL;
+
     web_client_enable_wait_receive(w);
 
     log_connection(w, "CONNECTED");

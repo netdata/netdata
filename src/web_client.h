@@ -144,6 +144,7 @@ struct web_client {
     char cookie1[NETDATA_WEB_REQUEST_COOKIE_SIZE+1];
     char cookie2[NETDATA_WEB_REQUEST_COOKIE_SIZE+1];
     char origin[NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE+1];
+    char *user_agent;
 
     struct response response;
 
