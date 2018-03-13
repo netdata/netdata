@@ -364,7 +364,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
             "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
-                    "User-Agent: netdata-push-service/%s\r\n"
+                    "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
               , host->hostname
@@ -374,7 +374,8 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->os
               , host->timezone
               , (host->tags)?host->tags:""
-              , program_version
+              , host->program_name
+              , host->program_version
     );
 
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
@@ -721,7 +722,20 @@ static RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY get_multiple_connections_strategy(s
     return ret;
 }
 
-static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *timezone, const char *tags, int update_every, char *client_ip, char *client_port) {
+static int rrdpush_receive(int fd
+                           , const char *key
+                           , const char *hostname
+                           , const char *registry_hostname
+                           , const char *machine_guid
+                           , const char *os
+                           , const char *timezone
+                           , const char *tags
+                           , const char *program_name
+                           , const char *program_version
+                           , int update_every
+                           , char *client_ip
+                           , char *client_port
+) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -773,6 +787,8 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
                 , os
                 , timezone
                 , tags
+                , program_name
+                , program_version
                 , update_every
                 , history
                 , mode
@@ -911,6 +927,8 @@ struct rrdpush_thread {
     char *tags;
     char *client_ip;
     char *client_port;
+    char *program_name;
+    char *program_version;
     int update_every;
 };
 
@@ -931,6 +949,8 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->tags);
         freez(rpt->client_ip);
         freez(rpt->client_port);
+        freez(rpt->program_name);
+        freez(rpt->program_version);
         freez(rpt);
     }
 }
@@ -950,6 +970,8 @@ static void *rrdpush_receiver_thread(void *ptr) {
                 , rpt->os
                 , rpt->timezone
                 , rpt->tags
+                , rpt->program_name
+                , rpt->program_version
                 , rpt->update_every
                 , rpt->client_ip
                 , rpt->client_port
@@ -1088,7 +1110,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         }
     }
 
-    struct rrdpush_thread *rpt = mallocz(sizeof(struct rrdpush_thread));
+    struct rrdpush_thread *rpt = callocz(1, sizeof(struct rrdpush_thread));
     rpt->fd                = w->ifd;
     rpt->key               = strdupz(key);
     rpt->hostname          = strdupz(hostname);
@@ -1100,6 +1122,18 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
+
+    if(w->user_agent && w->user_agent[0]) {
+        char *t = strchr(w->user_agent, '/');
+        if(t && *t) {
+            *t = '\0';
+            t++;
+        }
+
+        rpt->program_name = strdupz(w->user_agent);
+        if(t && *t) rpt->program_version = strdupz(t);
+    }
+
     netdata_thread_t thread;
 
     debug(D_SYSTEM, "starting STREAM receive thread.");
