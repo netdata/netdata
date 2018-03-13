@@ -215,14 +215,14 @@ CHARTS = {
         'lines': [
             ['indices_segments_memory_in_bytes', 'total', 'absolute', 1, 1048567],
             ['indices_segments_terms_memory_in_bytes', 'terms', 'absolute', 1, 1048567],
-            ['indices_segments_stored_fields_memory_in_bytes', 'stored_fields', 'absolute', 1, 1048567],
-            ['indices_segments_term_vectors_memory_in_bytes', 'term_vectors', 'absolute', 1, 1048567],
+            ['indices_segments_stored_fields_memory_in_bytes', 'stored fields', 'absolute', 1, 1048567],
+            ['indices_segments_term_vectors_memory_in_bytes', 'term vectors', 'absolute', 1, 1048567],
             ['indices_segments_norms_memory_in_bytes', 'norms', 'absolute', 1, 1048567],
             ['indices_segments_points_memory_in_bytes', 'points', 'absolute', 1, 1048567],
-            ['indices_segments_doc_values_memory_in_bytes', 'doc_values', 'absolute', 1, 1048567],
-            ['indices_segments_index_writer_memory_in_bytes', 'index_writer', 'absolute', 1, 1048567],
-            ['indices_segments_version_map_memory_in_bytes', 'version_map', 'absolute', 1, 1048567],
-            ['indices_segments_fixed_bit_set_memory_in_bytes', 'fixed_bit_set', 'absolute', 1, 1048567]
+            ['indices_segments_doc_values_memory_in_bytes', 'doc values', 'absolute', 1, 1048567],
+            ['indices_segments_index_writer_memory_in_bytes', 'index writer', 'absolute', 1, 1048567],
+            ['indices_segments_version_map_memory_in_bytes', 'version map', 'absolute', 1, 1048567],
+            ['indices_segments_fixed_bit_set_memory_in_bytes', 'fixed bit set', 'absolute', 1, 1048567]
         ]},
     'jvm_mem_heap': {
         'options': [None, 'JVM Heap Currently in Use/Committed', 'percent/MB', 'memory usage and gc',
