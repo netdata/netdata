@@ -32,7 +32,7 @@ NODE_STATS = [
     'indices.indexing.index_time_in_millis',
     'indices.refresh.total',
     'indices.refresh.total_time_in_millis',
-    'indices.flush.total'
+    'indices.flush.total',
     'indices.flush.total_time_in_millis',
     'jvm.gc.collectors.young.collection_count',
     'jvm.gc.collectors.old.collection_count',
@@ -40,7 +40,7 @@ NODE_STATS = [
     'jvm.gc.collectors.old.collection_time_in_millis',
     'jvm.mem.heap_used_percent',
     'jvm.mem.heap_committed_in_bytes',
-    'thread_pool.bulk.queue'
+    'thread_pool.bulk.queue',
     'thread_pool.bulk.rejected',
     'thread_pool.index.queue',
     'thread_pool.index.rejected',
