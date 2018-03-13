@@ -323,6 +323,39 @@ local:
 
 ---
 
+# ceph
+
+This module monitors the ceph cluster usage and consuption data of a server.
+
+It produces:
+
+* Cluster statistics (usage, available, latency, objects, read/write rate)
+* OSD usage
+* OSD latency
+* Pool usage
+* Pool read/write operations
+* Pool read/write rate
+* number of objects per pool
+
+**Requirements:**
+
+- `rados` python module
+- Granting read permissions to ceph group from keyring file
+```shell
+# chmod 640 /etc/ceph/ceph.client.admin.keyring
+```
+
+### Configuration
+
+Sample:
+```yaml
+local:
+  config_file: '/etc/ceph/ceph.conf'
+  keyring_file: '/etc/ceph/ceph.client.admin.keyring'
+```
+
+---
+
 # couchdb
 
 This module monitors vital statistics of a local Apache CouchDB 2.x server, including:
@@ -411,6 +444,59 @@ This module provides dns query time statistics.
 It produces one aggregate chart or one chart per dns server, showing the query time.
 
 ---
+
+# dnsdist
+
+Module monitor dnsdist performance and health metrics.
+
+Following charts are drawn:
+
+1. **Response latency**
+ * latency-slow
+ * latency100-1000
+ * latency50-100
+ * latency10-50
+ * latency1-10
+ * latency0-1
+
+2. **Cache performance**
+ * cache-hits
+ * cache-misses
+
+3. **ACL events**
+ * acl-drops
+ * rule-drop
+ * rule-nxdomain
+ * rule-refused
+
+4. **Noncompliant data**
+ * empty-queries
+ * no-policy
+ * noncompliant-queries
+ * noncompliant-responses
+
+5. **Queries**
+ * queries
+ * rdqueries
+ * rdqueries
+
+6. **Health**
+ * downstream-send-errors
+ * downstream-timeouts
+ * servfail-responses
+ * trunc-failures
+
+### configuration
+
+```yaml
+localhost:
+  name : 'local'
+  url  : 'http://127.0.0.1:5053/jsonstat?command=stats'
+  user : 'username'
+  pass : 'password'
+  header:
+    X-API-Key: 'dnsdist-api-key'
+```
 
 # dovecot
 
@@ -764,6 +850,75 @@ port: 7634
 ```
 
 If no configuration is given, module will attempt to connect to hddtemp daemon on `127.0.0.1:7634` address
+
+---
+
+# httpcheck
+
+Module monitors remote http server for availability and response time.
+
+Following charts are drawn per job:
+
+1. **Response time** ms
+ * Time in 0.1 ms resolution in which the server responds.
+   If the connection failed, the value is missing.
+
+2. **Status** boolean
+ * Connection successful
+ * Unexpected content: No Regex match found in the response
+ * Unexpected status code: Do we get 500 errors?
+ * Connection failed: port not listening or blocked
+ * Connection timed out: host or port unreachable
+
+### configuration
+
+Sample configuration and their default values.
+
+```yaml
+server:
+  url: 'http://host:port/path'  # required
+  status_accepted:              # optional
+    - 200
+  timeout: 1                    # optional, supports decimals (e.g. 0.2)
+  update_every: 3               # optional
+  regex: 'REGULAR_EXPRESSION'   # optional, see https://docs.python.org/3/howto/regex.html
+  redirect: yes                 # optional
+```
+
+### notes
+
+ * The status chart is primarily intended for alarms, badges or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * This plugin is meant for simple use cases. Currently, the accuracy of the
+   response time is low and should be used as reference only.
+
+---
+
+# icecast
+
+This module will monitor number of listeners for active sources.
+
+**Requirements:**
+ * icecast version >= 2.4.0
+
+It produces the following charts:
+
+1. **Listeners** in listeners
+ * source number
+
+### configuration
+
+Needs only `url` to server's `/status-json.xsl`
+
+Here is an example for remote server:
+
+```yaml
+remote:
+  url      : 'http://1.2.3.4:8443/status-json.xsl'
+```
+
+Without configuration, module attempts to connect to `http://localhost:8443/status-json.xsl`
 
 ---
 
@@ -1205,6 +1360,132 @@ Without configuration, module attempts to connect to `http://localhost/stub_stat
 
 ---
 
+# nginx_plus
+
+This module will monitor one or more nginx_plus servers depending on configuration.
+Servers can be either local or remote.
+
+Example nginx_plus configuration can be found in 'python.d/nginx_plus.conf'
+
+It produces following charts:
+
+1. **Requests total** in requests/s
+ * total
+
+2. **Requests current** in requests
+ * current
+
+3. **Connection Statistics** in connections/s
+ * accepted
+ * dropped
+
+4. **Workers Statistics** in workers
+ * idle
+ * active
+
+5. **SSL Handshakes** in handshakes/s
+ * successful
+ * failed
+
+6. **SSL Session Reuses** in sessions/s
+ * reused
+
+7. **SSL Memory Usage** in percent
+ * usage
+
+8. **Processes** in processes
+ * respawned
+
+For every server zone:
+
+1. **Processing** in requests
+ * processing
+
+2. **Requests** in requests/s
+ * requests
+
+3. **Responses** in requests/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+4. **Traffic** in kilobits/s
+ * received
+ * sent
+
+For every upstream:
+
+1. **Peers Requests** in requests/s
+ * peer name (dimension per peer)
+
+2. **All Peers Responses** in responses/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+3. **Peer Responses** in requests/s (for every peer)
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+4. **Peers Connections** in active
+ * peer name (dimension per peer)
+
+5. **Peers Connections Usage** in percent
+ * peer name (dimension per peer)
+
+6. **All Peers Traffic** in KB
+ * received
+ * sent
+
+7. **Peer Traffic** in KB/s (for every peer)
+ * received
+ * sent
+
+8. **Peer Timings** in ms (for every peer)
+ * header
+ * response
+
+9. **Memory Usage** in percent
+ * usage
+
+10. **Peers Status** in state
+ * peer name (dimension per peer)
+
+11. **Peers Total Downtime** in seconds
+ * peer name (dimension per peer)
+
+For every cache:
+
+1. **Traffic** in KB
+ * served
+ * written
+ * bypass
+
+2. **Memory Usage** in percent
+ * usage
+
+### configuration
+
+Needs only `url` to server's `status`
+
+Here is an example for local server:
+
+```yaml
+local:
+  url     : 'http://localhost/status'
+```
+
+Without configuration, module fail to start.
+
+---
+
 # nsd
 
 Module uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
@@ -1257,6 +1538,75 @@ It produces:
 
 
 Configuration is not needed.
+
+---
+
+# ntpd
+
+Module monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`.
+
+**Requirements:**
+ * Version of `ntpd` must be 2.0+
+ * Local interrogation allowed in `/etc/ntp.conf` (default):
+
+```
+# Local users may interrogate the ntp server more closely.
+restrict 127.0.0.1
+restrict ::1
+```
+
+It produces:
+
+1. system
+ * offset
+ * jitter
+ * frequency
+ * delay
+ * dispersion
+ * stratum
+ * tc
+ * precision
+
+2. peers
+ * offset
+ * delay
+ * dispersion
+ * jitter
+ * rootdelay
+ * rootdispersion
+ * stratum
+ * hmode
+ * pmode
+ * hpoll
+ * ppoll
+ * precision
+
+**configuration**
+
+Sample:
+
+```yaml
+update_every: 10
+
+host: 'localhost'
+port: '123'
+show_peers: yes
+peer_filter: '(127\..*)|(192\.168\..*)'
+```
+
+Sample (multiple jobs):
+
+Note: `ntp.conf` on host `otherhost` must be configured to allow queries from our local host by including a line like `restrict <IP> nomodify notrap nopeer`.
+
+```yaml
+local:
+    host: 'localhost'
+
+otherhost:
+    host: 'otherhost'
+```
+
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `show_peers: yes` to also show the charts for configured peers. Local peers (127.*) are hidden by default, use `peer_filter: ''` to show all.
 
 ---
 
@@ -1331,6 +1681,42 @@ local:
 ```
 
 Without configuration, module attempts to connect to `http://localhost/status`
+
+---
+
+# portcheck
+
+Module monitors a remote TCP service.
+
+Following charts are drawn per host:
+
+1. **Latency** ms
+ * Time required to connect to a TCP port.
+   Displays latency in 0.1 ms resolution. If the connection failed, the value is missing.
+
+2. **Status** boolean
+ * Connection successful
+ * Could not create socket: possible DNS problems
+ * Connection refused: port not listening or blocked
+ * Connection timed out: host or port unreachable
+
+
+### configuration
+
+```yaml
+server:
+  host: 'dns or ip'     # required
+  port: 22              # required
+  timeout: 1            # optional
+  update_every: 1       # optional
+```
+
+### notes
+
+ * The error chart is intended for alarms, badges or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * Currently, the accuracy of the latency is low and should be used as reference only.
 
 ---
 
@@ -1490,10 +1876,13 @@ Following charts are drawn:
 6. **Erlang processes**
  * used processes
 
-7. **Memory**
+7. **Erlang run queue**
+ * Erlang run queue
+
+8. **Memory**
  * free memory in megabytes
 
-8. **Disk Space**
+9. **Disk Space**
  * free disk space in gigabytes
 
 ### configuration
@@ -1635,6 +2024,39 @@ Please join this discussion for help.
 
 ---
 
+# springboot
+
+This module will monitor one or more Java Spring-boot applications depending on configuration.
+
+It produces following charts:
+
+1. **Response Codes** in requests/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+ * others
+
+2. **Threads**
+ * daemon
+ * total
+
+3. **GC Time** in milliseconds and **GC Operations** in operations/s
+ * Copy
+ * MarkSweep
+ * ...
+
+4. **Heap Mmeory Usage** in KB
+ * used
+ * committed
+
+### configuration
+
+Please see the [Monitoring Java Spring Boot Applications](https://github.com/firehol/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
+
+---
+
 # squid
 
 This module will monitor one or more squid instances depending on configuration.
@@ -1759,7 +2181,7 @@ It produces:
  * redirect (3xx except 304)  
  * bad (4xx)  
  * other (all other responses)  
- 
+
 2. **Responses** by codes  
  * 2xx (successful)  
  * 5xx (internal server errors)  
@@ -1767,7 +2189,7 @@ It produces:
  * 4xx (bad)  
  * 1xx (informational)  
  * other (non-standart responses)  
- 
+
 3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
 
 4. **Requests**/s   
@@ -1775,7 +2197,7 @@ It produces:
 
 5. **Total response time**  
  * sum of all response time  
- 
+
 6. **Average response time**  
 
 7. **Average response time per iteration**  
@@ -1808,59 +2230,63 @@ Module uses the `varnishstat` command to provide varnish cache statistics.
 
 It produces:
 
-1. **Client metrics**
- * session accepted
- * session dropped
- * good client requests received
+1. **Connections Statistics** in connections/s
+ * accepted
+ * dropped
 
-2. **All history hit rate ratio**
- * cache hits in percent
- * cache miss in percent
- * cache hits for pass percent
+2. **Client Requests** in requests/s
+ * received
 
-3. **Curent poll hit rate ratio**
- * cache hits in percent
- * cache miss in percent
- * cache hits for pass percent
+3. **All History Hit Rate Ratio** in percent
+ * hit
+ * miss
+ * hitpass
 
-4. **Thread-related metrics** (only for varnish version 4+)
- * total number of threads
- * threads created
- * threads creation failed
- * threads hit max
- * length os session queue
- * sessions queued for thread
+4. **Current Poll Hit Rate Ratio** in percent
+ * hit
+ * miss
+ * hitpass
 
-5. **Backend health**
- * backend conn. success
- * backend conn. not attempted
- * backend conn. too many
- * backend conn. failures
- * backend conn. reuses
- * backend conn. recycles
- * backend conn. retry
- * backend requests made
+5. **Expired Objects** in expired/s
+ * objects
 
-6. **Memory usage**
- * memory available in megabytes
- * memory allocated in megabytes
+6. **Least Recently Used Nuked Objects** in nuked/s
+ * objects
 
-7. **Problems summary**
- * session dropped
- * session accept failures
- * session pipe overflow
- * backend conn. not attempted
- * fetch failed (all causes)
- * backend conn. too many
- * threads hit max
- * threads destroyed
- * length of session queue
- * HTTP header overflows
- * ESI parse errors
- * ESI parse warnings
 
-8. **Uptime**
- * varnish instance uptime in seconds
+7. **Number Of Threads In All Pools** in threads
+ * threads
+
+8. **Threads Statistics** in threads/s
+ * created
+ * failed
+ * limited
+
+9. **Current Queue Length** in requests
+ * in queue
+
+10. **Backend Connections Statistics** in connections/s
+ * successful
+ * unhealthy
+ * reused
+ * closed
+ * resycled
+ * failed
+
+10. **Requests To The Backend** in requests/s
+ * received
+
+11. **ESI Statistics** in problems/s
+ * errors
+ * warnings
+
+12. **Memory Usage** in MB
+ * free
+ * allocated
+
+13. **Uptime** in seconds
+ * uptime
+
 
 ### configuration
 
