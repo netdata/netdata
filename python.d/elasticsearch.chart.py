@@ -54,6 +54,7 @@ NODE_STATS = [
     'jvm.gc.collectors.young.collection_time_in_millis',
     'jvm.gc.collectors.old.collection_time_in_millis',
     'jvm.mem.heap_used_percent',
+    'jvm.mem.heap_used_in_bytes',
     'jvm.mem.heap_committed_in_bytes',
     'jvm.buffer_pools.direct.count',
     'jvm.buffer_pools.direct.used_in_bytes',
@@ -125,7 +126,7 @@ LATENCY = {
 ORDER = ['search_performance_total', 'search_performance_current', 'search_performance_time',
          'search_latency', 'index_performance_total', 'index_performance_current', 'index_performance_time',
          'index_latency', 'index_translog_operations', 'index_translog_size', 'index_segments_count', 'index_segments_memory', 'jvm_mem_heap',
-         'jvm_buffer_pool_count', 'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory',
+         'jvm_mem_heap_bytes', 'jvm_buffer_pool_count', 'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory',
          'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
          'host_metrics_http', 'host_metrics_transport', 'thread_pool_queued', 'thread_pool_rejected',
          'fielddata_cache', 'fielddata_evictions_tripped', 'cluster_health_status', 'cluster_health_nodes',
@@ -225,11 +226,17 @@ CHARTS = {
             ['indices_segments_fixed_bit_set_memory_in_bytes', 'fixed bit set', 'absolute', 1, 1048567]
         ]},
     'jvm_mem_heap': {
-        'options': [None, 'JVM Heap Currently in Use/Committed', 'percent/MB', 'memory usage and gc',
+        'options': [None, 'JVM Heap Percentage Currently in Use', 'percent', 'memory usage and gc',
                     'elastic.jvm_heap', 'area'],
         'lines': [
-            ['jvm_mem_heap_used_percent', 'inuse', 'absolute'],
-            ['jvm_mem_heap_committed_in_bytes', 'commit', 'absolute', -1, 1048576]
+            ['jvm_mem_heap_used_percent', 'inuse', 'absolute']
+        ]},
+    'jvm_mem_heap_bytes': {
+        'options': [None, 'JVM Heap Commit And Usage', 'MB', 'memory usage and gc',
+                    'elastic.jvm_heap_bytes', 'area'],
+        'lines': [
+            ['jvm_mem_heap_committed_in_bytes', 'commited', 'absolute', 1, 1048576],
+            ['jvm_mem_heap_used_in_bytes', 'used', 'absolute', 1, 1048576]
         ]},
     'jvm_buffer_pool_count': {
         'options': [None, 'JVM Buffers', 'count', 'memory usage and gc',
