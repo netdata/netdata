@@ -124,7 +124,7 @@ LATENCY = {
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['search_performance_total', 'search_performance_current', 'search_performance_time',
          'search_latency', 'index_performance_total', 'index_performance_current', 'index_performance_time',
-         'index_latency', 'index_segments_count', 'index_segments_memory', 'jvm_mem_heap',
+         'index_latency', 'index_translog_operations', 'index_translog_size', 'index_segments_count', 'index_segments_memory', 'jvm_mem_heap',
          'jvm_buffer_pool_count', 'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory',
          'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
          'host_metrics_http', 'host_metrics_transport', 'thread_pool_queued', 'thread_pool_rejected',
@@ -188,6 +188,20 @@ CHARTS = {
         'lines': [
             ['indexing_latency', 'indexing', 'absolute', 1, 1000],
             ['flushing_latency', 'flushing', 'absolute', 1, 1000]
+        ]},
+    'index_translog_operations': {
+        'options': [None, 'Translog Operations', 'count', 'translog',
+                    'elastic.index_translog_operations', 'area'],
+        'lines': [
+            ['indices_translog_operations', 'total', 'absolute'],
+            ['indices_translog_uncommitted_operations', 'uncommited', 'absolute']
+        ]},
+    'index_translog_size': {
+        'options': [None, 'Translog Size', 'MB', 'translog',
+                    'elastic.index_translog_size', 'area'],
+        'lines': [
+            ['indices_translog_size_in_bytes', 'total', 'absolute', 1, 1048567],
+            ['indices_translog_uncommitted_size_in_bytes', 'uncommited', 'absolute', 1, 1048567]
         ]},
     'index_segments_count': {
         'options': [None, 'Total Number Of Indices Segments', 'count', 'indices segments',
