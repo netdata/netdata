@@ -124,7 +124,7 @@ LATENCY = {
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['search_performance_total', 'search_performance_current', 'search_performance_time',
          'search_latency', 'index_performance_total', 'index_performance_current', 'index_performance_time',
-         'index_latency', 'index_translog_operations', 'index_translog_size', 'index_segments_count', 'index_segments_memory_writer', 
+         'index_latency', 'index_translog_operations', 'index_translog_size', 'index_segments_count', 'index_segments_memory_writer',
          'index_segments_memory', 'jvm_mem_heap', 'jvm_mem_heap_bytes', 'jvm_buffer_pool_count',
          'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory', 'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
          'host_metrics_http', 'host_metrics_transport', 'thread_pool_queued', 'thread_pool_rejected',
