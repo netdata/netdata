@@ -34,12 +34,33 @@ NODE_STATS = [
     'indices.refresh.total_time_in_millis',
     'indices.flush.total',
     'indices.flush.total_time_in_millis',
+    'indices.translog.operations',
+    'indices.translog.size_in_bytes',
+    'indices.translog.uncommitted_operations',
+    'indices.translog.uncommitted_size_in_bytes',
+    'indices.segments.count',
+    'indices.segments.memory_in_bytes',
+    'indices.segments.terms_memory_in_bytes',
+    'indices.segments.stored_fields_memory_in_bytes',
+    'indices.segments.term_vectors_memory_in_bytes',
+    'indices.segments.norms_memory_in_bytes',
+    'indices.segments.points_memory_in_bytes',
+    'indices.segments.doc_values_memory_in_bytes',
+    'indices.segments.index_writer_memory_in_bytes',
+    'indices.segments.version_map_memory_in_bytes',
+    'indices.segments.fixed_bit_set_memory_in_bytes',
     'jvm.gc.collectors.young.collection_count',
     'jvm.gc.collectors.old.collection_count',
     'jvm.gc.collectors.young.collection_time_in_millis',
     'jvm.gc.collectors.old.collection_time_in_millis',
     'jvm.mem.heap_used_percent',
     'jvm.mem.heap_committed_in_bytes',
+    'jvm.buffer_pools.direct.count',
+    'jvm.buffer_pools.direct.used_in_bytes',
+    'jvm.buffer_pools.direct.total_capacity_in_bytes',
+    'jvm.buffer_pools.mapped.count',
+    'jvm.buffer_pools.mapped.used_in_bytes',
+    'jvm.buffer_pools.mapped.total_capacity_in_bytes',
     'thread_pool.bulk.queue',
     'thread_pool.bulk.rejected',
     'thread_pool.index.queue',
@@ -103,7 +124,9 @@ LATENCY = {
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['search_performance_total', 'search_performance_current', 'search_performance_time',
          'search_latency', 'index_performance_total', 'index_performance_current', 'index_performance_time',
-         'index_latency', 'jvm_mem_heap', 'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
+         'index_latency', 'index_segments_count', 'index_segments_memory', 'jvm_mem_heap',
+         'jvm_buffer_pool_count', 'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory',
+         'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
          'host_metrics_http', 'host_metrics_transport', 'thread_pool_queued', 'thread_pool_rejected',
          'fielddata_cache', 'fielddata_evictions_tripped', 'cluster_health_status', 'cluster_health_nodes',
          'cluster_health_shards', 'cluster_stats_nodes', 'cluster_stats_query_cache', 'cluster_stats_docs',
@@ -166,12 +189,54 @@ CHARTS = {
             ['indexing_latency', 'indexing', 'absolute', 1, 1000],
             ['flushing_latency', 'flushing', 'absolute', 1, 1000]
         ]},
+    'index_segments_count': {
+        'options': [None, 'Total Number Of Indices Segments', 'count', 'indices segments',
+                    'elastic.index_segments_count', 'line'],
+        'lines': [
+            ['indices_segments_count', 'segments', 'absolute']
+        ]},
+    'index_segments_memory': {
+        'options': [None, 'Indices Segments Memory Usage', 'MB', 'indices segments',
+                    'elastic.index_segments_memory', 'area'],
+        'lines': [
+            ['indices_segments_memory_in_bytes', 'total', 'absolute', 1, 1048567],
+            ['indices_segments_terms_memory_in_bytes', 'terms', 'absolute', 1, 1048567],
+            ['indices_segments_stored_fields_memory_in_bytes', 'stored_fields', 'absolute', 1, 1048567],
+            ['indices_segments_term_vectors_memory_in_bytes', 'term_vectors', 'absolute', 1, 1048567],
+            ['indices_segments_norms_memory_in_bytes', 'norms', 'absolute', 1, 1048567],
+            ['indices_segments_points_memory_in_bytes', 'points', 'absolute', 1, 1048567],
+            ['indices_segments_doc_values_memory_in_bytes', 'doc_values', 'absolute', 1, 1048567],
+            ['indices_segments_index_writer_memory_in_bytes', 'index_writer', 'absolute', 1, 1048567],
+            ['indices_segments_version_map_memory_in_bytes', 'version_map', 'absolute', 1, 1048567],
+            ['indices_segments_fixed_bit_set_memory_in_bytes', 'fixed_bit_set', 'absolute', 1, 1048567]
+        ]},
     'jvm_mem_heap': {
         'options': [None, 'JVM Heap Currently in Use/Committed', 'percent/MB', 'memory usage and gc',
                     'elastic.jvm_heap', 'area'],
         'lines': [
             ['jvm_mem_heap_used_percent', 'inuse', 'absolute'],
             ['jvm_mem_heap_committed_in_bytes', 'commit', 'absolute', -1, 1048576]
+        ]},
+    'jvm_buffer_pool_count': {
+        'options': [None, 'JVM Buffers', 'count', 'memory usage and gc',
+                    'elastic.jvm_buffer_pool_count', 'line'],
+        'lines': [
+            ['jvm_buffer_pools_direct_count', 'direct', 'absolute'],
+            ['jvm_buffer_pools_mapped_count', 'mapped', 'absolute']
+        ]},
+    'jvm_direct_buffers_memory': {
+        'options': [None, 'JVM Direct Buffers Memory', 'MB', 'memory usage and gc',
+                    'elastic.jvm_direct_buffers_memory', 'area'],
+        'lines': [
+            ['jvm_buffer_pools_direct_used_in_bytes', 'used', 'absolute', 1, 1048567],
+            ['jvm_buffer_pools_direct_total_capacity_in_bytes', 'total capacity', 'absolute', 1, 1048567]
+        ]},
+    'jvm_mapped_buffers_memory': {
+        'options': [None, 'JVM Mapped Buffers Memory', 'MB', 'memory usage and gc',
+                    'elastic.jvm_mapped_buffers_memory', 'area'],
+        'lines': [
+            ['jvm_buffer_pools_mapped_used_in_bytes', 'used', 'absolute', 1, 1048567],
+            ['jvm_buffer_pools_mapped_total_capacity_in_bytes', 'total capacity', 'absolute', 1, 1048567]
         ]},
     'jvm_gc_count': {
         'options': [None, 'Garbage Collections', 'counts', 'memory usage and gc', 'elastic.gc_count', 'stacked'],
