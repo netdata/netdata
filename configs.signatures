@@ -498,6 +498,7 @@ declare -A configs_signatures=(
   ['b7d769ce86a7aebba01315da5c0799e6']='health.d/ram.conf'
   ['b81b8f331161b0d48e03f6fbf6b6d062']='health.d/memcached.conf'
   ['b846ca1f99fa6a65303b58186f47d7a4']='python.d/squid.conf'
+  ['b854fcb711ee4d052741de5fc888682e']='health.d/backend.conf'
   ['b8969be5b3ceb4a99477937119bd4323']='python.d.conf'
   ['b8aff60806fb6829a4e72a824e655375']='health.d/beanstalkd.conf'
   ['b8b87574fd496a66ede884c5336493bd']='python.d/phpfpm.conf'
