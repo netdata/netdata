@@ -347,9 +347,24 @@ static inline int format_dimension_collected_json_plaintext(
     (void)before;
     (void)options;
 
+    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    if(!tags) tags = "";
+
+    if(*tags) {
+        if(*tags == '{' || *tags == '[' || *tags == '"') {
+            tags_pre = "\"host_tags\":";
+            tags_post = ",";
+        }
+        else {
+            tags_pre = "\"host_tags\":\"";
+            tags_post = "\",";
+        }
+    }
+
     buffer_sprintf(b, "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
+        "%s%s%s"
 
         "\"chart_id\":\"%s\","
         "\"chart_name\":\"%s\","
@@ -362,9 +377,10 @@ static inline int format_dimension_collected_json_plaintext(
         "\"name\":\"%s\","
         "\"value\":" COLLECTED_NUMBER_FORMAT ","
 
-        "\"timestamp\": %u}\n", 
+        "\"timestamp\": %u}\n",
             prefix,
             hostname,
+            tags_pre, tags, tags_post,
 
             st->id,
             st->name,
@@ -400,9 +416,24 @@ static inline int format_dimension_stored_json_plaintext(
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
     if(!isnan(value)) {
+        const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+        if(!tags) tags = "";
+
+        if(*tags) {
+            if(*tags == '{' || *tags == '[' || *tags == '"') {
+                tags_pre = "\"host_tags\":";
+                tags_post = ",";
+            }
+            else {
+                tags_pre = "\"host_tags\":\"";
+                tags_post = "\",";
+            }
+        }
+
         buffer_sprintf(b, "{"
             "\"prefix\":\"%s\","
             "\"hostname\":\"%s\","
+            "%s%s%s"
 
             "\"chart_id\":\"%s\","
             "\"chart_name\":\"%s\","
@@ -418,7 +449,8 @@ static inline int format_dimension_stored_json_plaintext(
             "\"timestamp\": %u}\n", 
                 prefix,
                 hostname,
-                
+                tags_pre, tags, tags_post,
+
                 st->id,
                 st->name,
                 st->family,
