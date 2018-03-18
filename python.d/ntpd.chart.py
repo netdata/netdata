@@ -86,7 +86,7 @@ CHARTS = {
             ['rootdisp', 'dispersion', 'absolute', 1, PRECISION]
         ]},
     'sys_stratum': {
-        'options': [None, 'Stratum (1-15)', '1', 'system', 'ntpd.sys_stratum', 'line'],
+        'options': [None, 'Stratum (1-15)', 'stratum', 'system', 'ntpd.sys_stratum', 'line'],
         'lines': [
             ['stratum', 'stratum', 'absolute', 1, PRECISION]
         ]},
@@ -135,15 +135,15 @@ PEER_CHARTS = {
         'lines': [
         ]},
     'peer_stratum': {
-        'options': [None, 'Stratum (1-15)', '1', 'peers', 'ntpd.peer_stratum', 'line'],
+        'options': [None, 'Stratum (1-15)', 'stratum', 'peers', 'ntpd.peer_stratum', 'line'],
         'lines': [
         ]},
     'peer_hmode': {
-        'options': [None, 'Host mode (1-6)', '1', 'peers', 'ntpd.peer_hmode', 'line'],
+        'options': [None, 'Host mode (1-6)', 'hmode', 'peers', 'ntpd.peer_hmode', 'line'],
         'lines': [
         ]},
     'peer_pmode': {
-        'options': [None, 'Peer mode (1-5)', '1', 'peers', 'ntpd.peer_pmode', 'line'],
+        'options': [None, 'Peer mode (1-5)', 'pmode', 'peers', 'ntpd.peer_pmode', 'line'],
         'lines': [
         ]},
     'peer_hpoll': {
@@ -225,7 +225,6 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = dict(CHARTS)
-        self.definitions.update(PEER_CHARTS)
 
         self.port = 'ntp'
         self.dgram_socket = True
@@ -235,6 +234,9 @@ class Service(SocketService):
         self.retries = 0
         self.show_peers = self.configuration.get('show_peers', False)
         self.peer_rescan = self.configuration.get('peer_rescan', 60)
+
+        if self.show_peers:
+            self.definitions.update(PEER_CHARTS)
 
     def check(self):
         """
@@ -340,6 +342,11 @@ class Service(SocketService):
                 continue
             srcadr = srcadr.group(2)
             if self.peer_filter.search(srcadr):
+                continue
+            stratum = re.search(r'(stratum)=([^,]+)', raw_peer_data)
+            if not stratum:
+                continue
+            if int(stratum.group(2)) > 15:
                 continue
 
             new_peer = Peer(idx=peer_id, name=srcadr)
