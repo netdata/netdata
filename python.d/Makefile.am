@@ -59,6 +59,7 @@ dist_python_DATA = \
     squid.chart.py \
     smartd_log.chart.py \
     tomcat.chart.py \
+    traefik.chart.py \
     varnish.chart.py \
     web_log.chart.py \
     $(NULL)
