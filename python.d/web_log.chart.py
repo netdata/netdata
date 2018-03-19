@@ -58,7 +58,7 @@ CHARTS_WEB = {
             ['resp_time_avg', 'avg', 'incremental', 1, 1000]
         ]},
     'response_time_hist': {
-        'options': [None, 'Processing Time Histgram', 'requests/s', 'timings', 'web_log.response_time_hist', 'line'],
+        'options': [None, 'Processing Time Histogram', 'requests/s', 'timings', 'web_log.response_time_hist', 'line'],
         'lines': [
         ]},
     'response_time_upstream': {
@@ -70,7 +70,7 @@ CHARTS_WEB = {
             ['resp_time_upstream_avg', 'avg', 'incremental', 1, 1000]
         ]},
     'response_time_upstream_hist': {
-        'options': [None, 'Processing Time Histgram', 'requests/s', 'timings',
+        'options': [None, 'Processing Time Histogram', 'requests/s', 'timings',
                     'web_log.response_time_upstream_hist', 'line'],
         'lines': [
         ]},
@@ -364,24 +364,24 @@ class Web:
             self.order.remove('response_time_upstream_hist')
 
         # Add 'response_time_hist' and 'response_time_upstream_hist' charts if is specified in the configuration
-        histgram = self.configuration.get('histgram', None)
-        if type(histgram) is list:
-            self.storage['bucket_index'] = histgram[:]
+        histogram = self.configuration.get('histogram', None)
+        if type(histogram) is list:
+            self.storage['bucket_index'] = histogram[:]
             self.storage['bucket_index'].append(sys.maxint)
-            self.storage['buckets'] = [0] * (len(histgram) + 1)
-            self.storage['upstream_buckets'] = [0] * (len(histgram) + 1)
+            self.storage['buckets'] = [0] * (len(histogram) + 1)
+            self.storage['upstream_buckets'] = [0] * (len(histogram) + 1)
             hist_lines = self.definitions['response_time_hist']['lines']
             upstream_hist_lines = self.definitions['response_time_upstream_hist']['lines']
-            for i, le in enumerate(histgram):
+            for i, le in enumerate(histogram):
                 hist_key = "response_time_hist_%d" % i
                 upstream_hist_key = "response_time_upstream_hist_%d" % i
                 hist_lines.append([hist_key, str(le), 'incremental', 1, 1])
                 upstream_hist_lines.append([upstream_hist_key, str(le), 'incremental', 1, 1])
 
-            hist_lines.append(["response_time_hist_%d" % len(histgram), '+Inf', 'incremental', 1, 1])
-            upstream_hist_lines.append(["response_time_upstream_hist_%d" % len(histgram), '+Inf', 'incremental', 1, 1])
-        elif histgram is not None:
-            self.error("expect histgram list, but was {}".format(type(histgram)))
+            hist_lines.append(["response_time_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
+            upstream_hist_lines.append(["response_time_upstream_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
+        elif histogram is not None:
+            self.error("expect histogram list, but was {}".format(type(histogram)))
 
         if not self.configuration.get('all_time', True):
             self.order.remove('clients_all')
@@ -494,7 +494,7 @@ class Web:
             self.data[elem + '_avg'] += timings[elem]['summary'] / timings[elem]['count']
             self.data[elem + '_max'] += timings[elem]['maximum']
 
-        # histgram
+        # histogram
         if 'bucket_index' in self.storage:
             buckets = self.storage['buckets']
             upstream_buckets = self.storage['upstream_buckets']
@@ -953,8 +953,8 @@ def get_timings(timings, time):
 
 def get_hist(index, buckets, time):
     """
-    :param index:   histgram index (Ex. [10, 50, 100, 150, ...])
-    :param buckets: histgram buckets
+    :param index:   histogram index (Ex. [10, 50, 100, 150, ...])
+    :param buckets: histogram buckets
     :param time:    time
     :return: None
     """
