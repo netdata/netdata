@@ -365,7 +365,7 @@ class Web:
 
         # Add 'response_time_hist' and 'response_time_upstream_hist' charts if is specified in the configuration
         histogram = self.configuration.get('histogram', None)
-        if type(histogram) is list:
+        if isinstance(histogram, list):
             self.storage['bucket_index'] = histogram[:]
             self.storage['bucket_index'].append(sys.maxint)
             self.storage['buckets'] = [0] * (len(histogram) + 1)
@@ -381,7 +381,7 @@ class Web:
             hist_lines.append(["response_time_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
             upstream_hist_lines.append(["response_time_upstream_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
         elif histogram is not None:
-            self.error("expect histogram list, but was {}".format(type(histogram)))
+            self.error("expect histogram list, but was {0}".format(type(histogram)))
 
         if not self.configuration.get('all_time', True):
             self.order.remove('clients_all')
@@ -958,7 +958,7 @@ def get_hist(index, buckets, time):
     :param time:    time
     :return: None
     """
-    for i in xrange(len(index)-1, -1, -1):
+    for i in range(len(index)-1, -1, -1):
         if time <= index[i]:
             buckets[i] += 1
         else:
