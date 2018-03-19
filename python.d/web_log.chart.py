@@ -498,7 +498,7 @@ class Web:
         if 'bucket_index' in self.storage:
             buckets = self.storage['buckets']
             upstream_buckets = self.storage['upstream_buckets']
-            for i, le in enumerate(self.storage['bucket_index']):
+            for i in range(0, len(self.storage['bucket_index'])):
                 hist_key = "response_time_hist_%d" % i
                 upstream_hist_key = "response_time_upstream_hist_%d" % i
                 self.data[hist_key] = buckets[i]
