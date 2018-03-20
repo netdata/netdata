@@ -71,6 +71,7 @@ dist_pythonconfig_DATA = \
     python.d/squid.conf \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \
+    python.d/traefik.conf \
     python.d/varnish.conf \
     python.d/web_log.conf \
     $(NULL)
