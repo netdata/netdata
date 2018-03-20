@@ -2487,7 +2487,7 @@ void *statsd_main(void *ptr) {
         }
     }
 
-cleanup:
+cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
