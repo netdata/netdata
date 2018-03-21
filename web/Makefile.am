@@ -120,7 +120,7 @@ dist_webdnt_DATA = \
 
 version.txt:
 	if test -d "$(top_srcdir)/.git"; then \
-		git --git-dir="$(top_srcdir)/.git" log -n 1 --format=%H; \
+		git --git-dir="$(top_srcdir)/.git" describe \
 	fi > $@.tmp
 	test -s $@.tmp || echo 0 > $@.tmp
 	mv $@.tmp $@
