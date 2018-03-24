@@ -897,10 +897,10 @@ server:
 
 # icecast
 
-This module will monitor number of listeners for active sources. 
+This module will monitor number of listeners for active sources.
 
 **Requirements:**
- * icecast version >= 2.4.0 
+ * icecast version >= 2.4.0
 
 It produces the following charts:
 
@@ -2169,6 +2169,61 @@ localhost:
 
 Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials.
 So it will probably fail.
+
+---
+
+# Traefik
+
+Module uses the `health` API to provide statistics.
+
+It produces:
+
+1. **Responses** by statuses
+ * success (1xx, 2xx, 304)
+ * error (5xx)
+ * redirect (3xx except 304)
+ * bad (4xx)
+ * other (all other responses)
+
+2. **Responses** by codes
+ * 2xx (successful)
+ * 5xx (internal server errors)
+ * 3xx (redirect)
+ * 4xx (bad)
+ * 1xx (informational)
+ * other (non-standart responses)
+
+3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
+
+4. **Requests**/s
+ * request statistics
+
+5. **Total response time**
+ * sum of all response time
+
+6. **Average response time**
+
+7. **Average response time per iteration**
+
+8. **Uptime**
+ * Traefik server uptime
+
+### configuration
+
+Needs only `url` to server's `health`
+
+Here is an example for local server:
+
+```yaml
+update_every : 1
+priority     : 60000
+
+local:
+  url     : 'http://localhost:8080/health'
+  retries : 10
+```
+
+Without configuration, module attempts to connect to `http://localhost:8080/health`.
 
 ---
 
