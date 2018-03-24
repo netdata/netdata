@@ -1008,7 +1008,7 @@ send_pd() {
             ${pd_send} -k ${PD_SERVICE_KEY} \
                        -t ${t} \
                        -d "${d}" \
-                       -i ${alarm_id} \
+                       -i ${host}:${chart}:${name} \
                        -f 'info'="${info}" \
                        -f 'value_w_units'="${value_string}" \
                        -f 'when'="${when}" \
