@@ -334,6 +334,7 @@ declare -A configs_signatures=(
   ['7a985528cc9176564640001aa73e3492']='health.d/nginx.conf'
   ['7aa209fa287c95b3ca04c23681b40770']='health.d/disks.conf'
   ['7ad46e684775d186251eb71b1e9be530']='charts.d/ap.conf'
+  ['7b3281b6dbdbbc0b48c53fd76033e0db']='health.d/disks.conf'
   ['7bac18d8d5ff8f117be8d489a21c0c65']='python.d/mysql.conf'
   ['7cf6402b51e5070f2be3ad6fe059ff89']='charts.d.conf'
   ['7d8bd884ec26cb35d16c4fc05f969799']='python.d/squid.conf'
