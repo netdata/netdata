@@ -633,6 +633,7 @@ declare -A configs_signatures=(
   ['eb748d6fb69d11b0d29c5794657e206c']='health.d/qos.conf'
   ['eb9fedc3c1dface77312d9bf48f673a8']='stream.conf'
   ['ebd0612ccc5807524ebb2b647e3e56c9']='apps_groups.conf'
+  ['eca875b2e4402ee07972589bad003e01']='python.d/traefik.conf'
   ['ecb6c01fae255d369748406945a50435']='apps_groups.conf'
   ['ecd3aa97e2581f88eb466d6612690ef2']='charts.d/nginx.conf'
   ['ed43efac299c31f8fd5e2abccff30071']='python.d/samba.conf'
