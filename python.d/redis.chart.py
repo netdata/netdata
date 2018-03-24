@@ -36,8 +36,8 @@ CHARTS = {
     'memory': {
         'options': [None, 'Redis Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
         'lines': [
-            ['used_memory', 'total', 'absolute', 1, 1024],
-            ['used_memory_lua', 'lua', 'absolute', 1, 1024]
+            ['used_memory', 'total', 'absolute', 1/1024, 1024],
+            ['used_memory_lua', 'lua', 'absolute', 1/1024, 1024]
         ]},
     'net': {
         'options': [None, 'Redis Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
