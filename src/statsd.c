@@ -222,6 +222,8 @@ typedef struct statsd_app {
 
 struct collection_thread_status {
     int status;
+    size_t max_sockets;
+
     netdata_thread_t thread;
     struct rusage rusage;
     RRDSET *st_cpu;
@@ -359,7 +361,7 @@ static int statsd_metric_compare(void* a, void* b) {
     else return strcmp(((STATSD_METRIC *)a)->name, ((STATSD_METRIC *)b)->name);
 }
 
-static inline STATSD_METRIC *stasd_metric_index_find(STATSD_INDEX *index, const char *name, uint32_t hash) {
+static inline STATSD_METRIC *statsd_metric_index_find(STATSD_INDEX *index, const char *name, uint32_t hash) {
     STATSD_METRIC tmp;
     tmp.name = name;
     tmp.hash = (hash)?hash:simple_hash(tmp.name);
@@ -372,7 +374,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 
     uint32_t hash = simple_hash(name);
 
-    STATSD_METRIC *m = stasd_metric_index_find(index, name, hash);
+    STATSD_METRIC *m = statsd_metric_index_find(index, name, hash);
     if(unlikely(!m)) {
         debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
 
@@ -982,6 +984,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd.tcp_idle_timeout  // tcp idle timeout, 0 = disabled
             , statsd.update_every * 1000
             , ptr // timer_data
+            , status->max_sockets
     );
 
     netdata_thread_cleanup_pop(1);
@@ -2169,6 +2172,8 @@ void *statsd_main(void *ptr) {
     if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
         statsd.timers.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
+    size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_STATSD, "statsd server max TCP sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
+
 #ifdef STATSD_MULTITHREADED
     statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", processors);
     if(statsd.threads < 1) {
@@ -2202,6 +2207,7 @@ void *statsd_main(void *ptr) {
 
     int i;
     for(i = 0; i < statsd.threads ;i++) {
+        statsd.collection_threads_status[i].max_sockets = max_sockets / statsd.threads;
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
         netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);

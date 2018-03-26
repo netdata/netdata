@@ -978,6 +978,12 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 
     if(unlikely(fd < 0)) return NULL;
 
+    //if(p->limit && p->used >= p->limit) {
+    //    info("Max sockets limit reached (%zu sockets), dropping connection", p->used);
+    //    close(fd);
+    //    return NULL;
+    //}
+
     if(unlikely(!p->first_free)) {
         size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
         debug(D_POLLFD, "POLLFD: ADD: increasing size (current = %zu, new = %zu, used = %zu, min = %zu, max = %zu)", p->slots, new_slots, p->used, p->min, p->max);
@@ -1199,7 +1205,28 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
         pi->last_received_t = now;
         pi->recv_count++;
 
-        if(likely(pi->flags & POLLINFO_FLAG_SERVER_SOCKET)) {
+        if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
+            // read data from client TCP socket
+            debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", i, fd);
+
+            pf->events = 0;
+            if (pi->rcv_callback(pi, &pf->events) == -1) {
+                poll_close_fd(&p->inf[i]);
+                return;
+            }
+            pf = &p->fds[i];
+            pi = &p->inf[i];
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            // this is common - it is used for web server file copies
+            if(unlikely(!(pf->events & (POLLIN|POLLOUT)))) {
+                error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+                //poll_close_fd(pi);
+                //return;
+            }
+#endif
+        }
+        else if(likely(pi->flags & POLLINFO_FLAG_SERVER_SOCKET)) {
             // new connection
             // debug(D_POLLFD, "POLLFD: LISTENER: accepting connections from slot %zu (fd %d)", i, fd);
 
@@ -1220,7 +1247,11 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
                             debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", i, fd);
 
-                            if(errno != EWOULDBLOCK && errno != EAGAIN)
+                            if(unlikely(errno == EMFILE)) {
+                                error("POLLFD: LISTENER: too many open files - sleeping for 1ms - used by this thread %zu, max for this thread %zu", p->used, p->limit);
+                                usleep(1000); // 10ms
+                            }
+                            else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
                                 error("POLLFD: LISTENER: accept() failed.");
 
                             break;
@@ -1245,7 +1276,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                             pf = &p->fds[i];
                             pi = &p->inf[i];
                         }
-                    } while (nfd >= 0);
+                    } while (nfd >= 0 && (!p->limit || p->used < p->limit));
                     break;
                 }
 
@@ -1268,26 +1299,6 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                 }
             }
         }
-
-        if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
-            // read data from client TCP socket
-            debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", i, fd);
-
-            pf->events = 0;
-            if (pi->rcv_callback(pi, &pf->events) == -1) {
-                poll_close_fd(pi);
-                return;
-            }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-            // this is common - it is used for web server file copies
-            if(unlikely(!(pf->events & (POLLIN|POLLOUT)))) {
-                error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
-                //poll_close_fd(pi);
-                //return;
-            }
-#endif
-        }
     }
 
     if(unlikely(revents & POLLOUT)) {
@@ -1299,9 +1310,11 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
         pf->events = 0;
         if (pi->snd_callback(pi, &pf->events) == -1) {
-            poll_close_fd(pi);
+            poll_close_fd(&p->inf[i]);
             return;
         }
+        pf = &p->fds[i];
+        pi = &p->inf[i];
 
 #ifdef NETDATA_INTERNAL_CHECKS
         // this is common - it is used for streaming
@@ -1347,6 +1360,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , time_t tcp_idle_timeout_seconds
         , time_t timer_milliseconds
         , void *timer_data
+        , size_t max_tcp_sockets
 ) {
     if(!sockets || !sockets->opened) {
         error("POLLFD: internal error: no listening sockets are opened");
@@ -1361,6 +1375,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             .slots = 0,
             .used = 0,
             .max = 0,
+            .limit = max_tcp_sockets,
             .fds = NULL,
             .inf = NULL,
             .first_free = NULL,
@@ -1401,6 +1416,8 @@ void poll_events(LISTEN_SOCKETS *sockets
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
+    int listen_sockets_active = 1;
+
     int timeout_ms = 1000; // in milliseconds
     time_t last_check = now_boottime_sec();
 
@@ -1430,6 +1447,17 @@ void poll_events(LISTEN_SOCKETS *sockets
                 timeout_ms = 1000;
             else
                 timeout_ms = (int)(dt_usec / USEC_PER_MS);
+        }
+
+        // enable or disable the TCP listening sockets, based on the current number of sockets used and the limit set
+        if((listen_sockets_active && (p.limit && p.used >= p.limit)) || (!listen_sockets_active && (!p.limit || p.used < p.limit))) {
+            listen_sockets_active = !listen_sockets_active;
+            info("%s listening sockets (used TCP sockets %zu, max allowed for this worker %zu)", (listen_sockets_active)?"ENABLING":"DISABLING", p.used, p.limit);
+            for (i = 0; i <= p.max; i++) {
+                if(p.inf[i].flags & POLLINFO_FLAG_SERVER_SOCKET && p.inf[i].socktype == SOCK_STREAM) {
+                    p.fds[i].events = (short int) ((listen_sockets_active) ? POLLIN : 0);
+                }
+            }
         }
 
         debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets for %zu ms...", p.max + 1, (size_t)timeout_ms);

@@ -902,6 +902,8 @@ struct web_server_static_threaded_worker {
     int id;
     int running;
 
+    size_t max_sockets;
+
     volatile size_t connected;
     volatile size_t disconnected;
     volatile size_t receptions;
@@ -1078,7 +1080,12 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                         , (void *) w
                 );
 
-                w->pollinfo_filecopy_slot = fpi->slot;
+                if(fpi)
+                    w->pollinfo_filecopy_slot = fpi->slot;
+                else {
+                    error("Failed to add filecopy fd. Closing client.");
+                    return -1;
+                }
             }
         }
     }
@@ -1192,6 +1199,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_client_timeout
                         , default_rrd_update_every * 1000 // timer_milliseconds
                         , ptr // timer_data
+                        , worker_private->max_sockets
             );
 
     netdata_thread_cleanup_pop(1);
@@ -1257,6 +1265,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
             static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
+            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 2));
+
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
 
             web_server_is_multithreaded = (static_threaded_workers_count > 1);
@@ -1264,6 +1274,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
             int i;
             for(i = 1; i < static_threaded_workers_count; i++) {
                 static_workers_private_data[i].id = i;
+                static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
 
                 char tag[50 + 1];
                 snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
@@ -1273,6 +1284,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
             }
 
             // and the main one
+            static_workers_private_data[0].max_sockets = max_sockets / static_threaded_workers_count;
             socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
 
     netdata_thread_cleanup_pop(1);

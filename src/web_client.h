@@ -128,6 +128,9 @@ struct web_client {
     WEB_CLIENT_MODE mode;           // the operational mode of the client
     WEB_CLIENT_ACL acl;             // the access list of the client
 
+    size_t header_parse_tries;
+    size_t header_parse_last_size;
+
     int tcp_cork;                   // 1 = we have a cork on the socket
 
     int ifd;

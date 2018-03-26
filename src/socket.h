@@ -101,6 +101,8 @@ struct poll {
     size_t min;
     size_t max;
 
+    size_t limit;
+
     time_t complete_request_timeout;
     time_t idle_timeout;
     time_t checks_every;
@@ -154,6 +156,7 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , time_t tcp_idle_timeout_seconds
         , time_t timer_milliseconds
         , void *timer_data
+        , size_t max_tcp_sockets
 );
 
 #endif //NETDATA_SOCKET_H
