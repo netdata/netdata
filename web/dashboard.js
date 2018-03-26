@@ -2559,6 +2559,9 @@ var NETDATA = window.NETDATA || {};
 
                 this.last_t = t;
 
+                if (state.foreign_element_selection !== null)
+                    state.foreign_element_selection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
+
                 if (this.timeout_id)
                     NETDATA.timeout.clear(this.timeout_id);
 
@@ -2800,7 +2803,13 @@ var NETDATA = window.NETDATA || {};
 
         this.force_update_every = null;             // number - overwrite the visualization update frequency of the chart
 
-        that.tmp = {};
+        this.tmp = {};
+
+        this.foreign_element_before = null;
+        this.foreign_element_after = null;
+        this.foreign_element_duration = null;
+        this.foreign_element_update_every = null;
+        this.foreign_element_selection = null;
 
         // ============================================================================================================
         // PRIVATE FUNCTIONS
@@ -2948,6 +2957,28 @@ var NETDATA = window.NETDATA || {};
 
             that.chart_url = null;                      // string - the url to download chart info
             that.chart = null;                          // object - the chart as downloaded from the server
+
+            function get_foreign_element_by_id(opt) {
+                var id = NETDATA.dataAttribute(that.element, opt, null);
+                if(id === null) {
+                    //that.log('option "' + opt + '" is undefined');
+                    return null;
+                }
+
+                var el = document.getElementById(id);
+                if(typeof el === 'undefined') {
+                    that.log('cannot find an element with name "' + id.toString() + '"');
+                    return null;
+                }
+
+                return el;
+            }
+
+            that.foreign_element_before = get_foreign_element_by_id('show-before-at');
+            that.foreign_element_after = get_foreign_element_by_id('show-after-at');
+            that.foreign_element_duration = get_foreign_element_by_id('show-duration-at');
+            that.foreign_element_update_every = get_foreign_element_by_id('show-update-every-at');
+            that.foreign_element_selection = get_foreign_element_by_id('show-selection-at');
         };
 
         var destroyDOM = function() {
@@ -3537,7 +3568,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         // ----------------------------------------------------------------------------------------------------------------
-        // global selection sync
+        // global selection sync for slaves
 
         // can the chart participate to the global selection sync as a slave?
         this.globalSelectionSyncIsEligible = function() {
@@ -3556,6 +3587,9 @@ var NETDATA = window.NETDATA || {};
 
             if(this.selected === true && this.debug === true)
                 this.log('selection set to ' + t.toString());
+
+            if (this.foreign_element_selection !== null)
+                this.foreign_element_selection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
 
             return this.selected;
         };
@@ -4835,6 +4869,18 @@ var NETDATA = window.NETDATA || {};
 
             if(this.refresh_dt_element !== null)
                 this.refresh_dt_element.innerText = this.refresh_dt_ms.toString();
+
+            if(this.foreign_element_before !== null)
+                this.foreign_element_before.innerText = NETDATA.dateTime.localeDateString(this.view_before) + ' ' + NETDATA.dateTime.localeTimeString(this.view_before);
+
+            if(this.foreign_element_after !== null)
+                this.foreign_element_after.innerText = NETDATA.dateTime.localeDateString(this.view_after) + ' ' + NETDATA.dateTime.localeTimeString(this.view_after);
+
+            if(this.foreign_element_duration !== null)
+                this.foreign_element_duration.innerText = NETDATA.seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
+
+            if(this.foreign_element_update_every !== null)
+                this.foreign_element_update_every.innerText = NETDATA.seconds4human(Math.floor(this.data_update_every / 1000));
         };
 
         this.getSnapshotData = function(key) {
@@ -8098,8 +8144,8 @@ var NETDATA = window.NETDATA || {};
         }
         else {
             NETDATA.gaugeAnimation(state, false);
-            NETDATA.gaugeSet(state, null, null, null);
             NETDATA.gaugeSetLabels(state, null, null, null);
+            NETDATA.gaugeSet(state, null, null, null);
         }
 
         NETDATA.gaugeAnimation(state, true);
