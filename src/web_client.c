@@ -159,6 +159,9 @@ void web_client_request_done(struct web_client *w) {
     w->response.sent = 0;
     w->response.code = 0;
 
+    w->header_parse_tries = 0;
+    w->header_parse_last_size = 0;
+
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
 
@@ -809,7 +812,31 @@ typedef enum {
 } HTTP_VALIDATION;
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = w->response.data->buffer, *encoded_url = NULL;
+    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+
+    size_t last_pos = w->header_parse_last_size;
+    if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
+    else last_pos = 0;
+
+    w->header_parse_tries++;
+    w->header_parse_last_size = buffer_strlen(w->response.data);
+
+    if(w->header_parse_tries > 1) {
+        if(w->header_parse_last_size < last_pos)
+            last_pos = 0;
+
+        if(strstr(&s[last_pos], "\r\n\r\n") == NULL) {
+            if(w->header_parse_tries > 10) {
+                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
+                web_client_disable_wait_receive(w);
+                return HTTP_VALIDATION_NOT_SUPPORTED;
+            }
+
+            return HTTP_VALIDATION_INCOMPLETE;
+        }
+    }
 
     // is is a valid request?
     if(!strncmp(s, "GET ", 4)) {
@@ -825,6 +852,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
+        w->header_parse_tries = 0;
+        w->header_parse_last_size = 0;
         web_client_disable_wait_receive(w);
         return HTTP_VALIDATION_NOT_SUPPORTED;
     }
@@ -872,6 +901,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // FIXME -- we should avoid it
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
                 web_client_disable_wait_receive(w);
                 return HTTP_VALIDATION_OK;
             }

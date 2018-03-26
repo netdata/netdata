@@ -323,6 +323,8 @@ extern int memory_file_save(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
 
+extern struct rlimit rlimit_nofile;
+
 extern int enable_ksm;
 
 extern int sleep_usec(usec_t usec);

@@ -19,6 +19,7 @@ char *netdata_configured_home_dir    = NULL;
 char *netdata_configured_host_prefix = NULL;
 char *netdata_configured_timezone    = NULL;
 
+struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
