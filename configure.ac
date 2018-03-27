@@ -4,13 +4,13 @@
 AC_PREREQ(2.60)
 
 define([VERSION_MAJOR], [1])
-define([VERSION_MINOR], [9])
-define([VERSION_FIX], [1])
+define([VERSION_MINOR], [10])
+define([VERSION_FIX], [0])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
-define([VERSION_SUFFIX], [_rolling])
+define([VERSION_SUFFIX], [])
 
 dnl Set to "1" for a first RPM release of a new version
-PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)"
+PACKAGE_RPM_RELEASE="1"
 
 # We do not use m4_esyscmd_s to support older autoconf.
 define([VERSION_STRING], m4_esyscmd(git describe 2>/dev/null | sed 's/^v//' | tr -d '\n'))
