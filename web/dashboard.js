@@ -3604,6 +3604,9 @@ var NETDATA = window.NETDATA || {};
                 if(this.selected === false && this.debug === true)
                     this.log('selection cleared');
 
+                if (this.foreign_element_selection !== null)
+                    this.foreign_element_selection.innerText = '';
+
                 this.legendReset();
             }
 
