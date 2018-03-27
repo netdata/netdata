@@ -34,7 +34,7 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 `Mar 27th, 2018` - **[netdata v1.10.0 released!](https://github.com/firehol/netdata/releases)**
 
  - new web server, a lot faster and more secure
- - updated all javascript libraries to their latest versions (fixed compatibility issues - now netdata can be embedded on Atlassian Conflunce pages and remain fully interactive!)
+ - updated all javascript libraries to their latest versions (fixed compatibility issues - now netdata chart can now be embedded on **Atlassian Confluence** pages and remain fully interactive!)
  - new plugins:
    - **BTRFS** (visualize BTRFS allocation with alarms)
    - **bcache** (monitor hybrid setups HDD + SSD)
@@ -52,7 +52,7 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
  - improved plugins:
    - **statsd**
    - **web_log**
-   - **cgroups** for containers and VMs monitoring (netdata now supports **systemd-nspawn** and **kubernetes**)
+   - **cgroups** for containers and VMs monitoring (netdata now supports **systemd-nspawn** and **kubernetes** - fixed security issue with `cgroup-network`)
    - **Linux memory**
    - **diskspace**
    - **network interfaces**
