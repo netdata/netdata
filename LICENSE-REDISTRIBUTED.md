@@ -19,18 +19,6 @@ connectivity is not available.
     [MIT License](http://dygraphs.com/legal.html)
 
 
-- [jQuery Sparklines](http://omnipotent.net/jquery.sparkline/)
-
-    Copyright 2009-2012, Splunk Inc.
-    [New BSD License](http://opensource.org/licenses/BSD-3-Clause)
-
-
-- [Peity](http://benpickles.github.io/peity/)
-
-    Copyright 2009-2015, Ben Pickles
-    [MIT License](https://github.com/benpickles/peity/blob/master/MIT-LICENCE)
-    
-
 - [Easy Pie Chart](https://rendro.github.io/easy-pie-chart/)
 
     Copyright 2013, Robert Fleischmann
@@ -43,6 +31,48 @@ connectivity is not available.
     [MIT License](http://bernii.github.io/gauge.js/)
 
 
+- [d3pie](https://github.com/benkeen/d3pie)
+
+    Copyright (c) 2014-2015 Benjamin Keen
+    [MIT License](https://github.com/benkeen/d3pie/blob/master/LICENSE)
+    
+
+- [jQuery Sparklines](http://omnipotent.net/jquery.sparkline/)
+
+    Copyright 2009-2012, Splunk Inc.
+    [New BSD License](http://opensource.org/licenses/BSD-3-Clause)
+
+
+- [Peity](http://benpickles.github.io/peity/)
+
+    Copyright 2009-2015, Ben Pickles
+    [MIT License](https://github.com/benpickles/peity/blob/master/MIT-LICENCE)
+    
+
+- [morris.js](http://morrisjs.github.io/morris.js/)
+
+    Copyright 2013, Olly Smith
+    [Simplified BSD License](http://morrisjs.github.io/morris.js/)
+
+
+- [Raphaël](http://raphaeljs.com/)
+
+    Copyright 2008, Dmitry Baranovskiy
+    [MIT License](http://raphaeljs.com/license.html)
+    
+
+- [C3](http://c3js.org/)
+
+    Copyright 2013, Masayuki Tanaka
+    [MIT License](https://github.com/masayuki0812/c3/blob/master/LICENSE)
+    
+
+- [D3](http://d3js.org/)
+
+    Copyright 2015, Mike Bostock
+    [BSD License](http://opensource.org/licenses/BSD-3-Clause)
+    
+    
 - [jQuery](https://jquery.org/)
 
     Copyright 2015, jQuery Foundation
@@ -54,15 +84,17 @@ connectivity is not available.
     Copyright 2015, Twitter
     [MIT License](http://getbootstrap.com/getting-started/#license-faqs)
 
-- [Bootstrap-slider](http://seiyria.com/bootstrap-slider/)
-
-    Copyright 2017 Kyle Kemp, Rohit Kalkur, and contributors
-    [MIT License](https://github.com/seiyria/bootstrap-slider/blob/master/LICENSE.md)
 
 - [Bootstrap Toggle](http://www.bootstraptoggle.com/)
 
     Copyright (c) 2011-2014 Min Hur, The New York Times Company
     [MIT License](https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE)
+
+
+- [Bootstrap-slider](http://seiyria.com/bootstrap-slider/)
+
+    Copyright 2017 Kyle Kemp, Rohit Kalkur, and contributors
+    [MIT License](https://github.com/seiyria/bootstrap-slider/blob/master/LICENSE.md)
 
 
 - [bootstrap-table](http://bootstrap-table.wenzhixin.net.cn/)
@@ -95,30 +127,6 @@ connectivity is not available.
     Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 
 
-- [morris.js](http://morrisjs.github.io/morris.js/)
-
-    Copyright 2013, Olly Smith
-    [Simplified BSD License](http://morrisjs.github.io/morris.js/)
-
-
-- [Raphaël](http://raphaeljs.com/)
-
-    Copyright 2008, Dmitry Baranovskiy
-    [MIT License](http://raphaeljs.com/license.html)
-    
-
-- [C3](http://c3js.org/)
-
-    Copyright 2013, Masayuki Tanaka
-    [MIT License](https://github.com/masayuki0812/c3/blob/master/LICENSE)
-    
-
-- [D3](http://d3js.org/)
-
-    Copyright 2015, Mike Bostock
-    [BSD License](http://opensource.org/licenses/BSD-3-Clause)
-    
-    
 - [node-extend](https://github.com/justmoon/node-extend)
 
     Copyright 2014, Stefan Thomas
@@ -143,38 +151,44 @@ connectivity is not available.
     Copyright 2015, Joseph Huckaby
     [MIT License](https://github.com/jhuckaby/pixl-xml)
     
+
 - [sensors](https://github.com/paroj/sensors.py)
 
     Copyright 2014, Pavel Rojtberg
     [LGPL 2.1 License](http://opensource.org/licenses/LGPL-2.1)
+
 
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
     Copyright 2006, Kirill Simonov
     [MIT License](http://pyyaml.org)
 
+
 - [urllib3](https://github.com/shazow/urllib3)
 
     Copyright 2008-2016 Andrey Petrov and [contributors](https://github.com/shazow/urllib3/blob/master/CONTRIBUTORS.txt)
     [MIT License](https://github.com/shazow/urllib3/blob/master/LICENSE.txt)
+
 
 - [lz-string](http://pieroxy.net/blog/pages/lz-string/index.html)
 
     Copyright 2013 Pieroxy
     [WTFPL License](http://pieroxy.net/blog/pages/lz-string/index.html#inline_menu_10)
 
+
 - [pako](http://nodeca.github.io/pako/)
 
     Copyright 2014-2017 Vitaly Puzrin and Andrei Tuputcyn
     [MIT License](https://github.com/nodeca/pako/blob/master/LICENSE)
+
 
 - [clipboard-polyfill](https://github.com/lgarron/clipboard-polyfill)
 
     Copyright (c) 2014 Lucas Garron
     [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
     
-- [d3pie](https://github.com/benkeen/d3pie)
 
-    Copyright (c) 2014-2015 Benjamin Keen
-    [MIT License](https://github.com/benkeen/d3pie/blob/master/LICENSE)
-    
+- [Utilities for writing code that runs on Python 2 and 3](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+
+    Copyright (c) 2010-2015 Benjamin Peterson
+    [MIT License](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
