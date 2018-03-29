@@ -14,50 +14,6 @@ export LC_ALL=C
 
 
 # -----------------------------------------------------------------------------
-# find /var/run/fireqos
-
-# the default
-fireqos_run_dir="/var/run/fireqos"
-
-function realdir {
-    local r="$1"
-    local t=$(readlink "$r")
-
-    while [ "$t" ]
-        do
-        r=$(cd $(dirname "$r") && cd $(dirname "$t") && pwd -P)/$(basename "$t")
-        t=$(readlink "$r")
-    done
-
-    dirname "$r"
-}
-
-if [ ! -d "${fireqos_run_dir}" ]
-    then
-
-    # the fireqos executable - we will use it to find its config
-    fireqos="$(which fireqos 2>/dev/null || command -v fireqos 2>/dev/null)"
-
-    if [ ! -z "${fireqos}" ]
-        then
-
-        fireqos_exec_dir="$(realdir ${fireqos})"
-
-        if [ ! -z "${fireqos_exec_dir}" -a "${fireqos_exec_dir}" != "." -a -f "${fireqos_exec_dir}/install.config" ]
-            then
-
-            LOCALSTATEDIR=
-            source "${fireqos_exec_dir}/install.config"
-
-            if [ -d "${LOCALSTATEDIR}/run/fireqos" ]
-                then
-                fireqos_run_dir="${LOCALSTATEDIR}/run/fireqos"
-            fi
-        fi
-    fi
-fi
-
-# -----------------------------------------------------------------------------
 # logging functions
 
 PROGRAM_FILE="$0"
@@ -98,6 +54,55 @@ debug() {
     [ $debug -eq 1 ] && log DEBUG "${@}"
 }
 
+# -----------------------------------------------------------------------------
+# find /var/run/fireqos
+
+# the default
+fireqos_run_dir="/var/run/fireqos"
+
+function realdir {
+    local r="$1"
+    local t=$(readlink "$r")
+
+    while [ "$t" ]
+        do
+        r=$(cd $(dirname "$r") && cd $(dirname "$t") && pwd -P)/$(basename "$t")
+        t=$(readlink "$r")
+    done
+
+    dirname "$r"
+}
+
+if [ ! -d "${fireqos_run_dir}" ]
+    then
+
+    # the fireqos executable - we will use it to find its config
+    fireqos="$(which fireqos 2>/dev/null || command -v fireqos 2>/dev/null)"
+
+    if [ ! -z "${fireqos}" ]
+        then
+
+        fireqos_exec_dir="$(realdir ${fireqos})"
+
+        if [ ! -z "${fireqos_exec_dir}" -a "${fireqos_exec_dir}" != "." -a -f "${fireqos_exec_dir}/install.config" ]
+            then
+
+            LOCALSTATEDIR=
+            source "${fireqos_exec_dir}/install.config"
+
+            if [ -d "${LOCALSTATEDIR}/run/fireqos" ]
+                then
+                fireqos_run_dir="${LOCALSTATEDIR}/run/fireqos"
+            else
+                warning "FireQoS is installed as '${fireqos}', its installation config at '${fireqos_exec_dir}/install.config' specifies local state data at '${LOCALSTATEDIR}/run/fireqos', but this directory is not found or is not readable (check the permissions of its parents)."
+            fi
+        else
+            warning "Although FireQoS is installed on this system as '${fireqos}', I cannot find/read its installation configuration at '${fireqos_exec_dir}/install.config'."
+        fi
+    else
+        warning "FireQoS is not installed on this system. Use FireQoS to apply traffic QoS and expose the class names to netdata. Check https://github.com/firehol/netdata/wiki/You-should-install-QoS-on-all-your-servers"
+    fi
+fi
 
 # -----------------------------------------------------------------------------
 
