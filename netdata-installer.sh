@@ -679,22 +679,23 @@ config_option() {
 if [ "${UID}" = "0" ]
     then
     NETDATA_USER="$( config_option "global" "run as user" "netdata" )"
-    NETDATA_GROUP="${NETDATA_USER}"
     ROOT_USER="root"
 else
     NETDATA_USER="${USER}"
-    NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
     ROOT_USER="${NETDATA_USER}"
 fi
+NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
+[ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
+NETDATA_WEB_GROUP="${NETDATA_GROUP}"
 if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]
 then
-    NETDATA_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
-    [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_WEB_USER}"
+    NETDATA_WEB_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
+    [ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
 fi
-NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_GROUP}" )"
+NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_WEB_GROUP}" )"
 
 # port
 defport=19999

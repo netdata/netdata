@@ -2332,7 +2332,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_next(cg->st_mem);
 
             rrddim_set(cg->st_mem, "cache", cg->memory.cache);
-            rrddim_set(cg->st_mem, "rss", cg->memory.rss);
+            rrddim_set(cg->st_mem, "rss", (cg->memory.rss > cg->memory.rss_huge)?(cg->memory.rss - cg->memory.rss_huge):0);
 
             if(cg->memory.detailed_has_swap)
                 rrddim_set(cg->st_mem, "swap", cg->memory.swap);
