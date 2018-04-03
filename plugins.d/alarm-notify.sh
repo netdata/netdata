@@ -314,7 +314,7 @@ declare -A role_recipients_pd=()
 
 # syslog configs
 SYSLOG_LEVEL=
-SYSLOG_LEVEL_CRIT=
+SYSLOG_CRITICAL_LEVEL=
 SYSLOG_FACILITY=
 
 # custom configs
