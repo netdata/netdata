@@ -27,6 +27,7 @@
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
 #  - custom notifications by @ktsaou
+#  - syslog messages by @Ferroin
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -237,6 +238,7 @@ SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
 SEND_IRC="YES"
+SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
 # slack configs
@@ -309,6 +311,11 @@ KAFKA_SENDER_IP=
 PD_SERVICE_KEY=
 DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
+
+# syslog configs
+SYSLOG_LEVEL=
+SYSLOG_LEVEL_CRIT=
+SYSLOG_FACILITY=
 
 # custom configs
 DEFAULT_RECIPIENT_CUSTOM=
@@ -718,6 +725,17 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
     fi
 fi
 
+# if we need logger, check for the logger command
+if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
+    then
+    logger="$(which logger 2>/dev/null || command -v logger 2>/dev/null)"
+    if [ -z "${logger}" ]
+        then
+        debug "Cannot find logger command in the system path. Disabling syslog notifications."
+        SEND_SYSLOG="NO"
+    fi
+fi
+
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
@@ -735,6 +753,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
+    -a "${SEND_SYSLOG}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1510,6 +1529,23 @@ send_irc() {
     return 1
 }
 
+# -----------------------------------------------------------------------------
+# syslog sender
+
+send_syslog() {
+    local message="${1}" level=${SYSLOG_LEVEL:-"warning"} crit_level=${SYSLOG_CRITICAL_LEVEL:-"err"} facility=${SYSLOG_FACILITY:-"local6"}
+
+    [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
+
+    if [ "${status}" -eq "CRITICAL" ] ; then
+        level=${crit_level}
+    fi
+
+    ${logger} -p ${facility}.${level} ${logger_options} "${message}"
+
+    return $?
+}
+
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
@@ -1769,6 +1805,14 @@ SENT_HIPCHAT=$?
 
 
 # -----------------------------------------------------------------------------
+# send the syslog message
+
+send_syslog "Netdata notification on ${host} at ${when}: ${status}, ${alarm}"
+
+SENT_SYSLOG=$?
+
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -1909,6 +1953,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
+    -o ${SENT_SYSLOG}       -eq 0 \
     ]
     then
     # we did send something
