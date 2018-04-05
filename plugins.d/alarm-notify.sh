@@ -313,9 +313,8 @@ DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
 
 # syslog configs
-SYSLOG_LEVEL=
-SYSLOG_CRITICAL_LEVEL=
 SYSLOG_FACILITY=
+declare -A role_recipients_syslog=()
 
 # custom configs
 DEFAULT_RECIPIENT_CUSTOM=
@@ -426,6 +425,7 @@ declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
 declare -A arr_irc=()
+declare -A arr_syslog=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -538,13 +538,21 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
-    
+
     # irc
     a="${role_recipients_irc[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
+    done
+
+    # syslog
+    a="${role_recipients_syslog[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality syslog "${r}" && arr_syslog[${r/|*/}]="1"
     done
 
     # custom
@@ -621,6 +629,10 @@ done
 # build the list of irc recipients (channels)
 to_irc="${!arr_irc[*]}"
 [ -z "${to_irc}" ] && SEND_IRC="NO"
+
+# build the list of syslog recipients (facilities, servers, and prefixes)
+to_syslog="${!arr_syslog[*]}"
+[ -z "${to_syslog}" ] && SEND_SYSLOG="NO"
 
 # -----------------------------------------------------------------------------
 # verify the delivery methods supported
@@ -1533,15 +1545,70 @@ send_irc() {
 # syslog sender
 
 send_syslog() {
-    local message="${1}" level=${SYSLOG_LEVEL:-"warning"} crit_level=${SYSLOG_CRITICAL_LEVEL:-"err"} facility=${SYSLOG_FACILITY:-"local6"}
+    local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
+    local prioiryt='' message='' host='' port='' prefix=''
+    local temp1='' temp2=''
 
     [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
 
     if [ "${status}" -eq "CRITICAL" ] ; then
-        level=${crit_level}
+        level='crit'
+    elif [ "${status}" -eq "WARNING" ] ; then
+        level='warning'
     fi
 
-    ${logger} -p ${facility}.${level} ${logger_options} "${message}"
+    for target in ${targets} ; do
+        priority="${facility}.${level}"
+        message=''
+        host=''
+        port=''
+        prefix=''
+        temp1=''
+        temp2=''
+
+        prefix=$(echo ${target} | cut -d '/' -f 2)
+        temp1=$(echo ${target} | cut -d '/' -f 1)
+
+        if [ ${prefix} != ${temp1} ] ; then
+            if (echo ${temp1} | grep -q '@' ) ; then
+                temp2=$(echo ${temp1} | cut -d '@' -f 1)
+                host=$(echo ${temp1} | cut -d '@' -f 2)
+
+                if [ ${temp2} != ${host} ] ; then
+                    priority=${temp2}
+                fi
+
+                port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+
+                if ( echo ${host} | grep -E -q '\[.*\]' ) ; then
+                    if ( echo ${port} | grep -q ']' ) ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+                    fi
+                else
+                    if [ ${port} = ${host} ] ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | cut -d ':' -f 1)
+                    fi
+                fi
+            else
+                priority=${temp1}
+            fi
+        fi
+
+        message="${prefix} ${status} on ${host} at ${date}: ${value_string}"
+
+        if [ ${host} ] ; then
+            logger_options="${logger_options} -n ${host}"
+            if [ ${port} ] ; then
+                logger_options="${logger_options} -P ${port}"
+            fi
+        fi
+
+        ${logger} -p ${priority} ${logger_options} "${message}"
+    done
 
     return $?
 }
@@ -1807,7 +1874,7 @@ SENT_HIPCHAT=$?
 # -----------------------------------------------------------------------------
 # send the syslog message
 
-send_syslog "Netdata notification on ${host} at ${when}: ${status}, ${alarm}"
+send_syslog ${to_syslog}
 
 SENT_SYSLOG=$?
 
