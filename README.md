@@ -1,4 +1,5 @@
 # netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata?ref=badge_shield)
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
@@ -368,3 +369,6 @@ Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
 netdata is [GPLv3+](LICENSE).
 
 It re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/LICENSE-REDISTRIBUTED.md).
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata?ref=badge_large)
