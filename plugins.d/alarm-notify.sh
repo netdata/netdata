@@ -1546,7 +1546,7 @@ send_irc() {
 
 send_syslog() {
     local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
-    local prioiryt='' message='' host='' port='' prefix=''
+    local priority='' message='' host='' port='' prefix=''
     local temp1='' temp2=''
 
     [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
