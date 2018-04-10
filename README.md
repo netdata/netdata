@@ -1,4 +1,7 @@
-# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+
+# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Backers on Open Collective](https://opencollective.com/netdata/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/netdata/sponsors/badge.svg)](#sponsors) 
+
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
@@ -362,6 +365,36 @@ The default port of dashboard is 19999. To access the web dashboard on localhost
 ## Documentation
 
 Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
+
+## Contributors
+
+This project exists thanks to all the people who contribute. 
+<a href="graphs/contributors"><img src="https://opencollective.com/netdata/contributors.svg?width=890&button=false" /></a>
+
+
+## Backers
+
+Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/netdata#backer)]
+
+<a href="https://opencollective.com/netdata#backers" target="_blank"><img src="https://opencollective.com/netdata/backers.svg?width=890"></a>
+
+
+## Sponsors
+
+Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/netdata#sponsor)]
+
+<a href="https://opencollective.com/netdata/sponsor/0/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/1/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/2/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/3/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/4/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/5/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/6/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/7/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/8/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/netdata/sponsor/9/website" target="_blank"><img src="https://opencollective.com/netdata/sponsor/9/avatar.svg"></a>
+
+
 
 ## License
 
