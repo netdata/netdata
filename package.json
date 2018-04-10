@@ -19,5 +19,15 @@
     "grunt-exec": "^2.0.0",
     "jasmine-reporters": "^2.2.1",
     "jasmine-node": "BrainDoctor/jasmine-node"
+  },
+  "dependencies": {
+    "opencollective": "^1.0.3"
+  },
+  "collective": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/netdata"
+  },
+  "scripts": {
+    "postinstall": "opencollective postinstall"
   }
 }
