@@ -71,9 +71,10 @@ METRICS = dict(
                 'vacuum_freeze',
                 'brin_summarize'],
     STANDBY_DELTA=['sent_delta',
-                       'write_delta',
-                       'flush_delta',
-                       'replay_delta'],
+                   'write_delta',
+                   'flush_delta',
+                   'replay_delta'
+                   ],
     REPSLOT_FILES=['replslot_wal_keep',
                    'replslot_files']
 
@@ -244,9 +245,9 @@ QUERY_STATS = {
 }
 
 ORDER = ['db_stat_temp_files', 'db_stat_temp_bytes', 'db_stat_blks', 'db_stat_tuple_returned', 'db_stat_tuple_write',
-         'db_stat_transactions','db_stat_connections', 'database_size', 'backend_process', 'index_count', 'index_size',
+         'db_stat_transactions', 'db_stat_connections', 'database_size', 'backend_process', 'index_count', 'index_size',
          'table_count', 'table_size', 'wal', 'wal_writes', 'archive_wal', 'checkpointer', 'stat_bgwriter_alloc', 'stat_bgwriter_checkpoint',
-         'stat_bgwriter_backend', 'stat_bgwriter_backend_fsync' , 'stat_bgwriter_bgwriter', 'stat_bgwriter_maxwritten',
+         'stat_bgwriter_backend', 'stat_bgwriter_backend_fsync', 'stat_bgwriter_bgwriter', 'stat_bgwriter_maxwritten',
          'replication_slot', 'standby_delta', 'autovacuum']
 
 CHARTS = {
@@ -397,7 +398,7 @@ CHARTS = {
             ['flush_delta', 'flush delta', 'absolute', 1, 1024],
             ['replay_delta', 'replay delta', 'absolute', 1, 1024]
         ]},
-     'replication_slot': {
+    'replication_slot': {
         'options': [None, 'Replication slot files', 'files', 'replication slot', 'postgres.replication_slot', 'line'],
         'lines': [
             ['replslot_wal_keep', 'wal keeped', 'absolute'],
@@ -482,8 +483,8 @@ class Service(SimpleService):
             wal = 'xlog'
             lsn = 'location'
         self.queries[QUERIES['BGWRITER']] = METRICS['BGWRITER']
-        self.queries[QUERIES['DIFF_LSN'].format(wal,lsn)] = METRICS['WAL_WRITES']
-        self.queries[QUERIES['STANDBY_DELTA'].format(wal,lsn)] = METRICS['STANDBY_DELTA']
+        self.queries[QUERIES['DIFF_LSN'].format(wal, lsn)] = METRICS['WAL_WRITES']
+        self.queries[QUERIES['STANDBY_DELTA'].format(wal, lsn)] = METRICS['STANDBY_DELTA']
 
         if self.index_stats:
             self.queries[QUERIES['INDEX_STATS']] = METRICS['INDEX_STATS']
@@ -492,7 +493,7 @@ class Service(SimpleService):
         if is_superuser:
             self.queries[QUERIES['ARCHIVE'].format(wal)] = METRICS['ARCHIVE']
             if self.server_version >= 90400:
-                self.queries[QUERIES['WAL'].format(wal,lsn)] = METRICS['WAL']
+                self.queries[QUERIES['WAL'].format(wal, lsn)] = METRICS['WAL']
             if self.server_version >= 100000:
                 self.queries[QUERIES['REPSLOT_FILES']] = METRICS['REPSLOT_FILES']
         if self.server_version >= 90400:
@@ -501,8 +502,8 @@ class Service(SimpleService):
     def create_dynamic_charts_(self):
 
         for database_name in self.databases[::-1]:
-            self.definitions['database_size']['lines'].append([database_name + '_size',
-                                                               database_name, 'absolute', 1, 1024 * 1024])
+            self.definitions['database_size']['lines'].append(
+                [database_name + '_size', database_name, 'absolute', 1, 1024 * 1024])
             for chart_name in [name for name in self.order if name.startswith('db_stat')]:
                     add_database_stat_chart_(order=self.order, definitions=self.definitions,
                                              name=chart_name, database_name=database_name)
@@ -510,14 +511,18 @@ class Service(SimpleService):
             add_database_lock_chart_(order=self.order, definitions=self.definitions, database_name=database_name)
 
         for application_name in self.secondaries[::-1]:
-              add_replication_delta_chart_(order=self.order, definitions=self.definitions,
-                                       name='standby_delta', application_name=application_name)
+            add_replication_delta_chart_(
+                order=self.order,
+                definitions=self.definitions,
+                name='standby_delta',
+                application_name=application_name)
 
         for slot_name in self.replication_slots[::-1]:
-              add_replication_slot_chart_(order=self.order, definitions=self.definitions,
-                                       name='replication_slot', slot_name=slot_name)
-
-
+            add_replication_slot_chart_(
+                order=self.order,
+                definitions=self.definitions,
+                name='replication_slot',
+                slot_name=slot_name)
 
     def _get_data(self):
         result, error = self._connect()
@@ -551,7 +556,8 @@ class Service(SimpleService):
                 else:
                     dimension_id = metric
                 if metric in row:
-                    self.data[dimension_id] = int(row[metric])
+                    if row[metric] is not None:
+                        self.data[dimension_id] = int(row[metric])
                 elif 'locks_count' in row:
                     self.data[dimension_id] = row['locks_count'] if metric == row['mode'] else 0
 
@@ -564,6 +570,7 @@ def discover_databases_(cursor, query):
             result.append(db)
     return result
 
+
 def discover_secondaries_(cursor, query):
     cursor.execute(query)
     result = list()
@@ -571,6 +578,7 @@ def discover_secondaries_(cursor, query):
         if sc not in result:
             result.append(sc)
     return result
+
 
 def discover_replication_slots_(cursor, query):
     cursor.execute(query)
@@ -580,13 +588,16 @@ def discover_replication_slots_(cursor, query):
             result.append(slot)
     return result
 
+
 def check_if_superuser_(cursor, query):
     cursor.execute(query)
     return cursor.fetchone()[0]
 
+
 def detect_server_version(cursor, query):
     cursor.execute(query)
     return int(cursor.fetchone()[0])
+
 
 def populate_lock_types(databases):
     result = dict()
@@ -631,6 +642,7 @@ def add_database_stat_chart_(order, definitions, name, database_name):
                'options': [name, title + ': ' + database_name,  units, 'db ' + database_name, context,  chart_type],
                'lines': create_lines(database_name, chart_template['lines'])}
 
+
 def add_replication_delta_chart_(order, definitions, name, application_name):
     def create_lines(standby, lines):
         result = list()
@@ -647,6 +659,7 @@ def add_replication_delta_chart_(order, definitions, name, application_name):
     definitions[chart_name] = {
                'options': [name, title + ': ' + application_name,  units, 'replication delta', context,  chart_type],
                'lines': create_lines(application_name, chart_template['lines'])}
+
 
 def add_replication_slot_chart_(order, definitions, name, slot_name):
     def create_lines(slot, lines):
