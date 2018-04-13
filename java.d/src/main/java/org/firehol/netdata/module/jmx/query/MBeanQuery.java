@@ -11,6 +11,7 @@ import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 
 @Getter
@@ -21,6 +22,7 @@ public abstract class MBeanQuery {
 
 	private String attribute;
 
+	@NonNull
 	MBeanServerConnection mBeanServer;
 
 	public boolean queryDestinationEquals(MBeanQuery mBeanQuery) {

@@ -245,6 +245,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		queryInfo.setMBeanName(name);
 		queryInfo.setMBeanAttribute(dimensionConfig.getValue());
 		queryInfo.setMBeanAttributeExample(value);
+		queryInfo.setMBeanServer(mBeanServer);
 		MBeanQuery query = MBeanQueryFactory.build(queryInfo);
 
 		return query;
