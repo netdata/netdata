@@ -2,6 +2,7 @@ package org.firehol.netdata.module.jmx;
 
 import org.firehol.netdata.module.jmx.exception.ClassTypeNotSupportedException;
 import org.firehol.netdata.module.jmx.store.MBeanDoubleStore;
+import org.firehol.netdata.module.jmx.store.MBeanLongStore;
 import org.firehol.netdata.module.jmx.store.MBeanValueStore;
 
 public class MBeanValueStoreFactory {
@@ -13,7 +14,10 @@ public class MBeanValueStoreFactory {
 		if (Double.class.isAssignableFrom(valueType)) {
 			return new MBeanDoubleStore();
 		}
+		if (Long.class.isAssignableFrom(valueType)) {
+			return new MBeanLongStore();
+		}
 
-		throw new ClassTypeNotSupportedException();
+		throw new ClassTypeNotSupportedException("Value type not supported: " + valueType);
 	}
 }
