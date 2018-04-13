@@ -42,7 +42,7 @@ public class LoggingUtilsTest {
 		String message = LoggingUtils.buildMessage(exception);
 
 		// Verify
-		assertEquals("Something went wrong. Detail: This is the reason. Detail: Here are the details.", message);
+		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.", message);
 	}
 
 	@Test
@@ -52,7 +52,7 @@ public class LoggingUtilsTest {
 
 		// Verify
 		assertEquals(
-				"Could not do it. Reason: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
+				"Could not do it. Reason: Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
 				message);
 	}
 
@@ -89,7 +89,7 @@ public class LoggingUtilsTest {
 		Supplier<String> messageSupplier = LoggingUtils.getMessageSupplier(exception);
 
 		// Verify
-		assertEquals("Something went wrong. Detail: This is the reason. Detail: Here are the details.",
+		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
 				messageSupplier.get());
 	}
 
@@ -100,7 +100,7 @@ public class LoggingUtilsTest {
 
 		// Verify
 		assertEquals(
-				"Could not do it. Reason: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
+				"Could not do it. Reason: Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
 				messageSupplier.get());
 
 	}

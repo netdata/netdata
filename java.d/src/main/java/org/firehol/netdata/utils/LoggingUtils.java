@@ -18,12 +18,16 @@
 
 package org.firehol.netdata.utils;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.function.Supplier;
 
 public abstract class LoggingUtils {
 
 	private static void appendMessage(Throwable reason, StringBuilder sb) {
 
+		sb.append(reason.getClass().getSimpleName());
+		sb.append(": ");
 		sb.append(reason.getMessage());
 
 		Throwable detail = reason.getCause();
@@ -37,6 +41,18 @@ public abstract class LoggingUtils {
 	public static String buildMessage(Throwable reason) {
 		StringBuilder sb = new StringBuilder();
 		appendMessage(reason, sb);
+		return sb.toString();
+	}
+
+	public static String buildTrace(String message, Throwable reason) {
+		StringBuilder sb = new StringBuilder(message);
+
+		sb.append(" Reason: ");
+		appendMessage(reason, sb);
+		sb.append(" Trace:\n");
+		StringWriter sw = new StringWriter();
+		reason.printStackTrace(new PrintWriter(sw));
+		sb.append(sw.toString());
 		return sb.toString();
 	}
 

@@ -131,6 +131,7 @@ public final class ConfigurationService {
 		Path configDir = environmentConfigurationService.getConfigDir().resolve("java.d");
 		Path configFile = configDir.resolve(pluginName + ".conf");
 
+		log.info(": Reading '" + pluginName + "' module configuration file '" + configFile.toFile().getAbsolutePath() + "'");
 		return this.readConfiguration(configFile.toFile(), clazz);
 	}
 }
