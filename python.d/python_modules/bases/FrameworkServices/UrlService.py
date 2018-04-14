@@ -24,6 +24,7 @@ class UrlService(SimpleService):
         self.proxy_url = self.configuration.get('proxy_url')
         self.header = self.configuration.get('header')
         self.request_timeout = self.configuration.get('timeout', 1)
+        self.tls_verify = self.configuration.get('tls_verify')
         self._manager = None
 
     def __make_headers(self, **header_kw):
@@ -62,8 +63,8 @@ class UrlService(SimpleService):
             params = dict(headers=header)
         try:
             url = header_kw.get('url') or self.url
-            if url.startswith('https'):
-                return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
+            if url.startswith('https') and not self.tls_verify:
+                return manager(assert_hostname=False, cert_reqs='CERT_NONE', ca_certs=None, **params)
             return manager(**params)
         except (urllib3.exceptions.ProxySchemeUnknown, TypeError) as error:
             self.error('build_manager() error:', str(error))
@@ -77,13 +78,13 @@ class UrlService(SimpleService):
         try:
             status, data = self._get_raw_data_with_status(url, manager)
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
-            self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
+            self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
             return None
 
         if status == 200:
             return data.decode()
         else:
-            self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
+            self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
             return None
 
     def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True):
