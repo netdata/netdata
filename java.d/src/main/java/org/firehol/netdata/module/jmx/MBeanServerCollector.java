@@ -169,7 +169,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 				try {
 					queryInfo = initializeMBeanQueryInfo(dimensionConfig);
 				} catch (JmxMBeanServerQueryException e) {
-					log.warning(LoggingUtils.buildMessage("Could not query one dimension. Skipping...", e));
+					log.warning(LoggingUtils.buildTrace("Could not query one dimension. Skipping...", e));
 					continue;
 				}
 

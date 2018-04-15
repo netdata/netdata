@@ -101,9 +101,6 @@ public class ConfigurationServiceTest {
 		// Test
 		NoTestConfiguration testConfig = configService.readConfiguration(testConfigurationFile,
 				NoTestConfiguration.class);
-
-		// Verify
-		assertEquals("defaultValue", testConfig.testProperty);
 	}
 
 	@Test

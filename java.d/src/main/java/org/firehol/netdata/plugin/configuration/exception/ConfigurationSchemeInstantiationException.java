@@ -29,4 +29,9 @@ public class ConfigurationSchemeInstantiationException extends ConfigurationExce
 	public ConfigurationSchemeInstantiationException(String explanation) {
 		super(explanation);
 	}
+
+	public ConfigurationSchemeInstantiationException(String explanation, Throwable cause) {
+		this(explanation);
+		this.initCause(cause);
+	}
 }

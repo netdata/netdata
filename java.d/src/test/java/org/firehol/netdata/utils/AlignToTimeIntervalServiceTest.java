@@ -19,6 +19,7 @@
 package org.firehol.netdata.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.firehol.netdata.test.utils.ReflectionUtils;
 import org.junit.Rule;
@@ -48,7 +49,8 @@ public class AlignToTimeIntervalServiceTest {
 		AlignToTimeIntervalService service = new AlignToTimeIntervalService(UnitConversion.NANO_PER_PLAIN / 100);
 
 		for (int i = 0; i < 100; i++) {
-			service.alignToNextInterval();
+			long delta = service.alignToNextInterval();
+			assertTrue(delta > 0);
 		}
 	}
 

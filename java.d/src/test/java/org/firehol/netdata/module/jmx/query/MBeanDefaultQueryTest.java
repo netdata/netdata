@@ -2,6 +2,7 @@ package org.firehol.netdata.module.jmx.query;
 
 import static org.junit.Assert.assertEquals;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
@@ -13,8 +14,12 @@ public class MBeanDefaultQueryTest {
 	@InjectMocks
 	public MBeanDefaultQuery mBeanQuery;
 
+	@SuppressWarnings("PMD")
+	@Ignore
 	@Test
-	public void testQuery() {
+	public void testQuery() throws Exception {
+		// TODO: would need to mock MBeanDefaultQuery.mBeanServer
+		mBeanQuery.query();
 	}
 
 	@Test

@@ -19,6 +19,7 @@
 package org.firehol.netdata;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -51,9 +52,8 @@ public class MainTest {
 		exit.expectSystemExitWithStatus(1);
 		final String[] args = { "to", "many" };
 
-		exit.expectSystemExitWithStatus(1);
-
 		Main.getUpdateEveryInSecondsFomCommandLineFailFast(args);
+		fail("Should have exit(1)");
 	}
 
 	@Test
@@ -61,9 +61,8 @@ public class MainTest {
 		exit.expectSystemExitWithStatus(1);
 		final String[] args = { "String" };
 
-		exit.expectSystemExitWithStatus(1);
-
 		Main.getUpdateEveryInSecondsFomCommandLineFailFast(args);
+		fail("Should have exit(1)");
 	}
 
 	@Test

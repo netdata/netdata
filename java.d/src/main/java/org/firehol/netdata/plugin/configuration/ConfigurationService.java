@@ -110,7 +110,7 @@ public final class ConfigurationService {
 				configuration = clazz.newInstance();
 			} catch (InstantiationException | IllegalAccessException e) {
 				throw new ConfigurationSchemeInstantiationException(
-						"Could not instanciate default configuration for class " + clazz.getName() + ".");
+						"Could not instanciate default configuration for class " + clazz.getName() + ".", e);
 			}
 		}
 

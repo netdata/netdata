@@ -14,12 +14,12 @@ import lombok.Getter;
 
 public class MBeanQueryDouble extends MBeanQuery {
 
+	@Getter(AccessLevel.NONE)
+	private MBeanValueStore mBeanValueStore = new MBeanDoubleStore();
+
 	public MBeanQueryDouble(MBeanServerConnection mBeanServerConnection, ObjectName objectName, String string) {
 		super(objectName, string, mBeanServerConnection);
 	}
-
-	@Getter(AccessLevel.NONE)
-	private MBeanValueStore mBeanValueStore = new MBeanDoubleStore();
 
 	@Override
 	public void addDimension(MBeanQueryDimensionMapping queryInfo) {
