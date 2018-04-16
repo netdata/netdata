@@ -1693,6 +1693,9 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
         m->reset = 1;
         updated = 1;
     }
+    else {
+        m->last = 0;
+    }
 
     if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_set(m);
@@ -1700,22 +1703,6 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
-
-    if(unlikely(!m->histogram.ext->zeroed)) {
-        // reset the metrics
-        // if we collected anything, they will be updated below
-        // this ensures that we report zeros if nothing is collected
-
-        m->histogram.ext->last_min = 0;
-        m->histogram.ext->last_max = 0;
-        m->last = 0;
-        m->histogram.ext->last_median = 0;
-        m->histogram.ext->last_stddev = 0;
-        m->histogram.ext->last_sum = 0;
-        m->histogram.ext->last_percentile = 0;
-
-        m->histogram.ext->zeroed = 1;
-    }
 
     int updated = 0;
     if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
@@ -1746,6 +1733,21 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         m->histogram.ext->zeroed = 0;
         m->reset = 1;
         updated = 1;
+    }
+    else if(unlikely(!m->histogram.ext->zeroed)) {
+        // reset the metrics
+        // if we collected anything, they will be updated below
+        // this ensures that we report zeros if nothing is collected
+
+        m->histogram.ext->last_min = 0;
+        m->histogram.ext->last_max = 0;
+        m->last = 0;
+        m->histogram.ext->last_median = 0;
+        m->histogram.ext->last_stddev = 0;
+        m->histogram.ext->last_sum = 0;
+        m->histogram.ext->last_percentile = 0;
+
+        m->histogram.ext->zeroed = 1;
     }
 
     if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
