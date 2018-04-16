@@ -1649,14 +1649,14 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing gauge metric '%s'", m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = (collected_number) (m->gauge.value * statsd.decimal_detail);
 
         m->reset = 1;
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_gauge(m);
 }
 
@@ -1664,14 +1664,14 @@ static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *d
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = m->counter.value;
 
         m->reset = 1;
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_counter_or_meter(m, dim, family);
 }
 
@@ -1687,14 +1687,14 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing set metric '%s'", m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = (collected_number)m->set.unique;
 
         m->reset = 1;
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_set(m);
 }
 
@@ -1720,7 +1720,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
     }
 
     int updated = 0;
-    if(m->count && !m->reset && m->histogram.ext->used > 0) {
+    if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
         size_t len = m->histogram.ext->used;
         LONG_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -1746,7 +1746,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_timer_or_histogram(m, dim, family, units);
 
     netdata_mutex_unlock(&m->histogram.ext->mutex);
@@ -2051,7 +2051,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         }
 
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
-            if(statsd.private_charts >= statsd.max_private_charts_hard) {
+            if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
                 debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
                 info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
