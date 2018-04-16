@@ -89,6 +89,8 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008, // show the count of events for this private chart
     STATSD_METRIC_OPTION_CHECKED_IN_APPS              = 0x00000010, // set when this metric has been checked against apps
     STATSD_METRIC_OPTION_USED_IN_APPS                 = 0x00000020, // set when this metric is used in apps
+    STATSD_METRIC_OPTION_CHECKED                      = 0x00000040, // set when the charting thread checks this metric for use in charts (its usefulness)
+    STATSD_METRIC_OPTION_USEFUL                       = 0x00000080, // set when the charting thread finds the metric useful (i.e. used in a chart)
 } STATS_METRIC_OPTIONS;
 
 typedef enum statsd_metric_type {
@@ -459,11 +461,11 @@ static inline int value_is_zinit(const char *value) {
     return (value && *value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
 }
 
-#define is_metric_checked(m) (((m)->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS)) == (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS))
-#define is_metric_useful(m) (!is_metric_checked(m) || ((m)->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) != 0)
+#define is_metric_checked(m) ((m)->options & STATSD_METRIC_OPTION_CHECKED)
+#define is_metric_useful_for_collection(m) (!is_metric_checked(m) || ((m)->options & STATSD_METRIC_OPTION_USEFUL))
 
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(!is_metric_useful(m)) return;
+    if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
@@ -490,7 +492,7 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
 }
 
 static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(!is_metric_useful(m)) return;
+    if(!is_metric_useful_for_collection(m)) return;
 
     // we accept empty values for counters
 
@@ -511,7 +513,7 @@ static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char 
 #define statsd_process_meter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
 
 static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const char *value, const char *sampling, const char *type) {
-    if(!is_metric_useful(m)) return;
+    if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
         error("STATSD: metric of type %s, with empty value is ignored.", type);
@@ -545,7 +547,7 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
 #define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
 static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
-    if(!is_metric_useful(m)) return;
+    if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
         error("STATSD: metric of type set, with empty value is ignored.");
@@ -2084,7 +2086,12 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
             m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED;
         }
 
-        if(is_metric_useful(m)) {
+        // mark it as checked
+        m->options |= STATSD_METRIC_OPTION_CHECKED;
+
+        // check if it is used in charts
+        if((m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) && !(m->options & STATSD_METRIC_OPTION_USEFUL)) {
+            m->options |= STATSD_METRIC_OPTION_USEFUL;
             index->useful++;
             m->next_useful = index->first_useful;
             index->first_useful = m;
