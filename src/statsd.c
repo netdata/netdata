@@ -87,7 +87,8 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002, // render a private chart for this metric
     STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED        = 0x00000004, // the metric has been checked if it should get private chart or not
     STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008, // show the count of events for this private chart
-    STATSD_METRIC_OPTION_CHECKED_IN_APPS              = 0x00000010, // set when this metric has been checked agains apps
+    STATSD_METRIC_OPTION_CHECKED_IN_APPS              = 0x00000010, // set when this metric has been checked against apps
+    STATSD_METRIC_OPTION_USED_IN_APPS                 = 0x00000020, // set when this metric is used in apps
 } STATS_METRIC_OPTIONS;
 
 typedef enum statsd_metric_type {
@@ -130,6 +131,7 @@ typedef struct statsd_metric {
 
     // linking, used for walking through all metrics
     struct statsd_metric *next;
+    struct statsd_metric *next_useful;
 } STATSD_METRIC;
 
 
@@ -144,6 +146,7 @@ typedef struct statsd_index {
     STATSD_AVL_TREE index;          // the AVL tree
 
     STATSD_METRIC *first;           // the linked list of metrics (new metrics are added in front)
+    STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
     STATSD_FIRST_PTR_MUTEX;         // when mutli-threading is enabled, a lock to protect the linked list
 
     STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
@@ -455,7 +458,17 @@ static inline int value_is_zinit(const char *value) {
     return (value && *value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
 }
 
+static inline int is_metric_checked(STATSD_METRIC *m) {
+    return ((m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS)) == (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS));
+}
+
+static inline int is_metric_useful(STATSD_METRIC *m) {
+    return (!is_metric_checked(m) || (m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) != 0);
+}
+
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful(m)) return;
+
     if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
         return;
@@ -480,7 +493,9 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
     }
 }
 
-static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, const char *sampling) {
+static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful(m)) return;
+
     // we accept empty values for counters
 
     if(unlikely(m->reset)) statsd_reset_metric(m);
@@ -496,14 +511,14 @@ static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, c
     }
 }
 
-static inline void statsd_process_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
-    // this is the same with the counter
-    statsd_process_counter(m, value, sampling);
-}
+#define statsd_process_counter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
+#define statsd_process_meter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
 
-static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value, const char *sampling) {
+static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const char *value, const char *sampling, const char *type) {
+    if(!is_metric_useful(m)) return;
+
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric '%s' of type histogram, with empty value is ignored.", m->name);
+        error("STATSD: metric of type %s, with empty value is ignored.", type);
         return;
     }
 
@@ -530,17 +545,12 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
     }
 }
 
-static inline void statsd_process_timer(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type timer, with empty value is ignored.");
-        return;
-    }
-
-    // timers are a use case of histogram
-    statsd_process_histogram(m, value, sampling);
-}
+#define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
+#define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
 static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
+    if(!is_metric_useful(m)) return;
+
     if(unlikely(!value || !*value)) {
         error("STATSD: metric of type set, with empty value is ignored.");
         return;
@@ -1839,6 +1849,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
     }
 
     chart->dimensions_linked_count++;
+    m->options |= STATSD_METRIC_OPTION_USED_IN_APPS;
     debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
 }
 
@@ -2045,7 +2056,13 @@ const char *statsd_metric_type_string(STATSD_METRIC_TYPE type) {
 
 static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_metric)(STATSD_METRIC *)) {
     STATSD_METRIC *m;
+
+    // find the useful metrics (incremental = each time we are called, we check the new metrics only)
     for(m = index->first; m ; m = m->next) {
+        // since we add new metrics at the beginning
+        // check for useful charts, until the point we last checked
+        if(unlikely(is_metric_checked(m))) break;
+
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_CHECKED_IN_APPS))) {
             log_access("NEW STATSD METRIC '%s': '%s'", statsd_metric_type_string(m->type), m->name);
             check_if_metric_is_for_app(index, m);
@@ -2071,8 +2088,15 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
             m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED;
         }
 
-        flush_metric(m);
+        if(is_metric_useful(m)) {
+            m->next_useful = index->first_useful;
+            index->first_useful = m;
+        }
     }
+
+    // flush all the useful metrics
+    for(m = index->first_useful; m ; m = m->next_useful)
+        flush_metric(m);
 }
 
 
