@@ -48,15 +48,15 @@ public final class ConfigurationService {
 	private static final ConfigurationService INSTANCE = new ConfigurationService();
 
 	private ConfigurationService() {
+		log.fine("Initialize object mapper for reading configuration files.");
+		mapper = buildObjectMapper();
+
 		log.info("Read configuration");
 		try {
 			this.globalConfiguration = readGlobalConfiguration();
 		} catch (ConfigurationSchemeInstantiationException e) {
 			Main.exit(LoggingUtils.buildMessage("Could not initialize ConfigurationService", e));
 		}
-
-		log.fine("Initialize object mapper for reading configuration files.");
-		mapper = buildObjectMapper();
 	}
 
 	private ObjectMapper buildObjectMapper() {
@@ -101,7 +101,7 @@ public final class ConfigurationService {
 					"Could not read malformed configuration file '" + file.getAbsolutePath() + ".", e));
 		} catch (Exception e) {
 			log.warning(LoggingUtils
-					.getMessageSupplier("Could not read configuration file '" + file.getAbsolutePath() + "'.", e));
+					.getMessageSupplier("Could not read configuration file '" + file.getAbsolutePath() + "', " + clazz + ", "+mapper+".", e));
 		}
 
 		// If we still have no configuration try to read the default one.
