@@ -101,7 +101,7 @@ typedef enum statsd_metric_type {
 
 
 typedef struct statsd_metric {
-    avl avl;                        // indexing
+    avl avl;                        // indexing - has to be first
 
     const char *name;               // the name of the metric
     uint32_t hash;                  // hash of the name
@@ -122,9 +122,9 @@ typedef struct statsd_metric {
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
-    char reset;                     // set to 1 to reset this metric to zero
+    char reset;                     // set to 1 by the charting thread to instruct the collector thread(s) to reset this metric
     collected_number last;          // the last value sent to netdata
-    RRDSET *st;                     // the chart of this metric
+    RRDSET *st;                     // the private chart of this metric
     RRDDIM *rd_value;               // the dimension of this metric value
     RRDDIM *rd_count;               // the dimension for the number of events received
 
