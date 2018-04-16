@@ -142,6 +142,7 @@ typedef struct statsd_index {
     char *name;                     // the name of the index of metrics
     size_t events;                  // the number of events processed for this index
     size_t metrics;                 // the number of metrics in this index
+    size_t useful;                  // the number of useful metrics in this index
 
     STATSD_AVL_TREE index;          // the AVL tree
 
@@ -458,13 +459,8 @@ static inline int value_is_zinit(const char *value) {
     return (value && *value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
 }
 
-static inline int is_metric_checked(STATSD_METRIC *m) {
-    return ((m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS)) == (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS));
-}
-
-static inline int is_metric_useful(STATSD_METRIC *m) {
-    return (!is_metric_checked(m) || (m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) != 0);
-}
+#define is_metric_checked(m) (((m)->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS)) == (STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED|STATSD_METRIC_OPTION_CHECKED_IN_APPS))
+#define is_metric_useful(m) (!is_metric_checked(m) || ((m)->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) != 0)
 
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
     if(!is_metric_useful(m)) return;
@@ -2089,14 +2085,16 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         }
 
         if(is_metric_useful(m)) {
+            index->useful++;
             m->next_useful = index->first_useful;
             index->first_useful = m;
         }
     }
 
     // flush all the useful metrics
-    for(m = index->first_useful; m ; m = m->next_useful)
+    for(m = index->first_useful; m ; m = m->next_useful) {
         flush_metric(m);
+    }
 }
 
 
@@ -2262,6 +2260,27 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_metrics_meter     = rrddim_add(st_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_histogram = rrddim_add(st_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_set       = rrddim_add(st_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDSET *st_useful_metrics = rrdset_create_localhost(
+            "netdata"
+            , "statsd_useful_metrics"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Useful metrics in the netdata statsd database"
+            , "metrics"
+            , "statsd"
+            , "stats"
+            , 132010
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_useful_metrics_gauge     = rrddim_add(st_useful_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_counter   = rrddim_add(st_useful_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_timer     = rrddim_add(st_useful_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_meter     = rrddim_add(st_useful_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_histogram = rrddim_add(st_useful_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_set       = rrddim_add(st_useful_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     RRDSET *st_events = rrdset_create_localhost(
             "netdata"
@@ -2456,6 +2475,7 @@ void *statsd_main(void *ptr) {
 
         if(likely(hb_dt)) {
             rrdset_next(st_metrics);
+            rrdset_next(st_useful_metrics);
             rrdset_next(st_events);
             rrdset_next(st_reads);
             rrdset_next(st_bytes);
@@ -2475,6 +2495,14 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
         rrdset_done(st_metrics);
+
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
+        rrdset_done(st_useful_metrics);
 
         rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
         rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
