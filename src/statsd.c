@@ -1701,8 +1701,6 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
-    netdata_mutex_lock(&m->histogram.ext->mutex);
-
     if(unlikely(!m->histogram.ext->zeroed)) {
         // reset the metrics
         // if we collected anything, they will be updated below
@@ -1721,6 +1719,8 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
 
     int updated = 0;
     if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
+        netdata_mutex_lock(&m->histogram.ext->mutex);
+
         size_t len = m->histogram.ext->used;
         LONG_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -1738,6 +1738,8 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         else
             m->histogram.ext->last_percentile = (collected_number)roundl(series[pct_len - 1] * statsd.decimal_detail);
 
+        netdata_mutex_unlock(&m->histogram.ext->mutex);
+
         debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
 
@@ -1748,8 +1750,6 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
 
     if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_timer_or_histogram(m, dim, family, units);
-
-    netdata_mutex_unlock(&m->histogram.ext->mutex);
 }
 
 static inline void statsd_flush_timer(STATSD_METRIC *m) {
