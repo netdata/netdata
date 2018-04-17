@@ -87,7 +87,10 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002, // render a private chart for this metric
     STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED        = 0x00000004, // the metric has been checked if it should get private chart or not
     STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008, // show the count of events for this private chart
-    STATSD_METRIC_OPTION_CHECKED_IN_APPS              = 0x00000010, // set when this metric has been checked agains apps
+    STATSD_METRIC_OPTION_CHECKED_IN_APPS              = 0x00000010, // set when this metric has been checked against apps
+    STATSD_METRIC_OPTION_USED_IN_APPS                 = 0x00000020, // set when this metric is used in apps
+    STATSD_METRIC_OPTION_CHECKED                      = 0x00000040, // set when the charting thread checks this metric for use in charts (its usefulness)
+    STATSD_METRIC_OPTION_USEFUL                       = 0x00000080, // set when the charting thread finds the metric useful (i.e. used in a chart)
 } STATS_METRIC_OPTIONS;
 
 typedef enum statsd_metric_type {
@@ -101,7 +104,7 @@ typedef enum statsd_metric_type {
 
 
 typedef struct statsd_metric {
-    avl avl;                        // indexing
+    avl avl;                        // indexing - has to be first
 
     const char *name;               // the name of the metric
     uint32_t hash;                  // hash of the name
@@ -122,14 +125,15 @@ typedef struct statsd_metric {
 
     // chart related members
     STATS_METRIC_OPTIONS options;   // STATSD_METRIC_OPTION_* (bitfield)
-    char reset;                     // set to 1 to reset this metric to zero
+    char reset;                     // set to 1 by the charting thread to instruct the collector thread(s) to reset this metric
     collected_number last;          // the last value sent to netdata
-    RRDSET *st;                     // the chart of this metric
+    RRDSET *st;                     // the private chart of this metric
     RRDDIM *rd_value;               // the dimension of this metric value
     RRDDIM *rd_count;               // the dimension for the number of events received
 
     // linking, used for walking through all metrics
     struct statsd_metric *next;
+    struct statsd_metric *next_useful;
 } STATSD_METRIC;
 
 
@@ -140,10 +144,12 @@ typedef struct statsd_index {
     char *name;                     // the name of the index of metrics
     size_t events;                  // the number of events processed for this index
     size_t metrics;                 // the number of metrics in this index
+    size_t useful;                  // the number of useful metrics in this index
 
     STATSD_AVL_TREE index;          // the AVL tree
 
     STATSD_METRIC *first;           // the linked list of metrics (new metrics are added in front)
+    STATSD_METRIC *first_useful;    // the linked list of useful metrics (new metrics are added in front)
     STATSD_FIRST_PTR_MUTEX;         // when mutli-threading is enabled, a lock to protect the linked list
 
     STATS_METRIC_OPTIONS default_options;  // default options for all metrics in this index
@@ -455,7 +461,12 @@ static inline int value_is_zinit(const char *value) {
     return (value && *value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
 }
 
+#define is_metric_checked(m) ((m)->options & STATSD_METRIC_OPTION_CHECKED)
+#define is_metric_useful_for_collection(m) (!is_metric_checked(m) || ((m)->options & STATSD_METRIC_OPTION_USEFUL))
+
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful_for_collection(m)) return;
+
     if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
         return;
@@ -480,7 +491,9 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
     }
 }
 
-static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, const char *sampling) {
+static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(!is_metric_useful_for_collection(m)) return;
+
     // we accept empty values for counters
 
     if(unlikely(m->reset)) statsd_reset_metric(m);
@@ -496,14 +509,14 @@ static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, c
     }
 }
 
-static inline void statsd_process_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
-    // this is the same with the counter
-    statsd_process_counter(m, value, sampling);
-}
+#define statsd_process_counter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
+#define statsd_process_meter(m, value, sampling) statsd_process_counter_or_meter(m, value, sampling)
 
-static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value, const char *sampling) {
+static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const char *value, const char *sampling, const char *type) {
+    if(!is_metric_useful_for_collection(m)) return;
+
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric '%s' of type histogram, with empty value is ignored.", m->name);
+        error("STATSD: metric of type %s, with empty value is ignored.", type);
         return;
     }
 
@@ -530,17 +543,12 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
     }
 }
 
-static inline void statsd_process_timer(STATSD_METRIC *m, const char *value, const char *sampling) {
-    if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type timer, with empty value is ignored.");
-        return;
-    }
-
-    // timers are a use case of histogram
-    statsd_process_histogram(m, value, sampling);
-}
+#define statsd_process_timer(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "timer")
+#define statsd_process_histogram(m, value, sampling) statsd_process_histogram_or_timer(m, value, sampling, "histogram")
 
 static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
+    if(!is_metric_useful_for_collection(m)) return;
+
     if(unlikely(!value || !*value)) {
         error("STATSD: metric of type set, with empty value is ignored.");
         return;
@@ -1649,14 +1657,14 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing gauge metric '%s'", m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = (collected_number) (m->gauge.value * statsd.decimal_detail);
 
         m->reset = 1;
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_gauge(m);
 }
 
@@ -1664,14 +1672,14 @@ static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *d
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = m->counter.value;
 
         m->reset = 1;
         updated = 1;
     }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_counter_or_meter(m, dim, family);
 }
 
@@ -1687,40 +1695,27 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing set metric '%s'", m->name);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(unlikely(!m->reset && m->count)) {
         m->last = (collected_number)m->set.unique;
 
         m->reset = 1;
         updated = 1;
     }
+    else {
+        m->last = 0;
+    }
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_set(m);
 }
 
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
-    netdata_mutex_lock(&m->histogram.ext->mutex);
-
-    if(unlikely(!m->histogram.ext->zeroed)) {
-        // reset the metrics
-        // if we collected anything, they will be updated below
-        // this ensures that we report zeros if nothing is collected
-
-        m->histogram.ext->last_min = 0;
-        m->histogram.ext->last_max = 0;
-        m->last = 0;
-        m->histogram.ext->last_median = 0;
-        m->histogram.ext->last_stddev = 0;
-        m->histogram.ext->last_sum = 0;
-        m->histogram.ext->last_percentile = 0;
-
-        m->histogram.ext->zeroed = 1;
-    }
-
     int updated = 0;
-    if(m->count && !m->reset && m->histogram.ext->used > 0) {
+    if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
+        netdata_mutex_lock(&m->histogram.ext->mutex);
+
         size_t len = m->histogram.ext->used;
         LONG_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -1738,6 +1733,8 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         else
             m->histogram.ext->last_percentile = (collected_number)roundl(series[pct_len - 1] * statsd.decimal_detail);
 
+        netdata_mutex_unlock(&m->histogram.ext->mutex);
+
         debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
 
@@ -1745,11 +1742,24 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         m->reset = 1;
         updated = 1;
     }
+    else if(unlikely(!m->histogram.ext->zeroed)) {
+        // reset the metrics
+        // if we collected anything, they will be updated below
+        // this ensures that we report zeros if nothing is collected
 
-    if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
+        m->histogram.ext->last_min = 0;
+        m->histogram.ext->last_max = 0;
+        m->last = 0;
+        m->histogram.ext->last_median = 0;
+        m->histogram.ext->last_stddev = 0;
+        m->histogram.ext->last_sum = 0;
+        m->histogram.ext->last_percentile = 0;
+
+        m->histogram.ext->zeroed = 1;
+    }
+
+    if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED))))
         statsd_private_chart_timer_or_histogram(m, dim, family, units);
-
-    netdata_mutex_unlock(&m->histogram.ext->mutex);
 }
 
 static inline void statsd_flush_timer(STATSD_METRIC *m) {
@@ -1837,6 +1847,7 @@ static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *
     }
 
     chart->dimensions_linked_count++;
+    m->options |= STATSD_METRIC_OPTION_USED_IN_APPS;
     debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
 }
 
@@ -2043,7 +2054,13 @@ const char *statsd_metric_type_string(STATSD_METRIC_TYPE type) {
 
 static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_metric)(STATSD_METRIC *)) {
     STATSD_METRIC *m;
+
+    // find the useful metrics (incremental = each time we are called, we check the new metrics only)
     for(m = index->first; m ; m = m->next) {
+        // since we add new metrics at the beginning
+        // check for useful charts, until the point we last checked
+        if(unlikely(is_metric_checked(m))) break;
+
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_CHECKED_IN_APPS))) {
             log_access("NEW STATSD METRIC '%s': '%s'", statsd_metric_type_string(m->type), m->name);
             check_if_metric_is_for_app(index, m);
@@ -2051,7 +2068,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         }
 
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
-            if(statsd.private_charts >= statsd.max_private_charts_hard) {
+            if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
                 debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
                 info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
@@ -2069,6 +2086,20 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
             m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED;
         }
 
+        // mark it as checked
+        m->options |= STATSD_METRIC_OPTION_CHECKED;
+
+        // check if it is used in charts
+        if((m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED|STATSD_METRIC_OPTION_USED_IN_APPS)) && !(m->options & STATSD_METRIC_OPTION_USEFUL)) {
+            m->options |= STATSD_METRIC_OPTION_USEFUL;
+            index->useful++;
+            m->next_useful = index->first_useful;
+            index->first_useful = m;
+        }
+    }
+
+    // flush all the useful metrics
+    for(m = index->first_useful; m ; m = m->next_useful) {
         flush_metric(m);
     }
 }
@@ -2236,6 +2267,27 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_metrics_meter     = rrddim_add(st_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_histogram = rrddim_add(st_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_metrics_set       = rrddim_add(st_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDSET *st_useful_metrics = rrdset_create_localhost(
+            "netdata"
+            , "statsd_useful_metrics"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Useful metrics in the netdata statsd database"
+            , "metrics"
+            , "statsd"
+            , "stats"
+            , 132010
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_useful_metrics_gauge     = rrddim_add(st_useful_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_counter   = rrddim_add(st_useful_metrics, "counters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_timer     = rrddim_add(st_useful_metrics, "timers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_meter     = rrddim_add(st_useful_metrics, "meters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_histogram = rrddim_add(st_useful_metrics, "histograms", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_useful_metrics_set       = rrddim_add(st_useful_metrics, "sets", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     RRDSET *st_events = rrdset_create_localhost(
             "netdata"
@@ -2430,6 +2482,7 @@ void *statsd_main(void *ptr) {
 
         if(likely(hb_dt)) {
             rrdset_next(st_metrics);
+            rrdset_next(st_useful_metrics);
             rrdset_next(st_events);
             rrdset_next(st_reads);
             rrdset_next(st_bytes);
@@ -2449,6 +2502,14 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
         rrdset_done(st_metrics);
+
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_gauge,        (collected_number)statsd.gauges.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_counter,      (collected_number)statsd.counters.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_timer,        (collected_number)statsd.timers.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_meter,        (collected_number)statsd.meters.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_histogram,    (collected_number)statsd.histograms.useful);
+        rrddim_set_by_pointer(st_useful_metrics, rd_useful_metrics_set,          (collected_number)statsd.sets.useful);
+        rrdset_done(st_useful_metrics);
 
         rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
         rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
