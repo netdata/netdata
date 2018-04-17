@@ -57,7 +57,7 @@ public class Plugin implements Collector {
 				Printer.initializeChart(chart);
 			}
 		} catch (Exception e) {
-			Main.exit(LoggingUtils.buildTrace("Could not initialize. Disabling Java Plugin Daemon.", e));
+			Main.exit(LoggingUtils.buildMessage("Could not initialize. Disabling Java Plugin Daemon.", e));
 		}
 
 	}

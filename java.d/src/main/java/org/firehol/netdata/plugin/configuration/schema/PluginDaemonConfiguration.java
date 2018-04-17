@@ -24,4 +24,11 @@ import lombok.Setter;
 @Getter
 @Setter
 public final class PluginDaemonConfiguration {
+
+	/**
+	 * Log full exception stacktraces into netadata's {@code error.log}, disabled if missing.
+	 * 
+	 * @see <a href="https://github.com/firehol/netdata/wiki/Log-Files#errorlog">Log-Files in Netdata wiki</a>
+	 */
+	Boolean logFullStackTraces;
 }

@@ -22,7 +22,12 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.function.Supplier;
 
-public abstract class LoggingUtils {
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
+public class LoggingUtils {
+
+	public static boolean LOG_TRACES = false;
 
 	private static void appendMessage(Throwable reason, StringBuilder sb) {
 
@@ -36,23 +41,19 @@ public abstract class LoggingUtils {
 			sb.append(detail.getMessage());
 			detail = detail.getCause();
 		}
+		if (LOG_TRACES) appendStackTrace(reason, sb);
+	}
+
+	private static void appendStackTrace(Throwable reason, StringBuilder sb) {
+		sb.append(" Trace:\n");
+		StringWriter sw = new StringWriter();
+		reason.printStackTrace(new PrintWriter(sw));
+		sb.append(sw.toString());
 	}
 
 	public static String buildMessage(Throwable reason) {
 		StringBuilder sb = new StringBuilder();
 		appendMessage(reason, sb);
-		return sb.toString();
-	}
-
-	public static String buildTrace(String message, Throwable reason) {
-		StringBuilder sb = new StringBuilder(message);
-
-		sb.append(" Reason: ");
-		appendMessage(reason, sb);
-		sb.append(" Trace:\n");
-		StringWriter sw = new StringWriter();
-		reason.printStackTrace(new PrintWriter(sw));
-		sb.append(sw.toString());
 		return sb.toString();
 	}
 
@@ -90,29 +91,14 @@ public abstract class LoggingUtils {
 	}
 
 	public static Supplier<String> getMessageSupplier(Throwable reason) {
-		return new Supplier<String>() {
-			@Override
-			public String get() {
-				return buildMessage(reason);
-			}
-		};
+		return () -> buildMessage(reason);
 	}
 
 	public static Supplier<String> getMessageSupplier(String message, Throwable reason) {
-		return new Supplier<String>() {
-			@Override
-			public String get() {
-				return buildMessage(message, reason);
-			}
-		};
+		return () -> buildMessage(message, reason);
 	}
 
 	public static Supplier<String> getMessageSupplier(String... messages) {
-		return new Supplier<String>() {
-			@Override
-			public String get() {
-				return buildMessage(messages);
-			}
-		};
+		return () -> buildMessage(messages);
 	}
 }

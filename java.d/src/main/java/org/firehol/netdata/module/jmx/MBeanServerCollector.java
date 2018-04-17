@@ -46,6 +46,7 @@ import org.firehol.netdata.module.jmx.query.MBeanQuery;
 import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 import org.firehol.netdata.plugin.Collector;
 import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.NetdataLevel;
 
 import lombok.Getter;
 
@@ -169,7 +170,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 				try {
 					queryInfo = initializeMBeanQueryInfo(dimensionConfig);
 				} catch (JmxMBeanServerQueryException e) {
-					log.warning(LoggingUtils.buildTrace("Could not query one dimension. Skipping...", e));
+					log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier("Could not query dimension" + dimensionConfig.getName() +
+							" of chart " + chart.getType() + "." + chart.getId() + ". Skipping it.", e));
 					continue;
 				}
 
@@ -266,7 +268,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 				queryInfo.query();
 			} catch (JmxMBeanServerQueryException e) {
 				// Stop collecting this value.
-				log.warning(LoggingUtils.buildMessage(
+				log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
 						"Stop collection value '" + queryInfo.getAttribute() + "' of '" + queryInfo.getName() + "'.",
 						e));
 				queryInfoIterator.remove();

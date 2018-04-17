@@ -19,8 +19,12 @@
 package org.firehol.netdata;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.firehol.netdata.utils.LoggingUtils;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
@@ -45,6 +49,11 @@ public class MainTest {
 		int updateEvery = Main.getUpdateEveryInSecondsFomCommandLineFailFast(args);
 
 		assertEquals(3, updateEvery);
+	}
+
+	@Before
+	public void setUp() {
+		LoggingUtils.LOG_TRACES = false; // omit traces when exit.expectSystemExitWithStatus(1)
 	}
 
 	@Test
@@ -72,5 +81,15 @@ public class MainTest {
 		Main.exit("Test");
 
 		assertEquals("DISABLE", systemOutRule.getLog());
+	}
+
+	@Test
+	public void testNetdataDebugEnabled() {
+		System.setProperty("NETDATA_DEBUG_FLAGS", "0x0000000");
+		assertFalse(Main.isNetdataPluginDebugEnabled());
+		System.setProperty("NETDATA_DEBUG_FLAGS", "0xFFFFFFF");
+		assertTrue(Main.isNetdataPluginDebugEnabled());
+		System.setProperty("NETDATA_DEBUG_FLAGS", String.valueOf(2048));
+		assertTrue(Main.isNetdataPluginDebugEnabled());
 	}
 }

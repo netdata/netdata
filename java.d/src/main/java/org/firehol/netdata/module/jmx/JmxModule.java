@@ -52,6 +52,7 @@ import org.firehol.netdata.module.jmx.utils.VirtualMachineUtils;
 import org.firehol.netdata.plugin.configuration.ConfigurationService;
 import org.firehol.netdata.plugin.configuration.exception.ConfigurationSchemeInstantiationException;
 import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.NetdataLevel;
 import org.firehol.netdata.utils.ResourceUtils;
 
 import com.sun.tools.attach.AttachNotSupportedException;
@@ -137,7 +138,7 @@ public class JmxModule implements Module {
 			try {
 				collector = buildMBeanServerCollector(virtualMachineDescriptor);
 			} catch (Exception e) {
-				log.warning(LoggingUtils.getMessageSupplier(
+				log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
 						"Could not connect to JMX agent of process with PID " + virtualMachineDescriptor.id(), e));
 				continue;
 			}
@@ -218,7 +219,7 @@ public class JmxModule implements Module {
 			try {
 				allChart.addAll(mBeanCollector.initialize());
 			} catch (InitializationException e) {
-				log.warning(LoggingUtils.buildTrace("Could not initialize JMX plugin " + mBeanCollector.getMBeanServer().toString(), e));
+				log.log(NetdataLevel.ERROR, LoggingUtils.buildMessage("Could not initialize JMX plugin " + mBeanCollector.getMBeanServer().toString(), e));
 				ResourceUtils.close(mBeanCollector);
 				mBeanCollectorIterator.remove();
 			}

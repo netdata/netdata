@@ -26,6 +26,7 @@ import org.firehol.netdata.Main;
 import org.firehol.netdata.plugin.configuration.exception.ConfigurationSchemeInstantiationException;
 import org.firehol.netdata.plugin.configuration.schema.PluginDaemonConfiguration;
 import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.NetdataLevel;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser.Feature;
@@ -97,11 +98,11 @@ public final class ConfigurationService {
 		try {
 			configuration = mapper.readValue(file, clazz);
 		} catch (JsonParseException | JsonMappingException e) {
-			log.warning(LoggingUtils.getMessageSupplier(
+			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
 					"Could not read malformed configuration file '" + file.getAbsolutePath() + ".", e));
 		} catch (Exception e) {
-			log.warning(LoggingUtils
-					.getMessageSupplier("Could not read configuration file '" + file.getAbsolutePath() + "', " + clazz + ", "+mapper+".", e));
+			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
+					"Could not read configuration file '" + file.getAbsolutePath() + "', " + clazz + ", " + mapper + ".", e));
 		}
 
 		// If we still have no configuration try to read the default one.

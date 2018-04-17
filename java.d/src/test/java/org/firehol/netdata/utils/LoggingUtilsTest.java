@@ -19,6 +19,7 @@
 package org.firehol.netdata.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.function.Supplier;
 
@@ -34,6 +35,8 @@ public class LoggingUtilsTest {
 		Exception fine = new Exception("Here are the details.");
 		Exception detail = new Exception("This is the reason.", fine);
 		exception = new Exception("Something went wrong.", detail);
+
+		LoggingUtils.LOG_TRACES = false;
 	}
 
 	@Test
@@ -115,4 +118,35 @@ public class LoggingUtilsTest {
 
 	}
 
+	@Test
+	public void testBuildMessageThrowableTrace() {
+		// enable logging message traces
+		LoggingUtils.LOG_TRACES = true;
+
+		// Test
+		String message = LoggingUtils.buildMessage(exception);
+
+		// Verify
+		String[] lines = message.split("\n");
+		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details. Trace:", lines[0]);
+		assertEquals("java.lang.Exception: Something went wrong.", lines[1]);
+		assertTrue(lines[2].startsWith("\tat " + LoggingUtilsTest.class.getCanonicalName()));
+	}
+
+	@Test
+	public void testBuildMessageStringThrowableTrace() {
+		// enable logging message traces
+		LoggingUtils.LOG_TRACES = true;
+
+		// Test
+		String message = LoggingUtils.buildMessage("Could not do it.", exception);
+
+		// Verify
+		String[] lines = message.split("\n");
+		assertEquals(
+				"Could not do it. Reason: Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details. Trace:",
+				lines[0]);
+		assertEquals("java.lang.Exception: Something went wrong.", lines[1]);
+		assertTrue(lines[2].startsWith("\tat " + LoggingUtilsTest.class.getCanonicalName()));
+	}
 }
