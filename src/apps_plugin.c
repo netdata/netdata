@@ -7,6 +7,35 @@
 
 #include "common.h"
 
+// ----------------------------------------------------------------------------
+// debugging
+
+static int debug_enabled = 0;
+static inline void debug_log_int(const char *fmt, ... ) {
+    va_list args;
+
+    fprintf( stderr, "apps.plugin: ");
+    va_start( args, fmt );
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    fputc('\n', stderr);
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+
+#define debug_log(fmt, args...) do { if(unlikely(debug_enabled)) debug_log_int(fmt, ##args); } while(0)
+
+#else
+
+static inline void debug_log_dummy(void) {}
+#define debug_log(fmt, args...) debug_log_dummy()
+
+#endif
+
+
+// ----------------------------------------------------------------------------
+
 #ifdef __FreeBSD__
 #include <sys/user.h>
 #endif
@@ -57,7 +86,6 @@
 // command line options
 
 static int
-        debug = 0,
         update_every = 1,
         enable_guest_charts = 0,
 #ifdef __FreeBSD__
@@ -193,7 +221,7 @@ struct target {
     unsigned int processes; // how many processes have been merged to this
     int exposed;            // if set, we have sent this to netdata
     int hidden;             // if set, we set the hidden flag on the dimension
-    int debug;
+    int debug_enabled;
     int ends_with;
     int starts_with;        // if set, the compare string matches only the
                             // beginning of the command
@@ -452,8 +480,7 @@ static struct target *get_users_target(uid_t uid) {
     w->next = users_root_target;
     users_root_target = w;
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: added uid %u ('%s') target\n", w->uid, w->name);
+    debug_log("added uid %u ('%s') target", w->uid, w->name);
 
     return w;
 }
@@ -485,8 +512,7 @@ struct target *get_groups_target(gid_t gid)
     w->next = groups_root_target;
     groups_root_target = w;
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: added gid %u ('%s') target\n", w->gid, w->name);
+    debug_log("added gid %u ('%s') target", w->gid, w->name);
 
     return w;
 }
@@ -527,11 +553,11 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
                 break;
         }
 
-        if(unlikely(debug)) {
+        if(unlikely(debug_enabled)) {
             if(unlikely(target))
-                fprintf(stderr, "apps.plugin: REUSING TARGET NAME '%s' on ID '%s'\n", target->name, target->id);
+                debug_log("REUSING TARGET NAME '%s' on ID '%s'", target->name, target->id);
             else
-                fprintf(stderr, "apps.plugin: NEW TARGET NAME '%s' on ID '%s'\n", name, id);
+                debug_log("NEW TARGET NAME '%s' on ID '%s'", name, id);
         }
     }
 
@@ -564,21 +590,25 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     w->comparelen = strlen(w->compare);
 
     w->hidden = thidden;
-    w->debug = tdebug;
+#ifdef NETDATA_INTERNAL_CHECKS
+    w->debug_enabled = tdebug;
+#else
+    if(tdebug)
+        fprintf(stderr, "apps.plugin has been compiled without debugging\n");
+#endif
     w->target = target;
 
     // append it, to maintain the order in apps_groups.conf
     if(last) last->next = w;
     else apps_groups_root_target = w;
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
-                , w->id
-                , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
-                , w->target?w->target->name:w->name
-                , (w->hidden)?"hidden":"-"
-                , (w->debug)?"debug":"-"
-        );
+    debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
+            , w->id
+            , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+            , w->target?w->target->name:w->name
+            , (w->hidden)?"hidden":"-"
+            , (w->debug_enabled)?"debug":"-"
+    );
 
     return w;
 }
@@ -590,8 +620,7 @@ static int read_apps_groups_conf(const char *file)
 
     snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, file);
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
+    debug_log("process groups file: '%s'", filename);
 
     // ----------------------------------------
 
@@ -685,8 +714,7 @@ static inline void del_pid_entry(pid_t pid) {
         return;
     }
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, p->comm);
+    debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
     if(root_of_pids == p)
         root_of_pids = p->next;
@@ -716,8 +744,8 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     if(unlikely(!status)) {
         // error("command failed log %u, errno %d", log, errno);
 
-        if(unlikely(debug || errno != ENOENT)) {
-            if(unlikely(debug || !(p->log_thrown & log))) {
+        if(unlikely(debug_enabled || errno != ENOENT)) {
+            if(unlikely(debug_enabled || !(p->log_thrown & log))) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
@@ -779,7 +807,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
-        // if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+        // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
         // find it - 4 cases:
         // 1. the target is not a pattern
@@ -796,8 +824,8 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
             if(w->target) p->target = w->target;
             else p->target = w;
 
-            if(debug || (p->target && p->target->debug))
-                fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
+            if(debug_enabled || (p->target && p->target->debug_enabled))
+                debug_log("%s linked to target %s", p->comm, p->target->name);
 
             break;
         }
@@ -843,8 +871,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
     p->cmdline = strdupz(cmdline);
 
-    if(unlikely(debug))
-        fprintf(stderr, "Read file '%s' contents: %s\n", p->cmdline_filename, p->cmdline);
+    debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
 
     return 1;
 
@@ -1004,7 +1031,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     arl_begin(p->status_arl);
 
     for(l = 0; l < lines ;l++) {
-        // fprintf(stderr, "CHECK: line %zu of %zu, key '%s' = '%s'\n", l, lines, procfile_lineword(ff, l, 0), procfile_lineword(ff, l, 1));
+        // debug_log("CHECK: line %zu of %zu, key '%s' = '%s'", l, lines, procfile_lineword(ff, l, 0), procfile_lineword(ff, l, 1));
         arl_ptr.line = l;
         if(unlikely(arl_check(p->status_arl,
                 procfile_lineword(ff, l, 0),
@@ -1013,7 +1040,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
 
     p->status_vmshared = p->status_rssfile + p->status_rssshmem;
 
-    // fprintf(stderr, "%s uid %d, gid %d, VmSize %zu, VmRSS %zu, RssFile %zu, RssShmem %zu, shared %zu\n", p->comm, (int)p->uid, (int)p->gid, p->status_vmsize, p->status_vmrss, p->status_rssfile, p->status_rssshmem, p->status_vmshared);
+    // debug_log("%s uid %d, gid %d, VmSize %zu, VmRSS %zu, RssFile %zu, RssShmem %zu, shared %zu", p->comm, (int)p->uid, (int)p->gid, p->status_vmsize, p->status_vmrss, p->status_rssfile, p->status_rssshmem, p->status_vmshared);
 
     return 1;
 #endif
@@ -1072,11 +1099,11 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 #endif
 
     if(strcmp(p->comm, comm) != 0) {
-        if(unlikely(debug)) {
+        if(unlikely(debug_enabled)) {
             if(p->comm[0])
-                fprintf(stderr, "apps.plugin: \tpid %d (%s) changed name to '%s'\n", p->pid, p->comm, comm);
+                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, p->comm, comm);
             else
-                fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", p->pid, comm);
+                debug_log("\tJust added %d (%s)", p->pid, comm);
         }
 
         strncpyz(p->comm, comm, MAX_COMPARE_NAME);
@@ -1152,8 +1179,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     }
 #endif
 
-    if(unlikely(debug || (p->target && p->target->debug)))
-        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d\n", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+        debug_log("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->minflt           = 0;
@@ -1368,15 +1395,13 @@ static inline void file_descriptor_not_used(int id)
         }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: decreasing slot %d (count = %d).\n", id, all_files[id].count);
+        debug_log("decreasing slot %d (count = %d).", id, all_files[id].count);
 
         if(all_files[id].count > 0) {
             all_files[id].count--;
 
             if(!all_files[id].count) {
-                if(unlikely(debug))
-                    fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
+                debug_log("  >> slot %d is empty.", id);
 
                 if(unlikely(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id]))
                     error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
@@ -1398,8 +1423,7 @@ static inline void all_files_grow() {
     int i;
 
     // there is no empty slot
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
+    debug_log("extending fd array to %d entries", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
 
     all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
 
@@ -1407,8 +1431,7 @@ static inline void all_files_grow() {
     // since all pointers are now invalid
 
     if(unlikely(old && old != (void *)all_files)) {
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
+        debug_log("  >> re-indexing.");
 
         all_files_index.root = NULL;
         for(i = 0; i < all_files_size; i++) {
@@ -1417,8 +1440,7 @@ static inline void all_files_grow() {
                 error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+        debug_log("  >> re-indexing done.");
     }
 
     // initialize the newly added entries
@@ -1441,8 +1463,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     if(!all_files || all_files_len == all_files_size)
         all_files_grow();
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
+    debug_log("  >> searching for empty slot.");
 
     // search for an empty slot
 
@@ -1453,16 +1474,14 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
         if(c == 0) continue;
 
         if(!all_files[c].count) {
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> Examining slot %d.\n", c);
+            debug_log("  >> Examining slot %d.", c);
 
 #ifdef NETDATA_INTERNAL_CHECKS
             if(all_files[c].magic == 0x0BADCAFE && all_files[c].name && file_descriptor_find(all_files[c].name, all_files[c].hash))
-                error("fd on position %d is not cleared properly. It still has %s in it.\n", c, all_files[c].name);
+                error("fd on position %d is not cleared properly. It still has %s in it.", c, all_files[c].name);
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
+            debug_log("  >> %s fd position %d for %s (last name: %s)", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 
             freez((void *)all_files[c].name);
             all_files[c].name = NULL;
@@ -1479,8 +1498,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     }
     // else we have an empty slot in 'c'
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
+    debug_log("  >> updating slot %d.", c);
 
     all_files[c].name = strdupz(name);
     all_files[c].hash = hash;
@@ -1493,8 +1511,7 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
         error("INTERNAL ERROR: duplicate indexing of fd.");
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
+    debug_log("using fd position %d (name: %s)", c, all_files[c].name);
 
     return c;
 }
@@ -1503,14 +1520,12 @@ static inline int file_descriptor_find_or_add(const char *name)
 {
     uint32_t hash = simple_hash(name);
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+    debug_log("adding or finding name '%s' with hash %u", name, hash);
 
     struct file_descriptor *fd = file_descriptor_find(name, hash);
     if(fd) {
         // found
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+        debug_log("  >> found on slot %d", fd->pos);
 
         fd->count++;
         return fd->pos;
@@ -1530,17 +1545,13 @@ static inline int file_descriptor_find_or_add(const char *name)
         else if(strcmp(t, "[timerfd]") == 0) type = FILETYPE_TIMERFD;
         else if(strcmp(t, "[signalfd]") == 0) type = FILETYPE_SIGNALFD;
         else {
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
-
+            debug_log("FIXME: unknown anonymous inode: %s", name);
             type = FILETYPE_OTHER;
         }
     }
     else if(likely(strcmp(name, "inotify") == 0)) type = FILETYPE_INOTIFY;
     else {
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", name);
-
+        debug_log("FIXME: cannot understand linkname: %s", name);
         type = FILETYPE_OTHER;
     }
 
@@ -1625,8 +1636,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         if (unlikely(fdid >= p->fds_size)) {
             // it is small, extend it
 
-            if (unlikely(debug))
-                fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+            debug_log("extending fd memory slots for %s from %d to %d", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
 
@@ -1736,13 +1746,11 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         if(unlikely(fdid >= p->fds_size)) {
             // it is small, extend it
 
-            if(unlikely(debug))
-                fprintf(stderr
-                        , "apps.plugin: extending fd memory slots for %s from %d to %d\n"
-                        , p->comm
-                        , p->fds_size
-                        , fdid + MAX_SPARE_FDS
-                );
+            debug_log("extending fd memory slots for %s from %d to %d"
+                    , p->comm
+                    , p->fds_size
+                    , fdid + MAX_SPARE_FDS
+            );
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
 
@@ -1757,10 +1765,9 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
             ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
             if(unlikely(l == -1)) {
-                if(debug || (p->target && p->target->debug)) {
-                    if(debug || (p->target && p->target->debug))
-                        error("Cannot read link %s", fdname);
-                }
+                if(debug_enabled || (p->target && p->target->debug_enabled))
+                    error("Cannot read link %s", fdname);
+
                 continue;
             }
             else
@@ -1791,12 +1798,12 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
 // ----------------------------------------------------------------------------
 
-static inline int print_process_and_parents(struct pid_stat *p, usec_t time) {
+static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t time) {
     char *prefix = "\\_ ";
     int indent = 0;
 
     if(p->parent)
-        indent = print_process_and_parents(p->parent, p->stat_collected_usec);
+        indent = debug_print_process_and_parents(p->parent, p->stat_collected_usec);
     else
         prefix = " > ";
 
@@ -1830,12 +1837,12 @@ static inline int print_process_and_parents(struct pid_stat *p, usec_t time) {
     return indent + 1;
 }
 
-static inline void print_process_tree(struct pid_stat *p, char *msg) {
-    fprintf(stderr, "%s: process %s (%d, %s) with parents:\n", msg, p->comm, p->pid, p->updated?"running":"exited");
-    print_process_and_parents(p, p->stat_collected_usec);
+static inline void debug_print_process_tree(struct pid_stat *p, char *msg) {
+    debug_log("%s: process %s (%d, %s) with parents:", msg, p->comm, p->pid, p->updated?"running":"exited");
+    debug_print_process_and_parents(p, p->stat_collected_usec);
 }
 
-static inline void find_lost_child_debug(struct pid_stat *pe, kernel_uint_t lost, int type) {
+static inline void debug_find_lost_child(struct pid_stat *pe, kernel_uint_t lost, int type) {
     int found = 0;
     struct pid_stat *p = NULL;
 
@@ -1938,8 +1945,8 @@ static inline void process_exited_processes() {
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
 
-        if(unlikely(debug)) {
-            fprintf(stderr, "Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")\n"
+        if(unlikely(debug_enabled)) {
+            debug_log("Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
                 , p->comm
                 , p->pid
                 , p->updated?"running":"exited"
@@ -1949,7 +1956,7 @@ static inline void process_exited_processes() {
                 , minflt
                 , majflt
                 );
-            print_process_tree(p, "Searching parents");
+            debug_print_process_tree(p, "Searching parents");
         }
 
         struct pid_stat *pp;
@@ -1958,59 +1965,57 @@ static inline void process_exited_processes() {
 
             kernel_uint_t absorbed;
             absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
-            if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
+            if(unlikely(debug_enabled && absorbed))
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
             absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
-            if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
+            if(unlikely(debug_enabled && absorbed))
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
-            if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+            if(unlikely(debug_enabled && absorbed))
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 
             absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
-            if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+            if(unlikely(debug_enabled && absorbed))
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
             absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
-            if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+            if(unlikely(debug_enabled && absorbed))
+                debug_log(" > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
         }
 
         if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
-            if(unlikely(debug)) {
-                if(utime)  find_lost_child_debug(p, utime,  3);
-                if(stime)  find_lost_child_debug(p, stime,  4);
-                if(gtime)  find_lost_child_debug(p, gtime,  5);
-                if(minflt) find_lost_child_debug(p, minflt, 1);
-                if(majflt) find_lost_child_debug(p, majflt, 2);
+            if(unlikely(debug_enabled)) {
+                if(utime) debug_find_lost_child(p, utime, 3);
+                if(stime) debug_find_lost_child(p, stime, 4);
+                if(gtime) debug_find_lost_child(p, gtime, 5);
+                if(minflt) debug_find_lost_child(p, minflt, 1);
+                if(majflt) debug_find_lost_child(p, majflt, 2);
             }
 
             p->keep = 1;
 
-            if(unlikely(debug))
-                fprintf(stderr, " > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")\n"
-                    , p->comm
-                    , p->pid
-                    , p->updated?"running":"exited"
-                    , utime
-                    , stime
-                    , gtime
-                    , minflt
-                    , majflt
-                    );
+            debug_log(" > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")"
+                , p->comm
+                , p->pid
+                , p->updated?"running":"exited"
+                , utime
+                , stime
+                , gtime
+                , minflt
+                , majflt
+            );
 
             for(pp = p->parent; pp ; pp = pp->parent) {
                 if(pp->updated) break;
                 pp->keep = 1;
 
-                if(unlikely(debug))
-                    fprintf(stderr, " > - KEEP - parent for another loop: %s (%d %s)\n"
-                        , pp->comm
-                        , pp->pid
-                        , pp->updated?"running":"exited"
-                        );
+                debug_log(" > - KEEP - parent for another loop: %s (%d %s)"
+                    , pp->comm
+                    , pp->pid
+                    , pp->updated?"running":"exited"
+                );
             }
 
             p->utime_raw   = utime  * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
@@ -2020,16 +2025,14 @@ static inline void process_exited_processes() {
             p->majflt_raw  = majflt * (p->stat_collected_usec - p->last_stat_collected_usec) / (USEC_PER_SEC * RATES_DETAIL);
             p->cutime_raw = p->cstime_raw = p->cgtime_raw = p->cminflt_raw = p->cmajflt_raw = 0;
 
-            if(unlikely(debug))
-                fprintf(stderr, "\n");
+            debug_log(" ");
         }
-        else if(unlikely(debug)) {
-            fprintf(stderr, " > totally absorbed - DONE - %s (%d %s)\n"
+        else
+            debug_log(" > totally absorbed - DONE - %s (%d %s)"
                 , p->comm
                 , p->pid
                 , p->updated?"running":"exited"
-                );
-        }
+            );
     }
 }
 
@@ -2054,8 +2057,8 @@ static inline void link_all_processes_to_their_parents(void) {
             p->parent = pp;
             pp->children_count++;
 
-            if(unlikely(debug || (p->target && p->target->debug)))
-                fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "\n", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
+            if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+                debug_log("child %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
             p->parent = NULL;
@@ -2105,7 +2108,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(!p || p->read)) return 0;
     p->read = 1;
 
-    // fprintf(stderr, "Reading process %d (%s), sortlist %d\n", p->pid, p->comm, p->sortlist);
+    // debug_log("Reading process %d (%s), sortlist %d", p->pid, p->comm, p->sortlist);
 
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
@@ -2141,8 +2144,8 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     // --------------------------------------------------------------------
     // done!
 
-    if(unlikely(debug && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
-        fprintf(stderr, "Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read\n", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
+    if(unlikely(debug_enabled && include_exited_childs && all_pids_count && p->ppid && all_pids[p->ppid] && !all_pids[p->ppid]->read))
+        debug_log("Read process %d (%s) sortlisted %d, but its parent %d (%s) sortlisted %d, is not read", p->pid, p->comm, p->sortlist, all_pids[p->ppid]->pid, all_pids[p->ppid]->comm, all_pids[p->ppid]->sortlist);
 
     // mark it as updated
     p->updated = 1;
@@ -2307,8 +2310,8 @@ static void cleanup_exited_pids(void) {
 
     for(p = root_of_pids; p ;) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
-            if(unlikely(debug && (p->keep || p->keeploops)))
-                fprintf(stderr, " > CLEANUP cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
+            if(unlikely(debug_enabled && (p->keep || p->keeploops)))
+                debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
 
             for(c = 0; c < p->fds_size; c++)
                 if(p->fds[c] > 0) {
@@ -2335,7 +2338,7 @@ static void apply_apps_groups_targets_inheritance(void) {
     // inherit their target from their parent
     int found = 1, loops = 0;
     while(found) {
-        if(unlikely(debug)) loops++;
+        if(unlikely(debug_enabled)) loops++;
         found = 0;
         for(p = root_of_pids; p ; p = p->next) {
             // if this process does not have a target
@@ -2346,8 +2349,8 @@ static void apply_apps_groups_targets_inheritance(void) {
                 p->target = p->parent->target;
                 found++;
 
-                if(debug || (p->target && p->target->debug))
-                    fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).\n", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+                if(debug_enabled || (p->target && p->target->debug_enabled))
+                    debug_log("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s).", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
             }
         }
     }
@@ -2357,7 +2360,7 @@ static void apply_apps_groups_targets_inheritance(void) {
     int sortlist = 1;
     found = 1;
     while(found) {
-        if(unlikely(debug)) loops++;
+        if(unlikely(debug_enabled)) loops++;
         found = 0;
 
         for(p = root_of_pids; p ; p = p->next) {
@@ -2382,16 +2385,15 @@ static void apply_apps_groups_targets_inheritance(void) {
                 if(unlikely(p->target && !p->parent->target)) {
                     p->parent->target = p->target;
 
-                    if(debug || (p->target && p->target->debug))
-                        fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).\n", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
+                    if(debug_enabled || (p->target && p->target->debug_enabled))
+                        debug_log("TARGET INHERITANCE: %s is inherited by %d (%s) from its child %d (%s).", p->target->name, p->parent->pid, p->parent->comm, p->pid, p->comm);
                 }
 
                 found++;
             }
         }
 
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: TARGET INHERITANCE: merged %d processes\n", found);
+        debug_log("TARGET INHERITANCE: merged %d processes", found);
     }
 
     // init goes always to default target
@@ -2403,7 +2405,7 @@ static void apply_apps_groups_targets_inheritance(void) {
         all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
-    if(unlikely(debug)) loops++;
+    if(unlikely(debug_enabled)) loops++;
     for(p = root_of_pids; p ; p = p->next) {
         // if the process is not merged itself
         // then is is a top level process
@@ -2421,21 +2423,20 @@ static void apply_apps_groups_targets_inheritance(void) {
     // give a target to all merged child processes
     found = 1;
     while(found) {
-        if(unlikely(debug)) loops++;
+        if(unlikely(debug_enabled)) loops++;
         found = 0;
         for(p = root_of_pids; p ; p = p->next) {
             if(unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
 
-                if(debug || (p->target && p->target->debug))
-                    fprintf(stderr, "apps.plugin: \t\tTARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.\n", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
+                if(debug_enabled || (p->target && p->target->debug_enabled))
+                    debug_log("TARGET INHERITANCE: %s is inherited by %d (%s) from its parent %d (%s) at phase 2.", p->target->name, p->pid, p->comm, p->parent->pid, p->parent->comm);
             }
         }
     }
 
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: apply_apps_groups_targets_inheritance() made %d loops on the process tree\n", loops);
+    debug_log("apply_apps_groups_targets_inheritance() made %d loops on the process tree", loops);
 }
 
 static size_t zero_all_targets(struct target *root) {
@@ -2628,8 +2629,8 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
-    if(unlikely(debug || w->debug))
-        fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+    if(unlikely(debug_enabled || w->debug_enabled))
+        debug_log("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 }
 
 static void calculate_netdata_statistics(void) {
@@ -2660,8 +2661,8 @@ static void calculate_netdata_statistics(void) {
         if(likely(p->user_target && p->user_target->uid == p->uid))
             w = p->user_target;
         else {
-            if(unlikely(debug && p->user_target))
-                    fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched user from %u (%s) to %u.\n", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
+            if(unlikely(debug_enabled && p->user_target))
+                debug_log("pid %d (%s) switched user from %u (%s) to %u.", p->pid, p->comm, p->user_target->uid, p->user_target->name, p->uid);
 
             w = p->user_target = get_users_target(p->uid);
         }
@@ -2676,8 +2677,8 @@ static void calculate_netdata_statistics(void) {
         if(likely(p->group_target && p->group_target->gid == p->gid))
             w = p->group_target;
         else {
-            if(unlikely(debug && p->group_target))
-                    fprintf(stderr, "apps.plugin: \t\tpid %d (%s) switched group from %u (%s) to %u.\n", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
+            if(unlikely(debug_enabled && p->group_target))
+                debug_log("pid %d (%s) switched group from %u (%s) to %u.", p->pid, p->comm, p->group_target->gid, p->group_target->name, p->gid);
 
             w = p->group_target = get_groups_target(p->gid);
         }
@@ -2957,14 +2958,12 @@ static void normalize_utilization(struct target *root) {
 
     // the report
 
-    if(unlikely(debug)) {
-        fprintf(stderr,
+    debug_log(
             "SYSTEM: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " "
             "COLLECTED: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " cu=" KERNEL_UINT_FORMAT " cs=" KERNEL_UINT_FORMAT " cg=" KERNEL_UINT_FORMAT " "
             "DELTA: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " "
             "FIX: u=%0.2f s=%0.2f g=%0.2f cu=%0.2f cs=%0.2f cg=%0.2f "
             "FINALLY: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " cu=" KERNEL_UINT_FORMAT " cs=" KERNEL_UINT_FORMAT " cg=" KERNEL_UINT_FORMAT " "
-            "\n"
             , global_utime
             , global_stime
             , global_gtime
@@ -2989,8 +2988,7 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cutime * cutime_fix_ratio)
             , (kernel_uint_t)(cstime * cstime_fix_ratio)
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
-            );
-    }
+    );
 }
 #else // ALL_PIDS_ARE_READ_INSTANTLY == 1
 static void normalize_utilization(struct target *root) {
@@ -3151,7 +3149,8 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if (!w->exposed && w->processes) {
             newly_added++;
             w->exposed = 1;
-            if (debug || w->debug) fprintf(stderr, "apps.plugin: %s just added - regenerating charts.\n", w->name);
+            if (debug_enabled || w->debug_enabled)
+                debug_log("%s just added - regenerating charts.", w->name);
         }
     }
 
@@ -3341,8 +3340,11 @@ static void parse_args(int argc, char **argv)
         }
 
         if(strcmp("debug", argv[i]) == 0) {
-            debug = 1;
-            // debug_flags = 0xffffffff;
+#ifdef NETDATA_INTERNAL_CHECKS
+            debug_enabled = 1;
+#else
+            fprintf(stderr, "apps.plugin has been compiled without debugging\n");
+#endif
             continue;
         }
 
@@ -3436,7 +3438,7 @@ static void parse_args(int argc, char **argv)
     }
 
     if(freq > 0) update_every = freq;
-    if(!name) name = "groups";
+    if(!name || !*name) name = "groups";
 
     if(read_apps_groups_conf(name)) {
         error("Cannot read process groups '%s/apps_%s.conf'. There are no internal defaults. Failing.", config_dir, name);
@@ -3448,11 +3450,11 @@ static int am_i_running_as_root() {
     uid_t uid = getuid(), euid = geteuid();
 
     if(uid == 0 || euid == 0) {
-        if(debug) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        if(debug_enabled) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    if(debug_enabled) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
@@ -3463,7 +3465,7 @@ static int check_capabilities() {
         error("Cannot get current capabilities.");
         return 0;
     }
-    else if(debug)
+    else if(debug_enabled)
         info("Received my capabilities from the system.");
 
     int ret = 1;
@@ -3478,7 +3480,7 @@ static int check_capabilities() {
             error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
             ret = 0;
         }
-        else if(debug)
+        else if(debug_enabled)
             info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
     }
 
@@ -3492,7 +3494,7 @@ static int check_capabilities() {
             error("apps.plugin should run with CAP_SYS_PTRACE.");
             ret = 0;
         }
-        else if(debug)
+        else if(debug_enabled)
             info("apps.plugin runs with CAP_SYS_PTRACE.");
     }
 
@@ -3630,8 +3632,7 @@ int main(int argc, char **argv) {
 
         show_guest_time_old = show_guest_time;
 
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: done Loop No %zu\n", global_iterations_counter);
+        debug_log("done Loop No %zu", global_iterations_counter);
 
         // restart check (14400 seconds)
         if(now_monotonic_sec() - started_t > 14400) exit(0);
