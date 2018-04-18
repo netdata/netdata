@@ -1361,6 +1361,8 @@ int recursively_delete_dir(const char *path, const char *reason) {
 }
 
 static int is_virtual_filesystem(const char *path, char **reason) {
+
+#ifdef __Linux__
     struct statfs stat;
     // stat.f_fsid.__val[0] is a file system id
     // stat.f_fsid.__val[1] is the inode
@@ -1376,6 +1378,7 @@ static int is_virtual_filesystem(const char *path, char **reason) {
         if(reason) *reason = "is not a virtual file system";
         return -1;
     }
+#endif
 
     return 0;
 }
