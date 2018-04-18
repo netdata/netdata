@@ -163,7 +163,7 @@ static void continue_as_child(void) {
 int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix?prefix:"", (int)pid, ns);
-    int fd = open(filename, O_RDONLY);
+    int fd = open(filename, procfile_open_flags);
 
     if(fd == -1)
         error("Cannot open file '%s'", filename);
@@ -270,9 +270,15 @@ int switch_namespace(const char *prefix, pid_t pid) {
 }
 
 pid_t read_pid_from_cgroup_file(const char *filename) {
-    FILE *fp = fopen(filename, "r");
+    int fd = open(filename, procfile_open_flags);
+    if(fd == -1) {
+        error("Cannot open file '%s'.", filename);
+        return 0;
+    }
+
+    FILE *fp = fdopen(fd, "r");
     if(!fp) {
-        error("Cannot read file '%s'.", filename);
+        error("Cannot open file '%s'.", filename);
         return 0;
     }
 
@@ -586,6 +592,8 @@ int main(int argc, char **argv) {
     program_version = VERSION;
     error_log_syslog = 0;
 
+    // since cgroup-network runs as root, prevent it from opening symbolic links
+    procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
     // ------------------------------------------------------------------------
     // make sure NETDATA_HOST_PREFIX is safe
