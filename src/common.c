@@ -1362,7 +1362,10 @@ int recursively_delete_dir(const char *path, const char *reason) {
 
 static int is_virtual_filesystem(const char *path, char **reason) {
 
-#ifdef __Linux__
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    (void)path;
+    (void)reason;
+#else
     struct statfs stat;
     // stat.f_fsid.__val[0] is a file system id
     // stat.f_fsid.__val[1] is the inode
