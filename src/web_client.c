@@ -53,6 +53,18 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
+static inline char *strip_control_characters(char *url) {
+    char *s = url;
+    if(!s) return "";
+
+    if(iscntrl(*s)) *s = ' ';
+    while(*++s) {
+        if(iscntrl(*s)) *s = ' ';
+    }
+
+    return url;
+}
+
 void web_client_request_done(struct web_client *w) {
     web_client_uncrock_socket(w);
 
@@ -120,7 +132,7 @@ void web_client_request_done(struct web_client *w) {
                    , dt_usec(&tv, &w->tv_ready) / 1000.0
                    , dt_usec(&tv, &w->tv_in) / 1000.0
                    , w->response.code
-                   , w->last_url
+                   , strip_control_characters(w->last_url)
         );
     }
 
