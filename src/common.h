@@ -5,7 +5,6 @@
 #include <config.h>
 #endif
 
-
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs
 
@@ -76,6 +75,7 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <sys/statvfs.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
@@ -333,6 +333,7 @@ extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 extern int processors;
 extern long get_system_cpus(void);
+extern int verify_netdata_host_prefix();
 
 extern pid_t pid_max;
 extern pid_t get_system_pid_max(void);

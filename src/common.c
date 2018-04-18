@@ -1359,3 +1359,64 @@ int recursively_delete_dir(const char *path, const char *reason) {
 
     return ret;
 }
+
+static int is_virtual_filesystem(const char *path, char **reason) {
+    struct statfs stat;
+    // stat.f_fsid.__val[0] is a file system id
+    // stat.f_fsid.__val[1] is the inode
+    // so their combination uniquely identifies the file/dir
+
+    if (statfs(path, &stat) == -1) {
+        if(reason) *reason = "failed to statfs()";
+        return -1;
+    }
+
+    if(stat.f_fsid.__val[0] != 0 || stat.f_fsid.__val[1] != 0) {
+        errno = EINVAL;
+        if(reason) *reason = "is not a virtual file system";
+        return -1;
+    }
+
+    return 0;
+}
+
+int verify_netdata_host_prefix() {
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
+
+    if(!*netdata_configured_host_prefix)
+        return 0;
+
+    char buffer[FILENAME_MAX + 1];
+    char *path = netdata_configured_host_prefix;
+    char *reason = "unknown reason";
+    errno = 0;
+
+    struct stat sb;
+    if (stat(path, &sb) == -1) {
+        reason = "failed to stat()";
+        goto failed;
+    }
+
+    if((sb.st_mode & S_IFMT) != S_IFDIR) {
+        errno = EINVAL;
+        reason = "is not a directory";
+        goto failed;
+    }
+
+    path = buffer;
+    snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
+    if(is_virtual_filesystem(path, &reason) == -1)
+        goto failed;
+
+    snprintfz(path, FILENAME_MAX, "%s/sys", netdata_configured_host_prefix);
+    if(is_virtual_filesystem(path, &reason) == -1)
+        goto failed;
+
+    return 0;
+
+failed:
+    error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
+    netdata_configured_host_prefix = "";
+    return -1;
+}
