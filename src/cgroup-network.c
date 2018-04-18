@@ -8,8 +8,6 @@
 #include <sched.h>
 #endif
 
-char *host_prefix = "";
-
 char environment_variable2[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
@@ -592,18 +590,17 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // make sure NETDATA_HOST_PREFIX is safe
 
-    host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(!host_prefix || !*host_prefix)
-        host_prefix = "";
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) exit(1);
 
-    if(host_prefix[0] != '\0' && verify_path(host_prefix) == -1)
-        fatal("invalid NETDATA_HOST_PREFIX '%s'", host_prefix);
+    if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
+        fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
 
     // the first environment variable is a fixed PATH=
-    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", host_prefix);
+    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
     // ------------------------------------------------------------------------
 
