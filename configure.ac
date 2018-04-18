@@ -153,6 +153,10 @@ AC_HEADER_MAJOR
 AC_HEADER_RESOLV
 
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
+AC_CHECK_HEADERS_ONCE([sys/vfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statvfs.h])
+AC_CHECK_HEADERS_ONCE([sys/mount.h])
 
 if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)
