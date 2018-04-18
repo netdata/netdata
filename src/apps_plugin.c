@@ -3416,10 +3416,6 @@ static void parse_args(int argc, char **argv)
                     " without-files     enable / disable reporting files, sockets, pipes\n"
                     "                   (default is enabled)\n"
                     "\n"
-                    " NAME              read apps_NAME.conf instead of\n"
-                    "                   apps_groups.conf\n"
-                    "                   (default NAME=groups)\n"
-                    "\n"
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
