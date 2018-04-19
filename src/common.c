@@ -1419,6 +1419,9 @@ int verify_netdata_host_prefix() {
     if(is_virtual_filesystem(path, &reason) == -1)
         goto failed;
 
+    if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
+        info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+
     return 0;
 
 failed:
