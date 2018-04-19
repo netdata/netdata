@@ -856,7 +856,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
         p->cmdline_filename = strdupz(filename);
     }
 
-    int fd = open(p->cmdline_filename, O_RDONLY, 0666);
+    int fd = open(p->cmdline_filename, procfile_open_flags, 0666);
     if(unlikely(fd == -1)) goto cleanup;
 
     ssize_t i, bytes = read(fd, cmdline, MAX_CMDLINE);
@@ -3314,7 +3314,6 @@ cleanup:
 static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
-    char *name = NULL;
 
     for(i = 1; i < argc; i++) {
         if(!freq) {
@@ -3417,10 +3416,6 @@ static void parse_args(int argc, char **argv)
                     " without-files     enable / disable reporting files, sockets, pipes\n"
                     "                   (default is enabled)\n"
                     "\n"
-                    " NAME              read apps_NAME.conf instead of\n"
-                    "                   apps_groups.conf\n"
-                    "                   (default NAME=groups)\n"
-                    "\n"
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
@@ -3428,20 +3423,14 @@ static void parse_args(int argc, char **argv)
             exit(1);
         }
 
-        if(!name) {
-            name = argv[i];
-            continue;
-        }
-
         error("Cannot understand option %s", argv[i]);
         exit(1);
     }
 
     if(freq > 0) update_every = freq;
-    if(!name || !*name) name = "groups";
 
-    if(read_apps_groups_conf(name)) {
-        error("Cannot read process groups '%s/apps_%s.conf'. There are no internal defaults. Failing.", config_dir, name);
+    if(read_apps_groups_conf("groups")) {
+        error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", config_dir);
         exit(1);
     }
 }
@@ -3523,12 +3512,11 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    // since apps.plugin runs as root, prevent it from opening symbolic links
+    procfile_open_flags = O_RDONLY|O_NOFOLLOW;
+
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(netdata_configured_host_prefix == NULL) {
-        // info("NETDATA_HOST_PREFIX is not passed from netdata");
-        netdata_configured_host_prefix = "";
-    }
-    // else info("Found NETDATA_HOST_PREFIX='%s'", netdata_configured_host_prefix);
+    if(verify_netdata_host_prefix() == -1) exit(1);
 
     config_dir = getenv("NETDATA_CONFIG_DIR");
     if(config_dir == NULL) {
@@ -3563,14 +3551,14 @@ int main(int argc, char **argv) {
         error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
-                      "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
               , uid, euid, argv[0], argv[0], argv[0]
         );
 #else
         error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                       "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                       "Your system does not support capabilities. "
-                      "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+                      "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; "
               , uid, euid, argv[0], argv[0]
         );
 #endif

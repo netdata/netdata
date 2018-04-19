@@ -103,6 +103,9 @@ extern char *procfile_filename(procfile *ff);
 
 // ----------------------------------------------------------------------------
 
+// set to the O_XXXX flags, to have procfile_open and procfile_reopen use them when opening proc files
+extern int procfile_open_flags;
+
 // set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
 extern int procfile_adaptive_initial_allocation;
 

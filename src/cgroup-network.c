@@ -8,8 +8,6 @@
 #include <sched.h>
 #endif
 
-char *host_prefix = "";
-
 char environment_variable2[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
@@ -41,8 +39,10 @@ struct iface {
 };
 
 unsigned int read_iface_iflink(const char *prefix, const char *iface) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", prefix?prefix:"", iface);
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", prefix, iface);
 
     unsigned long long iflink = 0;
     int ret = read_single_number_file(filename, &iflink);
@@ -52,8 +52,10 @@ unsigned int read_iface_iflink(const char *prefix, const char *iface) {
 }
 
 unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", prefix?prefix:"", iface);
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", prefix, iface);
 
     unsigned long long ifindex = 0;
     int ret = read_single_number_file(filename, &ifindex);
@@ -63,10 +65,12 @@ unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
 }
 
 struct iface *read_proc_net_dev(const char *prefix) {
+    if(!prefix) prefix = "";
+
     procfile *ff = NULL;
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s%s", prefix?prefix:"", "/proc/net/dev");
+    snprintfz(filename, FILENAME_MAX, "%s%s", prefix, (*prefix)?"/proc/1/net/dev":"/proc/net/dev");
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
         error("Cannot open file '%s'", filename);
@@ -163,12 +167,14 @@ static void continue_as_child(void) {
 }
 
 int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix?prefix:"", (int)pid, ns);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix, (int)pid, ns);
     int fd = open(filename, O_RDONLY);
 
     if(fd == -1)
-        error("Cannot open file '%s'", filename);
+        error("Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -193,6 +199,8 @@ static struct ns {
 };
 
 int switch_namespace(const char *prefix, pid_t pid) {
+    if(!prefix) prefix = "";
+
 #ifdef HAVE_SETNS
 
     int i;
@@ -272,9 +280,15 @@ int switch_namespace(const char *prefix, pid_t pid) {
 }
 
 pid_t read_pid_from_cgroup_file(const char *filename) {
-    FILE *fp = fopen(filename, "r");
+    int fd = open(filename, procfile_open_flags);
+    if(fd == -1) {
+        error("Cannot open pid_from_cgroup() file '%s'.", filename);
+        return 0;
+    }
+
+    FILE *fp = fdopen(fd, "r");
     if(!fp) {
-        error("Cannot read file '%s'.", filename);
+        error("Cannot upgrade fd to fp for file '%s'.", filename);
         return 0;
     }
 
@@ -388,9 +402,8 @@ int send_devices(void) {
 
 void detect_veth_interfaces(pid_t pid) {
     struct iface *host, *cgroup, *h, *c;
-    const char *prefix = getenv("NETDATA_HOST_PREFIX");
 
-    host = read_proc_net_dev(prefix);
+    host = read_proc_net_dev(netdata_configured_host_prefix);
     if(!host) {
         errno = 0;
         error("cannot read host interface list.");
@@ -403,7 +416,7 @@ void detect_veth_interfaces(pid_t pid) {
         goto cleanup;
     }
 
-    if(switch_namespace(prefix, pid)) {
+    if(switch_namespace(netdata_configured_host_prefix, pid)) {
         errno = 0;
         error("cannot switch to the namespace of pid %u", (unsigned int) pid);
         goto cleanup;
@@ -588,22 +601,23 @@ int main(int argc, char **argv) {
     program_version = VERSION;
     error_log_syslog = 0;
 
+    // since cgroup-network runs as root, prevent it from opening symbolic links
+    procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
     // ------------------------------------------------------------------------
     // make sure NETDATA_HOST_PREFIX is safe
 
-    host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(!host_prefix || !*host_prefix)
-        host_prefix = "";
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) exit(1);
 
-    if(host_prefix[0] != '\0' && verify_path(host_prefix) == -1)
-        fatal("invalid NETDATA_HOST_PREFIX '%s'", host_prefix);
+    if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
+        fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
 
     // the first environment variable is a fixed PATH=
-    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", host_prefix);
+    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
     // ------------------------------------------------------------------------
 
