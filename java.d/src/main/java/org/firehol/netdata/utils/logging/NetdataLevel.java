@@ -1,4 +1,4 @@
-package org.firehol.netdata.utils;
+package org.firehol.netdata.utils.logging;
 
 import java.util.logging.Level;
 
@@ -8,7 +8,9 @@ import java.util.logging.Level;
  * @see <a href="https://github.com/firehol/netdata/wiki/Log-Files#errorlog">Log-Files in Netdata wiki</a>
  */
 public class NetdataLevel extends Level {
-	private static final long serialVersionUID = 1L;
+
+	private static final long serialVersionUID = 5707091153615417010L;
+
 	protected NetdataLevel(String name, int value) {
 		super(name, value);
 	}

@@ -29,20 +29,13 @@ import org.firehol.netdata.module.jmx.JmxModule;
 import org.firehol.netdata.plugin.Plugin;
 import org.firehol.netdata.plugin.Printer;
 import org.firehol.netdata.plugin.configuration.ConfigurationService;
-import org.firehol.netdata.utils.LoggingUtils;
-import org.firehol.netdata.utils.NetdataLevel;
-import org.firehol.netdata.utils.StringUtils;
+import org.firehol.netdata.plugin.configuration.EnvironmentConfigurationService;
+import org.firehol.netdata.utils.logging.LoggingUtils;
+import org.firehol.netdata.utils.logging.NetdataLevel;
 
 /** @see <a href="https://github.com/firehol/netdata/wiki/External-Plugins#native-netdata-plugin-api">External-Plugins: native netdata plugin API</a> */
 public final class Main {
 	private static final Logger log = Logger.getLogger("org.firehol.netdata.plugin");
-
-
-	/** @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a> */
-	private static final String NETDATA_DEBUG_FLAGS = "NETDATA_DEBUG_FLAGS";
-
-	/** @see <a href="https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a> */
-	private static final long D_PLUGINSD = 0x0000000000000800;
 
 	private static List<Module> modules = Collections.emptyList();
 
@@ -53,30 +46,13 @@ public final class Main {
 	public static void main(final String[] args) {
 		// allow increasing verbosity before reading configuration option
 		// org.firehol.netdata.plugin.configuration.schema.PluginDaemonConfiguration#logFullStackTraces
-		LoggingUtils.LOG_TRACES = isNetdataPluginDebugEnabled();
+		LoggingUtils.LOG_TRACES = EnvironmentConfigurationService.getInstance().isPluginDebugFlagSet();
 
 		// handle updateEvery parameter provided by netdata
 		int updateEverySecond = getUpdateEveryInSecondsFomCommandLineFailFast(args);
 
 		configureModules();
 		new Plugin(updateEverySecond, modules).start();
-	}
-
-	/**
-	 * Chaecks whether the environment Netdata tracing flag for {@code plugins.d} is set.
-	 * 
-	 * @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a>
-	 */
-	public static boolean isNetdataPluginDebugEnabled() {
-		try {
-			String debugFlags = System.getenv(NETDATA_DEBUG_FLAGS);
-			if (StringUtils.isBlank(debugFlags)) debugFlags = System.getProperty(NETDATA_DEBUG_FLAGS); // for testing
-			if (StringUtils.isBlank(debugFlags)) return false;
-			return (Long.decode(debugFlags) & D_PLUGINSD) != 0;
-		} catch (RuntimeException e) {
-			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier("Failed to check " + NETDATA_DEBUG_FLAGS, e));
-			return false;
-		}
 	}
 
 	protected static int getUpdateEveryInSecondsFomCommandLineFailFast(final String[] args) {
@@ -92,7 +68,8 @@ public final class Main {
 		ConfigurationService configService = ConfigurationService.getInstance();
 
 		// apply global configuration
-		LoggingUtils.LOG_TRACES = isNetdataPluginDebugEnabled() || configService.getGlobalConfiguration().getLogFullStackTraces() == Boolean.TRUE;
+		LoggingUtils.LOG_TRACES = EnvironmentConfigurationService.getInstance().isPluginDebugFlagSet() ||
+				configService.getGlobalConfiguration().getLogFullStackTraces() == Boolean.TRUE;
 
 		modules = new LinkedList<>();
 		modules.add(new JmxModule(configService));

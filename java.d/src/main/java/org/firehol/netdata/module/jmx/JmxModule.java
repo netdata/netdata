@@ -51,9 +51,9 @@ import org.firehol.netdata.module.jmx.exception.VirtualMachineConnectionExceptio
 import org.firehol.netdata.module.jmx.utils.VirtualMachineUtils;
 import org.firehol.netdata.plugin.configuration.ConfigurationService;
 import org.firehol.netdata.plugin.configuration.exception.ConfigurationSchemeInstantiationException;
-import org.firehol.netdata.utils.LoggingUtils;
-import org.firehol.netdata.utils.NetdataLevel;
 import org.firehol.netdata.utils.ResourceUtils;
+import org.firehol.netdata.utils.logging.LoggingUtils;
+import org.firehol.netdata.utils.logging.NetdataLevel;
 
 import com.sun.tools.attach.AttachNotSupportedException;
 import com.sun.tools.attach.VirtualMachine;

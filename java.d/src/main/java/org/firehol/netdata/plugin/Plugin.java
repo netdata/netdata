@@ -30,8 +30,8 @@ import org.firehol.netdata.exception.InitializationException;
 import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.module.Module;
 import org.firehol.netdata.utils.AlignToTimeIntervalService;
-import org.firehol.netdata.utils.LoggingUtils;
 import org.firehol.netdata.utils.UnitConversion;
+import org.firehol.netdata.utils.logging.LoggingUtils;
 
 public class Plugin implements Collector {
 	private static final Logger log = Logger.getLogger("org.firehol.netdata.plugin");

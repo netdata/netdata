@@ -23,11 +23,9 @@ import java.util.logging.Logger;
 
 import javax.management.remote.JMXServiceURL;
 
-import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.logging.LoggingUtils;
 
 import com.sun.tools.attach.VirtualMachine;
-
-import lombok.experimental.UtilityClass;
 
 /**
  * Common methods for operation on a {@link VirtualMachine}.
@@ -37,12 +35,14 @@ import lombok.experimental.UtilityClass;
  * @since 1.0.0
  * @author Simon Nagl
  */
-@UtilityClass
 public final class VirtualMachineUtils {
 
-	private final Logger log = Logger.getLogger("org.firehol.netdata.module.jmx");
+	private static final Logger log = Logger.getLogger("org.firehol.netdata.module.jmx");
 
 	private static final String SERVICE_URL_AGENT_PROPERTY_KEY = "com.sun.management.jmxremote.localConnectorAddress";
+
+	private VirtualMachineUtils() {
+	}
 
 	/**
 	 * Get the JMX ServiceUrl of a virtualMachine.

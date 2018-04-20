@@ -19,11 +19,14 @@
 package org.firehol.netdata.plugin.configuration;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.firehol.netdata.plugin.configuration.exception.EnvironmentConfigurationException;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.EnvironmentVariables;
@@ -33,13 +36,50 @@ public class EnvironmentConfigurationServiceTest {
 	@Rule
 	public final EnvironmentVariables environmentVariables = new EnvironmentVariables();
 
+	@Before
+	public void setUp() throws EnvironmentConfigurationException {
+		// reset environment variables to safe defaults & reload the service
+		environmentVariables.set("NETDATA_CONFIG_DIR", "foo");
+		environmentVariables.set("NETDATA_DEBUG_FLAGS", null);
+		EnvironmentConfigurationService.reload();
+	}
+
 	@Test
 	public void testReadNetdataConfigDir() throws EnvironmentConfigurationException {
 		Path path = Paths.get("/test/folder");
 		environmentVariables.set("NETDATA_CONFIG_DIR", path.toString());
 
+		EnvironmentConfigurationService.reload();
 		Path result = EnvironmentConfigurationService.getInstance().readNetdataConfigDir();
 
 		assertEquals(path, result);
 	}
+
+	@Test
+	public void testNetdataDebugDisabled() throws EnvironmentConfigurationException {
+		environmentVariables.set("NETDATA_DEBUG_FLAGS", "0x0000000");
+		EnvironmentConfigurationService.reload();
+		assertFalse(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+	}
+
+	@Test
+	public void testNetdataDebugEnabledHexadecimal() throws EnvironmentConfigurationException {
+		environmentVariables.set("NETDATA_DEBUG_FLAGS", "0xFFFFFFF");
+		EnvironmentConfigurationService.reload();
+		assertTrue(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+	}
+
+	@Test
+	public void testNetdataDebugEnabledDecimal() throws EnvironmentConfigurationException {
+		environmentVariables.set("NETDATA_DEBUG_FLAGS", String.valueOf(2048));
+		EnvironmentConfigurationService.reload();
+		assertTrue(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+	}
+
+	@Test(expected=EnvironmentConfigurationException.class)
+	public void testNetdataDebugInvalid() throws EnvironmentConfigurationException {
+		environmentVariables.set("NETDATA_DEBUG_FLAGS", "Not-a-Number");
+		EnvironmentConfigurationService.reload();
+	}
+
 }

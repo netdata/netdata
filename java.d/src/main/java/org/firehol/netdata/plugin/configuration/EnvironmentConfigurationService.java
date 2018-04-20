@@ -25,7 +25,8 @@ import java.util.logging.Logger;
 
 import org.firehol.netdata.Main;
 import org.firehol.netdata.plugin.configuration.exception.EnvironmentConfigurationException;
-import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.StringUtils;
+import org.firehol.netdata.utils.logging.LoggingUtils;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -36,6 +37,8 @@ public class EnvironmentConfigurationService {
 	private final Logger log = Logger.getLogger("org.firehol.netdata.daemon.configuration.environment");
 
 	private Path configDir;
+
+	private Long debugFlags;
 
 	private static final EnvironmentConfigurationService INSTANCE = new EnvironmentConfigurationService();
 
@@ -52,8 +55,26 @@ public class EnvironmentConfigurationService {
 		}
 	}
 
+	/** @see <a href="https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a> */
+	public static final long D_PLUGINSD = 0x0000000000000800;
+
+	/** @see <a href="https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a> */
+	public static final long D_CHILDS = 0x0000000000001000;
+
 	private void readEnvironmentVariables() throws EnvironmentConfigurationException {
 		configDir = readNetdataConfigDir();
+		debugFlags = readNetdataDebugFlags();
+	}
+
+	/** @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a> */
+	private Long readNetdataDebugFlags() throws EnvironmentConfigurationException {
+		try {
+			String debugFlags = System.getenv("NETDATA_DEBUG_FLAGS");
+			if (StringUtils.isBlank(debugFlags)) return null;
+			return Long.decode(debugFlags);
+		} catch (RuntimeException e) {
+			throw new EnvironmentConfigurationException(LoggingUtils.buildMessage("Failed to read 'NETDATA_DEBUG_FLAGS'", e));
+		}
 	}
 
 	protected Path readNetdataConfigDir() throws EnvironmentConfigurationException {
@@ -76,5 +97,28 @@ public class EnvironmentConfigurationService {
 
 		return configDir;
 
+	}
+
+	/**
+	 * Checks whether all given environment Netdata tracing flags are set.
+	 * 
+	 * @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a>
+	 */
+	public boolean isDebugFlagSet(long flags) {
+		if (getDebugFlags() == null) return flags == 0;
+		return (getDebugFlags() & flags) == flags;
+	}
+
+	/** @see #isDebugFlagSet(long) */
+	public boolean isPluginDebugFlagSet() {
+		return isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD) ||
+				isDebugFlagSet(EnvironmentConfigurationService.D_CHILDS);
+	}
+
+	/** @deprecated visible for testing only */
+	// @VisibleForTesting
+	@Deprecated
+	static void reload() throws EnvironmentConfigurationException { // NOPMD
+		getInstance().readEnvironmentVariables();
 	}
 }

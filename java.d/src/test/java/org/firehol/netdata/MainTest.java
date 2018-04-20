@@ -19,11 +19,9 @@
 package org.firehol.netdata;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.firehol.netdata.utils.LoggingUtils;
+import org.firehol.netdata.utils.logging.LoggingUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -83,13 +81,4 @@ public class MainTest {
 		assertEquals("DISABLE", systemOutRule.getLog());
 	}
 
-	@Test
-	public void testNetdataDebugEnabled() {
-		System.setProperty("NETDATA_DEBUG_FLAGS", "0x0000000");
-		assertFalse(Main.isNetdataPluginDebugEnabled());
-		System.setProperty("NETDATA_DEBUG_FLAGS", "0xFFFFFFF");
-		assertTrue(Main.isNetdataPluginDebugEnabled());
-		System.setProperty("NETDATA_DEBUG_FLAGS", String.valueOf(2048));
-		assertTrue(Main.isNetdataPluginDebugEnabled());
-	}
 }

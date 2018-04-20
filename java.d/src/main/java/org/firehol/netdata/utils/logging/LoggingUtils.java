@@ -16,18 +16,19 @@
  *
  */
 
-package org.firehol.netdata.utils;
+package org.firehol.netdata.utils.logging;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.function.Supplier;
 
-import lombok.experimental.UtilityClass;
-
-@UtilityClass
-public class LoggingUtils {
+public final class LoggingUtils {
 
 	public static boolean LOG_TRACES = false;
+
+	private LoggingUtils() {
+		// hidden
+	}
 
 	private static void appendMessage(Throwable reason, StringBuilder sb) {
 

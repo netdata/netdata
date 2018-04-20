@@ -45,8 +45,9 @@ import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
 import org.firehol.netdata.module.jmx.query.MBeanQuery;
 import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 import org.firehol.netdata.plugin.Collector;
-import org.firehol.netdata.utils.LoggingUtils;
-import org.firehol.netdata.utils.NetdataLevel;
+import org.firehol.netdata.utils.StringUtils;
+import org.firehol.netdata.utils.logging.LoggingUtils;
+import org.firehol.netdata.utils.logging.NetdataLevel;
 
 import lombok.Getter;
 

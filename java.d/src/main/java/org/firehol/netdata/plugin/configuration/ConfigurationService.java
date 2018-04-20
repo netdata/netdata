@@ -25,8 +25,8 @@ import java.util.logging.Logger;
 import org.firehol.netdata.Main;
 import org.firehol.netdata.plugin.configuration.exception.ConfigurationSchemeInstantiationException;
 import org.firehol.netdata.plugin.configuration.schema.PluginDaemonConfiguration;
-import org.firehol.netdata.utils.LoggingUtils;
-import org.firehol.netdata.utils.NetdataLevel;
+import org.firehol.netdata.utils.logging.LoggingUtils;
+import org.firehol.netdata.utils.logging.NetdataLevel;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser.Feature;
@@ -132,7 +132,7 @@ public final class ConfigurationService {
 		Path configDir = environmentConfigurationService.getConfigDir().resolve("java.d");
 		Path configFile = configDir.resolve(pluginName + ".conf");
 
-		log.info(": Reading '" + pluginName + "' module configuration file '" + configFile.toFile().getAbsolutePath() + "'");
+		log.info("Reading '" + pluginName + "' module configuration file '" + configFile.toFile().getAbsolutePath() + "'");
 		return this.readConfiguration(configFile.toFile(), clazz);
 	}
 }

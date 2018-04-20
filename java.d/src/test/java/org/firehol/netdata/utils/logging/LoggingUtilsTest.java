@@ -16,7 +16,7 @@
  *
  */
 
-package org.firehol.netdata.utils;
+package org.firehol.netdata.utils.logging;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
