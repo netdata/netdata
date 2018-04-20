@@ -85,8 +85,8 @@ public final class ConfigurationService {
 	 *            to read
 	 * @param clazz
 	 *            The schema of the configuration.
-	 * @return The configuration read from file, or if it was invalid the default
-	 *         configuration.
+	 * @return The configuration read from file, or if it was invalid the
+	 *         default configuration.
 	 * @throws ConfigurationSchemeInstantiationException
 	 *             if it was not possible to instantiate clazz
 	 */

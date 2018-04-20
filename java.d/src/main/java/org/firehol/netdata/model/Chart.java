@@ -40,9 +40,9 @@ public class Chart {
 	 */
 	private String id;
 	/**
-	 * is the name that will be presented to the user instead of id in type.id. This
-	 * means that only the id part of type.id is changed. When a name has been
-	 * given, the chart is index (and can be referred) as both type.id and
+	 * is the name that will be presented to the user instead of id in type.id.
+	 * This means that only the id part of type.id is changed. When a name has
+	 * been given, the chart is index (and can be referred) as both type.id and
 	 * type.name. You can set name to '', or null, or (null) to disable it.
 	 */
 	private String name;
@@ -51,8 +51,8 @@ public class Chart {
 	 */
 	private String title;
 	/**
-	 * the label of the vertical axis of the chart, all dimensions added to a chart
-	 * should have the same units of measurement
+	 * the label of the vertical axis of the chart, all dimensions added to a
+	 * chart should have the same units of measurement
 	 */
 	private String units;
 	/**
@@ -64,8 +64,8 @@ public class Chart {
 	private String family;
 	/**
 	 * The context is giving the template of the chart. For example, if multiple
-	 * charts present the same information for a different family, they should have
-	 * the same context.
+	 * charts present the same information for a different family, they should
+	 * have the same context.
 	 *
 	 * This is used for looking up rendering information for the chart (colors,
 	 * sizes, informational texts) and also apply alarms to it.
@@ -78,8 +78,8 @@ public class Chart {
 	 */
 	private int priority = 1000;
 	/**
-	 * overwrite the update frequency set by the server, if empty or missing, the
-	 * user configured value will be used
+	 * overwrite the update frequency set by the server, if empty or missing,
+	 * the user configured value will be used
 	 */
 	private Integer updateEvery;
 

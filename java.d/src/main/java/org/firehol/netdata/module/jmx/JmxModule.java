@@ -120,7 +120,7 @@ public class JmxModule implements Module {
 		JmxServerConfiguration localConfiguration = new JmxServerConfiguration();
 		localConfiguration.setCharts(configuration.getCommonCharts());
 		localConfiguration.setName("JavaPluginDaemon");
-	
+
 		MBeanServerCollector collector = new MBeanServerCollector(localConfiguration,
 				ManagementFactory.getPlatformMBeanServer());
 		allMBeanCollector.add(collector);
@@ -128,7 +128,7 @@ public class JmxModule implements Module {
 
 	private void connectToLocalServers() {
 		Set<String> allRuntimeName = getAllMBeanCollectorRuntimeName();
-	
+
 		// List running VirtualMachines
 		List<VirtualMachineDescriptor> virtualMachineDescriptors = VirtualMachine.list();
 		for (VirtualMachineDescriptor virtualMachineDescriptor : virtualMachineDescriptors) {
@@ -141,7 +141,7 @@ public class JmxModule implements Module {
 						"Could not connect to JMX agent of process with PID " + virtualMachineDescriptor.id(), e));
 				continue;
 			}
-			
+
 			// Check if we already have a connection to this server...
 			try {
 				String runtimeName = collector.getRuntimeName();
@@ -159,7 +159,7 @@ public class JmxModule implements Module {
 			} catch (JmxMBeanServerQueryException e) {
 				log.warning(LoggingUtils.getMessageSupplier("Could not find runtimeName", e));
 			}
-	
+
 			allMBeanCollector.add(collector);
 		}
 	}
@@ -196,14 +196,14 @@ public class JmxModule implements Module {
 				serverConfiguartion.setCharts(configuration.getCommonCharts());
 				continue;
 			}
-	
+
 			Map<String, JmxChartConfiguration> chartConfigById = chartConfigurationsById(
 					serverConfiguartion.getCharts());
-	
+
 			for (JmxChartConfiguration chartConfig : configuration.getCommonCharts()) {
 				chartConfigById.putIfAbsent(chartConfig.getId(), chartConfig);
 			}
-	
+
 			List<JmxChartConfiguration> chartConfigs = chartConfigById.values().stream().collect(Collectors.toList());
 			serverConfiguartion.setCharts(chartConfigs);
 		}
@@ -212,7 +212,7 @@ public class JmxModule implements Module {
 	private List<Chart> initCharts() {
 		List<Chart> allChart = new LinkedList<>();
 		Iterator<MBeanServerCollector> mBeanCollectorIterator = allMBeanCollector.iterator();
-	
+
 		while (mBeanCollectorIterator.hasNext()) {
 			MBeanServerCollector mBeanCollector = mBeanCollectorIterator.next();
 			try {
@@ -223,7 +223,7 @@ public class JmxModule implements Module {
 				mBeanCollectorIterator.remove();
 			}
 		}
-		
+
 		return allChart;
 	}
 
@@ -309,8 +309,8 @@ public class JmxModule implements Module {
 
 	@Override
 	public Collection<Chart> collectValues() {
-		return allMBeanCollector.stream().map(MBeanServerCollector::collectValues).flatMap(Collection::stream)
-				.collect(Collectors.toList());
+		return allMBeanCollector.stream().map(MBeanServerCollector::collectValues).flatMap(Collection::stream).collect(
+				Collectors.toList());
 	}
 
 	@Override

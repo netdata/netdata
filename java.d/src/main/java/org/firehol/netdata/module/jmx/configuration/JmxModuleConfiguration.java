@@ -50,9 +50,9 @@ public class JmxModuleConfiguration {
 	 * A list of chart configurations.
 	 * 
 	 * <p>
-	 * Every monitored JMX Servers tries to monitor each chart in this list. If a
-	 * JMX Server does not have the required M(X)Beans we won't try adding it over
-	 * and over again.
+	 * Every monitored JMX Servers tries to monitor each chart in this list. If
+	 * a JMX Server does not have the required M(X)Beans we won't try adding it
+	 * over and over again.
 	 * </p>
 	 */
 	private List<JmxChartConfiguration> commonCharts = new ArrayList<>();

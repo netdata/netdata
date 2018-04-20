@@ -60,10 +60,8 @@ public class ConfigurationServiceTest {
 		File testConfigurationFile = tmpFolder.newFile();
 		Files.write(testConfigurationFile.toPath(), "{ \"testProperty\": \"testValue\" }".getBytes());
 
-
 		// Test
-		TestConfiguration testConfig = configService.readConfiguration(testConfigurationFile,
-				TestConfiguration.class);
+		TestConfiguration testConfig = configService.readConfiguration(testConfigurationFile, TestConfiguration.class);
 
 		// Verify
 		assertEquals("testValue", testConfig.testProperty);

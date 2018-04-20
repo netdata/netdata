@@ -20,14 +20,14 @@ package org.firehol.netdata.model;
 
 public enum DimensionAlgorithm {
 	/**
-	 * the value is to drawn as-is (interpolated to second boundary), if algorithm
-	 * is empty, invalid or missing, absolute is used
+	 * the value is to drawn as-is (interpolated to second boundary), if
+	 * algorithm is empty, invalid or missing, absolute is used
 	 */
 	ABSOLUTE,
 	/**
 	 * the value increases over time, the difference from the last value is
-	 * presented in the chart, the server interpolates the value and calculates a
-	 * per second figure
+	 * presented in the chart, the server interpolates the value and calculates
+	 * a per second figure
 	 */
 	INCREMENTAL,
 	/**

@@ -34,7 +34,8 @@ public class JmxServerConfiguration {
 	/**
 	 * JMX Service URL used to connect to the JVM.
 	 * 
-	 * <blockquote> {@code service:jmx:rmi://[host[:port]][urlPath]} </blockquote>
+	 * <blockquote> {@code service:jmx:rmi://[host[:port]][urlPath]}
+	 * </blockquote>
 	 * 
 	 * @see <a href=
 	 *      "https://docs.oracle.com/cd/E19159-01/819-7758/gcnqf/index.html">Oracle

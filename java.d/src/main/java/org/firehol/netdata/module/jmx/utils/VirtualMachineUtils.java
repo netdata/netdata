@@ -54,11 +54,11 @@ public final class VirtualMachineUtils {
 	 *            Attached virtual machine to query.
 	 * @param startJMXAgent
 	 *            If true, try to start the jmxAgent if it is not started.
-	 * @return a JMX ServiceUrl which can be used to connect to the VirtualMachine
-	 *         or null if it could not be found.
+	 * @return a JMX ServiceUrl which can be used to connect to the
+	 *         VirtualMachine or null if it could not be found.
 	 * @throws IOException
-	 *             Thrown when an IOException occurs while communicating with the
-	 *             virtualMachine.
+	 *             Thrown when an IOException occurs while communicating with
+	 *             the virtualMachine.
 	 */
 	public static JMXServiceURL getJMXServiceURL(VirtualMachine virtualMachine, boolean startJMXAgent)
 			throws IOException {
@@ -81,11 +81,11 @@ public final class VirtualMachineUtils {
 	 * 
 	 * @param virtualMachine
 	 *            Attached virtual machine to query.
-	 * @return a JMX ServiceUrl which can be used to connect to the VirtualMachine
-	 *         or null if it could not be found.
+	 * @return a JMX ServiceUrl which can be used to connect to the
+	 *         VirtualMachine or null if it could not be found.
 	 * @throws IOException
-	 *             Thrown when an IOException occurs while communicating with the
-	 *             virtualMachine.
+	 *             Thrown when an IOException occurs while communicating with
+	 *             the virtualMachine.
 	 */
 	public static JMXServiceURL getJMXServiceURL(VirtualMachine virtualMachine) throws IOException {
 		String serviceUrl = virtualMachine.getAgentProperties().getProperty(SERVICE_URL_AGENT_PROPERTY_KEY);

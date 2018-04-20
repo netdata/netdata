@@ -163,8 +163,8 @@ public final class Printer {
 	}
 
 	/**
-	 * Tell the caller to disable the plugin. This will prevent it from restarting
-	 * the plugin.
+	 * Tell the caller to disable the plugin. This will prevent it from
+	 * restarting the plugin.
 	 */
 	public static void disable() {
 		print("DISABLE");

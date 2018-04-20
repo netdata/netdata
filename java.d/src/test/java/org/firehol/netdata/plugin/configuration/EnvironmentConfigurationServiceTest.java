@@ -39,7 +39,7 @@ public class EnvironmentConfigurationServiceTest {
 		environmentVariables.set("NETDATA_CONFIG_DIR", path.toString());
 
 		Path result = EnvironmentConfigurationService.getInstance().readNetdataConfigDir();
-		
+
 		assertEquals(path, result);
 	}
 }

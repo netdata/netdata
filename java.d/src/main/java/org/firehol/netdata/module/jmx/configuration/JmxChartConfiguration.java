@@ -44,8 +44,8 @@ public class JmxChartConfiguration {
 	 */
 	private String title;
 	/**
-	 * the label of the vertical axis of the chart, all dimensions added to a chart
-	 * should have the same units of measurement
+	 * the label of the vertical axis of the chart, all dimensions added to a
+	 * chart should have the same units of measurement
 	 */
 	private String units;
 	/**

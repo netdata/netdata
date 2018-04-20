@@ -75,8 +75,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 	 * Creates an MBeanServerCollector.
 	 * 
 	 * <p>
-	 * <b>Warning:</b> Only use this when you do not want to close the underlying
-	 * JMXConnetor when closing the generated MBeanServerCollector.
+	 * <b>Warning:</b> Only use this when you do not want to close the
+	 * underlying JMXConnetor when closing the generated MBeanServerCollector.
 	 * </p>
 	 * 
 	 * @param configuration
@@ -93,8 +93,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 	 * Creates an MBeanServerCollector.
 	 * 
 	 * <p>
-	 * Calling {@link close()} on the resulting {@code MBeanServerCollector} closes
-	 * {@code jmxConnector} too.
+	 * Calling {@link close()} on the resulting {@code MBeanServerCollector}
+	 * closes {@code jmxConnector} too.
 	 * </p>
 	 * 
 	 * @param configuration
@@ -113,7 +113,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 	 * </p>
 	 * 
 	 * <p>
-	 * This attribute can be used as a unique identifier of the underlying JMX agent
+	 * This attribute can be used as a unique identifier of the underlying JMX
+	 * agent
 	 * </p>
 	 * 
 	 * @return the name representing the Java virtual machine of the queried
@@ -173,7 +174,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 				}
 
 				Optional<MBeanQuery> foundQueryInfo = allMBeanQuery.stream()
-						.filter(presentQueryInfo -> presentQueryInfo.queryDestinationEquals(queryInfo)).findAny();
+						.filter(presentQueryInfo -> presentQueryInfo.queryDestinationEquals(queryInfo))
+						.findAny();
 
 				MBeanQuery query;
 				if (!foundQueryInfo.isPresent()) {
