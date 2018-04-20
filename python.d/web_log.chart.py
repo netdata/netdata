@@ -5,7 +5,6 @@
 import bisect
 import re
 import os
-import sys
 
 from collections import namedtuple, defaultdict
 from copy import deepcopy
@@ -15,6 +14,11 @@ try:
 except ImportError:
     from itertools import ifilter as filter
     from itertools import ifilterfalse as filterfalse
+
+try:
+    from sys import maxint
+except ImportError:
+    from sys import maxsize as maxint
 
 from bases.collection import read_last_line
 from bases.FrameworkServices.LogService import LogService
@@ -367,7 +371,7 @@ class Web:
         histogram = self.configuration.get('histogram', None)
         if isinstance(histogram, list):
             self.storage['bucket_index'] = histogram[:]
-            self.storage['bucket_index'].append(sys.maxint)
+            self.storage['bucket_index'].append(maxint)
             self.storage['buckets'] = [0] * (len(histogram) + 1)
             self.storage['upstream_buckets'] = [0] * (len(histogram) + 1)
             hist_lines = self.definitions['response_time_hist']['lines']
