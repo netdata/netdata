@@ -81,7 +81,7 @@ class UrlService(SimpleService):
             return None
 
         if status == 200:
-            return data.decode()
+            return data
         else:
             self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
             return None
@@ -99,7 +99,7 @@ class UrlService(SimpleService):
                                    retries=retries,
                                    headers=manager.headers,
                                    redirect=redirect)
-        return response.status, response.data
+        return response.status, response.data.decode()
 
     def check(self):
         """
