@@ -433,6 +433,13 @@ static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
     return value;
 }
 
+static inline LONG_DOUBLE statsd_parse_sampling_rate(const char *v) {
+    LONG_DOUBLE sampling_rate = statsd_parse_float(v, 1.0);
+    if(unlikely(isless(sampling_rate, 0.001))) sampling_rate = 0.001;
+    if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
+    return sampling_rate;
+}
+
 static inline long long statsd_parse_int(const char *v, long long def) {
     long long value;
 
@@ -482,9 +489,9 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
     }
     else {
         if (unlikely(*value == '+' || *value == '-'))
-            m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+            m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_sampling_rate(sampling);
         else
-            m->gauge.value = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+            m->gauge.value = statsd_parse_float(value, 1.0);
 
         m->events++;
         m->count++;
@@ -502,7 +509,7 @@ static inline void statsd_process_counter_or_meter(STATSD_METRIC *m, const char 
         // magic loading of metric, without affecting anything
     }
     else {
-        m->counter.value += llrintl((LONG_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
+        m->counter.value += llrintl((LONG_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_sampling_rate(sampling));
 
         m->events++;
         m->count++;
@@ -529,14 +536,23 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         // magic loading of metric, without affecting anything
     }
     else {
-        if (unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
-            netdata_mutex_lock(&m->histogram.ext->mutex);
-            m->histogram.ext->size += statsd.histogram_increase_step;
-            m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(LONG_DOUBLE) * m->histogram.ext->size);
-            netdata_mutex_unlock(&m->histogram.ext->mutex);
-        }
+        LONG_DOUBLE v = statsd_parse_float(value, 1.0);
+        LONG_DOUBLE sampling_rate = statsd_parse_sampling_rate(sampling);
+        if(unlikely(isless(sampling_rate, 0.01))) sampling_rate = 0.01;
+        if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
 
-        m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+        long long samples = llrintl(1.0 / sampling_rate);
+        while(samples-- > 0) {
+
+            if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
+                netdata_mutex_lock(&m->histogram.ext->mutex);
+                m->histogram.ext->size += statsd.histogram_increase_step;
+                m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(LONG_DOUBLE) * m->histogram.ext->size);
+                netdata_mutex_unlock(&m->histogram.ext->mutex);
+            }
+
+            m->histogram.ext->values[m->histogram.ext->used++] = v;
+        }
 
         m->events++;
         m->count++;
