@@ -18,7 +18,8 @@
 
 package org.firehol.netdata.plugin.configuration;
 
-@SuppressWarnings("PMD") // suppress intended "Class cannot be instantiated and does not provide any static methods or fields"
+@SuppressWarnings("PMD") // suppress intended "Class cannot be instantiated and
+						 // does not provide any static methods or fields"
 public class NoTestConfiguration {
 	public String testProperty = "defaultValue";
 

@@ -101,8 +101,8 @@ public final class ConfigurationService {
 			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
 					"Could not read malformed configuration file '" + file.getAbsolutePath() + ".", e));
 		} catch (Exception e) {
-			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier(
-					"Could not read configuration file '" + file.getAbsolutePath() + "', " + clazz + ", " + mapper + ".", e));
+			log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier("Could not read configuration file '"
+					+ file.getAbsolutePath() + "', " + clazz + ", " + mapper + ".", e));
 		}
 
 		// If we still have no configuration try to read the default one.
@@ -132,7 +132,8 @@ public final class ConfigurationService {
 		Path configDir = environmentConfigurationService.getConfigDir().resolve("java.d");
 		Path configFile = configDir.resolve(pluginName + ".conf");
 
-		log.info("Reading '" + pluginName + "' module configuration file '" + configFile.toFile().getAbsolutePath() + "'");
+		log.info("Reading '" + pluginName + "' module configuration file '" + configFile.toFile().getAbsolutePath()
+				+ "'");
 		return this.readConfiguration(configFile.toFile(), clazz);
 	}
 }

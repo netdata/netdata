@@ -33,7 +33,11 @@ import org.firehol.netdata.plugin.configuration.EnvironmentConfigurationService;
 import org.firehol.netdata.utils.logging.LoggingUtils;
 import org.firehol.netdata.utils.logging.NetdataLevel;
 
-/** @see <a href="https://github.com/firehol/netdata/wiki/External-Plugins#native-netdata-plugin-api">External-Plugins: native netdata plugin API</a> */
+/**
+ * @see <a href=
+ *      "https://github.com/firehol/netdata/wiki/External-Plugins#native-netdata-plugin-api">External-Plugins:
+ *      native netdata plugin API</a>
+ */
 public final class Main {
 	private static final Logger log = Logger.getLogger("org.firehol.netdata.plugin");
 
@@ -42,7 +46,11 @@ public final class Main {
 	private Main() {
 	}
 
-	/** @see <a href="https://github.com/firehol/netdata/wiki/External-Plugins#command-line-parameters">External-Plugins: command line parameters</a> */
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/wiki/External-Plugins#command-line-parameters">External-Plugins:
+	 *      command line parameters</a>
+	 */
 	public static void main(final String[] args) {
 		// allow increasing verbosity before reading configuration option
 		// org.firehol.netdata.plugin.configuration.schema.PluginDaemonConfiguration#logFullStackTraces
@@ -68,8 +76,8 @@ public final class Main {
 		ConfigurationService configService = ConfigurationService.getInstance();
 
 		// apply global configuration
-		LoggingUtils.LOG_TRACES = EnvironmentConfigurationService.getInstance().isPluginDebugFlagSet() ||
-				configService.getGlobalConfiguration().getLogFullStackTraces() == Boolean.TRUE;
+		LoggingUtils.LOG_TRACES = EnvironmentConfigurationService.getInstance().isPluginDebugFlagSet()
+				|| configService.getGlobalConfiguration().getLogFullStackTraces() == Boolean.TRUE;
 
 		modules = new LinkedList<>();
 		modules.add(new JmxModule(configService));

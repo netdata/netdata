@@ -51,7 +51,8 @@ public class MainTest {
 
 	@Before
 	public void setUp() {
-		LoggingUtils.LOG_TRACES = false; // omit traces when exit.expectSystemExitWithStatus(1)
+		LoggingUtils.LOG_TRACES = false; // omit traces when
+										 // exit.expectSystemExitWithStatus(1)
 	}
 
 	@Test

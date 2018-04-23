@@ -171,8 +171,9 @@ public class MBeanServerCollector implements Collector, Closeable {
 				try {
 					queryInfo = initializeMBeanQueryInfo(dimensionConfig);
 				} catch (JmxMBeanServerQueryException e) {
-					log.log(NetdataLevel.ERROR, LoggingUtils.getMessageSupplier("Could not query dimension" + dimensionConfig.getName() +
-							" of chart " + chart.getType() + "." + chart.getId() + ". Skipping it.", e));
+					log.log(NetdataLevel.ERROR,
+							LoggingUtils.getMessageSupplier("Could not query dimension" + dimensionConfig.getName()
+									+ " of chart " + chart.getType() + "." + chart.getId() + ". Skipping it.", e));
 					continue;
 				}
 

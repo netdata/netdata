@@ -219,7 +219,8 @@ public class JmxModule implements Module {
 			try {
 				allChart.addAll(mBeanCollector.initialize());
 			} catch (InitializationException e) {
-				log.log(NetdataLevel.ERROR, LoggingUtils.buildMessage("Could not initialize JMX plugin " + mBeanCollector.getMBeanServer().toString(), e));
+				log.log(NetdataLevel.ERROR, LoggingUtils.buildMessage(
+						"Could not initialize JMX plugin " + mBeanCollector.getMBeanServer().toString(), e));
 				ResourceUtils.close(mBeanCollector);
 				mBeanCollectorIterator.remove();
 			}

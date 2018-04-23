@@ -42,7 +42,8 @@ public final class LoggingUtils {
 			sb.append(detail.getMessage());
 			detail = detail.getCause();
 		}
-		if (LOG_TRACES) appendStackTrace(reason, sb);
+		if (LOG_TRACES)
+			appendStackTrace(reason, sb);
 	}
 
 	private static void appendStackTrace(Throwable reason, StringBuilder sb) {

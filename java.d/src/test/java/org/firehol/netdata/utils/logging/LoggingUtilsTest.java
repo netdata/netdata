@@ -45,7 +45,8 @@ public class LoggingUtilsTest {
 		String message = LoggingUtils.buildMessage(exception);
 
 		// Verify
-		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.", message);
+		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details.",
+				message);
 	}
 
 	@Test
@@ -128,7 +129,9 @@ public class LoggingUtilsTest {
 
 		// Verify
 		String[] lines = message.split("\n");
-		assertEquals("Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details. Trace:", lines[0]);
+		assertEquals(
+				"Exception: Something went wrong. Detail: This is the reason. Detail: Here are the details. Trace:",
+				lines[0]);
 		assertEquals("java.lang.Exception: Something went wrong.", lines[1]);
 		assertTrue(lines[2].startsWith("\tat " + LoggingUtilsTest.class.getCanonicalName()));
 	}

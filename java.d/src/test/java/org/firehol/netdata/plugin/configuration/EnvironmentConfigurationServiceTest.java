@@ -59,24 +59,27 @@ public class EnvironmentConfigurationServiceTest {
 	public void testNetdataDebugDisabled() throws EnvironmentConfigurationException {
 		environmentVariables.set("NETDATA_DEBUG_FLAGS", "0x0000000");
 		EnvironmentConfigurationService.reload();
-		assertFalse(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+		assertFalse(EnvironmentConfigurationService.getInstance()
+				.isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
 	}
 
 	@Test
 	public void testNetdataDebugEnabledHexadecimal() throws EnvironmentConfigurationException {
 		environmentVariables.set("NETDATA_DEBUG_FLAGS", "0xFFFFFFF");
 		EnvironmentConfigurationService.reload();
-		assertTrue(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+		assertTrue(EnvironmentConfigurationService.getInstance()
+				.isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
 	}
 
 	@Test
 	public void testNetdataDebugEnabledDecimal() throws EnvironmentConfigurationException {
 		environmentVariables.set("NETDATA_DEBUG_FLAGS", String.valueOf(2048));
 		EnvironmentConfigurationService.reload();
-		assertTrue(EnvironmentConfigurationService.getInstance().isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
+		assertTrue(EnvironmentConfigurationService.getInstance()
+				.isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD));
 	}
 
-	@Test(expected=EnvironmentConfigurationException.class)
+	@Test(expected = EnvironmentConfigurationException.class)
 	public void testNetdataDebugInvalid() throws EnvironmentConfigurationException {
 		environmentVariables.set("NETDATA_DEBUG_FLAGS", "Not-a-Number");
 		EnvironmentConfigurationService.reload();

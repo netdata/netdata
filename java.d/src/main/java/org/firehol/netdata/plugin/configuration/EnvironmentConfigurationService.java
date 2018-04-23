@@ -55,10 +55,16 @@ public class EnvironmentConfigurationService {
 		}
 	}
 
-	/** @see <a href="https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a> */
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
+	 */
 	public static final long D_PLUGINSD = 0x0000000000000800;
 
-	/** @see <a href="https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a> */
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
+	 */
 	public static final long D_CHILDS = 0x0000000000001000;
 
 	private void readEnvironmentVariables() throws EnvironmentConfigurationException {
@@ -66,14 +72,20 @@ public class EnvironmentConfigurationService {
 		debugFlags = readNetdataDebugFlags();
 	}
 
-	/** @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a> */
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing
+	 *      Options</a>
+	 */
 	private Long readNetdataDebugFlags() throws EnvironmentConfigurationException {
 		try {
 			String debugFlags = System.getenv("NETDATA_DEBUG_FLAGS");
-			if (StringUtils.isBlank(debugFlags)) return null;
+			if (StringUtils.isBlank(debugFlags))
+				return null;
 			return Long.decode(debugFlags);
 		} catch (RuntimeException e) {
-			throw new EnvironmentConfigurationException(LoggingUtils.buildMessage("Failed to read 'NETDATA_DEBUG_FLAGS'", e));
+			throw new EnvironmentConfigurationException(
+					LoggingUtils.buildMessage("Failed to read 'NETDATA_DEBUG_FLAGS'", e));
 		}
 	}
 
@@ -102,17 +114,20 @@ public class EnvironmentConfigurationService {
 	/**
 	 * Checks whether all given environment Netdata tracing flags are set.
 	 * 
-	 * @see <a href="https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing Options</a>
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/wiki/Tracing-Options">Tracing
+	 *      Options</a>
 	 */
 	public boolean isDebugFlagSet(long flags) {
-		if (getDebugFlags() == null) return flags == 0;
+		if (getDebugFlags() == null)
+			return flags == 0;
 		return (getDebugFlags() & flags) == flags;
 	}
 
 	/** @see #isDebugFlagSet(long) */
 	public boolean isPluginDebugFlagSet() {
-		return isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD) ||
-				isDebugFlagSet(EnvironmentConfigurationService.D_CHILDS);
+		return isDebugFlagSet(EnvironmentConfigurationService.D_PLUGINSD)
+				|| isDebugFlagSet(EnvironmentConfigurationService.D_CHILDS);
 	}
 
 	/** @deprecated visible for testing only */
