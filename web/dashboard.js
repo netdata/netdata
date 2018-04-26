@@ -356,8 +356,12 @@ var NETDATA = window.NETDATA || {};
         noData: '<i class="fas fa-exclamation-triangle"></i>'
     };
 
-    if(typeof netdataIcons === 'object')
-        NETDATA.icons = netdataIcons;
+    if(typeof netdataIcons === 'object') {
+        for(var icon in NETDATA.icons) {
+            if(NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
+                NETDATA.icons[icon] = netdataIcons[icon];
+        }
+    }
 
     if(typeof netdataSnapshotData === 'undefined')
         netdataSnapshotData = null;
