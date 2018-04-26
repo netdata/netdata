@@ -100,6 +100,8 @@ class UrlService(SimpleService):
                                    retries=retries,
                                    headers=manager.headers,
                                    redirect=redirect)
+        if isinstance(response.data, str):
+            return response.status, response.data
         return response.status, response.data.decode()
 
     def check(self):
