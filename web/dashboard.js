@@ -23,6 +23,10 @@
  *                                                  (default: false) */
 /*global netdataNoBootstrap          *//* boolean,  disable bootstrap - disables help too
  *                                                  (default: false) */
+/*global netdataNoFontAwesome        *//* boolean,  disable fontawesome (do not load it)
+ *                                                  (default: false) */
+/*global netdataIcons                *//* object,   overwrite netdata fontawesome icons
+ *                                                  (default: null) */
 /*global netdataDontStart            *//* boolean,  do not start the thread to process the charts
  *                                                  (default: false) */
 /*global netdataErrorCallback        *//* function, callback to be called when the dashboard encounters an error
@@ -337,6 +341,23 @@ var NETDATA = window.NETDATA || {};
     // http://www.mulinblog.com/a-color-palette-optimized-for-data-visualization/
     //                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
     //NETDATA.colors        = [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
+
+    NETDATA.icons = {
+        left: '<i class="fas fa-backward"></i>',
+        reset: '<i class="fas fa-play"></i>',
+        right: '<i class="fas fa-forward"></i>',
+        zoomIn: '<i class="fas fa-plus"></i>',
+        zoomOut: '<i class="fas fa-minus"></i>',
+        resize: '<i class="fas fa-sort"></i>',
+        lineChart: '<i class="fas fa-chart-line"></i>',
+        areaChart: '<i class="fas fa-chart-area"></i>',
+        noChart: '<i class="fas fa-chart-area"></i>',
+        loading: '<i class="fas fa-sync-alt"></i>',
+        noData: '<i class="fas fa-exclamation-triangle"></i>'
+    };
+
+    if(typeof netdataIcons === 'object')
+        NETDATA.icons = netdataIcons;
 
     if(typeof netdataSnapshotData === 'undefined')
         netdataSnapshotData = null;
@@ -3119,19 +3140,19 @@ var NETDATA = window.NETDATA || {};
             var icon;
             if(that.chart !== null) {
                 if(that.chart.chart_type === 'line')
-                    icon = '<i class="fas fa-chart-line"></i>';
+                    icon = NETDATA.icons.lineChart;
                 else
-                    icon = '<i class="fas fa-chart-area"></i>';
+                    icon = NETDATA.icons.areaChart;
             }
             else
-                icon = '<i class="fas fa-chart-area"></i>';
+                icon = NETDATA.icons.noChart;
 
             showMessageIcon(icon + ' netdata' + invisibleSearchableText());
         };
 
         var showLoading = function() {
             if(that.chart_created === false) {
-                showMessageIcon('<i class="fas fa-sync-alt"></i> netdata');
+                showMessageIcon(NETDATA.icons.loading + ' netdata');
                 return true;
             }
             return false;
@@ -3532,7 +3553,7 @@ var NETDATA = window.NETDATA || {};
 
 
         var noDataToShow = function() {
-            showMessageIcon('<i class="fas fa-exclamation-triangle"></i> empty');
+            showMessageIcon(NETDATA.icons.noData + ' empty');
             that.legendUpdateDOM();
             that.tm.last_autorefreshed = Date.now();
             // that.data_update_every = 30 * 1000;
@@ -4315,7 +4336,7 @@ var NETDATA = window.NETDATA || {};
                     this.element.appendChild(this.element_legend_childs.toolbox);
 
                     this.element_legend_childs.toolbox_left.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_left.innerHTML = '<i class="fas fa-backward"></i>';
+                    this.element_legend_childs.toolbox_left.innerHTML = NETDATA.icons.left;
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_left);
                     this.element_legend_childs.toolbox_left.onclick = function(e) {
                         e.preventDefault();
@@ -4340,7 +4361,7 @@ var NETDATA = window.NETDATA || {};
 
 
                     this.element_legend_childs.toolbox_reset.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_reset.innerHTML = '<i class="fas fa-play"></i>';
+                    this.element_legend_childs.toolbox_reset.innerHTML = NETDATA.icons.reset;
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_reset);
                     this.element_legend_childs.toolbox_reset.onclick = function(e) {
                         e.preventDefault();
@@ -4359,7 +4380,7 @@ var NETDATA = window.NETDATA || {};
                     });
 
                     this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_right.innerHTML = '<i class="fas fa-forward"></i>';
+                    this.element_legend_childs.toolbox_right.innerHTML = NETDATA.icons.right;
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
                     this.element_legend_childs.toolbox_right.onclick = function(e) {
                         e.preventDefault();
@@ -4383,7 +4404,7 @@ var NETDATA = window.NETDATA || {};
 
 
                     this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_zoomin.innerHTML = '<i class="fas fa-plus"></i>';
+                    this.element_legend_childs.toolbox_zoomin.innerHTML = NETDATA.icons.zoomIn;
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
                     this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
                         e.preventDefault();
@@ -4405,7 +4426,7 @@ var NETDATA = window.NETDATA || {};
                     });
 
                     this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_zoomout.innerHTML = '<i class="fas fa-minus"></i>';
+                    this.element_legend_childs.toolbox_zoomout.innerHTML = NETDATA.icons.zoomOut;
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
                     this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
                         e.preventDefault();
@@ -4441,7 +4462,7 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.resize_handler = document.createElement('div');
 
                     this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
-                    this.element_legend_childs.resize_handler.innerHTML = '<i class="fas fa-sort"></i>';
+                    this.element_legend_childs.resize_handler.innerHTML = NETDATA.icons.resize;
                     this.element.appendChild(this.element_legend_childs.resize_handler);
                     if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.resize_handler).popover({
@@ -8695,7 +8716,9 @@ var NETDATA = window.NETDATA || {};
         {
             url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.1.min.js',
             async: true,
-            isAlreadyLoaded: function() { return false; }
+            isAlreadyLoaded: function() {
+                return (typeof netdataNoFontAwesome !== 'undefined' && netdataNoFontAwesome === true);
+            }
         },
         {
             url: NETDATA.serverStatic + 'lib/perfect-scrollbar-0.6.15.min.js',
