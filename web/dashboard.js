@@ -6424,6 +6424,7 @@ var NETDATA = window.NETDATA || {};
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
                     ticker: Dygraph.dateTicker,
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-xaxislabelwidth', 60),
+                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawxaxis', true),
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
                         return NETDATA.dateTime.xAxisTimeString(d);
@@ -6433,6 +6434,7 @@ var NETDATA = window.NETDATA || {};
                     logscale: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?true:undefined,
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
+                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', true),
                     axisLabelFormatter: function (y) {
 
                         // unfortunately, we have to call this every single time
