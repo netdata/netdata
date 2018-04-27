@@ -68,6 +68,7 @@ dist_pythonconfig_DATA = \
     python.d/samba.conf \
     python.d/sensors.conf \
     python.d/springboot.conf \
+    python.d/spigotmc.conf \
     python.d/squid.conf \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \

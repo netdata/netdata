@@ -55,6 +55,7 @@ dist_python_DATA = \
     retroshare.chart.py \
     samba.chart.py \
     sensors.chart.py \
+    spigotmc.chart.py \
     springboot.chart.py \
     squid.chart.py \
     smartd_log.chart.py \
