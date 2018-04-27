@@ -359,6 +359,12 @@ netdataDashboard.menu = {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
         info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+    },
+
+    'spigotmc': {
+        title: 'Spigot MC',
+        icon: '<i class="fas fa-eye"></i>',
+        info: 'Provides basic performance statistics for the <b><a href=""https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
     }
 };
 
@@ -2064,6 +2070,14 @@ netdataDashboard.context = {
 
     'ntpd.peer_precision': {
         height: 0.2
+    },
+
+    'spigotmc.tps': {
+        info: 'The running 1, 5, and 15 minute average number of server ticks per second.  An idealized server will show 20.0 for all values, but in practice this almost never happens.  Typical servers should show approximately 19.98-20.0 here.  Lower values indicate progressively more server-side lag (and thus that you need better hardware for your server or a lower user limit).  For every 0.05 ticks below 20, redstone clocks will lag behind by approximately 0.25%.  Values below approximately 19.50 may interfere with complex free-running redstone circuits and will noticeably slow down growth.'
+    },
+
+    'spigotmc.users': {
+        info: 'THe number of currently connect users on the monitored Spigot server.'
     }
 
     // ------------------------------------------------------------------------
