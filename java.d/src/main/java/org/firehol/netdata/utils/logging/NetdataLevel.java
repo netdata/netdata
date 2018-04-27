@@ -13,10 +13,6 @@ public class NetdataLevel extends Level {
 
 	private static final long serialVersionUID = 5707091153615417010L;
 
-	protected NetdataLevel(String name, int value) {
-		super(name, value);
-	}
-
 	/**
 	 * Something prevented a program from running.
 	 * 
@@ -46,5 +42,9 @@ public class NetdataLevel extends Level {
 	 *      in Netdata wiki</a>
 	 */
 	public static Level INFO = Level.INFO;
+
+	protected NetdataLevel(String name, int value) {
+		super(name, value);
+	}
 
 }

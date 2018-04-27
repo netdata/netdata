@@ -99,8 +99,7 @@ public class ConfigurationServiceTest {
 		Files.write(testConfigurationFile.toPath(), "{ \"noClassProperty\": \"testValue\" }".getBytes());
 
 		// Test
-		NoTestConfiguration testConfig = configService.readConfiguration(testConfigurationFile,
-				NoTestConfiguration.class);
+		configService.readConfiguration(testConfigurationFile, NoTestConfiguration.class);
 	}
 
 	@Test

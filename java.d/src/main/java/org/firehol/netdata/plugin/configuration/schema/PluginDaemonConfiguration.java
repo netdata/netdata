@@ -33,5 +33,5 @@ public final class PluginDaemonConfiguration {
 	 *      "https://github.com/firehol/netdata/wiki/Log-Files#errorlog">Log-Files
 	 *      in Netdata wiki</a>
 	 */
-	Boolean logFullStackTraces;
+	private Boolean logFullStackTraces;
 }

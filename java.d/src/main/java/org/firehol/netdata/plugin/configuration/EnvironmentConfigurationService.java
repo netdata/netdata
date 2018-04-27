@@ -33,14 +33,26 @@ import lombok.Getter;
 
 @Getter
 public class EnvironmentConfigurationService {
+
 	@Getter(AccessLevel.NONE)
 	private final Logger log = Logger.getLogger("org.firehol.netdata.daemon.configuration.environment");
-
 	private Path configDir;
 
 	private Long debugFlags;
 
 	private static final EnvironmentConfigurationService INSTANCE = new EnvironmentConfigurationService();
+
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
+	 */
+	public static final long D_PLUGINSD = 0x0000000000000800;
+
+	/**
+	 * @see <a href=
+	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
+	 */
+	public static final long D_CHILDS = 0x0000000000001000;
 
 	public static EnvironmentConfigurationService getInstance() {
 		return INSTANCE;
@@ -54,18 +66,6 @@ public class EnvironmentConfigurationService {
 			Main.exit(e.getMessage());
 		}
 	}
-
-	/**
-	 * @see <a href=
-	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
-	 */
-	public static final long D_PLUGINSD = 0x0000000000000800;
-
-	/**
-	 * @see <a href=
-	 *      "https://github.com/firehol/netdata/blob/master/src/log.h">log.h</a>
-	 */
-	public static final long D_CHILDS = 0x0000000000001000;
 
 	private void readEnvironmentVariables() throws EnvironmentConfigurationException {
 		configDir = readNetdataConfigDir();
@@ -132,7 +132,7 @@ public class EnvironmentConfigurationService {
 
 	/** @deprecated visible for testing only */
 	// @VisibleForTesting
-	@Deprecated
+	@Deprecated // NOPMD
 	static void reload() throws EnvironmentConfigurationException { // NOPMD
 		getInstance().readEnvironmentVariables();
 	}

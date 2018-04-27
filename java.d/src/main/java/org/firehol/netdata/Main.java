@@ -86,6 +86,6 @@ public final class Main {
 	public static void exit(String info) {
 		log.log(NetdataLevel.FATAL, info);
 		Printer.disable();
-		System.exit(1);
+		System.exit(1); // NOPMD we have to notify netdata via exit status
 	}
 }
