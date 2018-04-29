@@ -19,8 +19,27 @@
 package org.firehol.netdata.module;
 
 import org.firehol.netdata.plugin.Collector;
+import org.firehol.netdata.plugin.configuration.ConfigurationService;
 
 public interface Module extends Collector {
 
 	String getName();
+
+	/**
+	 * Knows how to construct this module.
+	 * 
+	 * <p>
+	 * <b> Note: Implementations MUST provide a public a no-arg constructor.
+	 * </b>
+	 * </p>
+	 * 
+	 * <p>
+	 * Implementations will typically invoke
+	 * {@link ConfigurationService#readModuleConfiguration(String, Class)} only
+	 * later when {@link Module#initialize()} is called.
+	 * </p>
+	 */
+	public static interface Builder {
+		public Module build(ConfigurationService configurationService, String moduleName);
+	}
 }

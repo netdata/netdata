@@ -127,7 +127,7 @@ public final class ConfigurationService {
 		return globalConfig;
 	}
 
-	public <T> T readPluginConfiguration(String pluginName, Class<T> clazz)
+	public <T> T readModuleConfiguration(String pluginName, Class<T> clazz)
 			throws ConfigurationSchemeInstantiationException {
 		Path configDir = environmentConfigurationService.getConfigDir().resolve("java.d");
 		Path configFile = configDir.resolve(pluginName + ".conf");

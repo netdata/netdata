@@ -25,7 +25,6 @@ import java.util.logging.Logger;
 
 import org.firehol.netdata.exception.UnreachableCodeException;
 import org.firehol.netdata.module.Module;
-import org.firehol.netdata.module.jmx.JmxModule;
 import org.firehol.netdata.plugin.Plugin;
 import org.firehol.netdata.plugin.Printer;
 import org.firehol.netdata.plugin.configuration.ConfigurationService;
@@ -79,8 +78,21 @@ public final class Main {
 		LoggingUtils.LOG_TRACES = EnvironmentConfigurationService.getInstance().isPluginDebugFlagSet()
 				|| configService.getGlobalConfiguration().getLogFullStackTraces() == Boolean.TRUE;
 
+		// instantiate modules via builder
 		modules = new LinkedList<>();
-		modules.add(new JmxModule(configService));
+		configService.getGlobalConfiguration().getModules().forEach((moduleName, builderName) -> {
+			try {
+				Module.Builder builder = (Module.Builder) Class.forName(builderName).newInstance();
+				modules.add(builder.build(configService, moduleName));
+			} catch (Exception e) {
+				// TODO: should we go on initializing other modules?
+				throw new IllegalArgumentException(
+						"Unable to instantiate builder '" + builderName + "' for module: " + moduleName, e);
+			}
+		});
+		if (modules.isEmpty()) {
+			exit("No modules to run");
+		}
 	}
 
 	public static void exit(String info) {

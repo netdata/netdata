@@ -59,6 +59,8 @@ import com.sun.tools.attach.AttachNotSupportedException;
 import com.sun.tools.attach.VirtualMachine;
 import com.sun.tools.attach.VirtualMachineDescriptor;
 
+import lombok.Getter;
+
 /**
  * Netdata Java Plugin which collects metrics from JMX Servers.
  * 
@@ -78,12 +80,16 @@ public class JmxModule implements Module {
 
 	private final ConfigurationService configurationService;
 
+	@Getter
+	private final String name;
+
 	private JmxModuleConfiguration configuration;
 
 	private final List<MBeanServerCollector> allMBeanCollector = new ArrayList<>();
 
-	public JmxModule(ConfigurationService configurationService) {
+	public JmxModule(ConfigurationService configurationService, String name) {
 		this.configurationService = configurationService;
+		this.name = name;
 	}
 
 	@Override
@@ -123,7 +129,7 @@ public class JmxModule implements Module {
 		localConfiguration.setName("JavaPluginDaemon");
 
 		MBeanServerCollector collector = new MBeanServerCollector(localConfiguration,
-				ManagementFactory.getPlatformMBeanServer());
+				ManagementFactory.getPlatformMBeanServer(), getName());
 		allMBeanCollector.add(collector);
 	}
 
@@ -185,7 +191,7 @@ public class JmxModule implements Module {
 
 	private void readConfiguration() throws InitializationException {
 		try {
-			configuration = configurationService.readPluginConfiguration("jmx", JmxModuleConfiguration.class);
+			configuration = configurationService.readModuleConfiguration(getName(), JmxModuleConfiguration.class);
 		} catch (ConfigurationSchemeInstantiationException e) {
 			throw new InitializationException("Could not read jmx plugin configuration", e);
 		}
@@ -242,7 +248,7 @@ public class JmxModule implements Module {
 			JMXServiceURL url = new JMXServiceURL(config.getServiceUrl());
 			connection = JMXConnectorFactory.connect(url);
 			MBeanServerConnection server = connection.getMBeanServerConnection();
-			MBeanServerCollector collector = new MBeanServerCollector(config, server, connection);
+			MBeanServerCollector collector = new MBeanServerCollector(config, server, connection, getName());
 			return collector;
 		} catch (IOException e) {
 			if (connection != null) {
@@ -315,9 +321,12 @@ public class JmxModule implements Module {
 				Collectors.toList());
 	}
 
-	@Override
-	public String getName() {
-		return "jmx";
-	}
+	public static final class Builder implements Module.Builder {
 
+		@Override
+		public Module build(ConfigurationService configurationService, String moduleName) {
+			return new JmxModule(configurationService, moduleName);
+		}
+
+	}
 }

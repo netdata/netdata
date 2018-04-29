@@ -18,12 +18,25 @@
 
 package org.firehol.netdata.plugin.configuration.schema;
 
+import java.util.Map;
+
+import org.firehol.netdata.module.Module;
+
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Schema for {@code java.d.conf}.
+ */
 @Getter
 @Setter
 public final class PluginDaemonConfiguration {
+
+	/**
+	 * Enabled modules mapping module name to the FQCN of a class with a no-arg
+	 * constructor implementing {@link Module.Builder}.
+	 */
+	Map<String, String> modules;
 
 	/**
 	 * Log full exception stacktraces into netadata's {@code error.log},

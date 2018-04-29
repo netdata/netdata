@@ -72,6 +72,8 @@ public class MBeanServerCollector implements Collector, Closeable {
 
 	private List<Chart> allChart = new LinkedList<>();
 
+	private final String moduleName;
+
 	/**
 	 * Creates an MBeanServerCollector.
 	 * 
@@ -85,9 +87,11 @@ public class MBeanServerCollector implements Collector, Closeable {
 	 * @param mBeanServer
 	 *            to query
 	 */
-	public MBeanServerCollector(JmxServerConfiguration configuration, MBeanServerConnection mBeanServer) {
+	public MBeanServerCollector(JmxServerConfiguration configuration, MBeanServerConnection mBeanServer,
+			String moduleName) {
 		this.serverConfiguration = configuration;
 		this.mBeanServer = mBeanServer;
+		this.moduleName = moduleName;
 	}
 
 	/**
@@ -103,9 +107,13 @@ public class MBeanServerCollector implements Collector, Closeable {
 	 * @param jmxConnector
 	 */
 	public MBeanServerCollector(JmxServerConfiguration configuration, MBeanServerConnection mBeanServer,
-			JMXConnector jmxConnector) {
-		this(configuration, mBeanServer);
+			JMXConnector jmxConnector, String moduleName) {
+		this(configuration, mBeanServer, moduleName);
 		this.jmxConnector = jmxConnector;
+	}
+
+	public String getModuleName() {
+		return moduleName == null ? "jmx" : moduleName;
 	}
 
 	/**
@@ -203,7 +211,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 	protected Chart initializeChart(JmxChartConfiguration config) {
 		Chart chart = new Chart();
 
-		chart.setType("jmx_" + serverConfiguration.getName());
+		chart.setType(getModuleName() + "_" + serverConfiguration.getName());
 		chart.setFamily(config.getFamily());
 		chart.setId(config.getId());
 		chart.setTitle(config.getTitle());

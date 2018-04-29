@@ -77,8 +77,12 @@ public class Plugin implements Collector {
 			}
 		}
 
+		if (modules.size() < 1) {
+			throw new InitializationException("No modules initialized successfully.");
+		}
+
 		if (chartsToInitialize.size() < 1) {
-			throw new InitializationException("No Charts to initialize.");
+			log.warning("No Charts to initialize.");
 		}
 
 		return chartsToInitialize;
