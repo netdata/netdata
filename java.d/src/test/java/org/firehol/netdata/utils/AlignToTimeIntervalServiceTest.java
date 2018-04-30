@@ -21,6 +21,8 @@ package org.firehol.netdata.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.concurrent.TimeUnit;
+
 import org.firehol.netdata.test.utils.ReflectionUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -36,7 +38,7 @@ public class AlignToTimeIntervalServiceTest {
 			throws NoSuchFieldException, IllegalAccessException, SecurityException {
 
 		// Test
-		AlignToTimeIntervalService service = new AlignToTimeIntervalService(100);
+		AlignToTimeIntervalService service = new AlignToTimeIntervalService(100, TimeUnit.NANOSECONDS);
 
 		// Verify
 		assertEquals(100L, ReflectionUtils.getPrivateField(service, "intervalInNSec"));
@@ -46,7 +48,8 @@ public class AlignToTimeIntervalServiceTest {
 	// Just test it does not fail.
 	public void testAlignToNextInterval() throws InterruptedException {
 		// Build object under test
-		AlignToTimeIntervalService service = new AlignToTimeIntervalService(UnitConversion.NANO_PER_PLAIN / 100);
+		AlignToTimeIntervalService service = new AlignToTimeIntervalService(UnitConversion.NANO_PER_PLAIN / 100,
+				TimeUnit.NANOSECONDS);
 
 		for (int i = 0; i < 100; i++) {
 			long delta = service.alignToNextInterval();
@@ -58,7 +61,7 @@ public class AlignToTimeIntervalServiceTest {
 	// Just test it does not fail.
 	public void testAlignToNextIntervalLong() throws InterruptedException {
 		// Build object under test
-		AlignToTimeIntervalService service = new AlignToTimeIntervalService(UnitConversion.NANO_PER_PLAIN * 5L);
+		AlignToTimeIntervalService service = new AlignToTimeIntervalService(5L, TimeUnit.SECONDS);
 
 		long delta = service.alignToNextInterval();
 		assertTrue(delta > 0);

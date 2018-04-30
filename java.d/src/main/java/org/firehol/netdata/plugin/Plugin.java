@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -30,7 +31,6 @@ import org.firehol.netdata.exception.InitializationException;
 import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.module.Module;
 import org.firehol.netdata.utils.AlignToTimeIntervalService;
-import org.firehol.netdata.utils.UnitConversion;
 import org.firehol.netdata.utils.logging.LoggingUtils;
 
 public class Plugin implements Collector {
@@ -85,8 +85,7 @@ public class Plugin implements Collector {
 	}
 
 	private void runMainLoop() {
-		long updateEveryNSec = updateEverySecond * UnitConversion.NANO_PER_PLAIN;
-		AlignToTimeIntervalService timeService = new AlignToTimeIntervalService(updateEveryNSec);
+		AlignToTimeIntervalService timeService = new AlignToTimeIntervalService(updateEverySecond, TimeUnit.SECONDS);
 		while (true) {
 			timeService.alignToNextInterval();
 
