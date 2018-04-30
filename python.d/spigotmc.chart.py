@@ -9,6 +9,10 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 from third_party import mcrcon
 
+# Update only every 5 seconds because collection takes in excess of
+# 100ms sometimes, and mos tpeople won't care about second-by-second data.
+update_every = 5
+
 PRECISION = 100
 
 ORDER = ['tps', 'users']
