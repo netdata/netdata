@@ -38,6 +38,7 @@ class Service(SimpleService):
         self.port = self.configuration.get('port', 25575)
         self.password = self.configuration.get('password', '')
         self.console = mcrcon.MCRcon()
+        self.alive = True
 
     def check(self):
         try:
@@ -56,11 +57,19 @@ class Service(SimpleService):
             except mcrcon.MCRconException:
                 pass
             self.console.connect(self.host, self.port, self.password)
+            self.alive = True
         except (mcrcon.MCRconException, socket.error):
             return False
         return True
 
+    def is_alive(self):
+        if not self.alive:
+            return self.reconnect()
+        return True
+
     def _get_data(self):
+        if not self.is_alive():
+            return None
         data = {}
         try:
             raw = self.console.command('tps')
@@ -68,17 +77,25 @@ class Service(SimpleService):
             # '§6TPS from last 1m, 5m, 15m: §a19.99, §a19.99, §a19.99\n'
             # The values we care about are the three numbers after the :
             tmp = raw.split(':')[1].split(',')
-            data['tps1'] = float(tmp[0].lstrip()[2:]) * PRECISION
-            data['tps5'] = float(tmp[1].lstrip()[2:]) * PRECISION
-            data['tps15'] = float(tmp[2].lstrip().rstrip()[2:]) * PRECISION
-        except (mcrcon.MCRconException, socket.error):
+            data['tps1'] = float(tmp[0].lstrip(u' §a*')) * PRECISION
+            data['tps5'] = float(tmp[1].lstrip(u' §a*')) * PRECISION
+            data['tps15'] = float(tmp[2].lstrip(u' §a*').rstrip()) * PRECISION
+        except mcrcon.MCRconException:
             self.error('Unable to fetch TPS values.')
+        except socket.error:
+            self.error('Connection is dead.')
+            self.alive = False
+            return None
         try:
             raw = self.console.command('list')
             # The above command returns a string that looks like this:
             # 'There are 0/20 players online:'
             # We care about the first number here.
             data['users'] = int(raw.split()[2].split('/')[0])
-        except (mcrcon.MCRconException, socket.error):
+        except mcrcon.MCRconException:
             self.error('Unable to fetch user counts.')
+        except socket.error:
+            self.error('Connection is dead.')
+            self.alive = False
+            return None
         return data
