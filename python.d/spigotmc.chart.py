@@ -3,6 +3,7 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 
 import socket
+import platform
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -41,6 +42,9 @@ class Service(SimpleService):
         self.alive = True
 
     def check(self):
+        if platform.system() != 'Linux':
+            self.error('Only supported on Linux.')
+            return False
         try:
             self.connect()
         except (mcrcon.MCRconException, socket.error):
@@ -63,7 +67,8 @@ class Service(SimpleService):
         return True
 
     def is_alive(self):
-        if not self.alive:
+        if (not self.alive) or \
+           self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1:
             return self.reconnect()
         return True
 

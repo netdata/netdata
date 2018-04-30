@@ -38,6 +38,7 @@ class MCRcon(object):
         if self.socket is not None:
             raise MCRconException("Already connected")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(0.9)
         self.socket.connect((host, port))
         self.send(3, password)
 
