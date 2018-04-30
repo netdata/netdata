@@ -68,7 +68,7 @@ class MCRcon(object):
             # Read a packet
             in_length, = struct.unpack('<i', self.read(4))
             in_payload = self.read(in_length)
-            in_id, in_type = struct.unpack('<ii', in_payload[:8])
+            in_id = struct.unpack('<ii', in_payload[:8])
             in_data_partial, in_padding = in_payload[8:-2], in_payload[-2:]
 
             # Sanity checks

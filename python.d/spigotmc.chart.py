@@ -40,11 +40,21 @@ class Service(SimpleService):
         self.console = mcrcon.MCRcon()
 
     def check(self):
-        '''Check plugin configuration validity.
-
-           This really just makes sure we can connect and authenticate
-           correctly.'''
         try:
+            self.connect()
+        except (mcrcon.MCRconException, socket.error):
+            return False
+        return True
+
+    def connect(self):
+        self.console.connect(self.host, self.port, self.password)
+
+    def reconnect(self):
+        try:
+            try:
+                self.console.disconnect()
+            except mcrcon.MCRconException:
+                pass
             self.console.connect(self.host, self.port, self.password)
         except (mcrcon.MCRconException, socket.error):
             return False
@@ -62,9 +72,6 @@ class Service(SimpleService):
             data['tps5'] = float(tmp[1].lstrip()[2:]) * PRECISION
             data['tps15'] = float(tmp[2].lstrip().rstrip()[2:]) * PRECISION
         except (mcrcon.MCRconException, socket.error):
-            data['tps1'] = None
-            data['tps5'] = None
-            data['tps15'] = None
             self.error('Unable to fetch TPS values.')
         try:
             raw = self.console.command('list')
@@ -73,6 +80,5 @@ class Service(SimpleService):
             # We care about the first number here.
             data['users'] = int(raw.split()[2].split('/')[0])
         except (mcrcon.MCRconException, socket.error):
-            data['users'] = None
             self.error('Unable to fetch user counts.')
         return data
