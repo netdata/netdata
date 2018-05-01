@@ -101,7 +101,7 @@ class Service(SocketService):
             self.definitions.update(EXTENDED_CHARTS)
         self.request = 'UBCT1 stats\n'
         self._parse_config()
-        self.debug('Unbound config: {0}'.format(self.ubconf)
+        self.debug('Unbound config: {0}'.format(self.ubconf))
         if os.access(self.ubconf, os.R_OK):
             with open(self.ubconf, 'r') as ubconf:
                 try:
