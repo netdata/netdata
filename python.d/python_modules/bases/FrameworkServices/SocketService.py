@@ -6,7 +6,7 @@ import socket
 
 try:
     import ssl
-except:
+except ImportError:
     _SSL_SUPPORT = False
 else:
     _SSL_SUPPORT = True
