@@ -10,7 +10,6 @@ import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.model.ChartType;
 import org.firehol.netdata.model.Dimension;
 import org.firehol.netdata.module.Module;
-import org.firehol.netdata.module.Module.Builder;
 import org.firehol.netdata.plugin.configuration.ConfigurationService;
 
 /**
@@ -59,7 +58,7 @@ public class ExampleModule implements Module {
 	public Collection<Chart> collectValues() {
 		for (int i = 1; i < 4; i++) {
 			String dimensionId = "random" + i;
-			Dimension dimension = charts.get("random").getOrAddDimension(dimensionId, id -> new Dimension());
+			Dimension dimension = charts.get("random_java").getOrAddDimension(dimensionId, id -> new Dimension());
 			dimension.setCurrentValue((long) random.nextInt(100));
 		}
 		return charts.values();
@@ -72,6 +71,7 @@ public class ExampleModule implements Module {
 
 	@Override
 	public void cleanup() {
+		charts.clear();
 	}
 
 	public static class Builder implements Module.Builder {
