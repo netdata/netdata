@@ -4,6 +4,13 @@
 
 import socket
 
+try:
+    import ssl
+except:
+    _SSL_SUPPORT = False
+else:
+    _SSL_SUPPORT = True
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
@@ -16,6 +23,9 @@ class SocketService(SimpleService):
         self.unix_socket = None
         self.dgram_socket = False
         self.request = ''
+        self.ssl = False
+        self.cert = None
+        self.key = None
         self.__socket_config = None
         self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -56,10 +66,24 @@ class SocketService(SimpleService):
             self.__socket_config = None
             return False
 
+        if self.ssl:
+            try:
+                self.debug('Encapsulating socket with SSL')
+                self._sock = ssl.wrap_socket(self._sock,
+                                             keyfile=self.key,
+                                             certfile=self.cert,
+                                             server_side=False,
+                                             cert_reqs=ssl.CERT_NONE)
+            except (socket.error, ssl.SSLError) as error:
+                self.error('Failed to wrap socket.')
+                self._disconnect()
+                self.__socket_config = None
+                return False
+
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             self._sock.connect(sa)
-        except socket.error as error:
+        except (socket.error, ssl.SSLError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
                                                                                               port=sa[1],
                                                                                               error=error))
@@ -248,6 +272,21 @@ class SocketService(SimpleService):
                 self.port = int(self.configuration['port'])
             except (KeyError, TypeError):
                 self.debug('No port specified. Using: "{0}"'.format(self.port))
+
+            if _SSL_SUPPORT:
+                try:
+                    self.ssl = bool(self.configuration['ssl'])
+                except (KeyError, TypeError):
+                    self.debug('No SSL preference specified, not using SSL.')
+                    self.ssl = False
+                else:
+                    try:
+                        self.key = str(self.configuration['ssl_key'])
+                        self.cert = str(self.configuration['ssl_cert'])
+                    except (KeyError, TypeError):
+                        self.debug('No SSL client certificate configuration found.')
+                        self.key = None
+                        self.cert = None
 
         try:
             self.request = str(self.configuration['request'])
