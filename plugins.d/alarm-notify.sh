@@ -44,6 +44,7 @@ then
 
     id=1
     last="CLEAR"
+    test_res=0
     for x in "WARNING" "CRITICAL"  "CLEAR"
     do
         echo >&2
@@ -53,6 +54,7 @@ then
         if [ $? -ne 0 ]
         then
             echo >&2 "# FAILED"
+            test_res=1
         else
             echo >&2 "# OK"
         fi
@@ -61,7 +63,7 @@ then
         id=$((id + 1))
     done
 
-    exit 1
+    exit $test_res
 fi
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
