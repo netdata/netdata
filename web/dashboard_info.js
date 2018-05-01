@@ -361,7 +361,7 @@ netdataDashboard.menu = {
         info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
     },
 
-    'unbound' {
+    'unbound': {
         title: 'Unbound',
         icon: '<i class="fas fa-tag"></i>',
         info: undefined
