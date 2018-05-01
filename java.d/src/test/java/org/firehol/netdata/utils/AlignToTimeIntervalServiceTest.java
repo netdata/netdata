@@ -54,4 +54,14 @@ public class AlignToTimeIntervalServiceTest {
 		}
 	}
 
+	@Test(timeout = 6000)
+	// Just test it does not fail.
+	public void testAlignToNextIntervalLong() throws InterruptedException {
+		// Build object under test
+		AlignToTimeIntervalService service = new AlignToTimeIntervalService(UnitConversion.NANO_PER_PLAIN * 5L);
+
+		long delta = service.alignToNextInterval();
+		assertTrue(delta > 0);
+	}
+
 }
