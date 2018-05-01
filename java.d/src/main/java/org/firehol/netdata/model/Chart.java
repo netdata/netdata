@@ -20,6 +20,8 @@ package org.firehol.netdata.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -100,5 +102,28 @@ public class Chart {
 
 	public boolean hasUpdateEvery() {
 		return getUpdateEvery() != null;
+	}
+
+	/**
+	 * Convenience method to get a dimension by ID or create and add one
+	 * 
+	 * @param mappingFunction
+	 *            the function to create a dimension
+	 */
+	public Dimension getOrAddDimension(String id, Function<String, Dimension> mappingFunction) {
+		// TODO: use Map.computeIfAbsent instead of List
+		for (Dimension dimension : getAllDimension()) {
+			if (Objects.equals(id, dimension.getId())) {
+				return dimension; // match
+			}
+		}
+		// no match
+		Dimension dimension = mappingFunction.apply(id);
+		if (dimension == null) {
+			return null; // do not create it
+		}
+		dimension.setId(id);
+		allDimension.add(dimension);
+		return dimension;
 	}
 }
