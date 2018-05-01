@@ -59,7 +59,12 @@ public final class Main {
 		int updateEverySecond = getUpdateEveryInSecondsFomCommandLineFailFast(args);
 
 		configureModules();
-		new Plugin(updateEverySecond, modules).start();
+		Plugin plugin = new Plugin(updateEverySecond, modules);
+		try {
+			plugin.run();
+		} finally {
+			plugin.cleanup();
+		}
 	}
 
 	protected static int getUpdateEveryInSecondsFomCommandLineFailFast(final String[] args) {

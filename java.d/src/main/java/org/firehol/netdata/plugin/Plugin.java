@@ -33,7 +33,7 @@ import org.firehol.netdata.module.Module;
 import org.firehol.netdata.utils.AlignToTimeIntervalService;
 import org.firehol.netdata.utils.logging.LoggingUtils;
 
-public class Plugin implements Collector {
+public class Plugin implements Collector, Runnable {
 	private static final Logger log = Logger.getLogger("org.firehol.netdata.plugin");
 
 	private final int updateEverySecond;
@@ -45,7 +45,9 @@ public class Plugin implements Collector {
 		this.modules = modules;
 	}
 
-	public void start() {
+	/** runs forever */
+	@Override
+	public void run() {
 		initializeModules();
 		runMainLoop();
 	}
@@ -89,6 +91,8 @@ public class Plugin implements Collector {
 	}
 
 	private void runMainLoop() {
+		// TODO: do not let one module's overtime collectValues() delay another
+		// module
 		AlignToTimeIntervalService timeService = new AlignToTimeIntervalService(updateEverySecond, TimeUnit.SECONDS);
 		while (true) {
 			timeService.alignToNextInterval();
@@ -99,6 +103,8 @@ public class Plugin implements Collector {
 
 	@Override
 	public Collection<Chart> collectValues() {
+		// TODO: do not let one module's overtime collectValues() delay another
+		// module
 		return modules.stream().map(Module::collectValues).flatMap(Collection::stream).collect(Collectors.toList());
 	}
 
