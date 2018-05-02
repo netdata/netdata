@@ -106,13 +106,13 @@ class Service(SocketService):
             self.definitions.update(EXTENDED_CHARTS)
         if self.unix_socket:
             self.debug('Using unix socket: {0}'.format(self.unix_socket))
-            for key in self.definitions.keys():
+            for key in self.definitions:
                 self.definitions[key]['options'][4] = 'Local'
         else:
             self.debug('Connecting to: {0}:{1}'.format(self.host, self.port))
             self.debug('Using key: {0}'.format(self.key))
             self.debug('Using certificate: {0}'.format(self.cert))
-            for key in self.definitions.keys():
+            for key in self.definitions:
                 self.definitions[key]['options'][4] = self.host
 
     def _auto_config(self):
@@ -120,9 +120,9 @@ class Service(SocketService):
             self.debug('Unbound config: {0}'.format(self.ubconf))
             conf = YamlOrderedLoader.load_config_from_file(self.ubconf)[0]
             if self.ext is None:
-                if 'extended-statistics' in conf['server'].keys():
+                if 'extended-statistics' in conf['server']:
                     self.ext = conf['server']['extended-statistics']
-            if 'remote-control' in conf.keys():
+            if 'remote-control' in conf:
                 if conf['remote-control'].get('control-use-cert', False):
                     if not self.key:
                         self.key = conf['remote-control'].get('control-key-file')
@@ -161,7 +161,7 @@ class Service(SocketService):
         for line in raw.splitlines():
             stat = line.split('=')
             tmp[stat[0]] = stat[1]
-        for item in STAT_MAP.keys():
-            if item in tmp.keys():
+        for item in STAT_MAP:
+            if item in tmp:
                 data[STAT_MAP[item][0]] = float(tmp[item]) * STAT_MAP[item][1]
         return data
