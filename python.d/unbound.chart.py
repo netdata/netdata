@@ -130,8 +130,7 @@ class Service(SocketService):
                     self.cert = self.cert or conf['remote-control'].get('control-cert-file')
                     self.port = self.port or conf['remote-control'].get('control-port')
                 else:
-                    if not self.unix_socket:
-                        self.unix_socket = conf['remote-control'].get('control-interface')
+                    self.unix_socket = self.unix_socket or conf['remote-control'].get('control-interface')
         else:
             self.debug('Unbound configuration not found.')
         if not self.key:
