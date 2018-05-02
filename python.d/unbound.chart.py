@@ -5,8 +5,9 @@
 import os
 import yaml
 
-from base.FrameworkServices.SocketService import SocketService
+from bases.FrameworkServices.SocketService import SocketService
 
+PRECISION = 1000
 
 ORDER = ['queries', 'reqlist', 'recursion']
 
@@ -36,8 +37,8 @@ CHARTS = {
     'recursion': {
         'options': [None, 'Recursion Timings', 'seconds', 'Unbound', 'unbound.recursion', 'line'],
         'lines': [
-            ['recursive_avg', 'Average', 'absolute', 1, 1],
-            ['recursive_med', 'Median', 'absolute', 1, 1]
+            ['recursive_avg', 'Average', 'absolute', 1, PRECISION],
+            ['recursive_med', 'Median', 'absolute', 1, PRECISION]
         ]
     }
 }
@@ -47,7 +48,7 @@ EXTENDED_ORDER = ['cache']
 
 EXTENDED_CHARTS = {
     'cache': {
-        'options': [None, 'Cache Sizes', 'items', 'Unbound', 'unbound.cache', 'line'],
+        'options': [None, 'Cache Sizes', 'items', 'Unbound', 'unbound.cache', 'stacked'],
         'lines': [
             ['cache_message', 'Message Cache', 'absolute', 1, 1],
             ['cache_rrset', 'RRSet Cache', 'absolute', 1, 1],
@@ -59,28 +60,28 @@ EXTENDED_CHARTS = {
     }
 }
 
-# This maps the Unbound stat names to our names.
+# This maps the Unbound stat names to our names and precision requiremnets.
 STAT_MAP = {
-    'total.num.queries_ip_ratelimited': 'ratelimit',
-    'total.num.cachehits': 'cachehit',
-    'total.num.cachemiss': 'cachemiss',
-    'total.num.zero_ttl': 'expired',
-    'total.num.prefetch': 'prefetch',
-    'total.num.recursivereplies': 'recursive',
-    'total.requestlist.avg': 'reqlist_avg',
-    'total.requestlist.max': 'reqlist_max',
-    'total.requestlist.overwritten': 'reqlist_overwritten',
-    'total.requestlist.exceeded': 'reqlist_exceeded',
-    'total.requestlist.current.all': 'reqlist_current',
-    'total.requestlist.current.user': 'reqlist_user',
-    'total.recursion.time.avg': 'recursive_avg',
-    'total.recursion.time.median': 'recursive_med',
-    'msg.cache.count': 'cache_message',
-    'rrset.cache.count': 'cache_rrset',
-    'infra.cache.count': 'cache_infra',
-    'key.cache.count': 'cache_key',
-    'dnscrypt_shared_secret.cache.count': 'cache_dnscss',
-    'dnscrypt_nonce.cache.count': 'cache_dnscn'
+    'total.num.queries_ip_ratelimited': ('ratelimit', 1),
+    'total.num.cachehits': ('cachehit', 1),
+    'total.num.cachemiss': ('cachemiss', 1),
+    'total.num.zero_ttl': ('expired', 1),
+    'total.num.prefetch': ('prefetch', 1),
+    'total.num.recursivereplies': ('recursive', 1),
+    'total.requestlist.avg': ('reqlist_avg', 1),
+    'total.requestlist.max': ('reqlist_max', 1),
+    'total.requestlist.overwritten': ('reqlist_overwritten', 1),
+    'total.requestlist.exceeded': ('reqlist_exceeded', 1),
+    'total.requestlist.current.all': ('reqlist_current', 1),
+    'total.requestlist.current.user': ('reqlist_user', 1),
+    'total.recursion.time.avg': ('recursive_avg', PRECISION),
+    'total.recursion.time.median': ('recursive_med', PRECISION),
+    'msg.cache.count': ('cache_message', 1),
+    'rrset.cache.count': ('cache_rrset', 1),
+    'infra.cache.count': ('cache_infra', 1),
+    'key.cache.count': ('cache_key', 1),
+    'dnscrypt_shared_secret.cache.count': ('cache_dnscss', 1),
+    'dnscrypt_nonce.cache.count': ('cache_dnscn', 1)
 }
 
 
@@ -102,6 +103,20 @@ class Service(SocketService):
         self.request = 'UBCT1 stats\n'
         self._parse_config()
         self.debug('Unbound config: {0}'.format(self.ubconf))
+        self._auto_config()
+        self.debug('Extended stats: {0}'.format(self.ext))
+        if self.unix_socket:
+            self.debug('Using unix socket: {0}'.format(self.unix_socket))
+            for key in self.definitions.keys():
+                self.definitions[key]['options'][4] = 'Local'
+        else:
+            self.debug('Connecting to: {0}:{1}'.format(self.host, self.port))
+            self.debug('Using key: {0}'.format(self.key))
+            self.debug('Using certificate: {0}'.format(self.cert))
+            for key in self.definitions.keys():
+                self.definitions[key]['options'][4] = self.host
+
+    def _auto_config(self):
         if os.access(self.ubconf, os.R_OK):
             with open(self.ubconf, 'r') as ubconf:
                 try:
@@ -121,24 +136,13 @@ class Service(SocketService):
                 else:
                     if not self.unix_socket:
                         self.unix_socket = conf['remote-control'].get('control-interface')
-        self.debug('Extended stats: {0}'.format(self.ext))
-        if self.unix_socket:
-            self.debug('Using unix socket: {0}'.format(self.unix_socket))
-            for key in self.definitions.keys():
-                self.definitions[key]['options'][4] = 'Local'
-        else:
-            self.debug('Connecting to: {0}:{1}'.format(self.host, self.port))
-            self.debug('Using key: {0}'.format(self.key))
-            self.debug('Using certificate: {0}'.format(self.cert))
-            for key in self.definitions.keys():
-                self.definitions[key]['options'][4] = self.host
-
 
     def check(self):
         # We need to check that auth works, otherwise there's no point.
         self._connect()
+        result = bool(self._sock)
         self._disconnect()
-        return bool(self._sock)
+        return result
 
     def _check_raw_data(self, data):
         # The server will close the connection when it's done sending
@@ -154,5 +158,5 @@ class Service(SocketService):
             tmp[stat[0]] = stat[1]
         for item in STAT_MAP.keys():
             if item in tmp.keys():
-                data[STAT_MAP[item]] = float(tmp[item])
+                data[STAT_MAP[item][0]] = float(tmp[item]) * STAT_MAP[item][1]
         return data
