@@ -281,8 +281,8 @@ class SocketService(SimpleService):
                 self.debug('No SSL preference specified, not using SSL.')
 
             if self.ssl and _SSL_SUPPORT:
-                self.key = str(self.configuration.get('ssl_key'))
-                self.cert = str(self.configuration.get('ssl_cert'))
+                self.key = self.configuration.get('ssl_key')
+                self.cert = self.configuration.get('ssl_cert')
                 if not self.cert:
                     # If there's not a valid certificate, clear the key too.
                     self.debug('No valid SSL client certificate configuration found.')
