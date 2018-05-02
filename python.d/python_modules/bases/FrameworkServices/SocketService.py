@@ -273,20 +273,24 @@ class SocketService(SimpleService):
             except (KeyError, TypeError):
                 self.debug('No port specified. Using: "{0}"'.format(self.port))
 
-            if _SSL_SUPPORT:
-                try:
-                    self.ssl = bool(self.configuration['ssl'])
-                except (KeyError, TypeError):
-                    self.debug('No SSL preference specified, not using SSL.')
+            try:
+                self.ssl = bool(self.configuration['ssl'])
+                if self.ssl and not _SSL_SUPPORT:
+                    self.warning('SSL requested but not SSL module found, disabling SSL support.')
                     self.ssl = False
-                else:
-                    try:
-                        self.key = str(self.configuration['ssl_key'])
-                        self.cert = str(self.configuration['ssl_cert'])
-                    except (KeyError, TypeError):
-                        self.debug('No SSL client certificate configuration found.')
-                        self.key = None
-                        self.cert = None
+            except (KeyError, TypeError):
+                if _SSL_SUPPORT:
+                    self.debug('No SSL preference specified, not using SSL.')
+                self.ssl = False
+
+            if self.ssl and _SSL_SUPPORT:
+                try:
+                    self.key = str(self.configuration['ssl_key'])
+                    self.cert = str(self.configuration['ssl_cert'])
+                except (KeyError, TypeError):
+                    self.debug('No SSL client certificate configuration found.')
+                    self.key = None
+                    self.cert = None
 
         try:
             self.request = str(self.configuration['request'])
