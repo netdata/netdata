@@ -3,9 +3,9 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 
 import os
-import yaml
 
 from bases.FrameworkServices.SocketService import SocketService
+from bases.loaders import YamlOrderedLoader
 
 PRECISION = 1000
 
@@ -94,7 +94,7 @@ class Service(SocketService):
         self.port = 8935
         SocketService.__init__(self, configuration, name)
         self.ext = self.configuration.get('extended', None)
-        self.ubconf = self.configuration.get('ubconf', '/etc/unbound/unbound.conf')
+        self.ubconf = self.configuration.get('ubconf', None)
         self.order = ORDER
         self.definitions = CHARTS
         if self.ext:
@@ -117,25 +117,28 @@ class Service(SocketService):
                 self.definitions[key]['options'][4] = self.host
 
     def _auto_config(self):
-        if os.access(self.ubconf, os.R_OK):
-            with open(self.ubconf, 'r') as ubconf:
-                try:
-                    conf = yaml.load(ubconf)
-                except yaml.YAMLError:
-                    conf = dict()
+        if self.ubconf and os.access(self.ubconf, os.R_OK):
+            conf = YamlOrderedLoader.load_config_from_file(self.ubconf)[0]
             if self.ext is None:
                 if 'extended-statistics' in conf['server'].keys():
                     self.ext = conf['server']['extended-statistics']
             if 'remote-control' in conf.keys():
                 if conf['remote-control'].get('control-use-cert', False):
                     if not self.key:
-                        self.key = conf['remote-control'].get('control-key-file', '/etc/unbound/unbound_control.key')
+                        self.key = conf['remote-control'].get('control-key-file')
                     if not self.cert:
-                        self.cert = conf['remote-control'].get('control-cert-file', '/etc/unbound/unbound_control.pem')
-                    self.port = conf['remote-control'].get('control-port', 8953)
+                        self.cert = conf['remote-control'].get('control-cert-file')
+                    if not self.port:
+                        self.port = conf['remote-control'].get('control-port')
                 else:
                     if not self.unix_socket:
                         self.unix_socket = conf['remote-control'].get('control-interface')
+        if not self.key:
+            self.key = '/etc/unbound/unbound_control.key'
+        if not self.cert:
+            self.cert = '/etc/unbound/unbound_control.pem'
+        if not self.port:
+            self.port = 8953
 
     def check(self):
         # We need to check that auth works, otherwise there's no point.
