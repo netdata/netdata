@@ -273,24 +273,27 @@ class SocketService(SimpleService):
             except (KeyError, TypeError):
                 self.debug('No port specified. Using: "{0}"'.format(self.port))
 
-            try:
-                self.ssl = bool(self.configuration['ssl'])
-                if self.ssl and not _SSL_SUPPORT:
-                    self.warning('SSL requested but not SSL module found, disabling SSL support.')
-                    self.ssl = False
-            except (KeyError, TypeError):
-                if _SSL_SUPPORT:
-                    self.debug('No SSL preference specified, not using SSL.')
+            self.ssl = bool(self.configuration.get('ssl', self.ssl))
+            if self.ssl and not _SSL_SUPPORT:
+                self.warning('SSL requested but not SSL module found, disabling SSL support.')
                 self.ssl = False
+            if _SSL_SUPPORT and not self.ssl:
+                self.debug('No SSL preference specified, not using SSL.')
 
             if self.ssl and _SSL_SUPPORT:
-                try:
-                    self.key = str(self.configuration['ssl_key'])
-                    self.cert = str(self.configuration['ssl_cert'])
-                except (KeyError, TypeError):
-                    self.debug('No SSL client certificate configuration found.')
+                self.key = str(self.configuration.get('ssl_key'))
+                self.cert = str(self.configuration.get('ssl_cert'))
+                if not self.cert:
+                    # If there's not a valid certificate, clear the key too.
+                    self.debug('No valid SSL client certificate configuration found.')
                     self.key = None
                     self.cert = None
+                elif not self.key:
+                    # If a key isn't listed, the config may still be
+                    # valid, because there may be a key attached to the
+                    # certificate.
+                    self.notice('No SSL client key specified, assuming it\'s attached to the certificate.')
+                    self.key = None
 
         try:
             self.request = str(self.configuration['request'])
