@@ -126,12 +126,9 @@ class Service(SocketService):
                     self.ext = conf['server']['extended-statistics']
             if 'remote-control' in conf:
                 if conf['remote-control'].get('control-use-cert', False):
-                    if not self.key:
-                        self.key = conf['remote-control'].get('control-key-file')
-                    if not self.cert:
-                        self.cert = conf['remote-control'].get('control-cert-file')
-                    if not self.port:
-                        self.port = conf['remote-control'].get('control-port')
+                    self.key = self.key or conf['remote-control'].get('control-key-file')
+                    self.cert = self.cert or conf['remote-control'].get('control-cert-file')
+                    self.port = self.port or conf['remote-control'].get('control-port')
                 else:
                     if not self.unix_socket:
                         self.unix_socket = conf['remote-control'].get('control-interface')
