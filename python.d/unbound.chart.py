@@ -148,7 +148,8 @@ class Service(SocketService):
         self._disconnect()
         return result
 
-    def _check_raw_data(self, data):
+    @staticmethod
+    def _check_raw_data(data):
         # The server will close the connection when it's done sending
         # data, so just keep looping until that happens.
         return False
