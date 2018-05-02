@@ -4,6 +4,8 @@
 
 import os
 
+from copy import deepcopy
+
 from bases.FrameworkServices.SocketService import SocketService
 from bases.loaders import YamlOrderedLoader
 
@@ -95,8 +97,8 @@ class Service(SocketService):
         SocketService.__init__(self, configuration, name)
         self.ext = self.configuration.get('extended', None)
         self.ubconf = self.configuration.get('ubconf', None)
-        self.order = ORDER
-        self.definitions = CHARTS
+        self.order = deepcopy(ORDER)
+        self.definitions = deepcopy(CHARTS)
         self.request = 'UBCT1 stats\n'
         self._parse_config()
         self._auto_config()
