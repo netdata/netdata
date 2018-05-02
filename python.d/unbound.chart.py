@@ -97,14 +97,13 @@ class Service(SocketService):
         self.ubconf = self.configuration.get('ubconf', None)
         self.order = ORDER
         self.definitions = CHARTS
+        self.request = 'UBCT1 stats\n'
+        self._parse_config()
+        self._auto_config()
+        self.debug('Extended stats: {0}'.format(self.ext))
         if self.ext:
             self.order = self.order + EXTENDED_ORDER
             self.definitions.update(EXTENDED_CHARTS)
-        self.request = 'UBCT1 stats\n'
-        self._parse_config()
-        self.debug('Unbound config: {0}'.format(self.ubconf))
-        self._auto_config()
-        self.debug('Extended stats: {0}'.format(self.ext))
         if self.unix_socket:
             self.debug('Using unix socket: {0}'.format(self.unix_socket))
             for key in self.definitions.keys():
@@ -118,6 +117,7 @@ class Service(SocketService):
 
     def _auto_config(self):
         if self.ubconf and os.access(self.ubconf, os.R_OK):
+            self.debug('Unbound config: {0}'.format(self.ubconf))
             conf = YamlOrderedLoader.load_config_from_file(self.ubconf)[0]
             if self.ext is None:
                 if 'extended-statistics' in conf['server'].keys():
@@ -133,6 +133,8 @@ class Service(SocketService):
                 else:
                     if not self.unix_socket:
                         self.unix_socket = conf['remote-control'].get('control-interface')
+        else:
+            self.debug('Unbound configuration not found.')
         if not self.key:
             self.key = '/etc/unbound/unbound_control.key'
         if not self.cert:
