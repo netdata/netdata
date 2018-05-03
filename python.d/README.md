@@ -1745,7 +1745,7 @@ Module monitors one or more postgres servers.
 
 **Requirements:**
 
- * `python-psycopg2` package. You have to install to manually.
+ * `python-psycopg2` package. You have to install it manually.
 
 Following charts are drawn:
 
