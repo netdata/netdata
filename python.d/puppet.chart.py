@@ -35,7 +35,8 @@ CHARTS = {
             ["jvm_heap_used", 'used', "absolute", 1, MB],
         ],
         'variables': [
-            ['jvm_heap_max', 'jvm_heap_init'],
+            ['jvm_heap_max'],
+            ['jvm_heap_init'],
         ],
     },
     'jvm_nonheap': {
@@ -45,7 +46,8 @@ CHARTS = {
             ["jvm_nonheap_used", 'used', "absolute", 1, MB],
         ],
         'variables': [
-            ['jvm_heap_max', 'jvm_heap_init'],
+            ['jvm_nonheap_max'],
+            ['jvm_nonheap_init'],
         ],
     },
     'cpu': {
