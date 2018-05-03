@@ -74,7 +74,7 @@ class SocketService(SimpleService):
                                              certfile=self.cert,
                                              server_side=False,
                                              cert_reqs=ssl.CERT_NONE)
-            except (socket.error, ssl.TLSError) as error:
+            except (socket.error, ssl.SSLError) as error:
                 self.error('Failed to wrap socket.')
                 self._disconnect()
                 self.__socket_config = None
@@ -83,7 +83,7 @@ class SocketService(SimpleService):
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             self._sock.connect(sa)
-        except (socket.error, ssl.TLSError) as error:
+        except (socket.error, ssl.SSLError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
                                                                                               port=sa[1],
                                                                                               error=error))
