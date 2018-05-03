@@ -1598,7 +1598,7 @@ send_syslog() {
             fi
         fi
 
-        message="${prefix} ${status} on ${host} at ${date}: ${value_string}"
+        message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
         if [ ${host} ] ; then
             logger_options="${logger_options} -n ${host}"
