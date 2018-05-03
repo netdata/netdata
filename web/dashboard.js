@@ -6337,6 +6337,7 @@ var NETDATA = window.NETDATA || {};
             :false;
 
         state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
+        var drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
 
         state.tmp.dygraph_options = {
             colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
@@ -6400,7 +6401,7 @@ var NETDATA = window.NETDATA || {};
                                     ),
             stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
             stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
-            drawAxis:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true),
+            drawAxis:               drawAxis,
             axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
             axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
             axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
@@ -6424,7 +6425,7 @@ var NETDATA = window.NETDATA || {};
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
                     ticker: Dygraph.dateTicker,
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-xaxislabelwidth', 60),
-                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawxaxis', true),
+                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawxaxis', drawAxis),
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
                         return NETDATA.dateTime.xAxisTimeString(d);
@@ -6434,7 +6435,7 @@ var NETDATA = window.NETDATA || {};
                     logscale: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?true:undefined,
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
-                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', true),
+                    drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', drawAxis),
                     axisLabelFormatter: function (y) {
 
                         // unfortunately, we have to call this every single time
@@ -7012,6 +7013,8 @@ var NETDATA = window.NETDATA || {};
             state.tmp.dygraph_options.labelsSeparateLines = true;
             state.tmp.dygraph_options.rightGap = 0;
             state.tmp.dygraph_options.yRangePad = 1;
+            state.tmp.dygraph_options.axes.x.drawAxis = false;
+            state.tmp.dygraph_options.axes.y.drawAxis = false;
         }
 
         if(smooth === true) {
