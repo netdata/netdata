@@ -72,6 +72,7 @@ dist_pythonconfig_DATA = \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \
     python.d/traefik.conf \
+    python.d/unbound.conf \
     python.d/varnish.conf \
     python.d/web_log.conf \
     $(NULL)
