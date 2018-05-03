@@ -5,6 +5,7 @@
 config.h.in
 Makefile.in
 *~
+.*.swp
 *.old
 *.log
 *.pyc
