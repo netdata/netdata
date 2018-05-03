@@ -60,9 +60,11 @@ CHARTS = {
     'fd_open': {
         'options': [None, "File Descriptors", "descriptors", "resources", "puppet.fdopen", "line"],
         'lines': [
-            ["fd_max", 'max', "absolute", 1, 1, 'hidden'],
             ["fd_used", 'used', "absolute"],
-        ]
+        ],
+        'variables': [
+            ['fd_max'],
+        ],
     },
 }
 
