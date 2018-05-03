@@ -7,9 +7,9 @@ import socket
 try:
     import ssl
 except ImportError:
-    _SSL_SUPPORT = False
+    _TLS_SUPPORT = False
 else:
-    _SSL_SUPPORT = True
+    _TLS_SUPPORT = True
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -23,7 +23,7 @@ class SocketService(SimpleService):
         self.unix_socket = None
         self.dgram_socket = False
         self.request = ''
-        self.ssl = False
+        self.tls = False
         self.cert = None
         self.key = None
         self.__socket_config = None
@@ -66,15 +66,15 @@ class SocketService(SimpleService):
             self.__socket_config = None
             return False
 
-        if self.ssl:
+        if self.tls:
             try:
-                self.debug('Encapsulating socket with SSL')
+                self.debug('Encapsulating socket with TLS')
                 self._sock = ssl.wrap_socket(self._sock,
                                              keyfile=self.key,
                                              certfile=self.cert,
                                              server_side=False,
                                              cert_reqs=ssl.CERT_NONE)
-            except (socket.error, ssl.SSLError) as error:
+            except (socket.error, ssl.TLSError) as error:
                 self.error('Failed to wrap socket.')
                 self._disconnect()
                 self.__socket_config = None
@@ -83,7 +83,7 @@ class SocketService(SimpleService):
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             self._sock.connect(sa)
-        except (socket.error, ssl.SSLError) as error:
+        except (socket.error, ssl.TLSError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
                                                                                               port=sa[1],
                                                                                               error=error))
@@ -273,26 +273,26 @@ class SocketService(SimpleService):
             except (KeyError, TypeError):
                 self.debug('No port specified. Using: "{0}"'.format(self.port))
 
-            self.ssl = bool(self.configuration.get('ssl', self.ssl))
-            if self.ssl and not _SSL_SUPPORT:
-                self.warning('SSL requested but not SSL module found, disabling SSL support.')
-                self.ssl = False
-            if _SSL_SUPPORT and not self.ssl:
-                self.debug('No SSL preference specified, not using SSL.')
+            self.tls = bool(self.configuration.get('tls', self.tls))
+            if self.tls and not _TLS_SUPPORT:
+                self.warning('TLS requested but no TLS module found, disabling TLS support.')
+                self.tls = False
+            if _TLS_SUPPORT and not self.tls:
+                self.debug('No TLS preference specified, not using TLS.')
 
-            if self.ssl and _SSL_SUPPORT:
-                self.key = self.configuration.get('ssl_key')
-                self.cert = self.configuration.get('ssl_cert')
+            if self.tls and _TLS_SUPPORT:
+                self.key = self.configuration.get('tls_key_file')
+                self.cert = self.configuration.get('tls_cert_file')
                 if not self.cert:
                     # If there's not a valid certificate, clear the key too.
-                    self.debug('No valid SSL client certificate configuration found.')
+                    self.debug('No valid TLS client certificate configuration found.')
                     self.key = None
                     self.cert = None
                 elif not self.key:
                     # If a key isn't listed, the config may still be
                     # valid, because there may be a key attached to the
                     # certificate.
-                    self.notice('No SSL client key specified, assuming it\'s attached to the certificate.')
+                    self.notice('No TLS client key specified, assuming it\'s attached to the certificate.')
                     self.key = None
 
         try:

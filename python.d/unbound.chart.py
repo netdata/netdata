@@ -89,10 +89,10 @@ STAT_MAP = {
 
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
-        # The unbound control protocol is always SSL encapsulated
-        # unless it's used over a UNIX socket, so enable SSL _before_
+        # The unbound control protocol is always TLS encapsulated
+        # unless it's used over a UNIX socket, so enable TLS _before_
         # doing the normal SocketService initialization.
-        configuration['ssl'] = True
+        configuration['tls'] = True
         self.port = 8935
         SocketService.__init__(self, configuration, name)
         self.ext = self.configuration.get('extended', None)
