@@ -19,6 +19,8 @@ priority = 60000
 # very long clojure-based service startup time
 retries = 180
 
+MB = 1048576
+CPU_SCALE = 1000
 ORDER = [
     'jvm_heap',
     'jvm_nonheap',
@@ -29,26 +31,28 @@ CHARTS = {
     'jvm_heap': {
         'options': [None, "JVM Heap", "MB", "resources", "puppet.jvm", "area"],
         'lines': [
-            ["jvm_heap_max", 'max', "absolute", 1, 1048576, 'hidden'],
-            ["jvm_heap_committed", 'committed', "absolute", 1, 1048576],
-            ["jvm_heap_used", 'used', "absolute", 1, 1048576],
-            ["jvm_heap_init", 'initial', "absolute", 1, 1048576, 'hidden'],
-        ]
+            ["jvm_heap_committed", 'committed', "absolute", 1, MB],
+            ["jvm_heap_used", 'used', "absolute", 1, MB],
+        ],
+        'variables': [
+            ['jvm_heap_max', 'jvm_heap_init'],
+        ],
     },
     'jvm_nonheap': {
         'options': [None, "JVM Non-Heap", "MB", "resources", "puppet.jvm", "area"],
         'lines': [
-            ["jvm_nonheap_max", 'max', "absolute", 1, 1048576, 'hidden'],
-            ["jvm_nonheap_committed", 'committed', "absolute", 1, 1048576],
-            ["jvm_nonheap_used", 'used', "absolute", 1, 1048576],
-            ["jvm_nonheap_init", 'initial', "absolute", 1, 1048576, 'hidden'],
-        ]
+            ["jvm_nonheap_committed", 'committed', "absolute", 1, MB],
+            ["jvm_nonheap_used", 'used', "absolute", 1, MB],
+        ],
+        'variables': [
+            ['jvm_heap_max', 'jvm_heap_init'],
+        ],
     },
     'cpu': {
-        'options': [None, "CPU usage", "descriptors", "resources", "puppet.cpu", "stacked"],
+        'options': [None, "CPU usage", "percentage", "resources", "puppet.cpu", "stacked"],
         'lines': [
-            ["cpu_time", 'execution', "absolute", 1, 1000],
-            ["gc_time", 'GC', "absolute", 1, 1000],
+            ["cpu_time", 'execution', "absolute", 1, CPU_SCALE],
+            ["gc_time", 'GC', "absolute", 1, CPU_SCALE],
         ]
     },
     'fd_open': {
@@ -105,8 +109,8 @@ class Service(UrlService):
             data['fd_max'] = fd_open['max']
             data['fd_used'] = fd_open['used']
 
-            data['cpu_time'] = int(jvm_metrics['cpu-usage'] * 1000)
-            data['gc_time'] = int(jvm_metrics['gc-cpu-usage'] * 1000)
+            data['cpu_time'] = int(jvm_metrics['cpu-usage'] * CPU_SCALE)
+            data['gc_time'] = int(jvm_metrics['gc-cpu-usage'] * CPU_SCALE)
         except KeyError:
             pass
 
