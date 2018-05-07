@@ -335,12 +335,13 @@ static void web_client_release(struct web_client *w) {
 
 static void web_client_initialize_connection(struct web_client *w) {
     int flag = 1;
-    if(setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+
+    if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
+        debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
-    if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+    if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
+        debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
 
