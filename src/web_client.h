@@ -70,6 +70,7 @@ typedef enum web_client_flags {
 #define web_client_set_tcp(w) web_client_flag_set(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 #define web_client_set_unix(w) web_client_flag_set(w, WEB_CLIENT_FLAG_UNIX_CLIENT)
 #define web_client_check_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_UNIX_CLIENT)
+#define web_client_check_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 
 #define web_client_is_corkable(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 
