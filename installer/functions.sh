@@ -493,16 +493,6 @@ install_non_systemd_init() {
         then
         echo >&2 "file '/etc/init.d/netdata' already exists."
         return 0
-    elif [[ "${key}" =~ ^MacOS.* ]]
-        then
-        if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]
-            then
-            echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
-        else
-            echo >&2 "Installing MacOS X plist file..."
-            run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist && \
-            run launchctl load /Library/LaunchDaemons/com.github.netdata.plist
-        fi
     else
         echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
     fi
@@ -521,8 +511,16 @@ install_netdata_service() {
         if [ "${uname}" = "Darwin" ]
         then
 
-            echo >&2 "hm... I don't know how to install a startup script for MacOS X"
-            return 1
+            if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]
+                then
+                echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
+                return 0
+            else
+                echo >&2 "Installing MacOS X plist file..."
+                run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist && \
+                run launchctl load /Library/LaunchDaemons/com.github.netdata.plist && \
+                return 0
+            fi
 
         elif [ "${uname}" = "FreeBSD" ]
         then
