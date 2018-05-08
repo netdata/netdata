@@ -511,8 +511,16 @@ install_netdata_service() {
         if [ "${uname}" = "Darwin" ]
         then
 
-            echo >&2 "hm... I don't know how to install a startup script for MacOS X"
-            return 1
+            if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]
+                then
+                echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
+                return 0
+            else
+                echo >&2 "Installing MacOS X plist file..."
+                run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist && \
+                run launchctl load /Library/LaunchDaemons/com.github.netdata.plist && \
+                return 0
+            fi
 
         elif [ "${uname}" = "FreeBSD" ]
         then
