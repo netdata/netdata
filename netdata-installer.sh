@@ -137,6 +137,11 @@ Valid <installer options> are:
         Enable/disable Link-Time-Optimization
         Default: enabled
 
+   --disable-x86-sse
+
+        Disable SSE instructions
+        Default: enabled
+
    --zlib-is-really-here
    --libs-are-really-here
 
@@ -251,6 +256,10 @@ do
     elif [ "$1" = "--disable-lto" ]
         then
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto"
+        shift 1
+    elif [ "$1" = "--disable-x86-sse" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"
         shift 1
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
