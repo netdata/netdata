@@ -216,7 +216,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_received = rrddim_add(st, "SctpInSCTPPacks",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "SctpOutSCTPPacks", "sent",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "SctpOutSCTPPacks", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
