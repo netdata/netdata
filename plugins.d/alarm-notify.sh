@@ -27,6 +27,7 @@
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
 #  - custom notifications by @ktsaou
+#  - syslog messages by @Ferroin
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -239,6 +240,7 @@ SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
 SEND_IRC="YES"
+SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
 # slack configs
@@ -311,6 +313,10 @@ KAFKA_SENDER_IP=
 PD_SERVICE_KEY=
 DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
+
+# syslog configs
+SYSLOG_FACILITY=
+declare -A role_recipients_syslog=()
 
 # custom configs
 DEFAULT_RECIPIENT_CUSTOM=
@@ -421,6 +427,7 @@ declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
 declare -A arr_irc=()
+declare -A arr_syslog=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -533,13 +540,21 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
-    
+
     # irc
     a="${role_recipients_irc[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
+    done
+
+    # syslog
+    a="${role_recipients_syslog[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality syslog "${r}" && arr_syslog[${r/|*/}]="1"
     done
 
     # custom
@@ -616,6 +631,10 @@ done
 # build the list of irc recipients (channels)
 to_irc="${!arr_irc[*]}"
 [ -z "${to_irc}" ] && SEND_IRC="NO"
+
+# build the list of syslog recipients (facilities, servers, and prefixes)
+to_syslog="${!arr_syslog[*]}"
+[ -z "${to_syslog}" ] && SEND_SYSLOG="NO"
 
 # -----------------------------------------------------------------------------
 # verify the delivery methods supported
@@ -720,6 +739,17 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
     fi
 fi
 
+# if we need logger, check for the logger command
+if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
+    then
+    logger="$(which logger 2>/dev/null || command -v logger 2>/dev/null)"
+    if [ -z "${logger}" ]
+        then
+        debug "Cannot find logger command in the system path. Disabling syslog notifications."
+        SEND_SYSLOG="NO"
+    fi
+fi
+
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
@@ -737,6 +767,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
+    -a "${SEND_SYSLOG}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1514,6 +1545,78 @@ send_irc() {
     return 1
 }
 
+# -----------------------------------------------------------------------------
+# syslog sender
+
+send_syslog() {
+    local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
+    local priority='' message='' host='' port='' prefix=''
+    local temp1='' temp2=''
+
+    [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
+
+    if [ "${status}" -eq "CRITICAL" ] ; then
+        level='crit'
+    elif [ "${status}" -eq "WARNING" ] ; then
+        level='warning'
+    fi
+
+    for target in ${targets} ; do
+        priority="${facility}.${level}"
+        message=''
+        host=''
+        port=''
+        prefix=''
+        temp1=''
+        temp2=''
+
+        prefix=$(echo ${target} | cut -d '/' -f 2)
+        temp1=$(echo ${target} | cut -d '/' -f 1)
+
+        if [ ${prefix} != ${temp1} ] ; then
+            if (echo ${temp1} | grep -q '@' ) ; then
+                temp2=$(echo ${temp1} | cut -d '@' -f 1)
+                host=$(echo ${temp1} | cut -d '@' -f 2)
+
+                if [ ${temp2} != ${host} ] ; then
+                    priority=${temp2}
+                fi
+
+                port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+
+                if ( echo ${host} | grep -E -q '\[.*\]' ) ; then
+                    if ( echo ${port} | grep -q ']' ) ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+                    fi
+                else
+                    if [ ${port} = ${host} ] ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | cut -d ':' -f 1)
+                    fi
+                fi
+            else
+                priority=${temp1}
+            fi
+        fi
+
+        message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+        if [ ${host} ] ; then
+            logger_options="${logger_options} -n ${host}"
+            if [ ${port} ] ; then
+                logger_options="${logger_options} -P ${port}"
+            fi
+        fi
+
+        ${logger} -p ${priority} ${logger_options} "${message}"
+    done
+
+    return $?
+}
+
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
@@ -1773,6 +1876,14 @@ SENT_HIPCHAT=$?
 
 
 # -----------------------------------------------------------------------------
+# send the syslog message
+
+send_syslog ${to_syslog}
+
+SENT_SYSLOG=$?
+
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -1913,6 +2024,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
+    -o ${SENT_SYSLOG}       -eq 0 \
     ]
     then
     # we did send something
