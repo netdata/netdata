@@ -61,6 +61,7 @@ dist_python_DATA = \
     smartd_log.chart.py \
     tomcat.chart.py \
     traefik.chart.py \
+    unbound.chart.py \
     varnish.chart.py \
     web_log.chart.py \
     $(NULL)
