@@ -262,7 +262,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "kilobits/s"
                             , "proc"
                             , "net/netstat"
-                            , 501
+                            , NETDATA_CHART_PRIO_SYSTEM_IPV4
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -297,7 +297,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 4000
+                            , NETDATA_CHART_PRIO_IPV4_ERRORS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -336,7 +336,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "kilobits/s"
                             , "proc"
                             , "net/netstat"
-                            , 9000
+                            , NETDATA_CHART_PRIO_IPV4_MCAST
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -374,7 +374,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "kilobits/s"
                             , "proc"
                             , "net/netstat"
-                            , 8000
+                            , NETDATA_CHART_PRIO_IPV4_BCAST
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -412,7 +412,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 8600
+                            , NETDATA_CHART_PRIO_IPV4_MCAST + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -449,7 +449,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 8500
+                            , NETDATA_CHART_PRIO_IPV4_BCAST + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -487,7 +487,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 8700
+                            , NETDATA_CHART_PRIO_IPV4_ECN
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -539,7 +539,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "events/s"
                             , "proc"
                             , "net/netstat"
-                            , 3000
+                            , NETDATA_CHART_PRIO_IPV4_TCP_MEM
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -573,7 +573,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "connections/s"
                             , "proc"
                             , "net/netstat"
-                            , 3010
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -617,7 +617,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 3020
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 20
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -658,7 +658,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 3050
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 50
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -699,7 +699,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 3100
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 60
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -738,7 +738,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
-                            , 3015
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 15
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
