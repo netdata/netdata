@@ -50,6 +50,7 @@ dist_python_DATA = \
     postfix.chart.py \
     postgres.chart.py \
     powerdns.chart.py \
+    puppet.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
     retroshare.chart.py \
@@ -61,6 +62,7 @@ dist_python_DATA = \
     smartd_log.chart.py \
     tomcat.chart.py \
     traefik.chart.py \
+    unbound.chart.py \
     varnish.chart.py \
     web_log.chart.py \
     $(NULL)

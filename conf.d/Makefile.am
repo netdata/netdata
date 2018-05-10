@@ -62,6 +62,7 @@ dist_pythonconfig_DATA = \
     python.d/postfix.conf \
     python.d/postgres.conf \
     python.d/powerdns.conf \
+    python.d/puppet.conf \
     python.d/rabbitmq.conf \
     python.d/redis.conf \
     python.d/retroshare.conf \
@@ -73,6 +74,7 @@ dist_pythonconfig_DATA = \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \
     python.d/traefik.conf \
+    python.d/unbound.conf \
     python.d/varnish.conf \
     python.d/web_log.conf \
     $(NULL)

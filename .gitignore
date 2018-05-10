@@ -5,6 +5,7 @@
 config.h.in
 Makefile.in
 *~
+.*.swp
 *.old
 *.log
 *.pyc
@@ -71,6 +72,7 @@ system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
 system/netdata.service
+system/netdata.plist
 system/netdata-freebsd
 
 # installer generated files

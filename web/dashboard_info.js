@@ -49,6 +49,12 @@ netdataDashboard.menu = {
         info: 'Metrics for the IPv6 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv6" target="_blank">Internet Protocol version 6 (IPv6)</a> is the most recent version of the Internet Protocol (IP), the communications protocol that provides an identification and location system for computers on networks and routes traffic across the Internet. IPv6 was developed by the Internet Engineering Task Force (IETF) to deal with the long-anticipated problem of IPv4 address exhaustion. IPv6 is intended to replace IPv4.'
     },
 
+    'sctp': {
+        title: 'SCTP Networking',
+        icon: '<i class="fas fa-cloud"></i>',
+        info: '<a href="https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol" target="_blank">Stream Control Transmission Protocol (SCTP)</a> is a computer network protocol which operates at the transport layer and serves a role similar to the popular protocols TCP and UDP. SCTP provides some of the features of both UDP and TCP: it is message-oriented like UDP and ensures reliable, in-sequence transport of messages with congestion control like TCP. It differs from those protocols by providing multi-homing and redundant paths to increase resilience and reliability.'
+    },
+
     'ipvs': {
         title: 'IP Virtual Server',
         icon: '<i class="fas fa-eye"></i>',
@@ -365,6 +371,11 @@ netdataDashboard.menu = {
         title: 'Spigot MC',
         icon: '<i class="fas fa-eye"></i>',
         info: 'Provides basic performance statistics for the <b><a href=""https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+
+    'unbound': {
+        title: 'Unbound',
+        icon: '<i class="fas fa-tag"></i>',
+        info: undefined
     }
 };
 
@@ -472,7 +483,7 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
         }
@@ -482,7 +493,7 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
@@ -2078,6 +2089,21 @@ netdataDashboard.context = {
 
     'spigotmc.users': {
         info: 'THe number of currently connect users on the monitored Spigot server.'
+
+    'unbound.queries': {
+        info: 'Shows the number of queries being processed of each type.  Note that <code>Recursive</code> queries are also accounted as cache misses.'
+    },
+
+    'unbound.reqlist': {
+        info: 'Shows various stats about Unbound\'s internal request list.'
+    },
+
+    'unbound.recursion': {
+        info: 'Average and median time to complete recursive name resolution.'
+    },
+
+    'unbound.cache': {
+        info: 'The number of items in each of the various caches.'
     }
 
     // ------------------------------------------------------------------------
