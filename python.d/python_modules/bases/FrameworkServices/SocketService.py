@@ -292,7 +292,7 @@ class SocketService(SimpleService):
                     # If a key isn't listed, the config may still be
                     # valid, because there may be a key attached to the
                     # certificate.
-                    self.notice('No TLS client key specified, assuming it\'s attached to the certificate.')
+                    self.info('No TLS client key specified, assuming it\'s attached to the certificate.')
                     self.key = None
 
         try:
