@@ -105,20 +105,20 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
     static ssize_t last_max_connections = 0;
 
     if(unlikely(!arl_ip)) {
-        do_ip_packets       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 packets", 1);
-        do_ip_fragsout      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 fragments sent", 1);
-        do_ip_fragsin       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", 1);
-        do_ip_errors        = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 errors", 1);
-        do_tcp_sockets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP connections", 1);
-        do_tcp_packets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP packets", 1);
-        do_tcp_errors       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP errors", 1);
-        do_tcp_opens        = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP opens", 1);
-        do_tcp_handshake    = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", 1);
-        do_udp_packets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 UDP packets", 1);
-        do_udp_errors       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 UDP errors", 1);
-        do_icmp_packets     = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 ICMP packets", 1);
-        do_icmpmsg          = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", 1);
-        do_udplite_packets  = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", 1);
+        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_sockets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP connections", CONFIG_BOOLEAN_AUTO);
+        do_tcp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP packets", CONFIG_BOOLEAN_AUTO);
+        do_tcp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP errors", CONFIG_BOOLEAN_AUTO);
+        do_tcp_opens        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP opens", CONFIG_BOOLEAN_AUTO);
+        do_tcp_handshake    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp_packets     = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP packets", CONFIG_BOOLEAN_AUTO);
+        do_icmpmsg          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 ICMP messages", CONFIG_BOOLEAN_AUTO);
+        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 UDPLite packets", CONFIG_BOOLEAN_AUTO);
 
         hash_ip = simple_hash("Ip");
         hash_tcp = simple_hash("Tcp");
@@ -256,7 +256,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_packets) {
+            if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_OutRequests || snmp_root.ip_InReceives || snmp_root.ip_ForwDatagrams || snmp_root.ip_InDelivers))) {
+                do_ip_packets = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_InReceives = NULL,
                               *rd_OutRequests = NULL,
@@ -274,7 +276,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2450
+                            , NETDATA_CHART_PRIO_IPV4_PACKETS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -295,7 +297,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_fragsout) {
+            if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_FragOKs || snmp_root.ip_FragFails || snmp_root.ip_FragCreates))) {
+                do_ip_fragsout = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_FragOKs = NULL,
                               *rd_FragFails = NULL,
@@ -312,7 +316,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 3020
+                            , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -332,7 +336,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_fragsin) {
+            if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_ReasmOKs || snmp_root.ip_ReasmFails || snmp_root.ip_ReasmReqds))) {
+                do_ip_fragsin = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ReasmOKs = NULL,
                               *rd_ReasmFails = NULL,
@@ -349,7 +355,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 3030
+                            , NETDATA_CHART_PRIO_IPV4_FRAGMENTS + 1
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -369,7 +375,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_errors) {
+            if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_InDiscards || snmp_root.ip_OutDiscards || snmp_root.ip_InHdrErrors || snmp_root.ip_InAddrErrors || snmp_root.ip_InUnknownProtos || snmp_root.ip_OutNoRoutes))) {
+                do_ip_errors = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_InDiscards = NULL,
                               *rd_OutDiscards = NULL,
@@ -389,7 +397,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2470
+                            , NETDATA_CHART_PRIO_IPV4_ERRORS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -437,7 +445,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_icmp_packets) {
+            if(do_icmp_packets == CONFIG_BOOLEAN_YES || (do_icmp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.icmp_InMsgs || snmp_root.icmp_OutMsgs || snmp_root.icmp_InErrors || snmp_root.icmp_OutErrors || snmp_root.icmp_InCsumErrors))) {
+                do_icmp_packets = CONFIG_BOOLEAN_YES;
+
                 {
                     static RRDSET *st_packets = NULL;
                     static RRDDIM *rd_InMsgs = NULL,
@@ -454,7 +464,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , "packets/s"
                                 , "proc"
                                 , "net/snmp"
-                                , 2602
+                                , NETDATA_CHART_PRIO_IPV4_ICMP
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
@@ -487,7 +497,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , "packets/s"
                                 , "proc"
                                 , "net/snmp"
-                                , 2603
+                                , NETDATA_CHART_PRIO_IPV4_ICMP + 1
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
@@ -528,7 +538,30 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_icmpmsg) {
+            if(do_icmpmsg == CONFIG_BOOLEAN_YES || (do_icmpmsg == CONFIG_BOOLEAN_AUTO && (
+                    snmp_root.icmpmsg_InEchoReps
+                    || snmp_root.icmpmsg_OutEchoReps
+                    || snmp_root.icmpmsg_InDestUnreachs
+                    || snmp_root.icmpmsg_OutDestUnreachs
+                    || snmp_root.icmpmsg_InRedirects
+                    || snmp_root.icmpmsg_OutRedirects
+                    || snmp_root.icmpmsg_InEchos
+                    || snmp_root.icmpmsg_OutEchos
+                    || snmp_root.icmpmsg_InRouterAdvert
+                    || snmp_root.icmpmsg_OutRouterAdvert
+                    || snmp_root.icmpmsg_InRouterSelect
+                    || snmp_root.icmpmsg_OutRouterSelect
+                    || snmp_root.icmpmsg_InTimeExcds
+                    || snmp_root.icmpmsg_OutTimeExcds
+                    || snmp_root.icmpmsg_InParmProbs
+                    || snmp_root.icmpmsg_OutParmProbs
+                    || snmp_root.icmpmsg_InTimestamps
+                    || snmp_root.icmpmsg_OutTimestamps
+                    || snmp_root.icmpmsg_InTimestampReps
+                    || snmp_root.icmpmsg_OutTimestampReps
+                    ))) {
+                do_icmpmsg = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st                  = NULL;
                 static RRDDIM *rd_InEchoReps       = NULL,
                               *rd_OutEchoReps      = NULL,
@@ -562,7 +595,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2604
+                            , NETDATA_CHART_PRIO_IPV4_ICMP + 2
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -644,7 +677,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-            if(do_tcp_sockets) {
+            if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO && snmp_root.tcp_CurrEstab)) {
+                do_tcp_sockets = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_CurrEstab = NULL;
 
@@ -659,7 +694,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "active connections"
                             , "proc"
                             , "net/snmp"
-                            , 2501
+                            , NETDATA_CHART_PRIO_IPV4_TCP
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -674,7 +709,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_packets) {
+            if(do_tcp_packets == CONFIG_BOOLEAN_YES || (do_tcp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_InSegs || snmp_root.tcp_OutSegs))) {
+                do_tcp_packets = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_InSegs = NULL,
                               *rd_OutSegs = NULL;
@@ -690,7 +727,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2510
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -707,7 +744,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_errors) {
+            if(do_tcp_errors == CONFIG_BOOLEAN_YES || (do_tcp_errors == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_InErrs || snmp_root.tcp_InCsumErrors || snmp_root.tcp_RetransSegs))) {
+                do_tcp_errors = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_InErrs = NULL,
                               *rd_InCsumErrors = NULL,
@@ -724,7 +763,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2525
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 20
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -744,7 +783,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_opens) {
+            if(do_tcp_opens == CONFIG_BOOLEAN_YES || (do_tcp_opens == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_ActiveOpens || snmp_root.tcp_PassiveOpens))) {
+                do_tcp_opens = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_ActiveOpens = NULL,
                               *rd_PassiveOpens = NULL;
@@ -760,7 +801,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "connections/s"
                             , "proc"
                             , "net/snmp"
-                            , 2502
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 5
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -778,7 +819,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_handshake) {
+            if(do_tcp_handshake == CONFIG_BOOLEAN_YES || (do_tcp_handshake == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_EstabResets || snmp_root.tcp_OutRsts || snmp_root.tcp_AttemptFails))) {
+                do_tcp_handshake = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_EstabResets = NULL,
                               *rd_OutRsts = NULL,
@@ -796,7 +839,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "events/s"
                             , "proc"
                             , "net/snmp"
-                            , 2530
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 30
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -839,7 +882,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
-            if(do_udp_packets) {
+            if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.udp_InDatagrams || snmp_root.udp_OutDatagrams))) {
+                do_udp_packets = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_InDatagrams = NULL,
                               *rd_OutDatagrams = NULL;
@@ -855,7 +900,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2602
+                            , NETDATA_CHART_PRIO_IPV4_UDP
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -872,7 +917,16 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_udp_errors) {
+            if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO && (
+                    snmp_root.udp_InErrors
+                    || snmp_root.udp_NoPorts
+                    || snmp_root.udp_RcvbufErrors
+                    || snmp_root.udp_SndbufErrors
+                    || snmp_root.udp_InCsumErrors
+                    || snmp_root.udp_IgnoredMulti
+                    ))) {
+                do_udp_errors = CONFIG_BOOLEAN_YES;
+
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_RcvbufErrors = NULL,
                               *rd_SndbufErrors = NULL,
@@ -892,7 +946,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "events/s"
                             , "proc"
                             , "net/snmp"
-                            , 2701
+                            , NETDATA_CHART_PRIO_IPV4_UDP + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -938,7 +992,18 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_udplite_packets) {
+            if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (
+                    snmp_root.udplite_InDatagrams
+                    || snmp_root.udplite_OutDatagrams
+                    || snmp_root.udplite_NoPorts
+                    || snmp_root.udplite_InErrors
+                    || snmp_root.udplite_InCsumErrors
+                    || snmp_root.udplite_RcvbufErrors
+                    || snmp_root.udplite_SndbufErrors
+                    || snmp_root.udplite_IgnoredMulti
+                    ))) {
+                do_udplite_packets = CONFIG_BOOLEAN_YES;
+
                 {
                     static RRDSET *st = NULL;
                     static RRDDIM *rd_InDatagrams = NULL,
@@ -955,7 +1020,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , "packets/s"
                                 , "proc"
                                 , "net/snmp"
-                                , 2603
+                                , NETDATA_CHART_PRIO_IPV4_UDPLITE
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
@@ -990,7 +1055,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , "packets/s"
                                 , "proc"
                                 , "net/snmp"
-                                , 2604
+                                , NETDATA_CHART_PRIO_IPV4_UDPLITE + 10
                                 , update_every
                                 , RRDSET_TYPE_LINE);
 
