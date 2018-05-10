@@ -365,6 +365,12 @@ netdataDashboard.menu = {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
         info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+    },
+
+    'unbound': {
+        title: 'Unbound',
+        icon: '<i class="fas fa-tag"></i>',
+        info: undefined
     }
 };
 
@@ -2070,6 +2076,22 @@ netdataDashboard.context = {
 
     'ntpd.peer_precision': {
         height: 0.2
+    },
+
+    'unbound.queries': {
+        info: 'Shows the number of queries being processed of each type.  Note that <code>Recursive</code> queries are also accounted as cache misses.'
+    },
+
+    'unbound.reqlist': {
+        info: 'Shows various stats about Unbound\'s internal request list.'
+    },
+
+    'unbound.recursion': {
+        info: 'Average and median time to complete recursive name resolution.'
+    },
+
+    'unbound.cache': {
+        info: 'The number of items in each of the various caches.'
     }
 
     // ------------------------------------------------------------------------
