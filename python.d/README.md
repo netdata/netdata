@@ -1745,7 +1745,7 @@ Module monitors one or more postgres servers.
 
 **Requirements:**
 
- * `python-psycopg2` package. You have to install to manually.
+ * `python-psycopg2` package. You have to install it manually.
 
 Following charts are drawn:
 
@@ -1844,6 +1844,55 @@ local:
   header   :
     X-API-Key: 'change_me'
 ```
+
+---
+
+# puppet
+
+Monitor status of Puppet Server and Puppet DB.
+
+Following charts are drawn:
+
+1. **JVM Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+2. **JVM Non-Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+3. **CPU Usage**
+ * execution
+ * GC (taken by garbage collection)
+4. **File Descriptors**
+ * max
+ * used
+
+
+### configuration
+
+```yaml
+puppetdb:
+    url: 'https://fqdn.example.com:8081'
+    tls_cert_file: /path/to/client.crt
+    tls_key_file: /path/to/client.key
+    autodetection_retry: 1
+    retries: 3600
+
+puppetserver:
+    url: 'https://fqdn.example.com:8140'
+    autodetection_retry: 1
+    retries: 3600
+```
+
+When no configuration is given then `https://fqdn.example.com:8140` is
+tried without any retries.
+
+### notes
+
+* Exact Fully Qualified Domain Name of the node should be used.
+* Usually Puppet Server/DB startup time is VERY long. So, there should
+  be quite reasonable retry count.
+* Secure PuppetDB config may require client certificate. Not applies
+  to default PuppetDB configuration though.
 
 ---
 
@@ -2247,6 +2296,77 @@ local:
 ```
 
 Without configuration, module attempts to connect to `http://localhost:8080/health`.
+
+---
+
+# Unbound
+
+Monitoring uses the remote control interface to fetch statistics.
+
+Provides the following charts:
+
+1. **Queries Processed**
+ * Ratelimited
+ * Cache Misses
+ * Cache Hits
+ * Expired
+ * Prefetched
+ * Recursive
+
+2. **Request List**
+ * Average Size
+ * Max Size
+ * Overwritten Requests
+ * Overruns
+ * Current Size
+ * User Requests
+
+3. **Recursion Timings**
+ * Average recursion processing time
+ * Median recursion processing time
+
+If extended stats are enabled, also provides:
+
+4. **Cache Sizes**
+ * Message Cache
+ * RRset Cache
+ * Infra Cache
+ * DNSSEC Key Cache
+ * DNSCrypt Shared Secret Cache
+ * DNSCrypt Nonce Cache
+
+### configuration
+
+Unbound must be manually configured to enable the remote-control protocol.
+Check the Unbound documentation for info on how to do this.  Additionally,
+if you want to take advantage of the autodetection this plugin offers,
+you will need to make sure your `unbound.conf` file only uses spaces for
+indentation (the default config shipped by most distributions uses tabs
+instead of spaces).
+
+Once you have the Unbound control protocol enabled, you need to make sure
+that either the certificate and key are readable by Netdata (if you're
+using the regular control interface), or that the socket is accessible
+to Netdata (if you're using a UNIX socket for the contorl interface).
+
+By default, for the local system, every thing can be auto-detected
+assumign Unbound is configured correctly and has been told to listen
+on the loopback interface or a UNIX socket.  This is done by looking
+up info in the Unbound config file specified by the `ubconf` key.
+
+To enable extended stats for a given job, add `extended: yes` to the
+definition.
+
+A basic local configuration with extended statistics looks like this:
+
+```yaml
+local:
+    ubconf: /etc/unbound/unbound.conf
+    extended: yes
+```
+
+While it's a bit more complicated to set up correctly, it is recommended
+that you use a UNIX socket as it provides far better performance.
 
 ---
 

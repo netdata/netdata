@@ -144,6 +144,8 @@
 // - for each FAMILY  +100
 // - for each CHART   +10
 
+#define NETDATA_CHART_PRIO_SYSTEM_IPV4             501
+
 // Memory Section - 1xxx
 #define NETDATA_CHART_PRIO_MEM_SYSTEM              1000
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE    1010
@@ -155,6 +157,46 @@
 #define NETDATA_CHART_PRIO_MEM_KSM                 1300
 #define NETDATA_CHART_PRIO_MEM_NUMA                1400
 #define NETDATA_CHART_PRIO_MEM_HW                  1500
+
+
+// IPv4
+
+#define NETDATA_CHART_PRIO_IPV4                    3000
+#define NETDATA_CHART_PRIO_IPV4_SOCKETS            3000
+#define NETDATA_CHART_PRIO_IPV4_PACKETS            3050
+#define NETDATA_CHART_PRIO_IPV4_ERRORS             3100
+
+#define NETDATA_CHART_PRIO_IPV4_ICMP               3150
+
+#define NETDATA_CHART_PRIO_IPV4_TCP                3200
+#define NETDATA_CHART_PRIO_IPV4_TCP_MEM            3290
+
+#define NETDATA_CHART_PRIO_IPV4_UDP                3300
+#define NETDATA_CHART_PRIO_IPV4_UDP_MEM            3390
+
+#define NETDATA_CHART_PRIO_IPV4_UDPLITE            3400
+
+#define NETDATA_CHART_PRIO_IPV4_RAW                3450
+
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS          3460
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM      3470
+
+#define NETDATA_CHART_PRIO_IPV4_BCAST              3500
+#define NETDATA_CHART_PRIO_IPV4_MCAST              3600
+#define NETDATA_CHART_PRIO_IPV4_ECN                3700
+
+// IPv6
+
+#define NETDATA_CHART_PRIO_IPV6                    3500
+
+// SCTP
+
+#define NETDATA_CHART_PRIO_SCTP                    3600
+
+// Netfilter
+
+#define NETDATA_CHART_PRIO_NETFILTER               3700
+#define NETDATA_CHART_PRIO_SYNPROXY                3750
 
 
 // ----------------------------------------------------------------------------

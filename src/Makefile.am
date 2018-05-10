@@ -194,6 +194,7 @@ netdata_SOURCES += \
 	proc_net_rpc_nfsd.c \
 	proc_net_snmp.c \
 	proc_net_snmp6.c \
+	proc_net_sctp_snmp.c \
 	proc_net_sockstat.c \
 	proc_net_sockstat6.c \
 	proc_net_softnet_stat.c \
