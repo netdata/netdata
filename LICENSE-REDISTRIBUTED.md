@@ -192,3 +192,10 @@ connectivity is not available.
 
     Copyright (c) 2010-2015 Benjamin Peterson
     [MIT License](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+
+
+- [mcrcon](https://github.com/barneygale/MCRcon)
+
+    Copyright (C) 2015 Barnaby Gale
+    [MIT License](https://raw.githubusercontent.com/barneygale/MCRcon/master/COPYING.txt)
+
