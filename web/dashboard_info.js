@@ -370,8 +370,8 @@ netdataDashboard.menu = {
     'spigotmc': {
         title: 'Spigot MC',
         icon: '<i class="fas fa-eye"></i>',
-        info: 'Provides basic performance statistics for the <b><a href=""https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
-
+        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+    },
     'unbound': {
         title: 'Unbound',
         icon: '<i class="fas fa-tag"></i>',
@@ -2089,9 +2089,10 @@ netdataDashboard.context = {
 
     'spigotmc.users': {
         info: 'THe number of currently connect users on the monitored Spigot server.'
+    },
 
     'unbound.queries': {
-        info: 'Shows the number of queries being processed of each type.  Note that <code>Recursive</code> queries are also accounted as cache misses.'
+        info: 'Shows the number of queries being processed of each type. Note that <code>Recursive</code> queries are also accounted as cache misses.'
     },
 
     'unbound.reqlist': {
