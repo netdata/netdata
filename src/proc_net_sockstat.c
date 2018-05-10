@@ -231,7 +231,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2400
+                    , NETDATA_CHART_PRIO_IPV4_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -266,7 +266,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2500
+                    , NETDATA_CHART_PRIO_IPV4_TCP + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -304,7 +304,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 4000
+                    , NETDATA_CHART_PRIO_IPV4_TCP_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -336,7 +336,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2600
+                    , NETDATA_CHART_PRIO_IPV4_UDP
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -368,7 +368,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 2603
+                    , NETDATA_CHART_PRIO_IPV4_UDP_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -400,7 +400,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2602
+                    , NETDATA_CHART_PRIO_IPV4_UDPLITE
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -432,7 +432,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 3010
+                    , NETDATA_CHART_PRIO_IPV4_RAW
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -464,7 +464,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "fragments"
                     , "proc"
                     , "net/sockstat"
-                    , 3010
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -496,7 +496,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 3020
+                    , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
