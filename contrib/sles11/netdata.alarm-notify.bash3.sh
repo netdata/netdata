@@ -182,7 +182,7 @@ non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
 units="${17}"              # the units of the value
 info="${18}"               # a short description of the alarm
 value_string="${19}"       # friendly value (with units)
-old_value_string="${20}"   # friendly old value (with units)
+#old_value_string="${20}"   # friendly old value (with units)
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -1095,7 +1095,7 @@ send_hipchat() {
     then
         # A label to be shown in addition to the sender's name
         # Valid length range: 0 - 64. 
-        sender="netdata"
+        #sender="netdata"
 
         # Valid values: html, text.
         # Defaults to 'html'.
