@@ -163,7 +163,10 @@
 
 #define NETDATA_CHART_PRIO_IPV4                    3000
 #define NETDATA_CHART_PRIO_IPV4_SOCKETS            3000
-#define NETDATA_CHART_PRIO_IPV4_ERRORS             3120
+#define NETDATA_CHART_PRIO_IPV4_PACKETS            3050
+#define NETDATA_CHART_PRIO_IPV4_ERRORS             3100
+
+#define NETDATA_CHART_PRIO_IPV4_ICMP               3150
 
 #define NETDATA_CHART_PRIO_IPV4_TCP                3200
 #define NETDATA_CHART_PRIO_IPV4_TCP_MEM            3290
