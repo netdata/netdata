@@ -319,6 +319,10 @@ This is a list of what it currently monitors:
 - **ceph**<br/>
   OSD usage, Pool usage, number of objects, etc.
 
+- **Neo4j Graph Database** (http://www.neo4j.com)<br/>
+  Metrics: Total number of nodes, number of nodes for top 5 labels and relations.
+
+
 And you can extend it, by writing plugins that collect data from any source, using any computer language.
 
 ---

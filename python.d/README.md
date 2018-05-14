@@ -2504,3 +2504,29 @@ apache_log:
 Module has preconfigured jobs for nginx, apache and gunicorn on various distros.
 
 ---
+
+# neo
+
+Displays key metrics for the Neo4j graph database (www.neo4j.com) 
+   * Total number of nodes
+   * number of nodes for the top5 labels
+   * number of nodes for the top5 relations
+
+Requires the neo4j-module (JS driver) to access the wanted server.
+By default, listens to Neo4j on localhost, accessible with neo4j/password credentials 
+
+## configuration   
+See the neo.conf file to change the settings
+```
+neo:
+    name : 'neo'
+    host : 'localhost'
+    port : '7687' # port where Bolt protocol is listening
+    user : 'neo4j'
+    pwd : 'password'
+    update_every : 30
+    priority: 22000 # the JOB's order on the dashboard
+    retries: 10       # the JOB's number of restoration attempts
+```
+
+---

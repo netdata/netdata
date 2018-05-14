@@ -376,7 +376,13 @@ netdataDashboard.menu = {
         title: 'Unbound',
         icon: '<i class="fas fa-tag"></i>',
         info: undefined
+    },
+    'neo': {
+        title: 'Neo4j',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Overview of the key Neo4j metrics.'
     }
+
 };
 
 
@@ -2105,6 +2111,19 @@ netdataDashboard.context = {
 
     'unbound.cache': {
         info: 'The number of items in each of the various caches.'
+    },
+    'neo.monnodes': {
+        title: 'Total nodes',
+        info: 'Nodes count.'
+    }
+    ,
+    'neo.monrels': {
+        title: 'Nodes per relation type',
+        info: 'Most used relations. Top 5 by default.'
+    }
+    ,'neo.monlabels': {
+        title: 'Nodes per Label',
+        info: 'Most used labels. Top 5 by default.'
     }
 
     // ------------------------------------------------------------------------

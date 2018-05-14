@@ -65,6 +65,7 @@ dist_python_DATA = \
     unbound.chart.py \
     varnish.chart.py \
     web_log.chart.py \
+    neo.chart.py \
     $(NULL)
 
 pythonmodulesdir=$(pythondir)/python_modules

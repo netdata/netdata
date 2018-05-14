@@ -133,9 +133,11 @@ if [ "${pv}" = "2" ]
 then
     pip_install "is libyaml-dev and python-dev installed?" pyyaml
     pip_install "is libmysqlclient-dev and python-dev installed?" mysqlclient mysql-python pymysql
+    pip_install "is neo4j-driver installed?" neo4j-driver
 else
     pip_install "is libyaml-dev and python-dev installed?" pyyaml
     pip_install "is libmysqlclient-dev and python-dev installed?" mysql-python mysqlclient pymysql
+    pip_install "is neo4j-driver installed?" neo4j-driver
 fi
 
 echo >&2
