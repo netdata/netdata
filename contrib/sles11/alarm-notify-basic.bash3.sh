@@ -6,6 +6,14 @@
 # - syslog: "netdata" with local6 facility; disabled by default
 # - also: setting recipient to "disabled" or "silent" stops notifications for this alert
 
+# in /etc/netdata/health_alarm_notify.conf set something like
+# EMAIL_SENDER="netdata@gesdev-vm.m0.maxidom.ru"
+# SEND_EMAIL="YES"
+# DEFAULT_RECIPIENT_EMAIL="root"
+# SEND_SYSLOG="YES"
+# SYSLOG_FACILITY="local6"
+# DEFAULT_RECIPIENT_SYSLOG="netdata"
+
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
@@ -255,7 +263,7 @@ else
 fi
 
 if [[ "SEND_SYSLOG" != "NO" ]]; then
-    to_syslog=$SYSLOG_FACILITY
+    to_syslog=$DEFAULT_RECIPIENT_SYSLOG
 else
     to_syslog=''
 fi
@@ -383,10 +391,10 @@ duration4human() {
 
 send_email() {
     local ret= opts=
-    if [ "${SEND_EMAIL}" = "YES" ]
+    if [[ "${SEND_EMAIL}" == "YES" ]]
         then
 
-        if [ ! -z "${EMAIL_SENDER}" ]
+        if [[ ! -z "${EMAIL_SENDER}" ]]
             then
             if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
                 then
@@ -406,7 +414,7 @@ send_email() {
             fi
         fi
 
-        if [ "${debug}" = "1" ]
+        if [[ "${debug}" = "1" ]]
             then
             echo >&2 "--- BEGIN sendmail command ---"
             printf >&2 "%q " "${sendmail}" -t ${opts}
@@ -438,11 +446,11 @@ send_syslog() {
     local priority='' message='' host='' port='' prefix=''
     local temp1='' temp2=''
 
-    [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
+    [[ "${SEND_SYSLOG}" == "YES" ]] || return 1
 
-    if [ "${status}" -eq "CRITICAL" ] ; then
+    if [[ "${status}" == "CRITICAL" ]] ; then
         level='crit'
-    elif [ "${status}" -eq "WARNING" ] ; then
+    elif [[ "${status}" == "WARNING" ]] ; then
         level='warning'
     fi
 
@@ -458,7 +466,7 @@ send_syslog() {
         prefix=$(echo ${target} | cut -d '/' -f 2)
         temp1=$(echo ${target} | cut -d '/' -f 1)
 
-        if [ ${prefix} != ${temp1} ] ; then
+        if [[ ${prefix} != ${temp1} ]] ; then
             if (echo ${temp1} | grep -q '@' ) ; then
                 temp2=$(echo ${temp1} | cut -d '@' -f 1)
                 host=$(echo ${temp1} | cut -d '@' -f 2)
@@ -487,7 +495,9 @@ send_syslog() {
             fi
         fi
 
-        message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
+        # message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+        message="${prefix} ${status}: ${chart} ${value_string}"
 
         if [ ${host} ] ; then
             logger_options="${logger_options} -n ${host}"
@@ -519,7 +529,7 @@ severity="${status}"
 # the time the alarm was raised
 duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
 duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
-raised_for="(was ${old_status,,} for ${duration_txt})"
+raised_for="(was ${old_status} for ${duration_txt})"
 
 # the key status message
 status_message="status unknown"
@@ -628,6 +638,7 @@ Severity: ${severity}
 URL     : ${goto_url}
 Source  : ${src}
 Date    : ${date}
+Value   : ${value_string}
 Notification generated on ${this_host}
 
 --multipart-boundary
@@ -665,6 +676,12 @@ Content-Transfer-Encoding: 8bit
                                         <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding:0 0 20px;" align="left" valign="top">
                                             <span>${chart}</span>
                                             <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Chart</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
+                                            <span>${value_string}</span>
+                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Value</span>
                                         </td>
                                     </tr>
                                     <tr style="margin: 0; padding: 0;">
