@@ -2512,11 +2512,13 @@ Displays key metrics for the Neo4j graph database (www.neo4j.com)
    * number of nodes for the top5 labels
    * number of nodes for the top5 relations
 
-Requires the neo4j-module (JS driver) to access the wanted server.
-By default, listens to Neo4j on localhost, accessible with neo4j/password credentials 
+Requires the neo4j-driver module (JS driver) to access the wanted server.
+Users can install the neo4j-driver package by running the /usr/libexec/netdata/python-modules-installer.sh script (with sudo) and restart the netdata service (sudo service netdata restart).
+
+By default, listens to a Neo4j instance on localhost, accessible with neo4j/password credentials. You can update the credentials in the  /etc/netdata/python.d/neo.conf file. 
 
 ## configuration   
-See the neo.conf file to change the settings
+See the /etc/netdata/python.d/neo.conf file to change the settings
 ```
 neo:
     name : 'neo'

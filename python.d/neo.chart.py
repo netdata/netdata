@@ -36,11 +36,6 @@ CHARTS = {
 
 }
 
-update_every = 10
-priority = 99000
-retries = 10
-
-
 class Service(SimpleService):
 
     def __init__(self, configuration=None, name=None):
