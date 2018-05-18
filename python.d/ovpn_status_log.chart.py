@@ -107,8 +107,10 @@ class Service(SimpleService):
 
         data = dict(users=0, bytes_in=0, bytes_out=0)
         for row in raw_data:
-            row = ' '.join(row.split(',')) if ',' in row else ' '.join(row.split())
-            match = self.regex['tls'].search(row)
+            columns = row.split(',') if ',' in row else row.split()
+            if columns[0] == 'UNDEF': continue # see https://openvpn.net/archive/openvpn-users/2004-08/msg00116.html
+
+            match = self.regex['tls'].search(' '.join(columns))
             if match:
                 match = match.groupdict()
                 data['users'] += 1
