@@ -816,7 +816,7 @@ class Squid:
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
                                            r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
-                                           r' (?P<mime_type>[^\n]+)')
+                                           r' (?P<mime_type>[A-Za-z0-9-]+)')
 
         match = self.storage['regex'].search(last_line)
         if not match:
