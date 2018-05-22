@@ -261,6 +261,7 @@ SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods',
 
 REQUEST_REGEX = re.compile(r'(?P<method>[A-Z]+) (?P<url>[^ ]+) [A-Z]+/(?P<http_version>\d(?:.\d)?)')
 
+MIME_TYPES = ['application', 'audio', 'example', 'font', 'image', 'message', 'model', 'multipart', 'text', 'video']
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -808,15 +809,15 @@ class Squid:
             return False
         self.storage['unique_all_time'] = list()
         self.storage['regex'] = re.compile(r'[0-9.]+\s+(?P<duration>[0-9]+)'
-                                           r' (?P<client_address>[\da-f.:]+)'
+                                           r' (?P<client_address>[\dA-Za-z.:_-]+)'
                                            r' (?P<squid_code>[A-Z_]+)/'
                                            r'(?P<http_code>[0-9]+)'
                                            r' (?P<bytes>[0-9]+)'
                                            r' (?P<method>[A-Z_]+)'
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
-                                           r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
-                                           r' (?P<mime_type>[A-Za-z0-9-]+)')
+                                           r' (?P<hier_code>[A-Z_]+)/[\da-z.:-]+'
+                                           r' (?P<mime_type>[A-Za-z-]*)')
 
         match = self.storage['regex'].search(last_line)
         if not match:
@@ -837,7 +838,7 @@ class Squid:
                 'func_dim': None},
             'mime_type': {
                 'chart': 'squid_mime_type',
-                'func_dim_id': lambda v: v.split('/')[0],
+                'func_dim_id': lambda v: str.lower(v) if str.lower(v) in MIME_TYPES else 'unknown',
                 'func_dim': None}}
         if not self.configuration.get('all_time', True):
             self.order.remove('squid_clients_all')
