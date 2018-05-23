@@ -1278,7 +1278,7 @@ It will produce following charts (if data is available):
 
 You can provide, per server, the following:
 
-1. username which have access to database (deafults to 'root')
+1. username which have access to database (defaults to 'root')
 2. password (defaults to none)
 3. mysql my.cnf configuration file
 4. mysql socket (optional)
