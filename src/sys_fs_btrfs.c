@@ -171,12 +171,16 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
             snprintfz(filename, FILENAME_MAX, "%s/%s/size", path, de->d_name);
             d->size_filename = strdupz(filename);
 
-            // for disks
-            snprintfz(filename, FILENAME_MAX, "%s/%s/queue/hw_sector_size", path, de->d_name);
+            // for bcache
+            snprintfz(filename, FILENAME_MAX, "%s/%s/bcache/../queue/hw_sector_size", path, de->d_name);
             struct stat sb;
-            if(stat(filename, &sb) == -1)
-                // for partitions
-                snprintfz(filename, FILENAME_MAX, "%s/%s/../queue/hw_sector_size", path, de->d_name);
+            if(stat(filename, &sb) == -1) {
+                // for disks
+                snprintfz(filename, FILENAME_MAX, "%s/%s/queue/hw_sector_size", path, de->d_name);
+                if(stat(filename, &sb) == -1)
+                    // for partitions
+                    snprintfz(filename, FILENAME_MAX, "%s/%s/../queue/hw_sector_size", path, de->d_name);
+            }
 
             d->hw_sector_size_filename = strdupz(filename);
 
