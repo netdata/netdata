@@ -776,8 +776,8 @@ fi
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
 
-date=$(date --date=@${when} "${DATE_FORMAT}" 2>/dev/null)
-[ -z "${date}" ] && date=$(date "${DATE_FORMAT}" 2>/dev/null)
+date=$(date --date=@${when} "${date_format}" 2>/dev/null)
+[ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date --date=@${when} 2>/dev/null)
 [ -z "${date}" ] && date=$(date 2>/dev/null)
 
