@@ -81,38 +81,41 @@ nut_create() {
 CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 1)) $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
 
-CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $((nut_priority + 2)) $nut_update_every
+CHART nut_$x.runtime '' "UPS Runtime" "seconds" ups nut.runtime area $((nut_priority + 2)) $nut_update_every
+DIMENSION battery_runtime runtime absolute 1 100
+
+CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $((nut_priority + 3)) $nut_update_every
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_high high absolute 1 100
 DIMENSION battery_voltage_low low absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $((nut_priority + 3)) $nut_update_every
+CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $((nut_priority + 4)) $nut_update_every
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_fault fault absolute 1 100
 DIMENSION input_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $((nut_priority + 4)) $nut_update_every
+CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $((nut_priority + 5)) $nut_update_every
 DIMENSION input_current_nominal nominal absolute 1 100
 
-CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $((nut_priority + 5)) $nut_update_every
+CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $((nut_priority + 6)) $nut_update_every
 DIMENSION input_frequency frequency absolute 1 100
 DIMENSION input_frequency_nominal nominal absolute 1 100
 
-CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $((nut_priority + 6)) $nut_update_every
+CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $((nut_priority + 7)) $nut_update_every
 DIMENSION output_voltage voltage absolute 1 100
 
 CHART nut_$x.load '' "UPS Load" "percentage" ups nut.load area $((nut_priority)) $nut_update_every
 DIMENSION load load absolute 1 100
 
-CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 7)) $nut_update_every
+CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 8)) $nut_update_every
 DIMENSION temp temp absolute 1 100
 EOF
 
 	if [ "${nut_clients_chart}" = "1" ]
 		then
 		cat <<EOF2
-CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 8)) $nut_update_every
+CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 9)) $nut_update_every
 DIMENSION clients '' absolute 1 1
 EOF2
 	fi
@@ -138,6 +141,7 @@ nut_update() {
 		nut_get "$i" | awk "
 BEGIN {
 	battery_charge = 0;
+    battery_runtime = 0;
 	battery_voltage = 0;
 	battery_voltage_high = 0;
 	battery_voltage_low = 0;
@@ -155,6 +159,7 @@ BEGIN {
 	do_clients = ${nut_clients_chart};
 }
 /^battery.charge: .*/			{ battery_charge = \$2 * 100 };
+/^battery.runtime: .*/          { battery_runtime = \$2 * 100 };
 /^battery.voltage: .*/			{ battery_voltage = \$2 * 100 };
 /^battery.voltage.high: .*/		{ battery_voltage_high = \$2 * 100 };
 /^battery.voltage.low: .*/		{ battery_voltage_low = \$2 * 100 };
@@ -173,6 +178,10 @@ END {
 	print \"BEGIN nut_$x.charge $1\";
 	print \"SET battery_charge = \" battery_charge;
 	print \"END\"
+
+    print \"BEGIN nut_$x.runtime $1\";
+    print \"SET battery_runtime = \" battery_runtime;
+    print \"END\"
 
 	print \"BEGIN nut_$x.battery_voltage $1\";
 	print \"SET battery_voltage = \" battery_voltage;
