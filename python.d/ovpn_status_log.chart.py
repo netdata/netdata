@@ -32,7 +32,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.log_path = self.configuration.get('log_path')
-        self.regex = dict(tls=r_compile(r'\d{1,3}(?:\.\d{1,3}){3}(?::\d+)? (?P<bytes_in>\d+) (?P<bytes_out>\d+)'),
+        self.regex = dict(tls=r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)'),
                           static_key=r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)'))
 
     def check(self):
@@ -107,8 +107,10 @@ class Service(SimpleService):
 
         data = dict(users=0, bytes_in=0, bytes_out=0)
         for row in raw_data:
-            row = ' '.join(row.split(',')) if ',' in row else ' '.join(row.split())
-            match = self.regex['tls'].search(row)
+            columns = row.split(',') if ',' in row else row.split()
+            if 'UNDEF' in columns: continue # see https://openvpn.net/archive/openvpn-users/2004-08/msg00116.html
+
+            match = self.regex['tls'].search(' '.join(columns))
             if match:
                 match = match.groupdict()
                 data['users'] += 1
