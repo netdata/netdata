@@ -1553,11 +1553,11 @@ send_syslog() {
     local priority='' message='' host='' port='' prefix=''
     local temp1='' temp2=''
 
-    [ "${SEND_SYSLOG}" -eq "YES" ] || return 1
+    [ "${SEND_SYSLOG}" = "YES" ] || return 1
 
-    if [ "${status}" -eq "CRITICAL" ] ; then
+    if [ "${status}" = "CRITICAL" ] ; then
         level='crit'
-    elif [ "${status}" -eq "WARNING" ] ; then
+    elif [ "${status}" = "WARNING" ] ; then
         level='warning'
     fi
 
