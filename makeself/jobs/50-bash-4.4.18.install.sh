@@ -2,13 +2,16 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
-fetch "bash-4.4" "http://ftp.gnu.org/gnu/bash/bash-4.4.tar.gz"
+fetch "bash-4.4.18" "http://ftp.gnu.org/gnu/bash/bash-4.4.18.tar.gz"
 
 run ./configure \
 	--prefix=${NETDATA_INSTALL_PATH} \
-	--enable-static-link \
-	--disable-nls \
 	--without-bash-malloc \
+	--enable-static-link \
+	--enable-net-redirections \
+	--enable-array-variables \
+	--disable-profiling \
+	--disable-nls \
 #	--disable-rpath \
 #	--enable-alias \
 #	--enable-arith-for-command \

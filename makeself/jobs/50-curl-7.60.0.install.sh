@@ -2,7 +2,7 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
-fetch "curl-curl-7_53_1" "https://github.com/curl/curl/archive/curl-7_53_1.tar.gz"
+fetch "curl-curl-7_60_0" "https://github.com/curl/curl/archive/curl-7_60_0.tar.gz"
 
 export LDFLAGS="-static"
 export PKG_CONFIG="pkg-config --static"
