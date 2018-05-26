@@ -85,11 +85,12 @@ fi
 # -----------------------------------------------------------------------------
 # use read with timeout for sleep
 
-mysleep="mysleep_read"
+mysleep=""
 
 mysleep_fifo="${NETDATA_CACHE_DIR-/tmp}/.netdata_bash_sleep_timer_fifo"
-[ ! -e "${mysleep_fifo}" ] && mkfifo "${mysleep_fifo}"
-[ ! -e "${mysleep_fifo}" ] && mysleep="sleep"
+[ -f "${mysleep_fifo}" ] && rm "${mysleep_fifo}"
+[ ! -p "${mysleep_fifo}" ] && mkfifo "${mysleep_fifo}"
+[ -p "${mysleep_fifo}" ] && mysleep="mysleep_read"
 
 mysleep_read() {
     read -t "${1}" <>"${mysleep_fifo}"
@@ -105,7 +106,18 @@ mysleep_read() {
 # -----------------------------------------------------------------------------
 # use bash loadable module for sleep
 
-if [ "$((BASH_VERSINFO[0] +0))" -ge 3 ]
+builtin_sleep() {
+    builtin sleep "${1}"
+    ret=$?
+    if [ $ret -ne 0 ]
+        then
+        echo >&2 "$0: Cannot use builtin sleep for sleeping (return code ${ret})."
+        mysleep="sleep"
+        ${mysleep} "${1}"
+    fi
+}
+
+if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 ]
     then
     # enable modules only for bash version 3+
 
@@ -120,7 +132,7 @@ if [ "$((BASH_VERSINFO[0] +0))" -ge 3 ]
                 then
                 if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null
                     then
-                    mysleep="builtin sleep"
+                    mysleep="builtin_sleep"
                     #echo >&2 "$0: Using bash loadable ${bash_modules_path}/sleep for sleep"
                     break
                 fi
@@ -129,6 +141,11 @@ if [ "$((BASH_VERSINFO[0] +0))" -ge 3 ]
 
     done
 fi
+
+# -----------------------------------------------------------------------------
+# fallback to external sleep
+
+[ -z "${mysleep}" ] && mysleep="sleep"
 
 
 # -----------------------------------------------------------------------------
