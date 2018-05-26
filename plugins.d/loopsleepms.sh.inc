@@ -133,12 +133,14 @@ if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 ]
                 if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null
                     then
                     mysleep="builtin_sleep"
-                    #echo >&2 "$0: Using bash loadable ${bash_modules_path}/sleep for sleep"
+                    # echo >&2 "$0: Using bash loadable ${bash_modules_path}/sleep for sleep"
                     break
                 fi
             fi
+
         done
 
+        [ ! -z "${mysleep}" ] && break
     done
 fi
 
