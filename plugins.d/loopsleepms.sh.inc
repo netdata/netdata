@@ -117,7 +117,7 @@ mysleep_builtin() {
     fi
 }
 
-if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 ]
+if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 -a "${NETDATA_BASH_LOADABLES}" != "DISABLE" ]
     then
     # enable modules only for bash version 3+
 
