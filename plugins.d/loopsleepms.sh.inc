@@ -102,6 +102,33 @@ mysleep_read() {
     fi
 }
 
+# -----------------------------------------------------------------------------
+# use bash loadable module for sleep
+
+# BASH_LOADABLE_MODULES_DIR can be used in various netdata config files to
+# set the directory the loadable bash modules can be found.
+
+if [ "$((BASH_VERSINFO[0] +0))" -ge 3 ]
+    then
+    # enable modules only for bash version 3+
+
+    for bash_modules_path in "${BASH_LOADABLE_MODULES_DIR}" "/usr/lib/bash" "/lib/bash" "/lib64/bash" "/usr/local/lib/bash" "/usr/local/lib64/bash"
+    do
+        [ -z "${bash_modules_path}" -o ! -d "${bash_modules_path}" ] && continue
+
+        # check for sleep
+        if [ -f "${bash_modules_path}/sleep" ]
+            then
+            if enable -f "${bash_modules_path}/sleep" sleep 2>/dev/null
+                then
+                mysleep="sleep"
+                #echo >&2 "$0: Using bash loadable ${bash_modules_path}/sleep for sleep"
+                break
+            fi
+        fi
+    done
+fi
+
 
 # -----------------------------------------------------------------------------
 # this function is used to sleep a fraction of a second
