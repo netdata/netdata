@@ -10,8 +10,8 @@ dist_noinst_SCRIPTS = \
 	install-alpine-packages.sh \
 	post-installer.sh \
 	jobs/10-prepare-destination.install.sh \
-	jobs/50-curl-7.53.1.install.sh \
-	jobs/50-bash-4.4.install.sh \
+	jobs/50-curl-7.60.0.install.sh \
+	jobs/50-bash-4.4.18.install.sh \
 	jobs/50-fping-4.0.install.sh \
 	jobs/70-netdata-git.install.sh \
 	jobs/99-makeself.install.sh \

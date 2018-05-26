@@ -64,6 +64,7 @@ run mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
 
 cat >"${NETDATA_INSTALL_PATH}/bin/netdata" <<EOF
 #!${NETDATA_INSTALL_PATH}/bin/bash
+export NETDATA_BASH_LOADABLES="DISABLE"
 export PATH="${NETDATA_INSTALL_PATH}/bin:\${PATH}"
 exec "${NETDATA_INSTALL_PATH}/bin/srv/netdata" "\${@}"
 EOF
