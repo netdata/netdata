@@ -106,7 +106,7 @@ mysleep_read() {
 # -----------------------------------------------------------------------------
 # use bash loadable module for sleep
 
-builtin_sleep() {
+mysleep_builtin() {
     builtin sleep "${1}"
     ret=$?
     if [ $ret -ne 0 ]
@@ -132,8 +132,8 @@ if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 ]
                 then
                 if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null
                     then
-                    mysleep="builtin_sleep"
-                    # echo >&2 "$0: Using bash loadable ${bash_modules_path}/sleep for sleep"
+                    mysleep="mysleep_builtin"
+                    # echo >&2 "$0: Using bash loadable ${bash_modules_path}/${bash_module_sleep} for sleep"
                     break
                 fi
             fi
