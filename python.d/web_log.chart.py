@@ -809,7 +809,7 @@ class Squid:
             return False
         self.storage['unique_all_time'] = list()
         self.storage['regex'] = re.compile(r'[0-9.]+\s+(?P<duration>[0-9]+)'
-                                           r' (?P<client_address>[\dA-Za-z.:_-]+)'
+                                           r' (?P<client_address>[\da-f.:]+)'
                                            r' (?P<squid_code>[A-Z_]+)/'
                                            r'(?P<http_code>[0-9]+)'
                                            r' (?P<bytes>[0-9]+)'
