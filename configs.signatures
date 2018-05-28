@@ -498,6 +498,7 @@ declare -A configs_signatures=(
   ['b32164929eda7449a9677044e11151bf']='python.d.conf'
   ['b3d48935ab7f44a57d40ad349df0033d']='python.d/postgres.conf'
   ['b3fc4749b132e55ac0d3a0f92859237e']='health.d/tcp_resets.conf'
+  ['b44e33ba5c7a7306b467ac9c9b698895']='health.d/bcache.conf'
   ['b4825f731cc7eb03b374eade14a453c1']='health.d/net.conf'
   ['b5246eed059e33e0903a819fa5460ce0']='python.d/ipfs.conf'
   ['b544e5934ac79a9548b5af6756c042a6']='apps_groups.conf'
