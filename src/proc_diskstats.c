@@ -49,6 +49,8 @@ static struct disk {
     char *bcache_filename_stats_total_cache_bypass_misses;
     char *bcache_filename_stats_total_cache_readaheads;
 
+    char *bcache_filename_priority_stats;
+
     RRDSET *st_io;
     RRDDIM *rd_io_reads;
     RRDDIM *rd_io_writes;
@@ -111,6 +113,13 @@ static struct disk {
     RRDDIM *rd_bcache_readaheads;
     RRDDIM *rd_bcache_rate_writeback;
 
+    RRDSET *st_bcache_cache_allocations;
+    RRDDIM *rd_bcache_cache_allocations_unused;
+    RRDDIM *rd_bcache_cache_allocations_clean;
+    RRDDIM *rd_bcache_cache_allocations_dirty;
+    RRDDIM *rd_bcache_cache_allocations_metadata;
+    RRDDIM *rd_bcache_cache_allocations_unknown;
+
     struct disk *next;
 } *disk_root = NULL;
 
@@ -168,6 +177,88 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
     }
 
     return 0;
+}
+
+void bcache_read_priority_stats(struct disk *d, const char *family, int update_every) {
+    static procfile *ff = NULL;
+    static char *separators = " \t:%[]";
+
+    static ARL_BASE *arl_base = NULL;
+
+    static unsigned long long unused;
+    static unsigned long long clean;
+    static unsigned long long dirty;
+    static unsigned long long metadata;
+    static unsigned long long unknown;
+
+    if(unlikely(!arl_base)) {
+        arl_base = arl_create("bcache/priority_stats", NULL, 60);
+        arl_expect(arl_base, "Unused", &unused);
+        arl_expect(arl_base, "Clean", &clean);
+        arl_expect(arl_base, "Dirty", &dirty);
+        arl_expect(arl_base, "Metadata", &metadata);
+    }
+
+    ff = procfile_reopen(ff, d->bcache_filename_priority_stats, separators, PROCFILE_FLAG_DEFAULT);
+    if(likely(ff)) ff = procfile_readall(ff);
+    if(unlikely(!ff)) {
+        separators = " \t:%[]";
+        return;
+    }
+    separators = NULL;
+
+    arl_begin(arl_base);
+    unused = clean = dirty = metadata = unknown = 0;
+
+    size_t lines = procfile_lines(ff), l;
+
+    for(l = 0; l < lines ;l++) {
+        size_t words = procfile_linewords(ff, l);
+        if(unlikely(words < 2)) {
+            if(unlikely(words)) error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
+            continue;
+        }
+
+        if(unlikely(arl_check(arl_base,
+                procfile_lineword(ff, l, 0),
+                procfile_lineword(ff, l, 1)))) break;
+    }
+
+    unknown = 100 - unused - clean - dirty - metadata;
+
+    // create / update the cache allocations chart
+    {
+        if(unlikely(!d->st_bcache_cache_allocations)) {
+            d->st_bcache_cache_allocations = rrdset_create_localhost(
+                    "disk_bcache_cache_alloc"
+                    , d->device
+                    , d->disk
+                    , family
+                    , "disk.bcache_cache_alloc"
+                    , "BCache Cache Allocations"
+                    , "percentage"
+                    , "proc"
+                    , "diskstats"
+                    , 2120
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            d->rd_bcache_cache_allocations_unused    = rrddim_add(d->st_bcache_cache_allocations, "unused",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_dirty     = rrddim_add(d->st_bcache_cache_allocations, "dirty",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_clean     = rrddim_add(d->st_bcache_cache_allocations, "clean",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_metadata  = rrddim_add(d->st_bcache_cache_allocations, "metadata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_unknown   = rrddim_add(d->st_bcache_cache_allocations, "undefined",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(d->st_bcache_cache_allocations);
+
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unused, unused);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_dirty, dirty);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_clean, clean);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_metadata, metadata);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unknown, unknown);
+        rrdset_done(d->st_bcache_cache_allocations);
+    }
 }
 
 static inline int is_major_enabled(int major) {
@@ -529,6 +620,12 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         snprintfz(buffer2, FILENAME_MAX, "%s/readahead", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_readaheads = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/priority_stats", buffer); // only one cache is supported by bcache
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_priority_stats = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
@@ -1160,11 +1257,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(d->bcache_filename_stats_total_cache_readaheads)
                 cache_readaheads = bcache_read_number_with_units(d->bcache_filename_stats_total_cache_readaheads);
 
+            if(d->bcache_filename_priority_stats)
+                bcache_read_priority_stats(d, family, update_every);
 
             // update the charts
 
             {
-
                 if(unlikely(!d->st_bcache_hit_ratio)) {
                     d->st_bcache_hit_ratio = rrdset_create_localhost(
                             "disk_bcache_hit_ratio"
@@ -1421,6 +1519,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->bcache_filename_stats_total_cache_bypass_hits);
             freez(t->bcache_filename_stats_total_cache_bypass_misses);
             freez(t->bcache_filename_stats_total_cache_readaheads);
+            freez(t->bcache_filename_priority_stats);
 
             freez(t->disk);
             freez(t->device);
