@@ -1392,7 +1392,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , d->device
                             , d->disk
                             , family
-                            , "disk.disk_bcache_cache_read_races"
+                            , "disk.bcache_cache_read_races"
                             , "BCache Cache Read Races"
                             , "operations/s"
                             , "proc"
