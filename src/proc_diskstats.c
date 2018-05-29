@@ -141,7 +141,7 @@ static char *path_to_device_mapper = NULL;
 static char *path_to_device_label = NULL;
 static char *path_to_device_id = NULL;
 static int name_disks_by_id = CONFIG_BOOLEAN_NO;
-static int global_bcache_priority_stats_update_every = 60;
+static int global_bcache_priority_stats_update_every = 0; // disabled by default
 
 static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         global_enable_performance_for_physical_disks = CONFIG_BOOLEAN_AUTO,
