@@ -1,4 +1,5 @@
 declare -A configs_signatures=(
+  ['00049600c2f9237e6c46b8b0f703c13c']='health.d/bcache.conf'
   ['00403e687213f3b7db9bf4563a5a92cc']='python.d/isc_dhcpd.conf'
   ['0056936ce99788ed9ae1c611c87aa6d8']='apps_groups.conf'
   ['007fc019fb32e952b509d455c016a002']='health.d/tcp_resets.conf'
