@@ -51,6 +51,9 @@ static struct disk {
     char *bcache_filename_cache_read_races;
     char *bcache_filename_priority_stats;
 
+    usec_t bcache_priority_stats_update_every_usec;
+    usec_t bcache_priority_stats_elapsed_usec;
+
     RRDSET *st_io;
     RRDDIM *rd_io_reads;
     RRDDIM *rd_io_writes;
@@ -138,6 +141,7 @@ static char *path_to_device_mapper = NULL;
 static char *path_to_device_label = NULL;
 static char *path_to_device_id = NULL;
 static int name_disks_by_id = CONFIG_BOOLEAN_NO;
+static int global_bcache_priority_stats_update_every = 60;
 
 static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         global_enable_performance_for_physical_disks = CONFIG_BOOLEAN_AUTO,
@@ -182,7 +186,7 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
     return 0;
 }
 
-void bcache_read_priority_stats(struct disk *d, const char *family, int update_every) {
+void bcache_read_priority_stats(struct disk *d, const char *family, int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static char *separators = " \t:%[]";
 
@@ -194,6 +198,12 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
     static unsigned long long metadata;
     static unsigned long long unknown;
 
+    // check if it is time to update this metric
+    d->bcache_priority_stats_elapsed_usec += dt;
+    if(likely(d->bcache_priority_stats_elapsed_usec < d->bcache_priority_stats_update_every_usec)) return;
+    d->bcache_priority_stats_elapsed_usec = 0;
+
+    // initialize ARL
     if(unlikely(!arl_base)) {
         arl_base = arl_create("bcache/priority_stats", NULL, 60);
         arl_expect(arl_base, "Unused", &unused);
@@ -208,6 +218,8 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
         separators = " \t:%[]";
         return;
     }
+
+    // do not reset the separators on every iteration
     separators = NULL;
 
     arl_begin(arl_base);
@@ -247,11 +259,13 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
                     , RRDSET_TYPE_STACKED
             );
 
-            d->rd_bcache_cache_allocations_unused    = rrddim_add(d->st_bcache_cache_allocations, "unused",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_bcache_cache_allocations_dirty     = rrddim_add(d->st_bcache_cache_allocations, "dirty",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_bcache_cache_allocations_clean     = rrddim_add(d->st_bcache_cache_allocations, "clean",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_bcache_cache_allocations_metadata  = rrddim_add(d->st_bcache_cache_allocations, "metadata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_unused    = rrddim_add(d->st_bcache_cache_allocations, "unused",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_dirty     = rrddim_add(d->st_bcache_cache_allocations, "dirty",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_clean     = rrddim_add(d->st_bcache_cache_allocations, "clean",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_metadata  = rrddim_add(d->st_bcache_cache_allocations, "metadata",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             d->rd_bcache_cache_allocations_unknown   = rrddim_add(d->st_bcache_cache_allocations, "undefined",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            d->bcache_priority_stats_update_every_usec = update_every * USEC_PER_SEC;
         }
         else rrdset_next(d->st_bcache_cache_allocations);
 
@@ -734,6 +748,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
         global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "bcache for all disks", global_do_bcache);
+        global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
         global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
         
@@ -1270,8 +1285,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(d->bcache_filename_cache_read_races)
                 cache_read_races = bcache_read_number_with_units(d->bcache_filename_cache_read_races);
 
-            if(d->bcache_filename_priority_stats)
-                bcache_read_priority_stats(d, family, update_every);
+            if(d->bcache_filename_priority_stats && global_bcache_priority_stats_update_every >= 1)
+                bcache_read_priority_stats(d, family, global_bcache_priority_stats_update_every, dt);
 
             // update the charts
 
