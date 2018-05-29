@@ -49,6 +49,7 @@ static struct disk {
     char *bcache_filename_stats_total_cache_bypass_misses;
     char *bcache_filename_stats_total_cache_readaheads;
     char *bcache_filename_cache_read_races;
+    char *bcache_filename_cache_io_errors;
     char *bcache_filename_priority_stats;
 
     usec_t bcache_priority_stats_update_every_usec;
@@ -125,6 +126,7 @@ static struct disk {
 
     RRDSET *st_bcache_cache_read_races;
     RRDDIM *rd_bcache_cache_read_races;
+    RRDDIM *rd_bcache_cache_io_errors;
 
     struct disk *next;
 } *disk_root = NULL;
@@ -649,6 +651,12 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/internal/cache_read_races", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_read_races = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/io_errors", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_cache_io_errors = strdupz(buffer2);
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
@@ -1234,6 +1242,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     cache_available_percent = 0,
                     cache_readaheads = 0,
                     cache_read_races = 0,
+                    cache_io_errors = 0,
                     cache_congested = 0,
                     dirty_data = 0,
                     writeback_rate = 0;
@@ -1284,6 +1293,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if(d->bcache_filename_cache_read_races)
                 cache_read_races = bcache_read_number_with_units(d->bcache_filename_cache_read_races);
+
+            if(d->bcache_filename_cache_io_errors)
+                cache_io_errors = bcache_read_number_with_units(d->bcache_filename_cache_io_errors);
 
             if(d->bcache_filename_priority_stats && global_bcache_priority_stats_update_every >= 1)
                 bcache_read_priority_stats(d, family, global_bcache_priority_stats_update_every, dt);
@@ -1417,11 +1429,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    d->rd_bcache_cache_read_races = rrddim_add(d->st_bcache_cache_read_races, "races", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    d->rd_bcache_cache_read_races = rrddim_add(d->st_bcache_cache_read_races, "races",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    d->rd_bcache_cache_io_errors  = rrddim_add(d->st_bcache_cache_read_races, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(d->st_bcache_cache_read_races);
 
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_read_races, cache_read_races);
+                rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_io_errors, cache_io_errors);
                 rrdset_done(d->st_bcache_cache_read_races);
             }
 
@@ -1574,6 +1588,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->bcache_filename_stats_total_cache_bypass_misses);
             freez(t->bcache_filename_stats_total_cache_readaheads);
             freez(t->bcache_filename_cache_read_races);
+            freez(t->bcache_filename_cache_io_errors);
             freez(t->bcache_filename_priority_stats);
 
             freez(t->disk);
