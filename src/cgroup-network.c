@@ -401,13 +401,13 @@ int send_devices(void) {
 // since it switches namespaces, so after this call, everything is different!
 
 void detect_veth_interfaces(pid_t pid) {
-    struct iface *host, *cgroup, *h, *c;
+    struct iface *host = NULL, *cgroup = NULL, *h, *c;
 
     host = read_proc_net_dev(netdata_configured_host_prefix);
     if(!host) {
         errno = 0;
         error("cannot read host interface list.");
-        return;
+        goto cleanup;
     }
 
     if(!eligible_ifaces(host)) {
@@ -446,6 +446,7 @@ void detect_veth_interfaces(pid_t pid) {
     }
 
 cleanup:
+    free_host_ifaces(cgroup);
     free_host_ifaces(host);
 }
 
