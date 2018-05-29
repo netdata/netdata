@@ -28,15 +28,6 @@ dist_web_DATA = \
 	version.txt \
 	$(NULL)
 
-webolddir=$(webdir)/old
-dist_webold_DATA = \
-	old/datasource.html \
-	old/index.html \
-	old/index.js \
-	old/netdata.js \
-	old/theme.css \
-	$(NULL)
-
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
 	lib/bootstrap-3.3.7.min.js \
