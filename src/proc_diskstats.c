@@ -1292,10 +1292,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 cache_readaheads = bcache_read_number_with_units(d->bcache_filename_stats_total_cache_readaheads);
 
             if(d->bcache_filename_cache_read_races)
-                cache_read_races = bcache_read_number_with_units(d->bcache_filename_cache_read_races);
+                read_single_number_file(d->bcache_filename_cache_read_races, &cache_read_races);
 
             if(d->bcache_filename_cache_io_errors)
-                cache_io_errors = bcache_read_number_with_units(d->bcache_filename_cache_io_errors);
+                read_single_number_file(d->bcache_filename_cache_io_errors, &cache_io_errors);
 
             if(d->bcache_filename_priority_stats && global_bcache_priority_stats_update_every >= 1)
                 bcache_read_priority_stats(d, family, global_bcache_priority_stats_update_every, dt);
