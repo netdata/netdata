@@ -165,7 +165,7 @@ pidof() {
 portable_deletedir_recursively_interactively() {
     if [ ! -z "$1" -a -d "$1" ]
         then
-        if [ "\$(uname -s)" = "Darwin" ]
+        if [ "$(uname -s)" = "Darwin" ]
         then
             echo >&2
             read >&2 "Press ENTER to recursively delete directory '$1' > "
