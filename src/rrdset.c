@@ -755,6 +755,30 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
             microseconds = (usec_t)since_last_usec;
         }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(since_last_usec > 0 && (susec_t)microseconds < since_last_usec) {
+            static __thread susec_t min_delta = USEC_PER_SEC * 3600, permanent_min_delta = 0;
+            static __thread time_t last_t = 0;
+
+            // the first time initialize it so that it will make the check later
+            if(last_t == 0) last_t = now.tv_sec + 60;
+
+            susec_t delta = since_last_usec - (susec_t)microseconds;
+            if(delta < min_delta) min_delta = delta;
+
+            if(now.tv_sec >= last_t + 60) {
+                last_t = now.tv_sec;
+
+                if(min_delta > permanent_min_delta) {
+                    info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    permanent_min_delta = min_delta;
+                }
+
+                min_delta = USEC_PER_SEC * 3600;
+            }
+        }
+#endif
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
