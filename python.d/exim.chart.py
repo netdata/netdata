@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: exim netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# SPDX-License-Identifier: GPL-3.0+
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 

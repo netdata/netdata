@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
 ACLOCAL_AMFLAGS = -I m4

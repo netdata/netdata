@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 int do_proc_meminfo(int update_every, usec_t dt) {

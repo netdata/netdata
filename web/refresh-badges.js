@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 // ----------------------------------------------------------------------------
 // This script periodically updates all the netdata badges you have added to a
 // page as images. You don't need this script if you add the badges with

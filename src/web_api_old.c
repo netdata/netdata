@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *url, int datasource_type) {

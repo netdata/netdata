@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0+
 [Unit]
 Description=Real time performance monitoring
 After=network.target httpd.service squid.service nfs-server.service mysqld.service mysql.service named.service postfix.service chronyd.service

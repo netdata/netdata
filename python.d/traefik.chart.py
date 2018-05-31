@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: traefik netdata python.d module
 # Author: Alexandre Menezes (@ale_menezes)
+# SPDX-License-Identifier: GPL-3.0+
 
 from json import loads
 from collections import defaultdict
