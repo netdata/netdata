@@ -326,6 +326,7 @@ declare -A role_recipients_custom=()
 EMAIL_SENDER=
 DEFAULT_RECIPIENT_EMAIL="root"
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
+EMAIL_THREADING=
 declare -A role_recipients_email=()
 
 # irc configs
@@ -780,6 +781,14 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date --date=@${when} 2>/dev/null)
 [ -z "${date}" ] && date=$(date 2>/dev/null)
+
+# ----------------------------------------------------------------------------
+# prepare some extra headers if we've been asked to thread e-mails
+if [ "${SEND_EMAIL}" == "YES" -a "${EMAIL_THREADING}" == "YES" ] ; then
+    email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\nReferences: <${chart}-${name}@${host}>"
+else
+    email_thread_headers=
+fi
 
 # -----------------------------------------------------------------------------
 # function to URL encode a string
@@ -1891,6 +1900,7 @@ To: ${to_email}
 Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
 
 This is a MIME-encoded multipart message
 
