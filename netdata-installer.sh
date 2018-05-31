@@ -1086,7 +1086,7 @@ if [ -f /etc/cron.daily/netdata-updater ]
 fi
 
 portable_check_user_exists netdata
-if [ $? -eq 0 ]
+if [ \$? -eq 0 ]
     then
     echo
     echo "You may also want to remove the user netdata"
@@ -1095,7 +1095,7 @@ if [ $? -eq 0 ]
 fi
 
 portable_check_group_exists netdata > /dev/null
-if [ $? -eq 0 ]
+if [ \$? -eq 0 ]
     then
     echo
     echo "You may also want to remove the group netdata"
@@ -1106,7 +1106,7 @@ fi
 for g in ${NETDATA_ADDED_TO_GROUPS}
 do
     portable_check_group_exists \$g > /dev/null
-    if [ $? -eq 0 ]
+    if [ \$? -eq 0 ]
         then
         echo
         echo "You may also want to remove the netdata user from the \$g group"
