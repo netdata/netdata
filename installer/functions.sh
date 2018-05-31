@@ -160,6 +160,29 @@ pidof() {
 }
 
 # -----------------------------------------------------------------------------
+# portable delete recursively interactively
+
+portable_deletedir_recursively_interactively() {
+    if [ ! -z "$1" -a -d "$1" ]
+        then
+        if [ "$(uname -s)" = "Darwin" ]
+        then
+            echo >&2
+            read >&2 -p "Press ENTER to recursively delete directory '$1' > "
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -R "$1"
+        else
+            echo >&2
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -I -R "$1"
+        fi
+    else
+        echo "Directory '$1' does not exist."
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
 
 export SYSTEM_CPUS=1
 portable_find_processors() {
@@ -800,31 +823,20 @@ download_netdata_conf() {
 # -----------------------------------------------------------------------------
 # add netdata user and group
 
-NETDATA_ADDED_TO_DOCKER=0
-NETDATA_ADDED_TO_NGINX=0
-NETDATA_ADDED_TO_VARNISH=0
-NETDATA_ADDED_TO_HAPROXY=0
-NETDATA_ADDED_TO_ADM=0
-NETDATA_ADDED_TO_NSD=0
-NETDATA_ADDED_TO_PROXY=0
-NETDATA_ADDED_TO_SQUID=0
-NETDATA_ADDED_TO_CEPH=0
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph"
+NETDATA_ADDED_TO_GROUPS=""
 add_netdata_user_and_group() {
-    local homedir="${1}"
+    local homedir="${1}" g
 
     if [ ${UID} -eq 0 ]
         then
         portable_add_group netdata || return 1
         portable_add_user netdata "${homedir}"  || return 1
-        portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
-        portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
-        portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
-        portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
-        portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
-        portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-        portable_add_user_to_group proxy    netdata && NETDATA_ADDED_TO_PROXY=1
-        portable_add_user_to_group squid    netdata && NETDATA_ADDED_TO_SQUID=1
-        portable_add_user_to_group ceph     netdata && NETDATA_ADDED_TO_CEPH=1
+
+        for g in ${NETDATA_WANTED_GROUPS}
+        do
+            portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+        done
 
         [ ~netdata = / ] && cat <<USERMOD
 
