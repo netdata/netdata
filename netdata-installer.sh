@@ -1026,24 +1026,17 @@ if [ "\$1" != "--force" ]
     exit 1
 fi
 
-echo >&2 "Stopping a possibly running netdata..."
-for p in \$(pidof netdata); do kill \$p; done
-sleep 2
+source installer/functions.sh || exit 1
 
-deletedir() {
-    if [ ! -z "\$1" -a -d "\$1" ]
-        then
-        echo
-        echo "Deleting directory '\$1' ..."
-        rm -I -R "\$1"
-    fi
-}
+echo >&2 "Stopping a possibly running netdata..."
+for p in \$(pidof netdata); do run kill \$p; done
+sleep 2
 
 if [ ! -z "${NETDATA_PREFIX}" -a -d "${NETDATA_PREFIX}" ]
     then
     # installation prefix was given
 
-    deletedir "${NETDATA_PREFIX}"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}"
 
 else
     # installation prefix was NOT given
@@ -1051,48 +1044,48 @@ else
     if [ -f "${NETDATA_PREFIX}/usr/sbin/netdata" ]
         then
         echo "Deleting ${NETDATA_PREFIX}/usr/sbin/netdata ..."
-        rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
+        run rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
     fi
 
-    deletedir "${NETDATA_PREFIX}/etc/netdata"
-    deletedir "${NETDATA_PREFIX}/usr/share/netdata"
-    deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
-    deletedir "${NETDATA_PREFIX}/var/lib/netdata"
-    deletedir "${NETDATA_PREFIX}/var/cache/netdata"
-    deletedir "${NETDATA_PREFIX}/var/log/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/etc/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/share/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/libexec/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/lib/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/cache/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/log/netdata"
 fi
 
 if [ -f /etc/logrotate.d/netdata ]
     then
     echo "Deleting /etc/logrotate.d/netdata ..."
-    rm -i /etc/logrotate.d/netdata
+    run rm -i /etc/logrotate.d/netdata
 fi
 
 if [ -f /etc/systemd/system/netdata.service ]
     then
     echo "Deleting /etc/systemd/system/netdata.service ..."
-    rm -i /etc/systemd/system/netdata.service
+    run rm -i /etc/systemd/system/netdata.service
 fi
 
 if [ -f /etc/init.d/netdata ]
     then
     echo "Deleting /etc/init.d/netdata ..."
-    rm -i /etc/init.d/netdata
+    run rm -i /etc/init.d/netdata
 fi
 
 if [ -f /etc/periodic/daily/netdata-updater ]
     then
     echo "Deleting /etc/periodic/daily/netdata-updater ..."
-    rm -i /etc/periodic/daily/netdata-updater
+    run rm -i /etc/periodic/daily/netdata-updater
 fi
 
 if [ -f /etc/cron.daily/netdata-updater ]
     then
     echo "Deleting /etc/cron.daily/netdata-updater ..."
-    rm -i /etc/cron.daily/netdata-updater
+    run rm -i /etc/cron.daily/netdata-updater
 fi
 
-getent passwd netdata > /dev/null
+portable_check_user_exists netdata
 if [ $? -eq 0 ]
     then
     echo
@@ -1101,7 +1094,7 @@ if [ $? -eq 0 ]
     echo "   userdel netdata"
 fi
 
-getent group netdata > /dev/null
+portable_check_group_exists netdata > /dev/null
 if [ $? -eq 0 ]
     then
     echo
@@ -1110,86 +1103,17 @@ if [ $? -eq 0 ]
     echo "   groupdel netdata"
 fi
 
-getent group docker > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the docker group"
-    echo "by running:"
-    echo "   gpasswd -d netdata docker"
-fi
-
-getent group nginx > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NGINX}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the nginx group"
-    echo "by running:"
-    echo "   gpasswd -d netdata nginx"
-fi
-
-getent group varnish > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_VARNISH}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the varnish group"
-    echo "by running:"
-    echo "   gpasswd -d netdata varnish"
-fi
-
-getent group haproxy > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_HAPROXY}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the haproxy group"
-    echo "by running:"
-    echo "   gpasswd -d netdata haproxy"
-fi
-
-getent group adm > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_ADM}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the adm group"
-    echo "by running:"
-    echo "   gpasswd -d netdata adm"
-fi
-
-getent group nsd > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NSD}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the nsd group"
-    echo "by running:"
-    echo "   gpasswd -d netdata nsd"
-fi
-
-getent group proxy > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_PROXY}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the proxy group"
-    echo "by running:"
-    echo "   gpasswd -d netdata proxy"
-fi
-
-getent group squid > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_SQUID}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the squid group"
-    echo "by running:"
-    echo "   gpasswd -d netdata squid"
-fi
-
-getent group ceph > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_CEPH}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the squid group"
-    echo "by running:"
-    echo "   gpasswd -d netdata ceph"
-fi
+for g in ${NETDATA_ADDED_TO_GROUPS}
+do
+    portable_check_group_exists \$g > /dev/null
+    if [ $? -eq 0 ]
+        then
+        echo
+        echo "You may also want to remove the netdata user from the \$g group"
+        echo "by running:"
+        echo "   gpasswd -d netdata \$g"
+    fi
+done
 
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
