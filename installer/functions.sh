@@ -168,7 +168,7 @@ portable_deletedir_recursively_interactively() {
         if [ "$(uname -s)" = "Darwin" ]
         then
             echo >&2
-            read >&2 "Press ENTER to recursively delete directory '$1' > "
+            read >&2 -p "Press ENTER to recursively delete directory '$1' > "
             echo >&2 "Deleting directory '$1' ..."
             run rm -R "$1"
         else
