@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0+
 #
 # Makeself version 2.3.x
 #  by Stephane Peter <megastep@megastep.org>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 

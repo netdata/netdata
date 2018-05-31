@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0+ */
 #include "config.h"
 #include "common.h"
 #include "clocks.h"

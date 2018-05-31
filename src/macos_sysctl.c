@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 #include <Availability.h>
 #include <sys/sysctl.h>

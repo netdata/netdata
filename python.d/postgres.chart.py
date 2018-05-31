@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: example netdata python.d module
 # Authors: facetoe, dangtranhoang
+# SPDX-License-Identifier: GPL-3.0+
 
 from copy import deepcopy
 

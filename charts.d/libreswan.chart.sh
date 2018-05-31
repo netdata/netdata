@@ -1,9 +1,9 @@
 # no need for shebang - this file is loaded from charts.d.plugin
+# SPDX-License-Identifier: GPL-3.0+
 
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2018 Costa Tsaousis <costa@tsaousis.gr>
-# GPL v3+
 #
 
 # _update_every is a special variable - it holds the number of seconds

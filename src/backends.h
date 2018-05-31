@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_BACKENDS_H
 #define NETDATA_BACKENDS_H 1
 

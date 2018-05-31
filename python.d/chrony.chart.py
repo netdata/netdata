@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: chrony netdata python.d module
 # Author: Dominik Schloesser (domschl)
+# SPDX-License-Identifier: GPL-3.0+
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 /*
  * procfile is a library for reading kernel files from /proc
  *

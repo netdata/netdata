@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: NSD `nsd-control stats_noreset` netdata python.d module
 # Author: <383c57 at gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 
 import re
 

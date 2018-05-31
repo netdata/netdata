@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0+
 %global contentdir %{_datadir}/netdata
 
 # This is temporary and should eventually be resolved. This bypasses

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: go_expvar netdata python.d module
 # Author: Jan Kral (kralewitz)
+# SPDX-License-Identifier: GPL-3.0+
 
 from __future__ import division
 import json

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: cpufreq netdata python.d module
 # Author: Pawel Krupa (paulfantom) and Steven Noonan (tycho)
+# SPDX-License-Identifier: GPL-3.0+
 
 import glob
 import os

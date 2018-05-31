@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: tomcat netdata python.d module
 # Author: Wing924
+# SPDX-License-Identifier: GPL-3.0+
 
 import json
 from bases.FrameworkServices.UrlService import UrlService

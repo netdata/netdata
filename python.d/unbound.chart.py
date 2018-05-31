@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: unbound netdata python.d module
 # Author: Austin S. Hemmelgarn (Ferroin)
+# SPDX-License-Identifier: GPL-3.0+
 
 import os
 

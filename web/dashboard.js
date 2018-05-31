@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 // ----------------------------------------------------------------------------
 // You can set the following variables before loading this script:
 

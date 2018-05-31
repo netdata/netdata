@@ -1,4 +1,5 @@
 # no shebang necessary - this is a library to be sourced
+# SPDX-License-Identifier: GPL-3.0+
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
