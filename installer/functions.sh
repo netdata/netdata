@@ -833,9 +833,9 @@ add_netdata_user_and_group() {
         portable_add_group netdata || return 1
         portable_add_user netdata "${homedir}"  || return 1
 
-        for x in ${NETDATA_WANTED_GROUPS}
+        for g in ${NETDATA_WANTED_GROUPS}
         do
-            portable_add_user_to_group ${x} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${x}"
+            portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
         done
 
         [ ~netdata = / ] && cat <<USERMOD
