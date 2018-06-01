@@ -2,7 +2,7 @@
 import ctypes
 # import os
 
-CLOCK_MONOTONIC_RAW = 4  # see <linux/time.h>
+CLOCK_MONOTONIC = 1  # see <linux/time.h>
 
 
 class _Timespec(ctypes.Structure):
@@ -19,7 +19,7 @@ _clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(_Timespec)]
 
 def time():
     t = _Timespec()
-    if _clock_gettime(CLOCK_MONOTONIC_RAW, ctypes.pointer(t)) != 0:
+    if _clock_gettime(CLOCK_MONOTONIC, ctypes.pointer(t)) != 0:
         # errno_ = ctypes.get_errno()
         # raise OSError(errno_, os.strerror(errno_))
         return None
