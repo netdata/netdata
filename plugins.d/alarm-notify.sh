@@ -717,7 +717,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
-        -o "${SEND_ROCKETCHAT}"       = "YES" \
+        -o "${SEND_ROCKETCHAT}"  = "YES" \
         -o "${SEND_ALERTA}"      = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
