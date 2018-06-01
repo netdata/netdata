@@ -40,9 +40,9 @@ EXTRA_DIST = \
 	autogen.sh \
 	README.md \
 	LICENSE \
+	LICENSES/GPL-3.0 \
 	LICENSE.md \
 	LICENSE-REDISTRIBUTED.md \
-	COPYING \
 	autogen.sh \
 	$(NULL)
 
