@@ -8,8 +8,8 @@ Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 ## Re-distributed software
 
 Netdata re-distributes the following third party software.
-We decided to re-distribute all these, instead of using them
-through a CDN, to allow netdata work in cases where internet
+We have decided to re-distribute all these, instead of using them
+through a CDN, to allow netdata to work in cases where internet
 connectivity is not available.
 
 
