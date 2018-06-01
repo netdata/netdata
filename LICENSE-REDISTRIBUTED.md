@@ -55,10 +55,10 @@ connectivity is not available.
     [Simplified BSD License](http://morrisjs.github.io/morris.js/)
 
 
-- [Raphaël](http://raphaeljs.com/)
+- [Raphaël](http://dmitrybaranovskiy.github.io/raphael/)
 
     Copyright 2008, Dmitry Baranovskiy
-    [MIT License](http://raphaeljs.com/license.html)
+    [MIT License](http://dmitrybaranovskiy.github.io/raphael/license.html)
 
 
 - [C3](http://c3js.org/)
