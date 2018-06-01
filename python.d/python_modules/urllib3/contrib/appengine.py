@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 This module provides a pool manager that uses Google App Engine's
 `URLFetch Service <https://cloud.google.com/appengine/docs/python/urlfetch>`_.
