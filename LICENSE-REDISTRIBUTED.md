@@ -119,7 +119,8 @@ connectivity is not available.
 
     Created by Dave Gandy
     Font license: [SIL OFL 1.1](http://scripts.sil.org/OFL)
-    CSS license: [MIT License](http://opensource.org/licenses/mit-license.html)
+    Icon license [Creative Commons Attribution 4.0 (CC-BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+    Code license: [MIT License](http://opensource.org/licenses/mit-license.html)
 
 
 - [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
