@@ -3,8 +3,10 @@
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
     struct timeval tv;
-    if(unlikely(gettimeofday(&tv, NULL) == -1))
+    if(unlikely(gettimeofday(&tv, NULL) == -1)) {
+        error("gettimeofday() failed.");
         return -1;
+    }
     ts->tv_sec = tv.tv_sec;
     ts->tv_nsec = (tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC;
     return 0;
@@ -13,15 +15,19 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
 
 static inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1))
+    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
+    }
     return ts.tv_sec;
 }
 
 static inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1))
+    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
+    }
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
@@ -29,6 +35,7 @@ static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
         return -1;
