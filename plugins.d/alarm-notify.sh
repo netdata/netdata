@@ -248,6 +248,11 @@ SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
 
+# rocketchat configs
+ROCKETCHAT_WEBHOOK_URL=
+DEFAULT_RECIPIENT_ROCKETCHAT=
+declare -A role_recipients_rocketchat=()
+
 # alerta configs
 ALERTA_WEBHOOK_URL=
 ALERTA_API_KEY=
@@ -414,6 +419,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
 declare -A arr_discord=()
@@ -510,6 +516,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # rocketchat
+    a="${role_recipients_rocketchat[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality rocketchat "${r}" && arr_rocketchat[${r/|*/}]="1"
+    done
+
     # alerta
     a="${role_recipients_alerta[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ALERTA}"
@@ -571,6 +585,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of rocketchat recipients (channels)
+to_rocketchat="${!arr_rocketchat[*]}"
+[ -z "${to_rocketchat}" ] && SEND_ROCKETCHAT="NO"
 
 # build the list of alerta recipients (channels)
 to_alerta="${!arr_alerta[*]}"
@@ -643,6 +661,9 @@ to_syslog="${!arr_syslog[*]}"
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
+# check rocketchat
+[ -z "${ROCKETCHAT_WEBHOOK_URL}" ] && SEND_ROCKETCHAT="NO"
+
 # check alerta
 [ -z "${ALERTA_WEBHOOK_URL}" ] && SEND_ALERTA="NO"
 
@@ -696,6 +717,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_ROCKETCHAT}"       = "YES" \
         -o "${SEND_ALERTA}"      = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
@@ -717,6 +739,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
         SEND_DISCORD="NO"
@@ -756,6 +779,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_ROCKETCHAT}"     != "YES" \
     -a "${SEND_ALERTA}"         != "YES" \
     -a "${SEND_FLOCK}"          != "YES" \
     -a "${SEND_DISCORD}"        != "YES" \
@@ -1349,6 +1373,71 @@ EOF
     return 1
 }
 
+
+# -----------------------------------------------------------------------------
+# rocketchat sender
+
+send_rocketchat() {
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_ROCKETCHAT}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
+    esac
+
+    for channel in ${channels}
+    do
+        payload="$(cat <<EOF
+        {
+            "channel": "#${channel}",
+            "alias": "netdata on ${host}",
+            "avatar": "${images_base_url}/images/seo-performance-128.png",
+            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "attachments": [
+                {
+                    "color": "${color}",
+                    "title": "${alarm}",
+                    "title_link": "${goto_url}",
+                    "text": "${info}",
+                    "fields": [
+                        {
+                            "title": "${chart}",
+                            "short": true,
+                            "value": "chart"
+                        },
+                        {
+                            "title": "${family}",
+                            "short": true,
+                            "value": "family"
+                        }
+                    ],
+                    "thumb_url": "${image}",
+                    "ts": "${when}"
+                }
+            ]
+        }
+EOF
+        )"
+
+        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
 # -----------------------------------------------------------------------------
 # alerta sender
 
@@ -1727,6 +1816,15 @@ send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
+# send the rocketchat notification
+
+# rocketchat aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_rocketchat "${ROCKETCHAT_WEBHOOK_URL}" "${to_rocketchat}"
+SENT_ROCKETCHAT=$?
+
+# -----------------------------------------------------------------------------
 # send the alerta notification
 
 # alerta aggregates posts from the same username
@@ -2022,6 +2120,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
     -o ${SENT_DISCORD}      -eq 0 \
