@@ -15,10 +15,6 @@ from re import sub
 from sys import version_info, argv
 from time import sleep
 
-try:
-    from time import monotonic as time
-except ImportError:
-    from time import time
 
 PY_VERSION = version_info[:2]
 PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
