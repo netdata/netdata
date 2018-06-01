@@ -46,7 +46,7 @@ connectivity is not available.
 - [Peity](http://benpickles.github.io/peity/)
 
     Copyright 2009-2015, Ben Pickles
-    [MIT License](https://github.com/benpickles/peity/blob/master/MIT-LICENCE)
+    [MIT License](https://github.com/benpickles/peity/blob/master/LICENCE)
 
 
 - [morris.js](http://morrisjs.github.io/morris.js/)
