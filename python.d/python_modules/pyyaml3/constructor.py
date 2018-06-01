@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 __all__ = ['BaseConstructor', 'SafeConstructor', 'Constructor',
     'ConstructorError']

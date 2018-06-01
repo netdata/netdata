@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 # Scanner produces tokens of the following types:
 # STREAM-START
