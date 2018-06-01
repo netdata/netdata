@@ -80,6 +80,7 @@ dist_bases_DATA = \
     python_modules/bases/collection.py \
     python_modules/bases/loaders.py \
     python_modules/bases/loggers.py \
+    python_modules/bases/monotonic.py \
     $(NULL)
 
 bases_framework_servicesdir=$(basesdir)/FrameworkServices
