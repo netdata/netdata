@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-2.1
 """
 @package sensors.py
 Python Bindings for libsensors3
