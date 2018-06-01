@@ -161,7 +161,7 @@ connectivity is not available.
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
     Copyright 2006, Kirill Simonov
-    [MIT License](http://pyyaml.org)
+    [MIT License](https://github.com/yaml/pyyaml)
 
 
 - [urllib3](https://github.com/shazow/urllib3)
