@@ -15,19 +15,19 @@ ORDER = ['monnodes','monlabels','monrels']
 
 CHARTS = {
     'monnodes': {
-        'options': [None, 'Nodes count', 'Nodes', 'Node count', 'neo4j', 'line'],
+        'options': [None, 'nodes count', 'nodes', 'node count', 'neo4j', 'line'],
         'lines': [
              ['id', 'name', 'absolute', 1, 1, 'hidden']
         ]
     },
     'monrels': {
-        'options': [None, 'Relations count', 'Nodes', 'Most present relations', 'neo4j', 'line'],
+        'options': [None, 'relations count', 'nodes', 'most present relations', 'neo4j', 'line'],
         'lines': [
              ['id', 'name', 'absolute', 1, 1, 'hidden']
         ]
     },
     'monlabels': {
-        'options': [None, 'Relations count', 'Nodes', 'Most present labels', 'neo4j', 'line'],
+        'options': [None, 'relations count', 'nodes', 'most present labels', 'neo4j', 'line'],
         'lines': [
             ['id', 'name', 'absolute', 1, 1, 'hidden']
         ]
@@ -35,6 +35,22 @@ CHARTS = {
 
 
 }
+
+# nodes (total)
+class Monnodes:
+    name = "monnodes"
+    query = "MATCH (n) RETURN 'Total' AS label, count(n) AS cnt"
+
+# relations (top 5)
+class Monrels:
+        name = "monrels"
+        query = "MATCH (n)-[r]-(m) RETURN type(r) as label, count(r) AS cnt ORDER BY cnt DESC LIMIT 5"
+
+# labels (top 5)
+class Monlabels:
+        name = "monlabels"
+        query = "MATCH (a) WITH DISTINCT LABELS(a) AS temp, COUNT(a) AS tempCnt UNWIND temp AS label RETURN label, SUM(tempCnt) AS cnt ORDER BY cnt DESC LIMIT 5"
+
 
 class Service(SimpleService):
 
@@ -44,6 +60,11 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.neosession = None
         self.alive = True
+        
+        self.host = self.configuration.get('host')
+        self.boltport = self.configuration.get('port','7687')
+        self.uri = "bolt://" + self.host + ":" + self.boltport
+        self.neodriver = GraphDatabase.driver(self.uri, auth=(self.configuration.get('user'), self.configuration.get('pwd') ))
 
     def __exit__(self, exc_type, exc_value, traceback):
        if NEO4JDRIVER:
@@ -66,7 +87,8 @@ class Service(SimpleService):
                         self.charts[chartName].add_dimension([ neorecord["label"] ])
                     data[ neorecord["label"] ]  = neorecord["cnt"]
                     tx.close()
-        except Exception:
+        except Exception as ex:
+            self.error(str(ex))
             return None
 
     def get_data(self):
@@ -84,21 +106,16 @@ class Service(SimpleService):
         data = dict()
 
         # nodes (total)
-        self.get_data_from_cypher_query( 'monnodes',data, "MATCH (n) RETURN 'Total' AS label, count(n) AS cnt")
+        self.get_data_from_cypher_query( Monnodes.name,data, Monnodes.query)
 
         # relations (top 5)
-        self.get_data_from_cypher_query( 'monrels',data,  "MATCH (n)-[r]-(m) RETURN type(r) as label, count(r) AS cnt ORDER BY cnt DESC LIMIT 5")
+        self.get_data_from_cypher_query( Monrels.name,data,Monrels.query)
 
         # labels (top 5)
-        self.get_data_from_cypher_query( 'monlabels',data,  "MATCH (a) WITH DISTINCT LABELS(a) AS temp, COUNT(a) AS tempCnt UNWIND temp AS label RETURN label, SUM(tempCnt) AS cnt ORDER BY cnt DESC LIMIT 5")
+        self.get_data_from_cypher_query( Monlabels.name,data, Monlabels.query)
         return data
 
     def connect(self):
-        host = self.configuration.get('host')
-        boltport = self.configuration.get('port','7687')
-        uri = "bolt://" + host + ":" + boltport
-        self.neodriver = GraphDatabase.driver(uri, auth=(self.configuration.get('user'), self.configuration.get('pwd') ))
-
         if self.neosession == None:
             self.neosession = self.neodriver.session()
 
@@ -108,6 +125,7 @@ class Service(SimpleService):
             self.alive = True
             return True
         except Exception:
+            self.alive = False
             return False
 
     def is_alive(self):
