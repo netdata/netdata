@@ -50,7 +50,7 @@ RE = re.compile(r'([A-Z_]+): ([0-9.]+)')
 class DataFile:
     def __init__(self, abs_path):
         self.path = abs_path
-        self.mtime = os.stat(abs_path).st_mtime
+        self.mtime = 0
 
     def is_updated(self):
         o = self.mtime
