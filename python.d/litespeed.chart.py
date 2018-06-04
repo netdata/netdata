@@ -6,6 +6,8 @@ import glob
 import re
 import os
 
+from collections import defaultdict
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
@@ -99,6 +101,8 @@ class Service(SimpleService):
         Format data received from http request
         :return: dict
         """
+        data = defaultdict(int)
+
         for f in self.files:
             try:
                 if not f.is_updated():
@@ -109,18 +113,22 @@ class Service(SimpleService):
                 self.error(err)
                 return None
             else:
-                self.parse_file(lines)
+                parse_file(data, lines)
+
+        if data:
+            self.data = dict(data)
 
         return self.data
 
-    def parse_file(self, lines):
-        for line in lines:
-            if not line.startswith("REQ_RATE []"):
-                continue
-            m = dict(RE.findall(line))
-            for k, d in KEYS:
-                self.data[d] = float(m[k]) * 100 if k in m else 0
-            break
+
+def parse_file(data, lines):
+    for line in lines:
+        if not line.startswith("REQ_RATE []"):
+            continue
+        m = dict(RE.findall(line))
+        for k, d in KEYS:
+            data[d] += float(m[k]) * 100 if k in m else 0
+        break
 
 
 def is_readable_file(v):
