@@ -14,32 +14,52 @@ from bases.FrameworkServices.SimpleService import SimpleService
 update_every = 10
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['requests', 'pub_cache_hits', 'priv_cache_hits', 'static_hits']
+ORDER = [
+    'net_throughput_http', 'net_throughput_https',
+    'requests', 'pub_cache_hits', 'priv_cache_hits', 'static_hits']
 
 CHARTS = {
-    'requests': {
-        'options': [None, 'Requests', 'req/sec', 'requests', 'litespeed.requests', 'line'],
+    'net_throughput_http': {
+        'options': [
+            None, 'Network Throughput HTTP', 'kilobytes/s', 'net throughput', 'litespeed.net_throughput', 'area'],
         'lines': [
-            ["requests", None, "incremental", 1, 100]
+            ["bps_in", "in", "absolute"],
+            ["bps_out", "out", "absolute", -1]
+        ]},
+    'net_throughput_https': {
+        'options': [
+            None, 'Network Throughput HTTPS', 'kilobytes/s', 'net throughput', 'litespeed.net_throughput', 'area'],
+        'lines': [
+            ["ssl_bps_in", "in", "absolute"],
+            ["ssl_bps_out", "out", "absolute", -1]
+        ]},
+    'requests': {
+        'options': [None, 'Requests', 'req/s', 'requests', 'litespeed.requests', 'line'],
+        'lines': [
+            ["requests", None, "incremental"]
         ]},
     'pub_cache_hits': {
-        'options': [None, 'Public Cache Hits', 'hits/sec', 'cache', 'litespeed.pub_cache', 'line'],
+        'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.pub_cache', 'line'],
         'lines': [
-            ["pub_cache_hits", "hits", "incremental", 1, 100]
+            ["pub_cache_hits", "hits", "incremental"]
         ]},
     'priv_cache_hits': {
-        'options': [None, 'Private Cache Hits', 'hits/sec', 'cache', 'litespeed.priv_cache', 'line'],
+        'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.priv_cache', 'line'],
         'lines': [
-            ["priv_cache_hits", "hits", "incremental", 1, 100]
+            ["priv_cache_hits", "hits", "incremental"]
         ]},
     'static_hits': {
-        'options': [None, 'Static Hits', 'hits/sec', 'static', 'litespeed.static', 'line'],
+        'options': [None, 'Static Hits', 'hits/s', 'static', 'litespeed.static', 'line'],
         'lines': [
-            ["static_hits", "hits", "incremental", 1, 100]
+            ["static_hits", "hits", "incremental"]
         ]},
 }
 
 KEYS = [
+    ('BPS_IN', 'bps_in'),
+    ('BPS_OUT', 'bps_out'),
+    ('SSL_BPS_IN', 'ssl_bps_in'),
+    ('SSL_BPS_OUT', 'ssl_bps_out'),
     ('TOT_REQS', 'requests'),
     ('TOTAL_PUB_CACHE_HITS', 'pub_cache_hits'),
     ('TOTAL_PRIVATE_CACHE_HITS', 'priv_cache_hits'),
@@ -69,6 +89,10 @@ class Service(SimpleService):
         self.path = self.configuration.get('path')
         self.files = list()
         self.data = {
+            "bps_in": 0,
+            "bps_out": 0,
+            "ssl_bps_in": 0,
+            "ssl_bps_out": 0,
             "requests": 0,
             "pub_cache_hits": 0,
             "priv_cache_hits": 0,
@@ -123,12 +147,12 @@ class Service(SimpleService):
 
 def parse_file(data, lines):
     for line in lines:
-        if not line.startswith("REQ_RATE []"):
+        if not line.startswith(("BPS_IN", "REQ_RATE []")):
             continue
         m = dict(RE.findall(line))
         for k, d in KEYS:
-            data[d] += float(m[k]) * 100 if k in m else 0
-        break
+            if k in m:
+                data[d] += int(m[k])
 
 
 def is_readable_file(v):
