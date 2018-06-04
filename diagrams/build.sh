@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0+
 
 path=$(dirname "$0")
 cd "${path}" || exit 1
