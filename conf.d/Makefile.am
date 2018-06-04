@@ -48,6 +48,7 @@ dist_pythonconfig_DATA = \
     python.d/icecast.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
+    python.d/litespeed.conf \
     python.d/mdstat.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
