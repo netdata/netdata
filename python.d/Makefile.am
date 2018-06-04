@@ -99,6 +99,7 @@ dist_third_party_DATA = \
     python_modules/third_party/__init__.py \
     python_modules/third_party/ordereddict.py \
     python_modules/third_party/lm_sensors.py \
+    python_modules/third_party/mcrcon.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
