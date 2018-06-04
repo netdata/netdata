@@ -52,7 +52,7 @@ class DataFile:
         self.path = abs_path
         self.mtime = os.stat(abs_path).st_mtime
 
-    def is_changed(self):
+    def is_updated(self):
         o = self.mtime
         n = os.stat(self.path).st_mtime
         self.mtime = n
@@ -101,7 +101,7 @@ class Service(SimpleService):
         """
         for f in self.files:
             try:
-                if not f.is_changed():
+                if not f.is_updated():
                     continue
                 with open(f.path) as b:
                     lines = b.readlines()
