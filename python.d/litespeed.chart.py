@@ -8,6 +8,9 @@ import os
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
+
+update_every = 10
+
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['requests', 'pub_cache_hits', 'priv_cache_hits', 'static_hits']
 
@@ -80,6 +83,8 @@ class Service(SimpleService):
         if not fs:
             self.error('"{0}" has no "rtreport" files or dir is not readable'.format(self.path))
             return None
+
+        self.debug("stats files:", fs)
 
         for f in fs:
             if not is_readable_file(f):
