@@ -17,6 +17,7 @@ dist_python_DATA = \
     apache.chart.py \
     beanstalk.chart.py \
     bind_rndc.chart.py \
+    boinc.chart.py \
     ceph.chart.py \
     chrony.chart.py \
     couchdb.chart.py \
