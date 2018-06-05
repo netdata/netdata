@@ -1009,6 +1009,15 @@ It produces:
 
 6. **Requests In Processing** in requests
  * processing
+ 
+7. **Public Cache Hits** in hits/s
+ * hits
+ 
+8. **Private Cache Hits** in hits/s
+ * hits
+ 
+9. **Static Hits** in hits/s
+ * hits 
 
 
 ### configuration
