@@ -16,6 +16,7 @@ update_every = 10
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'net_throughput_http', 'net_throughput_https',
+    'connections_http', 'connections_https',
     'requests', 'pub_cache_hits', 'private_cache_hits', 'static_hits']
 
 CHARTS = {
@@ -32,6 +33,20 @@ CHARTS = {
         'lines': [
             ["ssl_bps_in", "in", "absolute"],
             ["ssl_bps_out", "out", "absolute", -1]
+        ]},
+    'connections_http': {
+        'options': [
+            None, 'Connections HTTP', 'conns', 'connections', 'litespeed.connections', 'stack'],
+        'lines': [
+            ["conn_free", "free", "absolute"],
+            ["conn_used", "used", "absolute"]
+        ]},
+    'connections_https': {
+        'options': [
+            None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stack'],
+        'lines': [
+            ["ssl_conn_free", "free", "absolute"],
+            ["ssl_conn_used", "used", "absolute"]
         ]},
     'requests': {
         'options': [None, 'Requests', 'req/s', 'requests', 'litespeed.requests', 'line'],
@@ -66,6 +81,10 @@ T = [
     t("PUB_CACHE_HITS_PER_SEC", "pub_cache_hits", 100),
     t("PRIVATE_CACHE_HITS_PER_SEC", "private_cache_hits", 100),
     t("STATIC_HITS_PER_SEC", "static_hits", 100),
+    t("PLAINCONN", "conn_used", 1),
+    t("AVAILCONN", "conn_free", 1),
+    t("SSLCONN", "ssl_conn_used", 1),
+    t("AVAILSSL", "ssl_conn_free", 1),
 ]
 
 RE = re.compile(r'([A-Z_]+): ([0-9.]+)')
@@ -79,6 +98,10 @@ ZERO_DATA = {
     "pub_cache_hits": 0,
     "private_cache_hits": 0,
     "static_hits": 0,
+    "conn_used": 0,
+    "conn_free": 0,
+    "ssl_conn_used": 0,
+    "ssl_conn_free": 0,
     }
 
 
@@ -150,7 +173,7 @@ class Service(SimpleService):
 
 def parse_file(data, lines):
     for line in lines:
-        if not line.startswith(("BPS_IN", "REQ_RATE []")):
+        if not line.startswith(("BPS_IN:", "MAXCONN:", "REQ_RATE []:")):
             continue
         m = dict(RE.findall(line))
         for v in T:
