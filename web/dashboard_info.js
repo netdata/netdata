@@ -381,7 +381,7 @@ netdataDashboard.menu = {
     },
 
     'boinc': {
-        title: 'BOINC'
+        title: 'BOINC',
         icon: '<i class="fas fa-microchip"></i>',
         info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
     }
@@ -2129,7 +2129,7 @@ netdataDashboard.context = {
     },
 
     'boinc.tasks': {
-        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
     },
 
     'boinc.states': {

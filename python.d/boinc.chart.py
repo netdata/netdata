@@ -6,8 +6,6 @@
 import platform
 import socket
 
-from copy import deepcopy
-
 from bases.FrameworkServices.SimpleService import SimpleService
 
 from third_party import boinc_client
@@ -127,10 +125,7 @@ class Service(SimpleService):
             self.error('Only supported on Linux.')
             return False
         self.connect()
-        if self.client.connected and self.client.authorized:
-            self.alive = True
-        else:
-            self.alive = False
+        self.alive = self.client.connected and self.client.authorized:
         return self.alive
 
     def connect(self):
@@ -142,10 +137,7 @@ class Service(SimpleService):
         except socket.error:
             pass
         self.client.connect()
-        if self.client.connected and self.client.authorized:
-            self.alive = True
-        else:
-            self.alive = False
+        self.alive = self.client.connected and self.client.authorized:
         return self.alive
 
     def is_alive(self):
@@ -157,7 +149,7 @@ class Service(SimpleService):
     def _get_data(self):
         if not self.is_alive():
             return None
-        data = deepcopy(_DATA_TEMPLATE)
+        data = dict(_DATA_TEMPLATE)
         results = []
         try:
             results = self.client.get_tasks()
