@@ -22,14 +22,14 @@ ORDER = [
 CHARTS = {
     'net_throughput_http': {
         'options': [
-            None, 'Network Throughput HTTP', 'kilobytes/s', 'net throughput', 'litespeed.net_throughput', 'area'],
+            None, 'Network Throughput HTTP', 'kilobits/s', 'net throughput', 'litespeed.net_throughput', 'area'],
         'lines': [
             ["bps_in", "in", "absolute"],
             ["bps_out", "out", "absolute", -1]
         ]},
     'net_throughput_https': {
         'options': [
-            None, 'Network Throughput HTTPS', 'kilobytes/s', 'net throughput', 'litespeed.net_throughput', 'area'],
+            None, 'Network Throughput HTTPS', 'kilobits/s', 'net throughput', 'litespeed.net_throughput', 'area'],
         'lines': [
             ["ssl_bps_in", "in", "absolute"],
             ["ssl_bps_out", "out", "absolute", -1]
@@ -73,10 +73,10 @@ CHARTS = {
 t = namedtuple("T", ["key", "id", "mul"])
 
 T = [
-    t("BPS_IN", "bps_in", 1),
-    t("BPS_OUT", "bps_out", 1),
-    t("SSL_BPS_IN", "ssl_bps_in", 1),
-    t("SSL_BPS_OUT", "ssl_bps_out", 1),
+    t("BPS_IN", "bps_in", 8),
+    t("BPS_OUT", "bps_out", 8),
+    t("SSL_BPS_IN", "ssl_bps_in", 8),
+    t("SSL_BPS_OUT", "ssl_bps_out", 8),
     t("REQ_PER_SEC", "requests", 100),
     t("PUB_CACHE_HITS_PER_SEC", "pub_cache_hits", 100),
     t("PRIVATE_CACHE_HITS_PER_SEC", "private_cache_hits", 100),
