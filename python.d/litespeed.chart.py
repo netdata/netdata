@@ -15,9 +15,12 @@ update_every = 10
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
-    'net_throughput_http', 'net_throughput_https',
-    'connections_http', 'connections_https',
-    'requests', 'pub_cache_hits', 'private_cache_hits', 'static_hits']
+    'net_throughput_http', 'net_throughput_https',  # net throughput
+    'connections_http', 'connections_https',        # connections
+    'requests', 'requests_processing',              # requests
+    'pub_cache_hits', 'private_cache_hits',         # cache
+    'static_hits'                                   # static
+]
 
 CHARTS = {
     'net_throughput_http': {
@@ -49,9 +52,14 @@ CHARTS = {
             ["ssl_conn_used", "used", "absolute"]
         ]},
     'requests': {
-        'options': [None, 'Requests', 'req/s', 'requests', 'litespeed.requests', 'line'],
+        'options': [None, 'Requests', 'requests/s', 'requests', 'litespeed.requests', 'line'],
         'lines': [
             ["requests", None, "absolute", 1, 100]
+        ]},
+    'requests_processing': {
+        'options': [None, 'Requests In Processing', 'requests', 'requests', 'litespeed.requests_processing', 'line'],
+        'lines': [
+            ["requests_processing", "processing", "absolute"]
         ]},
     'pub_cache_hits': {
         'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
@@ -78,6 +86,7 @@ T = [
     t("SSL_BPS_IN", "ssl_bps_in", 8),
     t("SSL_BPS_OUT", "ssl_bps_out", 8),
     t("REQ_PER_SEC", "requests", 100),
+    t("REQ_PROCESSING", "requests_processing", 1),
     t("PUB_CACHE_HITS_PER_SEC", "pub_cache_hits", 100),
     t("PRIVATE_CACHE_HITS_PER_SEC", "private_cache_hits", 100),
     t("STATIC_HITS_PER_SEC", "static_hits", 100),
@@ -95,6 +104,7 @@ ZERO_DATA = {
     "ssl_bps_in": 0,
     "ssl_bps_out": 0,
     "requests": 0,
+    "requests_processing": 0,
     "pub_cache_hits": 0,
     "private_cache_hits": 0,
     "static_hits": 0,
