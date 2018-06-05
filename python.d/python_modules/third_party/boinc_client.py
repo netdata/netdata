@@ -711,9 +711,7 @@ class BoincClient(object):
         component = component.replace('cpu', 'run')
         component = component.replace('net', 'network')
         try:
-            reply = self.rpc.call("<set_{0}_mode>"
-                                  "<{1}/><duration>{2]</duration>"
-                                  "</set_{0}_mode>".format(component, RunMode.name(mode).lower(), duration))
+            reply = self.rpc.call("<set_{0}_mode><{1}/>\n<duration>{2]</duration>\n</set_{0}_mode>".format(component, RunMode.name(mode).lower(), duration))
             return (reply.tag == 'success')
         except socket.error:
             return False
