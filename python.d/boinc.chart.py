@@ -128,7 +128,7 @@ class Service(SimpleService):
 
     def connect(self):
         self.client.connect()
-        self.alive = self.client.connected and self.client.authorized:
+        self.alive = self.client.connected and self.client.authorized
         return self.alive
 
     def reconnect(self):
