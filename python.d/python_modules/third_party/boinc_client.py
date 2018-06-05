@@ -12,6 +12,7 @@
 
 import hashlib
 import socket
+import sys
 import time
 from functools import total_ordering
 from xml.etree import ElementTree
@@ -82,7 +83,10 @@ class Rpc(object):
 
         # pack request
         end = '\003'
-        req = "<boinc_gui_rpc_request>\n{0}\n</boinc_gui_rpc_request>\n{1}".format(ElementTree.tostring(request).replace(' />', '/>'), end)
+        if sys.version_info[0] < 3:
+            req = "<boinc_gui_rpc_request>\n{0}\n</boinc_gui_rpc_request>\n{1}".format(ElementTree.tostring(request).replace(' />', '/>'), end)
+        else:
+            req = "<boinc_gui_rpc_request>\n{0}\n</boinc_gui_rpc_request>\n{1}".format(ElementTree.tostring(request, encoding='unicode').replace(' />', '/>'), end).encode()
 
         try:
             self.sock.sendall(req)
@@ -95,6 +99,8 @@ class Rpc(object):
                 buf = self.sock.recv(8192)
                 if not buf:
                     raise socket.error("No data from socket")
+                if sys.version_info[0] >= 3:
+                    buf = buf.decode()
             except socket.error:
                 raise
             n = buf.find(end)
