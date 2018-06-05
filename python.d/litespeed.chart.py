@@ -6,7 +6,7 @@ import glob
 import re
 import os
 
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -36,14 +36,14 @@ CHARTS = {
         ]},
     'connections_http': {
         'options': [
-            None, 'Connections HTTP', 'conns', 'connections', 'litespeed.connections', 'stack'],
+            None, 'Connections HTTP', 'conns', 'connections', 'litespeed.connections', 'stacked'],
         'lines': [
             ["conn_free", "free", "absolute"],
             ["conn_used", "used", "absolute"]
         ]},
     'connections_https': {
         'options': [
-            None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stack'],
+            None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stacked'],
         'lines': [
             ["ssl_conn_free", "free", "absolute"],
             ["ssl_conn_used", "used", "absolute"]
@@ -105,18 +105,6 @@ ZERO_DATA = {
     }
 
 
-class DataFile:
-    def __init__(self, abs_path):
-        self.path = abs_path
-        self.mtime = 0
-
-    def is_updated(self):
-        o = self.mtime
-        n = os.stat(self.path).st_mtime
-        self.mtime = n
-        return o != n
-
-
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -142,7 +130,7 @@ class Service(SimpleService):
             if not is_readable_file(f):
                 self.error("{0} is not readable".format(f))
                 continue
-            self.files.append(DataFile(f))
+            self.files.append(f)
 
         return bool(self.files)
 
@@ -151,13 +139,11 @@ class Service(SimpleService):
         Format data received from http request
         :return: dict
         """
-        data = defaultdict(int)
+        data = dict(ZERO_DATA)
 
         for f in self.files:
             try:
-                if not f.is_updated():
-                    continue
-                with open(f.path) as b:
+                with open(f) as b:
                     lines = b.readlines()
             except (OSError, IOError) as err:
                 self.error(err)
@@ -165,10 +151,7 @@ class Service(SimpleService):
             else:
                 parse_file(data, lines)
 
-        if not data:
-            self.debug('"rtreport" files have not been updated, returning zero values')
-            return ZERO_DATA
-        return dict(data)
+        return data
 
 
 def parse_file(data, lines):
