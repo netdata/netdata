@@ -6,7 +6,7 @@ import glob
 import re
 import os
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -16,7 +16,7 @@ update_every = 10
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'net_throughput_http', 'net_throughput_https',
-    'requests', 'pub_cache_hits', 'priv_cache_hits', 'static_hits']
+    'requests', 'pub_cache_hits', 'private_cache_hits', 'static_hits']
 
 CHARTS = {
     'net_throughput_http': {
@@ -36,37 +36,50 @@ CHARTS = {
     'requests': {
         'options': [None, 'Requests', 'req/s', 'requests', 'litespeed.requests', 'line'],
         'lines': [
-            ["requests", None, "incremental"]
+            ["requests", None, "absolute", 1, 100]
         ]},
     'pub_cache_hits': {
-        'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.pub_cache', 'line'],
+        'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
         'lines': [
-            ["pub_cache_hits", "hits", "incremental"]
+            ["pub_cache_hits", "hits", "absolute", 1, 100]
         ]},
-    'priv_cache_hits': {
-        'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.priv_cache', 'line'],
+    'private_cache_hits': {
+        'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
         'lines': [
-            ["priv_cache_hits", "hits", "incremental"]
+            ["private_cache_hits", "hits", "absolute", 1, 100]
         ]},
     'static_hits': {
         'options': [None, 'Static Hits', 'hits/s', 'static', 'litespeed.static', 'line'],
         'lines': [
-            ["static_hits", "hits", "incremental"]
+            ["static_hits", "hits", "absolute", 1, 100]
         ]},
 }
 
-KEYS = [
-    ('BPS_IN', 'bps_in'),
-    ('BPS_OUT', 'bps_out'),
-    ('SSL_BPS_IN', 'ssl_bps_in'),
-    ('SSL_BPS_OUT', 'ssl_bps_out'),
-    ('TOT_REQS', 'requests'),
-    ('TOTAL_PUB_CACHE_HITS', 'pub_cache_hits'),
-    ('TOTAL_PRIVATE_CACHE_HITS', 'priv_cache_hits'),
-    ('TOTAL_STATIC_HITS', 'static_hits'),
+t = namedtuple("T", ["key", "id", "mul"])
+
+T = [
+    t("BPS_IN", "bps_in", 1),
+    t("BPS_OUT", "bps_out", 1),
+    t("SSL_BPS_IN", "ssl_bps_in", 1),
+    t("SSL_BPS_OUT", "ssl_bps_out", 1),
+    t("REQ_PER_SEC", "requests", 100),
+    t("PUB_CACHE_HITS_PER_SEC", "pub_cache_hits", 100),
+    t("PRIVATE_CACHE_HITS_PER_SEC", "private_cache_hits", 100),
+    t("STATIC_HITS_PER_SEC", "static_hits", 100),
 ]
 
 RE = re.compile(r'([A-Z_]+): ([0-9.]+)')
+
+ZERO_DATA = {
+    "bps_in": 0,
+    "bps_out": 0,
+    "ssl_bps_in": 0,
+    "ssl_bps_out": 0,
+    "requests": 0,
+    "pub_cache_hits": 0,
+    "private_cache_hits": 0,
+    "static_hits": 0,
+    }
 
 
 class DataFile:
@@ -88,16 +101,6 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.path = self.configuration.get('path')
         self.files = list()
-        self.data = {
-            "bps_in": 0,
-            "bps_out": 0,
-            "ssl_bps_in": 0,
-            "ssl_bps_out": 0,
-            "requests": 0,
-            "pub_cache_hits": 0,
-            "priv_cache_hits": 0,
-            "static_hits": 0,
-        }
 
     def check(self):
         if not self.path:
@@ -139,10 +142,10 @@ class Service(SimpleService):
             else:
                 parse_file(data, lines)
 
-        if data:
-            self.data = dict(data)
-
-        return self.data
+        if not data:
+            self.debug('"rtreport" files have not been updated, returning zero values')
+            return ZERO_DATA
+        return dict(data)
 
 
 def parse_file(data, lines):
@@ -150,9 +153,9 @@ def parse_file(data, lines):
         if not line.startswith(("BPS_IN", "REQ_RATE []")):
             continue
         m = dict(RE.findall(line))
-        for k, d in KEYS:
-            if k in m:
-                data[d] += int(m[k])
+        for v in T:
+            if v.key in m:
+                data[v.id] += float(m[v.key]) * v.mul
 
 
 def is_readable_file(v):
