@@ -82,8 +82,7 @@ class Rpc(object):
 
         # pack request
         end = '\003'
-        req = "<boinc_gui_rpc_request>\n%s\n</boinc_gui_rpc_request>\n%s" \
-            % (ElementTree.tostring(request).replace(' />','/>'), end)
+        req = "<boinc_gui_rpc_request>\n{0}\n</boinc_gui_rpc_request>\n{1}".format(ElementTree.tostring(request).replace(' />', '/>'), end)
 
         try:
             self.sock.sendall(req)
@@ -169,7 +168,7 @@ def parse_str(e):
 
 
 def parse_list(e):
-    ''' Helper to convert ElementTree.Element to list. For now, simply return
+    ''' Helper to convert  ElementTree.Element to list. For now, simply return
         the list of root element's children
     '''
     return list(e)
@@ -332,15 +331,15 @@ class _Struct(object):
         return setattrs_from_xml(cls(), xml)
 
     def __str__(self, indent=0):
-        buf = '%s%s:\n' % ('\t' * indent, self.__class__.__name__)
+        buf = '{0}{1}:\n'.format('\t' * indent, self.__class__.__name__)
         for attr in self.__dict__:
             value = getattr(self, attr)
             if isinstance(value, list):
-                buf += '%s\t%s [\n' % ('\t' * indent, attr)
-                for v in value: buf += '\t\t%s\t\t,\n' % v
+                buf += '{0}\t{1} [\n'.format('\t' * indent, attr)
+                for v in value: buf += '\t\t{0}\t\t,\n'.format(v)
                 buf += '\t]\n'
             else:
-                buf += '%s\t%s\t%s\n' % ('\t' * indent,
+                buf += '{0}\t{1}\t{2}\n'.format('\t' * indent,
                                          attr,
                                          value.__str__(indent+2)
                                             if isinstance(value, _Struct)
@@ -371,10 +370,10 @@ class VersionInfo(_Struct):
         return self._tuple > other._tuple
 
     def __str__(self):
-        return "%d.%d.%d" % (self.major, self.minor, self.release)
+        return "{0}.{1}.{2}".format(self.major, self.minor, self.release)
 
     def __repr__(self):
-        return "%s%r" % (self.__class__.__name__, self._tuple)
+        return "{0}{1}".format(self.__class__.__name__, self._tuple)
 
 
 class CcStatus(_Struct):
@@ -598,12 +597,12 @@ class Result(_Struct):
         return result
 
     def __str__(self):
-        buf = '%s:\n' % self.__class__.__name__
+        buf = '{0}:\n'.format(self.__class__.__name__)
         for attr in self.__dict__:
             value = getattr(self, attr)
             if attr in ['received_time', 'report_deadline']:
                 value = time.ctime(value)
-            buf += '\t%s\t%r\n' % (attr, value)
+            buf += '\t{0}\t{1}\n'.format(attr, value)
         return buf
 
 
@@ -651,8 +650,8 @@ class BoincClient(object):
         if password is None and not self.hostname:
             password = read_gui_rpc_password() or ""
         nonce = self.rpc.call('<auth1/>').text
-        hash = hashlib.md5('%s%s' % (nonce, password)).hexdigest().lower()
-        reply = self.rpc.call('<auth2><nonce_hash>%s</nonce_hash></auth2>' % hash)
+        authhash = hashlib.md5('{0}{1}'.format(nonce, password).encode()).hexdigest().lower()
+        reply = self.rpc.call('<auth2><nonce_hash>{0}</nonce_hash></auth2>'.format(authhash))
 
         if reply.tag == 'authorized':
             return True
@@ -688,8 +687,7 @@ class BoincClient(object):
             Use CC_STATE::lookup_result() to find this result in the current static state;
             if it's not there, call get_state() again.
         '''
-        reply = self.rpc.call("<get_results><active_only>%d</active_only></get_results>"
-                               % (1 if active_only else 0))
+        reply = self.rpc.call("<get_results><active_only>{0}</active_only></get_results>".format(1 if active_only else 0))
         if not reply.tag == 'results':
             return []
 
@@ -704,15 +702,12 @@ class BoincClient(object):
             This method is not part of the original API.
             Valid components are 'run' (or 'cpu'), 'gpu', 'network' (or 'net')
         '''
-        component = component.replace('cpu','run')
-        component = component.replace('net','network')
+        component = component.replace('cpu', 'run')
+        component = component.replace('net', 'network')
         try:
-            reply = self.rpc.call("<set_%s_mode>"
-                                  "<%s/><duration>%f</duration>"
-                                  "</set_%s_mode>"
-                                  % (component,
-                                     RunMode.name(mode).lower(), duration,
-                                     component))
+            reply = self.rpc.call("<set_{0}_mode>"
+                                  "<{1}/><duration>{2]</duration>"
+                                  "</set_{0}_mode>".format(component, RunMode.name(mode).lower(), duration))
             return (reply.tag == 'success')
         except socket.error:
             return False
