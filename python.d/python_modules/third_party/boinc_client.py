@@ -201,83 +201,6 @@ class Enum(object):
         return cls.name(Enum.UNKNOWN)
 
 
-class NetworkStatus(Enum):
-    ''' Values of "network_status" '''
-    ONLINE                 =    0  #// have network connections open
-    WANT_CONNECTION        =    1  #// need a physical connection
-    WANT_DISCONNECT        =    2  #// don't have any connections, and don't need any
-    LOOKUP_PENDING         =    3  #// a website lookup is pending (try again later)
-
-    @classmethod
-    def name(cls, v):
-        if   v == cls.UNKNOWN:         return "unknown"
-        elif v == cls.ONLINE:          return "online"  # misleading
-        elif v == cls.WANT_CONNECTION: return "need connection"
-        elif v == cls.WANT_DISCONNECT: return "don't need connection"
-        elif v == cls.LOOKUP_PENDING:  return "reference site lookup pending"
-        else: return super(NetworkStatus, cls).name(v)
-
-
-class SuspendReason(Enum):
-    ''' bitmap defs for task_suspend_reason, network_suspend_reason
-        Note: doesn't need to be a bitmap, but keep for compatibility
-    '''
-    NOT_SUSPENDED          =    0  # Not in original API
-    BATTERIES              =    1
-    USER_ACTIVE            =    2
-    USER_REQ               =    4
-    TIME_OF_DAY            =    8
-    BENCHMARKS             =   16
-    DISK_SIZE              =   32
-    CPU_THROTTLE           =   64
-    NO_RECENT_INPUT        =  128
-    INITIAL_DELAY          =  256
-    EXCLUSIVE_APP_RUNNING  =  512
-    CPU_USAGE              = 1024
-    NETWORK_QUOTA_EXCEEDED = 2048
-    OS                     = 4096
-    WIFI_STATE             = 4097
-    BATTERY_CHARGING       = 4098
-    BATTERY_OVERHEATED     = 4099
-
-    @classmethod
-    def name(cls, v):
-        if   v == cls.UNKNOWN:                return "unknown reason"
-        elif v == cls.BATTERIES:              return "on batteries"
-        elif v == cls.USER_ACTIVE:            return "computer is in use"
-        elif v == cls.USER_REQ:               return "user request"
-        elif v == cls.TIME_OF_DAY:            return "time of day"
-        elif v == cls.BENCHMARKS:             return "CPU benchmarks in progress"
-        elif v == cls.DISK_SIZE:              return "need disk space - check preferences"
-        elif v == cls.NO_RECENT_INPUT:        return "no recent user activity"
-        elif v == cls.INITIAL_DELAY:          return "initial delay"
-        elif v == cls.EXCLUSIVE_APP_RUNNING:  return "an exclusive app is running"
-        elif v == cls.CPU_USAGE:              return "CPU is busy"
-        elif v == cls.NETWORK_QUOTA_EXCEEDED: return "network bandwidth limit exceeded"
-        elif v == cls.OS:                     return "requested by operating system"
-        elif v == cls.WIFI_STATE:             return "not connected to WiFi network"
-        elif v == cls.BATTERY_CHARGING:       return "battery is recharging"
-        elif v == cls.BATTERY_OVERHEATED:     return "battery is overheated"
-        else: return super(SuspendReason, cls).name(v)
-
-
-class RunMode(Enum):
-    ''' Run modes for CPU, GPU, network,
-        controlled by Activity menu and snooze button
-    '''
-    ALWAYS                 =    1
-    AUTO                   =    2
-    NEVER                  =    3
-    RESTORE                =    4
-        #// restore permanent mode - used only in set_X_mode() GUI RPC
-
-    @classmethod
-    def name(cls, v):
-        # all other modes use the fallback name
-        if v == cls.AUTO: return "according to prefs"
-        else: return super(RunMode, cls).name(v)
-
-
 class CpuSched(Enum):
     ''' values of ACTIVE_TASK::scheduler_state and ACTIVE_TASK::next_scheduler_state
         "SCHEDULED" is synonymous with "executing" except when CPU throttling
@@ -380,118 +303,6 @@ class VersionInfo(_Struct):
 
     def __repr__(self):
         return "{0}{1}".format(self.__class__.__name__, self._tuple)
-
-
-class CcStatus(_Struct):
-    def __init__(self):
-        self.network_status         = NetworkStatus.UNKNOWN
-        self.ams_password_error     = False
-        self.manager_must_quit      = False
-
-        self.task_suspend_reason    = SuspendReason.UNKNOWN  #// bitmap
-        self.task_mode              = RunMode.UNKNOWN
-        self.task_mode_perm         = RunMode.UNKNOWN        #// same, but permanent version
-        self.task_mode_delay        = 0.0                    #// time until perm becomes actual
-
-        self.network_suspend_reason = SuspendReason.UNKNOWN
-        self.network_mode           = RunMode.UNKNOWN
-        self.network_mode_perm      = RunMode.UNKNOWN
-        self.network_mode_delay     = 0.0
-
-        self.gpu_suspend_reason     = SuspendReason.UNKNOWN
-        self.gpu_mode               = RunMode.UNKNOWN
-        self.gpu_mode_perm          = RunMode.UNKNOWN
-        self.gpu_mode_delay         = 0.0
-
-        self.disallow_attach        = False
-        self.simple_gui_only        = False
-
-
-class HostInfo(_Struct):
-    def __init__(self):
-        self.timezone     = 0    #// local STANDARD time - UTC time (in seconds)
-        self.domain_name  = ""
-        self.ip_addr      = ""
-        self.host_cpid    = ""
-
-        self.p_ncpus      = 0    #// Number of CPUs on host
-        self.p_vendor     = ""   #// Vendor name of CPU
-        self.p_model      = ""   #// Model of CPU
-        self.p_features   = ""
-        self.p_fpops      = 0.0  #// measured floating point ops/sec of CPU
-        self.p_iops       = 0.0  #// measured integer ops/sec of CPU
-        self.p_membw      = 0.0  #// measured memory bandwidth (bytes/sec) of CPU
-            #// The above are per CPU, not total
-        self.p_calculated = 0.0  #// when benchmarks were last run, or zero
-        self.p_vm_extensions_disabled = False
-
-        self.m_nbytes     = 0    #// Size of memory in bytes
-        self.m_cache      = 0    #// Size of CPU cache in bytes (L1 or L2?)
-        self.m_swap       = 0    #// Size of swap space in bytes
-
-        self.d_total      = 0    #// Total disk space on volume containing
-                                    #// the BOINC client directory.
-        self.d_free       = 0    #// how much is free on that volume
-
-        self.os_name      = ""   #// Name of operating system
-        self.os_version   = ""   #// Version of operating system
-
-        #// the following is non-empty if VBox is installed
-        self.virtualbox_version = ""
-
-        self.coprocs = [] # COPROCS
-
-        # The following are currently unused (not in RPC XML)
-        self.serialnum    = ""   #// textual description of coprocessors
-
-    @classmethod
-    def parse(cls, xml):
-        if not isinstance(xml, ElementTree.Element):
-            xml = ElementTree.fromstring(xml)
-
-        # parse main XML
-        hostinfo = super(HostInfo, cls).parse(xml)
-
-        # parse each coproc in coprocs list
-        aux = []
-        for c in hostinfo.coprocs:
-            aux.append(Coproc.parse(c))
-        hostinfo.coprocs = aux
-
-        return hostinfo
-
-
-class Coproc(_Struct):
-    ''' represents a set of identical coprocessors on a particular computer.
-        Abstract class;
-        objects will always be a derived class (COPROC_CUDA, COPROC_ATI)
-        Used in both client and server.
-    '''
-    def __init__(self):
-        self.type        = ""     #// must be unique
-        self.count       = 0      #// how many are present
-        self.peak_flops  = 0.0
-        self.used        = 0.0    #// how many are in use (used by client)
-        self.have_cuda   = False  #// True if this GPU supports CUDA on this computer
-        self.have_cal    = False  #// True if this GPU supports CAL on this computer
-        self.have_opencl = False  #// True if this GPU supports openCL on this computer
-        self.available_ram = 0
-        self.specified_in_config = False
-            #// If true, this coproc was listed in cc_config.xml
-            #// rather than being detected by the client.
-
-        #// the following are used in both client and server for work-fetch info
-        self.req_secs = 0.0
-            #// how many instance-seconds of work requested
-        self.req_instances = 0.0
-            #// client is requesting enough jobs to use this many instances
-        self.estimated_delay = 0
-            #// resource will be saturated for this long
-
-        self.opencl_device_count = 0
-        self.last_print_time = 0.0
-
-        #self.opencl_prop = None  # OPENCL_DEVICE_PROP
 
 
 class Result(_Struct):
@@ -668,20 +479,6 @@ class BoincClient(object):
         ''' Return VersionInfo instance with core client version info '''
         return VersionInfo.parse(self.rpc.call('<exchange_versions/>'))
 
-    def get_cc_status(self):
-        ''' Return CcStatus instance containing basic status, such as
-            CPU / GPU / Network active/suspended, etc
-        '''
-        if not self.connected: self.connect()
-        try:
-            return CcStatus.parse(self.rpc.call('<get_cc_status/>'))
-        except socket.error:
-            self.connected = False
-
-    def get_host_info(self):
-        ''' Get information about host hardware and usage. '''
-        return HostInfo.parse(self.rpc.call('<get_host_info/>'))
-
     def get_tasks(self):
         ''' Same as get_results(active_only=False) '''
         return self.get_results(False)
@@ -702,50 +499,6 @@ class BoincClient(object):
             results.append(Result.parse(item))
 
         return results
-
-    def set_mode(self, component, mode, duration=0):
-        ''' Do the real work of set_{run,gpu,network}_mode()
-            This method is not part of the original API.
-            Valid components are 'run' (or 'cpu'), 'gpu', 'network' (or 'net')
-        '''
-        component = component.replace('cpu', 'run')
-        component = component.replace('net', 'network')
-        try:
-            reply = self.rpc.call("<set_{0}_mode><{1}/>\n<duration>{2]</duration>\n</set_{0}_mode>".format(component, RunMode.name(mode).lower(), duration))
-            return (reply.tag == 'success')
-        except socket.error:
-            return False
-
-    def set_run_mode(self, mode, duration=0):
-        ''' Set the run mode (RunMode.NEVER/AUTO/ALWAYS/RESTORE)
-            NEVER will suspend all activity, including CPU, GPU and Network
-            AUTO will run according to preferences.
-            If duration is zero, mode is permanent. Otherwise revert to last
-            permanent mode after duration seconds elapse.
-        '''
-        return self.set_mode('cpu', mode, duration)
-
-    def set_gpu_mode(self, mode, duration=0):
-        ''' Set the GPU run mode, similar to set_run_mode() but for GPU only
-        '''
-        return self.set_mode('gpu', mode, duration)
-
-    def set_network_mode(self, mode, duration=0):
-        ''' Set the Network run mode, similar to set_run_mode()
-            but for network activity only
-        '''
-        return self.set_mode('net', mode, duration)
-
-    def run_benchmarks(self):
-        ''' Run benchmarks. Computing will suspend during benchmarks '''
-        return self.rpc.call('<run_benchmarks/>').tag == "success"
-
-    def quit(self):
-        ''' Tell the core client to exit '''
-        if self.rpc.call('<quit/>').tag == "success":
-            self.connected = False
-            return True
-        return False
 
 
 def read_gui_rpc_password():
