@@ -124,21 +124,18 @@ class Service(SimpleService):
         if platform.system() != 'Linux':
             self.error('Only supported on Linux.')
             return False
-        self.connect()
-        self.alive = self.client.connected and self.client.authorized:
-        return self.alive
+        return self.connect()
 
     def connect(self):
         self.client.connect()
-
-    def reconnect(self):
-        try:
-            self.client.disconnect()
-        except socket.error:
-            pass
-        self.client.connect()
         self.alive = self.client.connected and self.client.authorized:
         return self.alive
+
+    def reconnect(self):
+        # The client class itself actually disconnects existing
+        # connections when it is told to connect, so we don't need to
+        # explicitly disconnect when we're just trying to reconnect.
+        return self.connect()
 
     def is_alive(self):
         if (not self.alive) or \
