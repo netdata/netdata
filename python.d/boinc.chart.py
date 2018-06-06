@@ -121,9 +121,6 @@ class Service(SimpleService):
         self.alive = False
 
     def check(self):
-        if platform.system() != 'Linux':
-            self.error('Only supported on Linux.')
-            return False
         return self.connect()
 
     def connect(self):
@@ -138,12 +135,7 @@ class Service(SimpleService):
         return self.connect()
 
     def is_alive(self):
-        # TODO: This final check should ideally not be needed, but the
-        # boinc_client code does not currenlty handle remote disconnects
-        # gracefully in a threaded environment.  This is the only thing
-        # making this module Linux specific.
-        if (not self.alive) or \
-           self.client.rpc.sock.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1:
+        if not self.alive:
             return self.reconnect()
         return True
 

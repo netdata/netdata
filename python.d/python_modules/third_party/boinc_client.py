@@ -21,7 +21,7 @@ GUI_RPC_PASSWD_FILE = "/var/lib/boinc/gui_rpc_auth.cfg"
 
 GUI_RPC_HOSTNAME    = None  # localhost
 GUI_RPC_PORT        = 31416
-GUI_RPC_TIMEOUT     = 30
+GUI_RPC_TIMEOUT     = 1
 
 class Rpc(object):
     ''' Class to perform GUI RPC calls to a BOINC core client.
