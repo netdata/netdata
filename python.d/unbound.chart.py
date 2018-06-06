@@ -200,7 +200,6 @@ class Service(SocketService):
             longname = 'Thread {0}'.format(thread)
             charts = dict()
             order = [[], [], []]
-            statmap = dict()
             count = 0
             for item in PER_THREAD_CHARTS:
                 chartname = '{0}{1}'.format(shortname, item)
