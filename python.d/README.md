@@ -2349,20 +2349,26 @@ that either the certificate and key are readable by Netdata (if you're
 using the regular control interface), or that the socket is accessible
 to Netdata (if you're using a UNIX socket for the contorl interface).
 
-By default, for the local system, every thing can be auto-detected
-assumign Unbound is configured correctly and has been told to listen
+By default, for the local system, everything can be auto-detected
+assuming Unbound is configured correctly and has been told to listen
 on the loopback interface or a UNIX socket.  This is done by looking
 up info in the Unbound config file specified by the `ubconf` key.
 
 To enable extended stats for a given job, add `extended: yes` to the
 definition.
 
-A basic local configuration with extended statistics looks like this:
+You can also enable per-thread charts for a given job by adding
+`per_thread: yes` to the definition.  Note that the numbe rof threads
+is only checked on startup.
+
+A basic local configuration with extended statistics and per-thread
+charts looks like this:
 
 ```yaml
 local:
     ubconf: /etc/unbound/unbound.conf
     extended: yes
+    per_thread: yes
 ```
 
 While it's a bit more complicated to set up correctly, it is recommended
