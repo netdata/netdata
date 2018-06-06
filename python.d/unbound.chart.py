@@ -210,13 +210,8 @@ class Service(SocketService):
                 charts[chartname]['options'][1] = charts[chartname]['options'][1].format(longname)
                 for line in range(0, len(charts[chartname]['lines'])):
                     charts[chartname]['lines'][line][0] = charts[chartname]['lines'][line][0].format(shortname)
-            order = order[0] + order[1] + order[2]
-            for chart in order:
-                params = [chart] + charts[chart]['options']
-                dimensions = charts[chart]['lines']
-                new_chart = self.charts.add_chart(params)
-                for dimension in dimensions:
-                    new_chart.add_dimension(dimension)
+            self.order = self.order + order[0] + order[1] + order[2]
+            self.definitions.update(charts)
             for key, value in PER_THREAD_STAT_MAP.items():
                 STAT_MAP[key.format(shortname)] = (value[0].format(shortname), value[1])
 
