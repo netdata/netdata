@@ -2107,5 +2107,17 @@ netdataDashboard.context = {
         info: 'The number of items in each of the various caches.'
     }
 
+    'unbound.threads.queries': {
+        height: 0.2
+    }
+
+    'unbound.threads.reqlist': {
+        height: 0.2
+    }
+
+    'unbound.threads.recursion': {
+        height: 0.2
+    }
+
     // ------------------------------------------------------------------------
 };
