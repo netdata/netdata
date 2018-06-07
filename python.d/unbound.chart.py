@@ -12,36 +12,36 @@ from bases.loaders import YamlOrderedLoader
 
 PRECISION = 1000
 
-ORDER = ['queries', 'reqlist', 'recursion']
+ORDER = ['queries', 'recursion', 'reqlist']
 
 CHARTS = {
     'queries': {
         'options': [None, 'Queries Processed', 'queries', 'Unbound', 'unbound.queries', 'line'],
         'lines': [
-            ['ratelimit', 'Ratelimited', 'absolute', 1, 1],
-            ['cachemiss', 'Cache Miss', 'absolute', 1, 1],
-            ['cachehit', 'Cache Hit', 'absolute', 1, 1],
-            ['expired', 'Expired', 'absolute', 1, 1],
-            ['prefetch', 'Prefetched', 'absolute', 1, 1],
-            ['recursive', 'Recursive', 'absolute', 1, 1]
-        ]
-    },
-    'reqlist': {
-        'options': [None, 'Request List', 'items', 'Unbound', 'unbound.reqlist', 'line'],
-        'lines': [
-            ['reqlist_avg', 'Average Size', 'absolute', 1, 1],
-            ['reqlist_max', 'Maximum Size', 'absolute', 1, 1],
-            ['reqlist_overwritten', 'Overwritten Requests', 'absolute', 1, 1],
-            ['reqlist_exceeded', 'Overruns', 'absolute', 1, 1],
-            ['reqlist_current', 'Current Size', 'absolute', 1, 1],
-            ['reqlist_user', 'User Requests', 'absolute', 1, 1]
+            ['ratelimit', 'ratelimited', 'absolute', 1, 1],
+            ['cachemiss', 'cache_miss', 'absolute', 1, 1],
+            ['cachehit', 'cache_hit', 'absolute', 1, 1],
+            ['expired', 'expired', 'absolute', 1, 1],
+            ['prefetch', 'prefetched', 'absolute', 1, 1],
+            ['recursive', 'recursive', 'absolute', 1, 1]
         ]
     },
     'recursion': {
         'options': [None, 'Recursion Timings', 'seconds', 'Unbound', 'unbound.recursion', 'line'],
         'lines': [
-            ['recursive_avg', 'Average', 'absolute', 1, PRECISION],
-            ['recursive_med', 'Median', 'absolute', 1, PRECISION]
+            ['recursive_avg', 'average', 'absolute', 1, PRECISION],
+            ['recursive_med', 'median', 'absolute', 1, PRECISION]
+        ]
+    },
+    'reqlist': {
+        'options': [None, 'Request List', 'items', 'Unbound', 'unbound.reqlist', 'line'],
+        'lines': [
+            ['reqlist_avg', 'average_size', 'absolute', 1, 1],
+            ['reqlist_max', 'maximum_size', 'absolute', 1, 1],
+            ['reqlist_overwritten', 'overwritten_requests', 'absolute', 1, 1],
+            ['reqlist_exceeded', 'overruns', 'absolute', 1, 1],
+            ['reqlist_current', 'current_size', 'absolute', 1, 1],
+            ['reqlist_user', 'user_requests', 'absolute', 1, 1]
         ]
     }
 }
@@ -53,12 +53,12 @@ EXTENDED_CHARTS = {
     'cache': {
         'options': [None, 'Cache Sizes', 'items', 'Unbound', 'unbound.cache', 'stacked'],
         'lines': [
-            ['cache_message', 'Message Cache', 'absolute', 1, 1],
-            ['cache_rrset', 'RRSet Cache', 'absolute', 1, 1],
-            ['cache_infra', 'Infra Cache', 'absolute', 1, 1],
-            ['cache_key', 'DNSSEC Key Cache', 'absolute', 1, 1],
-            ['cache_dnscss', 'DNSCrypt Shared Secret Cache', 'absolute', 1, 1],
-            ['cache_dnscn', 'DNSCrypt Nonce Cache', 'absolute', 1, 1]
+            ['cache_message', 'message_cache', 'absolute', 1, 1],
+            ['cache_rrset', 'rrset_cache', 'absolute', 1, 1],
+            ['cache_infra', 'infra_cache', 'absolute', 1, 1],
+            ['cache_key', 'dnssec_key_cache', 'absolute', 1, 1],
+            ['cache_dnscss', 'dnscrypt_Shared_Secret_cache', 'absolute', 1, 1],
+            ['cache_dnscn', 'dnscrypt_Nonce_cache', 'absolute', 1, 1]
         ]
     }
 }
@@ -66,32 +66,32 @@ EXTENDED_CHARTS = {
 # This is used as a templates for the per-thread charts.
 PER_THREAD_CHARTS = {
     '_queries': {
-        'options': [None, '{0} Queries Processed', 'queries', 'Queries Processed', 'unbound.threads.queries', 'line'],
+        'options': [None, '{longname} Queries Processed', 'queries', 'Queries Processed', 'unbound.threads.queries', 'line'],
         'lines': [
-            ['{0}_ratelimit', 'Ratelimited', 'absolute', 1, 1],
-            ['{0}_cachemiss', 'Cache Miss', 'absolute', 1, 1],
-            ['{0}_cachehit', 'Cache Hit', 'absolute', 1, 1],
-            ['{0}_expired', 'Expired', 'absolute', 1, 1],
-            ['{0}_prefetch', 'Prefetched', 'absolute', 1, 1],
-            ['{0}_recursive', 'Recursive', 'absolute', 1, 1]
-        ]
-    },
-    '_reqlist': {
-        'options': [None, '{0} Request List', 'items', 'Request List', 'unbound.threads.reqlist', 'line'],
-        'lines': [
-            ['{0}_reqlist_avg', 'Average Size', 'absolute', 1, 1],
-            ['{0}_reqlist_max', 'Maximum Size', 'absolute', 1, 1],
-            ['{0}_reqlist_overwritten', 'Overwritten Requests', 'absolute', 1, 1],
-            ['{0}_reqlist_exceeded', 'Overruns', 'absolute', 1, 1],
-            ['{0}_reqlist_current', 'Current Size', 'absolute', 1, 1],
-            ['{0}_reqlist_user', 'User Requests', 'absolute', 1, 1]
+            ['{shortname}_ratelimit', 'ratelimited', 'absolute', 1, 1],
+            ['{shortname}_cachemiss', 'cache_miss', 'absolute', 1, 1],
+            ['{shortname}_cachehit', 'cache_hit', 'absolute', 1, 1],
+            ['{shortname}_expired', 'expired', 'absolute', 1, 1],
+            ['{shortname}_prefetch', 'prefetched', 'absolute', 1, 1],
+            ['{shortname}_recursive', 'recursive', 'absolute', 1, 1]
         ]
     },
     '_recursion': {
-        'options': [None, '{0} Recursion Timings', 'seconds', 'Recursive Timings', 'unbound.threads.recursion', 'line'],
+        'options': [None, '{longname} Recursion Timings', 'seconds', 'Recursive Timings', 'unbound.threads.recursion', 'line'],
         'lines': [
-            ['{0}_recursive_avg', 'Average', 'absolute', 1, PRECISION],
-            ['{0}_recursive_med', 'Median', 'absolute', 1, PRECISION]
+            ['{shortname}_recursive_avg', 'average', 'absolute', 1, PRECISION],
+            ['{shortname}_recursive_med', 'median', 'absolute', 1, PRECISION]
+        ]
+    },
+    '_reqlist': {
+        'options': [None, '{longname} Request List', 'items', 'Request List', 'unbound.threads.reqlist', 'line'],
+        'lines': [
+            ['{shortname}_reqlist_avg', 'average_size', 'absolute', 1, 1],
+            ['{shortname}_reqlist_max', 'maximum_size', 'absolute', 1, 1],
+            ['{shortname}_reqlist_overwritten', 'overwritten_requests', 'absolute', 1, 1],
+            ['{shortname}_reqlist_exceeded', 'overruns', 'absolute', 1, 1],
+            ['{shortname}_reqlist_current', 'current_size', 'absolute', 1, 1],
+            ['{shortname}_reqlist_user', 'user_requests', 'absolute', 1, 1]
         ]
     }
 }
@@ -123,21 +123,46 @@ STAT_MAP = {
 
 # Same as above, but for per-thread stats.
 PER_THREAD_STAT_MAP = {
-    '{0}.num.queries_ip_ratelimited': ('{0}_ratelimit', 1),
-    '{0}.num.cachehits': ('{0}_cachehit', 1),
-    '{0}.num.cachemiss': ('{0}_cachemiss', 1),
-    '{0}.num.zero_ttl': ('{0}_expired', 1),
-    '{0}.num.prefetch': ('{0}_prefetch', 1),
-    '{0}.num.recursivereplies': ('{0}_recursive', 1),
-    '{0}.requestlist.avg': ('{0}_reqlist_avg', 1),
-    '{0}.requestlist.max': ('{0}_reqlist_max', 1),
-    '{0}.requestlist.overwritten': ('{0}_reqlist_overwritten', 1),
-    '{0}.requestlist.exceeded': ('{0}_reqlist_exceeded', 1),
-    '{0}.requestlist.current.all': ('{0}_reqlist_current', 1),
-    '{0}.requestlist.current.user': ('{0}_reqlist_user', 1),
-    '{0}.recursion.time.avg': ('{0}_recursive_avg', PRECISION),
-    '{0}.recursion.time.median': ('{0}_recursive_med', PRECISION)
+    '{shortname}.num.queries_ip_ratelimited': ('{shortname}_ratelimit', 1),
+    '{shortname}.num.cachehits': ('{shortname}_cachehit', 1),
+    '{shortname}.num.cachemiss': ('{shortname}_cachemiss', 1),
+    '{shortname}.num.zero_ttl': ('{shortname}_expired', 1),
+    '{shortname}.num.prefetch': ('{shortname}_prefetch', 1),
+    '{shortname}.num.recursivereplies': ('{shortname}_recursive', 1),
+    '{shortname}.requestlist.avg': ('{shortname}_reqlist_avg', 1),
+    '{shortname}.requestlist.max': ('{shortname}_reqlist_max', 1),
+    '{shortname}.requestlist.overwritten': ('{shortname}_reqlist_overwritten', 1),
+    '{shortname}.requestlist.exceeded': ('{shortname}_reqlist_exceeded', 1),
+    '{shortname}.requestlist.current.all': ('{shortname}_reqlist_current', 1),
+    '{shortname}.requestlist.current.user': ('{shortname}_reqlist_user', 1),
+    '{shortname}.recursion.time.avg': ('{shortname}_recursive_avg', PRECISION),
+    '{shortname}.recursion.time.median': ('{shortname}_recursive_med', PRECISION)
 }
+
+
+# Used to actually generate per-thread charts.
+def _get_perthread_info(thread):
+    sname = 'thread{0}'.format(thread)
+    lname = 'Thread {0}'.format(thread)
+    charts = dict()
+    order = []
+    statmap = dict()
+
+    for item in PER_THREAD_CHARTS:
+        cname = '{0}{1}'.format(sname, item)
+        chart = deepcopy(PER_THREAD_CHARTS[item])
+        chart['options'][1] = chart['options'][1].format(longname=lname)
+
+        for index, line in enumerate(chart['lines']):
+            chart['lines'][index][0] = line[0].format(shortname=sname)
+
+        order.append(cname)
+        charts[cname] = chart
+
+    for key, value in PER_THREAD_STAT_MAP.items():
+        statmap[key.format(shortname=sname)] = (value[0].format(shortname=sname), value[1])
+
+    return (charts, order, statmap)
 
 
 class Service(SocketService):
@@ -155,6 +180,7 @@ class Service(SocketService):
         self.order = deepcopy(ORDER)
         self.definitions = deepcopy(CHARTS)
         self.request = 'UBCT1 stats\n'
+        self.statmap = deepcopy(STAT_MAP)
         self._parse_config()
         self._auto_config()
         self.debug('Extended stats: {0}'.format(self.ext))
@@ -193,26 +219,13 @@ class Service(SocketService):
             self.port = 8953
 
     def _generate_perthread_charts(self):
-        # TODO: THis could probably be more efficient, but it's only
-        # run once, so it probably doesn't really matter.
+        tmporder = list()
         for thread in range(0, self.threads):
-            shortname = 'thread{0}'.format(thread)
-            longname = 'Thread {0}'.format(thread)
-            charts = dict()
-            order = [[], [], []]
-            count = 0
-            for item in PER_THREAD_CHARTS:
-                chartname = '{0}{1}'.format(shortname, item)
-                order[count].append(chartname)
-                count += 1
-                charts[chartname] = deepcopy(PER_THREAD_CHARTS[item])
-                charts[chartname]['options'][1] = charts[chartname]['options'][1].format(longname)
-                for line in range(0, len(charts[chartname]['lines'])):
-                    charts[chartname]['lines'][line][0] = charts[chartname]['lines'][line][0].format(shortname)
-            self.order = self.order + order[0] + order[1] + order[2]
+            charts, order, statmap = _get_perthread_info(thread)
+            tmporder.extend(order)
             self.definitions.update(charts)
-            for key, value in PER_THREAD_STAT_MAP.items():
-                STAT_MAP[key.format(shortname)] = (value[0].format(shortname), value[1])
+            self.statmap.update(statmap)
+        self.order.extend(sorted(tmporder))
 
     def check(self):
         # Check if authentication is working.
@@ -253,7 +266,7 @@ class Service(SocketService):
         for line in raw.splitlines():
             stat = line.split('=')
             tmp[stat[0]] = stat[1]
-        for item in STAT_MAP:
+        for item in self.statmap:
             if item in tmp:
-                data[STAT_MAP[item][0]] = float(tmp[item]) * STAT_MAP[item][1]
+                data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
         return data
