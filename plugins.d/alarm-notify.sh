@@ -26,6 +26,7 @@
 #  - pagerduty.com notifications by Jim Cooley @jimcooley #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
+#  - fleep notifications by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 
@@ -239,6 +240,7 @@ SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
+SEND_FLEEP="YES"
 SEND_IRC="YES"
 SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
@@ -313,6 +315,11 @@ KAFKA_SENDER_IP=
 PD_SERVICE_KEY=
 DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
+
+# fleep.io configs
+FLEEP_SENDER="${host}"
+DEFAULT_RECIPIENT_FLEEP=
+declare -A role_recipients_fleep=()
 
 # syslog configs
 SYSLOG_FACILITY=
@@ -427,6 +434,7 @@ declare -A arr_email=()
 declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
+declare -A arr_fleep=()
 declare -A arr_irc=()
 declare -A arr_syslog=()
 
@@ -542,6 +550,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
 
+    # fleep.io
+    a="${role_recipients_fleep[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLEEP}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality fleep "${r}" && arr_fleep[${r/|*/}]="1"
+    done
+
     # irc
     a="${role_recipients_irc[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
@@ -616,6 +632,10 @@ to_telegram="${!arr_telegram[*]}"
 to_pd="${!arr_pd[*]}"
 [ -z "${to_pd}" ] && SEND_PD="NO"
 
+# build the list of fleep recipients (conversation webhooks)
+to_fleep="${!arr_fleep[*]}"
+[ -z "${to_fleep}" ] && SEND_FLEEP="NO"
+
 # build the list of custom recipients
 to_custom="${!arr_custom[*]}"
 [ -z "${to_custom}" ] && SEND_CUSTOM="NO"
@@ -679,6 +699,9 @@ to_syslog="${!arr_syslog[*]}"
 # check irc
 [ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
+# check fleep
+[ -z "${FLEEP_SERVER}" -o -z "${FLEEP_SENDER}" ] && SEND_FLEEP="NO"
+
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
 # https://www.pagerduty.com/docs/guides/agent-install-guide/
@@ -706,6 +729,7 @@ if [ \( \
         -o "${SEND_TELEGRAM}"    = "YES" \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
+        -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
     \) -a -z "${curl}" ]
     then
@@ -725,6 +749,7 @@ if [ \( \
         SEND_MESSAGEBIRD="NO"
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
+        SEND_FLEEP="NO"
         SEND_CUSTOM="NO"
     fi
 fi
@@ -766,6 +791,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHBULLET}"     != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
+    -a "${SEND_FLEEP}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
@@ -1515,6 +1541,36 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# fleep sender
+
+send_fleep() {
+    local httpcode sent=0 webhooks="${1}" data message
+    if [ "${SEND_FLEEP}" = "YES" ] ; then
+            message="${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}"
+
+            for hook in "${webhooks}" ; do
+                data="{ "
+                data="${data} 'message': '${message}', "
+                data="${data} 'user': '${FLEEP_SENDER}' "
+                data="${data} }"
+
+                httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
+
+                if [ "${httpcode}" = "200" ] ; then
+                    info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
+                    sent=$((sent + 1))
+                else
+                    error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP error code ${httpcode}."
+                fi
+            done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # irc sender
 
 send_irc() {
@@ -1841,6 +1897,12 @@ send_pd "${to_pd}"
 SENT_PD=$?
 
 # -----------------------------------------------------------------------------
+# send the fleep message
+
+send_fleep "${to_fleep}"
+SENT_FLEEP=$?
+
+# -----------------------------------------------------------------------------
 # send the irc message
 
 send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
@@ -2032,6 +2094,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
+    -o ${SENT_FLEEP}        -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
     -o ${SENT_SYSLOG}       -eq 0 \
