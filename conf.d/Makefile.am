@@ -71,6 +71,7 @@ dist_pythonconfig_DATA = \
     python.d/icecast.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
+    python.d/linux_power_supply.conf \
     python.d/litespeed.conf \
     python.d/logind.conf \
     python.d/mdstat.conf \
