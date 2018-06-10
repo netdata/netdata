@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 __all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
     'RepresenterError']

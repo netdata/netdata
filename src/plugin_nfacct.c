@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #ifdef INTERNAL_PLUGIN_NFACCT

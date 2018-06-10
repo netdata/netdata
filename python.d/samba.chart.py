@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description:  samba netdata python.d module
 # Author: Christopher Cox <chris_cox@endlessnow.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 # The netdata user needs to be able to be able to sudo the smbstatus program
 # without password:

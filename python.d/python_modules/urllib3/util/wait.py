@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from .selectors import (
     HAS_SELECT,
     DefaultSelector,

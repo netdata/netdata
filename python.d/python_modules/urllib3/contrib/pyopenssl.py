@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 SSL with SNI_-support for Python 2. Follow these instructions if you would
 like to verify SSL certificates in Python 2. Note, the default libraries do

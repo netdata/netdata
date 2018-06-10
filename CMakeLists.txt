@@ -1,4 +1,5 @@
 
+# SPDX-License-Identifier: GPL-3.0+
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 

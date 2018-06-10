@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 SecureTranport support for urllib3 via ctypes.
 

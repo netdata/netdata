@@ -1,4 +1,4 @@
-
+/* SPDX-License-Identifier: GPL-3.0+ */
 /*
  * 1. build netdata (as normally)
  * 2. cd profile/

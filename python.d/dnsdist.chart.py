@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: GPL-3.0+
 from json import loads
 from bases.FrameworkServices.UrlService import UrlService
 

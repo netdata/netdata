@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: IPFS netdata python.d module
 # Authors: Pawel Krupa (paulfantom), davidak
+# SPDX-License-Identifier: GPL-3.0+
 
 import json
 

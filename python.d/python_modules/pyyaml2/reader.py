@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # This module contains abstractions for the input stream. You don't have to
 # looks further, there are no pretty code.
 #

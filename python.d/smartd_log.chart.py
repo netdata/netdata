@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: smart netdata python.d module
 # Author: l2isbad, vorph1
+# SPDX-License-Identifier: GPL-3.0+
 
 import os
 import re
