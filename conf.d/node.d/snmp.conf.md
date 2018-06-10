@@ -154,7 +154,7 @@ The `options` given for each server, are:
  - `port`, the port of the SNMP device to connect to. The default is `161`.
  - `retries`, the number of attempts to make to fetch the data. The default is `1`.
 
-## Retreiving names from snmp
+## Retrieving names from snmp
 
 You can append a value retrieved from SNMP to the title, by adding `titleoid` to the chart.
 
