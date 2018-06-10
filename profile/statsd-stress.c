@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0+ */
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>

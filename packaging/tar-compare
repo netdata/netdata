@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0+
 
 # When provided with a git repo, which has been used to produce a
 # distribution tar.gz (with make dist) and the resultant tar-file,

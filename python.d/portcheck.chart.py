@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: simple port check netdata python.d module
 # Original Author: ccremer (github.com/ccremer)
+# SPDX-License-Identifier: GPL-3.0+
 
 import socket
 

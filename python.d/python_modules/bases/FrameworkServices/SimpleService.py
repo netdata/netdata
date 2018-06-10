@@ -2,6 +2,7 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 from threading import Thread
 from time import sleep

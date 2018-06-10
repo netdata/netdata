@@ -1,4 +1,5 @@
 'use strict';
+// SPDX-License-Identifier: GPL-3.0+
 // netdata snmp module
 // This program will connect to one or more SNMP Agents
 //

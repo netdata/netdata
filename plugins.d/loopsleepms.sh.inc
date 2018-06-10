@@ -1,4 +1,5 @@
 # no need for shebang - this file is included from other scripts
+# SPDX-License-Identifier: GPL-3.0+
 
 LOOPSLEEP_DATE="$(which date 2>/dev/null || command -v date 2>/dev/null)"
 if [ -z "$LOOPSLEEP_DATE" ]

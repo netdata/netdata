@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 class Token(object):
     def __init__(self, start_mark, end_mark):

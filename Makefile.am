@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
 ACLOCAL_AMFLAGS = -I m4
@@ -39,9 +40,21 @@ EXTRA_DIST = \
 	autogen.sh \
 	README.md \
 	LICENSE \
+	LICENSES/Apache-2.0 \
+	LICENSES/BSD-2-Clause \
+	LICENSES/BSD-3-Clause \
+	LICENSES/CC-BY-4.0 \
+	LICENSES/CC0-1.0 \
+	LICENSES/FSFAP \
+	LICENSES/GPL-3.0 \
+	LICENSES/LGPL-2.1 \
+	LICENSES/LGPL-3.0 \
+	LICENSES/MIT \
+	LICENSES/OFL-1.1 \
+	LICENSES/Python-2.0 \
+	LICENSES/WTFPL \
 	LICENSE.md \
 	LICENSE-REDISTRIBUTED.md \
-	COPYING \
 	autogen.sh \
 	$(NULL)
 

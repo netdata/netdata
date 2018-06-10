@@ -1,5 +1,6 @@
 # author  : titpetric
 # original: https://github.com/titpetric/netdata
+# SPDX-License-Identifier: CC0-1.0
 
 FROM debian:stretch
 

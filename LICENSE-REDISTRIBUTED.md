@@ -8,8 +8,8 @@ Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 ## Re-distributed software
 
 Netdata re-distributes the following third party software.
-We decided to re-distribute all these, instead of using them
-through a CDN, to allow netdata work in cases where internet
+We have decided to re-distribute all these, instead of using them
+through a CDN, to allow netdata to work in cases where internet
 connectivity is not available.
 
 
@@ -35,7 +35,7 @@ connectivity is not available.
 
     Copyright (c) 2014-2015 Benjamin Keen
     [MIT License](https://github.com/benkeen/d3pie/blob/master/LICENSE)
-    
+
 
 - [jQuery Sparklines](http://omnipotent.net/jquery.sparkline/)
 
@@ -46,8 +46,8 @@ connectivity is not available.
 - [Peity](http://benpickles.github.io/peity/)
 
     Copyright 2009-2015, Ben Pickles
-    [MIT License](https://github.com/benpickles/peity/blob/master/MIT-LICENCE)
-    
+    [MIT License](https://github.com/benpickles/peity/blob/master/LICENCE)
+
 
 - [morris.js](http://morrisjs.github.io/morris.js/)
 
@@ -55,24 +55,24 @@ connectivity is not available.
     [Simplified BSD License](http://morrisjs.github.io/morris.js/)
 
 
-- [Raphaël](http://raphaeljs.com/)
+- [Raphaël](http://dmitrybaranovskiy.github.io/raphael/)
 
     Copyright 2008, Dmitry Baranovskiy
-    [MIT License](http://raphaeljs.com/license.html)
-    
+    [MIT License](http://dmitrybaranovskiy.github.io/raphael/license.html)
+
 
 - [C3](http://c3js.org/)
 
     Copyright 2013, Masayuki Tanaka
     [MIT License](https://github.com/masayuki0812/c3/blob/master/LICENSE)
-    
+
 
 - [D3](http://d3js.org/)
 
     Copyright 2015, Mike Bostock
     [BSD License](http://opensource.org/licenses/BSD-3-Clause)
-    
-    
+
+
 - [jQuery](https://jquery.org/)
 
     Copyright 2015, jQuery Foundation
@@ -119,7 +119,8 @@ connectivity is not available.
 
     Created by Dave Gandy
     Font license: [SIL OFL 1.1](http://scripts.sil.org/OFL)
-    CSS license: [MIT License](http://opensource.org/licenses/mit-license.html)
+    Icon license [Creative Commons Attribution 4.0 (CC-BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+    Code license: [MIT License](http://opensource.org/licenses/mit-license.html)
 
 
 - [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
@@ -131,26 +132,26 @@ connectivity is not available.
 
     Copyright 2014, Stefan Thomas
     [MIT License](https://github.com/justmoon/node-extend/blob/master/LICENSE)
-    
+
 
 - [node-net-snmp](https://github.com/stephenwvickers/node-net-snmp)
 
     Copyright 2013, Stephen Vickers
     [MIT License](https://github.com/stephenwvickers/node-net-snmp)
-    
+
 
 - [node-asn1-ber](https://github.com/stephenwvickers/node-asn1-ber)
 
     Copyright 2017, Stephen Vickers
     Copyright 2011, Mark Cavage
     [MIT License](https://github.com/stephenwvickers/node-asn1-ber)
-    
+
 
 - [pixl-xml](https://github.com/jhuckaby/pixl-xml)
 
     Copyright 2015, Joseph Huckaby
     [MIT License](https://github.com/jhuckaby/pixl-xml)
-    
+
 
 - [sensors](https://github.com/paroj/sensors.py)
 
@@ -161,7 +162,7 @@ connectivity is not available.
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
     Copyright 2006, Kirill Simonov
-    [MIT License](http://pyyaml.org)
+    [MIT License](https://github.com/yaml/pyyaml)
 
 
 - [urllib3](https://github.com/shazow/urllib3)
@@ -186,7 +187,7 @@ connectivity is not available.
 
     Copyright (c) 2014 Lucas Garron
     [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
-    
+
 
 - [Utilities for writing code that runs on Python 2 and 3](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
 

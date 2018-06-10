@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 /*
  *  netdata freeipmi.plugin
  *  Copyright (C) 2017 Costa Tsaousis

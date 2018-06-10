@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 __all__ = ['CBaseLoader', 'CSafeLoader', 'CLoader',
         'CBaseDumper', 'CSafeDumper', 'CDumper']

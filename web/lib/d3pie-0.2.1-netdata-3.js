@@ -4,6 +4,7 @@
  * @version 0.1.9
  * @date June 17th, 2015
  * @repo http://github.com/benkeen/d3pie
+ * SPDX-License-Identifier: MIT
  */
 
 // UMD pattern from https://github.com/umdjs/umd/blob/master/returnExports.js

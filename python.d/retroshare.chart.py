@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: RetroShare netdata python.d module
 # Authors: sehraf
+# SPDX-License-Identifier: GPL-3.0+
 
 import json
 

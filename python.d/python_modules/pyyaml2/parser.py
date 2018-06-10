@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 # The following YAML grammar is LL(1) and is parsed by a recursive descent
 # parser.

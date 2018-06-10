@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: apache netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# SPDX-License-Identifier: GPL-3.0+
 
 from bases.FrameworkServices.UrlService import UrlService
 

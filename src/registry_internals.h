@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #ifndef NETDATA_REGISTRY_INTERNALS_H_H

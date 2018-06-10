@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 unsigned long rrdset_info2json_api_old(RRDSET *st, char *options, BUFFER *wb) {

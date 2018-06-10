@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: http check netdata python.d module
 # Original Author: ccremer (github.com/ccremer)
+# SPDX-License-Identifier: GPL-3.0+
 
 import urllib3
 import re
