@@ -824,7 +824,7 @@ download_netdata_conf() {
 # -----------------------------------------------------------------------------
 # add netdata user and group
 
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph"
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
 add_netdata_user_and_group() {
     local homedir="${1}" g
