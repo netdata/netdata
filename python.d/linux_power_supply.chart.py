@@ -3,6 +3,7 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 
 import os
+import platform
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -117,6 +118,9 @@ class Service(SimpleService):
         self.types = self.configuration.get('charts', 'energy charge capacity voltage').split()
 
     def check(self):
+        if platform.system() != 'Linux':
+            self.error('Only supported on Linux.')
+            return False
         if self.supply is None:
             self.error('No power supply specified for monitoring.')
             return False
