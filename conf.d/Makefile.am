@@ -79,6 +79,7 @@ dist_pythonconfig_DATA = \
     python.d/traefik.conf \
     python.d/unbound.conf \
     python.d/varnish.conf \
+    python.d/w1sensor.conf \
     python.d/web_log.conf \
     $(NULL)
 
