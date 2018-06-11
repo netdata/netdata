@@ -67,6 +67,7 @@ dist_python_DATA = \
     traefik.chart.py \
     unbound.chart.py \
     varnish.chart.py \
+    w1sensor.chart.py \
     web_log.chart.py \
     $(NULL)
 
