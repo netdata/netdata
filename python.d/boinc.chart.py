@@ -3,7 +3,6 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 # SPDX-License-Identifier: GPL-3.0+
 
-import platform
 import socket
 
 from bases.FrameworkServices.SimpleService import SimpleService
