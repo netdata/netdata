@@ -4,13 +4,13 @@
 
 import os
 
-from bases.FrameworkServices.SocketService import SimpleService
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # Everything except percentages is reported as µ units.
 PRECISION = 10 ** 6
 
 # A priority of 90000 places us next to the other PSU related stuff.
-PRIORITY=90000
+PRIORITY = 90000
 
 # We add our charts dynamically when we probe for the device attributes,
 # so these are empty by default.
@@ -120,39 +120,36 @@ class Service(SimpleService):
         if self.supply is None:
             self.error('No power supply specified for monitoring.')
             return False
-        if not len(self.types) > 0:
+        if not self.types:
             self.error('No attributes requested for monitoring.')
             return False
-        if os.access(self.syspath, os.R_OK):
-            chartset = set(GET_CHART.keys()).intersection(set(self.types))
-            if len(chartset) > 0:
-                charts = dict()
-                attrlist = list()
-                for item in chartset:
-                    chart, attrs = GET_CHART[item](self.syspath)
-                    if chart is not None:
-                        charts.update(chart)
-                        attrlist.extend(attrs)
-                if len(charts) == 0:
-                    self.error('No charts can be created.')
-                    return False
-                self.definitions.update(charts)
-                self.order.extend(sorted(charts.keys()))
-                self.attrlist.extend(attrlist)
-            else:
-                self.error('No valid attributes requested for monitoring.')
-                return False
-        else:
+        if not os.access(self.syspath, os.R_OK):
             self.error('Unable to access {0}'.format(self.syspath))
             return False
+        chartset = set(GET_CHART.keys()).intersection(set(self.types))
+        if not chartset:
+            self.error('No valid attributes requested for monitoring.')
+            return False
+        charts = dict()
+        attrlist = list()
+        for item in chartset:
+            chart, attrs = GET_CHART[item](self.syspath)
+            if chart is not None:
+                charts.update(chart)
+                attrlist.extend(attrs)
+        if len(charts) == 0:
+            self.error('No charts can be created.')
+            return False
+        self.definitions.update(charts)
+        self.order.extend(sorted(charts.keys()))
+        self.attrlist.extend(attrlist)
         return True
 
     def _get_data(self):
         data = dict()
         for attr in self.attrlist:
             attrpath = os.path.join(self.syspath, attr)
-            if attr.endswith('_min') or attr.endswith('_min_design') or \
-               attr.endswith('_empty') or attr.endswith('_empty_design'):
+            if attr.endswith(('_min', '_min_design', '_empty', '_empty_design')):
                 data[attr] = _get_sysfs_value_or_zero(attrpath)
             else:
                 data[attr] = _get_sysfs_value(attrpath)
