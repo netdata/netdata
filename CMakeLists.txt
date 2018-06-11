@@ -243,7 +243,7 @@ include_directories(AFTER .)
 add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
 
 add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES})
-target_link_libraries (netdata m z uuid ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (netdata m z uuid mnl netfilter_acct ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(netdata_freebsd ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
 target_link_libraries (netdata_freebsd m z uuid ${CMAKE_THREAD_LIBS_INIT})
