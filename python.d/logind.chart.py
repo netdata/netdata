@@ -3,9 +3,6 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 # SPDX-License-Identifier: GPL-3.0+
 
-import os
-import sys
-
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
 PRIORITY = 40000
