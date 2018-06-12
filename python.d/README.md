@@ -1095,7 +1095,7 @@ command: '/path/to/other/command'
 
 ### notes
 
-* This module's ability to trakck logins is dependent on what PAM services
+* This module's ability to track logins is dependent on what PAM services
 are configured to register sessions with logind.  In particular, for
 most systems, it will only track TTY logins, local desktop logins,
 and logins through remote shell connections.
