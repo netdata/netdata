@@ -393,7 +393,7 @@ netdataDashboard.menu = {
     },
 
     'logind': {
-        title: 'Logind'
+        title: 'Logind',
         icon: '<i class="fas fa-user"></i>',
         info: undefined
     }
