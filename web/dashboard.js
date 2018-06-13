@@ -4663,7 +4663,7 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
-        this.chartURL = function() {
+        this.chartsURLs = function() {
             var after, before, points_multiplier = 1;
             if(NETDATA.globalPanAndZoom.isActive()) {
                 if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
@@ -4722,25 +4722,32 @@ var NETDATA = window.NETDATA || {};
                 data_points = this.data_points * points_multiplier;
             }
 
-            // build the data URL
-            this.data_url = this.host + this.chart.data_url;
-            this.data_url += "&format="  + this.library.format();
-            this.data_url += "&points="  + (data_points).toString();
-            this.data_url += "&group="   + this.method;
-            this.data_url += "&gtime="   + this.gtime;
-            this.data_url += "&options=" + this.chartURLOptions();
+            var data_urls = [];
 
-            if(after)
-                this.data_url += "&after="  + after.toString();
+            for(var i in this.multi_ids) {
+                // build the data URL
+                var data_url = this.host + "/api/v1/data?chart="+this.multi_ids[i];
+                data_url += "&format="  + this.library.format();
+                data_url += "&points="  + (data_points).toString();
+                data_url += "&group="   + this.method;
+                data_url += "&gtime="   + this.gtime;
+                data_url += "&options=" + this.chartURLOptions();
 
-            if(before)
-                this.data_url += "&before=" + before.toString();
+                if(after)
+                    data_url += "&after="  + after.toString();
+    
+                if(before)
+                    data_url += "&before=" + before.toString();
+    
+                if(this.dimensions)
+                    data_url += "&dimensions=" + this.dimensions;
+    
+                if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
+                    this.log('chartsURLs(): ' + data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
 
-            if(this.dimensions)
-                this.data_url += "&dimensions=" + this.dimensions;
-
-            if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
-                this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
+                data_urls.push(data_url);
+            }
+            return data_urls;
         };
 
         this.redrawChart = function() {
@@ -5010,7 +5017,6 @@ var NETDATA = window.NETDATA || {};
             }
 
             this.clearSelection();
-            this.chartURL();
 
             NETDATA.statistics.refreshes_total++;
             NETDATA.statistics.refreshes_active++;
@@ -5044,11 +5050,107 @@ var NETDATA = window.NETDATA || {};
                 return;
             }
 
+            this.fetchChartData(0, [], callback);
+        };
+
+        var __isVisible = function() {
+            var ret = true;
+
+            if(NETDATA.options.current.update_only_visible !== false) {
+                // tolerance is the number of pixels a chart can be off-screen
+                // to consider it as visible and refresh it as if was visible
+                var tolerance = 0;
+
+                that.tm.last_visible_check = Date.now();
+
+                var rect = that.element.getBoundingClientRect();
+
+                var screenTop = window.scrollY;
+                var screenBottom = screenTop + window.innerHeight;
+
+                var chartTop = rect.top + screenTop;
+                var chartBottom = chartTop + rect.height;
+
+                ret = !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
+            }
+
+            if(that.debug === true)
+                that.log('__isVisible(): ' + ret);
+
+            return ret;
+        };
+
+        this.formatDimensionName = function(result, toFormat) {
+            return result.id + "." + toFormat;
+        };
+
+        this.handleMultiChartData = function(data) {
+            var newData = data[0];
+            console.log("handleMultiChartData 1", newData);
+            for(var j in newData.dimension_ids) {
+                newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
+            }
+
+            for(var j in newData.dimension_names) {
+                newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
+            }
+
+            for(var i in data) {
+                if(i == 0) continue;
+                var dataPart = data[i];
+                console.log("handleMultiChartData 2", dataPart);
+                newData.dimensions += 1;
+                newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
+
+                for(var j in dataPart.dimension_ids) {
+                    newData.dimension_ids.push(this.formatDimensionName(dataPart, dataPart.dimension_ids[j]));
+                }
+
+                for(var j in dataPart.dimension_names) {
+                    newData.dimension_names.push(this.formatDimensionName(dataPart, dataPart.dimension_names[j]));
+                }
+
+                newData.view_latest_values = newData.view_latest_values.concat(dataPart.view_latest_values);
+
+                if(dataPart.max > newData.max) {
+                    newData.max = dataPart.max;
+                }
+
+                if(dataPart.min > newData.min) {
+                    newData.min = dataPart.min;
+                }
+
+                var resultMap = {};
+                for(var j in dataPart.result.data) {
+                    var result = dataPart.result.data[j];
+                    // FIX MULTI
+                    resultMap[result[0]] = result[1];
+                } 
+                for(var j in newData.result.data) {
+                    newData.result.data[j].push(resultMap[newData.result.data[j][0]]);
+                }
+
+                // FIX MULTI
+                newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[1]));
+            }
+            this.data = newData;
+            this.updateChartWithData(newData);
+        };
+
+        this.fetchChartData = function(i, data, callback) {
+            var urls = this.chartsURLs();
+            var data_url = urls[i];
+
+            var last_loop = false;
+            if(i == urls.length - 1) {
+                last_loop = true;
+            }
+
             if(this.debug === true)
-                this.log('updating from ' + this.data_url);
+                this.log('updating from ' + data_url);
 
             this.xhr = $.ajax( {
-                url: this.data_url,
+                url: data_url,
                 cache: false,
                 async: true,
                 headers: {
@@ -5057,8 +5159,9 @@ var NETDATA = window.NETDATA || {};
                 },
                 xhrFields: { withCredentials: true } // required for the cookie
             })
-            .done(function(data) {
-                data = NETDATA.xss.checkData('/api/v1/data', data, that.library.xssRegexIgnore);
+            .done(function(dataPart) {
+                dataPart = NETDATA.xss.checkData('/api/v1/data', dataPart, that.library.xssRegexIgnore);
+                data.push(dataPart);
 
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
@@ -5067,7 +5170,11 @@ var NETDATA = window.NETDATA || {};
                 if(that.debug === true)
                     that.log('data received. updating chart.');
 
-                that.updateChartWithData(data);
+                if(last_loop) {
+                    that.handleMultiChartData(data);
+                } else {
+                    that.fetchChartData(i+1, data, callback);
+                }
             })
             .fail(function(msg) {
                 that.xhr = undefined;
@@ -5091,8 +5198,10 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.statistics.refreshes_active--;
                 that.fetching_data = false;
 
-                if(typeof callback === 'function')
-                    return callback(ok, 'download');
+                if(last_loop) {
+                    if(typeof callback === 'function')
+                        return callback(ok, 'download');
+                }
             });
         };
 
@@ -5122,6 +5231,7 @@ var NETDATA = window.NETDATA || {};
 
             return ret;
         };
+
 
         this.isVisible = function(nocache) {
             // this.log('last_visible_check: ' + this.tm.last_visible_check + ', last_page_scroll: ' + NETDATA.options.last_page_scroll);
@@ -5294,9 +5404,15 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
+        this.firstChartId = function() {
+            return this.id.split(",")[0];
+        };
+
         // fetch the chart description from the netdata server
         this.getChart = function(callback) {
-            this.chart = NETDATA.chartRegistry.get(this.host, this.id);
+            this.chart = NETDATA.chartRegistry.get(this.host, this.firstChartId());
+            this.multi_ids = this.id.split(",");
+            
             if(this.chart) {
                 this.__defaultsFromDownloadedChart(this.chart);
 
@@ -5313,7 +5429,7 @@ var NETDATA = window.NETDATA || {};
                     return callback();
             }
             else {
-                this.chart_url = "/api/v1/chart?chart=" + this.id;
+                this.chart_url = "/api/v1/chart?chart=" + this.firstChartId();
 
                 if(this.debug === true)
                     this.log('downloading ' + this.chart_url);
