@@ -2753,6 +2753,22 @@ var NETDATA = window.NETDATA || {};
             });
         }
 
+        // The friendly metric map
+        this.labels_map = {};
+        var rawLabels = NETDATA.dataAttribute(this.element, 'friendly-labels', "").split(",");
+        for(var i in rawLabels) {
+            infos = rawLabels[i].split(":");
+            this.labels_map[infos[0]] = infos[1];
+        }
+
+        // The friendly hostname map
+        this.hosts_map = {};
+        var rawHosts = NETDATA.dataAttribute(this.element, 'friendly-host-names', "").split(",");
+        for(var i in rawHosts) {
+            infos = rawHosts[i].split(":");
+            this.hosts_map[infos[0]] = infos[1];
+        }
+
         // the chart library requested by the user
         this.library_name = NETDATA.dataAttribute(this.element, 'chart-library', NETDATA.chartDefaults.library);
 
@@ -4663,7 +4679,7 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
-        this.chartsURLs = function() {
+        this.chartsInfos = function() {
             var after, before, points_multiplier = 1;
             if(NETDATA.globalPanAndZoom.isActive()) {
                 if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
@@ -4725,27 +4741,31 @@ var NETDATA = window.NETDATA || {};
             var data_urls = [];
 
             for(var i in this.multi_ids) {
-                // build the data URL
-                var data_url = this.host + "/api/v1/data?chart="+this.multi_ids[i];
-                data_url += "&format="  + this.library.format();
-                data_url += "&points="  + (data_points).toString();
-                data_url += "&group="   + this.method;
-                data_url += "&gtime="   + this.gtime;
-                data_url += "&options=" + this.chartURLOptions();
+                var chart_id = this.multi_ids[i];
+                for(var j in this.multi_hosts) {
+                    var host = this.multi_hosts[j];
+                    // build the data URL
+                    var data_url = host + "/api/v1/data?chart="+chart_id;
+                    data_url += "&format="  + this.library.format();
+                    data_url += "&points="  + (data_points).toString();
+                    data_url += "&group="   + this.method;
+                    data_url += "&gtime="   + this.gtime;
+                    data_url += "&options=" + this.chartURLOptions();
 
-                if(after)
-                    data_url += "&after="  + after.toString();
+                    if(after)
+                        data_url += "&after="  + after.toString();
     
-                if(before)
-                    data_url += "&before=" + before.toString();
+                    if(before)
+                        data_url += "&before=" + before.toString();
     
-                if(this.dimensions)
-                    data_url += "&dimensions=" + this.dimensions;
+                    if(this.dimensions)
+                        data_url += "&dimensions=" + this.dimensions;
     
-                if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
-                    this.log('chartsURLs(): ' + data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
+                    if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
+                        this.log('chartsURLs(): ' + data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
 
-                data_urls.push(data_url);
+                    data_urls.push({chart_id: chart_id, data_url: data_url, host: host});
+                }
             }
             return data_urls;
         };
@@ -5081,10 +5101,22 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.formatDimensionName = function(result, toFormat) {
-            return result.id + "." + toFormat;
+            var metric = "";
+
+            // Only add the host to the metric if the chart is showing data from multiple hosts
+            if(this.multi_hosts.length > 1) {
+                var friendly_host = this.hosts_map[result.host] != undefined ? this.hosts_map[result.host] : result.host;
+                metric += friendly_host + ".";
+            }
+
+            var friendly_label = this.labels_map[result.id] != undefined ? this.labels_map[result.id] : result.id;           
+            if(friendly_label != "") metric += friendly_label + "." 
+
+            metric += toFormat;
+            return metric;
         };
 
-        this.handleMultiChartData = function(data) {
+        this.handleChartData = function(data) {
             var newData = data[0];
 
             // Don't handle multi-chart if there is only one chart
@@ -5150,11 +5182,12 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.fetchChartData = function(i, data, callback) {
-            var urls = this.chartsURLs();
-            var data_url = urls[i];
+            var infos = this.chartsInfos();
+            var chart_info = infos[i];
+            var data_url = chart_info["data_url"];
 
             var last_loop = false;
-            if(i == urls.length - 1) {
+            if(i == infos.length - 1) {
                 last_loop = true;
             }
 
@@ -5172,6 +5205,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(dataPart) {
+console.log(chart_info);
+                dataPart = $.extend({}, chart_info, dataPart);
                 dataPart = NETDATA.xss.checkData('/api/v1/data', dataPart, that.library.xssRegexIgnore);
                 data.push(dataPart);
 
@@ -5183,7 +5218,7 @@ var NETDATA = window.NETDATA || {};
                     that.log('data received. updating chart.');
 
                 if(last_loop) {
-                    that.handleMultiChartData(data);
+                    that.handleChartData(data);
                 } else {
                     that.fetchChartData(i+1, data, callback);
                 }
@@ -5420,10 +5455,16 @@ var NETDATA = window.NETDATA || {};
             return this.id.split(",")[0];
         };
 
+        this.firstHost = function() {
+            return this.host.split(",")[0];
+        };
+
         // fetch the chart description from the netdata server
         this.getChart = function(callback) {
             this.chart = NETDATA.chartRegistry.get(this.host, this.firstChartId());
             this.multi_ids = this.id.split(",");
+            this.multi_hosts = this.host.split(",");
+            this.host = this.firstHost();
             
             if(this.chart) {
                 this.__defaultsFromDownloadedChart(this.chart);
