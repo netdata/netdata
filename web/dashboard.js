@@ -2753,7 +2753,7 @@ var NETDATA = window.NETDATA || {};
             });
         }
 
-        // The friendly metric map
+        // The friendly labels map
         this.labels_map = {};
         var rawLabels = NETDATA.dataAttribute(this.element, 'friendly-labels', "").split(",");
         for(var i in rawLabels) {
@@ -4738,7 +4738,7 @@ var NETDATA = window.NETDATA || {};
                 data_points = this.data_points * points_multiplier;
             }
 
-            var data_urls = [];
+            var chart_infos = [];
 
             for(var i in this.multi_ids) {
                 var chart_id = this.multi_ids[i];
@@ -4764,10 +4764,10 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
                         this.log('chartsURLs(): ' + data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
 
-                    data_urls.push({chart_id: chart_id, data_url: data_url, host: host});
+                    chart_infos.push({chart_id: chart_id, data_url: data_url, host: host});
                 }
             }
-            return data_urls;
+            return chart_infos;
         };
 
         this.redrawChart = function() {
@@ -5071,33 +5071,6 @@ var NETDATA = window.NETDATA || {};
             }
 
             this.fetchChartData(0, [], callback);
-        };
-
-        var __isVisible = function() {
-            var ret = true;
-
-            if(NETDATA.options.current.update_only_visible !== false) {
-                // tolerance is the number of pixels a chart can be off-screen
-                // to consider it as visible and refresh it as if was visible
-                var tolerance = 0;
-
-                that.tm.last_visible_check = Date.now();
-
-                var rect = that.element.getBoundingClientRect();
-
-                var screenTop = window.scrollY;
-                var screenBottom = screenTop + window.innerHeight;
-
-                var chartTop = rect.top + screenTop;
-                var chartBottom = chartTop + rect.height;
-
-                ret = !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
-            }
-
-            if(that.debug === true)
-                that.log('__isVisible(): ' + ret);
-
-            return ret;
         };
 
         this.formatDimensionName = function(result, toFormat) {
