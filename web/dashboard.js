@@ -5086,7 +5086,6 @@ var NETDATA = window.NETDATA || {};
 
         this.handleMultiChartData = function(data) {
             var newData = data[0];
-            console.log("handleMultiChartData 1", newData);
             for(var j in newData.dimension_ids) {
                 newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
             }
@@ -5095,10 +5094,14 @@ var NETDATA = window.NETDATA || {};
                 newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
             }
 
+            for(var j in newData.result.labels) {
+                if(j == 0) continue;
+                newData.result.labels[j] = this.formatDimensionName(newData, newData.result.labels[j]);
+            }
+
             for(var i in data) {
                 if(i == 0) continue;
                 var dataPart = data[i];
-                console.log("handleMultiChartData 2", dataPart);
                 newData.dimensions += 1;
                 newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
 
@@ -5123,15 +5126,17 @@ var NETDATA = window.NETDATA || {};
                 var resultMap = {};
                 for(var j in dataPart.result.data) {
                     var result = dataPart.result.data[j];
-                    // FIX MULTI
-                    resultMap[result[0]] = result[1];
+                    resultMap[result[0]] = result.slice(1);
                 } 
+                console.log(resultMap);
                 for(var j in newData.result.data) {
-                    newData.result.data[j].push(resultMap[newData.result.data[j][0]]);
+                    newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
                 }
 
-                // FIX MULTI
-                newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[1]));
+                for(var j in dataPart.result.labels) {
+                    if(j == 0) continue;
+                    newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[j]));
+                }
             }
             this.data = newData;
             this.updateChartWithData(newData);
