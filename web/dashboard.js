@@ -5086,58 +5086,65 @@ var NETDATA = window.NETDATA || {};
 
         this.handleMultiChartData = function(data) {
             var newData = data[0];
-            for(var j in newData.dimension_ids) {
-                newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
-            }
 
-            for(var j in newData.dimension_names) {
-                newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
-            }
-
-            for(var j in newData.result.labels) {
-                if(j == 0) continue;
-                newData.result.labels[j] = this.formatDimensionName(newData, newData.result.labels[j]);
-            }
-
-            for(var i in data) {
-                if(i == 0) continue;
-                var dataPart = data[i];
-                newData.dimensions += 1;
-                newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
-
-                for(var j in dataPart.dimension_ids) {
-                    newData.dimension_ids.push(this.formatDimensionName(dataPart, dataPart.dimension_ids[j]));
+            // Don't handle multi-chart if there is only one chart
+            if(data.length > 1) {
+                // Format the first chart data
+                for(var j in newData.dimension_ids) {
+                    newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
                 }
 
-                for(var j in dataPart.dimension_names) {
-                    newData.dimension_names.push(this.formatDimensionName(dataPart, dataPart.dimension_names[j]));
+                for(var j in newData.dimension_names) {
+                    newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
                 }
 
-                newData.view_latest_values = newData.view_latest_values.concat(dataPart.view_latest_values);
-
-                if(dataPart.max > newData.max) {
-                    newData.max = dataPart.max;
-                }
-
-                if(dataPart.min > newData.min) {
-                    newData.min = dataPart.min;
-                }
-
-                var resultMap = {};
-                for(var j in dataPart.result.data) {
-                    var result = dataPart.result.data[j];
-                    resultMap[result[0]] = result.slice(1);
-                } 
-                console.log(resultMap);
-                for(var j in newData.result.data) {
-                    newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
-                }
-
-                for(var j in dataPart.result.labels) {
+                for(var j in newData.result.labels) {
                     if(j == 0) continue;
-                    newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[j]));
+                    newData.result.labels[j] = this.formatDimensionName(newData, newData.result.labels[j]);
+                }
+
+                // Format the data from the other charts and merge it with the first one
+                for(var i in data) {
+                    if(i == 0) continue;
+                    var dataPart = data[i];
+                    newData.dimensions += 1;
+                    newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
+
+                    for(var j in dataPart.dimension_ids) {
+                        newData.dimension_ids.push(this.formatDimensionName(dataPart, dataPart.dimension_ids[j]));
+                    }
+
+                    for(var j in dataPart.dimension_names) {
+                        newData.dimension_names.push(this.formatDimensionName(dataPart, dataPart.dimension_names[j]));
+                    }
+
+                    newData.view_latest_values = newData.view_latest_values.concat(dataPart.view_latest_values);
+
+                    if(dataPart.max > newData.max) {
+                        newData.max = dataPart.max;
+                    }
+
+                    if(dataPart.min > newData.min) {
+                        newData.min = dataPart.min;
+                    }
+
+                    var resultMap = {};
+                    for(var j in dataPart.result.data) {
+                        var result = dataPart.result.data[j];
+                        resultMap[result[0]] = result.slice(1);
+                    } 
+                    console.log(resultMap);
+                    for(var j in newData.result.data) {
+                        newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
+                    }
+
+                    for(var j in dataPart.result.labels) {
+                        if(j == 0) continue;
+                        newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[j]));
+                    }
                 }
             }
+
             this.data = newData;
             this.updateChartWithData(newData);
         };
