@@ -2757,7 +2757,7 @@ var NETDATA = window.NETDATA || {};
         this.labels_map = {};
         var rawLabels = NETDATA.dataAttribute(this.element, 'friendly-labels', "").split(",");
         for(var i in rawLabels) {
-            infos = rawLabels[i].split(":");
+            infos = rawLabels[i].split("::");
             this.labels_map[infos[0]] = infos[1];
         }
 
@@ -2765,7 +2765,7 @@ var NETDATA = window.NETDATA || {};
         this.hosts_map = {};
         var rawHosts = NETDATA.dataAttribute(this.element, 'friendly-host-names', "").split(",");
         for(var i in rawHosts) {
-            infos = rawHosts[i].split(":");
+            infos = rawHosts[i].split("::");
             this.hosts_map[infos[0]] = infos[1];
         }
 
@@ -5165,7 +5165,6 @@ var NETDATA = window.NETDATA || {};
                         var result = dataPart.result.data[j];
                         resultMap[result[0]] = result.slice(1);
                     } 
-                    console.log(resultMap);
                     for(var j in newData.result.data) {
                         newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
                     }
@@ -5205,7 +5204,6 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(dataPart) {
-console.log(chart_info);
                 dataPart = $.extend({}, chart_info, dataPart);
                 dataPart = NETDATA.xss.checkData('/api/v1/data', dataPart, that.library.xssRegexIgnore);
                 data.push(dataPart);
