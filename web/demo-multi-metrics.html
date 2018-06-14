@@ -34,7 +34,7 @@
 
     <div data-netdata="system.active_processes"
     data-host="http://netdata1:19999,http://netdata2:19999"
-    data-friendly-host-names="http://netdata1:19999::test-fresh,http://netdata2:19999::pf-julien"
+    data-friendly-host-names="http://netdata1:19999=test-fresh,http://netdata2:19999=pf-julien"
     data-title="Multiple hosts, single metric"
     data-chart-library="dygraph"
     data-height="200px"
@@ -42,8 +42,8 @@
 
     <div data-netdata="system.active_processes,system.forks"
     data-host="http://netdata1:19999,http://netdata2:19999"
-    data-friendly-host-names="http://netdata1:19999::test-fresh,http://netdata2:19999::pf-julien"
-    data-friendly-labels="system.forks::forks,system.active_processes::"
+    data-friendly-host-names="http://netdata1:19999=test-fresh,http://netdata2:19999=pf-julien"
+    data-friendly-labels="system.forks=forks,system.active_processes="
     data-title="Multiple metrics, multiple hosts"
     data-chart-library="dygraph"
     data-height="200px"

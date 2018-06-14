@@ -2757,7 +2757,7 @@ var NETDATA = window.NETDATA || {};
         this.labels_map = {};
         var rawLabels = NETDATA.dataAttribute(this.element, 'friendly-labels', "").split(",");
         for(var i in rawLabels) {
-            infos = rawLabels[i].split("::");
+            infos = rawLabels[i].split("=");
             this.labels_map[infos[0]] = infos[1];
         }
 
@@ -2765,7 +2765,7 @@ var NETDATA = window.NETDATA || {};
         this.hosts_map = {};
         var rawHosts = NETDATA.dataAttribute(this.element, 'friendly-host-names', "").split(",");
         for(var i in rawHosts) {
-            infos = rawHosts[i].split("::");
+            infos = rawHosts[i].split("=");
             this.hosts_map[infos[0]] = infos[1];
         }
 
