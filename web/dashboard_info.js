@@ -373,10 +373,17 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-eye"></i>',
         info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
     },
+
     'unbound': {
         title: 'Unbound',
         icon: '<i class="fas fa-tag"></i>',
         info: undefined
+    },
+
+    'boinc': {
+        title: 'BOINC',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
     }
 };
 
@@ -2119,6 +2126,22 @@ netdataDashboard.context = {
 
     'unbound.threads.recursion': {
         height: 0.2
+    },
+
+    'boinc.tasks': {
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+    },
+
+    'boinc.states': {
+        info: 'Counts of tasks in each task state.  The normal sequence of states is <code>New</code>, <code>Downloading</code>, <code>Ready to Run</code>, <code>Uploading</code>, <code>Uploaded</code>.  Tasks which are marked <code>Ready to Run</code> may be actively running, or may be waiting to be scheduled.  <code>Compute Errors</code> are tasks which failed for some reason during execution.  <code>Aborted</code> tasks were manually cancelled, and will not be processed.  <code>Failed Uploads</code> are otherwise finished tasks which failed to upload to the server, and usually indicate networking issues.'
+    },
+
+    'boinc.sched': {
+        info: 'Counts of active tasks in each scheduling state.  <code>Scheduled</code> tasks are the ones which will run if the system is permitted to process tasks.  <code>Preempted</code> tasks are on standby, and will run if a <code>Scheduled</code> task stops running for some reason.  <code>Uninitialized</code> tasks should never be present, and indicate tha the scheduler has not tried to schedule them yet.'
+    },
+
+    'boinc.process': {
+        info: 'Counts of active tasks in each process state.  <code>Executing</code> tasks are running right now.  <code>Suspended</code> tasks have an associated process, but are not currently running (either because the system isn\'t processing any tasks right now, or because they have been preempted by higher priority tasks).  <code>Quit</code> tasks are exiting gracefully.  <code>Aborted</code> tasks exceeded some resource limit, and are being shut down.  code>Copy Pending</code> tasks are waiting on a background file transfer to finish.  <code>Uninitialized</code> tasks do not have an associated process yet.'
     }
 
     // ------------------------------------------------------------------------

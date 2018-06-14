@@ -17,6 +17,7 @@ dist_python_DATA = \
     apache.chart.py \
     beanstalk.chart.py \
     bind_rndc.chart.py \
+    boinc.chart.py \
     ceph.chart.py \
     chrony.chart.py \
     couchdb.chart.py \
@@ -102,6 +103,7 @@ dist_third_party_DATA = \
     python_modules/third_party/ordereddict.py \
     python_modules/third_party/lm_sensors.py \
     python_modules/third_party/mcrcon.py \
+    python_modules/third_party/boinc_client.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
