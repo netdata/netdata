@@ -91,6 +91,7 @@ dist_healthconfig_DATA = \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
+    health.d/boinc.conf \
     health.d/btrfs.conf \
     health.d/ceph.conf \
     health.d/cpu.conf \
