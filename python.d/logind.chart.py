@@ -5,7 +5,7 @@
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-PRIORITY = 40000
+prioirty = 59999
 
 ORDER = ['sessions', 'users', 'seats']
 
