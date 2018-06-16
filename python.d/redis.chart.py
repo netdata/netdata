@@ -112,7 +112,7 @@ CHARTS = {
 
 
 def copy_chart(name):
-    return dict((k, deepcopy(v)) for k, v in CHARTS.items() if k == name)
+    return {name: deepcopy(CHARTS[name])}
 
 
 RE = re.compile(r'\n([a-z_0-9 ]+):(?:keys=)?([^,\r]+)')
