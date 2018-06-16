@@ -137,7 +137,9 @@ class Service(SocketService):
 
     def do_auth(self):
         resp = self._get_raw_data(request=self.auth_request)
-        if not resp or resp.strip() != '+OK':
+        if not resp:
+            return False
+        if not resp.strip() != '+OK':
             self.error("invalid password")
             return False
         return True
