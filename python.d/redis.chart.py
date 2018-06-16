@@ -15,6 +15,7 @@ REDIS_ORDER = [
     'hit_rate',
     'memory',
     'keys_redis',
+    'eviction',
     'net',
     'connections',
     'clients',
@@ -72,6 +73,11 @@ CHARTS = {
             ['list_keys', 'list', 'absolute'],
             ['zset_keys', 'zset', 'absolute'],
             ['set_keys', 'set', 'absolute']
+        ]},
+    'eviction': {
+        'options': [None, 'Evicted Keys', 'keys', 'keys', 'redis.eviction', 'line'],
+        'lines': [
+            ['evicted_keys', 'evicted', 'absolute']
         ]},
     'connections': {
         'options': [None, 'Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
