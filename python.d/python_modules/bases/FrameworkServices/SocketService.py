@@ -172,7 +172,7 @@ class SocketService(SimpleService):
                 pass
             self._sock = None
 
-    def _send(self):
+    def _send(self, request=None):
         """
         Send request.
         :return: boolean
@@ -180,8 +180,8 @@ class SocketService(SimpleService):
         # Send request if it is needed
         if self.request != self.__empty_request:
             try:
-                self.debug('sending request: {0}'.format(self.request))
-                self._sock.send(self.request)
+                self.debug('sending request: {0}'.format(request or self.request))
+                self._sock.send(request or self.request)
             except Exception as error:
                 self._socket_error('error sending request: {0}'.format(error))
                 self._disconnect()
@@ -222,7 +222,7 @@ class SocketService(SimpleService):
         self.debug('final response: {0}'.format(data))
         return data
 
-    def _get_raw_data(self, raw=False):
+    def _get_raw_data(self, raw=False, request=None):
         """
         Get raw data with low-level "socket" module.
         :param raw: set `True` to return bytes
@@ -236,7 +236,7 @@ class SocketService(SimpleService):
                 return None
 
         # Send request if it is needed
-        if not self._send():
+        if not self._send(request):
             return None
 
         data = self._receive(raw)
