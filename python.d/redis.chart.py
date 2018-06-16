@@ -23,6 +23,7 @@ REDIS_ORDER = [
     'persistence',
     'bgsave_now',
     'bgsave_health',
+    'uptime',
 ]
 
 PIKA_ORDER = [
@@ -33,6 +34,7 @@ PIKA_ORDER = [
     'connections',
     'clients',
     'slaves',
+    'uptime',
 ]
 
 
@@ -113,6 +115,11 @@ CHARTS = {
                     'redis.bgsave_health', 'line'],
         'lines': [
             ['rdb_last_bgsave_status', 'rdb save', 'absolute']
+        ]},
+    'uptime': {
+        'options': [None, 'Uptime', 'seconds', 'uptime', 'redis.uptime', 'line'],
+        'lines': [
+            ['uptime_in_seconds', 'uptime', 'absolute']
         ]}
 }
 
