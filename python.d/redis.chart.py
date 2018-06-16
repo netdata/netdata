@@ -19,10 +19,15 @@ retries = 60
 #             'unix_socket': None
 #          }}
 
-ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence',
+ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'eviction', 'slaves', 'persistence',
          'bgsave_now', 'bgsave_health']
 
 CHARTS = {
+    'eviction':{
+        'options': [None, 'Evicted keys', 'keys', 'evicted', 'redis.evictios', 'area'],
+        'lines': [
+            ['evicted_keys', 'evictied', 'absolute']
+        ]},
     'operations': {
         'options': [None, 'Redis Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
         'lines': [
