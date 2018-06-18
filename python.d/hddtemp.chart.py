@@ -1,27 +1,16 @@
 # -*- coding: utf-8 -*-
 # Description: hddtemp netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
 
-import os
+import re
+
 from copy import deepcopy
 
 from bases.FrameworkServices.SocketService import SocketService
 
-# default module values (can be overridden per job in `config`)
-#update_every = 2
-priority = 60000
-retries = 60
-
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'host': 'localhost',
-#             'port': 7634
-#          }}
 
 ORDER = ['temperatures']
 
@@ -31,6 +20,18 @@ CHARTS = {
         'lines': [
             # lines are created dynamically in `check()` method
         ]}}
+
+RE = re.compile(r'\/([a-zA-Z_0-9-]+)\|([a-zA-Z0-9- ]+)\|([0-9]+|SLP|UNK)\|')
+
+
+class Disk:
+    def __init__(self, id_, name, temp):
+        self.id = id_.replace(' ', '_')
+        self.name = name.replace(' ', '_')
+        self.temp = temp if temp.isdigit() else 0
+
+    def __repr__(self):
+        return self.id
 
 
 class Service(SocketService):
@@ -42,56 +43,43 @@ class Service(SocketService):
         self.request = ""
         self.host = "127.0.0.1"
         self.port = 7634
-        self.disks = list()
+        self.do_only = self.configuration.get('devices')
 
     def get_disks(self):
-        try:
-            disks = self.configuration['devices']
-            self.info("Using configured disks {0}".format(disks))
-        except (KeyError, TypeError):
-            self.info("Autodetecting disks")
-            return ["/dev/" + f for f in os.listdir("/dev") if len(f) == 3 and f.startswith("sd")]
+        r = self._get_raw_data()
 
-        ret = list()
-        for disk in disks:
-            if not disk.startswith('/dev/'):
-                disk = "/dev/" + disk
-            ret.append(disk)
-        if not ret:
-            self.error("Provided disks cannot be found in /dev directory.")
-        return ret
+        if not r:
+            return None
 
-    def _check_raw_data(self, data):
-        if not data.endswith('|'):
-            return False
+        m = RE.findall(r)
 
-        if all(disk in data for disk in self.disks):
-            return True
-        return False
+        if not m:
+            self.error("received data doesn't have needed records")
+            return None
+
+        rv = [Disk(*d) for d in m]
+        self.debug('available disks: {0}'.format(rv))
+
+        if self.do_only:
+            return [v for v in rv if v.id in self.do_only]
+        return rv
 
     def get_data(self):
         """
         Get data from TCP/IP socket
         :return: dict
         """
-        try:
-            raw = self._get_raw_data().split("|")[:-1]
-        except AttributeError:
-            self.error("no data received")
-            return None
-        data = dict()
-        for i in range(len(raw) // 5):
-            if not raw[i*5+1] in self.disks:
-                continue
-            try:
-                val = int(raw[i*5+3])
-            except ValueError:
-                val = 0
-            data[raw[i*5+1].replace("/dev/", "")] = val
 
-        if not data:
-            self.error("received data doesn't have needed records")
+        disks = self.get_disks()
+
+        if not disks:
             return None
+
+        data = dict()
+
+        for d in disks:
+            data[d.id] = d.temp
+
         return data
 
     def check(self):
@@ -100,12 +88,18 @@ class Service(SocketService):
         :return: boolean
         """
         self._parse_config()
-        self.disks = self.get_disks()
+        disks = self.get_disks()
 
-        data = self.get_data()
-        if data is None:
+        if not disks:
             return False
 
-        for name in data:
-            self.definitions['temperatures']['lines'].append([name])
+        for d in disks:
+            n = d.id if d.id.startswith('sd') else d.name
+            dim = [d.id, n]
+            self.definitions['temperatures']['lines'].append(dim)
+
         return True
+
+    @staticmethod
+    def _check_raw_data(data):
+        return not bool(data)
