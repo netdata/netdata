@@ -75,12 +75,7 @@ class Service(SocketService):
         if not disks:
             return None
 
-        data = dict()
-
-        for d in disks:
-            data[d.id] = d.temp
-
-        return data
+        return dict((d.id, d.temp) for d in disks)
 
     def check(self):
         """
