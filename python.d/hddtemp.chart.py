@@ -21,12 +21,12 @@ CHARTS = {
             # lines are created dynamically in `check()` method
         ]}}
 
-RE = re.compile(r'\/([a-zA-Z_0-9-]+)\|([a-zA-Z0-9- ]+)\|([0-9]+|SLP|UNK)\|')
+RE = re.compile(r'\/dev\/([^|]+)\|([^|]+)\|([0-9]+|SLP|UNK)\|')
 
 
 class Disk:
     def __init__(self, id_, name, temp):
-        self.id = id_.replace(' ', '_')
+        self.id = id_.split('/')[-1]
         self.name = name.replace(' ', '_')
         self.temp = temp if temp.isdigit() else 0
 
