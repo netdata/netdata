@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: 1-wire temperature monitor netdata python.d module
 # Author: Diomidis Spinellis <http://www.spinellis.gr>
+# SPDX-License-Identifier: GPL-3.0+
 
 import os
 import re
