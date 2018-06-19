@@ -376,6 +376,7 @@ class Service(SimpleService):
         self.password = self.configuration.get('pass')
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 27017)
+        self.uri = self.configuration.get('uri')
         self.timeout = self.configuration.get('timeout', 100)
         self.metrics_to_collect = deepcopy(DEFAULT_METRICS)
         self.connection = None
@@ -649,7 +650,13 @@ class Service(SimpleService):
 
     def _create_connection(self):
         conn_vars = {'host': self.host, 'port': self.port}
-        if hasattr(MongoClient, 'server_selection_timeout'):
+        if self.uri:
+            try:
+                connection = MongoClient(self.uri)
+                server_status = connection.admin.command('serverStatus')
+            except PyMongoError as error:
+                return None, None, str(error)
+        elif hasattr(MongoClient, 'server_selection_timeout'):
             conn_vars.update({'serverselectiontimeoutms': self.timeout})
         try:
             connection = MongoClient(**conn_vars)
