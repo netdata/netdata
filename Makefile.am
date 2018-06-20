@@ -38,10 +38,10 @@ EXTRA_DIST = \
     m4/ax_c__generic.m4 \
 	autogen.sh \
 	README.md \
+	CONTRIBUTORS.md \
 	LICENSE \
 	LICENSE.md \
 	LICENSE-REDISTRIBUTED.md \
-	CONTRIBUTORS.md \
 	COPYING \
 	autogen.sh \
 	$(NULL)
