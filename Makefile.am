@@ -39,6 +39,7 @@ EXTRA_DIST = \
     m4/ax_c__generic.m4 \
 	autogen.sh \
 	README.md \
+	CONTRIBUTORS.md \
 	LICENSE \
 	LICENSES/Apache-2.0 \
 	LICENSES/BSD-2-Clause \
