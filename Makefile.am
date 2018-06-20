@@ -41,6 +41,7 @@ EXTRA_DIST = \
 	LICENSE \
 	LICENSE.md \
 	LICENSE-REDISTRIBUTED.md \
+	CONTRIBUTORS.md \
 	COPYING \
 	autogen.sh \
 	$(NULL)
