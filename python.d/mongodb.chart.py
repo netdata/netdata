@@ -650,14 +650,18 @@ class Service(SimpleService):
 
     def _create_connection(self):
         conn_vars = {'host': self.host, 'port': self.port}
+        if hasattr(MongoClient, 'server_selection_timeout'):
+            conn_vars.update({'serverselectiontimeoutms': self.timeout})
         if self.uri:
             try:
-                connection = MongoClient(self.uri)
-                server_status = connection.admin.command('serverStatus')
+                if self.timeout:
+                    connection = MongoClient(self.uri,serverselectiontimeoutms=self.timeout)
+                    server_status = connection.admin.command('serverStatus')
+                else:
+                    connection = MongoClient(self.uri)
+                    server_status = connection.admin.command('serverStatus')
             except PyMongoError as error:
                 return None, None, str(error)
-        elif hasattr(MongoClient, 'server_selection_timeout'):
-            conn_vars.update({'serverselectiontimeoutms': self.timeout})
         try:
             connection = MongoClient(**conn_vars)
             if self.user and self.password:
