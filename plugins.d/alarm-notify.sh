@@ -924,39 +924,42 @@ duration4human() {
 # email sender
 
 send_email() {
-    local ret= opts=
+    local ret= opts=() sender_email="${EMAIL_SENDER}" sender_name=
     if [ "${SEND_EMAIL}" = "YES" ]
         then
 
         if [ ! -z "${EMAIL_SENDER}" ]
             then
-            if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
-                then
-                # the name includes single quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
-            elif [[ "${EMAIL_SENDER}" =~ \'.*\'\ \<.*\> ]]
+            if [[ "${EMAIL_SENDER}" =~ ^\".*\"\ \<.*\>$ ]]
                 then
                 # the name includes double quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
-            elif [[ "${EMAIL_SENDER}" =~ .*\ \<.*\> ]]
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '"' -f 2)"
+            elif [[ "${EMAIL_SENDER}" =~ ^\'.*\'\ \<.*\>$ ]]
+                then
+                # the name includes single quotes
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d "'" -f 2)"
+            elif [[ "${EMAIL_SENDER}" =~ ^.*\ \<.*\>$ ]]
                 then
                 # the name does not have any quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)'"
-            else
-                # no name at all
-                opts=" -f ${EMAIL_SENDER}"
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
             fi
         fi
+
+        [ ! -z "${sender_email}" ] && opts+=(-f "${sender_email}")
+        [ ! -z "${sender_name}" ]  && opts+=(-F "${sender_name}")
 
         if [ "${debug}" = "1" ]
             then
             echo >&2 "--- BEGIN sendmail command ---"
-            printf >&2 "%q " "${sendmail}" -t ${opts}
+            printf >&2 "%q " "${sendmail}" -t "${opts[@]}"
             echo >&2
             echo >&2 "--- END sendmail command ---"
         fi
 
-        "${sendmail}" -t ${opts}
+        "${sendmail}" -t "${opts[@]}"
         ret=$?
 
         if [ ${ret} -eq 0 ]
