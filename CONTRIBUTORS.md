@@ -67,3 +67,4 @@ username|name|email (optional)
 :--------:|:----:|:----------------
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
+@philwhineray|Phil Whineray|
