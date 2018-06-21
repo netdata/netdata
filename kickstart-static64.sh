@@ -3,6 +3,9 @@
 
 umask 022
 
+# make sure UID is set
+[ -z "${UID}" ] && export UID="$(id -u)"
+
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh
 
