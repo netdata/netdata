@@ -39,6 +39,7 @@ dist_python_DATA = \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
     litespeed.chart.py \
+    logind.chart.py \
     mdstat.chart.py \
     memcached.chart.py \
     mongodb.chart.py \
