@@ -1108,6 +1108,10 @@ of login.  So if the same user has a graphical and a console login on a
 system, they will show up once in the graphical count, and once in the
 console count.
 
+* Because the data collection process is rather expensive, this plugin
+is currently disabled by default, and needs to be explicitly enabled in
+`/etc/netdata/python.d.conf` before it will run.
+
 ---
 
 # mdstat

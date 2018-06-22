@@ -6,6 +6,7 @@
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
 prioirty = 59999
+disabled_by_default = True
 
 ORDER = ['sessions', 'users', 'seats']
 
