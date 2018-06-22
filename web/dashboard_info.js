@@ -390,6 +390,12 @@ netdataDashboard.menu = {
         title: '1-Wire Sensors',
         icon: '<i class="fas fa-thermometer-half"></i>',
         info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
+    },
+
+    'logind': {
+        title: 'Logind',
+        icon: '<i class="fas fa-user"></i>',
+        info: undefined
     }
 };
 
@@ -2152,6 +2158,18 @@ netdataDashboard.context = {
 
     'w1sensor.temp': {
         info: 'Temperature derived from 1-Wire temperature sensors.'
+    },
+
+    'logind.sessions': {
+        info: 'Shows the number of active sessions of each type tracked by logind.'
+    },
+
+    'logind.users': {
+        info: 'Shows the number of active users of each type tracked by logind.'
+    },
+
+    'logind.seats': {
+        info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
     }
 
     // ------------------------------------------------------------------------
