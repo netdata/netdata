@@ -1,7 +1,12 @@
 # Netdata
 
 Copyright 2016-2017, Costa Tsaousis.
+Copyright 2017, Netdata Inc.
 Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
+
+Netdata uses SPDX license tags to identify the license for it's files.
+Individual licenses referenced in the tags can be found in [the LICENSES
+directory](LICENSES/).
 
 ---
 
@@ -11,7 +16,6 @@ Netdata re-distributes the following third party software.
 We have decided to re-distribute all these, instead of using them
 through a CDN, to allow netdata to work in cases where internet
 connectivity is not available.
-
 
 - [Dygraphs](http://dygraphs.com/)
 
