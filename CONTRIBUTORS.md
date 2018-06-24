@@ -74,3 +74,4 @@ username|name|email (optional)
 @rlefevre|Rémi Lefèvre|
 @vlvkobal|Vladimir Kobal|vlad@prokk.net
 @simonnagl|Simon Nagl|
+@manosf|Emmanouil Fokas|manosf@protonmail.com
