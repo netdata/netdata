@@ -73,4 +73,4 @@ username|name|email (optional)
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
 @rlefevre|Rémi Lefèvre|
 @vlvkobal|Vladimir Kobal|vlad@prokk.net
-@simonnagl|Simon Nagl
+@simonnagl|Simon Nagl|
