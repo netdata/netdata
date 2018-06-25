@@ -64,6 +64,8 @@ NODE_STATS = [
     'jvm.buffer_pools.mapped.total_capacity_in_bytes',
     'thread_pool.bulk.queue',
     'thread_pool.bulk.rejected',
+    'thread_pool.write.queue',
+    'thread_pool.write.rejected',
     'thread_pool.index.queue',
     'thread_pool.index.rejected',
     'thread_pool.search.queue',
@@ -281,6 +283,7 @@ CHARTS = {
                     'elastic.thread_pool_queued', 'stacked'],
         'lines': [
             ['thread_pool_bulk_queue', 'bulk', 'absolute'],
+            ['thread_pool_write_queue', 'write', 'absolute'],
             ['thread_pool_index_queue', 'index', 'absolute'],
             ['thread_pool_search_queue', 'search', 'absolute'],
             ['thread_pool_merge_queue', 'merge', 'absolute']
@@ -290,6 +293,7 @@ CHARTS = {
                     'elastic.thread_pool_rejected', 'stacked'],
         'lines': [
             ['thread_pool_bulk_rejected', 'bulk', 'absolute'],
+            ['thread_pool_write_rejected', 'write', 'absolute'],
             ['thread_pool_index_rejected', 'index', 'absolute'],
             ['thread_pool_search_rejected', 'search', 'absolute'],
             ['thread_pool_merge_rejected', 'merge', 'absolute']
