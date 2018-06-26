@@ -76,4 +76,9 @@ username|name|email (optional)
 @simonnagl|Simon Nagl|
 @manosf|Emmanouil Fokas|manosf@protonmail.com
 @user501254|Ashesh Singh|user501254@gmail.com
+@t-h-e|Stefan Forstenlechner|
+@facetoe|Facetoe|
+@ntlug|Christopher Cox|ccox@endlessnow.com
+@alonbl|Alon Bar-Lev|alon.barlev@gmail.com
+@Wing924|Wei He|weihe924stephen@gmail.com
 @NeonSludge|Kirill Buev|kirill.buev@gmx.com
