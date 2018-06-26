@@ -24,6 +24,7 @@ nut_clients_chart=0
 nut_priority=90000
 
 declare -A nut_ids=()
+declare -A nut_names=()
 
 nut_get_all() {
 	run -t $nut_timeout upsc -l
@@ -56,7 +57,12 @@ nut_check() {
 		nut_get "$x" >/dev/null
 		if [ $? -eq 0 ]
 			then
-			nut_ids[$x]="$( fixid "$x" )"
+				if [ ! -z "${nut_names[${x}]}" ]
+				then
+					nut_ids[$x]="$( fixid "${nut_names[${x}]}" )"
+				else
+ 					nut_ids[$x]="$( fixid "$x" )"
+				fi
 			continue
 		fi
 		error "cannot get information for NUT UPS '$x'."
