@@ -83,3 +83,4 @@ username|name|email (optional)
 @Wing924|Wei He|weihe924stephen@gmail.com
 @NeonSludge|Kirill Buev|kirill.buev@gmx.com
 @kmlucy|Kyle Lucy|kmlucy@gmail.com
+@383c57|Shinichi Tagashira|
