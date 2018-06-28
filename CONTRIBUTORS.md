@@ -84,4 +84,5 @@ username|name|email (optional)
 @NeonSludge|Kirill Buev|kirill.buev@gmx.com
 @kmlucy|Kyle Lucy|kmlucy@gmail.com
 @383c57|Shinichi Tagashira|
+@ccremer|Christian Cremer|
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
