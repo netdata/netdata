@@ -85,5 +85,6 @@ username|name|email (optional)
 @kmlucy|Kyle Lucy|kmlucy@gmail.com
 @RicardoSette|Ricardo Sette|ricardosette@freebsdbrasil.com.br
 @383c57|Shinichi Tagashira|
+@davidak|David Kleuker|netdata-contributors+vyff@davidak.de
 @ccremer|Christian Cremer|
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
