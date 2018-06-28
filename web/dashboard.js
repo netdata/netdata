@@ -2120,6 +2120,16 @@ var NETDATA = window.NETDATA || {};
         },
 
         scalableUnits: {
+            'packets/s': {
+                'pps': 1,
+                'Kpps': 1000,
+                'Mpps': 1000000
+            },
+            'pps': {
+                'pps': 1,
+                'Kpps': 1000,
+                'Mpps': 1000000
+            },
             'kilobits/s': {
                 'bits/s': 1 / 1000,
                 'kilobits/s': 1,
