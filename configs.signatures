@@ -586,6 +586,7 @@ declare -A configs_signatures=(
   ['ce0fa3485a0d8d3aa80b25ab0c70cc5a']='charts.d/apcupsd.conf'
   ['ce2e8768964a936f58c4c2144aee8a01']='health_alarm_notify.conf'
   ['ce3b65eac6c472b21905f7f72104f4c9']='python.d/nginx.conf'
+  ['ce937f8b9ab7820b61ce9fcde6b946e8']='charts.d/nut.conf'
   ['cf2c9096b3a8c506a3ec76fa52574395']='charts.d/phpfpm.conf'
   ['cf46545065f7698c4d529fdc77955274']='python.d/puppet.conf'
   ['cf48dfd828af70bea04db7a809f94358']='health.d/haproxy.conf'
