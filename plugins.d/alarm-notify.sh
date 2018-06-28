@@ -29,6 +29,7 @@
 #  - fleep notifications by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
+#  - MS Team notification @tioumen @Michelin
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -218,7 +219,7 @@ fi
 images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
-curl_options=
+curl_options="--insecure"
 
 # needed commands
 # if empty they will be searched in the system path
@@ -227,6 +228,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_TEAM="YES"
 SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
@@ -249,6 +251,11 @@ SEND_CUSTOM="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# Microsoft Team configs
+TEAM_WEBHOOK_URL=
+DEFAULT_RECIPIENT_TEAM=
+declare -A role_recipients_team=()
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -426,6 +433,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_team=()
 declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
@@ -524,6 +532,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # Team
+    a="${role_recipients_team[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TEAM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality team "${r}" && arr_team[${r/|*/}]="1"
+    done
+
     # rocketchat
     a="${role_recipients_rocketchat[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
@@ -601,6 +617,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of team recipients (channels)
+to_team="${!arr_team[*]}"
+[ -z "${to_team}" ] && SEND_TEAM="NO"
 
 # build the list of rocketchat recipients (channels)
 to_rocketchat="${!arr_rocketchat[*]}"
@@ -753,6 +773,7 @@ if [ \( \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
+        -o "${SEND_TEAM}"        = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -763,6 +784,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_TEAM="NO"
         SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
@@ -1339,6 +1361,69 @@ send_telegram() {
 }
 
 # -----------------------------------------------------------------------------
+# Team sender
+
+send_team() {
+echo "entering in send_team function"
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_TEAM}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  icon="⚠️" && color="FFA500";;
+        CRITICAL) icon="🔥" && color="D93F3C";;
+        CLEAR)    icon="💚" && color="65A677";;
+        *)        icon="♡" && color="0076D7";;
+    esac
+
+    for channels in ${channels}
+    do
+        ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
+        ## Online designer : https://acdesignerbeta.azurewebsites.net/
+        payload="$(cat <<EOF
+        {
+            "@context": "http://schema.org/extensions",
+            "@type": "MessageCard",
+            "themeColor": "${color}",
+            "title": "$icon Alert ${status} from netdata for ${host}",
+            "text": "${host} ${status_message}, ${chart} (_${family}_), *${alarm}*",
+            "potentialAction": [
+            {
+                "@type": "OpenUri",
+                "name": "Netdata",
+                "targets": [
+                { "os": "default", "uri": "http://$(hostname -f):19999" }
+                ]
+            },
+            {
+                "@type": "OpenUri",
+                "name": "Splunk",
+                "targets": [
+                { "os": "default", "uri": "https://your_url.com" }
+                ]
+            }
+            ]
+        }
+EOF
+        )"
+	
+	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
 # slack sender
 
 send_slack() {
@@ -1875,6 +1960,15 @@ send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
+# send the team notification
+
+# team aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_team "${TEAM_WEBHOOK_URL}" "${to_team}"
+SENT_TEAM=$?
+
+# -----------------------------------------------------------------------------
 # send the rocketchat notification
 
 # rocketchat aggregates posts from the same username
@@ -2185,6 +2279,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_TEAM}         -eq 0 \
     -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
