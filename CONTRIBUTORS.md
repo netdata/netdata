@@ -85,3 +85,4 @@ username|name|email (optional)
 @kmlucy|Kyle Lucy|kmlucy@gmail.com
 @383c57|Shinichi Tagashira|
 @ccremer|Christian Cremer|
+@jimcooley|Jim Cooley|jim.cooley@healthvana.com
