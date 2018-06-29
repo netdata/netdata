@@ -152,7 +152,7 @@ class Service(SocketService):
         resp = self._get_raw_data(request=self.auth_request)
         if not resp:
             return False
-        if not resp.strip() != '+OK':
+        if resp.strip() != '+OK':
             self.error("invalid password")
             return False
         return True
