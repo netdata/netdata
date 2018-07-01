@@ -90,4 +90,6 @@ username|name|email (optional)
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
 @Chocobo1|Mike Tzou|
 @cosmix|Dimosthenis Kaponis|
+@shadycuz|Levi Blaney|shadycuz+spam@gmail.com
+@Flums|Philip Gabrielsen|philip@digno.no
 @domschl|Dominik Schlösser|dominik.schloesser@gmail.com
