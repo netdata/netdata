@@ -92,3 +92,4 @@ username|name|email (optional)
 @cosmix|Dimosthenis Kaponis|
 @shadycuz|Levi Blaney|shadycuz+spam@gmail.com
 @Flums|Philip Gabrielsen|philip@digno.no
+@domschl|Dominik Schlösser|dominik.schloesser@gmail.com
