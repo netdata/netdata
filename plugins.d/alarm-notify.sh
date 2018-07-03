@@ -1399,13 +1399,6 @@ echo "entering in send_msteam function"
                 "targets": [
                 { "os": "default", "uri": "http://$(hostname -f):19999" }
                 ]
-            },
-            {
-                "@type": "OpenUri",
-                "name": "Splunk",
-                "targets": [
-                { "os": "default", "uri": "https://your_url.com" }
-                ]
             }
             ]
         }
