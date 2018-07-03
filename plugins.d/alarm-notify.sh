@@ -29,10 +29,14 @@
 #  - fleep notifications by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
-#  - MS Team notification @tioumen @Michelin
+#  - Microsoft Team notification by @tioumen
 
 # -----------------------------------------------------------------------------
 # testing notifications
+
+export PATH="/opt/netdata/bin:${PATH}"
+export NETDATA_ALARM_NOTIFY_DEBUG=1
+
 
 if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
@@ -228,7 +232,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
-SEND_TEAM="YES"
+SEND_MSTEAM="YES"
 SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
@@ -253,9 +257,9 @@ DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
 
 # Microsoft Team configs
-TEAM_WEBHOOK_URL=
-DEFAULT_RECIPIENT_TEAM=
-declare -A role_recipients_team=()
+MSTEAM_WEBHOOK_URL=
+DEFAULT_RECIPIENT_MSTEAM=
+declare -A role_recipients_msteam=()
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -433,7 +437,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
-declare -A arr_team=()
+declare -A arr_msteam=()
 declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
@@ -532,12 +536,12 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
-    # Team
-    a="${role_recipients_team[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TEAM}"
+    # Microsoft Team
+    a="${role_recipients_msteam[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MSTEAM}"
     for r in ${a//,/ }
     do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality team "${r}" && arr_team[${r/|*/}]="1"
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality msteam "${r}" && arr_msteam[${r/|*/}]="1"
     done
 
     # rocketchat
@@ -618,9 +622,9 @@ done
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
 
-# build the list of team recipients (channels)
-to_team="${!arr_team[*]}"
-[ -z "${to_team}" ] && SEND_TEAM="NO"
+# build the list of Microsoft team recipients (channels)
+to_msteam="${!arr_msteam[*]}"
+[ -z "${to_msteam}" ] && SEND_MSTEAM="NO"
 
 # build the list of rocketchat recipients (channels)
 to_rocketchat="${!arr_rocketchat[*]}"
@@ -773,7 +777,7 @@ if [ \( \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
-        -o "${SEND_TEAM}"        = "YES" \
+        -o "${SEND_MSTEAM}"        = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -784,7 +788,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
-        SEND_TEAM="NO"
+        SEND_MSTEAM="NO"
         SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
@@ -841,6 +845,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
+    -a "${SEND_MSTEAM}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1361,19 +1366,19 @@ send_telegram() {
 }
 
 # -----------------------------------------------------------------------------
-# Team sender
+# Microsoft Team sender
 
-send_team() {
-echo "entering in send_team function"
+send_msteam() {
+echo "entering in send_msteam function"
     local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    [ "${SEND_TEAM}" != "YES" ] && return 1
+    [ "${SEND_MSTEAM}" != "YES" ] && return 1
 
     case "${status}" in
-        WARNING)  icon="⚠️" && color="FFA500";;
-        CRITICAL) icon="🔥" && color="D93F3C";;
-        CLEAR)    icon="💚" && color="65A677";;
-        *)        icon="♡" && color="0076D7";;
+        WARNING)  icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}";;
+        CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}";;
+        CLEAR)    icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}";;
+        *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
     esac
 
     for channels in ${channels}
@@ -1411,10 +1416,10 @@ EOF
 
         if [ "${httpcode}" = "200" ]
         then
-            info "sent team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+            info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
             sent=$((sent + 1))
         else
-            error "failed to send team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+            error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
         fi
     done
 
@@ -1960,13 +1965,13 @@ send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
-# send the team notification
+# send the Microsoft notification
 
-# team aggregates posts from the same username
+# Microsoft team aggregates posts from the same username
 # so we use "${host} ${status}" as the bot username, to make them diff
 
-send_team "${TEAM_WEBHOOK_URL}" "${to_team}"
-SENT_TEAM=$?
+send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
+SENT_MSTEAM=$?
 
 # -----------------------------------------------------------------------------
 # send the rocketchat notification
@@ -2279,7 +2284,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
-    -o ${SENT_TEAM}         -eq 0 \
+    -o ${SENT_MSTEAM}       -eq 0 \
     -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \

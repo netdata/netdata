@@ -88,3 +88,4 @@ username|name|email (optional)
 @davidak|David Kleuker|netdata-contributors+vyff@davidak.de
 @ccremer|Christian Cremer|
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
+@tioumen|Guillaume Hospital
