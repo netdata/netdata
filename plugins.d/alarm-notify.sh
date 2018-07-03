@@ -34,9 +34,6 @@
 # -----------------------------------------------------------------------------
 # testing notifications
 
-export PATH="/opt/netdata/bin:${PATH}"
-export NETDATA_ALARM_NOTIFY_DEBUG=1
-
 
 if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
@@ -1369,7 +1366,7 @@ send_telegram() {
 # Microsoft Team sender
 
 send_msteam() {
-echo "entering in send_msteam function"
+
     local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
     [ "${SEND_MSTEAM}" != "YES" ] && return 1
