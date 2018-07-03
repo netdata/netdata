@@ -220,7 +220,7 @@ fi
 images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
-curl_options="--insecure"
+#curl_options=""
 
 # needed commands
 # if empty they will be searched in the system path
