@@ -976,6 +976,43 @@ send_email() {
 }
 
 # -----------------------------------------------------------------------------
+# Custom.  Send to Alexa
+
+# curl https://api.notifymyecho.com/v1/NotifyMe -H "Content-Type: application/json" -d '{"notification":"Hello Worl
+# d!","accessCode":"amzn1.ask.account.AEMUQHZPY3CYPU64II7RC6LWYN734IKYE7YB4DYEMT3HD5DTJNOENIUK7FDXKYPSKJ54W7I4W42E6MGP2UGV
+# IBKAU2OLZT7EE3AMKCQOJP3KGXW6C5UWVUATGARIHNGCKPPIKNLV3O3NLTVATWYXJGD7JEYHFVHVE3YM2RMXDZW34HJHZPQQPAUHT6JPIERSF5LFPGGNHIP3
+# OWI"}'
+
+send_alexa() {
+    local httpcode sent=0
+
+    if [ "${SEND_ALEXA}" = "YES" -a ! -z "${ACCESSCODES}" ]
+        then
+
+        for accesscode in ${ACCESSCODES}
+        do
+            httpcode=$(docurl \
+                --header 'Content-Type: application/json' \
+                --data "{\"notification\":\" ${chart}.${name} is ${status}\",\"accessCode\":\"${accesscode}\"}" \
+                https://api.notifymyecho.com/v1/NotifyMe)
+
+            if [ "${httpcode}" = "200" ]
+            then
+                info "sent Alexa notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send Alexa notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}." \
+                "{\"notification\":\"${message}\",\"accessCode\":\"${accesscode}\"}"
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # pushover sender
 
 send_pushover() {
@@ -1909,6 +1946,12 @@ SENT_FLOCK=$?
 
 send_discord "${DISCORD_WEBHOOK_URL}" "${to_discord}"
 SENT_DISCORD=$?
+
+# -----------------------------------------------------------------------------
+# send the Alexa notification
+
+send_alexa
+SENT_ALEXA=$?
 
 # -----------------------------------------------------------------------------
 # send the pushover notification
