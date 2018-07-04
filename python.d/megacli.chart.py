@@ -39,7 +39,7 @@ def pd_charts(pds):
     ]
 
     def dims(k, pd):
-        return [['slot_{0}_{1}'.format(p.id, k), 'slot {0}'.format(p.id)] for p in pd]
+        return [['slot_{0}_{1}'.format(p.id, k), 'slot {0}'.format(p.id), 'incremental'] for p in pd]
 
     charts = {
         'pd_media_error': {
