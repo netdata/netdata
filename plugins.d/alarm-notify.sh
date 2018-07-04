@@ -997,8 +997,7 @@ send_alexa() {
                 info "sent Alexa notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
             else
-                error "failed to send Alexa notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}." \
-                "{\"notification\":\"${message}\",\"accessCode\":\"${accesscode}\"}"
+                error "failed to send Alexa notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
             fi
         done
 
