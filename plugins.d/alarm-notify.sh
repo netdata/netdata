@@ -19,6 +19,7 @@
 #  - alerta.io notifications by @kattunga
 #  - discordapp.com notifications by @lowfive
 #  - pushover.net notifications by @ktsaou
+#  - Alexa nontifications by @scottjg89
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 #1070
 #  - telegram.org notifications by @hashworks #1002
 #  - twilio.com notifications by Levi Blaney @shadycuz #1211
@@ -977,11 +978,6 @@ send_email() {
 
 # -----------------------------------------------------------------------------
 # Custom.  Send to Alexa
-
-# curl https://api.notifymyecho.com/v1/NotifyMe -H "Content-Type: application/json" -d '{"notification":"Hello Worl
-# d!","accessCode":"amzn1.ask.account.AEMUQHZPY3CYPU64II7RC6LWYN734IKYE7YB4DYEMT3HD5DTJNOENIUK7FDXKYPSKJ54W7I4W42E6MGP2UGV
-# IBKAU2OLZT7EE3AMKCQOJP3KGXW6C5UWVUATGARIHNGCKPPIKNLV3O3NLTVATWYXJGD7JEYHFVHVE3YM2RMXDZW34HJHZPQQPAUHT6JPIERSF5LFPGGNHIP3
-# OWI"}'
 
 send_alexa() {
     local httpcode sent=0
