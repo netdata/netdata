@@ -17,13 +17,13 @@ class ExecutableService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.command = None
 
-    def _get_raw_data(self, stderr=False):
+    def _get_raw_data(self, stderr=False, command=None):
         """
         Get raw data from executed command
         :return: <list>
         """
         try:
-            p = Popen(self.command, stdout=PIPE, stderr=PIPE)
+            p = Popen(command if command else self.command, stdout=PIPE, stderr=PIPE)
         except Exception as error:
             self.error('Executing command {command} resulted in error: {error}'.format(command=self.command,
                                                                                        error=error))
