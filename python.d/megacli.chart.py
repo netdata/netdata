@@ -120,14 +120,14 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-        self.command = Command()
+        self.megacli = Command()
 
     def check(self):
-        if not self.command:
+        if not self.megacli:
             self.error("can't locate \"megacli\" binary or binary is not executable by netdata")
             return None
 
-        d = self._get_raw_data(command=self.command.disk_info)
+        d = self._get_raw_data(command=self.megacli.disk_info)
 
         if not d:
             return None
@@ -136,7 +136,7 @@ class Service(ExecutableService):
         pds = find_pds(d)
 
         if not (ads and pds):
-            self.error('failed to parse "{0}" output'.format(' '.join(self.command.disk_info)))
+            self.error('failed to parse "{0}" output'.format(' '.join(self.megacli.disk_info)))
             return None
 
         self.create_charts(ads, pds)
@@ -146,7 +146,7 @@ class Service(ExecutableService):
         return self.get_adapter_pd_data()
 
     def get_adapter_pd_data(self):
-        raw = self._get_raw_data(command=self.command.disk_info)
+        raw = self._get_raw_data(command=self.megacli.disk_info)
 
         if not raw:
             return None
