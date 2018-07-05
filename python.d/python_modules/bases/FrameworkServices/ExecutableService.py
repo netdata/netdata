@@ -25,7 +25,7 @@ class ExecutableService(SimpleService):
         try:
             p = Popen(command if command else self.command, stdout=PIPE, stderr=PIPE)
         except Exception as error:
-            self.error('Executing command {command} resulted in error: {error}'.format(command=self.command,
+            self.error('Executing command {command} resulted in error: {error}'.format(command=command or self.command,
                                                                                        error=error))
             return None
         data = list()

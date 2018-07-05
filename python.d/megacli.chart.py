@@ -102,14 +102,16 @@ class PD:
         }
 
 
-class Command:
+class Megacli:
     def __init__(self):
-        self.command = find_binary('megacli')
-        self.disk_info = [self.command, '-LDPDInfo', '-aAll']
-        self.battery_info = [self.command, '-AdpBbuCmd', '-a0']
+        self.s = find_binary('sudo')
+        self.m = find_binary('megacli')
+        self.sudo_check = [self.s, '-n', '-v']
+        self.disk_info = [self.s, '-n', self.m, '-LDPDInfo', '-aAll']
+        self.battery_info = [self.s, '-n', self.m, '-AdpBbuCmd', '-a0']
 
     def __bool__(self):
-        return bool(self.command)
+        return bool(self.s and self.m)
 
     def __nonzero__(self):
         return self.__bool__()
@@ -120,12 +122,18 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-        self.megacli = Command()
+        self.megacli = Megacli()
 
     def check(self):
         if not self.megacli:
-            self.error("can't locate \"megacli\" binary or binary is not executable by netdata")
+            self.error('can\'t locate "sudo" or "megacli" binary')
             return None
+
+        err = self._get_raw_data(command=self.megacli.sudo_check, stderr=True)
+
+        if err:
+            self.error(''.join(err))
+            return False
 
         d = self._get_raw_data(command=self.megacli.disk_info)
 
