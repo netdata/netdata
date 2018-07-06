@@ -91,7 +91,7 @@ RE_VD = re.compile(
 )
 
 RE_BATTERY = re.compile(
-    r'BBU Capacity Info for Adapter: ([0-9]+) Relative State of Charge: ([0-9]+) % Cycle Count: ([0-5]+)'
+    r'BBU Capacity Info for Adapter: ([0-9]+) Relative State of Charge: ([0-9]+) % Cycle Count: ([0-9]+)'
 )
 
 
@@ -109,7 +109,7 @@ def find_pds(d):
 
 def find_batteries(d):
     keys = ('BBU Capacity Info for Adapter', 'Relative State of Charge', 'Cycle Count')
-    d = ' '.join(v.strip() for v in d if v.startswith(keys))
+    d = ' '.join(v.strip() for v in d if v.strip().startswith(keys))
     return [Battery(*v) for v in RE_BATTERY.findall(d)]
 
 
