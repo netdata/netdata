@@ -52,6 +52,7 @@ dist_pythonconfig_DATA = \
     python.d/isc_dhcpd.conf \
     python.d/litespeed.conf \
     python.d/logind.conf \
+    python.d/megacli.conf \
     python.d/mdstat.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
