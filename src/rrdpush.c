@@ -1111,6 +1111,21 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         }
     }
 
+    {
+        static netdata_mutex_t stream_rate_mutex = NETDATA_MUTEX_INITIALIZER;
+        static volatile time_t last_stream_accepted_t = 0;
+        time_t now = now_realtime_sec();
+
+        netdata_mutex_lock(&stream_rate_mutex);
+        if(last_stream_accepted_t + 30 < now) {
+            netdata_mutex_unlock(&stream_rate_mutex);
+            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Try again in a while.", w->client_ip, w->client_port);
+            return rrdpush_receiver_permission_denied(w);
+        }
+        last_stream_accepted_t = now;
+        netdata_mutex_unlock(&stream_rate_mutex);
+    }
+
     struct rrdpush_thread *rpt = callocz(1, sizeof(struct rrdpush_thread));
     rpt->fd                = w->ifd;
     rpt->key               = strdupz(key);
