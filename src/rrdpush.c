@@ -1119,20 +1119,19 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         }
     }
 
-    {
+    if(unlikely(web_client_streaming_rate_t > 0)) {
         static netdata_mutex_t stream_rate_mutex = NETDATA_MUTEX_INITIALIZER;
         static volatile time_t last_stream_accepted_t = 0;
 
         netdata_mutex_lock(&stream_rate_mutex);
         time_t now = now_realtime_sec();
-        time_t rate_t = 10;
 
         if(unlikely(last_stream_accepted_t == 0))
             last_stream_accepted_t = now;
 
-        if(now - last_stream_accepted_t < rate_t) {
+        if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
             netdata_mutex_unlock(&stream_rate_mutex);
-            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Try again in %ld secs.", w->client_ip, w->client_port, (long)(rate_t - (now - last_stream_accepted_t)));
+            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %ld secs.", w->client_ip, w->client_port, (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
             return rrdpush_receiver_too_busy_now(w);
         }
 
