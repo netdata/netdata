@@ -57,12 +57,41 @@ def pd_charts(pds):
     return order, charts
 
 
+def battery_charts(bats):
+    order = [
+        'relative_charge',
+        'cycle_count',
+    ]
+
+    def dims(k, bat):
+        return [['battery_{0}_{1}'.format(b.id, k), 'adapter {0}'.format(b.id)] for b in bat]
+
+    charts = {
+        'relative_charge': {
+            'options': [
+                    None, 'Relative State of Charge', '%', 'battery', 'megacli.relative_charge', 'line'],
+            'lines': dims("relative_charge", bats)
+            },
+        'cycle_count': {
+            'options': [
+                None, 'Cycle Count', 'cycle count', 'battery', 'megacli.cycle_count', 'line'],
+            'lines': dims("cycle_count", bats)
+        },
+    }
+
+    return order, charts
+
+
 RE_ADAPTER = re.compile(
     r'Adapter #([0-9]+) State\s+: ([a-zA-Z]+)'
 )
 
 RE_VD = re.compile(
     r'Slot Number: ([0-9]+) Media Error Count: ([0-9]+) Predictive Failure Count: ([0-9]+)'
+)
+
+RE_BATTERY = re.compile(
+    r'BBU Capacity Info for Adapter: ([0-9]+) Relative State of Charge: ([0-9]+) % Cycle Count: ([0-5]+)'
 )
 
 
@@ -76,6 +105,12 @@ def find_pds(d):
     keys = ("Slot Number",  "Media Error Count", "Predictive Failure Count")
     d = ' '.join(v.strip() for v in d if v.startswith(keys))
     return [PD(*v) for v in RE_VD.findall(d)]
+
+
+def find_batteries(d):
+    keys = ('BBU Capacity Info for Adapter', 'Relative State of Charge', 'Cycle Count')
+    d = ' '.join(v.strip() for v in d if v.startswith(keys))
+    return [Battery(*v) for v in RE_BATTERY.findall(d)]
 
 
 class Adapter:
@@ -102,6 +137,20 @@ class PD:
         }
 
 
+class Battery:
+    def __init__(self, adapt_id, rel_charge, cycle_count):
+        self.id = adapt_id
+        self.rel_charge = rel_charge
+        self.cycle_count = cycle_count
+
+    def data(self):
+        return {
+            'battery_{0}_relative_charge'.format(self.id): self.rel_charge,
+            'battery_{0}_cycle_count'.format(self.id): self.cycle_count,
+        }
+
+
+# TODO: hardcoded sudo...
 class Megacli:
     def __init__(self):
         self.s = find_binary('sudo')
@@ -123,43 +172,81 @@ class Service(ExecutableService):
         self.order = list()
         self.definitions = dict()
         self.megacli = Megacli()
+        self.do_battery = self.configuration.get('do_battery')
 
-    def check(self):
-        if not self.megacli:
-            self.error('can\'t locate "sudo" or "megacli" binary')
-            return None
-
+    def check_sudo(self):
         err = self._get_raw_data(command=self.megacli.sudo_check, stderr=True)
-
         if err:
             self.error(''.join(err))
             return False
+        return True
 
+    def check_disk_info(self):
         d = self._get_raw_data(command=self.megacli.disk_info)
-
         if not d:
-            return None
+            return False
 
         ads = find_adapters(d)
         pds = find_pds(d)
 
         if not (ads and pds):
             self.error('failed to parse "{0}" output'.format(' '.join(self.megacli.disk_info)))
+            return False
+
+        o, c = adapter_charts(ads)
+        self.order.extend(o)
+        self.definitions.update(c)
+
+        o, c = pd_charts(pds)
+        self.order.extend(o)
+        self.definitions.update(c)
+
+        return True
+
+    def check_battery(self):
+        d = self._get_raw_data(command=self.megacli.battery_info)
+        if not d:
+            return
+
+        bats = find_batteries(d)
+
+        if not bats:
+            self.error('failed to parse "{0}" output'.format(' '.join(self.megacli.battery_info)))
+            return
+
+        o, c = battery_charts(bats)
+        self.order.extend(o)
+        self.definitions.update(c)
+
+    def check(self):
+        if not self.megacli:
+            self.error('can\'t locate "sudo" or "megacli" binary')
             return None
 
-        self.create_charts(ads, pds)
+        if not (self.check_sudo() and self.check_disk_info()):
+            return False
+
+        if self.do_battery:
+            self.check_battery()
+
         return True
 
     def get_data(self):
-        return self.get_adapter_pd_data()
+        data = dict()
+
+        data.update(self.get_adapter_pd_data())
+
+        if self.do_battery:
+            data.update(self.get_battery_data())
+
+        return data or None
 
     def get_adapter_pd_data(self):
         raw = self._get_raw_data(command=self.megacli.disk_info)
+        data = dict()
 
         if not raw:
-            return None
-
-        data = dict()
+            return data
 
         for a in find_adapters(raw):
             data.update(a.data())
@@ -169,11 +256,14 @@ class Service(ExecutableService):
 
         return data
 
-    def create_charts(self, ads, pds):
-        o, c = adapter_charts(ads)
-        self.order.extend(o)
-        self.definitions.update(c)
+    def get_battery_data(self):
+        raw = self._get_raw_data(command=self.megacli.battery_info)
+        data = dict()
 
-        o, c = pd_charts(pds)
-        self.order.extend(o)
-        self.definitions.update(c)
+        if not raw:
+            return data
+
+        for b in find_batteries(raw):
+            data.update(b.data())
+
+        return data
