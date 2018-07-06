@@ -1121,7 +1121,7 @@ Module collects adapter, physical drives and battery stats.
 **Requirements:**
  * `netdata` user needs to be able to be able to sudo the `megacli` program without password
 
-To grab stats it following executes:
+To grab stats it executes:
  * `sudo -n megacli -LDPDInfo -aAll`
  * `sudo -n megacli -AdpBbuCmd -a0`
  
