@@ -206,17 +206,18 @@ class Service(ExecutableService):
     def check_battery(self):
         d = self._get_raw_data(command=self.megacli.battery_info)
         if not d:
-            return
+            return False
 
         bats = find_batteries(d)
 
         if not bats:
             self.error('failed to parse "{0}" output'.format(' '.join(self.megacli.battery_info)))
-            return
+            return False
 
         o, c = battery_charts(bats)
         self.order.extend(o)
         self.definitions.update(c)
+        return True
 
     def check(self):
         if not self.megacli:
@@ -227,7 +228,7 @@ class Service(ExecutableService):
             return False
 
         if self.do_battery:
-            self.check_battery()
+            self.do_battery = self.check_battery()
 
         return True
 
