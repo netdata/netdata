@@ -1006,6 +1006,14 @@ int rrdpush_receiver_permission_denied(struct web_client *w) {
     return 401;
 }
 
+int rrdpush_receiver_too_busy_now(struct web_client *w) {
+    // we always respond with the same message and error code
+    // to prevent an attacker from gaining info about the error
+    buffer_flush(w->response.data);
+    buffer_sprintf(w->response.data, "The server is too busy now to accept this request. Try later.");
+    return 503;
+}
+
 int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
     (void)host;
 
@@ -1117,11 +1125,15 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         time_t now = now_realtime_sec();
 
         netdata_mutex_lock(&stream_rate_mutex);
+        if(unlikely(last_stream_accepted_t == 0))
+            last_stream_accepted_t = now;
+
         if(last_stream_accepted_t + 30 < now) {
             netdata_mutex_unlock(&stream_rate_mutex);
-            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Try again in a while.", w->client_ip, w->client_port);
-            return rrdpush_receiver_permission_denied(w);
+            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Try again in %ld secs.", w->client_ip, w->client_port, (long)(last_stream_accepted_t + 30 - now));
+            return rrdpush_receiver_too_busy_now(w);
         }
+
         last_stream_accepted_t = now;
         netdata_mutex_unlock(&stream_rate_mutex);
     }
