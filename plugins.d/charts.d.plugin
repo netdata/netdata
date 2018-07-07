@@ -297,7 +297,7 @@ run() {
         {
             printf "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: command '"
             printf "%q " "${@}"
-            printf "' failed:\n --- BEGIN TRACE ---\n"
+            printf "' failed with code ${ret}:\n --- BEGIN TRACE ---\n"
             cat "${TMP_DIR}/run.${pid}"
             printf " --- END TRACE ---\n"
         } >&2

@@ -43,5 +43,6 @@ extern int api_listen_sockets_setup(void);
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
 extern int web_client_first_request_timeout;
+extern long web_client_streaming_rate_t;
 
 #endif /* NETDATA_WEB_SERVER_H */
