@@ -58,26 +58,36 @@ def pd_charts(pds):
 
 
 def battery_charts(bats):
-    order = [
-        'relative_charge',
-        'cycle_count',
-    ]
+    order = list()
+    charts = dict()
 
-    def dims(k, bat):
-        return [['battery_{0}_{1}'.format(b.id, k), 'adapter {0}'.format(b.id)] for b in bat]
+    for b in bats:
+        order.append('bbu_{0}_relative_charge'.format(b.id))
+        charts.update(
+            {
+                'bbu_{0}_relative_charge'.format(b.id): {
+                    'options': [
+                        None, 'Relative State of Charge', '%', 'battery', 'megacli.bbu_relative_charge', 'line'],
+                    'lines': [
+                        ['bbu_{0}_relative_charge'.format(b.id), 'adapter {0}'.format(b.id)],
+                    ]
+                }
+            }
+        )
 
-    charts = {
-        'relative_charge': {
-            'options': [
-                    None, 'Relative State of Charge', '%', 'battery', 'megacli.relative_charge', 'line'],
-            'lines': dims("relative_charge", bats)
-            },
-        'cycle_count': {
-            'options': [
-                None, 'Cycle Count', 'cycle count', 'battery', 'megacli.cycle_count', 'line'],
-            'lines': dims("cycle_count", bats)
-        },
-    }
+    for b in bats:
+        order.append('bbu_{0}_cycle_count'.format(b.id))
+        charts.update(
+            {
+                'bbu_{0}_cycle_count'.format(b.id): {
+                    'options': [
+                        None, 'Cycle Count', 'cycle count', 'battery', 'megacli.bbu_cycle_count', 'line'],
+                    'lines': [
+                        ['bbu_{0}_cycle_count'.format(b.id), 'adapter {0}'.format(b.id)],
+                    ]
+                }
+            }
+        )
 
     return order, charts
 
@@ -145,8 +155,8 @@ class Battery:
 
     def data(self):
         return {
-            'battery_{0}_relative_charge'.format(self.id): self.rel_charge,
-            'battery_{0}_cycle_count'.format(self.id): self.cycle_count,
+            'bbu_{0}_relative_charge'.format(self.id): self.rel_charge,
+            'bbu_{0}_cycle_count'.format(self.id): self.cycle_count,
         }
 
 
