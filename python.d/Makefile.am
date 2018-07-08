@@ -41,6 +41,7 @@ dist_python_DATA = \
     litespeed.chart.py \
     logind.chart.py \
     mdstat.chart.py \
+    megacli.chart.py \
     memcached.chart.py \
     mongodb.chart.py \
     mysql.chart.py \
