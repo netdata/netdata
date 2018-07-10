@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_RRD2JSON_H
 #define NETDATA_RRD2JSON_H 1
 
@@ -6,7 +7,7 @@
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 // type of JSON generations
-#define DATASOURCE_INVALID -1
+#define DATASOURCE_INVALID (-1)
 #define DATASOURCE_JSON 0
 #define DATASOURCE_DATATABLE_JSON 1
 #define DATASOURCE_DATATABLE_JSONP 2
@@ -61,6 +62,9 @@
 #define RRDR_OPTION_LABEL_QUOTES    0x00000400 // in CSV output, wrap header labels in double quotes
 #define RRDR_OPTION_PERCENTAGE      0x00000800 // give values as percentage of total
 #define RRDR_OPTION_NOT_ALIGNED     0x00001000 // do not align charts for persistant timeframes
+#define RRDR_OPTION_DISPLAY_ABS     0x00002000 // for badges, display the absolute value, but calculate colors with sign
+#define RRDR_OPTION_MATCH_IDS       0x00004000 // when filtering dimensions, match only IDs
+#define RRDR_OPTION_MATCH_NAMES     0x00008000 // when filtering dimensions, match only names
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
@@ -69,11 +73,11 @@ extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
 
 extern int rrdset2anything_api_v1(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points
-                            , long long after, long long before, int group_method, uint32_t options
+                            , long long after, long long before, int group_method, long group_time, uint32_t options
                             , time_t *latest_timestamp);
 
 extern int rrdset2value_api_v1(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points
-                            , long long after, long long before, int group_method, uint32_t options
-                            , time_t *db_before, time_t *db_after, int *value_is_null);
+                            , long long after, long long before, int group_method, long group_time, uint32_t options
+                            , time_t *db_after, time_t *db_before, int *value_is_null);
 
 #endif /* NETDATA_RRD2JSON_H */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -77,7 +78,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%08x\t%08x\t%08x"
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
-                        "\t%Lf\t%Lf"
+                        "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -109,8 +110,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->old_status
                             , ae->delay
 
-                            , (long double)ae->new_value
-                            , (long double)ae->old_value
+                            , ae->new_value
+                            , ae->old_value
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {

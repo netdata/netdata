@@ -1,84 +1,58 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: GPL-3.0+
 
 # The user netdata is configured to run as.
 # If you edit its configuration file to set a different
 # user, set it here too, to have its files switch ownership
-: ${NETDATA_OWNER:=netdata:netdata}
-
-# The URL to download netdata config.
-: ${NETDATA_CONFIG_URL:=http://localhost:19999/netdata.conf}
+: "${NETDATA_OWNER:=netdata:netdata}"
 
 # The timeout in seconds to wait for netdata
 # to save its database on disk and exit.
-: ${NETDATA_WAIT_EXIT_TIMEOUT:=60}
+: "${NETDATA_WAIT_EXIT_TIMEOUT:=60}"
 
 # When set to 1, if netdata does not exit in
 # NETDATA_WAIT_EXIT_TIMEOUT, we will force it
 # to exit.
-: ${NETDATA_FORCE_EXIT:=0}
+: "${NETDATA_FORCE_EXIT:=0}"
 
 # Netdata will use these services, only if they
 # are enabled to start.
-: ${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}
+: "${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}"
 
-extra_started_commands="getconf"
-pidfile="/run/netdata.pid"
+extra_started_commands="reload rotate save"
+pidfile="/run/netdata/netdata.pid"
 command="@sbindir_POST@/netdata"
-command_background="yes"
 command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
-# start_stop_daemon_args="-u ${NETDATA_OWNER}"
-start_stop_daemon_args=""
+start_stop_daemon_args="-u ${NETDATA_OWNER}"
+required_files="/etc/netdata/netdata.conf"
+if [ "${NETDATA_FORCE_EXIT}" -eq 1 ]; then
+    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}/KILL/1"
+else
+    retry="TERM/${NETDATA_WAIT_EXIT_TIMEOUT}"
+fi
 
 depend() {
-	use logger
-	need net
-	after ${NETDATA_START_AFTER_SERVICES}
+    use logger
+    need net
+    after ${NETDATA_START_AFTER_SERVICES}
 
-	checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
+    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
 }
 
-start_post() {
-	if [ ! -f @sysconfdir_POST@/netdata/netdata.conf ]; then
-		ebegin "Downloading default configuration to @sysconfdir_POST@/netdata/netdata.conf"
-		sleep 2
-		curl -s -o @sysconfdir_POST@/netdata/netdata.conf.new "${NETDATA_CONFIG_URL}"
-		ret=$?
-		if [ $ret -eq 0 && -s @sysconfdir_POST@/netdata/netdata.conf.new ]; then
-			mv @sysconfdir_POST@/netdata/netdata.conf.new @sysconfdir_POST@/netdata/netdata.conf
-		else
-			ret=1
-			rm @sysconfdir_POST@/netdata/netdata.conf.new 2>/dev/null
-		fi
-		eend $ret
-	fi
+reload() {
+    ebegin "Reloading Netdata"
+    start-stop-daemon --signal SIGUSR2 --pidfile "${pidfile}"
+    eend $? "Failed to reload Netdata"
 }
 
-stop_post() {
-	local result ret=0 count=0 sigkill=0
-
-	ebegin "Waiting for netdata to save its database"
-	while [ -f "${pidfile}" ]; do
-		if [ $count -gt ${NETDATA_WAIT_EXIT_TIMEOUT} ]; then
-			sigkill=1
-			break
-		fi
-
-		count=$((count + 1))
-		kill -0 $(cat ${pidfile}) 2>/dev/null
-		ret=$?
-		test $ret -eq 0 && sleep 1
-	done
-	eend $sigkill
-
-	if [ $sigkill -eq 1 -a -f "${pidfile}" ]; then
-		ebegin "Netdata is taking too long to exit, forcing it to quit"
-		kill -SIGKILL $(cat ${pidfile}) 2>/dev/null
-		eend $?
-	fi
+rotate() {
+    ebegin "Logrotating Netdata"
+    start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
+    eend $? "Failed to logrotate Netdata"
 }
 
-getconf() {
-	ebegin "Downloading configuration from netdata to /tmp/netdata.conf"
-	curl -o /tmp/netdata.conf "${NETDATA_CONFIG_URL}"
-	eend $?
+save() {
+    ebegin "Saving Netdata database"
+    start-stop-daemon --signal SIGUSR1 --pidfile "${pidfile}"
+    eend $? "Failed to save Netdata database"
 }

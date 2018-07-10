@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0+ */
 html,
 body {
     /*font-family: Calibri,"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;*/
@@ -58,6 +59,8 @@ code {
     display: inline-block;
     overflow: hidden;
 
+    transform: translate3d(0,0,0);
+
     /* required for child elements to have absolute position */
     position: relative;
 
@@ -67,6 +70,8 @@ code {
 .netdata-container-gauge {
     display: inline-block;
     overflow: hidden;
+
+    transform: translate3d(0,0,0);
 
     /* required for child elements to have absolute position */
     position: relative;
@@ -83,6 +88,8 @@ code {
 .netdata-container-easypiechart {
     display: inline-block;
     overflow: hidden;
+
+    transform: translate3d(0,0,0);
 
     /* required for child elements to have absolute position */
     position: relative;
@@ -107,6 +114,8 @@ code {
     display: inline-block;
     overflow: hidden;
 
+    transform: translate3d(0,0,0);
+
     /* fix minimum scrollbar issue in firefox */
     min-height: 99px;
 
@@ -122,9 +131,9 @@ code {
     bottom: 0px;
     right: 0px;
     height: 15px;
-    width: 30px;
+    width: 20px;
     background-color: #272b30;
-    font-size: 12px;
+    font-size: 15px;
     vertical-align: middle;
     line-height: 15px;
     cursor: ns-resize;
@@ -153,6 +162,12 @@ code {
     z-index: 20;
     padding: 0px;
     margin: 0px;
+
+    /* prevent text selection after double click */
+    -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 .netdata-legend-toolbox-button {
@@ -171,6 +186,12 @@ code {
     padding: 0px;
     margin: 0px;
     cursor: pointer;
+
+    /* prevent text selection after double click */
+    -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 .netdata-message {
@@ -219,12 +240,18 @@ code {
     font-size: 10px;
     font-weight: normal;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-title-time {
     font-size: 11px;
     font-weight: bold;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-title-units {
@@ -235,6 +262,9 @@ code {
     vertical-align: top;
     font-weight: normal;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-series {
@@ -377,6 +407,10 @@ code {
 .dygraph-ylabel {
 }
 
+.dygraph-axis-label-x {
+    overflow-x: hidden;
+}
+
 .dygraph-axis-label {
     color: #6c7075;
 }
@@ -451,7 +485,7 @@ code {
     float: left;
     left: 0;
     width: 64%;
-    margin-left: 18%;
+    margin-left: 18% !important;
     text-align: center;
     color: #676b70;
     font-weight: bold;
@@ -463,7 +497,7 @@ code {
     float: left;
     left: 0;
     width: 60%;
-    margin-left: 20%;
+    margin-left: 20% !important;
     text-align: center;
     color: #676b70;
     font-weight: normal;

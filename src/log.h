@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_LOG_H
 #define NETDATA_LOG_H 1
 
@@ -37,6 +38,8 @@
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
 //#define DEBUG 0xffffffff
 #define DEBUG (0)
+
+extern int web_server_is_multithreaded;
 
 extern uint64_t debug_flags;
 

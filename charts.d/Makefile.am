@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
@@ -16,6 +17,7 @@ dist_charts_DATA = \
 	example.chart.sh \
 	exim.chart.sh \
 	hddtemp.chart.sh \
+	libreswan.chart.sh \
 	load_average.chart.sh \
 	mem_apps.chart.sh \
 	mysql.chart.sh \

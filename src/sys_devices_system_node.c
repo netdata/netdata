@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 struct node {
@@ -107,7 +108,7 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                             , "events/s"
                             , "proc"
                             , "/sys/devices/system/node"
-                            , 1000
+                            , NETDATA_CHART_PRIO_MEM_NUMA + 10
                             , update_every
                             , RRDSET_TYPE_LINE
                     );

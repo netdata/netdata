@@ -2,13 +2,17 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 from threading import Thread
+from time import sleep
 
 try:
-    from time import sleep, monotonic as time
+    from time import monotonic as time
 except ImportError:
-    from time import sleep, time
+    from bases.monotonic import AVAILABLE, time
+    if not AVAILABLE:
+        from time import time
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
@@ -33,6 +37,7 @@ class RuntimeCounters:
         self.RETRIES = 0
         self.RETRIES_MAX = configuration.pop('retries')
         self.PENALTY = 0
+        self.RUNS = 1
 
     def is_sleep_time(self):
         return self.START_RUN < self.NEXT_RUN
@@ -80,6 +85,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
     def actual_name(self):
         return self.fake_name or self.name
+
+    @property
+    def runs_counter(self):
+        return self._runtime_counters.RUNS
 
     @property
     def update_every(self):
@@ -178,6 +187,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 self.error('update() unhandled exception: {error}'.format(error=error))
                 updated = False
 
+            job.RUNS += 1
+
             if not updated:
                 if not self.manage_retries():
                     return
@@ -209,7 +220,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
         for chart in self.charts:
             if chart.flags.obsoleted:
-                continue
+                if chart.can_be_updated(data):
+                    chart.refresh()
+                else:
+                    continue
             elif self.charts.cleanup and chart.penalty >= self.charts.cleanup:
                 chart.obsolete()
                 self.error("chart '{0}' was suppressed due to non updating".format(chart.name))

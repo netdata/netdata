@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "adaptive_resortable_list.h"
 
 // the default processor() of the ARL
@@ -96,9 +97,14 @@ void arl_begin(ARL_BASE *base) {
     }
 #endif
 
-    if(unlikely(base->added || base->iteration % base->rechecks) == 1) {
+    if(unlikely(base->iteration > 0 && (base->added || (base->iteration % base->rechecks) == 0))) {
+        int wanted_equals_expected = ((base->iteration % base->rechecks) == 0);
+
+        // fprintf(stderr, "\n\narl_begin() rechecking, added %zu, iteration %zu, rechecks %zu, wanted_equals_expected %d\n\n\n", base->added, base->iteration, base->rechecks, wanted_equals_expected);
+
         base->added = 0;
-        base->wanted = 0;
+        base->wanted = (wanted_equals_expected)?base->expected:0;
+
         ARL_ENTRY *e = base->head;
         while(e) {
             if(e->flags & ARL_ENTRY_FLAG_FOUND) {
@@ -107,7 +113,7 @@ void arl_begin(ARL_BASE *base) {
                 e->flags &= ~ARL_ENTRY_FLAG_FOUND;
 
                 // count it in wanted
-                if(e->flags & ARL_ENTRY_FLAG_EXPECTED)
+                if(!wanted_equals_expected && e->flags & ARL_ENTRY_FLAG_EXPECTED)
                     base->wanted++;
 
             }
@@ -155,10 +161,11 @@ void arl_begin(ARL_BASE *base) {
 
 // register an expected keyword to the ARL
 // together with its destination ( i.e. the output of the processor() )
-ARL_ENTRY *arl_expect(ARL_BASE *base, const char *keyword, void *dst) {
+ARL_ENTRY *arl_expect_custom(ARL_BASE *base, const char *keyword, void (*processor)(const char *name, uint32_t hash, const char *value, void *dst), void *dst) {
     ARL_ENTRY *e = callocz(1, sizeof(ARL_ENTRY));
     e->name = strdupz(keyword);
     e->hash = simple_hash(e->name);
+    e->processor = (processor)?processor:base->processor;
     e->dst = dst;
     e->flags = ARL_ENTRY_FLAG_EXPECTED;
     e->prev = NULL;
@@ -198,7 +205,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
 
         // run the processor for it
         if(unlikely(e->dst)) {
-            base->processor(e->name, hash, value, e->dst);
+            e->processor(e->name, hash, value, e->dst);
             base->found++;
         }
 
@@ -254,8 +261,10 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
     if(unlikely(!base->next_keyword))
         base->next_keyword = base->head;
 
-    if(unlikely(base->found == base->wanted))
+    if(unlikely(base->found == base->wanted)) {
+        // fprintf(stderr, "FOUND ALL WANTED 1: found = %zu, wanted = %zu, expected %zu\n", base->found, base->wanted, base->expected);
         return 1;
+    }
 
     return 0;
 }

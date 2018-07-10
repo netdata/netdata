@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
 
@@ -35,14 +36,14 @@ extern int appconfig_load(struct config *root, char *filename, int overwrite_use
 
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-extern long double appconfig_get_float(struct config *root, const char *section, const char *name, long double value);
+extern LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
 extern long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
-extern long double appconfig_set_float(struct config *root, const char *section, const char *name, long double value);
+extern LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int appconfig_exists(struct config *root, const char *section, const char *name);

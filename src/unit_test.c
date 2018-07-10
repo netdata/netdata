@@ -1,4 +1,41 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
+
+static int check_number_printing(void) {
+    struct {
+        calculated_number n;
+        const char *correct;
+    } values[] = {
+            { .n = 0, .correct = "0" },
+            { .n = 0.0000001,   .correct = "0.0000001" },
+            { .n = 0.00000009,  .correct = "0.0000001" },
+            { .n = 0.000000001, .correct = "0" },
+            { .n = 99.99999999999999999, .correct = "100" },
+            { .n = -99.99999999999999999, .correct = "-100" },
+            { .n = 123.4567890123456789, .correct = "123.456789" },
+            { .n = 9999.9999999, .correct = "9999.9999999" },
+            { .n = -9999.9999999, .correct = "-9999.9999999" },
+            { .n = 0, .correct = NULL },
+    };
+
+    char netdata[50], system[50];
+    int i, failed = 0;
+    for(i = 0; values[i].correct ; i++) {
+        print_calculated_number(netdata, values[i].n);
+        snprintfz(system, 49, "%0.12" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)values[i].n);
+
+        int ok = 1;
+        if(strcmp(netdata, values[i].correct) != 0) {
+            ok = 0;
+            failed++;
+        }
+
+        fprintf(stderr, "'%s' (system) printed as '%s' (netdata): %s\n", system, netdata, ok?"OK":"FAILED");
+    }
+
+    if(failed) return 1;
+    return 0;
+}
 
 static int check_rrdcalc_comparisons(void) {
     RRDCALC_STATUS a, b;
@@ -92,8 +129,8 @@ int check_storage_number(calculated_number n, int debug) {
             p, pdiff, pcdiff
         );
         if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
-        if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, dcdiff);
-        if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, pcdiff);
+        if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, dcdiff);
+        if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, pcdiff);
     }
 
     if(len != strlen(buffer)) return 1;
@@ -136,10 +173,10 @@ void benchmark_storage_number(int loop, int multiplier) {
     their = (calculated_number)sizeof(calculated_number) * (calculated_number)loop;
 
     if(mine > their) {
-        fprintf(stderr, "\nNETDATA NEEDS %0.2Lf TIMES MORE MEMORY. Sorry!\n", (long double)(mine / their));
+        fprintf(stderr, "\nNETDATA NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES MORE MEMORY. Sorry!\n", (LONG_DOUBLE)(mine / their));
     }
     else {
-        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2Lf TIMES LESS MEMORY.\n", (long double)(their / mine));
+        fprintf(stderr, "\nNETDATA INTERNAL FLOATING POINT ARITHMETICS NEEDS %0.2" LONG_DOUBLE_MODIFIER " TIMES LESS MEMORY.\n", (LONG_DOUBLE)(their / mine));
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
@@ -172,7 +209,7 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
 
     // ------------------------------------------------------------------------
 
@@ -196,13 +233,13 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     their = total;
 
-    fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
 
     if(mine > total) {
-        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -230,13 +267,13 @@ void benchmark_storage_number(int loop, int multiplier) {
     total  = user + system;
     mine = total;
 
-    fprintf(stderr, "user %0.5Lf, system %0.5Lf, total %0.5Lf\n", (long double)(user / 1000000.0), (long double)(system / 1000000.0), (long double)(total / 1000000.0));
+    fprintf(stderr, "user %0.5" LONG_DOUBLE_MODIFIER ", system %0.5" LONG_DOUBLE_MODIFIER ", total %0.5" LONG_DOUBLE_MODIFIER "\n", (LONG_DOUBLE)(user / 1000000.0), (LONG_DOUBLE)(system / 1000000.0), (LONG_DOUBLE)(total / 1000000.0));
 
     if(mine > their) {
-        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2Lf %%\n", (long double)(mine * 100.0 / their - 100.0));
+        fprintf(stderr, "WITH PACKING UNPACKING NETDATA CODE IS SLOWER %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(mine * 100.0 / their - 100.0));
     }
     else {
-        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2Lf %%\n", (long double)(their * 100.0 / mine - 100.0));
+        fprintf(stderr, "EVEN WITH PACKING AND UNPACKING, NETDATA CODE IS  F A S T E R  %0.2" LONG_DOUBLE_MODIFIER " %%\n", (LONG_DOUBLE)(their * 100.0 / mine - 100.0));
     }
 
     // ------------------------------------------------------------------------
@@ -308,23 +345,23 @@ int unit_test_str2ld() {
     int i;
     for(i = 0; values[i] ; i++) {
         char *e_mine = "hello", *e_sys = "world";
-        long double mine = str2ld(values[i], &e_mine);
-        long double sys = strtold(values[i], &e_sys);
+        LONG_DOUBLE mine = str2ld(values[i], &e_mine);
+        LONG_DOUBLE sys = strtold(values[i], &e_sys);
 
         if(isnan(mine)) {
             if(!isnan(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf.\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
         else if(isinf(mine)) {
             if(!isinf(sys)) {
-                fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf.\n", values[i], mine, sys);
+                fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys);
                 return -1;
             }
         }
         else if(mine != sys && abs(mine-sys) > 0.000001) {
-            fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf, delta %Lf.\n", values[i], mine, sys, sys-mine);
+            fprintf(stderr, "Value '%s' is parsed as %" LONG_DOUBLE_MODIFIER ", but system believes it is %" LONG_DOUBLE_MODIFIER ", delta %" LONG_DOUBLE_MODIFIER ".\n", values[i], mine, sys, sys-mine);
             return -1;
         }
 
@@ -333,7 +370,7 @@ int unit_test_str2ld() {
             return -1;
         }
 
-        fprintf(stderr, "str2ld() parsed value '%s' exactly the same way with strtold(), returned %Lf vs %Lf\n", values[i], mine, sys);
+        fprintf(stderr, "str2ld() parsed value '%s' exactly the same way with strtold(), returned %" LONG_DOUBLE_MODIFIER " vs %" LONG_DOUBLE_MODIFIER "\n", values[i], mine, sys);
     }
 
     return 0;
@@ -1086,7 +1123,7 @@ int run_test(struct test *test)
     int errors = 0;
 
     if(st->counter != test->result_entries) {
-        fprintf(stderr, "    %s stored %lu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
+        fprintf(stderr, "    %s stored %zu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
         errors++;
     }
 
@@ -1163,6 +1200,9 @@ static int test_variable_renames(void) {
 
 int run_all_mockup_tests(void)
 {
+    if(check_number_printing())
+        return 1;
+
     if(check_rrdcalc_comparisons())
         return 1;
 

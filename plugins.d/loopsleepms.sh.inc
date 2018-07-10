@@ -1,4 +1,5 @@
 # no need for shebang - this file is included from other scripts
+# SPDX-License-Identifier: GPL-3.0+
 
 LOOPSLEEP_DATE="$(which date 2>/dev/null || command -v date 2>/dev/null)"
 if [ -z "$LOOPSLEEP_DATE" ]
@@ -85,11 +86,12 @@ fi
 # -----------------------------------------------------------------------------
 # use read with timeout for sleep
 
-mysleep="mysleep_read"
+mysleep=""
 
 mysleep_fifo="${NETDATA_CACHE_DIR-/tmp}/.netdata_bash_sleep_timer_fifo"
-[ ! -e "${mysleep_fifo}" ] && mkfifo "${mysleep_fifo}"
-[ ! -e "${mysleep_fifo}" ] && mysleep="sleep"
+[ -f "${mysleep_fifo}" ] && rm "${mysleep_fifo}"
+[ ! -p "${mysleep_fifo}" ] && mkfifo "${mysleep_fifo}"
+[ -p "${mysleep_fifo}" ] && mysleep="mysleep_read"
 
 mysleep_read() {
     read -t "${1}" <>"${mysleep_fifo}"
@@ -101,6 +103,52 @@ mysleep_read() {
         ${mysleep} "${1}"
     fi
 }
+
+# -----------------------------------------------------------------------------
+# use bash loadable module for sleep
+
+mysleep_builtin() {
+    builtin sleep "${1}"
+    ret=$?
+    if [ $ret -ne 0 ]
+        then
+        echo >&2 "$0: Cannot use builtin sleep for sleeping (return code ${ret})."
+        mysleep="sleep"
+        ${mysleep} "${1}"
+    fi
+}
+
+if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 -a "${NETDATA_BASH_LOADABLES}" != "DISABLE" ]
+    then
+    # enable modules only for bash version 3+
+
+    for bash_modules_path in ${BASH_LOADABLES_PATH//:/ } "$(pkg-config bash --variable=loadablesdir 2>/dev/null)" "/usr/lib/bash" "/lib/bash" "/lib64/bash" "/usr/local/lib/bash" "/usr/local/lib64/bash"
+    do
+        [ -z "${bash_modules_path}" -o ! -d "${bash_modules_path}" ] && continue
+
+        # check for sleep
+        for bash_module_sleep in "sleep" "sleep.so"
+        do
+            if [ -f "${bash_modules_path}/${bash_module_sleep}" ]
+                then
+                if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null
+                    then
+                    mysleep="mysleep_builtin"
+                    # echo >&2 "$0: Using bash loadable ${bash_modules_path}/${bash_module_sleep} for sleep"
+                    break
+                fi
+            fi
+
+        done
+
+        [ ! -z "${mysleep}" ] && break
+    done
+fi
+
+# -----------------------------------------------------------------------------
+# fallback to external sleep
+
+[ -z "${mysleep}" ] && mysleep="sleep"
 
 
 # -----------------------------------------------------------------------------

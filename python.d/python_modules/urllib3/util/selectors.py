@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Backport of selectors.py from Python 3.5+ to support Python < 3.4
 # Also has the behavior specified in PEP 475 which is to retry syscalls
 # in the case of an EINTR error. This module is required because selectors34

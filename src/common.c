@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #ifdef __APPLE__
@@ -19,6 +20,7 @@ char *netdata_configured_home_dir    = NULL;
 char *netdata_configured_host_prefix = NULL;
 char *netdata_configured_timezone    = NULL;
 
+struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
@@ -904,6 +906,30 @@ void strreverse(char *begin, char *end) {
     }
 }
 
+char *strsep_on_1char(char **ptr, char c) {
+    if(unlikely(!ptr || !*ptr))
+        return NULL;
+
+    // remember the position we started
+    char *s = *ptr;
+
+    // skip separators in front
+    while(*s == c) s++;
+    char *ret = s;
+
+    // find the next separator
+    while(*s++) {
+        if(unlikely(*s == c)) {
+            *s++ = '\0';
+            *ptr = s;
+            return ret;
+        }
+    }
+
+    *ptr = NULL;
+    return ret;
+}
+
 char *mystrsep(char **ptr, char *s) {
     char *p = "";
     while (p && !p[0] && *ptr) p = strsep(ptr, s);
@@ -1114,22 +1140,6 @@ int memory_file_save(const char *filename, void *mem, size_t size) {
 
 int fd_is_valid(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
-}
-
-pid_t gettid(void) {
-#ifdef __FreeBSD__
-    return (pid_t)pthread_getthreadid_np();
-#elif defined(__APPLE__)
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
-    uint64_t curthreadid;
-    pthread_threadid_np(NULL, &curthreadid);
-    return (pid_t)curthreadid;
-#else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-    return (pid_t)pthread_self;
-#endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-#else /* __APPLE__*/
-    return (pid_t)syscall(SYS_gettid);
-#endif /* __FreeBSD__, __APPLE__*/
 }
 
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
@@ -1349,4 +1359,74 @@ int recursively_delete_dir(const char *path, const char *reason) {
     closedir(dir);
 
     return ret;
+}
+
+static int is_virtual_filesystem(const char *path, char **reason) {
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    (void)path;
+    (void)reason;
+#else
+    struct statfs stat;
+    // stat.f_fsid.__val[0] is a file system id
+    // stat.f_fsid.__val[1] is the inode
+    // so their combination uniquely identifies the file/dir
+
+    if (statfs(path, &stat) == -1) {
+        if(reason) *reason = "failed to statfs()";
+        return -1;
+    }
+
+    if(stat.f_fsid.__val[0] != 0 || stat.f_fsid.__val[1] != 0) {
+        errno = EINVAL;
+        if(reason) *reason = "is not a virtual file system";
+        return -1;
+    }
+#endif
+
+    return 0;
+}
+
+int verify_netdata_host_prefix() {
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
+
+    if(!*netdata_configured_host_prefix)
+        return 0;
+
+    char buffer[FILENAME_MAX + 1];
+    char *path = netdata_configured_host_prefix;
+    char *reason = "unknown reason";
+    errno = 0;
+
+    struct stat sb;
+    if (stat(path, &sb) == -1) {
+        reason = "failed to stat()";
+        goto failed;
+    }
+
+    if((sb.st_mode & S_IFMT) != S_IFDIR) {
+        errno = EINVAL;
+        reason = "is not a directory";
+        goto failed;
+    }
+
+    path = buffer;
+    snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
+    if(is_virtual_filesystem(path, &reason) == -1)
+        goto failed;
+
+    snprintfz(path, FILENAME_MAX, "%s/sys", netdata_configured_host_prefix);
+    if(is_virtual_filesystem(path, &reason) == -1)
+        goto failed;
+
+    if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
+        info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+
+    return 0;
+
+failed:
+    error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
+    netdata_configured_host_prefix = "";
+    return -1;
 }

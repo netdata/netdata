@@ -1,17 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #ifdef NETDATA_INTERNAL_CHECKS
 
-void *checks_main(void *ptr) {
+static void checks_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("CHECKS thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *checks_main(void *ptr) {
+    netdata_thread_cleanup_push(checks_main_cleanup, ptr);
 
     usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
     struct timeval now, last, loop;
@@ -72,7 +74,7 @@ void *checks_main(void *ptr) {
     rrddim_add(check3, "apps.plugin", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     now_realtime_timeval(&last);
-    while(1) {
+    while(!netdata_exit) {
         usleep(susec);
 
         // find the time to sleep in order to wait exactly update_every seconds
@@ -119,10 +121,7 @@ void *checks_main(void *ptr) {
         rrdset_done(check3);
     }
 
-    info("CHECKS thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

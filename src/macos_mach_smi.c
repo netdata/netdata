@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 #include <mach/mach.h>
 
@@ -196,7 +197,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , "page faults/s"
                             , "macos"
                             , "mach_smi"
-                            , 500
+                            , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );

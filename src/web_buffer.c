@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define BUFFER_OVERFLOW_EOF "EOF"
@@ -21,7 +22,7 @@ static inline void _buffer_overflow_check(BUFFER *b, const char *file, const cha
         b->len = b->size;
     }
 
-    if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF)) {
+    if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF) != 0) {
         error("BUFFER: detected overflow at line %lu, at function %s() of file '%s'.", line, function, file);
         buffer_overflow_init(b);
     }
@@ -160,8 +161,6 @@ void buffer_strcat(BUFFER *wb, const char *txt)
 
 void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
 {
-    char b[2] = { [0] = '\0', [1] = '\0' };
-
     while(*txt) {
         switch(*txt) {
             case '&': buffer_strcat(wb, "&amp;"); break;
@@ -171,12 +170,14 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
             case '/': buffer_strcat(wb, "&#x2F;"); break;
             case '\'': buffer_strcat(wb, "&#x27;"); break;
             default: {
-                b[0] = *txt;
-                buffer_strcat(wb, b);
+                buffer_need_bytes(wb, 1);
+                wb->buffer[wb->len++] = *txt;
             }
         }
         txt++;
     }
+
+    buffer_overflow_check(wb);
 }
 
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...)

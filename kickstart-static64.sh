@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0+
 
 umask 022
+
+# make sure UID is set
+[ -z "${UID}" ] && export UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh
@@ -213,16 +217,30 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 
 opts=
-if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
-then
-    opts="--accept"
-fi
+inner_opts=
+while [ ! -z "${1}" ]
+do
+    if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" -o "${1}" = "--accept" ]
+    then
+        opts="${opts} --accept"
+    elif [ "${1}" = "--dont-start-it" ]
+    then
+        inner_opts="${inner_opts} ${1}"
+    else
+        echo >&2 "Unknown option '${1}'"
+        exit 1
+    fi
+    shift
+done
+[ ! -z "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
+
+# ---------------------------------------------------------------------------------------------------------------------
 
 progress "Installing netdata"
 
 sudo=
 [ "${UID}" != "0" ] && sudo="sudo"
-run ${sudo} sh "/tmp/${LATEST}" ${opts}
+run ${sudo} sh "/tmp/${LATEST}" ${opts} ${inner_opts}
 
 if [ $? -eq 0 ]
 	then

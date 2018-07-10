@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H
 
@@ -6,7 +7,6 @@
 typedef struct eval_variable {
     char *name;
     uint32_t hash;
-    struct rrdvar *rrdvar;
     struct eval_variable *next;
 } EVAL_VARIABLE;
 

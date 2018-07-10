@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: mongodb netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 from copy import deepcopy
 from datetime import datetime
@@ -244,7 +245,7 @@ CHARTS = {
             ['page_faults', None, 'incremental', 1, 1]
         ]},
     'queued_requests': {
-        'options': [None, 'Currently queued read and wrire requests', 'requests', 'resource saturation',
+        'options': [None, 'Currently queued read and write requests', 'requests', 'resource saturation',
                     'mongodb.queued_requests', 'line'],
         'lines': [
             ['currentQueue_readers', 'readers', 'absolute', 1, 1],

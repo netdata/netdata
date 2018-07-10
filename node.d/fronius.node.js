@@ -1,4 +1,5 @@
 "use strict";
+// SPDX-License-Identifier: GPL-3.0+
 
 // This program will connect to one or more Fronius Symo Inverters.
 // to get the Solar Power Generated (current, today).
@@ -24,6 +25,7 @@ var fronius = {
     consumptionLoadId: "p_load",
     autonomyId: "rel_autonomy",
     consumptionSelfId: "rel_selfconsumption",
+    solarConsumptionId: "solar_consumption",
     energyTodayId: "e_day",
     energyYearId: "e_year",
 
@@ -101,6 +103,7 @@ var fronius = {
         var dim = {};
         dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "autonomy", 1);
         dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "self_consumption", 1);
+        dim[fronius.solarConsumptionId] = this.createBasicDimension(fronius.solarConsumptionId, "solar_consumption", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -255,10 +258,17 @@ var fronius = {
 
     parseAutonomyChart: function (service, site) {
         var selfConsumption = site.rel_SelfConsumption;
+        var solarConsumption = 0;
+        var load = Math.abs(site.P_Load);
+        var power = Math.max(site.P_PV, 0);
+        if (power <= 0) solarConsumption = 0;
+        else if (load >= power) solarConsumption = 100;
+        else solarConsumption = 100 / power * load;
         return this.getChart(this.getSiteAutonomyChart(service, "autonomy"),
             [
                 this.getDimension(this.autonomyId, Math.round(site.rel_Autonomy)),
-                this.getDimension(this.consumptionSelfId, Math.round(selfConsumption === null ? 100 : selfConsumption))
+                this.getDimension(this.consumptionSelfId, Math.round(selfConsumption === null ? 100 : selfConsumption)),
+                this.getDimension(this.solarConsumptionId, Math.round(solarConsumption))
             ]
         );
     },

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define MAX_INTERRUPT_NAME 50
@@ -18,10 +19,10 @@ struct interrupt {
 
 // since each interrupt is variable in size
 // we use this to calculate its record size
-#define recordsize(cpus) (sizeof(struct interrupt) + (cpus * sizeof(struct cpu_interrupt)))
+#define recordsize(cpus) (sizeof(struct interrupt) + ((cpus) * sizeof(struct cpu_interrupt)))
 
 // given a base, get a pointer to each record
-#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
+#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[(line) * recordsize(cpus)])
 
 static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
     static struct interrupt *irrs = NULL;

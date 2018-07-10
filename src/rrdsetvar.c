@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -7,26 +8,27 @@
 
 static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
+    RRDHOST *host = st->rrdhost;
 
     // ------------------------------------------------------------------------
     // CHART
-    rrdvar_free(st->rrdhost, &st->rrdvar_root_index, rs->var_local);
+    rrdvar_free(host, &st->rrdvar_root_index, rs->var_local);
     rs->var_local = NULL;
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family);
     rs->var_family = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_name);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family_name);
     rs->var_family_name = NULL;
 
     // ------------------------------------------------------------------------
     // HOST
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host);
     rs->var_host = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_name);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host_name);
     rs->var_host_name = NULL;
 
     // ------------------------------------------------------------------------
@@ -40,6 +42,7 @@ static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
 
 static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
+    RRDHOST *host = st->rrdhost;
 
     // ------------------------------------------------------------------------
     // free the old ones (if any)
@@ -67,8 +70,8 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 
     // ------------------------------------------------------------------------
     // HOST
-    rs->var_host        = rrdvar_create_and_index("host",   &st->rrdhost->rrdvar_root_index, rs->key_fullid,   rs->type, rs->value);
-    rs->var_host_name   = rrdvar_create_and_index("host",   &st->rrdhost->rrdvar_root_index, rs->key_fullname, rs->type, rs->value);
+    rs->var_host        = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullid,   rs->type, rs->value);
+    rs->var_host_name   = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullname, rs->type, rs->value);
 }
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
@@ -128,6 +131,8 @@ void rrdsetvar_free(RRDSETVAR *rs) {
 // custom chart variables
 
 RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) {
+    RRDHOST *host = st->rrdhost;
+
     char *n = strdupz(name);
     rrdvar_fix_name(n);
     uint32_t hash = simple_hash(n);
@@ -144,7 +149,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
                 return rs;
             }
             else {
-                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", n, st->id, st->rrdhost->hostname);
+                error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", n, st->id, host->hostname);
                 free(n);
                 return NULL;
             }

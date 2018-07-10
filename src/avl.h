@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0+
 
 #ifndef _AVL_H
 #define _AVL_H 1

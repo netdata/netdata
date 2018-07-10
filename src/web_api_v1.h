@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_WEB_API_V1_H
 #define NETDATA_WEB_API_V1_H
 
@@ -17,5 +18,7 @@ extern int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, 
 extern int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
+
+extern void web_client_api_v1_init(void);
 
 #endif //NETDATA_WEB_API_V1_H

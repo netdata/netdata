@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
@@ -270,7 +271,7 @@ double verdana11_widths[256] = {
 
 // find the width of the string using the verdana 11points font
 // re-write the string in place, skiping zero-length characters
-static inline int verdana11_width(char *s) {
+static inline double verdana11_width(char *s) {
     double w = 0.0;
     char *d = s;
 
@@ -290,7 +291,7 @@ static inline int verdana11_width(char *s) {
     *d = '\0';
     w -= VERDANA_KERNING;
     w += VERDANA_PADDING;
-    return (int)ceil(w);
+    return w;
 }
 
 static inline size_t escape_xmlz(char *dst, const char *src, size_t len) {
@@ -382,20 +383,20 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         calculated_number abs = value;
         if(isless(value, 0)) {
             lstop = 1;
-            abs = -value;
+            abs = calculated_number_fabs(value);
         }
 
         if(isgreaterequal(abs, 1000)) {
-            len = snprintfz(value_string, value_string_len, "%0.0Lf", (long double) value);
+            len = snprintfz(value_string, value_string_len, "%0.0" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
             trim_zeros = 0;
         }
-        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1Lf", (long double) value);
-        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6Lf", (long double) value);
-        else                                 len = snprintfz(value_string, value_string_len, "%0.7Lf", (long double) value);
+        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else                                 len = snprintfz(value_string, value_string_len, "%0.7" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
 
         if(unlikely(trim_zeros)) {
             int l;
@@ -422,7 +423,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, value_string_len, "%0.*Lf%s%s", precision, (long double) value, separator, units);
+        snprintfz(value_string, value_string_len, "%0.*" LONG_DOUBLE_MODIFIER "%s%s", precision, (LONG_DOUBLE) value, separator, units);
     }
 
     return value_string;
@@ -610,16 +611,22 @@ static inline const char *color_map(const char *color) {
     return color;
 }
 
+typedef enum color_comparison {
+    COLOR_COMPARE_EQUAL,
+    COLOR_COMPARE_NOTEQUAL,
+    COLOR_COMPARE_LESS,
+    COLOR_COMPARE_LESSEQUAL,
+    COLOR_COMPARE_GREATER,
+    COLOR_COMPARE_GREATEREQUAL,
+} BADGE_COLOR_COMPARISON;
+
 static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
-    int value_is_null = 0;
-    if(isnan(value) || isinf(value)) {
-        value = 0.0;
-        value_is_null = 1;
-    }
+    if(isnan(value) || isinf(value))
+        value = NAN;
 
     char color_buffer[256 + 1] = "";
     char value_buffer[256 + 1] = "";
-    char comparison = '>';
+    BADGE_COLOR_COMPARISON comparison = COLOR_COMPARE_GREATER;
 
     // example input:
     // color<max|color>min|color:null...
@@ -633,8 +640,15 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 
         while(*t && *t != '|') {
             switch(*t) {
+                case '!':
+                    if(t[1] == '=') t++;
+                    comparison = COLOR_COMPARE_NOTEQUAL;
+                    dv = value_buffer;
+                    break;
+
+                case '=':
                 case ':':
-                    comparison = '=';
+                    comparison = COLOR_COMPARE_EQUAL;
                     dv = value_buffer;
                     break;
 
@@ -642,11 +656,11 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                 case ')':
                 case '>':
                     if(t[1] == '=') {
-                        comparison = ')';
+                        comparison = COLOR_COMPARE_GREATEREQUAL;
                         t++;
                     }
                     else
-                        comparison = '>';
+                        comparison = COLOR_COMPARE_GREATER;
                     dv = value_buffer;
                     break;
 
@@ -654,11 +668,15 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                 case '(':
                 case '<':
                     if(t[1] == '=') {
-                        comparison = '(';
+                        comparison = COLOR_COMPARE_LESSEQUAL;
+                        t++;
+                    }
+                    else if(t[1] == '>' || t[1] == ')' || t[1] == '}') {
+                        comparison = COLOR_COMPARE_NOTEQUAL;
                         t++;
                     }
                     else
-                        comparison = '<';
+                        comparison = COLOR_COMPARE_LESS;
                     dv = value_buffer;
                     break;
 
@@ -689,19 +707,28 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
         *dc = '\0';
         if(dv) {
             *dv = '\0';
+            calculated_number v;
 
-            if(value_is_null) {
-                if(!*value_buffer || !strcmp(value_buffer, "null"))
+            if(!*value_buffer || !strcmp(value_buffer, "null")) {
+                v = NAN;
+            }
+            else {
+                v = str2l(value_buffer);
+                if(isnan(v) || isinf(v))
+                    v = NAN;
+            }
+
+            if(unlikely(isnan(value) || isnan(v))) {
+                if(isnan(value) && isnan(v))
                     break;
             }
             else {
-                calculated_number v = str2l(value_buffer);
-
-                     if(comparison == '<' && value < v) break;
-                else if(comparison == '(' && value <= v) break;
-                else if(comparison == '>' && value > v) break;
-                else if(comparison == ')' && value >= v) break;
-                else if(comparison == '=' && value == v) break;
+                     if (unlikely(comparison == COLOR_COMPARE_LESS && isless(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_LESSEQUAL && islessequal(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_GREATER && isgreater(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_GREATEREQUAL && isgreaterequal(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_EQUAL && !islessgreater(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_NOTEQUAL && islessgreater(value, v))) break;
             }
         }
         else
@@ -726,7 +753,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -735,7 +762,9 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             , label_color_escaped[COLOR_STRING_SIZE + 1]
             , value_color_escaped[COLOR_STRING_SIZE + 1];
 
-    int label_width, value_width, total_width;
+    double label_width, value_width, total_width, height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
+
+    if(scale < 100) scale = 100;
 
     if(unlikely(!label_color || !*label_color))
         label_color = "#555";
@@ -744,7 +773,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
-    format_value_and_unit(value_string, VALUE_STRING_SIZE, value, units, precision);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);
@@ -760,35 +789,45 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 
     wb->contenttype = CT_IMAGE_SVG_XML;
 
+    total_width  = total_width * scale / 100.0;
+    height       = height      * scale / 100.0;
+    font_size    = font_size   * scale / 100.0;
+    text_offset  = text_offset * scale / 100.0;
+    label_width  = label_width * scale / 100.0;
+    value_width  = value_width * scale / 100.0;
+    round_corner = round_corner * scale / 100.0;
+
     // svg template from:
     // https://raw.githubusercontent.com/badges/shields/master/templates/flat-template.svg
     buffer_sprintf(wb,
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%d\" height=\"20\">"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"%0.2f\" height=\"%0.2f\">"
             "<linearGradient id=\"smooth\" x2=\"0\" y2=\"100%%\">"
                 "<stop offset=\"0\" stop-color=\"#bbb\" stop-opacity=\".1\"/>"
                 "<stop offset=\"1\" stop-opacity=\".1\"/>"
             "</linearGradient>"
             "<mask id=\"round\">"
-                "<rect width=\"%d\" height=\"20\" rx=\"3\" fill=\"#fff\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect width=\"%d\" height=\"20\" fill=\"%s\"/>"
-                "<rect x=\"%d\" width=\"%d\" height=\"20\" fill=\"%s\"/>"
-                "<rect width=\"%d\" height=\"20\" fill=\"url(#smooth)\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
             "</g>"
-            "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">"
-                "<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%d\" y=\"14\">%s</text>"
-                "<text x=\"%d\" y=\"15\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%d\" y=\"14\">%s</text>"
+            "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"%0.2f\">"
+                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
             "</g>"
         "</svg>",
-        total_width, total_width,
-        label_width, label_color_escaped,
-        label_width, value_width, value_color_escaped,
-        total_width,
-        label_width / 2, label_escaped,
-        label_width / 2, label_escaped,
-        label_width + value_width / 2 -1, value_escaped,
-        label_width + value_width / 2 -1, value_escaped);
+        total_width, height,
+        total_width, height, round_corner,
+        label_width, height, label_color_escaped,
+        label_width, value_width, height, value_color_escaped,
+        total_width, height,
+        font_size,
+        label_width / 2, ceil(height - text_offset), label_escaped,
+        label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped);
 }

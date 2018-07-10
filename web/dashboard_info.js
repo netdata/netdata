@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 
 var netdataDashboard = window.netdataDashboard || {};
 
@@ -9,142 +10,154 @@ var netdataDashboard = window.netdataDashboard || {};
 netdataDashboard.menu = {
     'system': {
         title: 'System Overview',
-        icon: '<i class="fa fa-bookmark" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-bookmark"></i>',
         info: 'Overview of the key system metrics.'
     },
 
     'services': {
         title: 'systemd Services',
-        icon: '<i class="fa fa-cogs" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cogs"></i>',
         info: 'Resources utilization of systemd services. netdata monitors all systemd services via cgroups (the resources accounting used by containers). '
     },
 
     'ap': {
         title: 'Access Points',
-        icon: '<i class="fa fa-wifi" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-wifi"></i>',
         info: 'Performance metrics for the access points (i.e. wireless interfaces in AP mode) found on the system.'
     },
 
     'tc': {
         title: 'Quality of Service',
-        icon: '<i class="fa fa-globe" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-globe"></i>',
         info: 'Netdata collects and visualizes <code>tc</code> class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
         title: 'Network Interfaces',
-        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-sitemap"></i>',
         info: 'Performance metrics for network interfaces.'
     },
 
     'ipv4': {
         title: 'IPv4 Networking',
-        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cloud"></i>',
         info: 'Metrics for the IPv4 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv4" target="_blank">Internet Protocol version 4 (IPv4)</a> is the fourth version of the Internet Protocol (IP). It is one of the core protocols of standards-based internetworking methods in the Internet. IPv4 is a connectionless protocol for use on packet-switched networks. It operates on a best effort delivery model, in that it does not guarantee delivery, nor does it assure proper sequencing or avoidance of duplicate delivery. These aspects, including data integrity, are addressed by an upper layer transport protocol, such as the Transmission Control Protocol (TCP).'
     },
 
     'ipv6': {
         title: 'IPv6 Networking',
-        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cloud"></i>',
         info: 'Metrics for the IPv6 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv6" target="_blank">Internet Protocol version 6 (IPv6)</a> is the most recent version of the Internet Protocol (IP), the communications protocol that provides an identification and location system for computers on networks and routes traffic across the Internet. IPv6 was developed by the Internet Engineering Task Force (IETF) to deal with the long-anticipated problem of IPv4 address exhaustion. IPv6 is intended to replace IPv4.'
+    },
+
+    'sctp': {
+        title: 'SCTP Networking',
+        icon: '<i class="fas fa-cloud"></i>',
+        info: '<a href="https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol" target="_blank">Stream Control Transmission Protocol (SCTP)</a> is a computer network protocol which operates at the transport layer and serves a role similar to the popular protocols TCP and UDP. SCTP provides some of the features of both UDP and TCP: it is message-oriented like UDP and ensures reliable, in-sequence transport of messages with congestion control like TCP. It differs from those protocols by providing multi-homing and redundant paths to increase resilience and reliability.'
     },
 
     'ipvs': {
         title: 'IP Virtual Server',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: '<a href="http://www.linuxvirtualserver.org/software/ipvs.html" target="_blank">IPVS (IP Virtual Server)</a> implements transport-layer load balancing inside the Linux kernel, so called Layer-4 switching. IPVS running on a host acts as a load balancer at the front of a cluster of real servers, it can direct requests for TCP/UDP based services to the real servers, and makes services of the real servers to appear as a virtual service on a single IP address.'
     },
 
     'netfilter': {
         title: 'Firewall (netfilter)',
-        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Performance metrics of the netfilter components.'
     },
 
     'ipfw': {
         title: 'Firewall (ipfw)',
-        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Counters and memory usage for the ipfw rules.'
     },
 
     'cpu': {
         title: 'CPUs',
-        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-bolt"></i>',
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
     'mem': {
         title: 'Memory',
-        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-microchip"></i>',
         info: 'Detailed information about the memory management of the system.'
     },
 
     'disk': {
         title: 'Disks',
-        icon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-hdd"></i>',
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
     'sensors': {
         title: 'Sensors',
-        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-leaf"></i>',
         info: 'Readings of the configured system sensors.'
     },
 
     'ipmi': {
         title: 'IPMI',
-        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-leaf"></i>',
         info: 'The Intelligent Platform Management Interface (IPMI) is a set of computer interface specifications for an autonomous computer subsystem that provides management and monitoring capabilities independently of the host system\'s CPU, firmware (BIOS or UEFI) and operating system.'
     },
 
     'samba': {
         title: 'Samba',
-        icon: "<i class=\"fa fa-folder-open\" aria-hidden=\"true\"></i>",
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the Samba file share operations of this system. Samba is a implementation of Windows services, including Windows SMB protocol file shares.'
     },
 
     'nfsd': {
         title: 'NFS Server',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the Network File Server. NFS is a distributed file system protocol, allowing a user on a client computer to access files over a network, much like local storage is accessed. NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system. The NFS is an open standard defined in Request for Comments (RFC).'
     },
 
     'nfs': {
         title: 'NFS Client',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
     },
 
     'zfs': {
         title: 'ZFS filesystem',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat.py" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary.py" target="_blank">arc_summary.py</a>.'
+    },
+
+    'btrfs': {
+        title: 'BTRFS filesystem',
+        icon: '<i class="fas fa-folder-open"></i>',
+        info: 'Disk space metrics for the BTRFS filesystem.'
     },
 
     'apps': {
         title: 'Applications',
-        icon: '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-heartbeat"></i>',
         info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'users': {
         title: 'Users',
-        icon: '<i class="fa fa-user" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-user"></i>',
         info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
         title: 'User Groups',
-        icon: '<i class="fa fa-users" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-users"></i>',
         info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'netdata': {
         title: 'Netdata Monitoring',
-        icon: '<i class="fa fa-bar-chart" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-chart-bar"></i>',
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
@@ -155,175 +168,234 @@ netdataDashboard.menu = {
 
     'cgroup': {
         title: '',
-        icon: '<i class="fa fa-th" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-th"></i>',
         info: 'Container resource utilization metrics. Netdata reads this information from <b>cgroups</b> (abbreviated from <b>control groups</b>), a Linux kernel feature that limits and accounts resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes. <b>cgroups</b> together with <b>namespaces</b> (that offer isolation between processes) provide what we usually call: <b>containers</b>.'
     },
 
     'cgqemu': {
         title: '',
-        icon: '<i class="fa fa-th-large" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-th-large"></i>',
         info: 'QEMU virtual machine resource utilization metrics. QEMU (short for Quick Emulator) is a free and open-source hosted hypervisor that performs hardware virtualization.'
     },
 
     'fping': {
         title: 'fping',
-        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-exchange-alt"></i>',
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
+    },
+
+    'httpcheck': {
+        title: 'Http Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Web Service availability and latency monitoring using HTTP checks. This plugin is a specialized version of the port check plugin.'
     },
 
     'memcached': {
         title: 'memcached',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>memcached</b>. Memcached is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.'
     },
 
     'mysql': {
         title: 'MySQL',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
     },
 
     'postgres': {
         title: 'Postgres',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>PostgresSQL</b>, the object-relational database (ORDBMS).'
     },
 
     'redis': {
         title: 'Redis',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>redis</b>. Redis (REmote DIctionary Server) is a software project that implements data structure servers. It is open-source, networked, in-memory, and stores keys with optional durability.'
     },
 
     'retroshare': {
         title: 'RetroShare',
-        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-share-alt"></i>',
         info: 'Performance metrics for <b>RetroShare</b>. RetroShare is open source software for encrypted filesharing, serverless email, instant messaging, online chat, and BBS, based on a friend-to-friend network built on GNU Privacy Guard (GPG).'
     },
 
     'ipfs': {
         title: 'IPFS',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics for the InterPlanetary File System (IPFS), a content-addressable, peer-to-peer hypermedia distribution protocol.'
     },
 
     'phpfpm': {
         title: 'PHP-FPM',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
+    },
+
+    'portcheck': {
+        title: 'Port Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Service availability and latency monitoring using port checks.'
     },
 
     'postfix': {
         title: 'postfix',
-        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-envelope"></i>',
         info: undefined
     },
 
     'dovecot': {
         title: 'Dovecot',
-        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-envelope"></i>',
         info: undefined
     },
 
     'hddtemp': {
         title: 'HDD Temp',
-        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
     'nginx': {
         title: 'nginx',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'apache': {
         title: 'Apache',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'lighttpd': {
         title: 'Lighttpd',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'web_log': {
         title: undefined,
-        icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-file-alt"></i>',
         info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'named': {
         title: 'named',
-        icon: '<i class="fa fa-tag" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-tag"></i>',
         info: undefined
     },
 
     'squid': {
         title: 'squid',
-        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-exchange-alt"></i>',
         info: undefined
     },
 
     'nut': {
         title: 'UPS',
-        icon: '<i class="fa fa-battery-half" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-battery-half"></i>',
         info: undefined
     },
 
     'apcupsd': {
         title: 'UPS',
-        icon: '<i class="fa fa-battery-half" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-battery-half"></i>',
         info: undefined
     },
 
     'smawebbox': {
         title: 'Solar Power',
-        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-sun"></i>',
         info: undefined
     },
 
     'fronius': {
         title: 'Fronius',
-        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-sun"></i>',
         info: undefined
     },
 
     'stiebeleltron': {
         title: 'Stiebel Eltron',
-        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
     'snmp': {
         title: 'SNMP',
-        icon: '<i class="fa fa-random" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-random"></i>',
         info: undefined
     },
 
     'go_expvar': {
         title: 'Go - expvars',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: 'Statistics about running Go applications exposed by the <a href="https://golang.org/pkg/expvar/" target="_blank">expvar package</a>.'
     },
 
     'chrony': {
-        icon: '<i class="fa fa-clock-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-clock"></i>',
         info: 'chronyd parameters about the system’s clock performance.'
     },
 
     'couchdb': {
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
-    
-    
+
     'beanstalk': {
         title: 'Beanstalkd',
-        icon: '<i class="fa fa-tasks" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-tasks"></i>',
         info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
+    },
+
+    'rabbitmq': {
+        title: 'RabbitMQ',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/">RabbitMQ</a></b> open-source message broker.'
+    },
+
+    'ceph': {
+        title: 'Ceph',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> cluster server, the open-source distributed storage system.'
+    },
+
+    'ntpd': {
+        title: 'ntpd',
+        icon: '<i class="fas fa-clock"></i>',
+        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+    },
+
+    'spigotmc': {
+        title: 'Spigot MC',
+        icon: '<i class="fas fa-eye"></i>',
+        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+    },
+
+    'unbound': {
+        title: 'Unbound',
+        icon: '<i class="fas fa-tag"></i>',
+        info: undefined
+    },
+
+    'boinc': {
+        title: 'BOINC',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
+    },
+
+    'w1sensor': {
+        title: '1-Wire Sensors',
+        icon: '<i class="fas fa-thermometer-half"></i>',
+        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
+    },
+
+    'logind': {
+        title: 'Logind',
+        icon: '<i class="fas fa-user"></i>',
+        info: undefined
     }
 };
 
@@ -391,8 +463,12 @@ netdataDashboard.submenu = {
     },
 
     'mem.ksm': {
-        title: 'Memory Deduper',
+        title: 'deduper (ksm)',
         info: 'Kernel Same-page Merging (KSM) performance monitoring, read from several files in <code>/sys/kernel/mm/ksm/</code>. KSM is a memory-saving de-duplication feature in the Linux kernel (since version 2.6.32). The KSM daemon ksmd periodically scans those areas of user memory which have been registered with it, looking for pages of identical content which can be replaced by a single write-protected page (which is automatically copied if a process later wants to update its content). KSM was originally developed for use with KVM (where it was known as Kernel Shared Memory), to fit more virtual machines into physical memory, by sharing the data common between them.  But it can be useful to any application which generates many instances of the same data.'
+    },
+
+    'mem.hugepages': {
+        info: 'Hugepages is a feature that allows the kernel to utilize the multiple page size capabilities of modern hardware architectures. The kernel creates multiple pages of virtual memory, mapped from both physical RAM and swap. There is a mechanism in the CPU architecture called "Translation Lookaside Buffers" (TLB) to manage the mapping of virtual memory pages to actual physical memory addresses. The TLB is a limited hardware resource, so utilizing a large amount of physical memory with the default page size consumes the TLB and adds processing overhead. By utilizing Huge Pages, the kernel is able to create pages of much larger sizes, each page consuming a single resource in the TLB. Huge Pages are pinned to physical RAM and cannot be swapped/paged out.'
     },
 
     'mem.numa': {
@@ -404,17 +480,17 @@ netdataDashboard.submenu = {
     },
 
     'netfilter.conntrack': {
-        title: 'Connection Tracker',
+        title: 'connection tracker',
         info: 'Netfilter Connection Tracker performance metrics. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
     },
 
     'netfilter.nfacct': {
-        title: 'Bandwidth Accounting',
+        title: 'bandwidth accounting',
         info: 'The following information is read using the <code>nfacct.plugin</code>.'
     },
 
     'netfilter.synproxy': {
-        title: 'DDoS Protection',
+        title: 'DDoS protection',
         info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
     },
 
@@ -427,7 +503,7 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
         }
@@ -437,39 +513,49 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
     },
 
     'go_expvar.memstats': {
-        title: 'Memory statistics',
+        title: 'memory statistics',
         info: 'Go runtime memory statistics. See <a href="https://golang.org/pkg/runtime/#MemStats" target="_blank">runtime.MemStats</a> documentation for more info about each chart and the values.'
     },
 
     'couchdb.dbactivity': {
-        title: 'DB activity',
+        title: 'db activity',
         info: 'Overall database reads and writes for the entire server. This includes any external HTTP traffic, as well as internal replication traffic performed in a cluster to ensure node consistency.'
     },
 
     'couchdb.httptraffic': {
-        title: 'HTTP traffic breakdown',
+        title: 'http traffic breakdown',
         info: 'All HTTP traffic, broken down by type of request (<tt>GET</tt>, <tt>PUT</tt>, <tt>POST</tt>, etc.) and response status code (<tt>200</tt>, <tt>201</tt>, <tt>4xx</tt>, etc.)<br/><br/>Any <tt>5xx</tt> errors here indicate a likely CouchDB bug; check the logfile for further information.'
     },
 
     'couchdb.ops': {
-        title: 'Server operations'
+        title: 'server operations'
     },
 
     'couchdb.perdbstats': {
-        title: 'Per-DB statistics',
+        title: 'per db statistics',
         info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
     },
 
     'couchdb.erlang': {
-        title: 'Erlang statistics',
+        title: 'erlang statistics',
         info: 'Detailed information about the status of the Erlang VM that hosts CouchDB. These are intended for advanced users only. High values of the peak message queue (>10e6) generally indicate an overload condition.'
+    },
+
+    'ntpd.system': {
+        title: 'system',
+        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
+    },
+
+    'ntpd.peers': {
+        title: 'peers',
+        info: 'Statistics of the peer variables for each peer configured in <code>/etc/ntp.conf</code> as shown by the readvar billboard <code>ntpq -c "rv &lt;association&gt;"</code>, while each peer is assigned a nonzero association ID as shown by <code>ntpq -c "apeers"</code>. The module periodically scans for new/changed peers (default: every 60s). <b>ntpd</b> selects the best possible peer from the available peers to synchronize the clock. A minimum of at least 3 peers is required to properly identify the best possible peer.'
     }
 };
 
@@ -653,6 +739,10 @@ netdataDashboard.context = {
         info: 'Committed Memory, is the sum of all memory which has been allocated by processes.'
     },
 
+    'mem.available': {
+        info: 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.'
+    },
+
     'mem.writeback': {
         info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
     },
@@ -663,6 +753,14 @@ netdataDashboard.context = {
 
     'mem.slab': {
         info: '<b>Reclaimable</b> is the amount of memory which the kernel can reuse. <b>Unreclaimable</b> can not be reused even when the kernel is lacking memory.'
+    },
+
+    'mem.hugepages': {
+        info: 'Dedicated (or Direct) HugePages is memory reserved for applications configured to utilize huge pages. Hugepages are <b>used</b> memory, even if there are free hugepages available.'
+    },
+
+    'mem.transparent_hugepages': {
+        info: 'Transparent HugePages (THP) is backing virtual memory with huge pages, supporting automatic promotion and demotion of page sizes. It works for all applications for anonymous memory mappings and tmpfs/shmem.'
     },
 
     // ------------------------------------------------------------------------
@@ -681,6 +779,33 @@ netdataDashboard.context = {
 
     'ipv4.tcpconnaborts': {
         info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
+    },
+
+    'ipv4.tcpsock': {
+        info: 'The number of established TCP connections (known as <code>CurrEstab</code>). This is a snapshot of the established connections at the time of measurement (i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
+    },
+
+    'ipv4.tcpopens': {
+        info: '<b>active</b> or <code>ActiveOpens</code> is the number of outgoing TCP <b>connections attempted</b> by this host.'
+            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of incoming TCP <b>connections accepted</b> by this host.'
+    },
+
+    'ipv4.tcperrors': {
+        info: '<code>InErrs</code> is the number of TCP segments received in error (including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6).'
+            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors (for both IPv4 and IPv6).'
+            + ' <code>RetransSegs</code> is the number of TCP segments retransmitted.'
+    },
+
+    'ipv4.tcphandshake': {
+        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code> to <code>CLOSED</code>).'
+            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
+            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
+            + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
+    },
+
+    'ipv4.tcplistenissues': {
+        info: '<b>overflows</b> (or <code>ListenOverflows</code>) is the number of incoming connections that could not be handled because the receive queue of the application was full (for both IPv4 and IPv6).'
+            + ' <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming connections that could not be handled, including SYN floods, overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
     },
 
     // ------------------------------------------------------------------------
@@ -942,6 +1067,66 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // POSTGRESQL
+
+
+    'postgres.db_stat_blks': {
+        info: 'Blocks reads from disk or cache.<ul>' +
+        '<li><strong>blks_read:</strong> number of disk blocks read in this database.</li>' +
+        '<li><strong>blks_hit:</strong> number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system&#39;s file system cache)</li>' +
+        '</ul>'
+    },
+    'postgres.db_stat_tuple_write': {
+        info: '<ul><li>Number of rows inserted/updated/deleted.</li>' +
+        '<li><strong>conflicts:</strong> number of queries canceled due to conflicts with recovery in this database. (Conflicts occur only on standby servers; see <a href="https://www.postgresql.org/docs/10/static/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW" target="_blank">pg_stat_database_conflicts</a> for details.)</li>' +
+        '</ul>'
+    },
+    'postgres.db_stat_temp_bytes': {
+        info: 'Temporary files can be created on disk for sorts, hashes, and temporary query results.'
+    },
+    'postgres.db_stat_temp_files': {
+        info: '<ul>' +
+        '<li><strong>files:</strong> number of temporary files created by queries. All temporary files are counted, regardless of why the temporary file was created (e.g., sorting or hashing).</li>' +
+        '</ul>'
+    },
+    'postgres.archive_wal': {
+         info: 'WAL archiving.<ul>' +
+        '<li><strong>total:</strong> total files.</li>' +
+        '<li><strong>ready:</strong> WAL waiting to be archived.</li>' +
+        '<li><strong>done:</strong> WAL successfully archived' +
+        'Ready WAL can indicate archive_command is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>.</li>' +
+        '</ul>'
+    },
+    'postgres.checkpointer': {
+        info: 'Number of checkpoints.<ul>' +
+        '<li><strong>scheduled:</strong> when checkpoint_timeout is reached.</li>' +
+        '<li><strong>requested:</strong> when max_wal_size is reached.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/wal-configuration.html" target="_blank">WAL Configuration</a>.'
+    },
+    'postgres.autovacuum': {
+        info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon.' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
+    },
+    'postgres.standby_delta': {
+        info: 'Streaming replication delta.<ul>' +
+        '<li><strong>sent_delta:</strong> replication delta sent to standby.</li>' +
+        '<li><strong>write_delta:</strong> replication delta written to disk by this standby.</li>' +
+        '<li><strong>flush_delta:</strong> replication delta flushed to disk by this standby server.</li>' +
+        '<li><strong>replay_delta:</strong> replication delta replayed into the database on this standby server.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#SYNCHRONOUS-REPLICATION" target="_blank">Synchronous Replication</a>.'
+    },
+    'postgres.replication_slot': {
+        info: 'Replication slot files.<ul>' +
+        '<li><strong>wal_keeped:</strong> WAL files retained by each replication slots.</li>' +
+        '<li><strong>pg_replslot_files:</strong> files present in pg_replslot.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
+    },
+
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
@@ -1080,6 +1265,25 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // HTTP check
+
+    'httpcheck.responsetime': {
+        info: 'The <code>response time</code> describes the time passed between request and response. ' +
+        'Currently, the accuracy of the response time is low and should be used as reference only.'
+    },
+
+    'httpcheck.responselength': {
+        info: 'The <code>response length</code> counts the number of characters in the response body. For static pages, this should be mostly constant.'
+    },
+
+    'httpcheck.status': {
+        valueRange: "[0, 1]",
+        info: 'This chart verifies the response of the webserver. Each status dimension will have a value of <code>1</code> if triggered. ' +
+        'Dimension <code>success</code> is <code>1</code> only if all constraints are satisfied.' +
+        'This chart is most useful for alarms or third-party apps.'
+    },
+
+    // ------------------------------------------------------------------------
     // NETDATA
 
     'netdata.response_time': {
@@ -1209,7 +1413,7 @@ netdataDashboard.context = {
             }
         ]
     },
-    
+
     // ------------------------------------------------------------------------
     // beanstalkd
     // system charts
@@ -1265,6 +1469,65 @@ netdataDashboard.context = {
 
     'beanstalk.pause': {
         info: 'Shows info on how long the tube has been paused for, and how long is left remaining on the pause.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ceph
+
+    'ceph.general_usage': {
+        info: 'The usage and available space in all ceph cluster.'
+    },
+
+    'ceph.general_objects': {
+        info: 'Total number of objects storage on ceph cluster.'
+    },
+
+    'ceph.general_bytes': {
+        info: 'Cluster read and write data per second.'
+    },
+
+    'ceph.general_operations': {
+        info: 'Number of read and write operations per second.'
+    },
+
+    'ceph.general_latency': {
+        info: 'Total of apply and commit latency in all OSDs. The apply latency is the total time taken to flush an update to disk. The commit latency is the total time taken to commit an operation to the journal.'
+    },
+
+    'ceph.pool_usage': {
+        info: 'The usage space in each pool.'
+    },
+
+    'ceph.pool_objects': {
+        info: 'Number of objects presents in each pool.'
+    },
+
+    'ceph.pool_read_bytes': {
+        info: 'The rate of read data per second in each pool.'
+    },
+
+    'ceph.pool_write_bytes': {
+        info: 'The rate of write data per second in each pool.'
+    },
+
+    'ceph.pool_read_objects': {
+        info: 'Number of read objects per second in each pool.'
+    },
+
+    'ceph.pool_write_objects': {
+        info: 'Number of write objects per second in each pool.'
+    },
+
+    'ceph.osd_usage': {
+        info: 'The usage space in each OSD.'
+    },
+
+    'ceph.apply_latency': {
+        info: 'Time taken to flush an update in each OSD.'
+    },
+
+    'ceph.commit_latency': {
+        info: 'Time taken to commit an operation to the journal in each OSD.'
     },
 
     // ------------------------------------------------------------------------
@@ -1612,6 +1875,21 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // Port check
+
+    'portcheck.latency': {
+        info: 'The <code>latency</code> describes the time spent connecting to a TCP port. No data is sent or received. ' +
+        'Currently, the accuracy of the latency is low and should be used as reference only.'
+    },
+
+    'portcheck.status': {
+        valueRange: "[0, 1]",
+        info: 'The <code>status</code> chart verifies the availability of the service. ' +
+        'Each status dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> only if connection could be established.' +
+        'This chart is most useful for alarms and third-party apps.'
+    },
+
+    // ------------------------------------------------------------------------
 
     'chrony.system': {
         info: 'In normal operation, chronyd never steps the system clock, because any jump in the timescale can have adverse consequences for certain application programs. Instead, any error in the system clock is corrected by slightly speeding up or slowing down the system clock until the error has been removed, and then returning to the system clock’s normal speed. A consequence of this is that there will be a period when the system clock (as read by other programs using the <code>gettimeofday()</code> system call, or by the <code>date</code> command in the shell) will be different from chronyd\'s estimate of the current true time (which it reports to NTP clients when it is operating in server mode). The value reported on this line is the difference due to this effect.',
@@ -1661,5 +1939,238 @@ netdataDashboard.context = {
 
     'couchdb.open_files': {
         info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit">needs to be increased.</a>'
+    },
+
+    'btrfs.disk': {
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the spac elisted as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        colors: [ NETDATA.colors[12] ]
+    },
+
+    'btrfs.data': {
+        info: 'Logical disk usage for BTRFS data. Data chunks are used to store the actual file data (file contents). The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
+    },
+
+    'btrfs.metadata': {
+        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem interal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
+    },
+
+    'btrfs.system': {
+        info: 'Logical disk usage for BTRFS system. System chunks store information about the allocation of other chunks. The disk space reported here is the usable allocation (i.e. after any striping or replication). The values reported here should be relatively small compared to Data and Metadata, and will scale with the volume size and overall space usage.'
+    },
+
+    // ------------------------------------------------------------------------
+    // RabbitMQ
+
+    // info: the text above the charts
+    // heads: the representation of the chart at the top the subsection (second level menu)
+    // mainheads: the representation of the chart at the top of the section (first level menu)
+    // colors: the dimension colors of the chart (the default colors are appended)
+    // height: the ratio of the chart height relative to the default
+
+    'rabbitmq.queued_messages': {
+        info: 'Overall total of ready and unacknowledged queued messages.  Messages that are delivered immediately are not counted here.'
+    },
+
+    'rabbitmq.message_rates': {
+        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+    },
+
+    'rabbitmq.global_counts': {
+        info: 'Overall totals for channels, consumers, connections, queues and exchanges.'
+    },
+
+    'rabbitmq.file_descriptors': {
+        info: 'Total number of used filed descriptors. See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-file-handle-limit" target="_blank">Open File Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.sockets': {
+        info: 'Total number of used socket descriptors.  Each used socket also counts as a used file descriptor.  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-file-handle-limit" target="_blank">Open File Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.processes': {
+        info: 'Total number of processes running within the Erlang VM.  This is not the same as the number of processes running on the host.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.erlang_run_queue': {
+        info: 'Number of Erlang processes the Erlang schedulers have queued to run.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.memory': {
+        info: 'Total amount of memory used by the RabbitMQ.  This is a complex statistic that can be further analyzed in the management UI.  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-ram" target="_blank">Memory</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.disk_space': {
+        info: 'Total amount of disk space consumed by the message store(s).  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-disk-space" target=_"blank">Disk Space Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    // ------------------------------------------------------------------------
+    // ntpd
+
+    'ntpd.sys_offset': {
+        info: 'For hosts without any time critical services an offset of &lt; 100 ms should be acceptable even with high network latencies. For hosts with time critical services an offset of about 0.01 ms or less can be achieved by using peers with low delays and configuring optimal <b>poll exponent</b> values.',
+        colors: NETDATA.colors[4]
+    },
+
+    'ntpd.sys_jitter': {
+        info: 'The jitter statistics are exponentially-weighted RMS averages. The system jitter is defined in the NTPv4 specification; the clock jitter statistic is computed by the clock discipline module.'
+    },
+
+    'ntpd.sys_frequency': {
+        info: 'The frequency offset is shown in ppm (parts per million) relative to the frequency of the system. The frequency correction needed for the clock can vary significantly between boots and also due to external influences like temperature or radiation.',
+        colors: NETDATA.colors[2],
+        height: 0.6
+    },
+
+    'ntpd.sys_wander': {
+        info: 'The wander statistics are exponentially-weighted RMS averages.',
+        colors: NETDATA.colors[3],
+        height: 0.6
+    },
+
+    'ntpd.sys_rootdelay': {
+        info: 'The rootdelay is the round-trip delay to the primary reference clock, similar to the delay shown by the <code>ping</code> command. A lower delay should result in a lower clock offset.',
+        colors: NETDATA.colors[1]
+    },
+
+    'ntpd.sys_stratum': {
+        info: 'The distance in "hops" to the primary reference clock',
+        colors: NETDATA.colors[5],
+        height: 0.3
+    },
+
+    'ntpd.sys_tc': {
+        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
+        height: 0.5
+    },
+
+    'ntpd.sys_precision': {
+        colors: NETDATA.colors[6],
+        height: 0.2
+    },
+
+    'ntpd.peer_offset': {
+        info: 'The offset of the peer clock relative to the system clock in milliseconds. Smaller values here weight peers more heavily for selection after the initial synchronization of the local clock. For a system providing time service to other systems, these should be as low as possible.'
+    },
+
+    'ntpd.peer_delay': {
+        info: 'The round-trip time (RTT) for communication with the peer, similar to the delay shown by the <code>ping</code> command. Not as critical as either the offset or jitter, but still factored into the selection algorithm (because as a general rule, lower delay means more accurate time). In most cases, it should be below 100ms.'
+    },
+
+    'ntpd.peer_dispersion': {
+        info: 'This is a measure of the estimated error between the peer and the local system. Lower values here are better.'
+    },
+
+    'ntpd.peer_jitter': {
+        info: 'This is essentially a remote estimate of the peer\'s <code>system_jitter</code> value. Lower values here weight highly in favor of peer selection, and this is a good indicator of overall quality of a given time server (good servers will have values not exceeding single digit milliseconds here, with high quality stratum one servers regularly having sub-millisecond jitter).'
+    },
+
+    'ntpd.peer_xleave': {
+        info: 'This variable is used in interleaved mode (used only in NTP symmetric and broadcast modes). See <a href="http://doc.ntp.org/current-stable/xleave.html">NTP Interleaved Modes</a>.'
+    },
+
+    'ntpd.peer_rootdelay': {
+        info: 'For a stratum 1 server, this is the access latency for the reference clock. For lower stratum servers, it is the sum of the <code>peer_delay</code> and <code>peer_rootdelay</code> for the system they are syncing off of. Similarly to <code>peer_delay</code>, lower values here are technically better, but have limited influence in peer selection.'
+    },
+
+    'ntpd.peer_rootdisp': {
+        info: 'Is the same as <code>peer_rootdelay</code>, but measures accumulated <code>peer_dispersion</code> instead of accumulated <code>peer_delay</code>.'
+    },
+
+    'ntpd.peer_hmode': {
+        info: 'The <code>peer_hmode</code> and <code>peer_pmode</code> variables give info about what mode the packets being sent to and received from a given peer are. Mode 1 is symmetric active (both the local system and the remote peer have each other declared as peers in <code>/etc/ntp.conf</code>), Mode 2 is symmetric passive (only one side has the other declared as a peer), Mode 3 is client, Mode 4 is server, and Mode 5 is broadcast (also used for multicast and manycast operation).',
+        height: 0.2
+    },
+
+    'ntpd.peer_pmode': {
+        height: 0.2
+    },
+
+    'ntpd.peer_hpoll': {
+        info: 'The <code>peer_hpoll</code> and <code>peer_ppoll</code> variables are log2 representations of the polling interval in seconds.',
+        height: 0.5
+    },
+
+    'ntpd.peer_ppoll': {
+        height: 0.5
+    },
+
+    'ntpd.peer_precision': {
+        height: 0.2
+    },
+
+    'spigotmc.tps': {
+        info: 'The running 1, 5, and 15 minute average number of server ticks per second.  An idealized server will show 20.0 for all values, but in practice this almost never happens.  Typical servers should show approximately 19.98-20.0 here.  Lower values indicate progressively more server-side lag (and thus that you need better hardware for your server or a lower user limit).  For every 0.05 ticks below 20, redstone clocks will lag behind by approximately 0.25%.  Values below approximately 19.50 may interfere with complex free-running redstone circuits and will noticeably slow down growth.'
+    },
+
+    'spigotmc.users': {
+        info: 'THe number of currently connect users on the monitored Spigot server.'
+    },
+
+    'unbound.queries': {
+        info: 'Shows the number of queries being processed of each type. Note that <code>Recursive</code> queries are also accounted as cache misses.'
+    },
+
+    'unbound.reqlist': {
+        info: 'Shows various stats about Unbound\'s internal request list.'
+    },
+
+    'unbound.recursion': {
+        info: 'Average and median time to complete recursive name resolution.'
+    },
+
+    'unbound.cache': {
+        info: 'The number of items in each of the various caches.'
+    },
+
+    'unbound.threads.queries': {
+        height: 0.2
+    },
+
+    'unbound.threads.reqlist': {
+        height: 0.2
+    },
+
+    'unbound.threads.recursion': {
+        height: 0.2
+    },
+
+    'boinc.tasks': {
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+    },
+
+    'boinc.states': {
+        info: 'Counts of tasks in each task state.  The normal sequence of states is <code>New</code>, <code>Downloading</code>, <code>Ready to Run</code>, <code>Uploading</code>, <code>Uploaded</code>.  Tasks which are marked <code>Ready to Run</code> may be actively running, or may be waiting to be scheduled.  <code>Compute Errors</code> are tasks which failed for some reason during execution.  <code>Aborted</code> tasks were manually cancelled, and will not be processed.  <code>Failed Uploads</code> are otherwise finished tasks which failed to upload to the server, and usually indicate networking issues.'
+    },
+
+    'boinc.sched': {
+        info: 'Counts of active tasks in each scheduling state.  <code>Scheduled</code> tasks are the ones which will run if the system is permitted to process tasks.  <code>Preempted</code> tasks are on standby, and will run if a <code>Scheduled</code> task stops running for some reason.  <code>Uninitialized</code> tasks should never be present, and indicate tha the scheduler has not tried to schedule them yet.'
+    },
+
+    'boinc.process': {
+        info: 'Counts of active tasks in each process state.  <code>Executing</code> tasks are running right now.  <code>Suspended</code> tasks have an associated process, but are not currently running (either because the system isn\'t processing any tasks right now, or because they have been preempted by higher priority tasks).  <code>Quit</code> tasks are exiting gracefully.  <code>Aborted</code> tasks exceeded some resource limit, and are being shut down.  <code>Copy Pending</code> tasks are waiting on a background file transfer to finish.  <code>Uninitialized</code> tasks do not have an associated process yet.'
+    },
+
+    'w1sensor.temp': {
+        info: 'Temperature derived from 1-Wire temperature sensors.'
+    },
+
+    'logind.sessions': {
+        info: 'Shows the number of active sessions of each type tracked by logind.'
+    },
+
+    'logind.users': {
+        info: 'Shows the number of active users of each type tracked by logind.'
+    },
+
+    'logind.seats': {
+        info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
     }
+
+    // ------------------------------------------------------------------------
 };

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: web log netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 import bisect
 import re
@@ -15,13 +16,19 @@ except ImportError:
     from itertools import ifilter as filter
     from itertools import ifilterfalse as filterfalse
 
+try:
+    from sys import maxint
+except ImportError:
+    from sys import maxsize as maxint
+
 from bases.collection import read_last_line
 from bases.FrameworkServices.LogService import LogService
 
 
 ORDER_APACHE_CACHE = ['apache_cache']
 
-ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'response_time_upstream',
+ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth',
+             'response_time', 'response_time_hist', 'response_time_upstream', 'response_time_upstream_hist',
              'requests_per_url', 'requests_per_user_defined', 'http_method', 'http_version',
              'requests_per_ipproto', 'clients', 'clients_all']
 
@@ -55,6 +62,10 @@ CHARTS_WEB = {
             ['resp_time_max', 'max', 'incremental', 1, 1000],
             ['resp_time_avg', 'avg', 'incremental', 1, 1000]
         ]},
+    'response_time_hist': {
+        'options': [None, 'Processing Time Histogram', 'requests/s', 'timings', 'web_log.response_time_hist', 'line'],
+        'lines': [
+        ]},
     'response_time_upstream': {
         'options': [None, 'Processing Time Upstream', 'milliseconds', 'timings',
                     'web_log.response_time_upstream', 'area'],
@@ -62,6 +73,11 @@ CHARTS_WEB = {
             ['resp_time_upstream_min', 'min', 'incremental', 1, 1000],
             ['resp_time_upstream_max', 'max', 'incremental', 1, 1000],
             ['resp_time_upstream_avg', 'avg', 'incremental', 1, 1000]
+        ]},
+    'response_time_upstream_hist': {
+        'options': [None, 'Processing Time Histogram', 'requests/s', 'timings',
+                    'web_log.response_time_upstream_hist', 'line'],
+        'lines': [
         ]},
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
@@ -246,6 +262,7 @@ SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods',
 
 REQUEST_REGEX = re.compile(r'(?P<method>[A-Z]+) (?P<url>[^ ]+) [A-Z]+/(?P<http_version>\d(?:.\d)?)')
 
+MIME_TYPES = ['application', 'audio', 'example', 'font', 'image', 'message', 'model', 'multipart', 'text', 'video']
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -347,8 +364,30 @@ class Web:
         """
         if 'resp_time' not in match_dict:
             self.order.remove('response_time')
+            self.order.remove('response_time_hist')
         if 'resp_time_upstream' not in match_dict:
             self.order.remove('response_time_upstream')
+            self.order.remove('response_time_upstream_hist')
+
+        # Add 'response_time_hist' and 'response_time_upstream_hist' charts if is specified in the configuration
+        histogram = self.configuration.get('histogram', None)
+        if isinstance(histogram, list):
+            self.storage['bucket_index'] = histogram[:]
+            self.storage['bucket_index'].append(maxint)
+            self.storage['buckets'] = [0] * (len(histogram) + 1)
+            self.storage['upstream_buckets'] = [0] * (len(histogram) + 1)
+            hist_lines = self.definitions['response_time_hist']['lines']
+            upstream_hist_lines = self.definitions['response_time_upstream_hist']['lines']
+            for i, le in enumerate(histogram):
+                hist_key = "response_time_hist_%d" % i
+                upstream_hist_key = "response_time_upstream_hist_%d" % i
+                hist_lines.append([hist_key, str(le), 'incremental', 1, 1])
+                upstream_hist_lines.append([upstream_hist_key, str(le), 'incremental', 1, 1])
+
+            hist_lines.append(["response_time_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
+            upstream_hist_lines.append(["response_time_upstream_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
+        elif histogram is not None:
+            self.error("expect histogram list, but was {0}".format(type(histogram)))
 
         if not self.configuration.get('all_time', True):
             self.order.remove('clients_all')
@@ -431,11 +470,15 @@ class Web:
                     resp_length = match_dict['resp_length'] if '-' not in match_dict['resp_length'] else 0
                     self.data['resp_length'] += int(resp_length)
                 if 'resp_time' in match_dict:
-                    get_timings(timings=timings['resp_time'],
-                                time=self.storage['func_resp_time'](float(match_dict['resp_time'])))
+                    resp_time = self.storage['func_resp_time'](float(match_dict['resp_time']))
+                    get_timings(timings=timings['resp_time'], time=resp_time)
+                    if 'bucket_index' in self.storage:
+                        get_hist(self.storage['bucket_index'], self.storage['buckets'], resp_time / 1000)
                 if 'resp_time_upstream' in match_dict and match_dict['resp_time_upstream'] != '-':
-                    get_timings(timings=timings['resp_time_upstream'],
-                                time=self.storage['func_resp_time'](float(match_dict['resp_time_upstream'])))
+                    resp_time_upstream = self.storage['func_resp_time'](float(match_dict['resp_time_upstream']))
+                    get_timings(timings=timings['resp_time_upstream'], time=resp_time_upstream)
+                    if 'bucket_index' in self.storage:
+                        get_hist(self.storage['bucket_index'], self.storage['upstream_buckets'], resp_time / 1000)
                 # requests per ip proto
                 proto = 'ipv6' if ':' in match_dict['address'] else 'ipv4'
                 self.data['req_' + proto] += 1
@@ -456,6 +499,17 @@ class Web:
             self.data[elem + '_min'] += timings[elem]['minimum']
             self.data[elem + '_avg'] += timings[elem]['summary'] / timings[elem]['count']
             self.data[elem + '_max'] += timings[elem]['maximum']
+
+        # histogram
+        if 'bucket_index' in self.storage:
+            buckets = self.storage['buckets']
+            upstream_buckets = self.storage['upstream_buckets']
+            for i in range(0, len(self.storage['bucket_index'])):
+                hist_key = "response_time_hist_%d" % i
+                upstream_hist_key = "response_time_upstream_hist_%d" % i
+                self.data[hist_key] = buckets[i]
+                self.data[upstream_hist_key] = upstream_buckets[i]
+
         return self.data
 
     def find_regex(self, last_line):
@@ -763,8 +817,8 @@ class Squid:
                                            r' (?P<method>[A-Z_]+)'
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
-                                           r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
-                                           r' (?P<mime_type>[^\n]+)')
+                                           r' (?P<hier_code>[A-Z_]+)/[\da-z.:-]+'
+                                           r' (?P<mime_type>[A-Za-z-]*)')
 
         match = self.storage['regex'].search(last_line)
         if not match:
@@ -785,7 +839,7 @@ class Squid:
                 'func_dim': None},
             'mime_type': {
                 'chart': 'squid_mime_type',
-                'func_dim_id': lambda v: v.split('/')[0],
+                'func_dim_id': lambda v: str.lower(v) if str.lower(v) in MIME_TYPES else 'unknown',
                 'func_dim': None}}
         if not self.configuration.get('all_time', True):
             self.order.remove('squid_clients_all')
@@ -903,6 +957,18 @@ def get_timings(timings, time):
     timings['summary'] += time
     timings['count'] += 1
 
+def get_hist(index, buckets, time):
+    """
+    :param index:   histogram index (Ex. [10, 50, 100, 150, ...])
+    :param buckets: histogram buckets
+    :param time:    time
+    :return: None
+    """
+    for i in range(len(index)-1, -1, -1):
+        if time <= index[i]:
+            buckets[i] += 1
+        else:
+            break
 
 def address_not_in_pool(pool, address, pool_size):
     """

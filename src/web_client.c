@@ -1,28 +1,23 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
-#define INITIAL_WEB_DATA_LENGTH 16384
-#define WEB_REQUEST_LENGTH 16384
-#define TOO_BIG_REQUEST 16384
+// this is an async I/O implementation of the web server request parser
+// it is used by all netdata web servers
 
-int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int respect_web_browser_do_not_track_policy = 0;
 char *web_x_frame_options = NULL;
-
-SIMPLE_PATTERN *web_allow_connections_from = NULL;
-SIMPLE_PATTERN *web_allow_streaming_from = NULL;
-SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
-
-// WEB_CLIENT_ACL
-SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
-SIMPLE_PATTERN *web_allow_registry_from = NULL;
-SIMPLE_PATTERN *web_allow_badges_from = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 #endif /* NETDATA_WITH_ZLIB */
 
-struct web_client *web_clients = NULL;
-unsigned long long web_clients_count = 0;
+inline int web_client_permission_denied(struct web_client *w) {
+    w->response.data->contenttype = CT_TEXT_PLAIN;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "You are not allowed to access this resource.");
+    w->response.code = 403;
+    return 403;
+}
 
 static inline int web_client_crock_socket(struct web_client *w) {
 #ifdef TCP_CORK
@@ -59,87 +54,19 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
-inline int web_client_permission_denied(struct web_client *w) {
-    w->response.data->contenttype = CT_TEXT_PLAIN;
-    buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "You are not allowed to access this resource.");
-    w->response.code = 403;
-    return 403;
-}
+static inline char *strip_control_characters(char *url) {
+    char *s = url;
+    if(!s) return "";
 
-static void log_connection(struct web_client *w, const char *msg) {
-    log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
-}
-
-static void web_client_update_acl_matches(struct web_client *w) {
-    w->acl = WEB_CLIENT_ACL_NONE;
-
-    if(!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
-        w->acl |= WEB_CLIENT_ACL_DASHBOARD;
-
-    if(!web_allow_registry_from || simple_pattern_matches(web_allow_registry_from, w->client_ip))
-        w->acl |= WEB_CLIENT_ACL_REGISTRY;
-
-    if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
-        w->acl |= WEB_CLIENT_ACL_BADGE;
-}
-
-struct web_client *web_client_create(int listener) {
-    struct web_client *w;
-
-    w = callocz(1, sizeof(struct web_client));
-    w->id = ++web_clients_count;
-    w->mode = WEB_CLIENT_MODE_NORMAL;
-
-    {
-        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
-
-        if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
-        if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
-
-        if (w->ifd == -1) {
-            if(errno == EPERM)
-                log_connection(w, "ACCESS DENIED");
-            else {
-                log_connection(w, "CONNECTION FAILED");
-                error("%llu: Failed to accept new incoming connection.", w->id);
-            }
-
-            freez(w);
-            return NULL;
-        }
-        else
-            log_connection(w, "CONNECTED");
-
-        w->ofd = w->ifd;
-
-        int flag = 1;
-        if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
-
-        flag = 1;
-        if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+    if(iscntrl(*s)) *s = ' ';
+    while(*++s) {
+        if(iscntrl(*s)) *s = ' ';
     }
 
-    web_client_update_acl_matches(w);
-
-    w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
-    w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->origin[0] = '*';
-    web_client_enable_wait_receive(w);
-
-    if(web_clients) web_clients->prev = w;
-    w->next = web_clients;
-    web_clients = w;
-
-    web_client_connected();
-
-    return(w);
+    return url;
 }
 
-void web_client_reset(struct web_client *w) {
+void web_client_request_done(struct web_client *w) {
     web_client_uncrock_socket(w);
 
     debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
@@ -206,14 +133,18 @@ void web_client_reset(struct web_client *w) {
                    , dt_usec(&tv, &w->tv_ready) / 1000.0
                    , dt_usec(&tv, &w->tv_in) / 1000.0
                    , w->response.code
-                   , w->last_url
+                   , strip_control_characters(w->last_url)
         );
     }
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->ifd != w->ofd) {
             debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
-            if(w->ifd != -1) close(w->ifd);
+
+            if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+                if (w->ifd != -1) close(w->ifd);
+            }
+
             w->ifd = w->ofd;
         }
     }
@@ -223,6 +154,8 @@ void web_client_reset(struct web_client *w) {
     w->cookie2[0] = '\0';
     w->origin[0] = '*';
     w->origin[1] = '\0';
+
+    freez(w->user_agent); w->user_agent = NULL;
 
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
@@ -238,6 +171,9 @@ void web_client_reset(struct web_client *w) {
     w->response.rlen = 0;
     w->response.sent = 0;
     w->response.code = 0;
+
+    w->header_parse_tries = 0;
+    w->header_parse_last_size = 0;
 
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
@@ -258,28 +194,6 @@ void web_client_reset(struct web_client *w) {
         w->response.zinitialized = 0;
     }
 #endif // NETDATA_WITH_ZLIB
-}
-
-struct web_client *web_client_free(struct web_client *w) {
-    web_client_reset(w);
-
-    struct web_client *n = w->next;
-    if(w == web_clients) web_clients = n;
-
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
-
-    if(w->prev) w->prev->next = w->next;
-    if(w->next) w->next->prev = w->prev;
-    buffer_free(w->response.header_output);
-    buffer_free(w->response.header);
-    buffer_free(w->response.data);
-    if(w->ifd != -1) close(w->ifd);
-    if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
-    freez(w);
-
-    web_client_disconnected();
-
-    return(n);
 }
 
 uid_t web_files_uid(void) {
@@ -344,6 +258,81 @@ gid_t web_files_gid(void) {
     return(owner_gid);
 }
 
+static struct {
+    const char *extension;
+    uint32_t hash;
+    uint8_t contenttype;
+} mime_types[] = {
+        {  "html" , 0    , CT_TEXT_HTML}
+        , {"js"   , 0    , CT_APPLICATION_X_JAVASCRIPT}
+        , {"css"  , 0    , CT_TEXT_CSS}
+        , {"xml"  , 0    , CT_TEXT_XML}
+        , {"xsl"  , 0    , CT_TEXT_XSL}
+        , {"txt"  , 0    , CT_TEXT_PLAIN}
+        , {"svg"  , 0    , CT_IMAGE_SVG_XML}
+        , {"ttf"  , 0    , CT_APPLICATION_X_FONT_TRUETYPE}
+        , {"otf"  , 0    , CT_APPLICATION_X_FONT_OPENTYPE}
+        , {"woff2", 0    , CT_APPLICATION_FONT_WOFF2}
+        , {"woff" , 0    , CT_APPLICATION_FONT_WOFF}
+        , {"eot"  , 0    , CT_APPLICATION_VND_MS_FONTOBJ}
+        , {"png"  , 0    , CT_IMAGE_PNG}
+        , {"jpg"  , 0    , CT_IMAGE_JPG}
+        , {"jpeg" , 0    , CT_IMAGE_JPG}
+        , {"gif"  , 0    , CT_IMAGE_GIF}
+        , {"bmp"  , 0    , CT_IMAGE_BMP}
+        , {"ico"  , 0    , CT_IMAGE_XICON}
+        , {"icns" , 0    , CT_IMAGE_ICNS}
+        , {       NULL, 0, 0}
+};
+
+static inline uint8_t contenttype_for_filename(const char *filename) {
+    // info("checking filename '%s'", filename);
+
+    static int initialized = 0;
+    int i;
+
+    if(unlikely(!initialized)) {
+        for (i = 0; mime_types[i].extension; i++)
+            mime_types[i].hash = simple_hash(mime_types[i].extension);
+
+        initialized = 1;
+    }
+
+    const char *s = filename, *last_dot = NULL;
+
+    // find the last dot
+    while(*s) {
+        if(unlikely(*s == '.')) last_dot = s;
+        s++;
+    }
+
+    if(unlikely(!last_dot || !*last_dot || !last_dot[1])) {
+        // info("no extension for filename '%s'", filename);
+        return CT_APPLICATION_OCTET_STREAM;
+    }
+    last_dot++;
+
+    // info("extension for filename '%s' is '%s'", filename, last_dot);
+
+    uint32_t hash = simple_hash(last_dot);
+    for(i = 0; mime_types[i].extension ; i++) {
+        if(unlikely(hash == mime_types[i].hash && !strcmp(last_dot, mime_types[i].extension))) {
+            // info("matched extension for filename '%s': '%s'", filename, last_dot);
+            return mime_types[i].contenttype;
+        }
+    }
+
+    // info("not matched extension for filename '%s': '%s'", filename, last_dot);
+    return CT_APPLICATION_OCTET_STREAM;
+}
+
+static inline int access_to_file_is_not_permitted(struct web_client *w, const char *filename) {
+    w->response.data->contenttype = CT_TEXT_HTML;
+    buffer_strcat(w->response.data, "Access to file is not permitted: ");
+    buffer_strcat_htmlescape(w->response.data, filename);
+    return 403;
+}
+
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
@@ -357,6 +346,7 @@ int mysendfile(struct web_client *w, char *filename) {
     if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0)
         filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
+    // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
         if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
@@ -377,49 +367,45 @@ int mysendfile(struct web_client *w, char *filename) {
         return 400;
     }
 
-    // access the file
+    // find the physical file on disk
     char webfilename[FILENAME_MAX + 1];
     snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
 
-    // check if the file exists
-    struct stat stat;
-    if(lstat(webfilename, &stat) != 0) {
-        debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 404;
-    }
+    struct stat statbuf;
+    int done = 0;
+    while(!done) {
+        // check if the file exists
+        if (lstat(webfilename, &statbuf) != 0) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+            buffer_strcat_htmlescape(w->response.data, webfilename);
+            return 404;
+        }
 
-    // check if the file is owned by expected user
-    if(stat.st_uid != web_files_uid()) {
-        error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
-    }
+        if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+            snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
+            continue;
+        }
 
-    // check if the file is owned by expected group
-    if(stat.st_gid != web_files_gid()) {
-        error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
-    }
+        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+            error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
 
-    if((stat.st_mode & S_IFMT) == S_IFDIR) {
-        snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
-        return mysendfile(w, webfilename);
-    }
+        // check if the file is owned by expected user
+        if (statbuf.st_uid != web_files_uid()) {
+            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, statbuf.st_uid, web_files_uid());
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
 
-    if((stat.st_mode & S_IFMT) != S_IFREG) {
-        error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
+        // check if the file is owned by expected group
+        if (statbuf.st_gid != web_files_gid()) {
+            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, statbuf.st_gid, web_files_gid());
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
+
+        done = 1;
     }
 
     // open the file
@@ -446,39 +432,19 @@ int mysendfile(struct web_client *w, char *filename) {
 
     sock_setnonblock(w->ifd);
 
-    // pick a Content-Type for the file
-         if(strstr(filename, ".html") != NULL)  w->response.data->contenttype = CT_TEXT_HTML;
-    else if(strstr(filename, ".js")   != NULL)  w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-    else if(strstr(filename, ".css")  != NULL)  w->response.data->contenttype = CT_TEXT_CSS;
-    else if(strstr(filename, ".xml")  != NULL)  w->response.data->contenttype = CT_TEXT_XML;
-    else if(strstr(filename, ".xsl")  != NULL)  w->response.data->contenttype = CT_TEXT_XSL;
-    else if(strstr(filename, ".txt")  != NULL)  w->response.data->contenttype = CT_TEXT_PLAIN;
-    else if(strstr(filename, ".svg")  != NULL)  w->response.data->contenttype = CT_IMAGE_SVG_XML;
-    else if(strstr(filename, ".ttf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
-    else if(strstr(filename, ".otf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
-    else if(strstr(filename, ".woff2")!= NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF2;
-    else if(strstr(filename, ".woff") != NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF;
-    else if(strstr(filename, ".eot")  != NULL)  w->response.data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
-    else if(strstr(filename, ".png")  != NULL)  w->response.data->contenttype = CT_IMAGE_PNG;
-    else if(strstr(filename, ".jpg")  != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
-    else if(strstr(filename, ".jpeg") != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
-    else if(strstr(filename, ".gif")  != NULL)  w->response.data->contenttype = CT_IMAGE_GIF;
-    else if(strstr(filename, ".bmp")  != NULL)  w->response.data->contenttype = CT_IMAGE_BMP;
-    else if(strstr(filename, ".ico")  != NULL)  w->response.data->contenttype = CT_IMAGE_XICON;
-    else if(strstr(filename, ".icns") != NULL)  w->response.data->contenttype = CT_IMAGE_ICNS;
-    else w->response.data->contenttype = CT_APPLICATION_OCTET_STREAM;
-
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
+    w->response.data->contenttype = contenttype_for_filename(webfilename);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
     buffer_flush(w->response.data);
-    w->response.rlen = stat.st_size;
+    buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
+    w->response.rlen = (size_t)statbuf.st_size;
 #ifdef __APPLE__
-    w->response.data->date = stat.st_mtimespec.tv_sec;
+    w->response.data->date = statbuf.st_mtimespec.tv_sec;
 #else
-    w->response.data->date = stat.st_mtim.tv_sec;
+    w->response.data->date = statbuf.st_mtim.tv_sec;
 #endif /* __APPLE__ */
     buffer_cacheable(w->response.data);
 
@@ -774,14 +740,15 @@ const char *web_response_code_to_string(int code) {
     }
 }
 
-static inline char *http_header_parse(struct web_client *w, char *s) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0;
+static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0;
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
         hash_accept_encoding = simple_uhash("Accept-Encoding");
         hash_donottrack = simple_uhash("DNT");
+        hash_useragent = simple_uhash("User-Agent");
     }
 
     char *e = s;
@@ -814,7 +781,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
     uint32_t hash = simple_uhash(s);
 
     if(hash == hash_origin && !strcasecmp(s, "Origin"))
-        strncpyz(w->origin, v, ORIGIN_MAX);
+        strncpyz(w->origin, v, NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE);
 
     else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
         if(strcasestr(v, "keep-alive"))
@@ -823,6 +790,9 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
     else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
         if(*v == '0') web_client_disable_donottrack(w);
         else if(*v == '1') web_client_enable_donottrack(w);
+    }
+    else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
+        w->user_agent = strdupz(v);
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -848,14 +818,38 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
-typedef enum http_validation {
+typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
     HTTP_VALIDATION_INCOMPLETE
 } HTTP_VALIDATION;
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = w->response.data->buffer, *encoded_url = NULL;
+    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+
+    size_t last_pos = w->header_parse_last_size;
+    if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
+    else last_pos = 0;
+
+    w->header_parse_tries++;
+    w->header_parse_last_size = buffer_strlen(w->response.data);
+
+    if(w->header_parse_tries > 1) {
+        if(w->header_parse_last_size < last_pos)
+            last_pos = 0;
+
+        if(strstr(&s[last_pos], "\r\n\r\n") == NULL) {
+            if(w->header_parse_tries > 10) {
+                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
+                web_client_disable_wait_receive(w);
+                return HTTP_VALIDATION_NOT_SUPPORTED;
+            }
+
+            return HTTP_VALIDATION_INCOMPLETE;
+        }
+    }
 
     // is is a valid request?
     if(!strncmp(s, "GET ", 4)) {
@@ -871,6 +865,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
+        w->header_parse_tries = 0;
+        w->header_parse_last_size = 0;
         web_client_disable_wait_receive(w);
         return HTTP_VALIDATION_NOT_SUPPORTED;
     }
@@ -911,19 +907,23 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // a valid complete HTTP request found
 
                 *ue = '\0';
-                url_decode_r(w->decoded_url, encoded_url, URL_MAX + 1);
+                url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
                 *ue = ' ';
                 
                 // copy the URL - we are going to overwrite parts of it
                 // FIXME -- we should avoid it
-                strncpyz(w->last_url, w->decoded_url, URL_MAX);
+                strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
                 web_client_disable_wait_receive(w);
                 return HTTP_VALIDATION_OK;
             }
 
             // another header line
-            s = http_header_parse(w, s);
+            s = http_header_parse(w, s,
+                    (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
+            );
         }
     }
 
@@ -965,13 +965,14 @@ static inline void web_client_send_http_header(struct web_client *w) {
     buffer_sprintf(w->response.header_output,
             "HTTP/1.1 %d %s\r\n"
                     "Connection: %s\r\n"
-                    "Server: NetData Embedded HTTP Server\r\n"
+                    "Server: NetData Embedded HTTP Server v%s\r\n"
                     "Access-Control-Allow-Origin: %s\r\n"
                     "Access-Control-Allow-Credentials: true\r\n"
                     "Content-Type: %s\r\n"
                     "Date: %s\r\n"
                    , w->response.code, code_msg
                    , web_client_has_keepalive(w)?"keep-alive":"close"
+                   , VERSION
                    , w->origin
                    , content_type_string
                    , date
@@ -1104,7 +1105,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
         // copy the URL, we need it to serve files
         w->last_url[0] = '/';
-        if(url && *url) strncpyz(&w->last_url[1], url, URL_MAX - 1);
+        if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
         else w->last_url[1] = '\0';
 
         uint32_t hash = simple_hash(tok);
@@ -1320,7 +1321,7 @@ void web_client_process_request(struct web_client *w) {
             break;
 
         case HTTP_VALIDATION_INCOMPLETE:
-            if(w->response.data->len > TOO_BIG_REQUEST) {
+            if(w->response.data->len > NETDATA_WEB_REQUEST_MAX_SIZE) {
                 strcpy(w->last_url, "too big request");
 
                 debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
@@ -1386,7 +1387,7 @@ void web_client_process_request(struct web_client *w) {
                     if(len != w->response.data->rbytes)
                         error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
                     else
-                        web_client_reset(w);
+                        web_client_request_done(w);
                 }
                 */
             }
@@ -1504,7 +1505,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         }
 
         // reset the client
-        web_client_reset(w);
+        web_client_request_done(w);
         debug(D_WEB_CLIENT, "%llu: Done sending all data on socket.", w->id);
         return t;
     }
@@ -1528,7 +1529,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 
         // reset the compressor output buffer
         w->response.zstream.next_out = w->response.zbuffer;
-        w->response.zstream.avail_out = ZLIB_CHUNK;
+        w->response.zstream.avail_out = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE;
 
         // ask for FINISH if we have all the input
         int flush = Z_SYNC_FLUSH;
@@ -1544,11 +1545,11 @@ ssize_t web_client_send_deflate(struct web_client *w)
         // compress
         if(deflate(&w->response.zstream, flush) == Z_STREAM_ERROR) {
             error("%llu: Compression failed. Closing down client.", w->id);
-            web_client_reset(w);
+            web_client_request_done(w);
             return(-1);
         }
 
-        w->response.zhave = ZLIB_CHUNK - w->response.zstream.avail_out;
+        w->response.zhave = NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE - w->response.zstream.avail_out;
         w->response.zsent = 0;
 
         // keep track of the bytes passed through the compressor
@@ -1615,7 +1616,7 @@ ssize_t web_client_send(struct web_client *w) {
             return 0;
         }
 
-        web_client_reset(w);
+        web_client_request_done(w);
         debug(D_WEB_CLIENT, "%llu: Done sending all data on socket. Waiting for next request on the same socket.", w->id);
         return 0;
     }
@@ -1638,22 +1639,69 @@ ssize_t web_client_send(struct web_client *w) {
     return(bytes);
 }
 
+ssize_t web_client_read_file(struct web_client *w)
+{
+    if(unlikely(w->response.rlen > w->response.data->size))
+        buffer_need_bytes(w->response.data, w->response.rlen - w->response.data->size);
+
+    if(unlikely(w->response.rlen <= w->response.data->len))
+        return 0;
+
+    ssize_t left = w->response.rlen - w->response.data->len;
+    ssize_t bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t)left);
+    if(likely(bytes > 0)) {
+        size_t old = w->response.data->len;
+        w->response.data->len += bytes;
+        w->response.data->buffer[w->response.data->len] = '\0';
+
+        debug(D_WEB_CLIENT, "%llu: Read %zd bytes.", w->id, bytes);
+        debug(D_WEB_DATA, "%llu: Read data: '%s'.", w->id, &w->response.data->buffer[old]);
+
+        web_client_enable_wait_send(w);
+
+        if(w->response.rlen && w->response.data->len >= w->response.rlen)
+            web_client_disable_wait_receive(w);
+    }
+    else if(likely(bytes == 0)) {
+        debug(D_WEB_CLIENT, "%llu: Out of input file data.", w->id);
+
+        // if we cannot read, it means we have an error on input.
+        // if however, we are copying a file from ifd to ofd, we should not return an error.
+        // in this case, the error should be generated when the file has been sent to the client.
+
+        // we are copying data from ifd to ofd
+        // let it finish copying...
+        web_client_disable_wait_receive(w);
+
+        debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
+
+        if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+            if (w->ifd != w->ofd) close(w->ifd);
+        }
+
+        w->ifd = w->ofd;
+    }
+    else {
+        debug(D_WEB_CLIENT, "%llu: read data failed.", w->id);
+        WEB_CLIENT_IS_DEAD(w);
+    }
+
+    return(bytes);
+}
+
 ssize_t web_client_receive(struct web_client *w)
 {
+    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
+        return web_client_read_file(w);
+
     // do we have any space for more data?
-    buffer_need_bytes(w->response.data, WEB_REQUEST_LENGTH);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
     ssize_t left = w->response.data->size - w->response.data->len;
-    ssize_t bytes;
-
-    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
-        bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
-    else
-        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    ssize_t bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 
     if(likely(bytes > 0)) {
-        if(w->mode != WEB_CLIENT_MODE_FILECOPY)
-            w->stats_received_bytes += bytes;
+        w->stats_received_bytes += bytes;
 
         size_t old = w->response.data->len;
         w->response.data->len += bytes;
@@ -1661,34 +1709,6 @@ ssize_t web_client_receive(struct web_client *w)
 
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
-
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-            web_client_enable_wait_send(w);
-
-            if(w->response.rlen && w->response.data->len >= w->response.rlen)
-                web_client_disable_wait_receive(w);
-        }
-    }
-    else if(likely(bytes == 0)) {
-        debug(D_WEB_CLIENT, "%llu: Out of input data.", w->id);
-
-        // if we cannot read, it means we have an error on input.
-        // if however, we are copying a file from ifd to ofd, we should not return an error.
-        // in this case, the error should be generated when the file has been sent to the client.
-
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-            // we are copying data from ifd to ofd
-            // let it finish copying...
-            web_client_disable_wait_receive(w);
-
-            debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
-            if(w->ifd != w->ofd) close(w->ifd);
-            w->ifd = w->ofd;
-        }
-        else {
-            debug(D_WEB_CLIENT, "%llu: failed to receive data.", w->id);
-            WEB_CLIENT_IS_DEAD(w);
-        }
     }
     else {
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
@@ -1696,158 +1716,4 @@ ssize_t web_client_receive(struct web_client *w)
     }
 
     return(bytes);
-}
-
-
-// --------------------------------------------------------------------------------------
-// the thread of a single client
-
-// 1. waits for input and output, using async I/O
-// 2. it processes HTTP requests
-// 3. it generates HTTP responses
-// 4. it copies data from input to output if mode is FILECOPY
-
-void *web_client_main(void *ptr)
-{
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
-
-    struct web_client *w = ptr;
-    struct pollfd fds[2], *ifd, *ofd;
-    int retval, timeout;
-    nfds_t fdmax = 0;
-
-    for(;;) {
-        if(unlikely(netdata_exit)) break;
-
-        if(unlikely(web_client_check_dead(w))) {
-            debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
-            break;
-        }
-        else if(unlikely(!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))) {
-            debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.", w->id);
-            break;
-        }
-
-        if(unlikely(w->ifd < 0 || w->ofd < 0)) {
-            error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd", w->id, w->ifd, w->ofd);
-            break;
-        }
-
-        if(w->ifd == w->ofd) {
-            fds[0].fd = w->ifd;
-            fds[0].events = 0;
-            fds[0].revents = 0;
-
-            if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
-            if(web_client_has_wait_send(w))    fds[0].events |= POLLOUT;
-
-            fds[1].fd = -1;
-            fds[1].events = 0;
-            fds[1].revents = 0;
-
-            ifd = ofd = &fds[0];
-
-            fdmax = 1;
-        }
-        else {
-            fds[0].fd = w->ifd;
-            fds[0].events = 0;
-            fds[0].revents = 0;
-            if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
-            ifd = &fds[0];
-
-            fds[1].fd = w->ofd;
-            fds[1].events = 0;
-            fds[1].revents = 0;
-            if(web_client_has_wait_send(w))    fds[1].events |= POLLOUT;
-            ofd = &fds[1];
-
-            fdmax = 2;
-        }
-
-        debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
-        errno = 0;
-        timeout = web_client_timeout * 1000;
-        retval = poll(fds, fdmax, timeout);
-
-        if(unlikely(netdata_exit)) break;
-
-        if(unlikely(retval == -1)) {
-            if(errno == EAGAIN || errno == EINTR) {
-                debug(D_WEB_CLIENT, "%llu: EAGAIN received.", w->id);
-                continue;
-            }
-
-            debug(D_WEB_CLIENT, "%llu: LISTENER: poll() failed (input fd = %d, output fd = %d). Closing client.", w->id, w->ifd, w->ofd);
-            break;
-        }
-        else if(unlikely(!retval)) {
-            debug(D_WEB_CLIENT, "%llu: Timeout while waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
-            break;
-        }
-
-        if(unlikely(netdata_exit)) break;
-
-        int used = 0;
-        if(web_client_has_wait_send(w) && ofd->revents & POLLOUT) {
-            used++;
-            if(web_client_send(w) < 0) {
-                debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
-                break;
-            }
-        }
-
-        if(unlikely(netdata_exit)) break;
-
-        if(web_client_has_wait_receive(w) && (ifd->revents & POLLIN || ifd->revents & POLLPRI)) {
-            used++;
-            if(web_client_receive(w) < 0) {
-                debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
-                break;
-            }
-
-            if(w->mode == WEB_CLIENT_MODE_NORMAL) {
-                debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
-                web_client_process_request(w);
-
-                // if the sockets are closed, may have transferred this client
-                // to plugins.d
-                if(unlikely(w->mode == WEB_CLIENT_MODE_STREAM))
-                    break;
-            }
-        }
-
-        if(unlikely(!used)) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on socket.", w->id);
-            break;
-        }
-    }
-
-    if(w->mode != WEB_CLIENT_MODE_STREAM)
-        log_connection(w, "DISCONNECTED");
-
-    web_client_reset(w);
-
-    debug(D_WEB_CLIENT, "%llu: done...", w->id);
-
-    // close the sockets/files now
-    // to free file descriptors
-    if(w->ifd == w->ofd) {
-        if(w->ifd != -1) close(w->ifd);
-    }
-    else {
-        if(w->ifd != -1) close(w->ifd);
-        if(w->ofd != -1) close(w->ofd);
-    }
-    w->ifd = -1;
-    w->ofd = -1;
-
-    WEB_CLIENT_IS_OBSOLETE(w);
-
-    pthread_exit(NULL);
-    return NULL;
 }

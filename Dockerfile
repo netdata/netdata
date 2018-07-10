@@ -1,12 +1,10 @@
 # author  : titpetric
 # original: https://github.com/titpetric/netdata
+# SPDX-License-Identifier: CC0-1.0
 
-FROM debian:jessie
+FROM debian:stretch
 
 ADD . /netdata.git
-
-RUN echo "deb http://ftp.nl.debian.org/debian/ jessie main" > /etc/apt/sources.list
-RUN echo "deb http://security.debian.org/debian-security jessie/updates main" >> /etc/apt/sources.list
 
 RUN cd ./netdata.git && chmod +x ./docker-build.sh && sync && sleep 1 && ./docker-build.sh
 

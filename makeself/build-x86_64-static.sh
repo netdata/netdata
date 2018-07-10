@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0+
 
 . $(dirname "$0")/../installer/functions.sh || exit 1
 
 set -e
 
-DOCKER_CONTAINER_NAME="netdata-package-x86_64-static"
+DOCKER_CONTAINER_NAME="netdata-package-x86_64-static-alpine37"
 
 if ! sudo docker inspect "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1
 then
@@ -21,7 +22,7 @@ then
     # inside the container and runs the script install-alpine-packages.sh
     # (also inside the container)
     #
-    run sudo docker run -v $(pwd):/usr/src/netdata.git:rw alpine:3.6 \
+    run sudo docker run -v $(pwd):/usr/src/netdata.git:rw alpine:3.7 \
         /bin/sh /usr/src/netdata.git/makeself/install-alpine-packages.sh
 
     # save the changes made permanently

@@ -141,19 +141,24 @@ static struct cgroup_network_interface *get_network_interface(const char *name) 
 int do_getifaddrs(int update_every, usec_t dt) {
     (void)dt;
 
-#define DELAULT_EXLUDED_INTERFACES "lo*"
+#define DEFAULT_EXLUDED_INTERFACES "lo*"
+#define DEFAULT_PHYSICAL_INTERFACES "igb* ix* cxl* em* ixl* ixlv* bge* ixgbe*"
 #define CONFIG_SECTION_GETIFADDRS "plugin:freebsd:getifaddrs"
 
     static int enable_new_interfaces = -1;
-    static int do_bandwidth_ipv4 = -1, do_bandwidth_ipv6 = -1, do_bandwidth = -1, do_packets = -1,
+    static int do_bandwidth_ipv4 = -1, do_bandwidth_ipv6 = -1, do_bandwidth = -1, do_packets = -1, do_bandwidth_net = -1, do_packets_net = -1,
             do_errors = -1, do_drops = -1, do_events = -1;
-    static SIMPLE_PATTERN *excluded_interfaces = NULL;
+    static SIMPLE_PATTERN *excluded_interfaces = NULL, *physical_interfaces = NULL;
 
     if (unlikely(enable_new_interfaces == -1)) {
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS,
                                                               "enable new interfaces detected at runtime",
                                                               CONFIG_BOOLEAN_AUTO);
-
+        
+        do_bandwidth_net  = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for physical interfaces",
+                                                       CONFIG_BOOLEAN_AUTO);
+        do_packets_net    = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total packets for physical interfaces",
+                                                       CONFIG_BOOLEAN_AUTO);
         do_bandwidth_ipv4 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv4 interfaces",
                                                         CONFIG_BOOLEAN_AUTO);
         do_bandwidth_ipv6 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv6 interfaces",
@@ -170,18 +175,27 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                         CONFIG_BOOLEAN_AUTO);
 
         excluded_interfaces = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching",
-                           DELAULT_EXLUDED_INTERFACES)
+                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DEFAULT_EXLUDED_INTERFACES)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
+        );
+        physical_interfaces = simple_pattern_create(
+                config_get(CONFIG_SECTION_GETIFADDRS, "set physical interfaces for system.net", DEFAULT_PHYSICAL_INTERFACES)
+                , NULL
                 , SIMPLE_PATTERN_EXACT
         );
     }
 
-    if (likely(do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors ||
+    if (likely(do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors || do_bandwidth_net || do_packets_net ||
                do_drops || do_events)) {
         struct ifaddrs *ifap;
 
         if (unlikely(getifaddrs(&ifap))) {
             error("FREEBSD: getifaddrs() failed");
+            do_bandwidth_net = 0;
+            error("DISABLED: system.net chart");
+            do_packets_net = 0;
+            error("DISABLED: system.packets chart");
             do_bandwidth_ipv4 = 0;
             error("DISABLED: system.ipv4 chart");
             do_bandwidth_ipv6 = 0;
@@ -204,7 +218,103 @@ int do_getifaddrs(int update_every, usec_t dt) {
             struct iftot {
                 u_long  ift_ibytes;
                 u_long  ift_obytes;
-            } iftot = {0, 0};
+                u_long  ift_ipackets;
+                u_long  ift_opackets;
+                u_long  ift_imcasts;
+                u_long  ift_omcasts;
+            } iftot = {0, 0, 0, 0, 0, 0};
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_bandwidth_net)) {
+                
+                iftot.ift_ibytes = iftot.ift_obytes = 0;
+                for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                    if (ifa->ifa_addr->sa_family != AF_LINK)
+                        continue;
+                    if (!simple_pattern_matches(physical_interfaces, ifa->ifa_name))
+                        continue;
+                    iftot.ift_ibytes += IFA_DATA(ibytes);
+                    iftot.ift_obytes += IFA_DATA(obytes);
+                }
+                
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+                
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "net",
+                                                 NULL,
+                                                 "network",
+                                                 NULL,
+                                                 "Network Traffic",
+                                                 "kilobits/s",
+                                                 "freebsd",
+                                                 "getifaddrs",
+                                                 500,
+                                                 update_every,
+                                                 RRDSET_TYPE_AREA
+                                                 );
+                    
+                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+                
+                rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
+                rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
+                rrdset_done(st);
+            }
+            
+            // --------------------------------------------------------------------
+
+            if (likely(do_packets_net)) {
+
+                iftot.ift_ipackets = iftot.ift_opackets = iftot.ift_imcasts = iftot.ift_omcasts = 0;
+                for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                    if (ifa->ifa_addr->sa_family != AF_LINK)
+                        continue;
+                    if (!simple_pattern_matches(physical_interfaces, ifa->ifa_name))
+                        continue;
+                    iftot.ift_ipackets += IFA_DATA(ipackets);
+                    iftot.ift_opackets += IFA_DATA(opackets);
+                    iftot.ift_imcasts += IFA_DATA(imcasts);
+                    iftot.ift_omcasts += IFA_DATA(omcasts);
+                }
+
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_packets_in = NULL, *rd_packets_out = NULL, *rd_packets_m_in = NULL, *rd_packets_m_out = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "packets",
+                                                 NULL,
+                                                 "network",
+                                                 NULL,
+                                                 "Network Packets",
+                                                 "packets/s",
+                                                 "freebsd",
+                                                 "getifaddrs",
+                                                 7001,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
+                                                 );
+
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+                    rd_packets_in    = rrddim_add(st, "received",           NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_packets_out   = rrddim_add(st, "sent",               NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_packets_m_in  = rrddim_add(st, "multicast_received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_packets_m_out = rrddim_add(st, "multicast_sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_packets_in,    iftot.ift_ipackets);
+                rrddim_set_by_pointer(st, rd_packets_out,   iftot.ift_opackets);
+                rrddim_set_by_pointer(st, rd_packets_m_in,  iftot.ift_imcasts);
+                rrddim_set_by_pointer(st, rd_packets_m_out, iftot.ift_omcasts);
+                rrdset_done(st);
+            }
 
             // --------------------------------------------------------------------
 

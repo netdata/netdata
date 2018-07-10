@@ -1,4 +1,5 @@
 "use strict";
+// SPDX-License-Identifier: GPL-3.0+
 
 var netdata = require("../../node.d/node_modules/netdata");
 // remember: subject will be a singleton!
@@ -233,6 +234,33 @@ describe("fronius parsing for autonomy", function () {
 
         expect(result.name).toBe(subject.consumptionSelfId);
         expect(result.value).toBe(0);
+    });
+
+    it("should return 0 for solarConsumption if PV is null", function () {
+        site.P_PV = null;
+        site.P_Load = -1000;
+        var result = subject.parseAutonomyChart(service, site).dimensions[2];
+
+        expect(result.name).toBe(subject.solarConsumptionId);
+        expect(result.value).toBe(0);
+    });
+
+    it("should return 100 for solarConsumption if Load is higher than solar power", function () {
+        site.P_PV = 500;
+        site.P_Load = -1500;
+        var result = subject.parseAutonomyChart(service, site).dimensions[2];
+
+        expect(result.name).toBe(subject.solarConsumptionId);
+        expect(result.value).toBe(100);
+    });
+
+    it("should return 50 for solarConsumption if Load is half than solar power", function () {
+        site.P_PV = 3000;
+        site.P_Load = -1500;
+        var result = subject.parseAutonomyChart(service, site).dimensions[2];
+
+        expect(result.name).toBe(subject.solarConsumptionId);
+        expect(result.value).toBe(50);
     });
 });
 

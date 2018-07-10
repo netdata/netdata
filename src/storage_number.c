@@ -1,8 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
-
-extern char *print_number_lu_r(char *str, unsigned long uvalue);
-extern char *print_number_llu_r(char *str, unsigned long long uvalue);
-extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags)
 {
@@ -166,6 +163,7 @@ int print_calculated_number(char *str, calculated_number value)
 */
 
 int print_calculated_number(char *str, calculated_number value) {
+    // info("printing number " CALCULATED_NUMBER_FORMAT, value);
     char integral_str[50], fractional_str[50];
 
     char *wstr = str;
@@ -178,30 +176,39 @@ int print_calculated_number(char *str, calculated_number value) {
     calculated_number integral, fractional;
 
 #ifdef STORAGE_WITH_MATH
-    fractional = modfl(value, &integral) * 10000000.0;
+    fractional = calculated_number_modf(value, &integral) * 10000000.0;
 #else
     fractional = ((unsigned long long)(value * 10000000ULL) % 10000000ULL);
 #endif
 
+    unsigned long long integral_int = (unsigned long long)integral;
+    unsigned long long fractional_int = (unsigned long long)calculated_number_llrint(fractional);
+    if(unlikely(fractional_int >= 10000000)) {
+        integral_int += 1;
+        fractional_int -= 10000000;
+    }
+
+    // info("integral " CALCULATED_NUMBER_FORMAT " (%llu), fractional " CALCULATED_NUMBER_FORMAT " (%llu)", integral, integral_int, fractional, fractional_int);
+
     char *istre;
-    if(integral == 0.0) {
+    if(unlikely(integral_int == 0)) {
         integral_str[0] = '0';
         istre = &integral_str[1];
     }
     else
         // convert the integral part to string (reversed)
-        istre = print_number_llu_r_smart(integral_str, (unsigned long long)integral);
+        istre = print_number_llu_r_smart(integral_str, integral_int);
 
     // copy reversed the integral string
     istre--;
     while( istre >= integral_str ) *wstr++ = *istre--;
 
-    if(fractional != 0.0) {
+    if(likely(fractional_int != 0)) {
         // add a dot
         *wstr++ = '.';
 
         // convert the fractional part to string (reversed)
-        char *fstre = print_number_llu_r_smart(fractional_str, (unsigned long long)calculated_number_llrint(fractional));
+        char *fstre = print_number_llu_r_smart(fractional_str, fractional_int);
 
         // prepend zeros to reach 7 digits length
         int decimal = 7;
@@ -220,5 +227,6 @@ int print_calculated_number(char *str, calculated_number value) {
     }
 
     *wstr = '\0';
+    // info("printed number '%s'", str);
     return (int)(wstr - str);
 }

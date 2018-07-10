@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0+ -->
 <html lang=en-us>
 <head>
     <meta charset=utf-8>
@@ -603,6 +604,20 @@ p {
         right: 0;
         font-size: 14px;
         z-index: 1;
+        pointer-events: none;
+    }
+
+    .mysparkline-overchart-label2 {
+        position: absolute;
+        display: block;
+        top: -15px;
+        left: 10px;
+        bottom: 0;
+        right: 0;
+        font-size: 8px;
+        color: #676b70;
+        z-index: 1;
+        pointer-events: none;
     }
 
     .mysparkline-overchart-value {
@@ -615,6 +630,7 @@ p {
         font-size: 40px;
         z-index: 2;
         text-shadow: #333 0px 0px 2px;
+        pointer-events: none;
     }
 
     .mysparkline-overchart-value-center {
@@ -629,6 +645,7 @@ p {
         text-align: center;
         z-index: 2;
         text-shadow: #333 0px 0px 2px;
+        pointer-events: none;
     }
 
     .fb-share-button span {
@@ -906,7 +923,116 @@ p {
                     </div>
                 </div>
             </div>
+            <div style="padding-top: 20px;">
+                <div class="mygauge-combo">
+                    <div class="mygauge">
+                        <div style="padding-bottom: 20px; font-size: 10px; color: #676b70;">
+                            <b>Isreal</b>
+                        </div>
+                        <div class="mysparkline">
+                            <div class="mysparkline-overchart-label2">
+                                requests/s
+                            </div>
+                            <div class="mysparkline-overchart-value" id="octopuscs.requests.netdata" >
+                            </div>
+                            <div data-netdata="netdata.requests"
+                                 data-dimensions="requests"
+                                 data-host="//octopuscs.my-netdata.io"
+                                 data-common-max="top-gauges"
+                                 data-decimal-digits="0"
+                                 data-chart-library="dygraph"
+                                 data-dygraph-theme="sparkline"
+                                 data-dygraph-type="area"
+                                 data-width="100%"
+                                 data-height="100%"
+                                 data-after="-300"
+                                 data-colors="#4BFF91"
+                                 data-show-value-of-requests-at="octopuscs.requests.netdata"
+                            ></div>
+                        </div>
+                    </div>
+                    <div class="mygauge-button">
+                        <a class="btn btn-alt mygauge-legend-button" href=//octopuscs.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoOctopuscs><strong>Enter Isreal!</strong></a>
+                        <div class="mygause-donation">
+                            Donated by octopuscs.com
+                        </div>
+                    </div>
+                </div>
+                <div class="mygauge-combo">
+                    <div class="mygauge">
+                        <div style="padding-bottom: 20px; font-size: 10px; color: #676b70;">
+                            <b>EU - France</b>
+                        </div>
+                        <div class="mysparkline">
+                            <div class="mysparkline-overchart-label2">
+                                requests/s
+                            </div>
+                            <div class="mysparkline-overchart-value" id="ventureer.requests.netdata" >
+                            </div>
+                            <div data-netdata="netdata.requests"
+                                 data-dimensions="requests"
+                                 data-host="//ventureer.my-netdata.io"
+                                 data-common-max="top-gauges"
+                                 data-decimal-digits="0"
+                                 data-chart-library="dygraph"
+                                 data-dygraph-theme="sparkline"
+                                 data-dygraph-type="area"
+                                 data-width="100%"
+                                 data-height="100%"
+                                 data-after="-300"
+                                 data-colors="#FF4B91"
+                                 data-show-value-of-requests-at="ventureer.requests.netdata"
+                            ></div>
+                        </div>
+                    </div>
+                    <div class="mygauge-button">
+                        <a class="btn btn-alt mygauge-legend-button" href=//ventureer.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoVentureer><strong>Enter Roubaix!</strong></a>
+                        <div class="mygause-donation">
+                            Donated by ventureer.com
+                        </div>
+                    </div>
+                </div>
+                <div class="mygauge-combo">
+                    <div class="mygauge">
+                        <div style="padding-bottom: 20px; font-size: 10px; color: #676b70;">
+                            <b>EU - Spain</b>
+                        </div>
+                        <div class="mysparkline">
+                            <div class="mysparkline-overchart-label2">
+                                requests/s
+                            </div>
+                            <div class="mysparkline-overchart-value" id="stackscale.requests.netdata" >
+                            </div>
+                            <div data-netdata="netdata.requests"
+                                 data-dimensions="requests"
+                                 data-host="//stackscale.my-netdata.io"
+                                 data-common-max="top-gauges"
+                                 data-decimal-digits="0"
+                                 data-chart-library="dygraph"
+                                 data-dygraph-theme="sparkline"
+                                 data-dygraph-type="area"
+                                 data-width="100%"
+                                 data-height="100%"
+                                 data-after="-300"
+                                 data-colors="#4B91FF"
+                                 data-show-value-of-requests-at="stackscale.requests.netdata"
+                            ></div>
+                        </div>
+                    </div>
+                    <div class="mygauge-button">
+                        <a class="btn btn-alt mygauge-legend-button" href=//stackscale.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoStackScale><strong>Enter Madrid!</strong></a>
+                        <div class="mygause-donation">
+                            Donated by stackscale.com
+                        </div>
+                    </div>
+                </div>
+                <div class="mygauge-combo">
+                    <div class="mygauge">
+                    </div>
+                </div>
+            </div>
         </div>
+
         <div class="container" style="padding-top: 40px; text-align: center;">
             Charts are coming from all servers, <b>in parallel</b>.
             <br/>
@@ -943,221 +1069,13 @@ p {
             But on this dashboard <b>they are one</b>! (hover on the chart above)
         </div>
 
-        <div class="mygauge-combo30">
-            <div style="padding-bottom: 20px;">
-                <b>on Amazon EC2</b>
-                <br/><small>(smallest AMI Linux)</small>
-            </div>
-            <div class="mysparkline">
-                <div class="mysparkline-overchart-label">
-                    requests/s
-                </div>
-                <div class="mysparkline-overchart-value" id="aws-fra-netdata.requests.netdata" >
-                </div>
-                <div data-netdata="netdata.requests"
-                     data-dimensions="requests"
-                     data-host="//aws-fra.my-netdata.io"
-                     data-common-max="top-gauges2"
-                     data-decimal-digits="0"
-                     data-chart-library="dygraph"
-                     data-dygraph-theme="sparkline"
-                     data-dygraph-type="area"
-                     data-width="100%"
-                     data-height="100%"
-                     data-after="-300"
-                     data-colors="#FF4B91"
-                     data-show-value-of-requests-at="aws-fra-netdata.requests.netdata"
-                ></div>
-            </div>
-            <div class="mygauge-button">
-                <a class="btn btn-alt mygauge-legend-button" href=//aws-fra.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAwsFra><strong>Enter Amazon!</strong></a>
-                <div class="mygause-donation">
-                    Donated by Amazon
-                </div>
-            </div>
-        </div>
-        <div class="mygauge-combo30">
-            <div style="padding-bottom: 20px;">
-                <b>on Azure</b>
-                <br/><small>(Ubuntu 16.10 on green A1)</small>
-            </div>
-            <div class="mysparkline">
-                <div class="mysparkline-overchart-label">
-                    requests/s
-                </div>
-                <div class="mysparkline-overchart-value" id="azure-west-eu-netdata.requests.netdata" >
-                </div>
-                <div data-netdata="netdata.requests"
-                     data-dimensions="requests"
-                     data-host="//azure-west-eu.my-netdata.io"
-                     data-common-max="top-gauges2"
-                     data-decimal-digits="0"
-                     data-chart-library="dygraph"
-                     data-dygraph-theme="sparkline"
-                     data-dygraph-type="area"
-                     data-width="100%"
-                     data-height="100%"
-                     data-after="-300"
-                     data-colors="#007FFF"
-                     data-show-value-of-requests-at="azure-west-eu-netdata.requests.netdata"
-                ></div>
-            </div>
-            <div class="mygauge-button">
-                <a class="btn btn-alt mygauge-legend-button" href=//azure-west-eu.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAzureWestEu><strong>Enter Azure!</strong></a>
-                <div class="mygause-donation">
-                    Donated by Azure
-                </div>
-            </div>
-        </div>
-        <div class="mygauge-combo30">
-            <div style="padding-bottom: 20px;">
-                <b>on Alpine</b>
-                <br/><small>(empty LXC container)</small>
-            </div>
-            <div class="mysparkline">
-                <div class="mysparkline-overchart-label">
-                    requests/s
-                </div>
-                <div class="mysparkline-overchart-value" id="alpine-netdata.requests.netdata" >
-                </div>
-                <div data-netdata="netdata.requests"
-                     data-dimensions="requests"
-                     data-host="//alpine.my-netdata.io"
-                     data-common-max="top-gauges2"
-                     data-decimal-digits="0"
-                     data-chart-library="dygraph"
-                     data-dygraph-theme="sparkline"
-                     data-dygraph-type="area"
-                     data-width="100%"
-                     data-height="100%"
-                     data-after="-300"
-                     data-colors="#FF7F00"
-                     data-show-value-of-requests-at="alpine-netdata.requests.netdata"
-                ></div>
-            </div>
-            <div class="mygauge-button">
-                <a class="btn btn-alt mygauge-legend-button" href=//alpine.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAlpine><strong>Enter Alpine!</strong></a>
-                <div class="mygause-donation">
-                    Donated by Azure
-                </div>
-            </div>
-        </div>
 
-        <div style="padding-top: 20px">
-            <h2>netdata global health monitoring</h2>
-
-            <div>
-                We are building a global netdata health monitoring service<br/>
-                <b>available for free</b> to all netdata users,<br/>
-                thanks to VMs donated by these companies.<br/>
-                &nbsp;<br/>
-                This service will be activated with the v1.8 release of netdata.
-                &nbsp;<br/>
-                You can help: <a href="https://github.com/firehol/netdata/issues/2466">join this movement</a>.
-            </div>
-
-            <div class="mygauge-combo30">
-                <div style="padding-bottom: 20px;">
-                    <b>digitalocean.com</b>
-                </div>
-                <div class="mysparkline">
-                    <div class="mysparkline-overchart-label">
-                        requests/s
-                    </div>
-                    <div class="mysparkline-overchart-value" id="digitalocean.requests.netdata" >
-                    </div>
-                    <div data-netdata="netdata.requests"
-                         data-dimensions="requests"
-                         data-host="//registry.my-netdata.io"
-                         data-common-max="top-gauges2"
-                         data-decimal-digits="0"
-                         data-chart-library="dygraph"
-                         data-dygraph-theme="sparkline"
-                         data-dygraph-type="area"
-                         data-width="100%"
-                         data-height="100%"
-                         data-after="-300"
-                         data-colors="#4BFF91"
-                         data-show-value-of-requests-at="digitalocean.requests.netdata"
-                    ></div>
-                </div>
-                <div class="mygauge-button">
-                    <a class="btn btn-alt mygauge-legend-button" href=//registry.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoDigitalOcean><strong>Enter digitalocean!</strong></a>
-                    <div class="mygause-donation">
-                        Donated by digitalocean.com
-                    </div>
-                </div>
-            </div>
-            <div class="mygauge-combo30">
-                <div style="padding-bottom: 20px;">
-                    <b>ventureer.com</b>
-                </div>
-                <div class="mysparkline">
-                    <div class="mysparkline-overchart-label">
-                        requests/s
-                    </div>
-                    <div class="mysparkline-overchart-value" id="ventureer.requests.netdata" >
-                    </div>
-                    <div data-netdata="netdata.requests"
-                         data-dimensions="requests"
-                         data-host="//ventureer.my-netdata.io"
-                         data-common-max="top-gauges2"
-                         data-decimal-digits="0"
-                         data-chart-library="dygraph"
-                         data-dygraph-theme="sparkline"
-                         data-dygraph-type="area"
-                         data-width="100%"
-                         data-height="100%"
-                         data-after="-300"
-                         data-colors="#FF4B91"
-                         data-show-value-of-requests-at="ventureer.requests.netdata"
-                    ></div>
-                </div>
-                <div class="mygauge-button">
-                    <a class="btn btn-alt mygauge-legend-button" href=//ventureer.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoVentureer><strong>Enter ventureer!</strong></a>
-                    <div class="mygause-donation">
-                        Donated by ventureer.com
-                    </div>
-                </div>
-            </div>
-            <div class="mygauge-combo30">
-                <div style="padding-bottom: 20px;">
-                    <b>stackscale.com</b>
-                </div>
-                <div class="mysparkline">
-                    <div class="mysparkline-overchart-label">
-                        requests/s
-                    </div>
-                    <div class="mysparkline-overchart-value" id="stackscale.requests.netdata" >
-                    </div>
-                    <div data-netdata="netdata.requests"
-                         data-dimensions="requests"
-                         data-host="//stackscale.my-netdata.io"
-                         data-common-max="top-gauges2"
-                         data-decimal-digits="0"
-                         data-chart-library="dygraph"
-                         data-dygraph-theme="sparkline"
-                         data-dygraph-type="area"
-                         data-width="100%"
-                         data-height="100%"
-                         data-after="-300"
-                         data-colors="#4B91FF"
-                         data-show-value-of-requests-at="stackscale.requests.netdata"
-                    ></div>
-                </div>
-                <div class="mygauge-button">
-                    <a class="btn btn-alt mygauge-legend-button" href=//stackscale.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoStackScale><strong>Enter stackscale!</strong></a>
-                    <div class="mygause-donation">
-                        Donated by stackscale.com
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <!--
         <div style="padding-top: 40px; color: #999;">
             <small>We would love to show demos of IoT devices running netdata.<br/>
                 If you can host at your DC an RPi or a Linux IoT, <a href="mailto:costa@tsaousis.gr?subject=I can host IoT for netdata&body=Hi Costa,%0D%0A%0D%0AI would love to host an IoT device to demo netdata on it.%0D%0A%0D%0A-- please tell me who you are and what infrastructure you have --%0D%0A-- Take into account I would need SSH access to it --%0D%0A-- You have to have a DC - a home is not good enough - sorry. --%0D%0A%0D%0AThanks!">contact me</a>.</small>
         </div>
+        -->
     </div>
 </div>
 
@@ -1165,7 +1083,7 @@ p {
     <div class="content">
         <div class="container" style="text-align: center;">
             <small>Figures come from users using the <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures may be a lot higher.<br/></small>
-            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 230px; display: inline-block;">
+            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 220px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
                         netdata <b>unique users</b>
@@ -1187,7 +1105,7 @@ p {
                     ></div>
                 </div>
             </div>
-            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 230px; display: inline-block;">
+            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 220px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
                         netdata <b>monitored servers</b>
@@ -1209,7 +1127,7 @@ p {
                     ></div>
                 </div>
             </div>
-            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 230px; display: inline-block;">
+            <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 220px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
                         netdata <b>sessions served</b>
@@ -1254,9 +1172,9 @@ p {
             </p>
         </div>
         <div class="container" style="text-align: center;">
-		<strong>netdata</strong> is featured at the <a href="https://octoverse.github.com/" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Octoverse>GitHub's state of the Octoverse 2016</a>
+		<strong>netdata</strong> is featured at the <a href="https://octoverse.github.com/2016/" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Octoverse>GitHub's state of the Octoverse 2016</a>
             <div style="padding-top: 10px;">
-                <a href="https://octoverse.github.com/" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=OctoverseImage>
+                <a href="https://octoverse.github.com/2016/" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=OctoverseImage>
                 <img src="https://cloud.githubusercontent.com/assets/2662304/21743260/23ebe62c-d507-11e6-80c0-76b95f53e464.png" width="90%" style="border-radius: 4px; border: 1px solid #fff;"/>
                 </a>
             </div>
@@ -1294,7 +1212,7 @@ p {
     </p>
     <p>
         <strong>netdata</strong><br/>
-        &copy; Copyright 2016-2017, <a href="https://github.com/ktsaou" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=CostaTsaousis>Costa Tsaousis</a><br/>
+        &copy; Copyright 2016-2018, <a href="https://github.com/ktsaou" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=CostaTsaousis>Costa Tsaousis</a><br/>
         Released under <a href="https://github.com/firehol/netdata/blob/master/LICENSE.md" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=License>GPL v3+</a><br/>
     </p>
     <p>

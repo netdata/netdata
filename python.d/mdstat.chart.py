@@ -1,73 +1,173 @@
 # -*- coding: utf-8 -*-
 # Description: mdstat netdata python.d module
-# Author: l2isbad
+# Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
+
+import re
 
 from collections import defaultdict
-from re import compile as re_compile
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-priority = 60000
-retries = 60
-update_every = 1
+MDSTAT = '/proc/mdstat'
+MISMATCH_CNT = '/sys/block/{0}/md/mismatch_cnt'
 
-OPERATIONS = ('check', 'resync', 'reshape', 'recovery', 'finish', 'speed')
+ORDER = ['mdstat_health']
+
+CHARTS = {
+    'mdstat_health': {
+        'options': [None, 'Faulty Devices In MD', 'failed disks', 'health', 'md.health', 'line'],
+        'lines': list()
+    }
+}
+
+RE_DISKS = re.compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+\['
+                      r'(?P<total_disks>[0-9]+)/'
+                      r'(?P<inuse_disks>[0-9]+)\]')
+
+RE_STATUS = re.compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
+                       r'(?P<operation>[a-z]+) =[ ]{1,2}'
+                       r'(?P<operation_status>[0-9.]+).+finish='
+                       r'(?P<finish_in>([0-9.]+))min speed='
+                       r'(?P<speed>[0-9]+)')
+
+
+def md_charts(name):
+    order = ['{0}_disks'.format(name),
+             '{0}_operation'.format(name),
+             '{0}_mismatch_cnt'.format(name),
+             '{0}_finish'.format(name),
+             '{0}_speed'.format(name)
+             ]
+
+    charts = dict()
+    charts[order[0]] = {
+        'options': [None, 'Disks Stats', 'disks', name, 'md.disks', 'stacked'],
+        'lines': [
+            ['{0}_total_disks'.format(name), 'total', 'absolute'],
+            ['{0}_inuse_disks'.format(name), 'inuse', 'absolute']
+        ]
+    }
+
+    charts[order[1]] = {
+        'options': [None, 'Current Status', 'percent', name, 'md.status', 'line'],
+        'lines': [
+            ['{0}_resync'.format(name), 'resync', 'absolute', 1, 100],
+            ['{0}_recovery'.format(name), 'recovery', 'absolute', 1, 100],
+            ['{0}_reshape'.format(name), 'reshape', 'absolute', 1, 100],
+            ['{0}_check'.format(name), 'check', 'absolute', 1, 100],
+        ]
+    }
+
+    charts[order[2]] = {
+        'options': [None, 'Mismatch Count', 'unsynchronized blocks', name, 'md.mismatch_cnt', 'line'],
+        'lines': [
+            ['{0}_mismatch_cnt'.format(name), 'count', 'absolute']
+        ]
+    }
+
+    charts[order[3]] = {
+        'options': [None, 'Approximate Time Until Finish', 'seconds', name, 'md.rate', 'line'],
+        'lines': [
+            ['{0}_finish_in'.format(name), 'finish in', 'absolute', 1, 1000]
+        ]
+    }
+
+    charts[order[4]] = {
+        'options': [None, 'Operation Speed', 'KB/s', name, 'md.rate', 'line'],
+        'lines': [
+            ['{0}_speed'.format(name), 'speed', 'absolute', 1, 1000]
+        ]
+    }
+
+    return order, charts
+
+
+class MD:
+    def __init__(self, raw_data):
+        self.name = raw_data["array"]
+        self.d = raw_data
+
+    def data(self):
+        rv = {
+            'total_disks': self.d['total_disks'],
+            'inuse_disks': self.d['inuse_disks'],
+            'health': int(self.d['total_disks']) - int(self.d['inuse_disks']),
+            'resync': 0,
+            'recovery': 0,
+            'reshape': 0,
+            'check': 0,
+            'finish_in': 0,
+            'speed': 0,
+        }
+
+        v = read_lines(MISMATCH_CNT.format(self.name))
+        if v:
+            rv['mismatch_cnt'] = v
+
+        if self.d.get('operation'):
+            rv[self.d['operation']] = float(self.d['operation_status']) * 100
+            rv['finish_in'] = float(self.d['finish_in']) * 1000 * 60
+            rv['speed'] = float(self.d['speed']) * 1000
+
+        return dict(('{0}_{1}'.format(self.name, k), v) for k, v in rv.items())
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.regex = dict(disks=re_compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+\['
-                                           r'(?P<total_disks>[0-9]+)/'
-                                           r'(?P<inuse_disks>[0-9])\]'),
-                          status=re_compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
-                                            r'(?P<operation>[a-z]+) =[ ]{1,2}'
-                                            r'(?P<operation_status>[0-9.]+).+finish='
-                                            r'(?P<finish>([0-9.]+))min speed='
-                                            r'(?P<speed>[0-9]+)'))
-
-    def check(self):
-        arrays = find_arrays(self._get_raw_data(), self.regex)
-        if not arrays:
-            self.error('Failed to read data from /proc/mdstat or there is no active arrays')
-            return None
-
-        self.order, self.definitions = create_charts(arrays.keys())
-        return True
+        self.order = ORDER
+        self.definitions = CHARTS
+        self.mds = list()
 
     @staticmethod
-    def _get_raw_data():
-        """
-        Read data from /proc/mdstat
-        :return: str
-        """
-        try:
-            with open('/proc/mdstat', 'rt') as proc_mdstat:
-                return proc_mdstat.readlines() or None
-        except (OSError, IOError):
+    def get_mds():
+        raw = read_lines(MDSTAT)
+
+        if not raw:
             return None
 
-    def _get_data(self):
+        return find_mds(raw)
+
+    def get_data(self):
         """
         Parse data from _get_raw_data()
         :return: dict
         """
-        raw_data = self._get_raw_data()
-        arrays = find_arrays(raw_data, self.regex)
-        if not arrays:
+        mds = self.get_mds()
+
+        if not mds:
             return None
 
-        to_netdata = dict()
-        for array, values in arrays.items():
-            for key, value in values.items():
-                to_netdata['_'.join([array, key])] = value
+        data = dict()
+        for md in mds:
+            if md.name not in self.mds:
+                self.mds.append(md.name)
+                self.add_new_md_charts(md.name)
+            data.update(md.data())
+        return data
 
-        return to_netdata
+    def check(self):
+        if not self.get_mds():
+            self.error('Failed to read data from {0} or there is no active arrays'.format(MDSTAT))
+            return False
+        return True
+
+    def add_new_md_charts(self, name):
+        order, charts = md_charts(name)
+
+        self.charts['mdstat_health'].add_dimension(['{0}_health'.format(name), name])
+
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dims = charts[chart_name]['lines']
+
+            chart = self.charts.add_chart(params)
+            for dim in dims:
+                chart.add_dimension(dim)
 
 
-def find_arrays(raw_data, regex):
-    if raw_data is None:
-        return None
+def find_mds(raw_data):
     data = defaultdict(str)
     counter = 1
 
@@ -77,51 +177,28 @@ def find_arrays(raw_data, regex):
             continue
         data[counter] = ' '.join([data[counter], row])
 
-    arrays = dict()
-    for value in data.values():
-        match = regex['disks'].search(value)
-        if not match:
+    mds = list()
+
+    for v in data.values():
+        m = RE_DISKS.search(v)
+
+        if not m:
             continue
 
-        match = match.groupdict()
-        array = match.pop('array')
-        arrays[array] = match
-        arrays[array]['health'] = int(match['total_disks']) - int(match['inuse_disks'])
-        for operation in OPERATIONS:
-            arrays[array][operation] = 0
+        d = m.groupdict()
 
-        match = regex['status'].search(value)
-        if match:
-            match = match.groupdict()
-            if match['operation'] in OPERATIONS:
-                arrays[array][match['operation']] = float(match['operation_status']) * 100
-                arrays[array]['finish'] = float(match['finish']) * 100
-                arrays[array]['speed'] = float(match['speed']) / 1000 * 100
+        m = RE_STATUS.search(v)
+        if m:
+            d.update(m.groupdict())
 
-    return arrays or None
+        mds.append(MD(d))
+
+    return sorted(mds, key=lambda md: md.name)
 
 
-def create_charts(arrays):
-    order = ['mdstat_health']
-    definitions = dict(mdstat_health={'options': [None, 'Faulty devices in MD', 'failed disks',
-                                                  'health', 'md.health', 'line'],
-                                      'lines': []})
-    for md in arrays:
-        order.append(md)
-        order.append(md + '_status')
-        order.append(md + '_rate')
-        definitions['mdstat_health']['lines'].append([md + '_health', md, 'absolute'])
-        definitions[md] = {'options': [None, '%s disks stats' % md, 'disks', md, 'md.disks', 'stacked'],
-                           'lines': [[md + '_total_disks', 'total', 'absolute'],
-                                     [md + '_inuse_disks', 'inuse', 'absolute']]}
-        definitions[md + '_status'] = {'options': [None, '%s current status' % md,
-                                                   'percent', md, 'md.status', 'line'],
-                                       'lines': [[md + '_resync', 'resync', 'absolute', 1, 100],
-                                                 [md + '_recovery', 'recovery', 'absolute', 1, 100],
-                                                 [md + '_reshape', 'reshape', 'absolute', 1, 100],
-                                                 [md + '_check', 'check', 'absolute', 1, 100]]}
-        definitions[md + '_rate'] = {'options': [None, '%s operation status' % md,
-                                                 'rate', md, 'md.rate', 'line'],
-                                     'lines': [[md + '_finish', 'finish min', 'absolute', 1, 100],
-                                               [md + '_speed', 'MB/s', 'absolute', -1, 100]]}
-    return order, definitions
+def read_lines(path):
+    try:
+        with open(path) as f:
+            return f.readlines()
+    except (IOError, OSError):
+        return None

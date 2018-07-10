@@ -1,17 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 
-void *cpuidlejitter_main(void *ptr) {
+static void cpuidlejitter_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("IDLEJITTER thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *cpuidlejitter_main(void *ptr) {
+    netdata_thread_cleanup_push(cpuidlejitter_main_cleanup, ptr);
 
     usec_t sleep_ut = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
     if(sleep_ut <= 0) {
@@ -23,13 +25,13 @@ void *cpuidlejitter_main(void *ptr) {
             "system"
             , "idlejitter"
             , NULL
-            , "processes"
+            , "idlejitter"
             , NULL
             , "CPU Idle Jitter"
             , "microseconds lost/s"
             , "idlejitter"
             , NULL
-            , 9999
+            , 800
             , localhost->rrd_update_every
             , RRDSET_TYPE_AREA
     );
@@ -40,6 +42,7 @@ void *cpuidlejitter_main(void *ptr) {
     usec_t update_every_ut = localhost->rrd_update_every * USEC_PER_SEC;
     struct timeval before, after;
     unsigned long long counter;
+
     for(counter = 0; 1 ;counter++) {
         int iterations = 0;
         usec_t error_total = 0,
@@ -82,10 +85,7 @@ void *cpuidlejitter_main(void *ptr) {
         }
     }
 
-    info("IDLEJITTER thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

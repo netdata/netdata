@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 // ----------------------------------------------------------------------------
@@ -56,6 +57,8 @@ inline calculated_number backend_calculate_value_from_stored_data(
         , time_t *first_timestamp   // the first point of the database used in this response
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
+    RRDHOST *host = st->rrdhost;
+
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
@@ -87,7 +90,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
     if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
         debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
-              st->rrdhost->hostname, st->id, rd->id,
+              host->hostname, st->id, rd->id,
               (unsigned long)after, (unsigned long)before,
               (unsigned long)first_t, (unsigned long)last_t
         );
@@ -124,7 +127,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
 
     if(unlikely(!counter)) {
         debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
-              st->rrdhost->hostname, st->id, rd->id,
+              host->hostname, st->id, rd->id,
               (unsigned long)after, (unsigned long)before
         );
         return NAN;
@@ -345,9 +348,24 @@ static inline int format_dimension_collected_json_plaintext(
     (void)before;
     (void)options;
 
+    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+    if(!tags) tags = "";
+
+    if(*tags) {
+        if(*tags == '{' || *tags == '[' || *tags == '"') {
+            tags_pre = "\"host_tags\":";
+            tags_post = ",";
+        }
+        else {
+            tags_pre = "\"host_tags\":\"";
+            tags_post = "\",";
+        }
+    }
+
     buffer_sprintf(b, "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
+        "%s%s%s"
 
         "\"chart_id\":\"%s\","
         "\"chart_name\":\"%s\","
@@ -360,9 +378,10 @@ static inline int format_dimension_collected_json_plaintext(
         "\"name\":\"%s\","
         "\"value\":" COLLECTED_NUMBER_FORMAT ","
 
-        "\"timestamp\": %u}\n", 
+        "\"timestamp\": %u}\n",
             prefix,
             hostname,
+            tags_pre, tags, tags_post,
 
             st->id,
             st->name,
@@ -398,9 +417,24 @@ static inline int format_dimension_stored_json_plaintext(
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
     if(!isnan(value)) {
+        const char *tags_pre = "", *tags_post = "", *tags = host->tags;
+        if(!tags) tags = "";
+
+        if(*tags) {
+            if(*tags == '{' || *tags == '[' || *tags == '"') {
+                tags_pre = "\"host_tags\":";
+                tags_post = ",";
+            }
+            else {
+                tags_pre = "\"host_tags\":\"";
+                tags_post = "\",";
+            }
+        }
+
         buffer_sprintf(b, "{"
             "\"prefix\":\"%s\","
             "\"hostname\":\"%s\","
+            "%s%s%s"
 
             "\"chart_id\":\"%s\","
             "\"chart_name\":\"%s\","
@@ -416,7 +450,8 @@ static inline int format_dimension_stored_json_plaintext(
             "\"timestamp\": %u}\n", 
                 prefix,
                 hostname,
-                
+                tags_pre, tags, tags_post,
+
                 st->id,
                 st->name,
                 st->family,
@@ -445,8 +480,11 @@ static inline int process_json_response(BUFFER *b) {
 // the backend thread
 
 static SIMPLE_PATTERN *charts_pattern = NULL;
+static SIMPLE_PATTERN *hosts_pattern = NULL;
 
 inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
 
@@ -456,18 +494,18 @@ inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_SEND);
         else {
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
-            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, st->rrdhost->hostname);
+            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, host->hostname);
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_backends(st))) {
-        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, st->rrdhost->hostname);
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, host->hostname);
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
-        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, st->rrdhost->hostname, rrd_memory_mode_name(st->rrdhost->rrd_memory_mode));
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
 
@@ -494,22 +532,23 @@ inline uint32_t backend_parse_data_source(const char *source, uint32_t mode) {
     return mode;
 }
 
+static void backends_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
 void *backends_main(void *ptr) {
+    netdata_thread_cleanup_push(backends_main_cleanup, ptr);
+
     int default_port = 0;
     int sock = -1;
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
-
-    info("BACKEND: thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("BACKEND: cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("BACKEND: cannot set pthread cancel state to ENABLE.");
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -529,7 +568,8 @@ void *backends_main(void *ptr) {
     long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", backend_update_every * 2 * 1000);
     backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
 
-    charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), SIMPLE_PATTERN_EXACT);
+    charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    hosts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
 
     // ------------------------------------------------------------------------
@@ -660,7 +700,7 @@ void *backends_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    for(;;) {
+    while(!netdata_exit) {
 
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
@@ -672,10 +712,7 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
 
-        int pthreadoldcancelstate;
-
-        if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-            error("BACKEND: cannot set pthread cancel state to DISABLE.");
+        netdata_thread_disable_cancelability();
 
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
@@ -684,6 +721,21 @@ void *backends_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
+            if(unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_BACKEND_SEND|RRDHOST_FLAG_BACKEND_DONT_SEND))) {
+                char *name = (host == localhost)?"localhost":host->hostname;
+                if (!hosts_pattern || simple_pattern_matches(hosts_pattern, name)) {
+                    rrdhost_flag_set(host, RRDHOST_FLAG_BACKEND_SEND);
+                    info("enabled backend for host '%s'", name);
+                }
+                else {
+                    rrdhost_flag_set(host, RRDHOST_FLAG_BACKEND_DONT_SEND);
+                    info("disabled backend for host '%s'", name);
+                }
+            }
+
+            if(unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_BACKEND_SEND)))
+                continue;
+
             rrdhost_rdlock(host);
 
             count_hosts++;
@@ -724,10 +776,9 @@ void *backends_main(void *ptr) {
         }
         rrd_unlock();
 
-        debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
+        netdata_thread_enable_cancelability();
 
-        if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-            error("BACKEND: cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+        debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
 
         // ------------------------------------------------------------------------
 
@@ -914,9 +965,6 @@ cleanup:
     buffer_free(b);
     buffer_free(response);
 
-    info("BACKEND: thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
