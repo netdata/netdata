@@ -1403,7 +1403,7 @@ EOF
         )"
 	
     # Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
-    webhook=`echo $1 | sed 's/CHANNEL/'${channel}'/g'`
+    webhook=$(echo "${webhook//CHANNEL/${channel}})"
     
 	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
 
