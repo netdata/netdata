@@ -65,6 +65,7 @@ This is the list of contributors that have signed this agreement:
 
 username|name|email (optional)
 :--------:|:----:|:----------------
+@lets00|Luís Eduardo|leduardo@lsd.ufcg.edu.br
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
 @philwhineray|Phil Whineray|
