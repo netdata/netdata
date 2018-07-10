@@ -409,6 +409,7 @@ static struct web_client *web_client_create_on_listenfd(int listener) {
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
+long web_client_streaming_rate_t = 0L;
 
 static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
     struct web_client *w = ptr;
