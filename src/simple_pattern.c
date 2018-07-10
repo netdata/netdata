@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 struct simple_pattern {
@@ -12,12 +13,13 @@ struct simple_pattern {
     struct simple_pattern *next;
 };
 
-static inline struct simple_pattern *parse_pattern(const char *str, SIMPLE_PREFIX_MODE default_mode) {
+static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode) {
+    // fprintf(stderr, "PARSING PATTERN: '%s'\n", str);
+
     SIMPLE_PREFIX_MODE mode;
     struct simple_pattern *child = NULL;
 
-    char *buf = strdupz(str);
-    char *s = buf, *c = buf;
+    char *s = str, *c = str;
 
     // skip asterisks in front
     while(*c == '*') c++;
@@ -64,61 +66,85 @@ static inline struct simple_pattern *parse_pattern(const char *str, SIMPLE_PREFI
 
     m->child = child;
 
-    freez(buf);
-
     return m;
 }
 
-SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE default_mode) {
+SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode) {
     struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
 
-    char *buf = strdupz(list);
-    if(buf && *buf) {
-        char *s = buf;
+    int isseparator[256] = {
+            [' '] = 1       // space
+            , ['\t'] = 1    // tab
+            , ['\r'] = 1    // carriage return
+            , ['\n'] = 1    // new line
+            , ['\f'] = 1    // form feed
+            , ['\v'] = 1    // vertical tab
+    };
 
-        while(s && *s) {
-            char negative = 0;
+    if (unlikely(separators && *separators)) {
+        memset(&isseparator[0], 0, sizeof(isseparator));
+        while(*separators) isseparator[(unsigned char)*separators++] = 1;
+    }
 
-            // skip all spaces
-            while(isspace(*s)) s++;
+    char *buf = mallocz(strlen(list) + 1);
+    const char *s = list;
 
-            if(*s == '!') {
-                negative = 1;
+    while(s && *s) {
+        buf[0] = '\0';
+        char *c = buf;
+
+        char negative = 0;
+
+        // skip all spaces
+        while(isseparator[(unsigned char)*s])
+            s++;
+
+        if(*s == '!') {
+            negative = 1;
+            s++;
+        }
+
+        // empty string
+        if(unlikely(!*s))
+            break;
+
+        // find the next space
+        char escape = 0;
+        while(*s) {
+            if(*s == '\\' && !escape) {
+                escape = 1;
                 s++;
             }
-
-            // empty string
-            if(unlikely(!*s)) break;
-
-            // find the next space
-            char *c = s;
-            while(*c && !isspace(*c)) c++;
-
-            // find the next word
-            char *n;
-            if(likely(*c)) n = c + 1;
-            else n = NULL;
-
-            // terminate our string
-            *c = '\0';
-
-            struct simple_pattern *m = parse_pattern(s, default_mode);
-            m->negative = negative;
-
-            if(likely(n)) *c = ' ';
-
-            // link it at the end
-            if(unlikely(!root))
-                root = last = m;
             else {
-                last->next = m;
-                last = m;
-            }
+                if (isseparator[(unsigned char)*s] && !escape) {
+                    s++;
+                    break;
+                }
 
-            // prepare for next loop
-            s = n;
+                *c++ = *s++;
+                escape = 0;
+            }
+        }
+
+        // terminate our string
+        *c = '\0';
+
+        // if we matched the empty string, skip it
+        if(unlikely(!*buf))
+            continue;
+
+        // fprintf(stderr, "FOUND PATTERN: '%s'\n", buf);
+        struct simple_pattern *m = parse_pattern(buf, default_mode);
+        m->negative = negative;
+
+        // link it at the end
+        if(unlikely(!root))
+            root = last = m;
+        else {
+            last->next = m;
+            last = m;
         }
     }
 
@@ -126,7 +152,28 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
     return (SIMPLE_PATTERN *)root;
 }
 
-static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len) {
+static inline char *add_wildcarded(const char *matched, size_t matched_size, char *wildcarded, size_t *wildcarded_size) {
+    //if(matched_size) {
+    //    char buf[matched_size + 1];
+    //    strncpyz(buf, matched, matched_size);
+    //    fprintf(stderr, "ADD WILDCARDED '%s' of length %zu\n", buf, matched_size);
+    //}
+
+    if(unlikely(wildcarded && *wildcarded_size && matched && *matched && matched_size)) {
+        size_t wss = *wildcarded_size - 1;
+        size_t len = (matched_size < wss)?matched_size:wss;
+        if(likely(len)) {
+            strncpyz(wildcarded, matched, len);
+
+            *wildcarded_size -= len;
+            return &wildcarded[len];
+        }
+    }
+
+    return wildcarded;
+}
+
+static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, size_t *wildcarded_size) {
     char *s;
 
     if(m->len <= len) {
@@ -134,20 +181,28 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
             case SIMPLE_PATTERN_SUBSTRING:
                 if(!m->len) return 1;
                 if((s = strstr(str, m->match))) {
-                    if(!m->child) return 1;
-                    return match_pattern(m->child, &s[m->len], len - (s - str) - m->len);
+                    wildcarded = add_wildcarded(str, s - str, wildcarded, wildcarded_size);
+                    if(!m->child) {
+                        wildcarded = add_wildcarded(&s[m->len], len - (&s[m->len] - str), wildcarded, wildcarded_size);
+                        return 1;
+                    }
+                    return match_pattern(m->child, &s[m->len], len - (s - str) - m->len, wildcarded, wildcarded_size);
                 }
                 break;
 
             case SIMPLE_PATTERN_PREFIX:
                 if(unlikely(strncmp(str, m->match, m->len) == 0)) {
-                    if(!m->child) return 1;
-                    return match_pattern(m->child, &str[m->len], len - m->len);
+                    if(!m->child) {
+                        wildcarded = add_wildcarded(&str[m->len], len - m->len, wildcarded, wildcarded_size);
+                        return 1;
+                    }
+                    return match_pattern(m->child, &str[m->len], len - m->len, wildcarded, wildcarded_size);
                 }
                 break;
 
             case SIMPLE_PATTERN_SUFFIX:
                 if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
+                    wildcarded = add_wildcarded(str, len - m->len, wildcarded, wildcarded_size);
                     if(!m->child) return 1;
                     return 0;
                 }
@@ -166,17 +221,26 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
     return 0;
 }
 
-int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
+int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
     if(unlikely(!root || !str || !*str)) return 0;
 
     size_t len = strlen(str);
-    for(m = root; m ; m = m->next)
-        if(match_pattern(m, str, len)) {
-            if(m->negative) return 0;
+    for(m = root; m ; m = m->next) {
+        char *ws = wildcarded;
+        size_t wss = wildcarded_size;
+        if(unlikely(ws)) *ws = '\0';
+
+        if (match_pattern(m, str, len, ws, &wss)) {
+
+            //if(ws && wss)
+            //    fprintf(stderr, "FINAL WILDCARDED '%s' of length %zu\n", ws, strlen(ws));
+
+            if (m->negative) return 0;
             return 1;
         }
+    }
 
     return 0;
 }

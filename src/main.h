@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
+
+#define NETDATA_MAIN_THREAD_RUNNING   CONFIG_BOOLEAN_YES
+#define NETDATA_MAIN_THREAD_EXITING  (CONFIG_BOOLEAN_YES + 1)
+#define NETDATA_MAIN_THREAD_EXITED    CONFIG_BOOLEAN_NO
 
 /**
  * This struct contains information about command line options.
@@ -22,15 +27,15 @@ struct netdata_static_thread {
     char *config_section;
     char *config_name;
 
-    volatile int enabled;
+    volatile sig_atomic_t enabled;
 
-    pthread_t *thread;
+    netdata_thread_t *thread;
 
     void (*init_routine) (void);
     void *(*start_routine) (void *);
 };
 
-extern void kill_childs(void);
+extern void cancel_main_threads(void);
 extern int killpid(pid_t pid, int signal);
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 

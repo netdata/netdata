@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -145,7 +146,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *exec      = (ae->exec)      ? ae->exec      : host->health_default_exec;
     const char *recipient = (ae->recipient) ? ae->recipient : host->health_default_recipient;
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -192,7 +193,7 @@ done:
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
-    debug(D_HEALTH, "Health alarm '%s.%s' = %0.2Lf - changed status from %s to %s",
+    debug(D_HEALTH, "Health alarm '%s.%s' = " CALCULATED_NUMBER_FORMAT_AUTO " - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
          rrdcalc_status2string(ae->old_status),
@@ -338,21 +339,20 @@ static inline int check_if_resumed_from_suspention(void) {
     return ret;
 }
 
-void *health_main(void *ptr) {
+static void health_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("HEALTH thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *health_main(void *ptr) {
+    netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
-
-    BUFFER *wb = buffer_create(100);
 
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
@@ -362,7 +362,7 @@ void *health_main(void *ptr) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
-        int oldstate, runnable = 0, apply_hibernation_delay = 0;
+        int runnable = 0, apply_hibernation_delay = 0;
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
@@ -373,9 +373,6 @@ void *health_main(void *ptr) {
             , hibernation_delay
             );
         }
-
-        if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
-            error("Cannot set pthread cancel state to DISABLE.");
 
         rrd_rdlock();
 
@@ -424,13 +421,14 @@ void *health_main(void *ptr) {
                     int value_is_null = 0;
 
                     int ret = rrdset2value_api_v1(rc->rrdset
-                                                  , wb
+                                                  , NULL
                                                   , &rc->value
                                                   , rc->dimensions
                                                   , 1
                                                   , rc->after
                                                   , rc->before
                                                   , rc->group
+                                                  , 0
                                                   , rc->options
                                                   , &rc->db_after
                                                   , &rc->db_before
@@ -721,9 +719,6 @@ void *health_main(void *ptr) {
 
         rrd_unlock();
 
-        if(unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
-            error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);
-
         if(unlikely(netdata_exit))
             break;
 
@@ -738,11 +733,6 @@ void *health_main(void *ptr) {
 
     } // forever
 
-    buffer_free(wb);
-
-    info("HEALTH thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

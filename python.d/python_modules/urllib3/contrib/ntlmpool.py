@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 NTLM authenticating pool, contributed by erikcederstran
 

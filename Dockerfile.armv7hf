@@ -1,7 +1,8 @@
 # author  : titpetric
 # original: https://github.com/titpetric/netdata
+# SPDX-License-Identifier: CC0-1.0
 
-FROM resin/armv7hf-debian:jessie
+FROM resin/armv7hf-debian:stretch
 
 RUN [ "cross-build-start"]
 

@@ -2,6 +2,7 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 import os
 
@@ -16,21 +17,24 @@ class ExecutableService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.command = None
 
-    def _get_raw_data(self, stderr=False):
+    def _get_raw_data(self, stderr=False, command=None):
         """
         Get raw data from executed command
         :return: <list>
         """
         try:
-            p = Popen(self.command, stdout=PIPE, stderr=PIPE)
+            p = Popen(command if command else self.command, stdout=PIPE, stderr=PIPE)
         except Exception as error:
-            self.error('Executing command {command} resulted in error: {error}'.format(command=self.command,
+            self.error('Executing command {command} resulted in error: {error}'.format(command=command or self.command,
                                                                                        error=error))
             return None
         data = list()
         std = p.stderr if stderr else p.stdout
         for line in std:
-            data.append(line.decode())
+            try:
+                data.append(line.decode('utf-8'))
+            except TypeError:
+                continue
 
         return data or None
 

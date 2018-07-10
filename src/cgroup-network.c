@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 #include <libgen.h>
 
@@ -8,16 +9,25 @@
 #include <sched.h>
 #endif
 
+char environment_variable2[FILENAME_MAX + 50] = "";
+char *environment[] = {
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+        environment_variable2,
+        NULL
+};
+
+
 // ----------------------------------------------------------------------------
 // callback required by fatal()
 
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
-
 void health_reload(void) {};
 void rrdhost_save_all(void) {};
 
+
+// ----------------------------------------------------------------------------
 
 struct iface {
     const char *device;
@@ -30,8 +40,10 @@ struct iface {
 };
 
 unsigned int read_iface_iflink(const char *prefix, const char *iface) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", prefix?prefix:"", iface);
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", prefix, iface);
 
     unsigned long long iflink = 0;
     int ret = read_single_number_file(filename, &iflink);
@@ -41,8 +53,10 @@ unsigned int read_iface_iflink(const char *prefix, const char *iface) {
 }
 
 unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", prefix?prefix:"", iface);
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", prefix, iface);
 
     unsigned long long ifindex = 0;
     int ret = read_single_number_file(filename, &ifindex);
@@ -52,10 +66,12 @@ unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
 }
 
 struct iface *read_proc_net_dev(const char *prefix) {
+    if(!prefix) prefix = "";
+
     procfile *ff = NULL;
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s%s", prefix?prefix:"", "/proc/net/dev");
+    snprintfz(filename, FILENAME_MAX, "%s%s", prefix, (*prefix)?"/proc/1/net/dev":"/proc/net/dev");
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
         error("Cannot open file '%s'", filename);
@@ -85,6 +101,19 @@ struct iface *read_proc_net_dev(const char *prefix) {
     procfile_close(ff);
 
     return root;
+}
+
+void free_iface(struct iface *iface) {
+    freez((void *)iface->device);
+    freez(iface);
+}
+
+void free_host_ifaces(struct iface *iface) {
+    while(iface) {
+        struct iface *t = iface->next;
+        free_iface(iface);
+        iface = t;
+    }
 }
 
 int iface_is_eligible(struct iface *iface) {
@@ -139,12 +168,14 @@ static void continue_as_child(void) {
 }
 
 int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
+    if(!prefix) prefix = "";
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix?prefix:"", (int)pid, ns);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix, (int)pid, ns);
     int fd = open(filename, O_RDONLY);
 
     if(fd == -1)
-        error("Cannot open file '%s'", filename);
+        error("Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -169,6 +200,8 @@ static struct ns {
 };
 
 int switch_namespace(const char *prefix, pid_t pid) {
+    if(!prefix) prefix = "";
+
 #ifdef HAVE_SETNS
 
     int i;
@@ -247,25 +280,24 @@ int switch_namespace(const char *prefix, pid_t pid) {
 #endif
 }
 
-pid_t read_pid_from_cgroup(const char *path) {
-    char buffer[FILENAME_MAX + 1];
-
-    snprintfz(buffer, FILENAME_MAX, "%s/cgroup.procs", path);
-    FILE *fp = fopen(buffer, "r");
-    if(!fp) {
-        error("Cannot read file '%s'.", buffer);
-        snprintfz(buffer, FILENAME_MAX, "%s/tasks", path);
-        fp = fopen(buffer, "r");
-    }
-
-    if(!fp) {
-        error("Cannot read file '%s'.", buffer);
+pid_t read_pid_from_cgroup_file(const char *filename) {
+    int fd = open(filename, procfile_open_flags);
+    if(fd == -1) {
+        error("Cannot open pid_from_cgroup() file '%s'.", filename);
         return 0;
     }
 
+    FILE *fp = fdopen(fd, "r");
+    if(!fp) {
+        error("Cannot upgrade fd to fp for file '%s'.", filename);
+        return 0;
+    }
+
+    char buffer[100 + 1];
     pid_t pid = 0;
     char *s;
-    while((s = fgets(buffer, FILENAME_MAX, fp))) {
+    while((s = fgets(buffer, 100, fp))) {
+        buffer[100] = '\0';
         pid = atoi(s);
         if(pid > 0) break;
     }
@@ -274,6 +306,46 @@ pid_t read_pid_from_cgroup(const char *path) {
     return pid;
 }
 
+pid_t read_pid_from_cgroup_files(const char *path) {
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup.procs", path);
+    pid_t pid = read_pid_from_cgroup_file(filename);
+    if(pid > 0) return pid;
+
+    snprintfz(filename, FILENAME_MAX, "%s/tasks", path);
+    return read_pid_from_cgroup_file(filename);
+}
+
+pid_t read_pid_from_cgroup(const char *path) {
+    pid_t pid = read_pid_from_cgroup_files(path);
+    if (pid > 0) return pid;
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        error("cannot read directory '%s'", path);
+        return 0;
+    }
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR
+            && (
+                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+            ))
+            continue;
+
+        if (de->d_type == DT_DIR) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
+            pid = read_pid_from_cgroup(filename);
+            if(pid > 0) break;
+        }
+    }
+    closedir(dir);
+    return pid;
+}
 
 // ----------------------------------------------------------------------------
 // send the result to netdata
@@ -298,7 +370,7 @@ void add_device(const char *host, const char *guest) {
         if(f->host_device_hash == hash && strcmp(host, f->host_device) == 0) {
 
             if(guest && !f->guest_device)
-                f->guest_device = strdup(guest);
+                f->guest_device = strdupz(guest);
 
             return;
         }
@@ -330,25 +402,39 @@ int send_devices(void) {
 // since it switches namespaces, so after this call, everything is different!
 
 void detect_veth_interfaces(pid_t pid) {
-    struct iface *host, *cgroup, *h, *c;
-    const char *prefix = getenv("NETDATA_HOST_PREFIX");
+    struct iface *host = NULL, *cgroup = NULL, *h, *c;
 
-    host = read_proc_net_dev(prefix);
-    if(!host)
-        fatal("cannot read host interface list.");
+    host = read_proc_net_dev(netdata_configured_host_prefix);
+    if(!host) {
+        errno = 0;
+        error("cannot read host interface list.");
+        goto cleanup;
+    }
 
-    if(!eligible_ifaces(host))
-        fatal("there are no double-linked host interfaces available.");
+    if(!eligible_ifaces(host)) {
+        errno = 0;
+        error("there are no double-linked host interfaces available.");
+        goto cleanup;
+    }
 
-    if(switch_namespace(prefix, pid))
-        fatal("cannot switch to the namespace of pid %u", (unsigned int)pid);
+    if(switch_namespace(netdata_configured_host_prefix, pid)) {
+        errno = 0;
+        error("cannot switch to the namespace of pid %u", (unsigned int) pid);
+        goto cleanup;
+    }
 
     cgroup = read_proc_net_dev(NULL);
-    if(!cgroup)
-        fatal("cannot read cgroup interface list.");
+    if(!cgroup) {
+        errno = 0;
+        error("cannot read cgroup interface list.");
+        goto cleanup;
+    }
 
-    if(!eligible_ifaces(cgroup))
-        fatal("there are not double-linked cgroup interfaces available.");
+    if(!eligible_ifaces(cgroup)) {
+        errno = 0;
+        error("there are not double-linked cgroup interfaces available.");
+        goto cleanup;
+    }
 
     for(h = host; h ; h = h->next) {
         if(iface_is_eligible(h)) {
@@ -359,34 +445,30 @@ void detect_veth_interfaces(pid_t pid) {
             }
         }
     }
+
+cleanup:
+    free_host_ifaces(cgroup);
+    free_host_ifaces(host);
 }
 
 // ----------------------------------------------------------------------------
 // call the external helper
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
-void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
-    const char *pluginsdir = getenv("NETDATA_PLUGINS_DIR");
-    char *m = NULL;
-
-    if(!pluginsdir || !*pluginsdir) {
-        m = strdupz(me);
-        pluginsdir = dirname(m);
-    }
-
+void call_the_helper(pid_t pid, const char *cgroup) {
     if(setresuid(0, 0, 0) == -1)
         error("setresuid(0, 0, 0) failed.");
 
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --cgroup '%s'", pluginsdir, cgroup);
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
     else
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --pid %d", pluginsdir, pid);
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
 
     info("running: %s", buffer);
 
     pid_t cgroup_pid;
-    FILE *fp = mypopen(buffer, &cgroup_pid);
+    FILE *fp = mypopene(buffer, &cgroup_pid, environment);
     if(fp) {
         char *s;
         while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
@@ -409,10 +491,102 @@ void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
     }
     else
         error("cannot execute cgroup-network helper script: %s", buffer);
-
-    freez(m);
 }
 
+int is_valid_path_symbol(char c) {
+    switch(c) {
+        case '/':   // path separators
+        case '\\':  // needed for virsh domains \x2d1\x2dname
+        case ' ':   // space
+        case '-':   // hyphen
+        case '_':   // underscore
+        case '.':   // dot
+        case ',':   // comma
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+// we will pass this path a shell script running as root
+// so, we need to make sure the path will be valid
+// and will not include anything that could allow
+// the caller use shell expansion for gaining escalated
+// privileges.
+int verify_path(const char *path) {
+    struct stat sb;
+
+    char c;
+    const char *s = path;
+    while((c = *s++)) {
+        if(!( isalnum(c) || is_valid_path_symbol(c) )) {
+            error("invalid character in path '%s'", path);
+            return -1;
+        }
+    }
+
+    if(strstr(path, "\\") && !strstr(path, "\\x")) {
+        error("invalid escape sequence in path '%s'", path);
+        return 1;
+    }
+
+    if(strstr(path, "/../")) {
+        error("invalid parent path sequence detected in '%s'", path);
+        return 1;
+    }
+
+    if(path[0] != '/') {
+        error("only absolute path names are supported - invalid path '%s'", path);
+        return -1;
+    }
+
+    if (stat(path, &sb) == -1) {
+        error("cannot stat() path '%s'", path);
+        return -1;
+    }
+
+    if((sb.st_mode & S_IFMT) != S_IFDIR) {
+        error("path '%s' is not a directory", path);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
+char *fix_path_variable(void) {
+    const char *path = getenv("PATH");
+    if(!path || !*path) return 0;
+
+    char *p = strdupz(path);
+    char *safe_path = callocz(1, strlen(p) + strlen("PATH=") + 1);
+    strcpy(safe_path, "PATH=");
+
+    int added = 0;
+    char *ptr = p;
+    while(ptr && *ptr) {
+        char *s = strsep(&ptr, ":");
+        if(s && *s) {
+            if(verify_path(s) == -1) {
+                error("the PATH variable includes an invalid path '%s' - removed it.", s);
+            }
+            else {
+                info("the PATH variable includes a valid path '%s'.", s);
+                if(added) strcat(safe_path, ":");
+                strcat(safe_path, s);
+                added++;
+            }
+        }
+    }
+
+    info("unsafe PATH:      '%s'.", path);
+    info("  safe PATH: '%s'.", safe_path);
+
+    freez(p);
+    return safe_path;
+}
+*/
 
 // ----------------------------------------------------------------------------
 // main
@@ -429,6 +603,26 @@ int main(int argc, char **argv) {
     program_version = VERSION;
     error_log_syslog = 0;
 
+    // since cgroup-network runs as root, prevent it from opening symbolic links
+    procfile_open_flags = O_RDONLY|O_NOFOLLOW;
+
+    // ------------------------------------------------------------------------
+    // make sure NETDATA_HOST_PREFIX is safe
+
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(verify_netdata_host_prefix() == -1) exit(1);
+
+    if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
+        fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
+
+    // ------------------------------------------------------------------------
+    // build a safe environment for our script
+
+    // the first environment variable is a fixed PATH=
+    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
+
+    // ------------------------------------------------------------------------
+
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
         fprintf(stderr, "cgroup-network %s\n", VERSION);
         exit(0);
@@ -442,18 +636,23 @@ int main(int argc, char **argv) {
 
         if(pid <= 0) {
             errno = 0;
-            fatal("Invalid pid %d given", (int) pid);
+            error("Invalid pid %d given", (int) pid);
+            return 2;
         }
 
-        call_the_helper(argv[0], pid, NULL);
+        call_the_helper(pid, NULL);
     }
     else if(!strcmp(argv[1], "--cgroup")) {
-        pid = read_pid_from_cgroup(argv[2]);
-        call_the_helper(argv[0], pid, argv[2]);
+        char *cgroup = argv[2];
+        if(verify_path(cgroup) == -1)
+            fatal("cgroup '%s' does not exist or is not valid.", cgroup);
+
+        pid = read_pid_from_cgroup(cgroup);
+        call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            fatal("Invalid pid %d read from cgroup '%s'", (int) pid, argv[2]);
+            error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }
     else
@@ -462,5 +661,7 @@ int main(int argc, char **argv) {
     if(pid > 0)
         detect_veth_interfaces(pid);
 
-    return send_devices();
+    int found = send_devices();
+    if(found <= 0) return 1;
+    return 0;
 }

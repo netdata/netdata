@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0+
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
@@ -19,7 +20,7 @@ install:
 EOF
 
 run make clean
-run make -j${PROCESSORS}
+run make -j${SYSTEM_CPUS}
 run make install
 
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]

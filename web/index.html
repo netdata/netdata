@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0+ -->
 <html lang="en">
 <head>
     <title>netdata dashboard</title>
@@ -29,6 +30,8 @@
 
     <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACNklEQVRYhcXXv2tUQRAH8M+FEIJISBHCIWIhIQSUILERi4AiiqCggiIiomAjlhaC4j+ghYWISgqNohZaCBZBC8Ei8QdEUCutFBsxCBqDYkgci/cunkfuJffjJQPD8mZm5/vd2WV2HzlJ0Bs8CvrywsgCHwy+BpGOg0sJfjj4nYKX9FdwKG9gwZlgtgK8pLOpPxfw1mCoCnClDgWtzQTvCEYWCV7SkWAlFBoEb8dlDKBF8t2bMWUSH/AHr3CiEfz5CPUusPJLkRCdk5ZqyeqUrQv4R7E5TwK7M3zTeIKduRAIitiWEfIY69GdCwGcRFuG/xqONRkzkaA7+J5x+MaDtWmHvJ4HgeEM8Nn0bridfv9HoOFyBAdwJCPkqqTzHWwUaz7wgeBHxupfBKuCj2W25mxBsCGYyAB/FxTT27HcPlyep64tCLbjKbqqhLzBlgKfF8pVE4FgRXABI+ioEnYfOyzcFWsCbg+OV+xlpU4ER4O+4HVwL51b3xYEXcGu4Ao+YQhr5gmdxHmsQyfG0b/YxbWmLfRWmnxa0s06VbTMCpnBS9zFzQKTwR5cXCzwHIE02Sl8wSZsRI/kgLVJqjSd+t9LVjiG1diPszhdK3A5gR48k5zYMTwscC59sfT799CYKvA8EttbSeXgTr3gJQKl91kR+yTlvyG5uUbLYh9gb+ovltkb6qYtNSRo3kOygsBSzGlKsubf43USWLYK5CLLXoFWyU/CtzLbVDpW2n+m40yN9ukqdvAX9ac/EIgOapcAAAAASUVORK5CYII=">
 
+    <link rel="mask-icon" href="images/netdata.svg" color="red" />
+
     <meta property="og:locale"             content="en_US" />
     <meta property="og:url"                content="https://my-netdata.io" />
     <meta property="og:type"               content="website" />
@@ -46,6 +49,12 @@
     <meta name="twitter:image"             content="https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif" />
 
     <style>
+
+    /* force the vertical window scrollbar */
+    html {
+        overflow-y: scroll;
+    }
+
     /* prevent body from hiding under the navbar */
     body {
         padding-top: 50px;
@@ -226,7 +235,7 @@
         font-weight: 500;
         color: #767676;
     }
-    .dashboard-sidebar .nav > li > a > .fa {
+    .dashboard-sidebar .nav > li > a > .svg-inline--fa {
         width: 20px;
         text-align: center;
     }
@@ -511,6 +520,45 @@
         }
     }
 
+    .action-button {
+        position: relative;
+        display: inline-block;
+        color: gray;
+        cursor: pointer;
+        margin: 0 auto;
+        width: 30px;
+        height: 30px;
+        font-size: 25px;
+    }
+
+    .ripple {
+        position: relative;
+        /*overflow: hidden;*/
+        transform: translate3d(0, 0, 0)
+    }
+
+    .ripple:after {
+        content: "";
+        display: block;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+        background-repeat: no-repeat;
+        background-position: 50%;
+        transform: scale(18, 18); /* the size of the ripple */
+        opacity: 0;
+        transition: transform .5s, opacity 1s
+    }
+
+    .ripple:active:after {
+        transform: scale(0, 0);
+        opacity: .2;
+        transition: 0s
+    }
     </style>
 
     <!-- check which theme to use -->
@@ -626,8 +674,11 @@
                     }
                 }
 
-                if(urlOptions.server !== null && urlOptions.server !== '')
+                if(urlOptions.server !== null && urlOptions.server !== '') {
+                    netdataServerStatic = document.location.origin.toString() + document.location.pathname.toString();
                     netdataServer = urlOptions.server;
+                    netdataCheckXSS = true;
+                }
                 else
                     urlOptions.server = null;
 
@@ -676,6 +727,9 @@
             },
 
             netdataPanAndZoomCallback: function(status, after, before) {
+                //console.log(1);
+                //console.log(new Error().stack);
+
                 if(netdataSnapshotData === null) {
                     urlOptions.pan_and_zoom = status;
                     urlOptions.after = after;
@@ -685,6 +739,9 @@
             },
 
             netdataHighlightCallback: function(status, after, before) {
+                //console.log(2);
+                //console.log(new Error().stack);
+
                 if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after >= before)) {
                     status = false;
                     after = 0;
@@ -713,7 +770,7 @@
                         + ' <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, '
                         + 'duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b>'
                         + '</span>'
-                        + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                        + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fas fa-times"></i></span>';
 
                     $('.navbar-highlight').show();
 
@@ -729,6 +786,9 @@
 
             clearHighlight: function() {
                 NETDATA.globalChartUnderlay.clear();
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    NETDATA.globalPanAndZoom.clearMaster();
             },
 
             showHighlight: function() {
@@ -916,7 +976,7 @@
                 // there are mirrored hosts here
 
                 el += '<li><a href="#" onClick="return false;" style="color: #666;" target="_blank">databases available on this host</a></li>';
-                a1 += '<li><a href="#" onClick="return false;"><i class="fa fa-info-circle" aria-hidden="true" style="color: #666;"></i></a></li>';
+                a1 += '<li><a href="#" onClick="return false;"><i class="fas fa-info-circle" style="color: #666;"></i></a></li>';
 
                 var base = document.location.origin.toString() + document.location.pathname.toString();
                 if(base.endsWith("/host/" + options.hostname + "/"))
@@ -945,7 +1005,7 @@
                     }
 
                     el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
-                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fas fa-' + icon + '" style="color: #999;"></i></a></li>';
                     hosted++;
                     i++;
                 }
@@ -975,7 +1035,7 @@
                     var u = machines[i++];
                     found++;
                     el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
-                    a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fas fa-trash" style="color: #999;"></i></a></li>';
                 }
             }
 
@@ -1011,7 +1071,7 @@
             a1 += '<li role="separator" class="divider"></li>';
 
             el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-sliders" aria-hidden="true" style="color: #999;"></i></a></li>'
+            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>'
 
             document.getElementById('mynetdata_servers').innerHTML = el;
             document.getElementById('mynetdata_servers2').innerHTML = el;
@@ -1289,8 +1349,10 @@
         function scrollToId(hash) {
             if(hash && hash !== '' && document.getElementById(hash) !== null) {
                 var offset = $('#' + hash).offset();
-                if(typeof offset !== 'undefined')
-                    $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
+                if(typeof offset !== 'undefined') {
+                    //console.log('scrolling to ' + hash + ' at ' + offset.top.toString());
+                    $('html, body').animate({scrollTop: offset.top - 30}, 0);
+                }
             }
 
             // we must return false to prevent the default action
@@ -1393,9 +1455,9 @@
 
             menuIcon: function(chart) {
                 if(typeof chart.menu_pattern !== 'undefined')
-                    return this.anyAttribute(this.menu, 'icon', chart.menu_pattern, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>').toString();
+                    return this.anyAttribute(this.menu, 'icon', chart.menu_pattern, '<i class="fas fa-puzzle-piece"></i>').toString();
 
-                return this.anyAttribute(this.menu, 'icon', chart.menu, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>');
+                return this.anyAttribute(this.menu, 'icon', chart.menu, '<i class="fas fa-puzzle-piece"></i>');
             },
 
             menuInfo: function(chart) {
@@ -1790,7 +1852,7 @@
 
                 var menuid = NETDATA.name2id('menu_' + menu);
                 sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
-                html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
+                html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].icon + ' ' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
 
                 if(menus[menu].info !== null)
                     html += menus[menu].info;
@@ -1878,8 +1940,8 @@
                 html += mhead + shtml + '</div></div><hr role="separator"/>';
             }
 
-            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more charts</a></li>';
-            sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more alarms</a></li>';
+            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
+            sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
             sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
             sidebar += '</ul>';
             div.innerHTML = html;
@@ -1997,6 +2059,15 @@
             })
         }
 
+        var clipboardLoaded = false;
+        function loadClipboard(callback) {
+            if(clipboardLoaded === false) {
+                clipboardLoaded = true;
+                loadJs('lib/clipboard-polyfill-be05dad.js', callback);
+            }
+            else callback();
+        }
+
         var bootstrapTableLoaded = false;
         function loadBootstrapTable(callback) {
             if(bootstrapTableLoaded === false) {
@@ -2026,9 +2097,7 @@
         function loadLzString(callback) {
             if(lzStringLoaded === false) {
                 lzStringLoaded = true;
-                loadJs('lib/lz-string-1.4.4.min.js', function() {
-                    callback();
-                });
+                loadJs('lib/lz-string-1.4.4.min.js', callback);
             }
             else callback();
         }
@@ -2037,17 +2106,29 @@
         function loadPako(callback) {
             if(pakoLoaded === false) {
                 pakoLoaded = true;
-                loadJs('lib/pako-1.0.6.min.js', function() {
-                    callback();
-                });
+                loadJs('lib/pako-1.0.6.min.js', callback);
             }
             else callback();
         }
+
+        // ----------------------------------------------------------------------------
+
+        function clipboardCopy(text) {
+            clipboard.writeText(text);
+        }
+        function clipboardCopyBadgeEmbed(url) {
+            clipboard.writeText('<embed src="' + url + '" type="image/svg+xml" height="20"/>');
+        }
+
+
+        // ----------------------------------------------------------------------------
 
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
             var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/firehol/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
+
+            loadClipboard(function() {});
 
             NETDATA.alarms.get('all', function(data) {
                 options.alarm_families = [];
@@ -2110,17 +2191,25 @@
                 function alarm_to_html(alarm, full) {
                     var chart = options.data.charts[alarm.chart];
                     if(typeof(chart) === 'undefined') {
-                        // this means the charts loaded are incomplete
-                        // probably netdata was restarted and more charts
-                        // are now available.
-                        return '';
+                        chart = options.data.charts_by_name[alarm.chart];
+                        if (typeof(chart) === 'undefined') {
+                            // this means the charts loaded are incomplete
+                            // probably netdata was restarted and more alarms
+                            // are now available.
+                            console.log('Cannot find chart ' + alarm.chart + ', you probably need to refresh the page.');
+                            return '';
+                        }
                     }
 
                     var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
+                    var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto';
 
-                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
+                    var action_buttons = '<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/>'
+                        + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
+                        + '<div class="action-button ripple" title="click to copy to the clipboard the URL of this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopy(\'' + badge_url + '\'); return false;"><i class="far fa-copy"></i></div>'
+                        + '<div class="action-button ripple" title="click to copy to the clipboard an auto-refreshing <code>embed</code> html element for this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopyBadgeEmbed(\'' + badge_url + '\'); return false;"><i class="fas fa-copy"></i></div>';
 
-                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + role_href + '</td>'
+                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + badge_url + '" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + action_buttons + '</td>'
                         + '<td><table class="table">'
                         + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
                         + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
@@ -2175,6 +2264,7 @@
                     html += '</table>';
 
                     $('#alarm_all_' + id.toString()).html(html);
+                    enableTooltipsAndPopovers();
                 }
 
                 // find the proper family of each alarm
@@ -2271,7 +2361,7 @@
                 all += "</div>";
 
                 if(!count_active)
-                    active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fa fa-thumbs-up" aria-hidden="true"></i></span><br/>Everything is normal. No raised alarms.</div>';
+                    active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fas fa-thumbs-up"></i></span><br/>Everything is normal. No raised alarms.</div>';
                 else
                     active += footer;
 
@@ -2282,6 +2372,7 @@
 
                 document.getElementById('alarms_active').innerHTML = active;
                 document.getElementById('alarms_all').innerHTML = all;
+                enableTooltipsAndPopovers();
 
                 if(families_sorted.length > 0) alarm_family_show(0);
 
@@ -2728,9 +2819,63 @@
             }
         }
 
+        // an object to keep initilization configuration
+        // needed due to the async nature of the XSS modal
+        var initializeConfig = {
+            url: null,
+            custom_info: true,
+        };
+
+        function loadCustomDashboardInfo(url, callback) {
+            loadJs(url, function () {
+                $.extend(true, netdataDashboard, customDashboard);
+                callback();
+            });
+        }
+
+        function initializeChartsAndCustomInfo() {
+            NETDATA.alarms.callback = alarmsCallback;
+
+            // download all the charts the server knows
+            NETDATA.chartRegistry.downloadAll(initializeConfig.url, function(data) {
+                if(data !== null) {
+                    if (initializeConfig.custom_info === true && typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
+                        //console.log('loading custom dashboard decorations from server ' + initializeConfig.url);
+                        loadCustomDashboardInfo(NETDATA.serverDefault + data.custom_info, function () {
+                            initializeDynamicDashboardWithData(data);
+                        });
+                    }
+                    else {
+                        //console.log('not loading custom dashboard decorations from server ' + initializeConfig.url);
+                        initializeDynamicDashboardWithData(data);
+                    }
+                }
+            });
+        }
+
+        function xssModalDisableXss() {
+            //console.log('disabling xss checks');
+            NETDATA.xss.enabled = false;
+            NETDATA.xss.enabled_for_data = false;
+            initializeConfig.custom_info = true;
+            initializeChartsAndCustomInfo();
+            return false;
+        }
+
+        function xssModalKeepXss() {
+            //console.log('keeping xss checks');
+            NETDATA.xss.enabled = true;
+            NETDATA.xss.enabled_for_data = true;
+            initializeConfig.custom_info = false;
+            initializeChartsAndCustomInfo();
+            return false;
+        }
+
         function initializeDynamicDashboard(netdata_url) {
             if(typeof netdata_url === 'undefined' || netdata_url === null)
                 netdata_url = NETDATA.serverDefault;
+
+            initializeConfig.url = netdata_url;
 
             // initialize clickable alarms
             NETDATA.alarms.chart_div_offset = -50;
@@ -2738,22 +2883,14 @@
             NETDATA.alarms.chart_div_animation_duration = 0;
 
             NETDATA.pause(function() {
-                NETDATA.alarms.callback = alarmsCallback;
-
-                // download all the charts the server knows
-                NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
-                    if(data !== null) {
-                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
-                            loadJs(NETDATA.serverDefault + data.custom_info, function () {
-                                $.extend(true, netdataDashboard, customDashboard);
-                                initializeDynamicDashboardWithData(data);
-                            });
-                        }
-                        else {
-                            initializeDynamicDashboardWithData(data);
-                        }
-                    }
-                });
+                if(typeof netdataCheckXSS !== 'undefined' && netdataCheckXSS === true) {
+                    //$("#loadOverlay").css("display","none");
+                    document.getElementById('netdataXssModalServer').innerText = initializeConfig.url;
+                    $('#xssModal').modal('show');
+                }
+                else {
+                    initializeChartsAndCustomInfo();
+                }
             });
         }
 
@@ -2877,7 +3014,7 @@
                 }
                 else if(sha1 === sha2) {
                     save = true;
-                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b>Star</b> at its github page</a>.</p>');
+                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
                 }
                 else {
                     save = true;
@@ -2902,7 +3039,7 @@
 
 
         function printPreflight() {
-            var url = document.location.origin + document.location.search + '#' + urlOptions.genHash() + ';mode=print';
+            var url = document.location.origin.toString() + document.location.pathname.toString() + document.location.search.toString() + urlOptions.genHash() + ';mode=print';
             var width = 990;
             var height = screen.height * 90 / 100;
             //console.log(url);
@@ -3122,6 +3259,7 @@
             $('#loadSnapshotImport').addClass('disabled');
 
             if(tmpSnapshotData === null) {
+                loadSnapshotPreflightEmpty();
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
             }
@@ -3129,6 +3267,7 @@
             loadPako(function() {
                 loadLzString(function () {
                     loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
+                    $('#loadSnapshotModal').modal('hide');
 
                     netdataShowAlarms === false;
                     netdataRegistry = false;
@@ -3187,20 +3326,25 @@
                         urlOptions.highlight = false;
                     }
 
+                    netdataCheckXSS = false; // disable the modal - this does not affect XSS checks, since dashboard.js is already loaded
+                    NETDATA.xss.enabled = true;             // we should not do any remote requests, but if we do, check them
+                    NETDATA.xss.enabled_for_data = true;    // check also snapshot data - that have been excluded from the initial check, due to compression
+                    loadSnapshotPreflightEmpty();
                     initializeDynamicDashboard();
-                    $('#loadSnapshotModal').modal('hide');
                 });
             });
         };
 
 
         function loadSnapshotPreflightFile(file) {
+            var filename = NETDATA.xss.string(file.name);
             var fr = new FileReader();
             fr.onload = function(e) {
-                document.getElementById('loadSnapshotFilename').innerHTML = file.name;
+                document.getElementById('loadSnapshotFilename').innerHTML = filename;
                 var result = null;
                 try {
-                    result = JSON.parse(e.target.result);
+                    result = NETDATA.xss.checkAlways('snapshot', JSON.parse(e.target.result), /^(snapshot\.info|snapshot\.data)$/);
+
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
@@ -3217,7 +3361,7 @@
                     if (typeof result.data_size === 'undefined')
                         result.data_size = 0;
 
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + file.name + '</code>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + filename + '</code>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
@@ -3249,11 +3393,12 @@
             document.getElementById('loadSnapshotInfo').innerHTML = '';
             document.getElementById('loadSnapshotTimeRange').innerHTML = '';
             document.getElementById('loadSnapshotComments').innerHTML = '';
+            loadSnapshotModalLog('success', 'Browse for a snapshot file (or drag it and drop it here), then click <b>Import</b> to render it.');
             $('#loadSnapshotImport').addClass('disabled');
         };
 
         var loadSnapshotDragAndDropInitialized = false;
-        function loadSnapshotDragAndDropInit() {
+        function loadSnapshotDragAndDropSetup() {
             if(loadSnapshotDragAndDropInitialized === false) {
                 loadSnapshotDragAndDropInitialized = true;
                 $('#loadSnapshotDragAndDrop')
@@ -3295,7 +3440,7 @@
         }
 
         var saveSnapshotModalInitialized = false;
-        function saveSnapshotModalInit() {
+        function saveSnapshotModalSetup() {
             if(saveSnapshotModalInitialized === false) {
                 saveSnapshotModalInitialized = true;
                 $('#saveSnapshotModal')
@@ -3554,76 +3699,74 @@
                         $('#saveSnapshotExport').removeClass('disabled');
                     }
 
-                    NETDATA.pause(function () {
-                        NETDATA.globalSelectionSync.stop();
-                        NETDATA.options.force_data_points = saveData.data_points;
-                        NETDATA.options.fake_chart_rendering = true;
-                        NETDATA.onscroll_updater_enabled = false;
-                        NETDATA.abort_all_refreshes();
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.options.force_data_points = saveData.data_points;
+                    NETDATA.options.fake_chart_rendering = true;
+                    NETDATA.onscroll_updater_enabled = false;
+                    NETDATA.abort_all_refreshes();
 
-                        var size = 0;
-                        var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
+                    var size = 0;
+                    var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
 
-                        function update_chart(idx) {
-                            if (saveSnapshotStop === true) {
-                                saveSnapshotModalLog('info', 'Cancelled!');
-                                saveSnapshotRestore();
-                                return;
-                            }
-
-                            var state = NETDATA.options.targets[--idx];
-
-                            var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
-                            $(el).css('width', pcent + '%').attr('aria-valuenow', pcent);
-                            eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
-
-                            setTimeout(function () {
-                                charts_count++;
-                                state.isVisible(true);
-                                state.current.force_after_ms = saveData.after_ms;
-                                state.current.force_before_ms = saveData.before_ms;
-
-                                state.updateChart(function (status, reason) {
-                                    state.current.force_after_ms = null;
-                                    state.current.force_before_ms = null;
-
-                                    if (status === true) {
-                                        charts_ok++;
-                                        // state.log('ok');
-                                        size += pack_api1_v1_chart_data(state);
-                                    }
-                                    else {
-                                        charts_failed++;
-                                        state.log('failed to be updated: ' + reason);
-                                    }
-
-                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
-
-                                    if (idx > 0) {
-                                        update_chart(idx);
-                                    }
-                                    else {
-                                        saveData.charts_ok = charts_ok;
-                                        saveData.charts_failed = charts_failed;
-                                        saveData.data_size = size;
-                                        // console.log(saveData.compression + ': ' + (size / (options.data.dimensions_count * Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint))).toString());
-
-                                        // save it
-                                        // console.log(saveData);
-                                        saveObjectToClient(saveData, filename);
-
-                                        if (charts_failed > 0)
-                                            alert(charts_failed.toString() + ' failed to be downloaded');
-
-                                        saveSnapshotRestore();
-                                        saveData = null;
-                                    }
-                                })
-                            }, 0);
+                    function update_chart(idx) {
+                        if (saveSnapshotStop === true) {
+                            saveSnapshotModalLog('info', 'Cancelled!');
+                            saveSnapshotRestore();
+                            return;
                         }
 
-                        update_chart(NETDATA.options.targets.length);
-                    });
+                        var state = NETDATA.options.targets[--idx];
+
+                        var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
+                        $(el).css('width', pcent + '%').attr('aria-valuenow', pcent);
+                        eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+
+                        setTimeout(function () {
+                            charts_count++;
+                            state.isVisible(true);
+                            state.current.force_after_ms = saveData.after_ms;
+                            state.current.force_before_ms = saveData.before_ms;
+
+                            state.updateChart(function (status, reason) {
+                                state.current.force_after_ms = null;
+                                state.current.force_before_ms = null;
+
+                                if (status === true) {
+                                    charts_ok++;
+                                    // state.log('ok');
+                                    size += pack_api1_v1_chart_data(state);
+                                }
+                                else {
+                                    charts_failed++;
+                                    state.log('failed to be updated: ' + reason);
+                                }
+
+                                saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
+
+                                if (idx > 0) {
+                                    update_chart(idx);
+                                }
+                                else {
+                                    saveData.charts_ok = charts_ok;
+                                    saveData.charts_failed = charts_failed;
+                                    saveData.data_size = size;
+                                    // console.log(saveData.compression + ': ' + (size / (options.data.dimensions_count * Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint))).toString());
+
+                                    // save it
+                                    // console.log(saveData);
+                                    saveObjectToClient(saveData, filename);
+
+                                    if (charts_failed > 0)
+                                        alert(charts_failed.toString() + ' failed to be downloaded');
+
+                                    saveSnapshotRestore();
+                                    saveData = null;
+                                }
+                            })
+                        }, 0);
+                    }
+
+                    update_chart(NETDATA.options.targets.length);
                 });
             });
         }
@@ -3631,225 +3774,7 @@
         // --------------------------------------------------------------------
         // activate netdata on the page
 
-        function finalizePage() {
-            // resize all charts - without starting the background thread
-            // this has to be done while NETDATA is paused
-            // if we ommit this, the affix menu will be wrong, since all
-            // the Dom elements are initially zero-sized
-            NETDATA.parseDom();
-
-            if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
-                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
-
-            // ------------------------------------------------------------------------
-            // https://github.com/viralpatel/jquery.shorten/blob/master/src/jquery.shorten.js
-            $.fn.shorten = function(settings) {
-                "use strict";
-
-                var config = {
-                    showChars: 750,
-                    minHideChars: 10,
-                    ellipsesText: "...",
-                    moreText: '<i class="fa fa-expand" aria-hidden="true"></i> show more information',
-                    lessText: '<i class="fa fa-compress" aria-hidden="true"></i> show less information',
-                    onLess: function() { NETDATA.onscroll(); },
-                    onMore: function() { NETDATA.onscroll(); },
-                    errMsg: null,
-                    force: false
-                };
-
-                if (settings) {
-                    $.extend(config, settings);
-                }
-
-                if ($(this).data('jquery.shorten') && !config.force) {
-                    return false;
-                }
-                $(this).data('jquery.shorten', true);
-
-                $(document).off("click", '.morelink');
-
-                $(document).on({
-                    click: function() {
-
-                        var $this = $(this);
-                        if ($this.hasClass('less')) {
-                            $this.removeClass('less');
-                            $this.html(config.moreText);
-                            $this.parent().prev().animate({'height':'0'+'%'}, 0, function () { $this.parent().prev().prev().show(); }).hide(0, function() {
-                                config.onLess();
-                            });
-
-                        } else {
-                            $this.addClass('less');
-                            $this.html(config.lessText);
-                            $this.parent().prev().animate({'height':'100'+'%'}, 0, function () { $this.parent().prev().prev().hide(); }).show(0, function() {
-                                config.onMore();
-                            });
-                        }
-                        return false;
-                    }
-                }, '.morelink');
-
-                return this.each(function() {
-                    var $this = $(this);
-
-                    var content = $this.html();
-                    var contentlen = $this.text().length;
-                    if (contentlen > config.showChars + config.minHideChars) {
-                        var c = content.substr(0, config.showChars);
-                        if (c.indexOf('<') >= 0) // If there's HTML don't want to cut it
-                        {
-                            var inTag = false; // I'm in a tag?
-                            var bag = ''; // Put the characters to be shown here
-                            var countChars = 0; // Current bag size
-                            var openTags = []; // Stack for opened tags, so I can close them later
-                            var tagName = null;
-
-                            for (var i = 0, r = 0; r <= config.showChars; i++) {
-                                if (content[i] === '<' && !inTag) {
-                                    inTag = true;
-
-                                    // This could be "tag" or "/tag"
-                                    tagName = content.substring(i + 1, content.indexOf('>', i));
-
-                                    // If its a closing tag
-                                    if (tagName[0] === '/') {
-
-
-                                        if (tagName !== ('/' + openTags[0])) {
-                                            config.errMsg = 'ERROR en HTML: the top of the stack should be the tag that closes';
-                                        } else {
-                                            openTags.shift(); // Pops the last tag from the open tag stack (the tag is closed in the retult HTML!)
-                                        }
-
-                                    } else {
-                                        // There are some nasty tags that don't have a close tag like <br/>
-                                        if (tagName.toLowerCase() !== 'br') {
-                                            openTags.unshift(tagName); // Add to start the name of the tag that opens
-                                        }
-                                    }
-                                }
-                                if (inTag && content[i] === '>') {
-                                    inTag = false;
-                                }
-
-                                if (inTag) { bag += content.charAt(i); } // Add tag name chars to the result
-                                else {
-                                    r++;
-                                    if (countChars <= config.showChars) {
-                                        bag += content.charAt(i); // Fix to ie 7 not allowing you to reference string characters using the []
-                                        countChars++;
-                                    } else // Now I have the characters needed
-                                    {
-                                        if (openTags.length > 0) // I have unclosed tags
-                                        {
-                                            //console.log('They were open tags');
-                                            //console.log(openTags);
-                                            for (var j = 0; j < openTags.length; j++) {
-                                                //console.log('Cierro tag ' + openTags[j]);
-                                                bag += '</' + openTags[j] + '>'; // Close all tags that were opened
-
-                                                // You could shift the tag from the stack to check if you end with an empty stack, that means you have closed all open tags
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            c = $('<div/>').html(bag + '<span class="ellip">' + config.ellipsesText + '</span>').html();
-                        }else{
-                            c+=config.ellipsesText;
-                        }
-
-                        var html = '<div class="shortcontent">' + c +
-                                '</div><div class="allcontent">' + content +
-                                '</div><span><a href="javascript://nop/" class="morelink">' + config.moreText + '</a></span>';
-
-                        $this.html(html);
-                        $this.find(".allcontent").hide(); // Hide all text
-                        $('.shortcontent p:last', $this).css('margin-bottom', 0); //Remove bottom margin on last paragraph as it's likely shortened
-                    }
-                });
-
-            };
-            $(".shorten").shorten();
-            // ------------------------------------------------------------------------
-
-            // callback for us to track PanAndZoom operations
-            NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
-            NETDATA.globalChartUnderlay.callback = urlOptions.netdataHighlightCallback;
-
-            // let it run (update the charts)
-            NETDATA.unpause();
-
-            // check if we have to jump to a specific section
-            scrollToId(urlOptions.hash.replace('#',''));
-
-            if(urlOptions.chart !== null) {
-                NETDATA.alarms.scrollToChart(urlOptions.chart);
-                //urlOptions.hash = '#' + NETDATA.name2id('menu_' + charts[c].menu + '_submenu_' + charts[c].submenu);
-                //urlOptions.hash = '#chart_' + NETDATA.name2id(urlOptions.chart);
-                //console.log('hash = ' + urlOptions.hash);
-            }
-
-            var $sidebar = $('#sidebar');
-            /* activate bootstrap sidebar (affix) */
-            $sidebar.affix({
-                offset: {
-                    top: (isdemo())?150:0,
-                    bottom: 0
-                }
-            });
-
-            /* fix scrolling of very long affix lists
-               http://stackoverflow.com/questions/21691585/bootstrap-3-1-0-affix-too-long
-             */
-            $sidebar.on('affixed.bs.affix', function() {
-                $(this).removeAttr('style');
-            });
-
-            /* activate bootstrap scrollspy (needed for sidebar) */
-            var scrollspyOffset = $(window).height() / 3;
-            if(scrollspyOffset > 250) scrollspyOffset = 250;
-            if(scrollspyOffset < 75) scrollspyOffset = 75;
-            document.body.setAttribute('data-offset', scrollspyOffset);
-            // console.log(scrollspyOffset);
-            $(document.body).scrollspy({
-                target: '#sidebar',
-                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
-            });
-
-            // change the URL based on the current position of the screen
-            $sidebar.on('activate.bs.scrollspy', function (e) {
-                //console.log(e);
-                var el = $(e.target);
-                //if(el.find('ul').size() === 0) {
-                var hash = el.find('a').attr('href');
-                // console.log(hash);
-                if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
-                    urlOptions.hash = hash;
-                    //console.log(urlOptions.hash);
-                    urlOptions.hashUpdate();
-                }
-                //else console.log('hash: not accepting ' + hash);
-                //}
-                //else console.log('el.find(): not found');
-            });
-
-            $('[data-toggle="tooltip"]').tooltip({
-                animated: 'fade',
-                trigger: 'hover',
-                html: true,
-                delay: {show: 500, hide: 0},
-                container: 'body'
-            });
-            $('[data-toggle="popover"]').popover();
-
-            loadSnapshotDragAndDropInit();
-            saveSnapshotModalInit();
-            showPageFooter();
-
+        function dashboardSettingsSetup() {
             var update_options_modal = function() {
                 // console.log('update_options_modal');
 
@@ -3977,32 +3902,443 @@
                 if(setTheme(urlOptions.theme))
                     netdataReload();
             });
+        }
 
-            var $updateModal = $('#updateModal');
-            $updateModal.on('show.bs.modal', function() {
-                versionLog('checking, please wait...');
+        function scrollDashboardTo() {
+            if(netdataSnapshotData !== null && typeof netdataSnapshotData.hash !== 'undefined') {
+                //console.log(netdataSnapshotData.hash);
+                scrollToId(netdataSnapshotData.hash.replace('#',''));
+            }
+            else {
+                // check if we have to jump to a specific section
+                scrollToId(urlOptions.hash.replace('#', ''));
+
+                if (urlOptions.chart !== null) {
+                    NETDATA.alarms.scrollToChart(urlOptions.chart);
+                    //urlOptions.hash = '#' + NETDATA.name2id('menu_' + charts[c].menu + '_submenu_' + charts[c].submenu);
+                    //urlOptions.hash = '#chart_' + NETDATA.name2id(urlOptions.chart);
+                    //console.log('hash = ' + urlOptions.hash);
+                }
+            }
+        }
+
+        var modalHiddenCallback = null;
+        function scrollToChartAfterHidingModal(chart) {
+            modalHiddenCallback = function() {
+                NETDATA.alarms.scrollToChart(chart);
+            };
+        }
+
+        // ----------------------------------------------------------------------------
+
+        function enableTooltipsAndPopovers() {
+            $('[data-toggle="tooltip"]').tooltip({
+                animated: 'fade',
+                trigger: 'hover',
+                html: true,
+                delay: {show: 500, hide: 0},
+                container: 'body'
+            });
+            $('[data-toggle="popover"]').popover();
+        }
+
+        // ----------------------------------------------------------------------------
+
+        var runOnceOnDashboardLastRun = 0;
+        function runOnceOnDashboardWithjQuery() {
+            if(runOnceOnDashboardLastRun !== 0) {
+                scrollDashboardTo();
+
+                // restore the scrollspy at the proper position
+                $(document.body).scrollspy('refresh');
+                $(document.body).scrollspy('process');
+
+                return;
+            }
+
+            runOnceOnDashboardLastRun = Date.now();
+
+            // ------------------------------------------------------------------------
+            // bootstrap modals
+
+            // prevent bootstrap modals from scrolling the page
+            // maintains the current scroll position
+            // https://stackoverflow.com/a/34754029/4525767
+
+            var scrollPos = 0;
+            var modal_depth = 0;                            // how many modals are currently open
+            var modal_shown = false;                        // set to true, if a modal is shown
+            var netdata_paused_on_modal = false;            // set to true, if the modal paused netdata
+            var scrollspyOffset = $(window).height() / 3;   // will be updated below - the offset of scrollspy to select an item
+
+            $('.modal')
+                .on('show.bs.modal', function () {
+                    if(modal_depth === 0) {
+                        scrollPos = window.scrollY;
+
+                        $('body').css({
+                            overflow: 'hidden',
+                            position: 'fixed',
+                            top: -scrollPos
+                        });
+
+                        modal_shown = true;
+
+                        if (NETDATA.options.pauseCallback === null) {
+                            NETDATA.pause(function () {});
+                            netdata_paused_on_modal = true;
+                        }
+                        else
+                            netdata_paused_on_modal = false;
+                    }
+
+                    modal_depth++;
+                    //console.log(urlOptions.after);
+
+                })
+                .on('hide.bs.modal', function () {
+
+                    modal_depth--;
+
+                    if(modal_depth <= 0) {
+                        modal_depth = 0;
+
+                        $('body')
+                            .css({
+                                overflow: '',
+                                position: '',
+                                top: ''
+                            });
+
+                        // scroll to the position we had open before the modal
+                        $('html, body')
+                            .animate({scrollTop: scrollPos}, 0);
+
+                        // unpause netdata, if we paused it
+                        if (netdata_paused_on_modal === true) {
+                            NETDATA.unpause();
+                            netdata_paused_on_modal = false;
+                        }
+
+                        // restore the scrollspy at the proper position
+                        $(document.body).scrollspy('process');
+                    }
+                    //console.log(urlOptions.after);
+                })
+                .on('hidden.bs.modal', function () {
+                    if(modal_depth === 0)
+                        modal_shown = false;
+
+                    if(typeof modalHiddenCallback === 'function')
+                        modalHiddenCallback();
+
+                    modalHiddenCallback = null;
+                    //console.log(urlOptions.after);
+                });
+
+            // ------------------------------------------------------------------------
+            // sidebar / affix
+
+            $('#sidebar')
+                .affix({
+                    offset: {
+                        top: (isdemo())?150:0,
+                        bottom: 0
+                    }
+                })
+                .on('affixed.bs.affix', function() {
+                    // fix scrolling of very long affix lists
+                    // http://stackoverflow.com/questions/21691585/bootstrap-3-1-0-affix-too-long
+
+                    $(this).removeAttr('style');
+                })
+                .on( 'affix-top.bs.affix', function() {
+                    // fix bootstrap affix click bug
+                    // https://stackoverflow.com/a/37847981/4525767
+
+                    if(modal_shown) return false;
+                })
+                .on('activate.bs.scrollspy', function (e) {
+                    // change the URL based on the current position of the screen
+
+                    if(modal_shown === false) {
+                        var el = $(e.target);
+                        var hash = el.find('a').attr('href');
+                        if (typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
+                            urlOptions.hash = hash;
+                            urlOptions.hashUpdate();
+                        }
+                    }
+                });
+
+            Ps.initialize(document.getElementById('sidebar'), {
+                wheelSpeed: 0.5,
+                wheelPropagation: true,
+                swipePropagation: true,
+                minScrollbarLength: null,
+                maxScrollbarLength: null,
+                useBothWheelAxes: false,
+                suppressScrollX: true,
+                suppressScrollY: false,
+                scrollXMarginOffset: 0,
+                scrollYMarginOffset: 0,
+                theme: 'default'
             });
 
-            $updateModal.on('shown.bs.modal', function() {
-                notifyForUpdate(true);
+
+            // ------------------------------------------------------------------------
+            // scrollspy
+
+            if(scrollspyOffset > 250) scrollspyOffset = 250;
+            if(scrollspyOffset < 75) scrollspyOffset = 75;
+            document.body.setAttribute('data-offset', scrollspyOffset);
+
+            // scroll the dashboard, before activating the scrollspy, so that our
+            // hash will not be updated before we got the chance to scroll to it
+            scrollDashboardTo();
+
+            $(document.body).scrollspy({
+                target: '#sidebar',
+                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
             });
 
-            var $alarmsModal = $('#alarmsModal');
-            $alarmsModal.on('shown.bs.modal', function() {
-                NETDATA.pause(alarmsUpdateModal);
+
+            // ------------------------------------------------------------------------
+            // my-netdata menu
+
+            Ps.initialize(document.getElementById('myNetdataDropdownUL'), {
+                wheelSpeed: 1,
+                wheelPropagation: false,
+                swipePropagation: false,
+                minScrollbarLength: null,
+                maxScrollbarLength: null,
+                useBothWheelAxes: false,
+                suppressScrollX: true,
+                suppressScrollY: false,
+                scrollXMarginOffset: 0,
+                scrollYMarginOffset: 0,
+                theme: 'default'
             });
 
-            $alarmsModal.on('hidden.bs.modal', function() {
-                NETDATA.unpause();
-                document.getElementById('alarms_active').innerHTML =
+            $('#myNetdataDropdownParent')
+                .on('show.bs.dropdown', function () {
+                    var hash = urlOptions.genHash();
+                    $('.registry_link').each(function(idx) {
+                        this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
+                    });
+
+                    NETDATA.pause(function() {});
+                })
+                .on('shown.bs.dropdown', function () {
+                    Ps.update(document.getElementById('myNetdataDropdownUL'));
+                })
+                .on('hidden.bs.dropdown', function () {
+                    NETDATA.unpause();
+                });
+
+
+            $('#deleteRegistryModal')
+                .on('hidden.bs.modal', function() {
+                    deleteRegistryGuid = null;
+                });
+
+
+            // ------------------------------------------------------------------------
+            // update modal
+
+            $('#updateModal')
+                .on('show.bs.modal', function() {
+                    versionLog('checking, please wait...');
+                })
+                .on('shown.bs.modal', function() {
+                    notifyForUpdate(true);
+                });
+
+
+            // ------------------------------------------------------------------------
+            // alarms modal
+
+            $('#alarmsModal')
+                .on('shown.bs.modal', function() {
+                    alarmsUpdateModal();
+                })
+                .on('hidden.bs.modal', function() {
+                    document.getElementById('alarms_active').innerHTML =
                         document.getElementById('alarms_all').innerHTML =
-                        document.getElementById('alarms_log').innerHTML =
+                            document.getElementById('alarms_log').innerHTML =
                                 'loading...';
-            });
+                });
 
-            $('#deleteRegistryModal').on('hidden.bs.modal', function() {
-                deleteRegistryGuid = null;
-            });
+
+            // ------------------------------------------------------------------------
+
+            dashboardSettingsSetup();
+            loadSnapshotDragAndDropSetup();
+            saveSnapshotModalSetup();
+            showPageFooter();
+
+
+            // ------------------------------------------------------------------------
+            // https://github.com/viralpatel/jquery.shorten/blob/master/src/jquery.shorten.js
+
+            $.fn.shorten = function(settings) {
+                "use strict";
+
+                var config = {
+                    showChars: 750,
+                    minHideChars: 10,
+                    ellipsesText: "...",
+                    moreText: '<i class="fas fa-expand"></i> show more information',
+                    lessText: '<i class="fas fa-compress"></i> show less information',
+                    onLess: function() { NETDATA.onscroll(); },
+                    onMore: function() { NETDATA.onscroll(); },
+                    errMsg: null,
+                    force: false
+                };
+
+                if (settings) {
+                    $.extend(config, settings);
+                }
+
+                if ($(this).data('jquery.shorten') && !config.force) {
+                    return false;
+                }
+                $(this).data('jquery.shorten', true);
+
+                $(document).off("click", '.morelink');
+
+                $(document).on({
+                    click: function() {
+
+                        var $this = $(this);
+                        if ($this.hasClass('less')) {
+                            $this.removeClass('less');
+                            $this.html(config.moreText);
+                            $this.parent().prev().animate({'height':'0'+'%'}, 0, function () { $this.parent().prev().prev().show(); }).hide(0, function() {
+                                config.onLess();
+                            });
+
+                        } else {
+                            $this.addClass('less');
+                            $this.html(config.lessText);
+                            $this.parent().prev().animate({'height':'100'+'%'}, 0, function () { $this.parent().prev().prev().hide(); }).show(0, function() {
+                                config.onMore();
+                            });
+                        }
+                        return false;
+                    }
+                }, '.morelink');
+
+                return this.each(function() {
+                    var $this = $(this);
+
+                    var content = $this.html();
+                    var contentlen = $this.text().length;
+                    if (contentlen > config.showChars + config.minHideChars) {
+                        var c = content.substr(0, config.showChars);
+                        if (c.indexOf('<') >= 0) // If there's HTML don't want to cut it
+                        {
+                            var inTag = false; // I'm in a tag?
+                            var bag = ''; // Put the characters to be shown here
+                            var countChars = 0; // Current bag size
+                            var openTags = []; // Stack for opened tags, so I can close them later
+                            var tagName = null;
+
+                            for (var i = 0, r = 0; r <= config.showChars; i++) {
+                                if (content[i] === '<' && !inTag) {
+                                    inTag = true;
+
+                                    // This could be "tag" or "/tag"
+                                    tagName = content.substring(i + 1, content.indexOf('>', i));
+
+                                    // If its a closing tag
+                                    if (tagName[0] === '/') {
+
+
+                                        if (tagName !== ('/' + openTags[0])) {
+                                            config.errMsg = 'ERROR en HTML: the top of the stack should be the tag that closes';
+                                        } else {
+                                            openTags.shift(); // Pops the last tag from the open tag stack (the tag is closed in the retult HTML!)
+                                        }
+
+                                    } else {
+                                        // There are some nasty tags that don't have a close tag like <br/>
+                                        if (tagName.toLowerCase() !== 'br') {
+                                            openTags.unshift(tagName); // Add to start the name of the tag that opens
+                                        }
+                                    }
+                                }
+                                if (inTag && content[i] === '>') {
+                                    inTag = false;
+                                }
+
+                                if (inTag) { bag += content.charAt(i); } // Add tag name chars to the result
+                                else {
+                                    r++;
+                                    if (countChars <= config.showChars) {
+                                        bag += content.charAt(i); // Fix to ie 7 not allowing you to reference string characters using the []
+                                        countChars++;
+                                    } else // Now I have the characters needed
+                                    {
+                                        if (openTags.length > 0) // I have unclosed tags
+                                        {
+                                            //console.log('They were open tags');
+                                            //console.log(openTags);
+                                            for (var j = 0; j < openTags.length; j++) {
+                                                //console.log('Cierro tag ' + openTags[j]);
+                                                bag += '</' + openTags[j] + '>'; // Close all tags that were opened
+
+                                                // You could shift the tag from the stack to check if you end with an empty stack, that means you have closed all open tags
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            c = $('<div/>').html(bag + '<span class="ellip">' + config.ellipsesText + '</span>').html();
+                        }else{
+                            c+=config.ellipsesText;
+                        }
+
+                        var html = '<div class="shortcontent">' + c +
+                            '</div><div class="allcontent">' + content +
+                            '</div><span><a href="javascript://nop/" class="morelink">' + config.moreText + '</a></span>';
+
+                        $this.html(html);
+                        $this.find(".allcontent").hide(); // Hide all text
+                        $('.shortcontent p:last', $this).css('margin-bottom', 0); //Remove bottom margin on last paragraph as it's likely shortened
+                    }
+                });
+            };
+        }
+
+        function finalizePage() {
+            // resize all charts - without starting the background thread
+            // this has to be done while NETDATA is paused
+            // if we ommit this, the affix menu will be wrong, since all
+            // the Dom elements are initially zero-sized
+            NETDATA.parseDom();
+
+            // ------------------------------------------------------------------------
+
+            NETDATA.globalPanAndZoom.callback = null;
+            NETDATA.globalChartUnderlay.callback = null;
+
+            if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
+
+            // callback for us to track PanAndZoom operations
+            NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
+            NETDATA.globalChartUnderlay.callback = urlOptions.netdataHighlightCallback;
+
+            // ------------------------------------------------------------------------
+
+            // let it run (update the charts)
+            NETDATA.unpause();
+
+            runOnceOnDashboardWithjQuery();
+            $(".shorten").shorten();
+            enableTooltipsAndPopovers();
 
             if(isdemo()) {
                 // do not to give errors on netdata demo servers for 60 seconds
@@ -4031,58 +4367,11 @@
             if(urlOptions.show_alarms === true)
                 setTimeout(function() { $('#alarmsModal').modal('show'); }, 1000);
 
-            var sidebar = document.getElementById('sidebar');
-            Ps.initialize(sidebar, {
-                wheelSpeed: 0.5,
-                wheelPropagation: true,
-                swipePropagation: true,
-                minScrollbarLength: null,
-                maxScrollbarLength: null,
-                useBothWheelAxes: false,
-                suppressScrollX: true,
-                suppressScrollY: false,
-                scrollXMarginOffset: 0,
-                scrollYMarginOffset: 0,
-                theme: 'default'
-            });
-            Ps.update(sidebar);
-
-            var registry = document.getElementById('myNetdataDropdownUL');
-            Ps.initialize(registry, {
-                wheelSpeed: 1,
-                wheelPropagation: false,
-                swipePropagation: false,
-                minScrollbarLength: null,
-                maxScrollbarLength: null,
-                useBothWheelAxes: false,
-                suppressScrollX: true,
-                suppressScrollY: false,
-                scrollXMarginOffset: 0,
-                scrollYMarginOffset: 0,
-                theme: 'default'
-            });
-            Ps.update(registry);
-
             NETDATA.onresizeCallback = function() {
-                Ps.update(sidebar);
-                Ps.update(registry);
+                Ps.update(document.getElementById('sidebar'));
+                Ps.update(document.getElementById('myNetdataDropdownUL'));
             };
-
-            $('#myNetdataDropdownParent')
-                .on('show.bs.dropdown', function () {
-                    var hash = urlOptions.genHash();
-                    $('.registry_link').each(function(idx) {
-                       this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
-                    });
-
-                    NETDATA.pause(function() {});
-                })
-                .on('shown.bs.dropdown', function () {
-                    Ps.update(registry);
-                })
-                .on('hidden.bs.dropdown', function () {
-                    NETDATA.unpause();
-                });
+            NETDATA.onresizeCallback();
 
             if(netdataSnapshotData !== null) {
                 NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
@@ -4107,17 +4396,17 @@
         // parallel javascript downloader in netdata
         var netdataPrepCallback = function() {
             NETDATA.requiredCSS.push({
-                url: NETDATA.serverDefault + 'css/bootstrap-toggle-2.2.2.min.css',
+                url: NETDATA.serverStatic + 'css/bootstrap-toggle-2.2.2.min.css',
                 isAlreadyLoaded: function() { return false; }
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'lib/bootstrap-toggle-2.2.2.min.js',
+                url: NETDATA.serverStatic + 'lib/bootstrap-toggle-2.2.2.min.js',
                 isAlreadyLoaded: function() { return false; }
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20171107-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20180628-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -4132,13 +4421,15 @@
         };
 
         var selected_server_timezone = function(timezone, status) {
-            // console.log(timezone + " " + ((typeof status === 'undefined')?'undefined':status).toString());
+            //console.log('called with timezone: ' + timezone + ", status: " + ((typeof status === 'undefined')?'undefined':status).toString());
 
             // clear the error
             document.getElementById('timezone_error_message').innerHTML = '';
 
             if (typeof status === 'undefined') {
                 // the user selected a timezone from the menu
+
+                NETDATA.setOption('user_set_server_timezone', timezone);
 
                 if (NETDATA.dateTime.init(timezone) === false) {
                     NETDATA.dateTime.init();
@@ -4150,30 +4441,32 @@
                     NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
                 }
                 else {
-                    NETDATA.setOption('user_set_server_timezone', timezone);
-
                     if($('#local_timezone').prop('checked'))
                         $('#local_timezone').bootstrapToggle('off');
                 }
             }
+            else if (status === true) {
+                // the user wants the browser default timezone to be activated
+
+                NETDATA.dateTime.init();
+            }
             else {
-                if (status === true) {
+                // the user wants the server default timezone to be activated
+                //console.log('found ' + NETDATA.options.current.user_set_server_timezone);
+
+                if (NETDATA.options.current.user_set_server_timezone === 'default')
+                    NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
+
+                timezone = NETDATA.options.current.user_set_server_timezone;
+
+                if (NETDATA.dateTime.init(timezone) === false) {
                     NETDATA.dateTime.init();
-                }
-                else {
-                    if (NETDATA.options.current.user_set_server_timezone === 'default')
-                        NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
 
-                    timezone = NETDATA.options.current.user_set_server_timezone;
-                    if (NETDATA.dateTime.init(timezone) === false) {
-                        NETDATA.dateTime.init();
+                    if(!$('#local_timezone').prop('checked'))
+                        $('#local_timezone').bootstrapToggle('on');
 
-                        if(!$('#local_timezone').prop('checked'))
-                            $('#local_timezone').bootstrapToggle('on');
-
-                        document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
-                        NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
-                    }
+                    document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
+                    NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
                 }
             }
 
@@ -4185,7 +4478,6 @@
         // var netdataStarted = performance.now();
 
         var netdataCallback = initializeDynamicDashboard;
-
     </script>
 </head>
 
@@ -4231,16 +4523,16 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
-                    <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fa fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i></a></li>
-                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
-                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
-                    <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
-                    <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
-                    <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
-                    <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
+                    <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
+                    <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
+                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
+                    <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fas fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
+                    <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fas fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
+                    <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fas fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
+                    <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
@@ -4252,9 +4544,7 @@
         </div>
     </nav>
     <div class="navbar-highlight">
-        <div id="navbar-highlight-content" class="navbar-highlight-content">
-            hello world
-        </div>
+        <div id="navbar-highlight-content" class="navbar-highlight-content"></div>
     </div>
 
     <div id="masthead" style="display: none;">
@@ -4300,46 +4590,89 @@
             <div class="col-md-10" role="main">
                 <div class="p">
                     <big><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></big><br/>
-                    <i class="fa fa-copyright"></i> Copyright 2016-2017, <a href="mailto:costa@tsaousis.gr">Costa Tsaousis</a>.<br/>
+                    <i class="fas fa-copyright"></i> Copyright 2016-2018, <a href="mailto:costa@tsaousis.gr">Costa Tsaousis</a>.<br/>
                     Released under <a href="http://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3 or later</a>.<br/>
                 </div>
                 <div class="p">
                     <small>
-                        <a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a> re-distributes these software tools:
+                        <a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a> uses the following third party tools on this dashboard:
 
-                        <i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://bernii.github.io/gauge.js/" target="_blank">Gauge.js</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright, Bernard Kobos, <a href="http://bernii.github.io/gauge.js/" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://bernii.github.io/gauge.js/" target="_blank">Gauge.js</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright, Bernard Kobos, <a href="http://bernii.github.io/gauge.js/" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://github.com/benkeen/d3pie" target="_blank">d3pie</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright 2014-2015 Benjamin Keen, <a href="https://github.com/benkeen/d3pie/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://getbootstrap.com/getting-started/" target="_blank">Bootstrap</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, Twitter, <a href="http://getbootstrap.com/getting-started/#license-faqs" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://d3js.org/" target="_blank">D3</a> web graphics library,
+                        <i class="fas fa-copyright"></i> Copyright 2015 Mike Bostock, <a href="http://opensource.org/licenses/BSD-3-Clause" target="_blank">BSD License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://www.bootstraptoggle.com/" target="_blank">Bootstrap Toggle</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2011-2014 Min Hur, The New York Times Company, <a href="https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/noraesae/perfect-scrollbar" target="_blank">perfect-scrollbar</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2016, Hyunje Alex Jun and other contributors, <a href="https://github.com/noraesae/perfect-scrollbar/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://getbootstrap.com/getting-started/" target="_blank">Bootstrap</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2015, Twitter, <a href="http://getbootstrap.com/getting-started/#license-faqs" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
-                        <i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://www.bootstraptoggle.com/" target="_blank">Bootstrap Toggle</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2011-2014 Min Hur, The New York Times Company, <a href="https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+                        <i class="fas fa-circle"></i> <a href="http://seiyria.com/bootstrap-slider/" target="_blank">Bootstrap-slider</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2017 Kyle Kemp, Rohit Kalkur, and contributors, <a href="https://github.com/seiyria/bootstrap-slider/blob/master/LICENSE.md" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://github.com/noraesae/perfect-scrollbar" target="_blank">perfect-scrollbar</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2016, Hyunje Alex Jun and other contributors, <a href="https://github.com/noraesae/perfect-scrollbar/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
+                        <i class="fas fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+
+                        <i class="fas fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+
+                        <i class="fas fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
+
+                        <i class="fas fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="xssModal" tabindex="-1" role="dialog" aria-labelledby="xssModalLabel" data-keyboard="false" data-backdrop="static" style="z-index: 3000">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="xssModalLabel">XSS Protection</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        This dashboard is about to render data from server:
+                    </p>
+                    <p style="font-size: 1.25em;">
+                        <code id="netdataXssModalServer"></code>
+                    </p>
+                    <p>
+                        To protect your privacy, the dashboard will <b>check all data transferred</b> for cross site scripting (XSS).
+                        <br/>This is CPU intensive, so your browser might be a bit slower.
+                    </p>
+                    <p>
+                        If you <b>trust</b> the remote server, you can disable XSS protection.<br/>
+                        In this case, any remote dashboard decoration code (javascript) will also run.
+                    </p>
+                    <p>
+                        If you <b>don't trust</b> the remote server, you should keep the protection on.<br/>
+                        The dashboard will run slower and remote dashboard decoration code will not run, but better be safe than sorry...
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" onclick="return xssModalKeepXss();" type="button" class="btn btn-success" data-dismiss="modal">Keep protecting me</a>
+                    <a href="#" onclick="return xssModalDisableXss();" type="button" class="btn btn-danger" data-dismiss="modal">I don't need this, the server is mine</a>
                 </div>
             </div>
         </div>
@@ -4435,6 +4768,7 @@
                     </p>
                 </div>
                 <div class="modal-footer">
+                    <span style="display: inline-block; padding-right: 20px;">Snapshot files contain both data and javascript code. Make sure <b>you trust the files</b> you import!</span>
                     <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success disabled">Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
@@ -5290,12 +5624,10 @@
                         <hr/>
                     </div>
                     <div>
-                        For progress reports and key netdata updates: <strong><a href="https://twitter.com/linuxnetdata" target="_blank">follow netdata on <i class="fa fa-twitter" aria-hidden="true"></i> twitter</a></strong>.
+                        For progress reports and key netdata updates: <strong><a href="https://twitter.com/linuxnetdata" target="_blank">follow netdata on <i class="fab fa-twitter"></i> twitter</a></strong>.
                         <br/>
-                        <small>
-                            You can also <a href="https://www.facebook.com/linuxnetdata/" target="_blank">follow netdata on <i class="fa fa-facebook" aria-hidden="true"></i> facebook</a>,
-                            or <a href="https://github.com/firehol/netdata" target="_blank">watch netdata on <i class="fa fa-github" aria-hidden="true"></i> github</a>.
-                        </small>
+                        You can also <a href="https://www.facebook.com/linuxnetdata/" target="_blank">follow netdata on <i class="fab fa-facebook"></i> facebook</a>,
+                        or <a href="https://github.com/firehol/netdata" target="_blank">watch netdata on <i class="fab fa-github"></i> github</a>.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -5396,6 +5728,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171122-3"></script>
+    <script type="text/javascript" src="dashboard.js?v20180628-1"></script>
 </body>
 </html>

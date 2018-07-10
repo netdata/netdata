@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 typedef enum signal_action {
@@ -147,6 +148,7 @@ void signals_handle(void) {
                                 break;
 
                             case NETDATA_SIGNAL_EXIT_CLEANLY:
+                                error_log_limit_unlimited();
                                 info("SIGNAL: Received %s. Cleaning up to exit...", name);
                                 netdata_cleanup_and_exit(0);
                                 exit(0);

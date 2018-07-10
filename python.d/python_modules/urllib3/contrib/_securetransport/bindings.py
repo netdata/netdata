@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 This module uses ctypes to bind a whole bunch of functions and constants from
 SecureTransport. The goal here is to provide the low-level API to

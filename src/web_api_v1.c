@@ -1,20 +1,110 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
+static struct {
+    const char *name;
+    uint32_t hash;
+    int value;
+} api_v1_data_groups[] = {
+        {  "average"        , 0    , GROUP_AVERAGE}
+        , {"min"            , 0    , GROUP_MIN}
+        , {"max"            , 0    , GROUP_MAX}
+        , {"sum"            , 0    , GROUP_SUM}
+        , {"incremental_sum", 0    , GROUP_INCREMENTAL_SUM}
+        , {"incremental-sum", 0    , GROUP_INCREMENTAL_SUM}
+        , {                 NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_options[] = {
+        {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
+        , {"flip"            , 0    , RRDR_OPTION_REVERSED}
+        , {"reversed"        , 0    , RRDR_OPTION_REVERSED}
+        , {"reverse"         , 0    , RRDR_OPTION_REVERSED}
+        , {"jsonwrap"        , 0    , RRDR_OPTION_JSON_WRAP}
+        , {"min2max"         , 0    , RRDR_OPTION_MIN2MAX}
+        , {"ms"              , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"milliseconds"    , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"abs"             , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute"        , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute_sum"    , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute-sum"    , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"display_absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"display-absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"seconds"         , 0    , RRDR_OPTION_SECONDS}
+        , {"null2zero"       , 0    , RRDR_OPTION_NULL2ZERO}
+        , {"objectrows"      , 0    , RRDR_OPTION_OBJECTSROWS}
+        , {"google_json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"google-json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"percentage"      , 0    , RRDR_OPTION_PERCENTAGE}
+        , {"unaligned"       , 0    , RRDR_OPTION_NOT_ALIGNED}
+        , {"match_ids"       , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match-ids"       , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {                  NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_formats[] = {
+        {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
+        , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
+        , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
+        , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
+        , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
+        , {DATASOURCE_FORMAT_TSV            , 0 , DATASOURCE_TSV}
+        , {"tsv-excel"                      , 0 , DATASOURCE_TSV}
+        , {DATASOURCE_FORMAT_HTML           , 0 , DATASOURCE_HTML}
+        , {DATASOURCE_FORMAT_JS_ARRAY       , 0 , DATASOURCE_JS_ARRAY}
+        , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
+        , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
+        , {                                 NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_google_formats[] = {
+        // this is not error - when google requests json, it expects javascript
+        // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
+        {  "json"     , 0    , DATASOURCE_DATATABLE_JSONP}
+        , {"html"     , 0    , DATASOURCE_HTML}
+        , {"csv"      , 0    , DATASOURCE_CSV}
+        , {"tsv-excel", 0    , DATASOURCE_TSV}
+        , {           NULL, 0, 0}
+};
+
+void web_client_api_v1_init(void) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
+
+    for(i = 0; api_v1_data_options[i].name ; i++)
+        api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+
+    for(i = 0; api_v1_data_formats[i].name ; i++)
+        api_v1_data_formats[i].hash = simple_hash(api_v1_data_formats[i].name);
+
+    for(i = 0; api_v1_data_google_formats[i].name ; i++)
+        api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
+}
+
 inline int web_client_api_request_v1_data_group(char *name, int def) {
-    if(!strcmp(name, "average"))
-        return GROUP_AVERAGE;
+    int i;
 
-    else if(!strcmp(name, "min"))
-        return GROUP_MIN;
-
-    else if(!strcmp(name, "max"))
-        return GROUP_MAX;
-
-    else if(!strcmp(name, "sum"))
-        return GROUP_SUM;
-
-    else if(!strcmp(name, "incremental-sum"))
-        return GROUP_INCREMENTAL_SUM;
+    uint32_t hash = simple_hash(name);
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
+            return api_v1_data_groups[i].value;
 
     return def;
 }
@@ -26,84 +116,41 @@ inline uint32_t web_client_api_request_v1_data_options(char *o) {
     while(o && *o && (tok = mystrsep(&o, ", |"))) {
         if(!*tok) continue;
 
-        if(!strcmp(tok, "nonzero"))
-            ret |= RRDR_OPTION_NONZERO;
-        else if(!strcmp(tok, "flip") || !strcmp(tok, "reversed") || !strcmp(tok, "reverse"))
-            ret |= RRDR_OPTION_REVERSED;
-        else if(!strcmp(tok, "jsonwrap"))
-            ret |= RRDR_OPTION_JSON_WRAP;
-        else if(!strcmp(tok, "min2max"))
-            ret |= RRDR_OPTION_MIN2MAX;
-        else if(!strcmp(tok, "ms") || !strcmp(tok, "milliseconds"))
-            ret |= RRDR_OPTION_MILLISECONDS;
-        else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
-            ret |= RRDR_OPTION_ABSOLUTE;
-        else if(!strcmp(tok, "seconds"))
-            ret |= RRDR_OPTION_SECONDS;
-        else if(!strcmp(tok, "null2zero"))
-            ret |= RRDR_OPTION_NULL2ZERO;
-        else if(!strcmp(tok, "objectrows"))
-            ret |= RRDR_OPTION_OBJECTSROWS;
-        else if(!strcmp(tok, "google_json"))
-            ret |= RRDR_OPTION_GOOGLE_JSON;
-        else if(!strcmp(tok, "percentage"))
-            ret |= RRDR_OPTION_PERCENTAGE;
-        else if(!strcmp(tok, "unaligned"))
-            ret |= RRDR_OPTION_NOT_ALIGNED;
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; api_v1_data_options[i].name ; i++) {
+            if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
+                ret |= api_v1_data_options[i].value;
+                break;
+            }
+        }
     }
 
     return ret;
 }
 
 inline uint32_t web_client_api_request_v1_data_format(char *name) {
-    if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
-        return DATASOURCE_DATATABLE_JSON;
+    uint32_t hash = simple_hash(name);
+    int i;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSONP)) // datasource
-        return DATASOURCE_DATATABLE_JSONP;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSON)) // json
-        return DATASOURCE_JSON;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSONP)) // jsonp
-        return DATASOURCE_JSONP;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV)) // ssv
-        return DATASOURCE_SSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV)) // csv
-        return DATASOURCE_CSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_TSV) || !strcmp(name, "tsv-excel")) // tsv
-        return DATASOURCE_TSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_HTML)) // html
-        return DATASOURCE_HTML;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JS_ARRAY)) // array
-        return DATASOURCE_JS_ARRAY;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
-        return DATASOURCE_SSV_COMMA;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV_JSON_ARRAY)) // csvjsonarray
-        return DATASOURCE_CSV_JSON_ARRAY;
+    for(i = 0; api_v1_data_formats[i].name ; i++) {
+        if (unlikely(hash == api_v1_data_formats[i].hash && !strcmp(name, api_v1_data_formats[i].name))) {
+            return api_v1_data_formats[i].value;
+        }
+    }
 
     return DATASOURCE_JSON;
 }
 
 inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
-    if(!strcmp(name, "json"))
-        return DATASOURCE_DATATABLE_JSONP;
+    uint32_t hash = simple_hash(name);
+    int i;
 
-    else if(!strcmp(name, "html"))
-        return DATASOURCE_HTML;
-
-    else if(!strcmp(name, "csv"))
-        return DATASOURCE_CSV;
-
-    else if(!strcmp(name, "tsv-excel"))
-        return DATASOURCE_TSV;
+    for(i = 0; api_v1_data_google_formats[i].name ; i++) {
+        if (unlikely(hash == api_v1_data_google_formats[i].hash && !strcmp(name, api_v1_data_google_formats[i].name))) {
+            return api_v1_data_google_formats[i].value;
+        }
+    }
 
     return DATASOURCE_JSON;
 }
@@ -208,7 +255,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
-    int help = 0, types = 0, names = backend_send_names; // prometheus options
+    int help = 0, types = 0, timestamps = 1, names = backend_send_names; // prometheus options
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_options = backend_options;
     const char *prometheus_prefix = backend_prefix;
@@ -251,6 +298,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             else
                 names = 0;
         }
+        else if(!strcmp(name, "timestamps")) {
+            if(!strcmp(value, "yes"))
+                timestamps = 1;
+            else
+                timestamps = 0;
+        }
         else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
@@ -278,12 +331,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
             return 200;
 
         default:
@@ -315,6 +368,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *value_color = NULL
     , *refresh_str = NULL
     , *precision_str = NULL
+    , *scale_str = NULL
     , *alarm = NULL;
 
     int group = GROUP_AVERAGE;
@@ -358,6 +412,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "divide")) divide_str = value;
         else if(!strcmp(name, "refresh")) refresh_str = value;
         else if(!strcmp(name, "precision")) precision_str = value;
+        else if(!strcmp(name, "scale")) scale_str = value;
         else if(!strcmp(name, "alarm")) alarm = value;
     }
 
@@ -367,11 +422,13 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         goto cleanup;
     }
 
+    int scale = (scale_str && *scale_str)?str2i(scale_str):100;
+
     RRDSET *st = rrdset_find(host, chart);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1);
+        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0);
         ret = 200;
         goto cleanup;
     }
@@ -382,7 +439,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1);
+            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0);
             ret = 200;
             goto cleanup;
         }
@@ -498,7 +555,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 units,
                 label_color,
                 value_color,
-                precision);
+                precision,
+                scale,
+                options
+        );
         ret = 200;
     }
     else {
@@ -510,7 +570,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, options, NULL, &latest_timestamp, &value_is_null);
+                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
@@ -532,7 +592,10 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 units,
                 label_color,
                 value_color,
-                precision);
+                precision,
+                scale,
+                options
+        );
     }
 
     cleanup:
@@ -561,6 +624,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart = NULL
     , *before_str = NULL
     , *after_str = NULL
+    , *group_time_str = NULL
     , *points_str = NULL;
 
     int group = GROUP_AVERAGE;
@@ -589,6 +653,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
         }
@@ -655,6 +720,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):0;
     int       points = (points_str && *points_str)?str2i(points_str):0;
+    long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
           , w->id
@@ -693,8 +759,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, options
-                                 , &last_timestamp_in_data);
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
+                                 , options, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

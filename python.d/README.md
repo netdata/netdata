@@ -29,7 +29,7 @@ local:  # job name
   update_every : 5 # job update frequency
   other_var1   : some_val # module specific variable
 
-other_job: 
+other_job:
   priority     : 5 # job position on dashboard
   retries      : 20 # job retries
   other_var2   : val # module specific variable
@@ -43,7 +43,7 @@ The following python.d modules are supported:
 
 # apache
 
-This module will monitor one or more apache servers depending on configuration. 
+This module will monitor one or more apache servers depending on configuration.
 
 **Requirements:**
  * apache with enabled `mod_status`
@@ -60,20 +60,20 @@ It produces the following charts:
  * keepalive
  * closing
  * writing
- 
+
 4. **Bandwidth** in kilobytes/s
  * sent
- 
+
 5. **Workers**
  * idle
  * busy
- 
+
 6. **Lifetime Avg. Requests/s** in requests/s
  * requests_sec
- 
+
 7. **Lifetime Avg. Bandwidth/s** in kilobytes/s
  * size_sec
- 
+
 8. **Lifetime Avg. Response Size** in bytes/request
  * size_req
 
@@ -109,7 +109,7 @@ Module monitors apache mod_cache log and produces only one chart:
  * hit
  * miss
  * other
- 
+
 ### configuration
 
 Sample:
@@ -138,14 +138,14 @@ Module provides server and tube level statistics:
 1. **Cpu usage** in cpu time
  * user
  * system
- 
+
 2. **Jobs rate** in jobs/s
  * total
  * timeouts
- 
+
 3. **Connections rate** in connections/s
  * connections
- 
+
 4. **Commands rate** in commands/s
  * put
  * peek
@@ -167,27 +167,27 @@ Module provides server and tube level statistics:
  * list-tube-used
  * list-tubes-watched
  * pause-tube
- 
+
 5. **Current tubes** in tubes
  * tubes
- 
+
 6. **Current jobs** in jobs
  * urgent
  * ready
  * reserved
  * delayed
  * buried
- 
+
 7. **Current connections** in connections
  * written
  * producers
  * workers
  * waiting
- 
+
 8. **Binlog** in records/s
  * written
  * migrated
- 
+
 9. **Uptime** in seconds
  * uptime
 
@@ -195,7 +195,7 @@ Module provides server and tube level statistics:
 
 1. **Jobs rate** in jobs/s
  * jobs
- 
+
 2. **Jobs** in jobs
  * using
  * ready
@@ -211,12 +211,12 @@ Module provides server and tube level statistics:
 4. **Commands** in commands/s
  * deletes
  * pauses
- 
+
 5. **Pause** in seconds
  * since
  * left
 
- 
+
 ### configuration
 
 Sample:
@@ -252,7 +252,7 @@ It produces:
  * recursion
  * duplicate
  * rejections
- 
+
 2. **Incoming queries**
  * RESERVED0
  * A
@@ -273,7 +273,7 @@ It produces:
  * SPF
  * ANY
  * DLV
- 
+
 3. **Outgoing queries**
  * Same as Incoming queries
 
@@ -288,6 +288,35 @@ local:
 ```
 
 If no configuration is given, module will attempt to read named.stats file  at `/var/log/bind/named.stats`
+
+---
+
+# boinc
+
+This module monitors task counts for the Berkely Open Infrastructure
+Networking Computing (BOINC) distributed computing client using the same
+RPC interface that the BOINC monitoring GUI does.
+
+It provides charts tracking the total number of tasks and active tasks,
+as well as ones tracking each of the possible states for tasks.
+
+### configuration
+
+BOINC requires use of a password to access it's RPC interface.  You can
+find this password in the `gui_rpc_auth.cfg` file in your BOINC directory.
+
+By default, the module will try to auto-detect the password by looking
+in `/var/lib/boinc` for this file (this is the location most Linux
+distributions use for a system-wide BOINC installation), so things may
+just work without needing configuration for the local system.
+
+You can monitor remote systems as well:
+
+```yaml
+remote:
+  hostname: some-host
+  password: some-password
+```
 
 ---
 
@@ -319,6 +348,39 @@ update_every: 1
 # chrony query command:
 local:
   command: 'chronyc -n tracking'
+```
+
+---
+
+# ceph
+
+This module monitors the ceph cluster usage and consuption data of a server.
+
+It produces:
+
+* Cluster statistics (usage, available, latency, objects, read/write rate)
+* OSD usage
+* OSD latency
+* Pool usage
+* Pool read/write operations
+* Pool read/write rate
+* number of objects per pool
+
+**Requirements:**
+
+- `rados` python module
+- Granting read permissions to ceph group from keyring file
+```shell
+# chmod 640 /etc/ceph/ceph.client.admin.keyring
+```
+
+### Configuration
+
+Sample:
+```yaml
+local:
+  config_file: '/etc/ceph/ceph.conf'
+  keyring_file: '/etc/ceph/ceph.client.admin.keyring'
 ```
 
 ---
@@ -412,15 +474,68 @@ It produces one aggregate chart or one chart per dns server, showing the query t
 
 ---
 
+# dnsdist
+
+Module monitor dnsdist performance and health metrics.
+
+Following charts are drawn:
+
+1. **Response latency**
+ * latency-slow
+ * latency100-1000
+ * latency50-100
+ * latency10-50
+ * latency1-10
+ * latency0-1
+
+2. **Cache performance**
+ * cache-hits
+ * cache-misses
+
+3. **ACL events**
+ * acl-drops
+ * rule-drop
+ * rule-nxdomain
+ * rule-refused
+
+4. **Noncompliant data**
+ * empty-queries
+ * no-policy
+ * noncompliant-queries
+ * noncompliant-responses
+
+5. **Queries**
+ * queries
+ * rdqueries
+ * rdqueries
+
+6. **Health**
+ * downstream-send-errors
+ * downstream-timeouts
+ * servfail-responses
+ * trunc-failures
+
+### configuration
+
+```yaml
+localhost:
+  name : 'local'
+  url  : 'http://127.0.0.1:5053/jsonstat?command=stats'
+  user : 'username'
+  pass : 'password'
+  header:
+    X-API-Key: 'dnsdist-api-key'
+```
+
 # dovecot
 
-This module provides statistics information from dovecot server. 
+This module provides statistics information from dovecot server.
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
 
 **Requirement:**
 Dovecot unix socket with R/W permissions for user netdata or dovecot with configured TCP/IP socket.
- 
+
 Module gives information with following charts:
 
 1. **sessions**
@@ -429,25 +544,25 @@ Module gives information with following charts:
 2. **logins**
  * logins
 
-3. **commands** - number of IMAP commands 
+3. **commands** - number of IMAP commands
  * commands
- 
+
 4. **Faults**
  * minor
  * major
- 
-5. **Context Switches** 
+
+5. **Context Switches**
  * volountary
  * involountary
- 
+
 6. **disk** in bytes/s
  * read
  * write
- 
+
 7. **bytes** in bytes/s
  * read
  * write
- 
+
 8. **number of syscalls** in syscalls/s
  * read
  * write
@@ -456,7 +571,7 @@ Module gives information with following charts:
  * path
  * attr
 
-10. **hits** - number of cache hits 
+10. **hits** - number of cache hits
  * hits
 
 11. **attempts** - authorization attemts
@@ -466,7 +581,7 @@ Module gives information with following charts:
 12. **cache** - cached authorization hits
  * hit
  * miss
- 
+
 ### configuration
 
 Sample:
@@ -508,7 +623,7 @@ It produces:
  * Time spent on garbage collections
 
 4. **Host metrics** charts:
- * Available file descriptors in percent 
+ * Available file descriptors in percent
  * Opened HTTP connections
  * Cluster communication transport metrics
 
@@ -549,7 +664,7 @@ If no configuration is given, module will fail to run.
 
 # exim
 
-Simple module executing `exim -bpc` to grab exim queue. 
+Simple module executing `exim -bpc` to grab exim queue.
 This command can take a lot of time to finish its execution thus it is not recommended to run it every second.
 
 It produces only one chart:
@@ -563,13 +678,13 @@ Configuration is not needed.
 
 # fail2ban
 
-Module monitor fail2ban log file to show all bans for all active jails 
+Module monitor fail2ban log file to show all bans for all active jails
 
 **Requirements:**
  * fail2ban.log file MUST BE readable by netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
- 
+
 It produces one chart with multiple lines (one line per jail)
- 
+
 ### configuration
 
 Sample:
@@ -638,14 +753,14 @@ local:
   port       : '18121'
   secret     : 'adminsecret'
   acct       : False # Freeradius accounting statistics.
-  proxy_auth : False # Freeradius proxy authentication statistics. 
+  proxy_auth : False # Freeradius proxy authentication statistics.
   proxy_acct : False # Freeradius proxy accounting statistics.
 ```
 
 **Freeradius server configuration:**
 
 The configuration for the status server is automatically created in the sites-available directory.
-By default, server is enabled and can be queried from every client. 
+By default, server is enabled and can be queried from every client.
 FreeRADIUS will only respond to status-server messages, if the status-server virtual server has been enabled.
 
 To do this, create a link from the sites-enabled directory to the status file in the sites-available directory:
@@ -668,30 +783,30 @@ For the memory statistics, it produces the following charts:
 
 1. **Heap allocations** in kB
  * alloc: size of objects allocated on the heap
- * inuse: size of allocated heap spans 
- 
+ * inuse: size of allocated heap spans
+
 2. **Stack allocations** in kB
  * inuse: size of allocated stack spans
- 
+
 3. **MSpan allocations** in kB
  * inuse: size of allocated mspan structures
- 
+
 4. **MCache allocations** in kB
  * inuse: size of allocated mcache structures
- 
+
 5. **Virtual memory** in kB
  * sys: size of reserved virtual address space
- 
+
 6. **Live objects**
  * live: number of live objects in memory
- 
+
 7. **GC pauses average** in ns
  * avg: average duration of all GC stop-the-world pauses
- 
+
 ### configuration
- 
+
 Please see the [wiki page](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications#using-netdata-go_expvar-module) for detailed info about module configuration.
- 
+
 ---
 
 # haproxy
@@ -707,13 +822,13 @@ Socket MUST be readable AND writable by netdata user.
 It produces:
 
 1. **Frontend** family charts
- * Kilobytes in/s 
+ * Kilobytes in/s
  * Kilobytes out/s
  * Sessions current
  * Sessions in queue current
 
 2. **Backend** family charts
- * Kilobytes in/s 
+ * Kilobytes in/s
  * Kilobytes out/s
  * Sessions current
  * Sessions in queue current
@@ -745,7 +860,7 @@ If no configuration is given, module will fail to run.
 ---
 
 # hddtemp
- 
+
 Module monitors disk temperatures from one or more hddtemp daemons.
 
 **Requirement:**
@@ -767,6 +882,75 @@ If no configuration is given, module will attempt to connect to hddtemp daemon o
 
 ---
 
+# httpcheck
+
+Module monitors remote http server for availability and response time.
+
+Following charts are drawn per job:
+
+1. **Response time** ms
+ * Time in 0.1 ms resolution in which the server responds.
+   If the connection failed, the value is missing.
+
+2. **Status** boolean
+ * Connection successful
+ * Unexpected content: No Regex match found in the response
+ * Unexpected status code: Do we get 500 errors?
+ * Connection failed: port not listening or blocked
+ * Connection timed out: host or port unreachable
+
+### configuration
+
+Sample configuration and their default values.
+
+```yaml
+server:
+  url: 'http://host:port/path'  # required
+  status_accepted:              # optional
+    - 200
+  timeout: 1                    # optional, supports decimals (e.g. 0.2)
+  update_every: 3               # optional
+  regex: 'REGULAR_EXPRESSION'   # optional, see https://docs.python.org/3/howto/regex.html
+  redirect: yes                 # optional
+```
+
+### notes
+
+ * The status chart is primarily intended for alarms, badges or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * This plugin is meant for simple use cases. Currently, the accuracy of the
+   response time is low and should be used as reference only.
+
+---
+
+# icecast
+
+This module will monitor number of listeners for active sources.
+
+**Requirements:**
+ * icecast version >= 2.4.0
+
+It produces the following charts:
+
+1. **Listeners** in listeners
+ * source number
+
+### configuration
+
+Needs only `url` to server's `/status-json.xsl`
+
+Here is an example for remote server:
+
+```yaml
+remote:
+  url      : 'http://1.2.3.4:8443/status-json.xsl'
+```
+
+Without configuration, module attempts to connect to `http://localhost:8443/status-json.xsl`
+
+---
+
 # IPFS
 
 Module monitors [IPFS](https://ipfs.io) basic information.
@@ -774,13 +958,13 @@ Module monitors [IPFS](https://ipfs.io) basic information.
 1. **Bandwidth** in kbits/s
  * in
  * out
- 
+
 2. **Peers**
  * peers
- 
+
 ### configuration
 
-Only url to IPFS server is needed. 
+Only url to IPFS server is needed.
 
 Sample:
 
@@ -807,11 +991,11 @@ It produces:
 
 2. **Total leases**
  * leases (overall number of leases for all pools)
- 
+
 3. **Active leases** for every pools
   * leases (number of active leases in pool)
 
-  
+
 ### configuration
 
 Sample:
@@ -827,6 +1011,108 @@ The module will not work If no configuration is given.
 
 ---
 
+# litespeed
+
+Module monitor litespeed web server performance metrics.
+
+It produces:
+
+1. **Network Throughput HTTP** in kilobits/s
+ * in
+ * out
+
+2. **Network Throughput HTTPS** in kilobits/s
+ * in
+ * out
+
+3. **Connections HTTP** in connections
+ * free
+ * used
+
+4. **Connections HTTPS** in connections
+ * free
+ * used
+
+5. **Requests** in requests/s
+ * requests
+
+6. **Requests In Processing** in requests
+ * processing
+ 
+7. **Public Cache Hits** in hits/s
+ * hits
+ 
+8. **Private Cache Hits** in hits/s
+ * hits
+ 
+9. **Static Hits** in hits/s
+ * hits 
+
+
+### configuration
+```yaml
+local:
+  path  : 'PATH'
+```
+
+If no configuration is given, module will use "/tmp/lshttpd/".
+
+---
+
+# logind
+
+THis module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+
+It provides the following charts:
+
+1. **Sessions** Tracks the total number of sessions.
+  * Graphical: Local graphical sessions (running X11, or Wayland, or something else).
+  * Console: Local console sessions.
+  * Remote: Remote sessions.
+
+2. **Users** Tracks total number of unique user logins of each type.
+  * Graphical
+  * Console
+  * Remote
+
+3. **Seats** Total number of seats in use.
+  * Seats
+
+### configuration
+
+This module needs no configuration.  Just make sure the netdata user
+can run the `loginctl` command and get a session list without having to
+specify a path.
+
+This will work with any command that can output data in the _exact_
+same format as `loginctl list-sessions --no-legend`.  If you have some
+other command you want to use that outputs data in this format, you can
+specify it using the `command` key like so:
+
+```yaml
+command: '/path/to/other/command'
+```
+
+### notes
+
+* This module's ability to track logins is dependent on what PAM services
+are configured to register sessions with logind.  In particular, for
+most systems, it will only track TTY logins, local desktop logins,
+and logins through remote shell connections.
+
+* The users chart counts _usernames_ not UID's.  This is potentially
+important in configurations where multiple users have the same UID.
+
+* The users chart counts any given user name up to once for _each_ type
+of login.  So if the same user has a graphical and a console login on a
+system, they will show up once in the graphical count, and once in the
+console count.
+
+* Because the data collection process is rather expensive, this plugin
+is currently disabled by default, and needs to be explicitly enabled in
+`/etc/netdata/python.d.conf` before it will run.
+
+---
 
 # mdstat
 
@@ -835,8 +1121,8 @@ Module monitor /proc/mdstat
 It produces:
 
 1. **Health** Number of failed disks in every array (aggregate chart).
- 
-2. **Disks stats** 
+
+2. **Disks stats**
  * total (number of devices array ideally would have)
  * inuse (number of devices currently are in use)
 
@@ -845,13 +1131,42 @@ It produces:
  * recovery in percent
  * reshape in percent
  * check in percent
- 
+
 4. **Operation status** (if resync/recovery/reshape/check is active)
  * finish in minutes
  * speed in megabytes/s
-  
+
 ### configuration
 No configuration is needed.
+
+---
+
+# megacli
+
+Module collects adapter, physical drives and battery stats.
+
+**Requirements:**
+ * `netdata` user needs to be able to be able to sudo the `megacli` program without password
+
+To grab stats it executes:
+ * `sudo -n megacli -LDPDInfo -aAll`
+ * `sudo -n megacli -AdpBbuCmd -a0`
+ 
+ 
+It produces:
+
+1. **Adapter State**
+
+2. **Physical Drives Media Errors**
+
+3. **Physical Drives Predictive Failures**
+
+4. **Battery Relative State of Charge**
+
+5. **Battery Cycle Count**
+
+### configuration
+Battery stats disabled by default in the module configuration file.
 
 ---
 
@@ -862,20 +1177,20 @@ Memcached monitoring module. Data grabbed from [stats interface](https://github.
 1. **Network** in kilobytes/s
  * read
  * written
- 
+
 2. **Connections** per second
  * current
  * rejected
  * total
- 
+
 3. **Items** in cluster
  * current
  * total
- 
+
 4. **Evicted and Reclaimed** items
  * evicted
  * reclaimed
- 
+
 5. **GET** requests/s
  * hits
  * misses
@@ -885,7 +1200,7 @@ Memcached monitoring module. Data grabbed from [stats interface](https://github.
 
 7. **SET rate** rate in requests/s
  * rate
- 
+
 8. **DELETE** requests/s
  * hits
  * misses
@@ -894,22 +1209,22 @@ Memcached monitoring module. Data grabbed from [stats interface](https://github.
  * hits
  * misses
  * bad value
- 
+
 10. **Increment** requests/s
  * hits
  * misses
- 
+
 11. **Decrement** requests/s
  * hits
  * misses
- 
+
 12. **Touch** requests/s
  * hits
  * misses
- 
+
 13. **Touch rate** rate in requests/s
  * rate
- 
+
 ### configuration
 
 Sample:
@@ -1123,7 +1438,7 @@ It will produce following charts (if data is available):
 
 You can provide, per server, the following:
 
-1. username which have access to database (deafults to 'root')
+1. username which have access to database (defaults to 'root')
 2. password (defaults to none)
 3. mysql my.cnf configuration file
 4. mysql socket (optional)
@@ -1161,7 +1476,7 @@ If no configuration is given, module will attempt to connect to mysql server via
 
 # nginx
 
-This module will monitor one or more nginx servers depending on configuration. Servers can be either local or remote. 
+This module will monitor one or more nginx servers depending on configuration. Servers can be either local or remote.
 
 **Requirements:**
  * nginx with configured 'ngx_http_stub_status_module'
@@ -1181,11 +1496,11 @@ It produces following charts:
  * reading
  * writing
  * waiting
- 
+
 4. **Connections Rate** in connections/s
  * accepts
  * handled
- 
+
 ### configuration
 
 Needs only `url` to server's `stub_status`
@@ -1202,6 +1517,132 @@ local:
 ```
 
 Without configuration, module attempts to connect to `http://localhost/stub_status`
+
+---
+
+# nginx_plus
+
+This module will monitor one or more nginx_plus servers depending on configuration.
+Servers can be either local or remote.
+
+Example nginx_plus configuration can be found in 'python.d/nginx_plus.conf'
+
+It produces following charts:
+
+1. **Requests total** in requests/s
+ * total
+
+2. **Requests current** in requests
+ * current
+
+3. **Connection Statistics** in connections/s
+ * accepted
+ * dropped
+
+4. **Workers Statistics** in workers
+ * idle
+ * active
+
+5. **SSL Handshakes** in handshakes/s
+ * successful
+ * failed
+
+6. **SSL Session Reuses** in sessions/s
+ * reused
+
+7. **SSL Memory Usage** in percent
+ * usage
+
+8. **Processes** in processes
+ * respawned
+
+For every server zone:
+
+1. **Processing** in requests
+ * processing
+
+2. **Requests** in requests/s
+ * requests
+
+3. **Responses** in requests/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+4. **Traffic** in kilobits/s
+ * received
+ * sent
+
+For every upstream:
+
+1. **Peers Requests** in requests/s
+ * peer name (dimension per peer)
+
+2. **All Peers Responses** in responses/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+3. **Peer Responses** in requests/s (for every peer)
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+
+4. **Peers Connections** in active
+ * peer name (dimension per peer)
+
+5. **Peers Connections Usage** in percent
+ * peer name (dimension per peer)
+
+6. **All Peers Traffic** in KB
+ * received
+ * sent
+
+7. **Peer Traffic** in KB/s (for every peer)
+ * received
+ * sent
+
+8. **Peer Timings** in ms (for every peer)
+ * header
+ * response
+
+9. **Memory Usage** in percent
+ * usage
+
+10. **Peers Status** in state
+ * peer name (dimension per peer)
+
+11. **Peers Total Downtime** in seconds
+ * peer name (dimension per peer)
+
+For every cache:
+
+1. **Traffic** in KB
+ * served
+ * written
+ * bypass
+
+2. **Memory Usage** in percent
+ * usage
+
+### configuration
+
+Needs only `url` to server's `status`
+
+Here is an example for local server:
+
+```yaml
+local:
+  url     : 'http://localhost/status'
+```
+
+Without configuration, module fail to start.
 
 ---
 
@@ -1260,9 +1701,81 @@ Configuration is not needed.
 
 ---
 
+# ntpd
+
+Module monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`, the [standard NTP query program](http://doc.ntp.org/current-stable/ntpq.html).
+
+**Requirements:**
+ * Version: `NTPv4`
+ * Local interrogation allowed in `/etc/ntp.conf` (default):
+
+```
+# Local users may interrogate the ntp server more closely.
+restrict 127.0.0.1
+restrict ::1
+```
+
+It produces:
+
+1. system
+ * offset
+ * jitter
+ * frequency
+ * delay
+ * dispersion
+ * stratum
+ * tc
+ * precision
+
+2. peers
+ * offset
+ * delay
+ * dispersion
+ * jitter
+ * rootdelay
+ * rootdispersion
+ * stratum
+ * hmode
+ * pmode
+ * hpoll
+ * ppoll
+ * precision
+
+**configuration**
+
+Sample:
+
+```yaml
+update_every: 10
+
+host: 'localhost'
+port: '123'
+show_peers: yes
+# hide peers with source address in ranges 127.0.0.0/8 and 192.168.0.0/16
+peer_filter: '(127\..*)|(192\.168\..*)'
+# check for new/changed peers every 60 updates
+peer_rescan: 60
+```
+
+Sample (multiple jobs):
+
+Note: `ntp.conf` on the host `otherhost` must be configured to allow queries from our local host by including a line like `restrict <IP> nomodify notrap nopeer`.
+
+```yaml
+local:
+    host: 'localhost'
+
+otherhost:
+    host: 'otherhost'
+```
+
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `show_peers: yes` to also show the charts for configured peers. Local peers in the range `127.0.0.0/8` are hidden by default, use `peer_filter: ''` to show all peers.
+
+---
+
 # ovpn_status_log
 
-Module monitor openvpn-status log file. 
+Module monitor openvpn-status log file.
 
 **Requirements:**
 
@@ -1272,16 +1785,16 @@ Module monitor openvpn-status log file.
  * Make sure NETDATA USER CAN READ openvpn-status.log
 
  * Update_every interval MUST MATCH interval on which OpenVPN writes operational status to log file.
- 
+
 It produces:
 
 1. **Users** OpenVPN active users
  * users
- 
+
 2. **Traffic** OpenVPN overall bandwidth usage in kilobit/s
  * in
  * out
- 
+
 ### configuration
 
 Sample:
@@ -1295,12 +1808,12 @@ default
 
 # phpfpm
 
-This module will monitor one or more php-fpm instances depending on configuration. 
+This module will monitor one or more php-fpm instances depending on configuration.
 
 **Requirements:**
  * php-fpm with enabled `status` page
  * access to `status` page via web server
- 
+
 It produces following charts:
 
 1. **Active Connections**
@@ -1310,15 +1823,15 @@ It produces following charts:
 
 2. **Requests** in requests/s
  * requests
- 
+
 3. **Performance**
  * reached
  * slow
- 
+
 ### configuration
 
 Needs only `url` to server's `status`
- 
+
 Here is an example for local instance:
 
 ```yaml
@@ -1334,6 +1847,42 @@ Without configuration, module attempts to connect to `http://localhost/status`
 
 ---
 
+# portcheck
+
+Module monitors a remote TCP service.
+
+Following charts are drawn per host:
+
+1. **Latency** ms
+ * Time required to connect to a TCP port.
+   Displays latency in 0.1 ms resolution. If the connection failed, the value is missing.
+
+2. **Status** boolean
+ * Connection successful
+ * Could not create socket: possible DNS problems
+ * Connection refused: port not listening or blocked
+ * Connection timed out: host or port unreachable
+
+
+### configuration
+
+```yaml
+server:
+  host: 'dns or ip'     # required
+  port: 22              # required
+  timeout: 1            # optional
+  update_every: 1       # optional
+```
+
+### notes
+
+ * The error chart is intended for alarms, badges or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * Currently, the accuracy of the latency is low and should be used as reference only.
+
+---
+
 # postfix
 
 Simple module executing `postfix -p` to grab postfix queue.
@@ -1342,7 +1891,7 @@ It produces only two charts:
 
 1. **Postfix Queue Emails**
  * emails
- 
+
 2. **Postfix Queue Emails Size** in KB
  * size
 
@@ -1356,7 +1905,7 @@ Module monitors one or more postgres servers.
 
 **Requirements:**
 
- * `python-psycopg2` package. You have to install to manually.
+ * `python-psycopg2` package. You have to install it manually.
 
 Following charts are drawn:
 
@@ -1374,10 +1923,10 @@ Following charts are drawn:
 4. **Checkpoints** writes/s
  * scheduled
  * requested
- 
+
 5. **Current connections to db** count
  * connections
- 
+
 6. **Tuples returned from db** tuples/s
  * sequential
  * bitmap
@@ -1398,7 +1947,7 @@ Following charts are drawn:
 
 10. **Locks on db** count per type
  * locks
- 
+
 ### configuration
 
 ```yaml
@@ -1458,6 +2007,55 @@ local:
 
 ---
 
+# puppet
+
+Monitor status of Puppet Server and Puppet DB.
+
+Following charts are drawn:
+
+1. **JVM Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+2. **JVM Non-Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+3. **CPU Usage**
+ * execution
+ * GC (taken by garbage collection)
+4. **File Descriptors**
+ * max
+ * used
+
+
+### configuration
+
+```yaml
+puppetdb:
+    url: 'https://fqdn.example.com:8081'
+    tls_cert_file: /path/to/client.crt
+    tls_key_file: /path/to/client.key
+    autodetection_retry: 1
+    retries: 3600
+
+puppetserver:
+    url: 'https://fqdn.example.com:8140'
+    autodetection_retry: 1
+    retries: 3600
+```
+
+When no configuration is given then `https://fqdn.example.com:8140` is
+tried without any retries.
+
+### notes
+
+* Exact Fully Qualified Domain Name of the node should be used.
+* Usually Puppet Server/DB startup time is VERY long. So, there should
+  be quite reasonable retry count.
+* Secure PuppetDB config may require client certificate. Not applies
+  to default PuppetDB configuration though.
+
+---
+
 # rabbitmq
 
 Module monitor rabbitmq performance and health metrics.
@@ -1490,10 +2088,13 @@ Following charts are drawn:
 6. **Erlang processes**
  * used processes
 
-7. **Memory**
+7. **Erlang run queue**
+ * Erlang run queue
+
+8. **Memory**
  * free memory in megabytes
 
-8. **Disk Space**
+9. **Disk Space**
  * free disk space in gigabytes
 
 ### configuration
@@ -1528,16 +2129,16 @@ Following charts are drawn:
  * total
  * lua
 
-4. **Database keys** 
+4. **Database keys**
  * lines are creates dynamically based on how many databases are there
- 
+
 5. **Clients**
  * connected
  * blocked
- 
+
 6. **Slaves**
  * connected
- 
+
 ### configuration
 
 ```yaml
@@ -1635,6 +2236,62 @@ Please join this discussion for help.
 
 ---
 
+# spigotmc
+
+This module does some really basic monitoring for Spigot Minecraft servers.
+
+It provides two charts, one tracking server-side ticks-per-second in
+1, 5 and 15 minute averages, and one tracking the number of currently
+active users.
+
+This is not compatible with Spigot plugins which change the format of
+the data returned by the `tps` or `list` console commands.
+
+### configuration
+
+```yaml
+host: localhost
+port: 25575
+password: pass
+```
+
+By default, a connection to port 25575 on the local system is attempted with an empty password.
+
+---
+
+# springboot
+
+This module will monitor one or more Java Spring-boot applications depending on configuration.
+
+It produces following charts:
+
+1. **Response Codes** in requests/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+ * others
+
+2. **Threads**
+ * daemon
+ * total
+
+3. **GC Time** in milliseconds and **GC Operations** in operations/s
+ * Copy
+ * MarkSweep
+ * ...
+
+4. **Heap Mmeory Usage** in KB
+ * used
+ * committed
+
+### configuration
+
+Please see the [Monitoring Java Spring Boot Applications](https://github.com/firehol/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
+
+---
+
 # squid
 
 This module will monitor one or more squid instances depending on configuration.
@@ -1654,11 +2311,11 @@ It produces following charts:
 3. **Server Bandwidth** in kilobits/s
  * in
  * out
- 
+
 4. **Server Requests** in requests/s
  * requests
  * errors
- 
+
 ### configuration
 
 ```yaml
@@ -1671,7 +2328,7 @@ local:
 ```
 
 Without any configuration module will try to autodetect where squid presents its `counters` data
- 
+
 ---
 
 # smartd_log
@@ -1685,7 +2342,7 @@ It produces following charts (you can add additional attributes in the module co
 2. **Start/Stop Count** attribute 4
 
 3. **Reallocated Sectors Count** attribute 5
- 
+
 4. **Seek Error Rate** attribute 7
 
 5. **Power-On Hours Count** attribute 9
@@ -1697,11 +2354,11 @@ It produces following charts (you can add additional attributes in the module co
 8. **Temperature** attribute 194
 
 9. **Current Pending Sectors** attribute 197
- 
+
 10. **Off-Line Uncorrectable** attribute 198
 
 11. **Write Error Rate** attribute 200
- 
+
 ### configuration
 
 ```yaml
@@ -1710,7 +2367,7 @@ local:
 ```
 
 If no configuration is given, module will attempt to read log files in /var/log/smartd/ directory.
- 
+
 ---
 
 # tomcat
@@ -1728,10 +2385,10 @@ Charts:
 3. **Threads**
  * current
  * busy
- 
+
 4. **JVM Free Memory** in MB
  * jvm
- 
+
 ### configuration
 
 ```yaml
@@ -1742,10 +2399,142 @@ localhost:
   pass : 'secret_tomcat_password'
 ```
 
-Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials. 
+Without configuration, module attempts to connect to `http://localhost:8080/manager/status?XML=true`, without any credentials.
 So it will probably fail.
 
---- 
+---
+
+# Traefik
+
+Module uses the `health` API to provide statistics.
+
+It produces:
+
+1. **Responses** by statuses
+ * success (1xx, 2xx, 304)
+ * error (5xx)
+ * redirect (3xx except 304)
+ * bad (4xx)
+ * other (all other responses)
+
+2. **Responses** by codes
+ * 2xx (successful)
+ * 5xx (internal server errors)
+ * 3xx (redirect)
+ * 4xx (bad)
+ * 1xx (informational)
+ * other (non-standart responses)
+
+3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
+
+4. **Requests**/s
+ * request statistics
+
+5. **Total response time**
+ * sum of all response time
+
+6. **Average response time**
+
+7. **Average response time per iteration**
+
+8. **Uptime**
+ * Traefik server uptime
+
+### configuration
+
+Needs only `url` to server's `health`
+
+Here is an example for local server:
+
+```yaml
+update_every : 1
+priority     : 60000
+
+local:
+  url     : 'http://localhost:8080/health'
+  retries : 10
+```
+
+Without configuration, module attempts to connect to `http://localhost:8080/health`.
+
+---
+
+# Unbound
+
+Monitoring uses the remote control interface to fetch statistics.
+
+Provides the following charts:
+
+1. **Queries Processed**
+ * Ratelimited
+ * Cache Misses
+ * Cache Hits
+ * Expired
+ * Prefetched
+ * Recursive
+
+2. **Request List**
+ * Average Size
+ * Max Size
+ * Overwritten Requests
+ * Overruns
+ * Current Size
+ * User Requests
+
+3. **Recursion Timings**
+ * Average recursion processing time
+ * Median recursion processing time
+
+If extended stats are enabled, also provides:
+
+4. **Cache Sizes**
+ * Message Cache
+ * RRset Cache
+ * Infra Cache
+ * DNSSEC Key Cache
+ * DNSCrypt Shared Secret Cache
+ * DNSCrypt Nonce Cache
+
+### configuration
+
+Unbound must be manually configured to enable the remote-control protocol.
+Check the Unbound documentation for info on how to do this.  Additionally,
+if you want to take advantage of the autodetection this plugin offers,
+you will need to make sure your `unbound.conf` file only uses spaces for
+indentation (the default config shipped by most distributions uses tabs
+instead of spaces).
+
+Once you have the Unbound control protocol enabled, you need to make sure
+that either the certificate and key are readable by Netdata (if you're
+using the regular control interface), or that the socket is accessible
+to Netdata (if you're using a UNIX socket for the contorl interface).
+
+By default, for the local system, everything can be auto-detected
+assuming Unbound is configured correctly and has been told to listen
+on the loopback interface or a UNIX socket.  This is done by looking
+up info in the Unbound config file specified by the `ubconf` key.
+
+To enable extended stats for a given job, add `extended: yes` to the
+definition.
+
+You can also enable per-thread charts for a given job by adding
+`per_thread: yes` to the definition.  Note that the numbe rof threads
+is only checked on startup.
+
+A basic local configuration with extended statistics and per-thread
+charts looks like this:
+
+```yaml
+local:
+    ubconf: /etc/unbound/unbound.conf
+    extended: yes
+    per_thread: yes
+```
+
+While it's a bit more complicated to set up correctly, it is recommended
+that you use a UNIX socket as it provides far better performance.
+
+---
 
 # varnish cache
 
@@ -1753,63 +2542,81 @@ Module uses the `varnishstat` command to provide varnish cache statistics.
 
 It produces:
 
-1. **Client metrics**
- * session accepted
- * session dropped
- * good client requests received
+1. **Connections Statistics** in connections/s
+ * accepted
+ * dropped
 
-2. **All history hit rate ratio**
- * cache hits in percent
- * cache miss in percent
- * cache hits for pass percent
+2. **Client Requests** in requests/s
+ * received
 
-3. **Curent poll hit rate ratio**
- * cache hits in percent
- * cache miss in percent
- * cache hits for pass percent
+3. **All History Hit Rate Ratio** in percent
+ * hit
+ * miss
+ * hitpass
 
-4. **Thread-related metrics** (only for varnish version 4+)
- * total number of threads
- * threads created
- * threads creation failed
- * threads hit max
- * length os session queue
- * sessions queued for thread
+4. **Current Poll Hit Rate Ratio** in percent
+ * hit
+ * miss
+ * hitpass
 
-5. **Backend health**
- * backend conn. success
- * backend conn. not attempted
- * backend conn. too many
- * backend conn. failures
- * backend conn. reuses
- * backend conn. recycles
- * backend conn. retry
- * backend requests made
+5. **Expired Objects** in expired/s
+ * objects
 
-6. **Memory usage**
- * memory available in megabytes
- * memory allocated in megabytes
+6. **Least Recently Used Nuked Objects** in nuked/s
+ * objects
 
-7. **Problems summary**
- * session dropped
- * session accept failures
- * session pipe overflow
- * backend conn. not attempted
- * fetch failed (all causes)
- * backend conn. too many
- * threads hit max
- * threads destroyed
- * length of session queue
- * HTTP header overflows
- * ESI parse errors
- * ESI parse warnings
 
-8. **Uptime**
- * varnish instance uptime in seconds
+7. **Number Of Threads In All Pools** in threads
+ * threads
+
+8. **Threads Statistics** in threads/s
+ * created
+ * failed
+ * limited
+
+9. **Current Queue Length** in requests
+ * in queue
+
+10. **Backend Connections Statistics** in connections/s
+ * successful
+ * unhealthy
+ * reused
+ * closed
+ * resycled
+ * failed
+
+10. **Requests To The Backend** in requests/s
+ * received
+
+11. **ESI Statistics** in problems/s
+ * errors
+ * warnings
+
+12. **Memory Usage** in MB
+ * free
+ * allocated
+
+13. **Uptime** in seconds
+ * uptime
+
 
 ### configuration
 
 No configuration is needed.
+
+---
+
+# w1sensor
+
+Data from 1-Wire sensors.
+On Linux these are supported by the wire, w1_gpio, and w1_therm modules.
+Currently temperature sensors are supported and automatically detected.
+
+Charts are created dynamically based on the number of detected sensors.
+
+### configuration
+
+For detailed configuration information please read [`w1sensor.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
 
 ---
 
@@ -1836,7 +2643,7 @@ It produces following charts:
  * unmatched (the lines in the log file that are not matched)
 
 3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
- 
+
 4. **Bandwidth** KB/s
  * received (bandwidth of requests)
  * send (bandwidth of responses)
@@ -1858,7 +2665,7 @@ It produces following charts:
 
 11. **All Time Unique Client IPs** unique ips/s (unique client IPs since the last restart of netdata)
 
- 
+
 ### configuration
 
 ```yaml
@@ -1876,4 +2683,4 @@ apache_log:
 
 Module has preconfigured jobs for nginx, apache and gunicorn on various distros.
 
---- 
+---

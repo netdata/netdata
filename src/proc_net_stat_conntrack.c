@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define RRD_TYPE_NET_STAT_NETFILTER     "netfilter"
@@ -142,7 +143,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "active connections"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3000
+                    , NETDATA_CHART_PRIO_NETFILTER
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -175,7 +176,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "connections/s"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3001
+                    , NETDATA_CHART_PRIO_NETFILTER + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -212,7 +213,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "changes/s"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3002
+                    , NETDATA_CHART_PRIO_NETFILTER + 2
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -249,7 +250,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "expectations/s"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3003
+                    , NETDATA_CHART_PRIO_NETFILTER + 3
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -286,7 +287,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "searches/s"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3010
+                    , NETDATA_CHART_PRIO_NETFILTER + 10
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -324,7 +325,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , "events/s"
                     , "proc"
                     , "net/stat/nf_conntrack"
-                    , 3005
+                    , NETDATA_CHART_PRIO_NETFILTER + 5
                     , update_every
                     , RRDSET_TYPE_LINE
             );

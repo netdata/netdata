@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -205,9 +206,10 @@ static calculated_number rrdvar2number(RRDVAR *rv) {
 
 int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
     RRDSET *st = rc->rrdset;
-    RRDVAR *rv;
-
     if(!st) return 0;
+
+    RRDHOST *host = st->rrdhost;
+    RRDVAR *rv;
 
     rv = rrdvar_index_find(&st->rrdvar_root_index, variable, hash);
     if(rv) {
@@ -221,7 +223,7 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
         return 1;
     }
 
-    rv = rrdvar_index_find(&st->rrdhost->rrdvar_root_index, variable, hash);
+    rv = rrdvar_index_find(&host->rrdvar_root_index, variable, hash);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;
@@ -246,7 +248,7 @@ static int single_variable2json(void *entry, void *data) {
     if(unlikely(isnan(value) || isinf(value)))
         buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
     else
-        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5Lf", helper->counter?",":"", rv->name, (long double)value);
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
 
     helper->counter++;
 
@@ -254,6 +256,8 @@ static int single_variable2json(void *entry, void *data) {
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
+    RRDHOST *host = st->rrdhost;
+
     struct variable2json_helper helper = {
             .buf = buf,
             .counter = 0
@@ -264,9 +268,9 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     buffer_sprintf(buf, "\n\t},\n\t\"family\": \"%s\",\n\t\"family_variables\": {", st->family);
     helper.counter = 0;
     avl_traverse_lock(&st->rrdfamily->rrdvar_root_index, single_variable2json, (void *)&helper);
-    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", st->rrdhost->hostname);
+    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", host->hostname);
     helper.counter = 0;
-    avl_traverse_lock(&st->rrdhost->rrdvar_root_index, single_variable2json, (void *)&helper);
+    avl_traverse_lock(&host->rrdvar_root_index, single_variable2json, (void *)&helper);
     buffer_strcat(buf, "\n\t}\n}\n");
 }
 

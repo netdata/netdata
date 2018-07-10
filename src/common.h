@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
@@ -74,8 +75,27 @@
 
 #include <sys/resource.h>
 #include <sys/socket.h>
+
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
+
+#ifdef HAVE_SYS_VFS_H
+#include <sys/vfs.h>
+#endif
+
+#ifdef HAVE_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
+
+#ifdef HAVE_SYS_STATVFS_H
 #include <sys/statvfs.h>
+#endif
+
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -99,6 +119,7 @@
 
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
+#include <float.h>
 #endif
 
 #if defined(HAVE_INTTYPES_H)
@@ -114,6 +135,70 @@
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
 #endif
+
+// ----------------------------------------------------------------------------
+// netdata chart priorities
+
+// This is a work in progress - to scope is to collect here all chart priorities.
+// These should be based on the CONTEXT of the charts + the chart id when needed
+// - for each SECTION +1000 (or +X000 for big sections)
+// - for each FAMILY  +100
+// - for each CHART   +10
+
+#define NETDATA_CHART_PRIO_SYSTEM_IPV4             501
+
+// Memory Section - 1xxx
+#define NETDATA_CHART_PRIO_MEM_SYSTEM              1000
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE    1010
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED    1020
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS     1030
+#define NETDATA_CHART_PRIO_MEM_KERNEL              1100
+#define NETDATA_CHART_PRIO_MEM_SLAB                1200
+#define NETDATA_CHART_PRIO_MEM_HUGEPAGES           1250
+#define NETDATA_CHART_PRIO_MEM_KSM                 1300
+#define NETDATA_CHART_PRIO_MEM_NUMA                1400
+#define NETDATA_CHART_PRIO_MEM_HW                  1500
+
+
+// IPv4
+
+#define NETDATA_CHART_PRIO_IPV4                    3000
+#define NETDATA_CHART_PRIO_IPV4_SOCKETS            3000
+#define NETDATA_CHART_PRIO_IPV4_PACKETS            3050
+#define NETDATA_CHART_PRIO_IPV4_ERRORS             3100
+
+#define NETDATA_CHART_PRIO_IPV4_ICMP               3150
+
+#define NETDATA_CHART_PRIO_IPV4_TCP                3200
+#define NETDATA_CHART_PRIO_IPV4_TCP_MEM            3290
+
+#define NETDATA_CHART_PRIO_IPV4_UDP                3300
+#define NETDATA_CHART_PRIO_IPV4_UDP_MEM            3390
+
+#define NETDATA_CHART_PRIO_IPV4_UDPLITE            3400
+
+#define NETDATA_CHART_PRIO_IPV4_RAW                3450
+
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS          3460
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM      3470
+
+#define NETDATA_CHART_PRIO_IPV4_BCAST              3500
+#define NETDATA_CHART_PRIO_IPV4_MCAST              3600
+#define NETDATA_CHART_PRIO_IPV4_ECN                3700
+
+// IPv6
+
+#define NETDATA_CHART_PRIO_IPV6                    3500
+
+// SCTP
+
+#define NETDATA_CHART_PRIO_SCTP                    3600
+
+// Netfilter
+
+#define NETDATA_CHART_PRIO_NETFILTER               3700
+#define NETDATA_CHART_PRIO_SYNPROXY                3750
+
 
 // ----------------------------------------------------------------------------
 // netdata common definitions
@@ -134,6 +219,12 @@
 #define NEVERNULL __attribute__((returns_nonnull))
 #else
 #define NEVERNULL
+#endif
+
+#ifdef HAVE_FUNC_ATTRIBUTE_NOINLINE
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
 #endif
 
 #ifdef HAVE_FUNC_ATTRIBUTE_MALLOC
@@ -163,7 +254,7 @@
 #ifdef abs
 #undef abs
 #endif
-#define abs(x) ((x < 0)? -x : x)
+#define abs(x) (((x) < 0)? (-(x)) : (x))
 
 #define GUID_LEN 36
 
@@ -172,6 +263,7 @@
 
 #include "clocks.h"
 #include "log.h"
+#include "threads.h"
 #include "locks.h"
 #include "simple_pattern.h"
 #include "avl.h"
@@ -292,9 +384,9 @@ extern int memory_file_save(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
 
-extern int enable_ksm;
+extern struct rlimit rlimit_nofile;
 
-extern pid_t gettid(void);
+extern int enable_ksm;
 
 extern int sleep_usec(usec_t usec);
 
@@ -302,6 +394,7 @@ extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 extern int processors;
 extern long get_system_cpus(void);
+extern int verify_netdata_host_prefix();
 
 extern pid_t pid_max;
 extern pid_t get_system_pid_max(void);

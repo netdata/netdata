@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #include <sys/vmmeter.h>
@@ -273,7 +274,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             "MB",
                             "freebsd",
                             "vm.vmtotal",
-                            5000,
+                            NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED,
                             update_every,
                             RRDSET_TYPE_AREA
                     );
@@ -1107,7 +1108,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                     "page faults/s",
                     "freebsd",
                     "vm.stats.vm.v_pgfaults",
-                    500,
+                    NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS,
                     update_every,
                     RRDSET_TYPE_LINE
             );

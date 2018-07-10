@@ -1,4 +1,5 @@
 'use strict';
+// SPDX-License-Identifier: GPL-3.0+
 
 // This program will connect to one Stiebel Eltron ISG for heatpump heating
 // to get the heat pump metrics.
@@ -116,7 +117,7 @@ var stiebeleltron = {
             title: chartDefinition.title,
             units: chartDefinition.unit,
             family: context.category.name,
-            context: 'stiebeleltron.' + context.page.id + "." + context.category.id,
+            context: 'stiebeleltron.' + context.category.id + '.' + chartDefinition.id,
             type: chartDefinition.type,
             priority: stiebeleltron.base_priority + chartDefinition.prio,// the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart

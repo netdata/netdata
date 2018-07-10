@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
 ACLOCAL_AMFLAGS = -I m4
@@ -38,10 +39,22 @@ EXTRA_DIST = \
     m4/ax_c__generic.m4 \
 	autogen.sh \
 	README.md \
+	CONTRIBUTORS.md \
 	LICENSE \
-	LICENSE.md \
-	LICENSE-REDISTRIBUTED.md \
-	COPYING \
+	LICENSES/Apache-2.0 \
+	LICENSES/BSD-2-Clause \
+	LICENSES/BSD-3-Clause \
+	LICENSES/CC-BY-4.0 \
+	LICENSES/CC0-1.0 \
+	LICENSES/FSFAP \
+	LICENSES/GPL-3.0 \
+	LICENSES/LGPL-2.1 \
+	LICENSES/LGPL-3.0 \
+	LICENSES/MIT \
+	LICENSES/OFL-1.1 \
+	LICENSES/Python-2.0 \
+	LICENSES/WTFPL \
+	REDISTRIBUTED.md \
 	autogen.sh \
 	$(NULL)
 
@@ -61,9 +74,13 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	cppcheck.sh \
 	configs.signatures \
 	Dockerfile \
+	Dockerfile.alpine \
+	Dockerfile.aarch64 \
 	Dockerfile.armv7hf \
+	netdata.cppcheck \
 	netdata.spec \
 	package.json \
 	$(NULL)

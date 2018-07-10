@@ -38,9 +38,7 @@
 #   Copyright (c) 2011 Rhys Ulerich <rhys.ulerich@gmail.com>
 #   Copyright (c) 2014, 2015 Philip Withnall <philip@tecnocode.co.uk>
 #
-#   Copying and distribution of this file, with or without modification, are
-#   permitted in any medium without royalty provided the copyright notice
-#   and this notice are preserved.
+#   SPDX-License-Identifier: FSFAP
 
 #serial 5
 

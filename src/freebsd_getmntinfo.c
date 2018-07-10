@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #include <sys/mount.h>
@@ -122,7 +123,7 @@ static struct mount_point *get_mount_point(const char *name) {
 int do_getmntinfo(int update_every, usec_t dt) {
     (void)dt;
 
-#define DELAULT_EXLUDED_PATHS "/proc/*"
+#define DELAULT_EXCLUDED_PATHS "/proc/*"
 // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
 #define DEFAULT_EXCLUDED_FILESYSTEMS "autofs procfs subfs devfs none"
 #define CONFIG_SECTION_GETMNTINFO "plugin:freebsd:getmntinfo"
@@ -142,14 +143,16 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
         excluded_mountpoints = simple_pattern_create(
                 config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths",
-                           DELAULT_EXLUDED_PATHS),
-                SIMPLE_PATTERN_EXACT
+                           DELAULT_EXCLUDED_PATHS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
         );
 
         excluded_filesystems = simple_pattern_create(
                 config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on filesystems",
-                           DEFAULT_EXCLUDED_FILESYSTEMS),
-                SIMPLE_PATTERN_EXACT
+                           DEFAULT_EXCLUDED_FILESYSTEMS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
         );
     }
 

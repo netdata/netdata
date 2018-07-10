@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -111,6 +112,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *os,
                         const char *timezone,
                         const char *tags,
+                        const char *program_name,
+                        const char *program_version,
                         int update_every,
                         long entries,
                         RRD_MEMORY_MODE memory_mode,
@@ -146,6 +149,9 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
+
+    host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
+    host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
@@ -265,6 +271,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", os '%s'"
                      ", timezone '%s'"
                      ", tags '%s'"
+                     ", program_name '%s'"
+                     ", program_version '%s'"
                      ", update every %d"
                      ", memory mode %s"
                      ", history entries %ld"
@@ -282,6 +290,8 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->os
              , host->timezone
              , (host->tags)?host->tags:""
+             , host->program_name
+             , host->program_version
              , host->rrd_update_every
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
@@ -309,6 +319,8 @@ RRDHOST *rrdhost_find_or_create(
         , const char *os
         , const char *timezone
         , const char *tags
+        , const char *program_name
+        , const char *program_version
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
@@ -329,6 +341,8 @@ RRDHOST *rrdhost_find_or_create(
                 , os
                 , timezone
                 , tags
+                , program_name
+                , program_version
                 , update_every
                 , history
                 , mode
@@ -342,10 +356,25 @@ RRDHOST *rrdhost_find_or_create(
     else {
         host->health_enabled = health_enabled;
 
-        if(strcmp(host->hostname, hostname)) {
+        if(strcmp(host->hostname, hostname) != 0) {
+            info("Host '%s' has been renamed to '%s'. If this is not intentional it may mean multiple hosts are using the same machine_guid.", host->hostname, hostname);
             char *t = host->hostname;
             host->hostname = strdupz(hostname);
             host->hash_hostname = simple_hash(host->hostname);
+            freez(t);
+        }
+
+        if(strcmp(host->program_name, program_name) != 0) {
+            info("Host '%s' switched program name from '%s' to '%s'", host->hostname, host->program_name, program_name);
+            char *t = host->program_name;
+            host->program_name = strdupz(program_name);
+            freez(t);
+        }
+
+        if(strcmp(host->program_version, program_version) != 0) {
+            info("Host '%s' switched program version from '%s' to '%s'", host->hostname, host->program_version, program_version);
+            char *t = host->program_version;
+            host->program_version = strdupz(program_version);
             freez(t);
         }
 
@@ -407,6 +436,9 @@ restart_after_removal:
 
 void rrd_init(char *hostname) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if(gap_when_lost_iterations_above < 1)
+        gap_when_lost_iterations_above = 1;
 
     health_init();
     registry_init();
@@ -421,6 +453,8 @@ void rrd_init(char *hostname) {
             , os_type
             , netdata_configured_timezone
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
             , default_rrd_update_every
             , default_rrd_history_entries
             , default_rrd_memory_mode
@@ -530,6 +564,8 @@ void rrdhost_free(RRDHOST *host) {
     freez((void *)host->tags);
     freez((void *)host->os);
     freez((void *)host->timezone);
+    freez(host->program_version);
+    freez(host->program_name);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);

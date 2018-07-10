@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 /*
  * procfile is a library for reading kernel files from /proc
  *
@@ -103,11 +104,14 @@ extern char *procfile_filename(procfile *ff);
 
 // ----------------------------------------------------------------------------
 
+// set to the O_XXXX flags, to have procfile_open and procfile_reopen use them when opening proc files
+extern int procfile_open_flags;
+
 // set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
 extern int procfile_adaptive_initial_allocation;
 
 // return the number of lines present
-#define procfile_lines(ff) (ff->lines->len)
+#define procfile_lines(ff) ((ff)->lines->len)
 
 // return the number of words of the Nth line
 #define procfile_linewords(ff, line) (((line) < procfile_lines(ff)) ? (ff)->lines->lines[(line)].words : 0)
@@ -119,6 +123,6 @@ extern int procfile_adaptive_initial_allocation;
 #define procfile_line(ff, line) (((line) < procfile_lines(ff)) ? procfile_word((ff), (ff)->lines->lines[(line)].first) : "")
 
 // return the Nth word of the current line
-#define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords(ff, (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + word) : "")
+#define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords((ff), (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + (word)) : "")
 
 #endif /* NETDATA_PROCFILE_H */

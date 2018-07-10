@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: dns_query_time netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 from random import choice
 from threading import Thread

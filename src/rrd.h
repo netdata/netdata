@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
@@ -9,6 +10,7 @@
 
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
+extern int gap_when_lost_iterations_above;
 
 #define RRD_ID_LENGTH_MAX 200
 
@@ -17,6 +19,8 @@ extern int default_rrd_history_entries;
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
+
+typedef struct rrdhost RRDHOST;
 
 // ----------------------------------------------------------------------------
 // chart types
@@ -99,18 +103,19 @@ typedef struct rrdfamily RRDFAMILY;
 // and may lead to missing information.
 
 typedef enum rrddim_flags {
+    RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
     RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1   // do not offer RESET or OVERFLOW info to callers
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & flag)
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
+#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 #else
-#define rrddim_flag_check(rd, flag) ((rd)->flags & flag)
-#define rrddim_flag_set(rd, flag)   (rd)->flags |= flag
-#define rrddim_flag_clear(rd, flag) (rd)->flags &= ~flag
+#define rrddim_flag_check(rd, flag) ((rd)->flags & (flag))
+#define rrddim_flag_set(rd, flag)   (rd)->flags |= (flag)
+#define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
 
@@ -204,10 +209,10 @@ typedef struct rrddim RRDDIM;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
-    for(rd = st->dimensions, rrdset_check_rdlock(st); rd ; rd = rd->next)
+    for((rd) = (st)->dimensions, rrdset_check_rdlock(st); (rd) ; (rd) = (rd)->next)
 
 #define rrddim_foreach_write(rd, st) \
-    for(rd = st->dimensions, rrdset_check_wrlock(st); rd ; rd = rd->next)
+    for((rd) = (st)->dimensions, rrdset_check_wrlock(st); (rd) ; (rd) = (rd)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -228,17 +233,18 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
     RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
     RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9  // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HIDDEN           = 1 << 10, // if set, do not show this chart on the dashboard, but use it for backends
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
-#define rrdset_flag_check(st, flag) ((st)->flags & flag)
-#define rrdset_flag_set(st, flag)   (st)->flags |= flag
-#define rrdset_flag_clear(st, flag) (st)->flags &= ~flag
+#define rrdset_flag_check(st, flag) ((st)->flags & (flag))
+#define rrdset_flag_set(st, flag)   (st)->flags |= (flag)
+#define rrdset_flag_clear(st, flag) (st)->flags &= ~(flag)
 #endif
 
 struct rrdset {
@@ -320,7 +326,7 @@ struct rrdset {
     total_number last_collected_total;              // used internally to calculate percentages
 
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
-    struct rrdhost *rrdhost;                        // pointer to RRDHOST this chart belongs to
+    RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
 
@@ -359,10 +365,10 @@ typedef struct rrdset RRDSET;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdset_foreach_read(st, host) \
-    for(st = host->rrdset_root, rrdhost_check_rdlock(host); st ; st = st->next)
+    for((st) = (host)->rrdset_root, rrdhost_check_rdlock(host); st ; (st) = (st)->next)
 
 #define rrdset_foreach_write(st, host) \
-    for(st = host->rrdset_root, rrdhost_check_wrlock(host); st ; st = st->next)
+    for((st) = (host)->rrdset_root, rrdhost_check_wrlock(host); st ; (st) = (st)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -374,17 +380,19 @@ typedef struct rrdset RRDSET;
 typedef enum rrdhost_flags {
     RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
     RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
+    RRDHOST_FLAG_BACKEND_SEND           = 1 << 3, // send it to backends
+    RRDHOST_FLAG_BACKEND_DONT_SEND      = 1 << 4, // don't send it to backends
 } RRDHOST_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
-#define rrdhost_flag_check(host, flag) ((host)->flags & flag)
-#define rrdhost_flag_set(host, flag)   (host)->flags |= flag
-#define rrdhost_flag_clear(host, flag) (host)->flags &= ~flag
+#define rrdhost_flag_check(host, flag) ((host)->flags & (flag))
+#define rrdhost_flag_set(host, flag)   (host)->flags |= (flag)
+#define rrdhost_flag_clear(host, flag) (host)->flags &= ~(flag)
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -425,6 +433,8 @@ struct rrdhost {
     char *cache_dir;                                // the directory to save RRD cache files
     char *varlib_dir;                               // the directory to save health log
 
+    char *program_name;                             // the program name that collects metrics for this host
+    char *program_version;                          // the program version that collects metrics for this host
 
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush
@@ -436,7 +446,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     volatile int rrdpush_sender_spawn:1;            // 1 when the sender thread has been spawn
-    pthread_t rrdpush_sender_thread;                // the sender thread
+    netdata_thread_t rrdpush_sender_thread;         // the sender thread
 
     volatile int rrdpush_sender_connected:1;        // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
@@ -508,7 +518,6 @@ struct rrdhost {
 
     struct rrdhost *next;
 };
-typedef struct rrdhost RRDHOST;
 extern RRDHOST *localhost;
 
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
@@ -519,10 +528,10 @@ extern RRDHOST *localhost;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdhost_foreach_read(var) \
-    for(var = localhost, rrd_check_rdlock(); var ; var = var->next)
+    for((var) = localhost, rrd_check_rdlock(); var ; (var) = (var)->next)
 
 #define rrdhost_foreach_write(var) \
-    for(var = localhost, rrd_check_wrlock(); var ; var = var->next)
+    for((var) = localhost, rrd_check_wrlock(); var ; (var) = (var)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -551,6 +560,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *os
         , const char *timezone
         , const char *tags
+        , const char *program_name
+        , const char *program_version
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
@@ -643,7 +654,7 @@ extern void rrdset_is_obsolete(RRDSET *st);
 extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_backends(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define RRD_TYPE_TC "tc"
@@ -828,17 +829,32 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
     while(i < max_words) words[i++] = NULL;
 }
 
-volatile pid_t tc_child_pid = 0;
-void *tc_main(void *ptr) {
+static pid_t tc_child_pid = 0;
+
+static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("TC thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    if(tc_child_pid) {
+        info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
+        if(killpid(tc_child_pid, SIGTERM) != -1) {
+            siginfo_t info;
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+            info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
+            waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
+            // info("TC: finished tc plugin child process pid %d.", tc_child_pid);
+        }
+
+        tc_child_pid = 0;
+    }
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *tc_main(void *ptr) {
+    netdata_thread_cleanup_push(tc_main_cleanup, ptr);
 
     struct rusage thread;
 
@@ -863,10 +879,8 @@ void *tc_main(void *ptr) {
 
     snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
-    
-    for(;1;) {
-        if(unlikely(netdata_exit)) break;
 
+    while(!netdata_exit) {
         FILE *fp;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
@@ -965,14 +979,10 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
-                    if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-                        error("Cannot set pthread cancel state to DISABLE.");
-
+                    netdata_thread_disable_cancelability();
                     tc_device_commit(device);
                     // tc_device_free(device);
-
-                    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-                        error("Cannot set pthread cancel state to ENABLE.");
+                    netdata_thread_enable_cancelability();
                 }
 
                 device = NULL;
@@ -1149,10 +1159,7 @@ void *tc_main(void *ptr) {
         sleep((unsigned int) localhost->rrd_update_every);
     }
 
-cleanup:
-    info("TC thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

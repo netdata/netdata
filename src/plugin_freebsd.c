@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 static struct freebsd_module {
@@ -66,22 +67,23 @@ static struct freebsd_module {
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
 };
 
-void *freebsd_main(void *ptr) {
+static void freebsd_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("FREEBSD Plugin thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *freebsd_main(void *ptr) {
+    netdata_thread_cleanup_push(freebsd_main_cleanup, ptr);
 
     int vdo_cpu_netdata = config_get_boolean("plugin:freebsd", "netdata server resources", 1);
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
-        netdata_exit = 1;
+        netdata_cleanup_and_exit(1);
 
     // check the enabled status for each module
     int i;
@@ -97,7 +99,7 @@ void *freebsd_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    for(;;) {
+    while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         usec_t duration = 0ULL;
 
@@ -167,9 +169,6 @@ void *freebsd_main(void *ptr) {
         }
     }
 
-    info("FREEBSD thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: IPFS netdata python.d module
 # Authors: Pawel Krupa (paulfantom), davidak
+# SPDX-License-Identifier: GPL-3.0+
 
 import json
 
@@ -93,7 +94,7 @@ class Service(UrlService):
 
     def _storagemax(self, store_cfg):
         if self.__storage_max is None:
-            self.__storage_max = self._dehumanize(store_cfg['StorageMax'])
+            self.__storage_max = self._dehumanize(store_cfg)
         return self.__storage_max
 
     def _get_data(self):
@@ -106,12 +107,11 @@ class Service(UrlService):
             '/api/v0/stats/bw':
                 [('in', 'RateIn', int), ('out', 'RateOut', int)],
             '/api/v0/swarm/peers':
-                [('peers', 'Strings', len)],
+                [('peers', 'Peers', len)],
             '/api/v0/stats/repo':
-                [('size', 'RepoSize', int), ('objects', 'NumObjects', int)],
+                [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
             '/api/v0/pin/ls':
-                [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)],
-            '/api/v0/config/show': [('avail', 'Datastore', self._storagemax)]
+                [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
         }
         r = dict()
         for suburl in cfg:

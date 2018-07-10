@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 // ----------------------------------------------------------------------------
@@ -156,11 +157,16 @@ void read_cgroup_plugin_configuration() {
 
             // ----------------------------------------------------------------
 
+                    " /machine.slice/*.service "           // #3367 systemd-nspawn
+
+            // ----------------------------------------------------------------
+
                     " !*/vcpu* "                           // libvirtd adds these sub-cgroups
                     " !*/emulator "                        // libvirtd adds these sub-cgroups
                     " !*.mount "
                     " !*.partition "
                     " !*.service "
+                    " !*.socket "
                     " !*.slice "
                     " !*.swap "
                     " !*.user "
@@ -175,7 +181,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " * "                                  // enable anything else
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     enabled_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
@@ -187,9 +193,9 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " !/user.slice "
-                    " !/lxc/*/* "                         //  #2161 #2649
+                    " !/lxc/*/* "                          //  #2161 #2649
                     " * "
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
@@ -199,32 +205,36 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
-                    " *.scope "
-                    " *docker* "
-                    " *lxc* "
-                    " *qemu* "
-                    " *.libvirt-qemu "                    //  #3010
-                    " !*/vcpu* "                          // libvirtd adds these sub-cgroups
-                    " !*/emulator* "                      // libvirtd adds these sub-cgroups
                     " !/ "
                     " !*.mount "
+                    " !*.socket "
                     " !*.partition "
+                    " /machine.slice/*.service "          // #3367 systemd-nspawn
                     " !*.service "
                     " !*.slice "
                     " !*.swap "
                     " !*.user "
+                    " !init.scope "
+                    " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
+                    " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
+                    " *.scope "
+                    " *docker* "
+                    " *lxc* "
+                    " *qemu* "
+                    " *kubepods* "                        // #3396 kubernetes
+                    " *.libvirt-qemu "                    // #3010
                     " * "
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
                         " !/system.slice/*/*.service "
                         " /system.slice/*.service "
-                ), SIMPLE_PATTERN_EXACT);
+                ), NULL, SIMPLE_PATTERN_EXACT);
     }
 
-    mountinfo_free(root);
+    mountinfo_free_all(root);
 }
 
 // ----------------------------------------------------------------------------
@@ -531,14 +541,14 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 }
 
 static inline void cgroup_read_blkio(struct blkio *io) {
-    static procfile *ff = NULL;
-
     if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
         io->delay_counter--;
         return;
     }
 
     if(likely(io->filename)) {
+        static procfile *ff = NULL;
+
         ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             io->updated = 0;
@@ -838,9 +848,9 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
+    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", buffer, cg->id);
     FILE *fp = mypopen(buffer, &cgroup_pid);
     if(fp) {
         // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
@@ -1386,7 +1396,6 @@ static inline void find_all_cgroups() {
     }
 
     debug(D_CGROUP, "done searching for cgroups");
-    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -2324,7 +2333,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_next(cg->st_mem);
 
             rrddim_set(cg->st_mem, "cache", cg->memory.cache);
-            rrddim_set(cg->st_mem, "rss", cg->memory.rss);
+            rrddim_set(cg->st_mem, "rss", (cg->memory.rss > cg->memory.rss_huge)?(cg->memory.rss - cg->memory.rss_huge):0);
 
             if(cg->memory.detailed_has_swap)
                 rrddim_set(cg->st_mem, "swap", cg->memory.swap);
@@ -2674,16 +2683,17 @@ void update_cgroup_charts(int update_every) {
 // ----------------------------------------------------------------------------
 // cgroups main
 
-void *cgroups_main(void *ptr) {
+static void cgroup_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("CGROUP plugin thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("CGROUP: cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("CGROUP: cannot set pthread cancel state to ENABLE.");
+void *cgroups_main(void *ptr) {
+    netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     struct rusage thread;
 
@@ -2698,7 +2708,8 @@ void *cgroups_main(void *ptr) {
     heartbeat_init(&hb);
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
-    for(;;) {
+
+    while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         if(unlikely(netdata_exit)) break;
 
@@ -2750,9 +2761,6 @@ void *cgroups_main(void *ptr) {
         }
     }
 
-    info("CGROUP thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

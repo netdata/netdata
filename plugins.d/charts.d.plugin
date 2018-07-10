@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0+
 
 # netdata
 # real-time performance and health monitoring, done right!
@@ -296,7 +297,7 @@ run() {
         {
             printf "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: command '"
             printf "%q " "${@}"
-            printf "' failed:\n --- BEGIN TRACE ---\n"
+            printf "' failed with code ${ret}:\n --- BEGIN TRACE ---\n"
             cat "${TMP_DIR}/run.${pid}"
             printf " --- END TRACE ---\n"
         } >&2
@@ -477,6 +478,7 @@ all_enabled_charts() {
 # -----------------------------------------------------------------------------
 # load the charts
 
+suffix_retries="_retries"
 suffix_update_every="_update_every"
 active_charts=
 for chart in $( all_enabled_charts )
@@ -582,7 +584,7 @@ debug "run_charts='$run_charts'"
 
 [ -z "$run_charts" ] && fatal "No charts to collect data from."
 
-declare -A charts_last_update=() charts_update_every=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
+declare -A charts_last_update=() charts_update_every=() charts_retries=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
 global_update() {
     local exit_at \
         c=0 dt ret last_ms exec_start_ms exec_end_ms \
@@ -597,7 +599,11 @@ global_update() {
     for chart in $run_charts
     do
         eval "charts_update_every[$chart]=\$$chart$suffix_update_every"
-        test -z "${charts_update_every[$chart]}" && charts_update_every[$charts]=$update_every
+        test -z "${charts_update_every[$chart]}" && charts_update_every[$chart]=$update_every
+
+        eval "charts_retries[$chart]=\$$chart$suffix_retries"
+        test -z "${charts_retries[$chart]}" && charts_retries[$chart]=10
+
         charts_last_update[$chart]=$((now_ms - (now_ms % (charts_update_every[$chart] * 1000) ) ))
         charts_next_update[$chart]=$(( charts_last_update[$chart] + (charts_update_every[$chart] * 1000) ))
         charts_run_counter[$chart]=0
@@ -660,7 +666,7 @@ global_update() {
                 else
                     charts_serial_failures[$chart]=$(( charts_serial_failures[$chart] + 1 ))
 
-                    if [ ${charts_serial_failures[$chart]} -gt 10 ]
+                    if [ ${charts_serial_failures[$chart]} -gt ${charts_retries[$chart]} ]
                         then
                         error "module's '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
                     else

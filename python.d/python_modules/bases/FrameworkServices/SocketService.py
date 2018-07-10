@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Pawel Krupa (paulfantom)
+# SPDX-License-Identifier: GPL-3.0+
 
 import socket
+
+try:
+    import ssl
+except ImportError:
+    _TLS_SUPPORT = False
+else:
+    _TLS_SUPPORT = True
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -14,7 +22,11 @@ class SocketService(SimpleService):
         self.host = 'localhost'
         self.port = None
         self.unix_socket = None
+        self.dgram_socket = False
         self.request = ''
+        self.tls = False
+        self.cert = None
+        self.key = None
         self.__socket_config = None
         self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -55,10 +67,24 @@ class SocketService(SimpleService):
             self.__socket_config = None
             return False
 
+        if self.tls:
+            try:
+                self.debug('Encapsulating socket with TLS')
+                self._sock = ssl.wrap_socket(self._sock,
+                                             keyfile=self.key,
+                                             certfile=self.cert,
+                                             server_side=False,
+                                             cert_reqs=ssl.CERT_NONE)
+            except (socket.error, ssl.SSLError) as error:
+                self.error('Failed to wrap socket.')
+                self._disconnect()
+                self.__socket_config = None
+                return False
+
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             self._sock.connect(sa)
-        except socket.error as error:
+        except (socket.error, ssl.SSLError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
                                                                                               port=sa[1],
                                                                                               error=error))
@@ -115,7 +141,11 @@ class SocketService(SimpleService):
                 if self.__socket_config is not None:
                     self._connect2socket()
                 else:
-                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                    if self.dgram_socket:
+                        sock_type = socket.SOCK_DGRAM
+                    else:
+                        sock_type = socket.SOCK_STREAM
+                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, sock_type):
                         if self._connect2socket(res):
                             break
 
@@ -142,7 +172,7 @@ class SocketService(SimpleService):
                 pass
             self._sock = None
 
-    def _send(self):
+    def _send(self, request=None):
         """
         Send request.
         :return: boolean
@@ -150,20 +180,23 @@ class SocketService(SimpleService):
         # Send request if it is needed
         if self.request != self.__empty_request:
             try:
-                self.debug('sending request: {0}'.format(self.request))
-                self._sock.send(self.request)
+                self.debug('sending request: {0}'.format(request or self.request))
+                self._sock.send(request or self.request)
             except Exception as error:
                 self._socket_error('error sending request: {0}'.format(error))
                 self._disconnect()
                 return False
         return True
 
-    def _receive(self):
+    def _receive(self, raw=False):
         """
         Receive data from socket
-        :return: str
+        :param raw: set `True` to return bytes
+        :type raw: bool
+        :return: decoded str or raw bytes
+        :rtype: str/bytes
         """
-        data = ""
+        data = "" if not raw else b""
         while True:
             self.debug('receiving response')
             try:
@@ -174,7 +207,7 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                if data == "":
+                if data == "" or data == b"":
                     self._socket_error('unexpectedly disconnected')
                 else:
                     self.debug('server closed the connection')
@@ -182,17 +215,20 @@ class SocketService(SimpleService):
                 break
 
             self.debug('received data')
-            data += buf.decode('utf-8', 'ignore')
+            data += buf.decode('utf-8', 'ignore') if not raw else buf
             if self._check_raw_data(data):
                 break
 
         self.debug('final response: {0}'.format(data))
         return data
 
-    def _get_raw_data(self):
+    def _get_raw_data(self, raw=False, request=None):
         """
         Get raw data with low-level "socket" module.
-        :return: str
+        :param raw: set `True` to return bytes
+        :type raw: bool
+        :return: decoded data (str) or raw data (bytes)
+        :rtype: str/bytes
         """
         if self._sock is None:
             self._connect()
@@ -200,10 +236,10 @@ class SocketService(SimpleService):
                 return None
 
         # Send request if it is needed
-        if not self._send():
+        if not self._send(request):
             return None
 
-        data = self._receive()
+        data = self._receive(raw)
 
         if not self._keep_alive:
             self._disconnect()
@@ -237,6 +273,28 @@ class SocketService(SimpleService):
                 self.port = int(self.configuration['port'])
             except (KeyError, TypeError):
                 self.debug('No port specified. Using: "{0}"'.format(self.port))
+
+            self.tls = bool(self.configuration.get('tls', self.tls))
+            if self.tls and not _TLS_SUPPORT:
+                self.warning('TLS requested but no TLS module found, disabling TLS support.')
+                self.tls = False
+            if _TLS_SUPPORT and not self.tls:
+                self.debug('No TLS preference specified, not using TLS.')
+
+            if self.tls and _TLS_SUPPORT:
+                self.key = self.configuration.get('tls_key_file')
+                self.cert = self.configuration.get('tls_cert_file')
+                if not self.cert:
+                    # If there's not a valid certificate, clear the key too.
+                    self.debug('No valid TLS client certificate configuration found.')
+                    self.key = None
+                    self.cert = None
+                elif not self.key:
+                    # If a key isn't listed, the config may still be
+                    # valid, because there may be a key attached to the
+                    # certificate.
+                    self.info('No TLS client key specified, assuming it\'s attached to the certificate.')
+                    self.key = None
 
         try:
             self.request = str(self.configuration['request'])

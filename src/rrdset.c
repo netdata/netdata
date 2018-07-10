@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
-
-#define RRD_DEFAULT_GAP_INTERPOLATIONS 1
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
@@ -83,7 +82,7 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, ui
     result = avl_search_lock(&host->rrdset_root_index_name, (avl *) (&(tmp.avlname)));
     if(result) {
         RRDSET *st = rrdset_from_avlname(result);
-        if(strcmp(st->magic, RRDSET_MAGIC))
+        if(strcmp(st->magic, RRDSET_MAGIC) != 0)
             error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
 
         // fprintf(stderr, "FOUND: %s\n", name);
@@ -139,6 +138,8 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     if(unlikely(st->name && !strcmp(st->name, name)))
         return 1;
 
+    RRDHOST *host = st->rrdhost;
+
     debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", st->name?st->name:"", name);
 
     char b[CONFIG_MAX_VALUE + 1];
@@ -147,13 +148,13 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
 
-    if(rrdset_index_find_name(st->rrdhost, b, 0)) {
-        error("RRDSET: chart name '%s' on host '%s' already exists.", b, st->rrdhost->hostname);
+    if(rrdset_index_find_name(host, b, 0)) {
+        error("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
         return 0;
     }
 
     if(st->name) {
-        rrdset_index_del_name(st->rrdhost, st);
+        rrdset_index_del_name(host, st);
         st->name = config_set_default(st->config_section, "name", b);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
@@ -169,20 +170,22 @@ int rrdset_set_name(RRDSET *st, const char *name) {
         rrddimvar_rename_all(rd);
     rrdset_unlock(st);
 
-    if(unlikely(rrdset_index_add_name(st->rrdhost, st) != st))
+    if(unlikely(rrdset_index_add_name(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
 
     return 1;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        if(unlikely(st->rrdhost->rrdpush_send_enabled))
+        if(unlikely(host->rrdpush_send_enabled))
             rrdset_push_chart_definition(st);
     }
 }
@@ -198,6 +201,7 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
 }
 
 inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd;
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
@@ -213,7 +217,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rd->name,
                         st->name,
-                        st->rrdhost->hostname,
+                        host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
                         rd->multiplier, multiplier,
                         rd->divisor, divisor
@@ -294,7 +298,9 @@ static inline void last_updated_time_align(RRDSET *st) {
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
 
-    rrdhost_check_wrlock(st->rrdhost);  // make sure we have a write lock on the host
+    RRDHOST *host = st->rrdhost;
+
+    rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
 
     // info("Removing chart '%s' ('%s')", st->id, st->name);
@@ -302,10 +308,10 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // remove it from the indexes
 
-    if(unlikely(rrdset_index_del(st->rrdhost, st) != st))
+    if(unlikely(rrdset_index_del(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
 
-    rrdset_index_del_name(st->rrdhost, st);
+    rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
     // free its children structures
@@ -314,25 +320,25 @@ void rrdset_free(RRDSET *st) {
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
-    rrdfamily_free(st->rrdhost, st->rrdfamily);
+    rrdfamily_free(host, st->rrdfamily);
 
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", st->rrdhost->hostname, st->id);
-    rrdvar_free_remaining_variables(st->rrdhost, &st->rrdvar_root_index);
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, st->id);
+    rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
 
-    if(st == st->rrdhost->rrdset_root) {
-        st->rrdhost->rrdset_root = st->next;
+    if(st == host->rrdset_root) {
+        host->rrdset_root = st->next;
     }
     else {
         // find the previous one
         RRDSET *s;
-        for(s = st->rrdhost->rrdset_root; s && s->next != st ; s = s->next) ;
+        for(s = host->rrdset_root; s && s->next != st ; s = s->next) ;
 
         // bypass it
         if(s) s->next = st->next;
-        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, st->rrdhost->hostname);
+        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, host->hostname);
     }
 
     rrdset_unlock(st);
@@ -654,8 +660,7 @@ RRDSET *rrdset_create_custom(
     st->last_collected_time.tv_usec = 0;
     st->counter_done = 0;
 
-    st->gap_when_lost_iterations_above = (int) (
-            config_get_number(st->config_section, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
+    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
     st->last_accessed_time = 0;
     st->upstream_resync_time = 0;
@@ -706,7 +711,7 @@ RRDSET *rrdset_create_custom(
 // RRDSET - data collection iteration control
 
 inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
-    if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (st->counter % remote_clock_resync_iterations) == 0)) {
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds)) {
         // call the full next_usec() function
         rrdset_next_usec(st, microseconds);
         return;
@@ -733,7 +738,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
-            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the future. Adjusting it to current time.", st->id, st->rrdhost->hostname, (long double)-since_last_usec / USEC_PER_SEC);
+            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the future (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)-since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
             st->last_collected_time.tv_usec = now.tv_usec;
@@ -745,12 +750,36 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
             microseconds    = st->update_every * USEC_PER_SEC;
         }
-        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 10 * USEC_PER_SEC))) {
+        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
-            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the past. Adjusting it to current time.", st->id, st->rrdhost->hostname, (long double)since_last_usec / USEC_PER_SEC);
+            info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             microseconds = (usec_t)since_last_usec;
         }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(since_last_usec > 0 && (susec_t)microseconds < since_last_usec) {
+            static __thread susec_t min_delta = USEC_PER_SEC * 3600, permanent_min_delta = 0;
+            static __thread time_t last_t = 0;
+
+            // the first time initialize it so that it will make the check later
+            if(last_t == 0) last_t = now.tv_sec + 60;
+
+            susec_t delta = since_last_usec - (susec_t)microseconds;
+            if(delta < min_delta) min_delta = delta;
+
+            if(now.tv_sec >= last_t + 60) {
+                last_t = now.tv_sec;
+
+                if(min_delta > permanent_min_delta) {
+                    info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    permanent_min_delta = min_delta;
+                }
+
+                min_delta = USEC_PER_SEC * 3600;
+            }
+        }
+#endif
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
@@ -772,7 +801,7 @@ static inline usec_t rrdset_init_last_collected_time(RRDSET *st) {
     usec_t last_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last collected time to %0.3Lf", (long double)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -785,7 +814,7 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
     st->last_collected_time.tv_usec = (suseconds_t) (ut % USEC_PER_SEC);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "updated last collected time to %0.3Lf", (long double)last_collect_ut / USEC_PER_SEC);
+    rrdset_debug(st, "updated last collected time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_collect_ut / USEC_PER_SEC);
     #endif
 
     return last_collect_ut;
@@ -804,7 +833,7 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     usec_t last_updated_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "initialized last updated time to %0.3Lf", (long double)last_updated_ut / USEC_PER_SEC);
+    rrdset_debug(st, "initialized last updated time to %0.3" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE)last_updated_ut / USEC_PER_SEC);
     #endif
 
     return last_updated_ut;
@@ -863,8 +892,8 @@ static inline size_t rrdset_done_interpolate(
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-        rrdset_debug(st, "last_stored_ut = %0.3Lf (last updated time)", (long double)last_stored_ut/USEC_PER_SEC);
-        rrdset_debug(st, "next_store_ut  = %0.3Lf (next interpolation point)", (long double)next_store_ut/USEC_PER_SEC);
+        rrdset_debug(st, "last_stored_ut = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
+        rrdset_debug(st, "next_store_ut  = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
         #endif
 
         last_ut = next_store_ut;
@@ -1080,9 +1109,6 @@ void rrdset_done(RRDSET *st) {
 
     RRDDIM *rd;
 
-    int
-            pthreadoldcancelstate;  // store the old cancelable pthread state, to restore it at the end
-
     char
             store_this_entry = 1,   // boolean: 1 = store this entry, 0 = don't store this entry
             first_entry = 0;        // boolean: 1 = this is the first entry seen for this chart, 0 = all other entries
@@ -1094,8 +1120,7 @@ void rrdset_done(RRDSET *st) {
             next_store_ut,          // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
-    if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-        error("Cannot set pthread cancel state to DISABLE.");
+    netdata_thread_disable_cancelability();
 
     // a read lock is OK here
     rrdset_rdlock(st);
@@ -1107,7 +1132,7 @@ void rrdset_done(RRDSET *st) {
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {
-        info("host '%s', chart %s: took too long to be updated (%0.3Lf secs). Resetting it.", st->rrdhost->hostname, st->name, (long double)st->usec_since_last_update / USEC_PER_SEC);
+        info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" LONG_DOUBLE_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (LONG_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1199,10 +1224,10 @@ void rrdset_done(RRDSET *st) {
         rrdset_done_push(st);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    rrdset_debug(st, "last_collect_ut = %0.3Lf (last collection time)", (long double)last_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "now_collect_ut  = %0.3Lf (current collection time)", (long double)now_collect_ut/USEC_PER_SEC);
-    rrdset_debug(st, "last_stored_ut  = %0.3Lf (last updated time)", (long double)last_stored_ut/USEC_PER_SEC);
-    rrdset_debug(st, "next_store_ut   = %0.3Lf (next interpolation point)", (long double)next_store_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_collect_ut = %0.3" LONG_DOUBLE_MODIFIER " (last collection time)", (LONG_DOUBLE)last_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "now_collect_ut  = %0.3" LONG_DOUBLE_MODIFIER " (current collection time)", (LONG_DOUBLE)now_collect_ut/USEC_PER_SEC);
+    rrdset_debug(st, "last_stored_ut  = %0.3" LONG_DOUBLE_MODIFIER " (last updated time)", (LONG_DOUBLE)last_stored_ut/USEC_PER_SEC);
+    rrdset_debug(st, "next_store_ut   = %0.3" LONG_DOUBLE_MODIFIER " (next interpolation point)", (LONG_DOUBLE)next_store_ut/USEC_PER_SEC);
     #endif
 
     // calculate totals and count the dimensions
@@ -1540,6 +1565,5 @@ void rrdset_done(RRDSET *st) {
 
     rrdset_unlock(st);
 
-    if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-        error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+    netdata_thread_enable_cancelability();
 }

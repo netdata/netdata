@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 struct mc {
@@ -142,7 +143,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , "errors"
                     , "proc"
                     , "/sys/devices/system/edac/mc"
-                    , 6600
+                    , NETDATA_CHART_PRIO_MEM_HW + 50
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -180,7 +181,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , "errors"
                     , "proc"
                     , "/sys/devices/system/edac/mc"
-                    , 6610
+                    , NETDATA_CHART_PRIO_MEM_HW + 60
                     , update_every
                     , RRDSET_TYPE_LINE
             );

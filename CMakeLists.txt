@@ -1,4 +1,5 @@
 
+# SPDX-License-Identifier: GPL-3.0+
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
@@ -49,6 +50,7 @@ set(NETDATA_LINUX_FILES
         src/proc_net_rpc_nfsd.c
         src/proc_net_snmp.c
         src/proc_net_snmp6.c
+        src/proc_net_sctp_snmp.c
         src/proc_net_sockstat.c
         src/proc_net_sockstat6.c
         src/proc_net_softnet_stat.c
@@ -63,7 +65,8 @@ set(NETDATA_LINUX_FILES
         src/proc_uptime.c
         src/sys_kernel_mm_ksm.c
         src/sys_fs_cgroup.c
-        )
+        src/sys_fs_btrfs.c
+        src/threads.c src/threads.h)
 
 set(NETDATA_COMMON_FILES
         src/adaptive_resortable_list.c
@@ -94,6 +97,7 @@ set(NETDATA_COMMON_FILES
         src/health_json.c
         src/health_log.c
         src/inlined.h
+        src/locks.c
         src/locks.h
         src/log.c
         src/log.h
@@ -189,6 +193,8 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c
@@ -205,6 +211,8 @@ set(FREEIPMI_PLUGIN_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c
@@ -219,6 +227,8 @@ set(CGROUP_NETWORK_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c
@@ -233,7 +243,7 @@ include_directories(AFTER .)
 add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
 
 add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES})
-target_link_libraries (netdata m z uuid ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (netdata m z uuid mnl netfilter_acct ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(netdata_freebsd ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
 target_link_libraries (netdata_freebsd m z uuid ${CMAKE_THREAD_LIBS_INIT})

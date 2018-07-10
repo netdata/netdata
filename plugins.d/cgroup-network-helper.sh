@@ -4,7 +4,7 @@
 # detect container and virtual machine interfaces
 #
 # (C) 2017 Costa Tsaousis
-# GPL v3+
+# SPDX-License-Identifier: GPL-3.0+
 #
 # This script is called as root (by cgroup-network), with either a pid, or a cgroup path.
 # It tries to find all the network interfaces that belong to the same cgroup.
@@ -22,7 +22,9 @@
 
 # -----------------------------------------------------------------------------
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+# the system path is cleared by cgroup-network
+[ -f /etc/profile ] && source /etc/profile
+
 export LC_ALL=C
 
 PROGRAM_NAME="$(basename "${0}")"
@@ -66,13 +68,6 @@ debug() {
 
 [ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
     fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
-
-# -----------------------------------------------------------------------------
-# defaults to allow running this script by hand
-
-[ -z "${NETDATA_PLUGINS_DIR}"  ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_CONFIG_DIR}"   ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-[ -z "${NETDATA_CACHE_DIR}"    ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
 
 # -----------------------------------------------------------------------------
 # parse the arguments
@@ -172,7 +167,7 @@ virsh_find_all_interfaces_for_cgroup() {
             # match only 'network' interfaces from virsh output
 
             set_source "virsh"
-            "${virsh}" domiflist ${d} |\
+            "${virsh}" -r domiflist ${d} |\
                 sed -n \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"

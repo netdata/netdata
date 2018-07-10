@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 urllib3 - Thread-safe connection pooling and re-using.
 """

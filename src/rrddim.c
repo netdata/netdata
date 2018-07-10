@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -87,6 +88,8 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM create a dimension
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
+    rrdset_wrlock(st);
+
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
@@ -96,9 +99,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rrddim_set_multiplier(st, rd, multiplier);
         rrddim_set_divisor(st, rd, divisor);
 
+        rrdset_unlock(st);
         return rd;
     }
 
+    RRDHOST *host = st->rrdhost;
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
@@ -155,7 +160,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                     reset = 1;
                 }
                 else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                    error("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
+                    info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
                     memset(rd, 0, size);
                     reset = 1;
                 }
@@ -235,7 +240,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->rrdset = st;
 
     // append this dimension
-    rrdset_wrlock(st);
     if(!st->dimensions)
         st->dimensions = rd;
     else {
@@ -247,7 +251,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rd->name,
                         st->name,
-                        st->rrdhost->hostname,
+                        host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
                         rd->multiplier, td->multiplier,
                         rd->divisor, td->divisor
@@ -261,17 +265,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         td->next = rd;
     }
 
-    if(st->rrdhost->health_enabled) {
+    if(host->health_enabled) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
     }
 
-    rrdset_unlock(st);
-
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
+    rrdset_unlock(st);
     return(rd);
 }
 
@@ -330,9 +333,11 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 int rrddim_hide(RRDSET *st, const char *id) {
     debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", st->name, id);
 
+    RRDHOST *host = st->rrdhost;
+
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
 
@@ -343,9 +348,10 @@ int rrddim_hide(RRDSET *st, const char *id) {
 int rrddim_unhide(RRDSET *st, const char *id) {
     debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
 
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
 
@@ -372,9 +378,10 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 }
 
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) {
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 0;
     }
 

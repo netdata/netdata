@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: sensors netdata python.d plugin
 # Author: Pawel Krupa (paulfantom)
+# SPDX-License-Identifier: GPL-3.0+
 
 from bases.FrameworkServices.SimpleService import SimpleService
 from third_party import lm_sensors as sensors

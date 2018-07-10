@@ -1,15 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
-void *macos_main(void *ptr) {
+static void macos_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("MACOS Plugin thread created with task id %d", gettid());
+    info("cleaning up...");
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *macos_main(void *ptr) {
+    netdata_thread_cleanup_push(macos_main_cleanup, ptr);
 
     // when ZERO, attempt to do it
     int vdo_cpu_netdata             = !config_get_boolean("plugin:macos", "netdata server resources", 1);
@@ -25,7 +27,8 @@ void *macos_main(void *ptr) {
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(;;) {
+
+    while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;
@@ -60,9 +63,6 @@ void *macos_main(void *ptr) {
         }
     }
 
-    info("MACOS thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

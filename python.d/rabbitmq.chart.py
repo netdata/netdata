@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: rabbitmq netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 from collections import namedtuple
 from json import loads
@@ -24,7 +25,8 @@ NODE_STATS = ['fd_used',
               'mem_used',
               'sockets_used',
               'proc_used',
-              'disk_free'
+              'disk_free',
+              'run_queue'
               ]
 OVERVIEW_STATS = ['object_totals.channels',
                   'object_totals.consumers',
@@ -39,7 +41,7 @@ OVERVIEW_STATS = ['object_totals.channels',
                   'message_stats.publish'
                   ]
 ORDER = ['queued_messages', 'message_rates', 'global_counts',
-         'file_descriptors', 'socket_descriptors', 'erlang_processes', 'memory', 'disk_space']
+         'file_descriptors', 'socket_descriptors', 'erlang_processes', 'erlang_run_queue', 'memory', 'disk_space']
 
 CHARTS = {
     'file_descriptors': {
@@ -71,6 +73,12 @@ CHARTS = {
                     'rabbitmq.processes', 'line'],
         'lines': [
             ['proc_used', 'used', 'absolute']
+        ]},
+    'erlang_run_queue': {
+        'options': [None, 'Erlang Run Queue', 'processes', 'overview',
+                    'rabbitmq.erlang_run_queue', 'line'],
+        'lines': [
+            ['run_queue',' length', 'absolute']
         ]},
     'global_counts': {
         'options': [None, 'Global Counts', 'counts', 'overview',

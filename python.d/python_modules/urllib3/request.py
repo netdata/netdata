@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from __future__ import absolute_import
 
 from .filepost import encode_multipart_formdata
