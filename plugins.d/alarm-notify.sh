@@ -1378,7 +1378,7 @@ send_msteam() {
         *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
     esac
 
-    for channels in ${channels}
+    for channel in ${channels}
     do
         ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
         ## Online designer : https://acdesignerbeta.azurewebsites.net/
@@ -1394,7 +1394,7 @@ send_msteam() {
                 "@type": "OpenUri",
                 "name": "Netdata",
                 "targets": [
-                { "os": "default", "uri": "http://$(hostname -f):19999" }
+                { "os": "default", "uri": "${goto_url}" }
                 ]
             }
             ]
@@ -1402,6 +1402,9 @@ send_msteam() {
 EOF
         )"
 	
+    # Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+    webhook=`echo $1 | sed 's/CHANNEL/'${channel}'/g'`
+    
 	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
 
         if [ "${httpcode}" = "200" ]
