@@ -70,6 +70,7 @@ username|name|email (optional)
 @philwhineray|Phil Whineray|
 @paulfantom|Pawel Krupa|pawel@krupa.net.pl
 @Ferroin|Austin S. Hemmelgarn|ahferroin7@gmail.com
+@glensc|Elan Ruusamäe|
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
 @rlefevre|Rémi Lefèvre|
 @vlvkobal|Vladimir Kobal|vlad@prokk.net
