@@ -65,11 +65,13 @@ This is the list of contributors that have signed this agreement:
 
 username|name|email (optional)
 :--------:|:----:|:----------------
+@lets00|Luís Eduardo|leduardo@lsd.ufcg.edu.br
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
 @philwhineray|Phil Whineray|
 @paulfantom|Pawel Krupa|pawel@krupa.net.pl
 @Ferroin|Austin S. Hemmelgarn|ahferroin7@gmail.com
+@glensc|Elan Ruusamäe|
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
 @rlefevre|Rémi Lefèvre|
 @vlvkobal|Vladimir Kobal|vlad@prokk.net
@@ -94,3 +96,8 @@ username|name|email (optional)
 @Flums|Philip Gabrielsen|philip@digno.no
 @domschl|Dominik Schlösser|dominik.schloesser@gmail.com
 @tioumen|Guillaume Hospital|
+@arch273|Jacob Ayres
+@x4FF3|David Fuellgraf|
+@jasonwbarnett|Jason Barnett|
+@ecowed|Ed Wade|
+@wungad|Rob Man|
