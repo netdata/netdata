@@ -4,16 +4,24 @@
 # SPDX-License-Identifier: GPL-3.0+
 
 import types
+
 from sys import version_info
 
 PY_VERSION = version_info[:2]
 
+try:
+    if PY_VERSION > (3, 1):
+        from pyyaml3 import SafeLoader as YamlSafeLoader
+    else:
+        from pyyaml2 import SafeLoader as YamlSafeLoader
+except ImportError:
+    from yaml import SafeLoader as YamlSafeLoader
+
+
 if PY_VERSION > (3, 1):
-    from pyyaml3 import SafeLoader as YamlSafeLoader
     from importlib.machinery import SourceFileLoader
     DEFAULT_MAPPING_TAG = 'tag:yaml.org,2002:map'
 else:
-    from pyyaml2 import SafeLoader as YamlSafeLoader
     from imp import load_source as SourceFileLoader
     DEFAULT_MAPPING_TAG = u'tag:yaml.org,2002:map'
 
