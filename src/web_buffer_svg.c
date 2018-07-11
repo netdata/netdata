@@ -438,9 +438,13 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             hash_hours = 0,
             hash_hours_ago = 0,
             hash_onoff = 0,
+            hash_onoff2 = 0,
             hash_updown = 0,
+            hash_updown2 = 0,
             hash_okerror = 0,
+            hash_okerror2 = 0,
             hash_okfailed = 0,
+            hash_okfailed2 = 0,
             hash_empty = 0,
             hash_null = 0,
             hash_percentage = 0,
@@ -455,9 +459,13 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
         hash_hours       = simple_hash("hours");
         hash_hours_ago   = simple_hash("hours ago");
         hash_onoff       = simple_hash("on/off");
+        hash_onoff2      = simple_hash("on-off");
         hash_updown      = simple_hash("up/down");
+        hash_updown2     = simple_hash("up-down");
         hash_okerror     = simple_hash("ok/error");
+        hash_okerror2    = simple_hash("ok-error");
         hash_okfailed    = simple_hash("ok/failed");
+        hash_okfailed2   = simple_hash("ok-failed");
         hash_empty       = simple_hash("empty");
         hash_null        = simple_hash("null");
         hash_percentage  = simple_hash("percentage");
@@ -550,22 +558,22 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_onoff && !strcmp(units, "on/off"))) {
+    else if(unlikely((hash_units == hash_onoff && !strcmp(units, "on/off")) || (hash_units == hash_onoff2 && !strcmp(units, "on-off")))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"on":"off");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_updown && !strcmp(units, "up/down"))) {
+    else if(unlikely((hash_units == hash_updown && !strcmp(units, "up/down")) || (hash_units == hash_updown2 && !strcmp(units, "up-down")))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"up":"down");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_okerror && !strcmp(units, "ok/error"))) {
+    else if(unlikely((hash_units == hash_okerror && !strcmp(units, "ok/error")) || (hash_units == hash_okerror2 && !strcmp(units, "ok-error")))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"error");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_okfailed && !strcmp(units, "ok/failed"))) {
+    else if(unlikely((hash_units == hash_okfailed && !strcmp(units, "ok/failed")) || (hash_units == hash_okfailed2 && !strcmp(units, "ok-failed")))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"failed");
         return value_string;
     }
