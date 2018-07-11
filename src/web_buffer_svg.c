@@ -446,7 +446,7 @@ typedef enum badge_units_format {
 } UNITS_FORMAT;
 
 
-struct units_formatter {
+static struct units_formatter {
     const char *units;
     uint32_t hash;
     UNITS_FORMAT format;
@@ -618,20 +618,51 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
     return format_value_with_precision_and_unit(value_string, value_string_len, value, units, precision);
 }
 
+static struct badge_color {
+    const char *name;
+    uint32_t hash;
+    const char *color;
+} badge_colors[] = {
+
+        // colors from:
+        // https://github.com/badges/shields/blob/master/colorscheme.json
+
+        { "brightgreen", 0, "#4c1"    },
+        { "green",       0, "#97CA00" },
+        { "yellow",      0, "#dfb317" },
+        { "yellowgreen", 0, "#a4a61d" },
+        { "orange",      0, "#fe7d37" },
+        { "red",         0, "#e05d44" },
+        { "blue",        0, "#007ec6" },
+        { "grey",        0, "#555"    },
+        { "gray",        0, "#555"    },
+        { "lightgrey",   0, "#9f9f9f" },
+        { "lightgray",   0, "#9f9f9f" },
+
+        // terminator
+        { NULL,          0, NULL      }
+};
+
 static inline const char *color_map(const char *color) {
-    // colors from:
-    // https://github.com/badges/shields/blob/master/colorscheme.json
-         if(!strcmp(color, "brightgreen")) return "#4c1";
-    else if(!strcmp(color, "green"))       return "#97CA00";
-    else if(!strcmp(color, "yellow"))      return "#dfb317";
-    else if(!strcmp(color, "yellowgreen")) return "#a4a61d";
-    else if(!strcmp(color, "orange"))      return "#fe7d37";
-    else if(!strcmp(color, "red"))         return "#e05d44";
-    else if(!strcmp(color, "blue"))        return "#007ec6";
-    else if(!strcmp(color, "grey"))        return "#555";
-    else if(!strcmp(color, "gray"))        return "#555";
-    else if(!strcmp(color, "lightgrey"))   return "#9f9f9f";
-    else if(!strcmp(color, "lightgray"))   return "#9f9f9f";
+    static int max = -1;
+    int i;
+
+    if(unlikely(max == -1)) {
+        for(i = 0; badge_colors[i].name ;i++)
+            badge_colors[i].hash = simple_hash(badge_colors[i].name);
+
+        max = i;
+    }
+
+    uint32_t hash = simple_hash(color);
+
+    for(i = 0; i < max; i++) {
+        struct badge_color *ptr = &badge_colors[i];
+
+        if(hash == ptr->hash && !strcmp(color, ptr->name))
+            return ptr->color;
+    }
+
     return color;
 }
 
