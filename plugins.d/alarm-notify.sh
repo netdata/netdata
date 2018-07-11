@@ -27,6 +27,7 @@
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
 #  - fleep notifications by @Ferroin
+#  - blink(1) color changes by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 
@@ -220,10 +221,14 @@ images_base_url="https://registry.my-netdata.io"
 # curl options to use
 curl_options=
 
+# blink1 options to use
+blink1_options=
+
 # needed commands
 # if empty they will be searched in the system path
 curl=
 sendmail=
+blink1=
 
 # enable / disable features
 SEND_SLACK="YES"
@@ -242,6 +247,7 @@ SEND_KAFKA="YES"
 SEND_PD="YES"
 SEND_FLEEP="YES"
 SEND_IRC="YES"
+SEND_BLINK1="NO"
 SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
@@ -329,6 +335,14 @@ declare -A role_recipients_fleep=()
 # syslog configs
 SYSLOG_FACILITY=
 declare -A role_recipients_syslog=()
+
+# blink(1) configs
+BLINK1_STATE_DIR="/tmp/netdata/blink1"
+BLINK1_COLOR_CLEAR="#000000"
+BLINK1_COLOR_WARN="#FFFF00"
+BLINK1_COLOR_CRIT="#FF0000"
+DEFAULT_RECIPIENT_BLINK1=
+declare -A role_recipients_blink1=()
 
 # custom configs
 DEFAULT_RECIPIENT_CUSTOM=
@@ -441,6 +455,7 @@ declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
 declare -A arr_fleep=()
+declare -A arr_blink1=()
 declare -A arr_irc=()
 declare -A arr_syslog=()
 
@@ -572,6 +587,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality fleep "${r}" && arr_fleep[${r/|*/}]="1"
     done
 
+    # blink(1)
+    a="${role_recipients_blink1[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_BLINK1}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality blink1 "${r}" && arr_blink1[${r/|*/}]="1"
+    done
+
     # irc
     a="${role_recipients_irc[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
@@ -654,6 +677,10 @@ to_pd="${!arr_pd[*]}"
 to_fleep="${!arr_fleep[*]}"
 [ -z "${to_fleep}" ] && SEND_FLEEP="NO"
 
+# build the list of blink(1) recipients (target devices)
+to_blink1="${!arr_blink1[*]}"
+[ -z "${to_blink1}" ] && SEND_BLINK1="NO"
+
 # build the list of custom recipients
 to_custom="${!arr_custom[*]}"
 [ -z "${to_custom}" ] && SEND_CUSTOM="NO"
@@ -722,6 +749,17 @@ to_syslog="${!arr_syslog[*]}"
 
 # check fleep
 [ -z "${FLEEP_SERVER}" -o -z "${FLEEP_SENDER}" ] && SEND_FLEEP="NO"
+
+# check blink(1)
+# Check for the blink1-tool command, because we can't send without it.
+if [ "${SEND_BLINK1}" = "YES" -a -z "${blink1}" ] ; then
+    blink1="$(which blink1-tool 2>/dev/null || command -v blink1-tool 2>/dev/null)"
+    if [ -z "${blink1}" ]
+        then
+        error "Cannot find blink1-tool command in the system path. Disabling blink(1) notifications."
+        SEND_BLINK1="NO"
+    fi
+fi
 
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
@@ -816,6 +854,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
     -a "${SEND_FLEEP}"          != "YES" \
+    -a "${SEND_BLINK1}"         != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
@@ -1776,6 +1815,72 @@ send_syslog() {
 
 
 # -----------------------------------------------------------------------------
+# blink(1) sender
+
+send_blink1() {
+    local ident targets="${1}" statepath alarmfile sent success
+
+    [ "${SEND_BLINK1}" = "YES" ] || return 1
+
+    mkdir -p ${BLINK1_STATE_DIR} || return 1
+
+    for target in ${targets}; do
+        statepath="${BLINK1_STATE_DIR}/${target}"
+        mkdir -p ${BLINK1_STATE_DIR}/${target}
+        (
+            # This subshell is used with the flock command for serialization.
+            flock -n 255  -w 5 || exit 1
+
+            # Figure out what to pass to identify this device.
+            ident=$(echo ${target} | cut -f 1 -d -)
+            if [ ${ident} = devnum- ] ; then
+                ident="-d $(echo ${target} | cut -f 2 -d -)"
+            elif [ ${ident} = serial- ] ; then
+                ident="--id $(echo ${target} | cut -f 2 -d -)"
+            else
+                # We got a bad recipient name
+                exit 1
+            fi
+
+            # Check that the device actually exists
+            ${blink1} --quiet --rgbread ${ident} || exit 1
+
+            alarmfile="${statepath}/${alarm_id}"
+
+            case "${status}" in
+                WARNING)
+                    touch ${alarmfile}
+                    rm -f ${alarmfile}-crit
+                    if [ -z "${statepath}/*-crit" ] ; then
+                        ${blink1} ${blink1_options} --quiet --rgb ${BLINK1_WARN_COLOR} ${ident} || exit 1
+                    fi
+                    ;;
+                CRITICAL)
+                    touch ${alarmfile}-crit
+                    ${blink1} ${blink1_options} --quiet --rgb ${BLINK1_CRIT_COLOR} ${ident} || exit 1
+                    ;;
+                CLEAR)
+                    rm -f ${alarmfile}{,-crit}
+                    if [ -z "${statepath}/*" ] ; then
+                        ${blink1} ${blink1_options} --quiet --rgb ${BLINK1_CLEAR_COLOR} ${ident} || exit 1
+                    fi
+                    ;;
+                *)         ;; # Do nothing otherwise.
+            esac
+
+        ) 255>${statepath}.lock
+        success=$?
+
+        if [ ${success} -eq 0 ] ; then
+            sent=0
+        fi
+    done
+
+    return ${sent}
+}
+
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -2048,6 +2153,14 @@ SENT_HIPCHAT=$?
 
 
 # -----------------------------------------------------------------------------
+# send the blink(1) trigger
+
+send_blink1 ${to_blink1}
+
+SENT_BLINK1=$?
+
+
+# -----------------------------------------------------------------------------
 # send the syslog message
 
 send_syslog ${to_syslog}
@@ -2197,6 +2310,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
     -o ${SENT_FLEEP}        -eq 0 \
+    -o ${SENT_BLINK1}       -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
     -o ${SENT_SYSLOG}       -eq 0 \
