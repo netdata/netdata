@@ -429,47 +429,81 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     return value_string;
 }
 
-inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
-    static uint32_t
-            hash_seconds = 0,
-            hash_seconds_ago = 0,
-            hash_minutes = 0,
-            hash_minutes_ago = 0,
-            hash_hours = 0,
-            hash_hours_ago = 0,
-            hash_onoff = 0,
-            hash_updown = 0,
-            hash_okerror = 0,
-            hash_okfailed = 0,
-            hash_empty = 0,
-            hash_null = 0,
-            hash_percentage = 0,
-            hash_percent = 0,
-            hash_pcent = 0;
+typedef enum badge_units_format {
+    UNITS_FORMAT_NONE,
+    UNITS_FORMAT_SECONDS,
+    UNITS_FORMAT_SECONDS_AGO,
+    UNITS_FORMAT_MINUTES,
+    UNITS_FORMAT_MINUTES_AGO,
+    UNITS_FORMAT_HOURS,
+    UNITS_FORMAT_HOURS_AGO,
+    UNITS_FORMAT_ONOFF,
+    UNITS_FORMAT_UPDOWN,
+    UNITS_FORMAT_OKERROR,
+    UNITS_FORMAT_OKFAILED,
+    UNITS_FORMAT_EMPTY,
+    UNITS_FORMAT_PERCENT
+} UNITS_FORMAT;
 
-    if(unlikely(!hash_seconds)) {
-        hash_seconds     = simple_hash("seconds");
-        hash_seconds_ago = simple_hash("seconds ago");
-        hash_minutes     = simple_hash("minutes");
-        hash_minutes_ago = simple_hash("minutes ago");
-        hash_hours       = simple_hash("hours");
-        hash_hours_ago   = simple_hash("hours ago");
-        hash_onoff       = simple_hash("on/off");
-        hash_updown      = simple_hash("up/down");
-        hash_okerror     = simple_hash("ok/error");
-        hash_okfailed    = simple_hash("ok/failed");
-        hash_empty       = simple_hash("empty");
-        hash_null        = simple_hash("null");
-        hash_percentage  = simple_hash("percentage");
-        hash_percent     = simple_hash("percent");
-        hash_pcent       = simple_hash("pcent");
+
+static struct units_formatter {
+    const char *units;
+    uint32_t hash;
+    UNITS_FORMAT format;
+} badge_units_formatters[] = {
+        { "seconds",     0, UNITS_FORMAT_SECONDS },
+        { "seconds ago", 0, UNITS_FORMAT_SECONDS_AGO },
+        { "minutes",     0, UNITS_FORMAT_MINUTES },
+        { "minutes ago", 0, UNITS_FORMAT_MINUTES_AGO },
+        { "hours",       0, UNITS_FORMAT_HOURS },
+        { "hours ago",   0, UNITS_FORMAT_HOURS_AGO },
+        { "on/off",      0, UNITS_FORMAT_ONOFF },
+        { "on-off",      0, UNITS_FORMAT_ONOFF },
+        { "onoff",       0, UNITS_FORMAT_ONOFF },
+        { "up/down",     0, UNITS_FORMAT_UPDOWN },
+        { "up-down",     0, UNITS_FORMAT_UPDOWN },
+        { "updown",      0, UNITS_FORMAT_UPDOWN },
+        { "ok/error",    0, UNITS_FORMAT_OKERROR },
+        { "ok-error",    0, UNITS_FORMAT_OKERROR },
+        { "okerror",     0, UNITS_FORMAT_OKERROR },
+        { "ok/failed",   0, UNITS_FORMAT_OKFAILED },
+        { "ok-failed",   0, UNITS_FORMAT_OKFAILED },
+        { "okfailed",    0, UNITS_FORMAT_OKFAILED },
+        { "empty",       0, UNITS_FORMAT_EMPTY },
+        { "null",        0, UNITS_FORMAT_EMPTY },
+        { "percentage",  0, UNITS_FORMAT_PERCENT },
+        { "percent",     0, UNITS_FORMAT_PERCENT },
+        { "pcent",       0, UNITS_FORMAT_PERCENT },
+
+        // terminator
+        { NULL,          0, UNITS_FORMAT_NONE }
+};
+
+inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+    static int max = -1;
+    int i;
+
+    if(unlikely(max == -1)) {
+        for(i = 0; badge_units_formatters[i].units; i++)
+            badge_units_formatters[i].hash = simple_hash(badge_units_formatters[i].units);
+
+        max = i;
     }
 
     if(unlikely(!units)) units = "";
-
     uint32_t hash_units = simple_hash(units);
 
-    if(unlikely((hash_units == hash_seconds && !strcmp(units, "seconds")) || (hash_units == hash_seconds_ago && !strcmp(units, "seconds ago")))) {
+    UNITS_FORMAT format = UNITS_FORMAT_NONE;
+    for(i = 0; i < max; i++) {
+        struct units_formatter *ptr = &badge_units_formatters[i];
+
+        if(hash_units == ptr->hash && !strcmp(units, ptr->units)) {
+            format = ptr->format;
+            break;
+        }
+    }
+
+    if(unlikely(format == UNITS_FORMAT_SECONDS || format == UNITS_FORMAT_SECONDS_AGO)) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -479,7 +513,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
 
-        const char *suffix = (hash_units == hash_seconds_ago)?" ago":"";
+        const char *suffix = (format == UNITS_FORMAT_SECONDS_AGO)?" ago":"";
 
         size_t s = (size_t)value;
         size_t d = s / 86400;
@@ -499,7 +533,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
         return value_string;
     }
 
-    else if(unlikely((hash_units == hash_minutes && !strcmp(units, "minutes")) || (hash_units == hash_minutes_ago && !strcmp(units, "minutes ago")))) {
+    else if(unlikely(format == UNITS_FORMAT_MINUTES || format == UNITS_FORMAT_MINUTES_AGO)) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -509,7 +543,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
 
-        const char *suffix = (hash_units == hash_minutes_ago)?" ago":"";
+        const char *suffix = (format == UNITS_FORMAT_MINUTES_AGO)?" ago":"";
 
         size_t m = (size_t)value;
         size_t d = m / (60 * 24);
@@ -526,7 +560,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
         return value_string;
     }
 
-    else if(unlikely((hash_units == hash_hours && !strcmp(units, "hours")) || (hash_units == hash_hours_ago && !strcmp(units, "hours ago")))) {
+    else if(unlikely(format == UNITS_FORMAT_HOURS || format == UNITS_FORMAT_HOURS_AGO)) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
             return value_string;
@@ -536,7 +570,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
 
-        const char *suffix = (hash_units == hash_hours_ago)?" ago":"";
+        const char *suffix = (format == UNITS_FORMAT_HOURS_AGO)?" ago":"";
 
         size_t h = (size_t)value;
         size_t d = h / 24;
@@ -550,41 +584,31 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_onoff && !strcmp(units, "on/off"))) {
+    else if(unlikely(format == UNITS_FORMAT_ONOFF)) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"on":"off");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_updown && !strcmp(units, "up/down"))) {
+    else if(unlikely(format == UNITS_FORMAT_UPDOWN)) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"up":"down");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_okerror && !strcmp(units, "ok/error"))) {
+    else if(unlikely(format == UNITS_FORMAT_OKERROR)) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"error");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_okfailed && !strcmp(units, "ok/failed"))) {
+    else if(unlikely(format == UNITS_FORMAT_OKFAILED)) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"failed");
         return value_string;
     }
 
-    else if(unlikely(hash_units == hash_empty && !strcmp(units, "empty")))
+    else if(unlikely(format == UNITS_FORMAT_EMPTY))
         units = "";
 
-    else if(unlikely(hash_units == hash_null && !strcmp(units, "null")))
-        units = "";
-
-    else if(unlikely(hash_units == hash_percentage && !strcmp(units, "percentage")))
+    else if(unlikely(format == UNITS_FORMAT_PERCENT))
         units = "%";
-
-    else if(unlikely(hash_units == hash_percent && !strcmp(units, "percent")))
-        units = "%";
-
-    else if(unlikely(hash_units == hash_pcent && !strcmp(units, "pcent")))
-        units = "%";
-
 
     if(unlikely(isnan(value) || isinf(value))) {
         strcpy(value_string, "-");
@@ -594,20 +618,51 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
     return format_value_with_precision_and_unit(value_string, value_string_len, value, units, precision);
 }
 
+static struct badge_color {
+    const char *name;
+    uint32_t hash;
+    const char *color;
+} badge_colors[] = {
+
+        // colors from:
+        // https://github.com/badges/shields/blob/master/colorscheme.json
+
+        { "brightgreen", 0, "#4c1"    },
+        { "green",       0, "#97CA00" },
+        { "yellow",      0, "#dfb317" },
+        { "yellowgreen", 0, "#a4a61d" },
+        { "orange",      0, "#fe7d37" },
+        { "red",         0, "#e05d44" },
+        { "blue",        0, "#007ec6" },
+        { "grey",        0, "#555"    },
+        { "gray",        0, "#555"    },
+        { "lightgrey",   0, "#9f9f9f" },
+        { "lightgray",   0, "#9f9f9f" },
+
+        // terminator
+        { NULL,          0, NULL      }
+};
+
 static inline const char *color_map(const char *color) {
-    // colors from:
-    // https://github.com/badges/shields/blob/master/colorscheme.json
-         if(!strcmp(color, "brightgreen")) return "#4c1";
-    else if(!strcmp(color, "green"))       return "#97CA00";
-    else if(!strcmp(color, "yellow"))      return "#dfb317";
-    else if(!strcmp(color, "yellowgreen")) return "#a4a61d";
-    else if(!strcmp(color, "orange"))      return "#fe7d37";
-    else if(!strcmp(color, "red"))         return "#e05d44";
-    else if(!strcmp(color, "blue"))        return "#007ec6";
-    else if(!strcmp(color, "grey"))        return "#555";
-    else if(!strcmp(color, "gray"))        return "#555";
-    else if(!strcmp(color, "lightgrey"))   return "#9f9f9f";
-    else if(!strcmp(color, "lightgray"))   return "#9f9f9f";
+    static int max = -1;
+    int i;
+
+    if(unlikely(max == -1)) {
+        for(i = 0; badge_colors[i].name ;i++)
+            badge_colors[i].hash = simple_hash(badge_colors[i].name);
+
+        max = i;
+    }
+
+    uint32_t hash = simple_hash(color);
+
+    for(i = 0; i < max; i++) {
+        struct badge_color *ptr = &badge_colors[i];
+
+        if(hash == ptr->hash && !strcmp(color, ptr->name))
+            return ptr->color;
+    }
+
     return color;
 }
 
