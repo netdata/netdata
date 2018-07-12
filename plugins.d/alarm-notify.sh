@@ -1401,10 +1401,10 @@ send_msteam() {
         }
 EOF
         )"
-	
-    # Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
-    webhook=$(echo "${webhook//CHANNEL/${channel}})"
-    
+
+	# Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+	webhook="${webhook//CHANNEL/${channel}}"
+
 	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
 
         if [ "${httpcode}" = "200" ]
