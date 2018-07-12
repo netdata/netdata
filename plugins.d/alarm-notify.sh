@@ -29,9 +29,11 @@
 #  - fleep notifications by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
+#  - Microsoft Team notification by @tioumen
 
 # -----------------------------------------------------------------------------
 # testing notifications
+
 
 if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
@@ -218,7 +220,7 @@ fi
 images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
-curl_options=
+curl_options=""
 
 # needed commands
 # if empty they will be searched in the system path
@@ -227,6 +229,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_MSTEAM="YES"
 SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
@@ -249,6 +252,11 @@ SEND_CUSTOM="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# Microsoft Team configs
+MSTEAM_WEBHOOK_URL=
+DEFAULT_RECIPIENT_MSTEAM=
+declare -A role_recipients_msteam=()
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -426,6 +434,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_msteam=()
 declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
@@ -524,6 +533,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # Microsoft Team
+    a="${role_recipients_msteam[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MSTEAM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality msteam "${r}" && arr_msteam[${r/|*/}]="1"
+    done
+
     # rocketchat
     a="${role_recipients_rocketchat[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
@@ -601,6 +618,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of Microsoft team recipients (channels)
+to_msteam="${!arr_msteam[*]}"
+[ -z "${to_msteam}" ] && SEND_MSTEAM="NO"
 
 # build the list of rocketchat recipients (channels)
 to_rocketchat="${!arr_rocketchat[*]}"
@@ -753,6 +774,7 @@ if [ \( \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
+        -o "${SEND_MSTEAM}"        = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -763,6 +785,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_MSTEAM="NO"
         SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
@@ -819,6 +842,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
+    -a "${SEND_MSTEAM}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1339,6 +1363,65 @@ send_telegram() {
 }
 
 # -----------------------------------------------------------------------------
+# Microsoft Team sender
+
+send_msteam() {
+
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_MSTEAM}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}";;
+        CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}";;
+        CLEAR)    icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}";;
+        *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
+    esac
+
+    for channel in ${channels}
+    do
+        ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
+        ## Online designer : https://acdesignerbeta.azurewebsites.net/
+        payload="$(cat <<EOF
+        {
+            "@context": "http://schema.org/extensions",
+            "@type": "MessageCard",
+            "themeColor": "${color}",
+            "title": "$icon Alert ${status} from netdata for ${host}",
+            "text": "${host} ${status_message}, ${chart} (_${family}_), *${alarm}*",
+            "potentialAction": [
+            {
+                "@type": "OpenUri",
+                "name": "Netdata",
+                "targets": [
+                { "os": "default", "uri": "${goto_url}" }
+                ]
+            }
+            ]
+        }
+EOF
+        )"
+	
+    # Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+    webhook=$(echo "${webhook//CHANNEL/${channel}})"
+    
+	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
 # slack sender
 
 send_slack() {
@@ -1875,6 +1958,15 @@ send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
+# send the Microsoft notification
+
+# Microsoft team aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
+SENT_MSTEAM=$?
+
+# -----------------------------------------------------------------------------
 # send the rocketchat notification
 
 # rocketchat aggregates posts from the same username
@@ -2185,6 +2277,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_MSTEAM}       -eq 0 \
     -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
