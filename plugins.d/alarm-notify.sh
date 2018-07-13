@@ -245,6 +245,7 @@ SEND_KAFKA="YES"
 SEND_PD="YES"
 SEND_FLEEP="YES"
 SEND_IRC="YES"
+SEND_AWSSNS="YES"
 SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
@@ -333,6 +334,11 @@ declare -A role_recipients_pd=()
 FLEEP_SENDER="${host}"
 DEFAULT_RECIPIENT_FLEEP=
 declare -A role_recipients_fleep=()
+
+# Amazon SNS configs
+DEFAULT_RECIPIENT_AWSSNS=
+AWSSNS_MESSAGE_FORMAT=
+declare -A role_recipients_awssns=()
 
 # syslog configs
 SYSLOG_FACILITY=
@@ -452,6 +458,7 @@ declare -A arr_kavenegar=()
 declare -A arr_fleep=()
 declare -A arr_irc=()
 declare -A arr_syslog=()
+declare -A arr_awssns=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -597,6 +604,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
     done
 
+    # awssns
+    a="${role_recipients_awssns[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_awssns}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality awssns "${r}" && arr_awssns[${r/|*/}]="1"
+    done
+
     # syslog
     a="${role_recipients_syslog[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
@@ -691,6 +706,10 @@ done
 # build the list of irc recipients (channels)
 to_irc="${!arr_irc[*]}"
 [ -z "${to_irc}" ] && SEND_IRC="NO"
+
+# build the list of awssns recipients (facilities, servers, and prefixes)
+to_awssns="${!arr_awssns[*]}"
+[ -z "${to_awssns}" ] && SEND_AWSSNS="NO"
 
 # build the list of syslog recipients (facilities, servers, and prefixes)
 to_syslog="${!arr_syslog[*]}"
@@ -822,6 +841,17 @@ if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
     fi
 fi
 
+# if we need aws, check for the aws command
+if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
+    then
+    aws="$(which aws 2>/dev/null || command -v aws 2>/dev/null)"
+    if [ -z "${aws}" ]
+        then
+        debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+        SEND_AWSSNS="NO"
+    fi
+fi
+
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
@@ -841,6 +871,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_FLEEP}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
+    -a "${SEND_AWSSNS}"         != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
     -a "${SEND_MSTEAM}"         != "YES" \
     ]
@@ -1786,6 +1817,34 @@ send_irc() {
 }
 
 # -----------------------------------------------------------------------------
+# Amazon SNS sender
+
+send_awssns() {
+    local targets="${1}" message='' sent=0 region=''
+    local default_format="${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+    [ "${SEND_AWSSNS}" = "YES" ] || return 1
+
+    message=${AWSSNS_MESSAGE_FORMAT:-${default_format}}
+
+    for target in ${targets} ; do
+        # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
+        region="$(echo ${target} | cut -f 4 -d ':')"
+        ${aws} --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
+        if [ $? = 0 ]; then
+            info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+            sent=$((${sent} + 1))
+        else
+            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'" 
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # syslog sender
 
 send_syslog() {
@@ -2140,6 +2199,14 @@ SENT_HIPCHAT=$?
 
 
 # -----------------------------------------------------------------------------
+# send the Amazon SNS message
+
+send_awssns ${to_awssns}
+
+SENT_AWSSNS=$?
+
+
+# -----------------------------------------------------------------------------
 # send the syslog message
 
 send_syslog ${to_syslog}
@@ -2291,6 +2358,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
     -o ${SENT_FLEEP}        -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
+    -o ${SENT_AWSSNS}       -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
     -o ${SENT_SYSLOG}       -eq 0 \
     ]
