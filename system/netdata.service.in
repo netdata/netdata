@@ -1,45 +1,57 @@
-# SPDX-License-Identifier: GPL-3.0+
+# netdata systemd target
+
 [Unit]
-Description=Real time performance monitoring
-After=network.target httpd.service squid.service nfs-server.service mysqld.service mysql.service named.service postfix.service chronyd.service
+Description=netdata - Real-time performance monitoring
+#Documentation=man:netdata
+#Documentation=file:///usr/share/doc/netdata/html/index.html
+Documentation=https://github.com/firehol/netdata/wiki
+After=network.target httpd.service squid.service nfs-server.service mysqld.service named.service postfix.service
+Wants=network-online.target
+ConditionPathExists=@sysconfig_POST@/netdata/netdata.conf
 
 [Service]
 Type=simple
+Environment="netdata_LOG_LOCATION=/var/log/netdata/log"
+ExecStart=@sbindir_POST@/netdata -D
+# Reload is not supported, see https://github.com/firehol/netdata/pull/1277
+TimeoutStopSec=60
+KillMode=mixed
+KillSignal=SIGTERM
+OOMScoreAdjust=-900
+
 User=netdata
 Group=netdata
-RuntimeDirectory=netdata
-RuntimeDirectoryMode=0775
-ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
-ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
+Restart=on-abnormal
+RestartSec=2s
+LimitNOFILE=65536
+
+WorkingDirectory=/tmp
+
+# Hardening
+
+NoNewPrivileges=false
 PermissionsStartOnly=true
+# CAP_SETGID is required for setgroups()
+# CAP_NET_RAW is needed by fping
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE CAP_SETGID CAP_NET_RAW
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=full
+#SystemCallFilter=~@cpu-emulation @debug @keyring @module @mount @obsolete @raw-io @resources
 
-# saving a big db on slow disks may need some time
-TimeoutStopSec=60
+ReadOnlyDirectories=/
+ReadWriteDirectories=/proc/self
+ReadWriteDirectories=@localstatedir_POST@/lib/netdata
+ReadWriteDirectories=@localstatedir_POST@/log/netdata
+ReadWriteDirectories=@localstatedir_POST@/cache/netdata
 
-# restart netdata if it crashes
-Restart=on-failure
-RestartSec=30
+# Access to devices and kernel modules and tunables is required
+PrivateDevices=no
+ProtectKernelModules=no
+ProtectKernelTunables=no
 
-# The minimum netdata Out-Of-Memory (OOM) score.
-# netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
-# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
-# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-#OOMScoreAdjust=0
-
-# By default netdata switches to scheduling policy idle, which makes it use CPU, only
-# when there is spare available.
-# Valid policies: other (the system default) | batch | idle | fifo | rr
-#CPUSchedulingPolicy=other
-
-# This sets the maximum scheduling priority netdata can set (for policies: rr and fifo).
-# netdata (via [global].process scheduling priority in netdata.conf) can only lower this value.
-# Priority gets values 1 (lowest) to 99 (highest).
-#CPUSchedulingPriority=1
-
-# For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata.
-# netdata (via [global].process nice level in netdata.conf) can only increase the value set here.
-#Nice=0
+StandardOutput=syslog+console
+StandardError=syslog+console
 
 [Install]
 WantedBy=multi-user.target
