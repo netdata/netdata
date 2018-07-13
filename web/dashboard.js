@@ -5138,8 +5138,26 @@ var NETDATA = window.NETDATA || {};
                         var result = dataPart.result.data[j];
                         resultMap[result[0]] = result.slice(1);
                     } 
+
+                    var length = 0;
+                    for(var j in resultMap) {
+                      if(resultMap[j].length > length) {
+                        length = resultMap[j].length;
+                      }
+                    }
+
+                    var previous = [];
                     for(var j in newData.result.data) {
-                        newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
+                        if(resultMap[newData.result.data[j][0]]) {
+                            newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
+                            previous = newData.result.data[j];
+                        } else if(previous.length > 0){
+                            newData.result.data[j] = previous;
+                        } else {
+                            var a = [];
+                            for(var k=0;k<length;k++) a.push(0);
+                            newData.result.data[j] = newData.result.data[j].concat(a);
+                        }
                     }
 
                     for(var j in dataPart.result.labels) {
