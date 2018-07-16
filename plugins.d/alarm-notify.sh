@@ -1833,7 +1833,7 @@ send_awssns() {
         ${aws} --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
         if [ $? = 0 ]; then
             info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
-            sent=$((${sent} + 1))
+            sent=$((sent + 1))
         else
             error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'" 
         fi
