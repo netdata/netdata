@@ -584,18 +584,17 @@ for method_name in ${method_names} ; do
     done
 
     # build the list of recipients
-    # This needs some creativity because email recipients need to be
-    # separated differently from how the others are.
-    oldifs="$IFS"
-    IFS='	'
+    to="to_${method_name}"
     if [ ${method_name} = "email" ] ; then
-        declare to_${method_name}="$(echo ${!arr[*]} | cut -d '	' --output-delimiter=', ' -f 1-)"
+        declare to_${method_name}
+        for x in "${!arr[@]}" ; do
+            [ ! -z "${!to}" ] && to_email="${!to}, "
+            to_email="${!to}${x}"
+        done
     else
         declare to_${method_name}="${!arr[*]}"
     fi
-    IFS="${oldifs}"
-    to="to_${method_name}"
-    [ -z "${!to}" ] && send="NO"
+    [ -z "${!to}" ] && declare ${send}="NO"
 
 done
 
