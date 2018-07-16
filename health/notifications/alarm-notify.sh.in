@@ -418,47 +418,6 @@ filter_recipient_by_criticality() {
 }
 
 # -----------------------------------------------------------------------------
-# find the recipients' addresses per method
-
-# netdata may call us with multiple roles, and roles may have multiple but
-# overlapping recipients - so, here we find the unique recipients.
-for method_name in ${method_names} ; do
-    declare -A arr=()
-
-    for x in ${roles//,/ } ; do
-        # the roles 'silent' and 'disabled' mean:
-        # don't send a notification for this role
-        [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
-
-        role_recipients="role_recipients_${method_name}"
-        role_recipients=${!role_recipients}
-        default_recipient="DEFAULT_RECIPIENT_${method_name^^}"
-
-        a="${role_recipients[${x}]}"
-        [ -z "${a}" ] && a="${!default_recipient}"
-        for r in ${a//,/ } ; do
-            [ "${r}" != "disabled" ] && filter_recipient_by_criticality email "${r}" && arr[${r/|*/}]="1"
-        done
-    done
-
-    # build the list of recipients
-    # This needs some creativity because email recipients need to be
-    # separated differently from how the others are.
-    oldifs="$IFS"
-    IFS='	'
-    if [ ${method_name} = "email" ] ; then
-        declare to_${method_name}="$(echo ${!arr[*]} | cut -d '	' --output-delimiter=', ' -f 1-)"
-    else
-        declare to_${method_name}="${!arr[*]}"
-    fi
-    IFS="${oldifs}"
-    send="SEND_${method_name^^}"
-    to="to_${method_name}"
-    [ -z "${!to}" ] && send="NO"
-
-done
-
-# -----------------------------------------------------------------------------
 # verify the delivery methods supported
 
 # check slack
@@ -595,6 +554,52 @@ if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
     fi
 fi
 
+# -----------------------------------------------------------------------------
+# find the recipients' addresses per method
+
+# netdata may call us with multiple roles, and roles may have multiple but
+# overlapping recipients - so, here we find the unique recipients.
+for method_name in ${method_names} ; do
+    send="SEND_${method_name^^}"
+    if [ ${!send} = "NO" ] ; then
+        continue
+    fi
+
+    declare -A arr=()
+
+    for x in ${roles//,/ } ; do
+        # the roles 'silent' and 'disabled' mean:
+        # don't send a notification for this role
+        [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
+
+        role_recipients="role_recipients_${method_name}"
+        role_recipients=${!role_recipients}
+        default_recipient="DEFAULT_RECIPIENT_${method_name^^}"
+
+        a="${role_recipients[${x}]}"
+        [ -z "${a}" ] && a="${!default_recipient}"
+        for r in ${a//,/ } ; do
+            [ "${r}" != "disabled" ] && filter_recipient_by_criticality email "${r}" && arr[${r/|*/}]="1"
+        done
+    done
+
+    # build the list of recipients
+    # This needs some creativity because email recipients need to be
+    # separated differently from how the others are.
+    oldifs="$IFS"
+    IFS='	'
+    if [ ${method_name} = "email" ] ; then
+        declare to_${method_name}="$(echo ${!arr[*]} | cut -d '	' --output-delimiter=', ' -f 1-)"
+    else
+        declare to_${method_name}="${!arr[*]}"
+    fi
+    IFS="${oldifs}"
+    to="to_${method_name}"
+    [ -z "${!to}" ] && send="NO"
+
+done
+
+# -----------------------------------------------------------------------------
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
