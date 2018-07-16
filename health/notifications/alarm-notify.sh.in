@@ -146,7 +146,24 @@ docurl() {
 # List of all the notification mechanisms we support.
 # Used in a couple of places to write more compact code.
 
-method_names="email pushover pushbullet telegram slack alerta flock discord hipchart twilio messagebird pd fleep syslog custom msteam"
+method_names="
+email
+pushover
+pushbullet
+telegram
+slack
+alerta
+flock
+discord
+hipchart
+twilio
+messagebird
+pd
+fleep
+syslog
+custom
+msteam
+"
 
 # -----------------------------------------------------------------------------
 # this is to be overwritten by the config file
@@ -235,7 +252,7 @@ curl=
 sendmail=
 
 # enable / disable features
-for method_name in $(echo ${method_names} | awk '{print toupper($0)}') ; do
+for method_name in ${method_names^^} ; do
     declare SEND_${method_name}="YES"
     declare DEFAULT_RECIPIENT_${method_name}
 done
@@ -415,7 +432,7 @@ for method_name in ${method_names} ; do
 
         role_recipients="role_recipients_${method_name}"
         role_recipients=${!role_recipients}
-        default_recipient="DEFAULT_RECIPIENT_$(echo ${method_name} | awk '{print toupper($0)}')"
+        default_recipient="DEFAULT_RECIPIENT_${method_name^^}"
 
         a="${role_recipients[${x}]}"
         [ -z "${a}" ] && a="${!default_recipient}"
@@ -432,10 +449,10 @@ for method_name in ${method_names} ; do
     if [ ${method_name} = "email" ] ; then
         declare to_${method_name}="$(echo ${!arr[*]} | cut -d '	' --output-delimiter=', ' -f 1-)"
     else
-        declare to_${method_name}="$(echo ${!arr[*]} | cut -d '	' --output-delimiter=' ' -f 1-)"
+        declare to_${method_name}="${!arr[*]}"
     fi
     IFS="${oldifs}"
-    send="SEND_$(echo ${method_name} | awk '{print toupper($0)}')"
+    send="SEND_${method_name^^}"
     to="to_${method_name}"
     [ -z "${!to}" ] && send="NO"
 
