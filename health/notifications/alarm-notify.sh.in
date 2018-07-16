@@ -579,7 +579,7 @@ for method_name in ${method_names} ; do
         a="${role_recipients[${x}]}"
         [ -z "${a}" ] && a="${!default_recipient}"
         for r in ${a//,/ } ; do
-            [ "${r}" != "disabled" ] && filter_recipient_by_criticality email "${r}" && arr[${r/|*/}]="1"
+            [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr[${r/|*/}]="1"
         done
     done
 
