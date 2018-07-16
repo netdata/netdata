@@ -604,9 +604,9 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
     done
 
-    # awssns
+    # amazon sns
     a="${role_recipients_awssns[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_awssns}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_AWSSNS}"
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality awssns "${r}" && arr_awssns[${r/|*/}]="1"
