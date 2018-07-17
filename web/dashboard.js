@@ -2769,6 +2769,14 @@ var NETDATA = window.NETDATA || {};
             this.hosts_map[infos[0]] = infos[1];
         }
 
+        this.filter_graph = NETDATA.dataAttribute(this.element, 'filter-graph', "")
+        if(this.filter_graph) {
+          this.filter_graph = this.filter_graph.split(",");
+        }
+        else {
+          this.filter_graph = [];
+        }
+
         // the chart library requested by the user
         this.library_name = NETDATA.dataAttribute(this.element, 'chart-library', NETDATA.chartDefaults.library);
 
@@ -5091,6 +5099,30 @@ var NETDATA = window.NETDATA || {};
 
         this.handleChartData = function(data) {
             var newData = data[0];
+
+            if(this.filter_graph.length > 0) {
+              restartLoop:
+              while(true) {
+                for(var i in data) {
+                  var d = data[i];
+                  for(var j in d.result.labels) {
+                    var label = d.result.labels[j];
+                    for(var k in this.filter_graph) {
+                      if(label != "time" && label != this.filter_graph[k]) {
+                        d.result.labels.splice(j, 1);
+                        d.dimension_ids.splice(j-1, 1);
+                        d.dimension_names.splice(j-1, 1);
+                        for(var l in d.result.data) {
+                          d.result.data[l].splice(j, 1)
+                        }
+                        continue restartLoop;
+                      }
+                    }
+                  }
+                }
+                break;
+              }
+            }
 
             // Don't handle multi-chart if there is only one chart
             if(data.length > 1) {
