@@ -235,6 +235,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
     RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9, // if set, the chart should be checked to determine if the dimensions as homogeneous
     RRDSET_FLAG_HIDDEN           = 1 << 10, // if set, do not show this chart on the dashboard, but use it for backends
+    RRDSET_FLAG_SYNC_CLOCK       = 1 << 11, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
