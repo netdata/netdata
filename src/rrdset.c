@@ -726,14 +726,36 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     struct timeval now;
     now_realtime_timeval(&now);
 
+    #ifdef NETDATA_INTERNAL_CHECKS
+    char *discard_reason = "UNDEFINED";
+    usec_t discarded = microseconds;
+    #endif
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK))) {
+        // the chart needs to be re-synced to current time
+        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+
+        // discard the microseconds supplied
+        microseconds = 0;
+
+        #ifdef NETDATA_INTERNAL_CHECKS
+        discard_reason = "SYNC CLOCK FLAG";
+        #endif
+    }
+
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // the first entry
         microseconds = st->update_every * USEC_PER_SEC;
+        #ifdef NETDATA_INTERNAL_CHECKS
+        discard_reason = "FIRST DATA COLLECTION";
+        #endif
     }
-    else if(unlikely(!microseconds || rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK))) {
+    else if(unlikely(!microseconds)) {
         // no dt given by the plugin
         microseconds = dt_usec(&now, &st->last_collected_time);
-        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+        #ifdef NETDATA_INTERNAL_CHECKS
+        discard_reason = "NO USEC GIVEN BY COLLECTOR";
+        #endif
     }
     else {
         // microseconds has the time since the last collection
@@ -752,12 +774,18 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             last_updated_time_align(st);
 
             microseconds    = st->update_every * USEC_PER_SEC;
+            #ifdef NETDATA_INTERNAL_CHECKS
+            discard_reason = "COLLECTION TIME IN FUTURE";
+            #endif
         }
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
             info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             microseconds = (usec_t)since_last_usec;
+            #ifdef NETDATA_INTERNAL_CHECKS
+            discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
+            #endif
         }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -788,6 +816,10 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     #ifdef NETDATA_INTERNAL_CHECKS
     debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
+
+    if(discarded && discarded != microseconds)
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, st->id, discarded, microseconds, discard_reason);
+
     #endif
 
     st->usec_since_last_update = microseconds;
