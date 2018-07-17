@@ -5125,7 +5125,7 @@ var NETDATA = window.NETDATA || {};
             }
 
             // Don't handle multi-chart if there is only one chart
-            if(data.length > 1) {
+            if(this.multi_ids.length > 1 || this.multi_hosts.length > 1) {
                 // Format the first chart data
                 for(var j in newData.dimension_ids) {
                     newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
@@ -5238,11 +5238,6 @@ var NETDATA = window.NETDATA || {};
                 if(that.debug === true)
                     that.log('data received. updating chart.');
 
-                if(last_loop) {
-                    that.handleChartData(data);
-                } else {
-                    that.fetchChartData(i+1, data, callback);
-                }
             })
             .fail(function(msg) {
                 that.xhr = undefined;
@@ -5265,6 +5260,12 @@ var NETDATA = window.NETDATA || {};
 
                 NETDATA.statistics.refreshes_active--;
                 that.fetching_data = false;
+
+                if(last_loop) {
+                    that.handleChartData(data);
+                } else {
+                    that.fetchChartData(i+1, data, callback);
+                }
 
                 if(last_loop) {
                     if(typeof callback === 'function')
