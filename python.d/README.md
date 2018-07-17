@@ -2022,6 +2022,7 @@ Following charts are drawn:
  * all-outqueries
  * ipv6-outqueries
  * tcp-outqueries
+ * throttled-outqueries
 
 3. **Answer Times**
  * answers-slow
