@@ -2007,6 +2007,60 @@ local:
 
 ---
 
+# powerdns_recursor
+
+Module monitor powerdns recursor performance and health metrics.
+
+Following charts are drawn:
+
+1. **Questions In**
+ * questions
+ * ipv6-questions
+ * tcp-queries
+
+2. **Questions Out**
+ * all-outqueries
+ * ipv6-outqueries
+ * tcp-outqueries
+
+3. **Answer Times**
+ * answers-slow
+ * answers0-1
+ * answers1-10
+ * answers10-100
+ * answers100-1000
+
+4. **Timeouts**
+ * outgoing-timeouts
+ * outgoing4-timeouts
+ * outgoing6-timeouts
+
+5. **Drops**
+ * over-capacity-drops
+
+6. **Cache Usage**
+ * cache-hits
+ * cache-misses
+ * packetcache-hits
+ * packetcache-misses
+
+7. **Cache Size**
+ * cache-entries
+ * packetcache-entries
+ * negcache-entries
+
+### configuration
+
+```yaml
+local:
+  name     : 'local'
+  url     : 'http://127.0.0.1:8082/api/v1/servers/localhost/statistics'
+  header   :
+    X-API-Key: 'change_me'
+```
+
+---
+
 # puppet
 
 Monitor status of Puppet Server and Puppet DB.

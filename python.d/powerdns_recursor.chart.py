@@ -11,13 +11,13 @@ priority = 60000
 retries = 60
 # update_every = 3
 
-ORDER = ['questions-in', 'questions-out', 'questions-time', 'timeouts', 'cache_usage', 'cache_size']
+ORDER = ['questions-in', 'questions-out', 'answer-times', 'timeouts', 'drops', 'cache_usage', 'cache_size']
 CHARTS = {
     'questions-in': {
         'options': [None, 'PowerDNS Recursor Questions In', 'count', 'questions', 'powerdns_recursor.questions-in', 'line'],
         'lines': [
             ['questions', None, 'incremental'],
-            ['ipv6-answers', None, 'incremental'],
+            ['ipv6-questions', None, 'incremental'],
             ['tcp-questions', None, 'incremental']
         ]},
     'questions-out': {
@@ -25,10 +25,11 @@ CHARTS = {
         'lines': [
             ['all-outqueries', None, 'incremental'],
             ['ipv6-outqueries', None, 'incremental'],
-            ['tcp-outqueries', None, 'incremental']
+            ['tcp-outqueries', None, 'incremental'],
+            ['throttled-outqueries', None, 'incremental']
         ]},
-   'questions-time': {
-        'options': [None, 'PowerDNS Recursor Questions Time', 'count', 'performance', 'powerdns_recursor.questions-time', 'line'],
+   'answer-times': {
+        'options': [None, 'PowerDNS Recursor Answer Times', 'count', 'performance', 'powerdns_recursor.answer-times', 'line'],
         'lines': [
             ['answers-slow', None, 'incremental'],
             ['answers0-1', None, 'incremental'],
@@ -41,7 +42,11 @@ CHARTS = {
         'lines': [
             ['outgoing-timeouts', None, 'incremental'],
             ['outgoing4-timeouts', None, 'incremental'],
-            ['outgoing6-timeouts', None, 'incremental'],
+            ['outgoing6-timeouts', None, 'incremental']
+        ]},
+   'drops': {
+        'options': [None, 'PowerDNS Recursor Drops', 'count', 'performance', 'powerdns_recursor.drops', 'line'],
+        'lines': [
             ['over-capacity-drops', None, 'incremental']
         ]},
     'cache_usage': {
