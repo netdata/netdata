@@ -484,6 +484,7 @@ RRDSET *rrdset_create_custom(
     st = rrdset_find_on_create(host, fullid);
     if(st) {
         rrdhost_unlock(host);
+        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         return st;
     }
 
@@ -646,6 +647,7 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
@@ -728,9 +730,10 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         // the first entry
         microseconds = st->update_every * USEC_PER_SEC;
     }
-    else if(unlikely(!microseconds)) {
+    else if(unlikely(!microseconds || rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK))) {
         // no dt given by the plugin
         microseconds = dt_usec(&now, &st->last_collected_time);
+        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
     }
     else {
         // microseconds has the time since the last collection
