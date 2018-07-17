@@ -18,7 +18,10 @@ typedef unsigned long long msec_t;
 typedef unsigned long long usec_t;
 typedef long long susec_t;
 
-typedef usec_t heartbeat_t;
+typedef struct heartbeat {
+    usec_t monotonic;
+    usec_t realtime;
+} heartbeat_t;
 
 /* Linux value is as good as any other */
 #ifndef CLOCK_REALTIME
@@ -120,6 +123,6 @@ extern void heartbeat_init(heartbeat_t *hb);
 extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
 
 /* Returns elapsed time in microseconds since last heartbeat */
-extern usec_t heartbeat_dt_usec(heartbeat_t *hb);
+extern usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb);
 
 #endif /* NETDATA_CLOCKS_H */
