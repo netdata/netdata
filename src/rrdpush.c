@@ -76,9 +76,14 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
         return 1;
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st)
-        if(unlikely(!rd->exposed))
+    rrddim_foreach_read(rd, st) {
+        if(unlikely(!rd->exposed)) {
+            #ifdef NETDATA_INTERNAL_CHECKS
+            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rd->id);
+            #endif
             return 1;
+        }
+    }
 
     return 0;
 }
