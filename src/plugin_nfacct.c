@@ -789,7 +789,6 @@ void *nfacct_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(;;) {
-        heartbeat_dt_usec(&hb);
         heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;

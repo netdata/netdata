@@ -360,7 +360,7 @@ void *proc_diskspace_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {
-        duration = heartbeat_dt_usec(&hb);
+        duration = heartbeat_monotonic_dt_to_now_usec(&hb);
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;

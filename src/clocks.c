@@ -107,39 +107,51 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
 
 inline void heartbeat_init(heartbeat_t *hb)
 {
-    *hb = 0ULL;
+    hb->monotonic = hb->realtime = 0ULL;
 }
 
-usec_t heartbeat_next(heartbeat_t *hb, usec_t tick)
-{
-    heartbeat_t now = now_monotonic_usec();
-    usec_t next = now - (now % tick) + tick;
+// waits for the next heartbeat
+// it waits using the monotonic clock
+// it returns the dt using the realtime clock
 
-    while(now < next) {
-        sleep_usec(next - now);
-        now = now_monotonic_usec();
+usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
+    heartbeat_t now;
+    now.monotonic = now_monotonic_usec();
+    now.realtime  = now_realtime_usec();
+
+    usec_t next_monotonic = now.monotonic - (now.monotonic % tick) + tick;
+
+    while(now.monotonic < next_monotonic) {
+        sleep_usec(next_monotonic - now.monotonic);
+        now.monotonic = now_monotonic_usec();
+        now.realtime  = now_realtime_usec();
     }
 
-    if(likely(*hb != 0ULL)) {
-        usec_t dt = now - *hb;
-        *hb = now;
+    if(likely(hb->realtime != 0ULL)) {
+        usec_t dt_monotonic = now.monotonic - hb->monotonic;
+        usec_t dt_realtime  = now.realtime - hb->realtime;
 
-        if(unlikely(dt >= tick + tick / 2)) {
+        hb->monotonic = now.monotonic;
+        hb->realtime  = now.realtime;
+
+        if(unlikely(dt_monotonic >= tick + tick / 2)) {
             errno = 0;
-            error("heartbeat missed %llu microseconds", dt - tick);
+            error("heartbeat missed %llu monotonic microseconds", dt_monotonic - tick);
         }
 
-        return dt;
+        return dt_realtime;
     }
     else {
-        *hb = now;
+        hb->monotonic = now.monotonic;
+        hb->realtime  = now.realtime;
         return 0ULL;
     }
 }
 
-inline usec_t heartbeat_dt_usec(heartbeat_t *hb)
-{
-    if(!*hb)
-        return 0ULL;
-    return now_monotonic_usec() - *hb;
+// returned the elapsed time, since the last heartbeat
+// using the monotonic clock
+
+inline usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb) {
+    if(!hb || !hb->monotonic) return 0ULL;
+    return now_monotonic_usec() - hb->monotonic;
 }
