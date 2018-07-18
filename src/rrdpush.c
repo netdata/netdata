@@ -76,9 +76,14 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
         return 1;
 
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st)
-        if(unlikely(!rd->exposed))
+    rrddim_foreach_read(rd, st) {
+        if(unlikely(!rd->exposed)) {
+            #ifdef NETDATA_INTERNAL_CHECKS
+            info("host '%s', chart '%s', dimension '%s' flag 'exposed' triggered chart refresh to upstream", st->rrdhost->hostname, st->id, rd->id);
+            #endif
             return 1;
+        }
+    }
 
     return 0;
 }
@@ -148,7 +153,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (st->upstream_resync_time > st->last_collected_time.tv_sec)?st->usec_since_last_update:0);
+    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
