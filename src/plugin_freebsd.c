@@ -114,7 +114,7 @@ void *freebsd_main(void *ptr) {
             debug(D_PROCNETDEV_LOOP, "FREEBSD calling %s.", pm->name);
 
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            pm->duration = heartbeat_dt_usec(&hb) - duration;
+            pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
 
             if(unlikely(netdata_exit)) break;
