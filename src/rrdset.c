@@ -727,7 +727,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     now_realtime_timeval(&now);
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    char *discard_reason = "UNDEFINED";
+    char *discard_reason = NULL;
     usec_t discarded = microseconds;
     #endif
 
@@ -739,7 +739,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         microseconds = 0;
 
         #ifdef NETDATA_INTERNAL_CHECKS
-        discard_reason = "SYNC CLOCK FLAG";
+        if(!discard_reason) discard_reason = "SYNC CLOCK FLAG";
         #endif
     }
 
@@ -747,14 +747,14 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         // the first entry
         microseconds = st->update_every * USEC_PER_SEC;
         #ifdef NETDATA_INTERNAL_CHECKS
-        discard_reason = "FIRST DATA COLLECTION";
+        if(!discard_reason) discard_reason = "FIRST DATA COLLECTION";
         #endif
     }
     else if(unlikely(!microseconds)) {
         // no dt given by the plugin
         microseconds = dt_usec(&now, &st->last_collected_time);
         #ifdef NETDATA_INTERNAL_CHECKS
-        discard_reason = "NO USEC GIVEN BY COLLECTOR";
+        if(!discard_reason) discard_reason = "NO USEC GIVEN BY COLLECTOR";
         #endif
     }
     else {
@@ -775,7 +775,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
             microseconds    = st->update_every * USEC_PER_SEC;
             #ifdef NETDATA_INTERNAL_CHECKS
-            discard_reason = "COLLECTION TIME IN FUTURE";
+            if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
             #endif
         }
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
@@ -784,7 +784,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
             microseconds = (usec_t)since_last_usec;
             #ifdef NETDATA_INTERNAL_CHECKS
-            discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
+            if(!discard_reason) discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
             #endif
         }
 
@@ -818,7 +818,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
 
     if(discarded && discarded != microseconds)
-        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, st->id, discarded, microseconds, discard_reason);
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, st->id, discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
 
     #endif
 
