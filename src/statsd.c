@@ -712,7 +712,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 
         if(likely(*s == '|' || *s == '#')) {
             s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '|');
-            if(*tags == '@') tags++;
+            if(*tags == '#') tags++;
         }
 
         // skip everything until the end of the line
