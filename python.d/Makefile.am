@@ -55,6 +55,7 @@ dist_python_DATA = \
     postfix.chart.py \
     postgres.chart.py \
     powerdns.chart.py \
+    powerdns_recursor.chart.py \
     puppet.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
