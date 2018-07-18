@@ -603,8 +603,10 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing
 
-static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling) {
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)");
+static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling, const char *tags) {
+    (void)tags;
+
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', sampling '%s', tags '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)", tags?tags:"(null)");
 
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
@@ -688,8 +690,8 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 
     const char *s = buffer;
     while(*s) {
-        const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL;
-        char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL;
+        const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL, *tags = NULL;
+        char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL, *tags_end = NULL;
 
         s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
         if(name == name_end) {
@@ -704,8 +706,13 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
             s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@');
 
         if(likely(*s == '|' || *s == '@')) {
-            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '\r', '\n');
+            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '|', '#');
             if(*sampling == '@') sampling++;
+        }
+
+        if(likely(*s == '|' || *s == '#')) {
+            s = tags_end = (char *) statsd_parse_skip_up_to(tags = ++s, '|', '|');
+            if(*tags == '#') tags++;
         }
 
         // skip everything until the end of the line
@@ -725,6 +732,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
                 , statsd_parse_field_trim(value, value_end)
                 , statsd_parse_field_trim(type, type_end)
                 , statsd_parse_field_trim(sampling, sampling_end)
+                , statsd_parse_field_trim(tags, tags_end)
         );
     }
 
