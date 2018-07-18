@@ -718,7 +718,7 @@ RRDSET *rrdset_create_custom(
 // RRDSET - data collection iteration control
 
 inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
-    if(unlikely(!st->last_collected_time.tv_sec || !microseconds)) {
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (rrdset_flag_check_noatomic(st, RRDSET_FLAG_SYNC_CLOCK)))) {
         // call the full next_usec() function
         rrdset_next_usec(st, microseconds);
         return;
@@ -736,7 +736,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     usec_t discarded = microseconds;
     #endif
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_SYNC_CLOCK))) {
+    if(unlikely(rrdset_flag_check_noatomic(st, RRDSET_FLAG_SYNC_CLOCK))) {
         // the chart needs to be re-synced to current time
         rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
 

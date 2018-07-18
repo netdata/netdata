@@ -247,6 +247,7 @@ typedef enum rrdset_flags {
 #define rrdset_flag_set(st, flag)   (st)->flags |= (flag)
 #define rrdset_flag_clear(st, flag) (st)->flags &= ~(flag)
 #endif
+#define rrdset_flag_check_noatomic(st, flag) ((st)->flags & (flag))
 
 struct rrdset {
     // ------------------------------------------------------------------------
