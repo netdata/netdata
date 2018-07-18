@@ -477,7 +477,11 @@ RRDSET *rrdset_create_custom(
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
-    if(st) return st;
+    if(st) {
+        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        return st;
+    }
 
     rrdhost_wrlock(host);
 
