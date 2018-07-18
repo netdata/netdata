@@ -485,6 +485,7 @@ RRDSET *rrdset_create_custom(
     if(st) {
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
         return st;
     }
 
