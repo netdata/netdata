@@ -1830,7 +1830,7 @@ send_awssns() {
     for target in ${targets} ; do
         # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
         region="$(echo ${target} | cut -f 4 -d ':')"
-        ${aws} --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
+        ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
         if [ $? = 0 ]; then
             info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
             sent=$((sent + 1))
