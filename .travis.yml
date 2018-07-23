@@ -1,5 +1,7 @@
+---
 dist: trusty
 sudo: true
+
 #
 # C includes autotools and make by default
 language: c
@@ -9,18 +11,20 @@ os:
   - linux
   - osx
 compiler:
- - gcc
- - clang
+  - gcc
+  - clang
+
 #
 # Extra packages
 addons:
   apt:
     packages:
-    - gnupg
-    - libcap2-bin
-    - zlib1g-dev
-    - uuid-dev
-    - fakeroot
+      - gnupg
+      - libcap2-bin
+      - zlib1g-dev
+      - uuid-dev
+      - fakeroot
+
 #
 # Setup environment
 before_install:
@@ -41,15 +45,17 @@ before_script:
  # Run the commit hooks in case the developer didn't
  - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
 script:
-   # make release packages
- - fakeroot ./packaging/git-build
-   # Make sure stdout is in blocking mode. If we don't, then conda create will barf during downloads.
-   # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
- - python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
-   # make self-extractor
- - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./makeself/build-x86_64-static.sh; fi
-   # test build and installer
- - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+  # make release packages
+  - fakeroot ./packaging/git-build
+  # Make sure stdout is in blocking mode. If we don't, then conda create will barf during downloads.
+  # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
+  - python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+  # make self-extractor
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./makeself/build-x86_64-static.sh; fi
+  # test build and installer
+  - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+  # build docker containers
+  - if [[ "$TRAVIS_BRANCH" == "master" &&  "$TRAVIS_OS_NAME" == "linux" && "$CC" == "gcc" ]]; then REPOSITORY="firehol/netdata" ./docker/build.sh; fi
 #
 # Deploy as required
 after_success:
