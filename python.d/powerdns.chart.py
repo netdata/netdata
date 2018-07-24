@@ -114,6 +114,10 @@ class Service(UrlService):
         self.definitions = CHARTS
 
     def check(self):
+        self._manager = self._build_manager()
+        if not self._manager:
+            return None
+
         d = self._get_data()
         if not d:
             return False
