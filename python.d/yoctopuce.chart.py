@@ -217,6 +217,8 @@ class Service(SimpleService):
                         sensors.append(entry)
                     else:
                         continue
+                except yocto_api.YAPI_Exception:
+                    continue
             if not sensors:
                 order.remove(item)
                 continue
