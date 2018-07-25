@@ -602,7 +602,7 @@ class Web:
         We are here only if "custom_log_format" is in logs. We need to make sure:
         1. "custom_log_format" is a dict
         2. "pattern" in "custom_log_format" and pattern is <str> instance
-        3. if "time_multiplier" is in "custom_log_format" it must be <int> instance
+        3. if "time_multiplier" is in "custom_log_format" it must be <int> or <float> instance
 
         If all parameters is ok we need to make sure:
         1. Pattern search is success
@@ -629,8 +629,8 @@ class Web:
 
         resp_time_func = self.configuration.get('custom_log_format', dict()).get('time_multiplier') or 0
 
-        if not isinstance(resp_time_func, int):
-            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer')
+        if not isinstance(resp_time_func, (int, float)):
+            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer or a float')
 
         try:
             regex = re.compile(pattern)
