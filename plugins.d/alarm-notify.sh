@@ -30,9 +30,11 @@
 #  - blink(1) color changes by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
+#  - Microsoft Team notification by @tioumen
 
 # -----------------------------------------------------------------------------
 # testing notifications
+
 
 if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
@@ -219,7 +221,7 @@ fi
 images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
-curl_options=
+curl_options=""
 
 # blink1 options to use
 blink1_options=
@@ -232,6 +234,7 @@ blink1=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_MSTEAM="YES"
 SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
@@ -248,6 +251,7 @@ SEND_PD="YES"
 SEND_FLEEP="YES"
 SEND_IRC="YES"
 SEND_BLINK1="NO"
+SEND_AWSSNS="YES"
 SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
@@ -255,6 +259,11 @@ SEND_CUSTOM="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# Microsoft Team configs
+MSTEAM_WEBHOOK_URL=
+DEFAULT_RECIPIENT_MSTEAM=
+declare -A role_recipients_msteam=()
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
@@ -331,6 +340,11 @@ declare -A role_recipients_pd=()
 FLEEP_SENDER="${host}"
 DEFAULT_RECIPIENT_FLEEP=
 declare -A role_recipients_fleep=()
+
+# Amazon SNS configs
+DEFAULT_RECIPIENT_AWSSNS=
+AWSSNS_MESSAGE_FORMAT=
+declare -A role_recipients_awssns=()
 
 # syslog configs
 SYSLOG_FACILITY=
@@ -440,6 +454,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_msteam=()
 declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
@@ -458,6 +473,7 @@ declare -A arr_fleep=()
 declare -A arr_blink1=()
 declare -A arr_irc=()
 declare -A arr_syslog=()
+declare -A arr_awssns=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -539,6 +555,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # Microsoft Team
+    a="${role_recipients_msteam[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MSTEAM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality msteam "${r}" && arr_msteam[${r/|*/}]="1"
+    done
+
     # rocketchat
     a="${role_recipients_rocketchat[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
@@ -603,6 +627,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
     done
 
+    # amazon sns
+    a="${role_recipients_awssns[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_AWSSNS}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality awssns "${r}" && arr_awssns[${r/|*/}]="1"
+    done
+
     # syslog
     a="${role_recipients_syslog[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
@@ -624,6 +656,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of Microsoft team recipients (channels)
+to_msteam="${!arr_msteam[*]}"
+[ -z "${to_msteam}" ] && SEND_MSTEAM="NO"
 
 # build the list of rocketchat recipients (channels)
 to_rocketchat="${!arr_rocketchat[*]}"
@@ -697,6 +733,10 @@ done
 # build the list of irc recipients (channels)
 to_irc="${!arr_irc[*]}"
 [ -z "${to_irc}" ] && SEND_IRC="NO"
+
+# build the list of awssns recipients (facilities, servers, and prefixes)
+to_awssns="${!arr_awssns[*]}"
+[ -z "${to_awssns}" ] && SEND_AWSSNS="NO"
 
 # build the list of syslog recipients (facilities, servers, and prefixes)
 to_syslog="${!arr_syslog[*]}"
@@ -791,6 +831,7 @@ if [ \( \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
+        -o "${SEND_MSTEAM}"        = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -801,6 +842,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_MSTEAM="NO"
         SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
@@ -837,6 +879,17 @@ if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
     fi
 fi
 
+# if we need aws, check for the aws command
+if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
+    then
+    aws="$(which aws 2>/dev/null || command -v aws 2>/dev/null)"
+    if [ -z "${aws}" ]
+        then
+        debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+        SEND_AWSSNS="NO"
+    fi
+fi
+
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
@@ -857,7 +910,9 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_BLINK1}"         != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
+    -a "${SEND_AWSSNS}"         != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
+    -a "${SEND_MSTEAM}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1378,6 +1433,65 @@ send_telegram() {
 }
 
 # -----------------------------------------------------------------------------
+# Microsoft Team sender
+
+send_msteam() {
+
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_MSTEAM}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}";;
+        CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}";;
+        CLEAR)    icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}";;
+        *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
+    esac
+
+    for channel in ${channels}
+    do
+        ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
+        ## Online designer : https://acdesignerbeta.azurewebsites.net/
+        payload="$(cat <<EOF
+        {
+            "@context": "http://schema.org/extensions",
+            "@type": "MessageCard",
+            "themeColor": "${color}",
+            "title": "$icon Alert ${status} from netdata for ${host}",
+            "text": "${host} ${status_message}, ${chart} (_${family}_), *${alarm}*",
+            "potentialAction": [
+            {
+                "@type": "OpenUri",
+                "name": "Netdata",
+                "targets": [
+                { "os": "default", "uri": "${goto_url}" }
+                ]
+            }
+            ]
+        }
+EOF
+        )"
+
+	# Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+	webhook="${webhook//CHANNEL/${channel}}"
+
+	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
 # slack sender
 
 send_slack() {
@@ -1742,6 +1856,34 @@ send_irc() {
 }
 
 # -----------------------------------------------------------------------------
+# Amazon SNS sender
+
+send_awssns() {
+    local targets="${1}" message='' sent=0 region=''
+    local default_format="${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+    [ "${SEND_AWSSNS}" = "YES" ] || return 1
+
+    message=${AWSSNS_MESSAGE_FORMAT:-${default_format}}
+
+    for target in ${targets} ; do
+        # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
+        region="$(echo ${target} | cut -f 4 -d ':')"
+        ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
+        if [ $? = 0 ]; then
+            info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'" 
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # syslog sender
 
 send_syslog() {
@@ -1980,6 +2122,15 @@ send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
 
 # -----------------------------------------------------------------------------
+# send the Microsoft notification
+
+# Microsoft team aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
+SENT_MSTEAM=$?
+
+# -----------------------------------------------------------------------------
 # send the rocketchat notification
 
 # rocketchat aggregates posts from the same username
@@ -2161,6 +2312,14 @@ SENT_BLINK1=$?
 
 
 # -----------------------------------------------------------------------------
+# send the Amazon SNS message
+
+send_awssns ${to_awssns}
+
+SENT_AWSSNS=$?
+
+
+# -----------------------------------------------------------------------------
 # send the syslog message
 
 send_syslog ${to_syslog}
@@ -2298,6 +2457,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_MSTEAM}       -eq 0 \
     -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
@@ -2312,6 +2472,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_FLEEP}        -eq 0 \
     -o ${SENT_BLINK1}       -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
+    -o ${SENT_AWSSNS}       -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
     -o ${SENT_SYSLOG}       -eq 0 \
     ]

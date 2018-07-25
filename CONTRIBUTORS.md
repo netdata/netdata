@@ -65,10 +65,42 @@ This is the list of contributors that have signed this agreement:
 
 username|name|email (optional)
 :--------:|:----:|:----------------
+@lets00|Luís Eduardo|leduardo@lsd.ufcg.edu.br
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
 @philwhineray|Phil Whineray|
 @paulfantom|Pawel Krupa|pawel@krupa.net.pl
 @Ferroin|Austin S. Hemmelgarn|ahferroin7@gmail.com
+@glensc|Elan Ruusamäe|
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
 @rlefevre|Rémi Lefèvre|
+@vlvkobal|Vladimir Kobal|vlad@prokk.net
+@simonnagl|Simon Nagl|
+@manosf|Emmanouil Fokas|manosf@protonmail.com
+@user501254|Ashesh Singh|user501254@gmail.com
+@t-h-e|Stefan Forstenlechner|
+@facetoe|Facetoe|
+@ntlug|Christopher Cox|ccox@endlessnow.com
+@alonbl|Alon Bar-Lev|alon.barlev@gmail.com
+@Wing924|Wei He|weihe924stephen@gmail.com
+@NeonSludge|Kirill Buev|kirill.buev@gmx.com
+@kmlucy|Kyle Lucy|kmlucy@gmail.com
+@RicardoSette|Ricardo Sette|ricardosette@freebsdbrasil.com.br
+@383c57|Shinichi Tagashira|
+@davidak|David Kleuker|netdata-contributors+vyff@davidak.de
+@ccremer|Christian Cremer|
+@jimcooley|Jim Cooley|jim.cooley@healthvana.com
+@Chocobo1|Mike Tzou|
+@cosmix|Dimosthenis Kaponis|
+@shadycuz|Levi Blaney|shadycuz+spam@gmail.com
+@Flums|Philip Gabrielsen|philip@digno.no
+@domschl|Dominik Schlösser|dominik.schloesser@gmail.com
+@tioumen|Guillaume Hospital|
+@arch273|Jacob Ayres
+@x4FF3|David Fuellgraf|
+@jasonwbarnett|Jason Barnett|
+@ecowed|Ed Wade|
+@wungad|Rob Man|
+@rda0|Sven Mäder|maeder@phys.ethz.ch
+@alibo|Ali Borhani|aliborhani1@gmail.com
+

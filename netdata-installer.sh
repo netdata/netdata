@@ -80,6 +80,7 @@ REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
+[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${0}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 

@@ -53,6 +53,7 @@ dist_pythonconfig_DATA = \
     python.d/litespeed.conf \
     python.d/logind.conf \
     python.d/mdstat.conf \
+    python.d/megacli.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
     python.d/mysql.conf \
@@ -88,6 +89,7 @@ healthconfigdir=$(configdir)/health.d
 
 dist_healthconfig_DATA = \
     health.d/apache.conf \
+    health.d/apcupsd.conf \
     health.d/backend.conf \
     health.d/bcache.conf \
     health.d/beanstalkd.conf \
@@ -110,6 +112,7 @@ dist_healthconfig_DATA = \
     health.d/isc_dhcpd.conf \
     health.d/lighttpd.conf \
     health.d/mdstat.conf \
+    health.d/megacli.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
     health.d/mongodb.conf \

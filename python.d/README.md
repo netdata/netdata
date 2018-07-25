@@ -1141,6 +1141,35 @@ No configuration is needed.
 
 ---
 
+# megacli
+
+Module collects adapter, physical drives and battery stats.
+
+**Requirements:**
+ * `netdata` user needs to be able to be able to sudo the `megacli` program without password
+
+To grab stats it executes:
+ * `sudo -n megacli -LDPDInfo -aAll`
+ * `sudo -n megacli -AdpBbuCmd -a0`
+ 
+ 
+It produces:
+
+1. **Adapter State**
+
+2. **Physical Drives Media Errors**
+
+3. **Physical Drives Predictive Failures**
+
+4. **Battery Relative State of Charge**
+
+5. **Battery Cycle Count**
+
+### configuration
+Battery stats disabled by default in the module configuration file.
+
+---
+
 # memcached
 
 Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
@@ -1943,7 +1972,7 @@ When no configuration file is found, module tries to connect to TCP/IP socket: `
 
 Module monitor powerdns performance and health metrics.
 
-Following charts are drawn:
+Powerdns charts:
 
 1. **Queries and Answers**
  * udp-queries
@@ -1965,6 +1994,45 @@ Following charts are drawn:
 
 4. **Latency**
  * latency
+ 
+ Powerdns Recursor charts:
+ 
+ 1. **Questions In**
+ * questions
+ * ipv6-questions
+ * tcp-queries
+
+2. **Questions Out**
+ * all-outqueries
+ * ipv6-outqueries
+ * tcp-outqueries
+ * throttled-outqueries
+
+3. **Answer Times**
+ * answers-slow
+ * answers0-1
+ * answers1-10
+ * answers10-100
+ * answers100-1000
+
+4. **Timeouts**
+ * outgoing-timeouts
+ * outgoing4-timeouts
+ * outgoing6-timeouts
+
+5. **Drops**
+ * over-capacity-drops
+
+6. **Cache Usage**
+ * cache-hits
+ * cache-misses
+ * packetcache-hits
+ * packetcache-misses
+
+7. **Cache Size**
+ * cache-entries
+ * packetcache-entries
+ * negcache-entries
 
 ### configuration
 
