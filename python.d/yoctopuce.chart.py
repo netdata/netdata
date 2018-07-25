@@ -120,7 +120,7 @@ def get_sensor_definition(sensor):
         'sensor': sensor,
         'units': sensor.get_unit(),
         'precision': int(1.0 / sensor.get_resolution()),
-        'name': format('yoctopuce.{0}', sensor.get_friendlyName())
+        'name': format('yoctopuce.{0}', sensor.get_friendlyName()),
         'id': sensor.get_friendlyName()
     }
 

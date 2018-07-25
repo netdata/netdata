@@ -2899,10 +2899,10 @@ Provides one chart each for the following sensor interface types:
 2. Temperature Sensors
 3. Humidity Sensors
 4. Pressure Sensors
-4. Current Sensors
-5. Voltage Sensors
-6. VOC (volatile organic compounds) Sensors
-7. Carbon Dioxide Sensors
+5. Current Sensors
+6. Voltage Sensors
+7. VOC (volatile organic compounds) Sensors
+8. Carbon Dioxide Sensors
 
 
 ### configuration
