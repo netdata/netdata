@@ -629,7 +629,7 @@ class Web:
 
         resp_time_func = self.configuration.get('custom_log_format', dict()).get('time_multiplier') or 0
 
-        if not isinstance(resp_time_func, int):
+        if not isinstance(resp_time_func, (int, float)):
             return find_regex_return(msg='Custom log: "time_multiplier" is not an integer')
 
         try:
