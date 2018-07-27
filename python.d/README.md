@@ -131,7 +131,6 @@ Module provides server and tube level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
- * `python-yaml`
 
 **Server statistics:**
 
