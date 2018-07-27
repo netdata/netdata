@@ -9,13 +9,8 @@ try:
 except ImportError:
     BEANSTALKC = False
 
-try:
-    import yaml
-    YAML = True
-except ImportError:
-    YAML = False
-
 from bases.FrameworkServices.SimpleService import SimpleService
+from bases.loaders import safe_load
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -177,10 +172,6 @@ class Service(SimpleService):
             self.error("'beanstalkc' module is needed to use beanstalk.chart.py")
             return False
 
-        if not YAML:
-            self.error("'yaml' module is needed to use beanstalk.chart.py")
-            return False
-
         self.conn = self.connect()
 
         return True if self.conn else False
@@ -232,7 +223,7 @@ class Service(SimpleService):
             return beanstalkc.Connection(host=host,
                                          port=port,
                                          connect_timeout=timeout,
-                                         parse_yaml=yaml.load)
+                                         parse_yaml=safe_load)
         except beanstalkc.SocketError as error:
             self.error('Connection to {0}:{1} failed: {2}'.format(host, port, error))
             return None

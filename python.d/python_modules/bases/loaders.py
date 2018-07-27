@@ -35,6 +35,14 @@ def dict_constructor(loader, node):
     return OrderedDict(loader.construct_pairs(node))
 
 
+def safe_load(stream):
+    loader = YamlSafeLoader(stream)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
 YamlSafeLoader.add_constructor(DEFAULT_MAPPING_TAG, dict_constructor)
 
 
