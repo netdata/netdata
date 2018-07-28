@@ -460,7 +460,7 @@ issystemd() {
         ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
 
         # if pid of systemd is in our namespace, it is systemd
-        [ ! -z "${myns}" && "${myns}" = "${ns}" ] && return 0
+        [ ! -z "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
     done
 
     # else, it is not systemd
