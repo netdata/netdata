@@ -77,7 +77,7 @@ class LoggerCounters:
                                                                             dropped=self.dropped)
 
 
-class BaseLogger(object):
+class BaseLogger:
     def __init__(self, logger_name, log_fmt=DEFAULT_LOG_LINE_FORMAT, date_fmt=DEFAULT_LOG_TIME_FORMAT,
                  handler=logging.StreamHandler):
         """
@@ -140,7 +140,7 @@ class BaseLogger(object):
         self.logger.critical(' '.join(map(str, msg)), **kwargs)
 
 
-class PythonDLogger(object):
+class PythonDLogger:
     def __init__(self, logger_name=PYTHON_D_LOG_NAME, log_fmt=PYTHON_D_LOG_LINE_FORMAT):
         """
         :param logger_name: <str>

@@ -129,7 +129,7 @@ def handle_os_error(method):
     return on_call
 
 
-class SmartAttribute(object):
+class SmartAttribute:
     def __init__(self, idx, normalized, raw):
         self.id = idx
         self.normalized = normalized
