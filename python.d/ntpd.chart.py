@@ -163,6 +163,8 @@ PEER_CHARTS = {
 
 
 class Base:
+    # No need for __slots__, no instance variables.
+
     regex = re.compile(r'([a-z_]+)=((?:-)?[0-9]+(?:\.[0-9]+)?)')
 
     @staticmethod
@@ -190,6 +192,8 @@ class Base:
 
 
 class System(Base):
+    __slots__ = ('request')
+
     def __init__(self):
         self.request = self.get_header()
 
@@ -204,6 +208,8 @@ class System(Base):
 
 
 class Peer(Base):
+    __slots__ = ('id', 'real_name', 'name', 'request')
+
     def __init__(self, idx, name):
         self.id = idx
         self.real_name = name
