@@ -80,27 +80,27 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
 
+    def parse(self, data):
+        try:
+            xml = ET.fromstring(data)
+        except ET.ParseError:
+            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
+            return None
+        return xml
+
     def check(self):
         self._manager = self._build_manager()
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
-        try:
-            xml = ET.fromstring(raw_data)
-            return True
-        except ET.ParseError:
-            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
-            return None
+        return bool(self.parse(raw_data))
 
     def _get_data(self):
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
-
-        try:
-            xml = ET.fromstring(raw_data)
-        except ET.ParseError:
-            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
+        xml = self.parse(raw_data)
+        if not xml:
             return None
 
         data = {}
