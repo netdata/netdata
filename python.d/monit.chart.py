@@ -11,6 +11,7 @@ from bases.FrameworkServices.UrlService import UrlService
 priority = 60000
 retries = 60
 
+# see enum State_Type from monit.h (https://bitbucket.org/tildeslash/monit/src/master/src/monit.h)
 MONIT_SERVICE_NAMES = [ 'Filesystem', 'Directory', 'File', 'Process', 'Host', 'System', 'Fifo', 'Program', 'Net' ]
 DEFAULT_SERVICES_IDS = [ 0, 1, 2, 3, 4, 6, 7, 8 ]
 
@@ -82,65 +83,64 @@ class Service(UrlService):
     def check(self):
         self._manager = self._build_manager()
         raw_data = self._get_raw_data()
-        if raw_data:
-            try:
-                xml = ET.fromstring(raw_data)
-            except ET.ParseError:
-                self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
-                return None
+        if not raw_data:
+            return None
+        try:
+            xml = ET.fromstring(raw_data)
             return True
-        return None
+        except ET.ParseError:
+            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
+            return None
 
     def _get_data(self):
-        data = None
         raw_data = self._get_raw_data()
-        if raw_data:
-            try:
-                xml = ET.fromstring(raw_data)
-            except ET.ParseError:
-                self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
-                return None
-            data = {}
+        if not raw_data:
+            return None
 
-            for svc_id in DEFAULT_SERVICES_IDS:
-                if svc_id not in DEFAULT_SERVICES_IDS:
-                    continue
+        try:
+            xml = ET.fromstring(raw_data)
+        except ET.ParseError:
+            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
+            return None
 
-                svc_category = MONIT_SERVICE_NAMES[svc_id].lower()
-                if svc_category == 'system':
-                    self.debug("Skipping service from 'System' category, because it's useless in graphs")
-                    continue
+        data = {}
+        for svc_id in DEFAULT_SERVICES_IDS:
+            svc_category = MONIT_SERVICE_NAMES[svc_id].lower()
+            if svc_category == 'system':
+                self.debug("Skipping service from 'System' category, because it's useless in graphs")
+                continue
 
-                xpath_query = "./service[@type='%d']" % (svc_id)
-                self.debug("Searching for %s as %s" % (svc_category, xpath_query))
-                for svc in xml.findall(xpath_query):
-                    svc_name = svc.find('name').text
-                    svc_status = svc.find('status').text
-                    svc_monitor = svc.find('monitor').text
-                    self.debug('=> found %s with type=%s, status=%s, monitoring=%s' % (svc_name, svc_id, svc_status, svc_monitor))
+            xpath_query = "./service[@type='%d']" % (svc_id)
+            self.debug("Searching for %s as %s" % (svc_category, xpath_query))
+            for svc in xml.findall(xpath_query):
+                svc_name = svc.find('name').text
+                svc_status = svc.find('status').text
+                svc_monitor = svc.find('monitor').text
+                self.debug('=> found %s with type=%s, status=%s, monitoring=%s' % (svc_name, svc_id, svc_status, svc_monitor))
 
-                    dimension_key = svc_category + '_' + svc_name
-                    if dimension_key not in self.charts[svc_category]:
-                        self.charts[svc_category].add_dimension([dimension_key, svc_name, 'absolute'])
-                    data[dimension_key] = 1 if svc_status == "0" and svc_monitor == "1" else 0
+                dimension_key = svc_category + '_' + svc_name
+                if dimension_key not in self.charts[svc_category]:
+                    self.charts[svc_category].add_dimension([dimension_key, svc_name, 'absolute'])
+                data[dimension_key] = 1 if svc_status == "0" and svc_monitor == "1" else 0
 
-                    if svc_category == 'process':
-                        for node in ('uptime', 'threads', 'children'):
-                            node_value = svc.find(node)
-                            if node_value != None:
-                                if node == 'uptime' and int(node_value.text) < 0:
-                                    self.debug('Skipping bugged metrics with negative uptime')
-                                    continue
-                                dimension_key = 'process_%s_%s' % (node, svc_name)
-                                if dimension_key not in self.charts['process_' + node]:
-                                    self.charts['process_' + node].add_dimension([dimension_key, svc_name, 'absolute'])
-                                data[dimension_key] = int(node_value.text)
-
-                    if svc_category == 'host':
-                        node_value = svc.find('./icmp/responsetime')
+                if svc_category == 'process':
+                    for node in ('uptime', 'threads', 'children'):
+                        node_value = svc.find(node)
                         if node_value != None:
-                            dimension_key = 'host_latency_%s' % (svc_name)
-                            if dimension_key not in self.charts['host_latency']:
-                                self.charts['host_latency'].add_dimension([dimension_key, svc_name, 'absolute', 1000, 1000000])
-                            data[dimension_key] = float(node_value.text) * 1000000
+                            if node == 'uptime' and int(node_value.text) < 0:
+                                self.debug('Skipping bugged metrics with negative uptime')
+                                continue
+                            dimension_key = 'process_%s_%s' % (node, svc_name)
+                            if dimension_key not in self.charts['process_' + node]:
+                                self.charts['process_' + node].add_dimension([dimension_key, svc_name, 'absolute'])
+                            data[dimension_key] = int(node_value.text)
+
+                if svc_category == 'host':
+                    node_value = svc.find('./icmp/responsetime')
+                    if node_value != None:
+                        dimension_key = 'host_latency_%s' % (svc_name)
+                        if dimension_key not in self.charts['host_latency']:
+                            self.charts['host_latency'].add_dimension([dimension_key, svc_name, 'absolute', 1000, 1000000])
+                        data[dimension_key] = float(node_value.text) * 1000000
+
         return data or None
