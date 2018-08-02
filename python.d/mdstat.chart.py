@@ -84,6 +84,8 @@ def md_charts(name):
 
 
 class MD:
+    __slots__ = ('d', 'name')
+
     def __init__(self, raw_data):
         self.name = raw_data["array"]
         self.d = raw_data
