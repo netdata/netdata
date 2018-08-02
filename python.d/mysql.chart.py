@@ -13,6 +13,7 @@ retries = 60
 # query executed on MySQL server
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
+QUERY_VARIABLES = 'SHOW GLOBAL VARIABLES LIKE \'max_connections\';'
 
 GLOBAL_STATS = [
  'Bytes_received',
@@ -49,6 +50,7 @@ GLOBAL_STATS = [
  'Created_tmp_tables',
  'Connections',
  'Aborted_connects',
+ 'Max_used_connections',
  'Binlog_cache_disk_use',
  'Binlog_cache_use',
  'Threads_connected',
@@ -143,13 +145,16 @@ SLAVE_STATS = [
     ('Slave_IO_Running', slave_running)
 ]
 
+VARIABLES = [
+ 'max_connections']
+
 ORDER = ['net',
          'queries',
          'handlers',
          'table_locks',
          'join_issues', 'sort_issues',
          'tmp',
-         'connections', 'connection_errors',
+         'connections', 'connections_active', 'connection_errors',
          'binlog_cache', 'binlog_stmt_cache',
          'threads', 'thread_cache_misses',
          'innodb_io', 'innodb_io_ops', 'innodb_io_pending_ops', 'innodb_log', 'innodb_os_log', 'innodb_os_log_io',
@@ -226,6 +231,13 @@ CHARTS = {
         'lines': [
             ['Connections', 'all', 'incremental'],
             ['Aborted_connects', 'aborted', 'incremental']
+        ]},
+    'connections_active': {
+        'options': [None, 'mysql Connections Active', 'connections', 'connections', 'mysql.connections_active', 'line'],
+        'lines': [
+            ['Threads_connected', 'active', 'absolute'],
+            ['max_connections', 'limit', 'absolute'],
+            ['Max_used_connections', 'max_active', 'absolute']
         ]},
     'binlog_cache': {
         'options': [None, 'mysql Binlog Cache', 'transactions/s', 'binlog', 'mysql.binlog_cache', 'line'],
@@ -459,7 +471,7 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.queries = dict(global_status=QUERY_GLOBAL, slave_status=QUERY_SLAVE)
+        self.queries = dict(global_status=QUERY_GLOBAL, slave_status=QUERY_SLAVE, variables=QUERY_VARIABLES)
 
     def _get_data(self):
 
@@ -487,6 +499,12 @@ class Service(MySQLService):
                         to_netdata[key] = func(slave_raw_data[key])
             else:
                 self.queries.pop('slave_status')
+
+        if 'variables' in raw_data:
+            variables = dict(raw_data['variables'][0])
+            for key in VARIABLES:
+                if key in variables:
+                    to_netdata[key] = variables[key]
 
         return to_netdata or None
 
