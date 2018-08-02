@@ -104,3 +104,4 @@ username|name|email (optional)
 @rda0|Sven Mäder|maeder@phys.ethz.ch
 @alibo|Ali Borhani|aliborhani1@gmail.com
 @Nani-o|Sofiane Medjkoune|sofiane@medjkoune.fr
+@amichelic|Adalbert Michelic|
