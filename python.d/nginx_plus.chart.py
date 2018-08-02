@@ -319,6 +319,8 @@ BAD_SYMBOLS = re.compile(r'[:/.-]+')
 
 
 class Cache:
+    __slots__ = ('real_name', 'name')
+
     key = 'caches'
     charts = cache_charts
 
@@ -339,6 +341,8 @@ class Cache:
 
 
 class WebZone:
+    __slots__ = ('real_name', 'name')
+
     key = 'server_zones'
     charts = web_zone_charts
 
@@ -353,6 +357,8 @@ class WebZone:
 
 
 class WebUpstream:
+    __slots__ = ('real_name', 'name', 'peers')
+
     key = 'upstreams'
     charts = web_upstream_charts
 
@@ -408,6 +414,8 @@ class WebUpstream:
 
 
 class WebUpstreamPeer:
+    __slots__ = ('id', 'real_server', 'server', 'active')
+
     def __init__(self, idx, server):
         self.id = idx
         self.real_server = server
