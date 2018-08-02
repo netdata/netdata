@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0+
 
 import xml.etree.ElementTree as ET
-import pdb
-
 from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
