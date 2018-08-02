@@ -45,6 +45,8 @@ CHARTS = {
 
 
 class DhcpdLeasesFile:
+    __slots__ = ('path', 'mod_time', 'size')
+
     def __init__(self, path):
         self.path = path
         self.mod_time = 0
@@ -81,6 +83,8 @@ class DhcpdLeasesFile:
 
 
 class Pool:
+    __slots__ = ('id', 'name', 'network')
+
     def __init__(self, name, network):
         self.id = re.sub(r'[:/.-]+', '_', name)
         self.name = name
@@ -94,6 +98,8 @@ class Pool:
 
 
 class Lease:
+    __slots__ = ('address', 'ends', 'state')
+
     def __init__(self, address, ends, state):
         self.address = ipaddress.ip_address(address=u'%s' % address)
         self.ends = ends
