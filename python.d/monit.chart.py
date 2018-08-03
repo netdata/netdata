@@ -85,7 +85,7 @@ class Service(UrlService):
         try:
             xml = ET.fromstring(data)
         except ET.ParseError:
-            self.debug('{} is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.'.format(self.url))
+            self.debug('{0} is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.'.format(self.url))
             return None
         return xml
 
@@ -142,7 +142,7 @@ class Service(UrlService):
                     subnode_value = service_node.find('./icmp/responsetime')
                     if subnode_value == None:
                         continue
-                    dimension_key = 'host_latency_{}'.format(service_name)
+                    dimension_key = 'host_latency_{0}'.format(service_name)
                     if dimension_key not in self.charts['host_latency']:
                         self.charts['host_latency'].add_dimension([dimension_key, service_name, 'absolute', 1000, 1000000])
                     data[dimension_key] = float(subnode_value.text) * 1000000
