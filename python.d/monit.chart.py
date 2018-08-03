@@ -3,6 +3,7 @@
 # Author: Evgeniy K. (n0guest)
 # SPDX-License-Identifier: GPL-3.0+
 
+import copy
 import xml.etree.ElementTree as ET
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -104,43 +105,46 @@ class Service(UrlService):
             return None
 
         data = {}
-        for svc_id in DEFAULT_SERVICES_IDS:
-            svc_category = MONIT_SERVICE_NAMES[svc_id].lower()
-            if svc_category == 'system':
+        for service_id in DEFAULT_SERVICES_IDS:
+            service_category = MONIT_SERVICE_NAMES[service_id].lower()
+            if service_category == 'system':
                 self.debug("Skipping service from 'System' category, because it's useless in graphs")
                 continue
 
-            xpath_query = "./service[@type='%d']" % (svc_id)
-            self.debug("Searching for %s as %s" % (svc_category, xpath_query))
-            for svc in xml.findall(xpath_query):
-                svc_name = svc.find('name').text
-                svc_status = svc.find('status').text
-                svc_monitor = svc.find('monitor').text
-                self.debug('=> found %s with type=%s, status=%s, monitoring=%s' % (svc_name, svc_id, svc_status, svc_monitor))
+            xpath_query = "./service[@type='%d']" % (service_id)
+            self.debug("Searching for %s as %s" % (service_category, xpath_query))
+            for service_node in xml.findall(xpath_query):
 
-                dimension_key = svc_category + '_' + svc_name
-                if dimension_key not in self.charts[svc_category]:
-                    self.charts[svc_category].add_dimension([dimension_key, svc_name, 'absolute'])
-                data[dimension_key] = 1 if svc_status == "0" and svc_monitor == "1" else 0
+                service_name = service_node.find('name').text
+                service_status = service_node.find('status').text
+                service_monitoring = service_node.find('monitor').text
+                self.debug('=> found %s with type=%s, status=%s, monitoring=%s' % (service_name, service_id, service_status, service_monitoring))
 
-                if svc_category == 'process':
-                    for node in ('uptime', 'threads', 'children'):
-                        node_value = svc.find(node)
-                        if node_value != None:
-                            if node == 'uptime' and int(node_value.text) < 0:
-                                self.debug('Skipping bugged metrics with negative uptime')
-                                continue
-                            dimension_key = 'process_%s_%s' % (node, svc_name)
-                            if dimension_key not in self.charts['process_' + node]:
-                                self.charts['process_' + node].add_dimension([dimension_key, svc_name, 'absolute'])
-                            data[dimension_key] = int(node_value.text)
+                dimension_key = service_category + '_' + service_name
+                if dimension_key not in self.charts[service_category]:
+                    self.charts[service_category].add_dimension([dimension_key, service_name, 'absolute'])
+                data[dimension_key] = 1 if service_status == "0" and service_monitoring == "1" else 0
 
-                if svc_category == 'host':
-                    node_value = svc.find('./icmp/responsetime')
-                    if node_value != None:
-                        dimension_key = 'host_latency_%s' % (svc_name)
-                        if dimension_key not in self.charts['host_latency']:
-                            self.charts['host_latency'].add_dimension([dimension_key, svc_name, 'absolute', 1000, 1000000])
-                        data[dimension_key] = float(node_value.text) * 1000000
+                if service_category == 'process':
+                    for subnode in ('uptime', 'threads', 'children'):
+                        subnode_value = service_node.find(subnode)
+                        if subnode_value == None:
+                            continue
+                        if subnode == 'uptime' and int(subnode_value.text) < 0:
+                            self.debug('Skipping bugged metrics with negative uptime (monit before v5.16')
+                            continue
+                        dimension_key = 'process_%s_%s' % (subnode, service_name)
+                        if dimension_key not in self.charts['process_' + subnode]:
+                            self.charts['process_' + subnode].add_dimension([dimension_key, service_name, 'absolute'])
+                        data[dimension_key] = int(subnode_value.text)
+
+                if service_category == 'host':
+                    subnode_value = service_node.find('./icmp/responsetime')
+                    if subnode_value == None:
+                        continue
+                    dimension_key = 'host_latency_%s' % (service_name)
+                    if dimension_key not in self.charts['host_latency']:
+                        self.charts['host_latency'].add_dimension([dimension_key, service_name, 'absolute', 1000, 1000000])
+                    data[dimension_key] = float(subnode_value.text) * 1000000
 
         return data or None
