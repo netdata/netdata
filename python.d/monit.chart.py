@@ -112,13 +112,13 @@ class Service(UrlService):
                 continue
 
             xpath_query = "./service[@type='{:d}']".format(service_id)
-            self.debug("Searching for {} as {}".format(service_category, xpath_query))
+            self.debug("Searching for {0} as {1}".format(service_category, xpath_query))
             for service_node in xml.findall(xpath_query):
 
                 service_name = service_node.find('name').text
                 service_status = service_node.find('status').text
                 service_monitoring = service_node.find('monitor').text
-                self.debug('=> found {} with type={}, status={}, monitoring={}'.format(service_name, service_id, service_status, service_monitoring))
+                self.debug('=> found {0} with type={1}, status={2}, monitoring={3}'.format(service_name, service_id, service_status, service_monitoring))
 
                 dimension_key = service_category + '_' + service_name
                 if dimension_key not in self.charts[service_category]:
@@ -133,7 +133,7 @@ class Service(UrlService):
                         if subnode == 'uptime' and int(subnode_value.text) < 0:
                             self.debug('Skipping bugged metrics with negative uptime (monit before v5.16')
                             continue
-                        dimension_key = 'process_{}_{}'.format(subnode, service_name)
+                        dimension_key = 'process_{0}_{1}'.format(subnode, service_name)
                         if dimension_key not in self.charts['process_' + subnode]:
                             self.charts['process_' + subnode].add_dimension([dimension_key, service_name, 'absolute'])
                         data[dimension_key] = int(subnode_value.text)
