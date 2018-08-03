@@ -85,7 +85,7 @@ class Service(UrlService):
         try:
             xml = ET.fromstring(data)
         except ET.ParseError:
-            self.debug('%s is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.' % self.url)
+            self.debug('{} is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.'.format(self.url))
             return None
         return xml
 
@@ -111,14 +111,14 @@ class Service(UrlService):
                 self.debug("Skipping service from 'System' category, because it's useless in graphs")
                 continue
 
-            xpath_query = "./service[@type='%d']" % (service_id)
-            self.debug("Searching for %s as %s" % (service_category, xpath_query))
+            xpath_query = "./service[@type='{:d}']".format(service_id)
+            self.debug("Searching for {} as {}".format(service_category, xpath_query))
             for service_node in xml.findall(xpath_query):
 
                 service_name = service_node.find('name').text
                 service_status = service_node.find('status').text
                 service_monitoring = service_node.find('monitor').text
-                self.debug('=> found %s with type=%s, status=%s, monitoring=%s' % (service_name, service_id, service_status, service_monitoring))
+                self.debug('=> found {} with type={}, status={}, monitoring={}'.format(service_name, service_id, service_status, service_monitoring))
 
                 dimension_key = service_category + '_' + service_name
                 if dimension_key not in self.charts[service_category]:
@@ -133,7 +133,7 @@ class Service(UrlService):
                         if subnode == 'uptime' and int(subnode_value.text) < 0:
                             self.debug('Skipping bugged metrics with negative uptime (monit before v5.16')
                             continue
-                        dimension_key = 'process_%s_%s' % (subnode, service_name)
+                        dimension_key = 'process_{}_{}'.format(subnode, service_name)
                         if dimension_key not in self.charts['process_' + subnode]:
                             self.charts['process_' + subnode].add_dimension([dimension_key, service_name, 'absolute'])
                         data[dimension_key] = int(subnode_value.text)
@@ -142,7 +142,7 @@ class Service(UrlService):
                     subnode_value = service_node.find('./icmp/responsetime')
                     if subnode_value == None:
                         continue
-                    dimension_key = 'host_latency_%s' % (service_name)
+                    dimension_key = 'host_latency_{}'.format(service_name)
                     if dimension_key not in self.charts['host_latency']:
                         self.charts['host_latency'].add_dimension([dimension_key, service_name, 'absolute', 1000, 1000000])
                     data[dimension_key] = float(subnode_value.text) * 1000000
