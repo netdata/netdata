@@ -65,7 +65,7 @@ CHARTS = {
         'lines': []
     },
     'host_latency': {
-        'options': ['hosts latency', 'Hosts latency', 'milliseconds/s', 'network', 'monit.hosts', 'line'],
+        'options': ['hosts latency', 'Hosts latency', 'milliseconds/s', 'network', 'monit.host_latency', 'line'],
         'lines': []
     },
     'net': {
@@ -111,7 +111,7 @@ class Service(UrlService):
                 self.debug("Skipping service from 'System' category, because it's useless in graphs")
                 continue
 
-            xpath_query = "./service[@type='{:d}']".format(service_id)
+            xpath_query = "./service[@type='{0}']".format(service_id)
             self.debug("Searching for {0} as {1}".format(service_category, xpath_query))
             for service_node in xml.findall(xpath_query):
 
