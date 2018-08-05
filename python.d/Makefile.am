@@ -44,6 +44,7 @@ dist_python_DATA = \
     megacli.chart.py \
     memcached.chart.py \
     mongodb.chart.py \
+    monit.chart.py \
     mysql.chart.py \
     nginx.chart.py \
     nginx_plus.chart.py \

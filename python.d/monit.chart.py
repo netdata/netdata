@@ -77,7 +77,7 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = self.configuration.get('url', "http://127.0.0.1:2812/_status?format=xml&level=full")
+        self.url = self.configuration.get('url', "http://localhost:2812/_status?format=xml&level=full")
         self.order = ORDER
         self.definitions = CHARTS
 
