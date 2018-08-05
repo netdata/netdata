@@ -1406,13 +1406,12 @@ Sample:
 ```yaml
 local:
   name     : 'local'
-  host     : '127.0.0.1'
-  port     : 2812
+  url     : 'http://localhost:2812'
   user:    : admin
   pass:    : monit
 ```
 
-If no configuration is given, module will attempt to connect to monit as `http://localhost:2812/_status?format=xml&level=full`.
+If no configuration is given, module will attempt to connect to monit as `http://localhost:2812`.
 
 ---
 
