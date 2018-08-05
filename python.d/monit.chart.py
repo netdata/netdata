@@ -3,7 +3,6 @@
 # Author: Evgeniy K. (n0guest)
 # SPDX-License-Identifier: GPL-3.0+
 
-import copy
 import xml.etree.ElementTree as ET
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -77,7 +76,8 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = self.configuration.get('url', "http://localhost:2812/_status?format=xml&level=full")
+        base_url = self.configuration.get('url', 'http://localhost:2812')
+        self.url = '{0}/_status?format=xml&level=full'.format(base_url)
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -85,7 +85,7 @@ class Service(UrlService):
         try:
             xml = ET.fromstring(data)
         except ET.ParseError:
-            self.debug('{0} is not a vaild XML page. Please add "_status?format=xml&level=full" to monit URL.'.format(self.url))
+            self.error("URL {0} didn't return a vaild XML page. Please check your settings.".format(self.url))
             return None
         return xml
 
