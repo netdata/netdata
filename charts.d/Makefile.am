@@ -12,14 +12,11 @@ dist_charts_DATA = \
 	ap.chart.sh \
 	apcupsd.chart.sh \
 	apache.chart.sh \
-	cpu_apps.chart.sh \
 	cpufreq.chart.sh \
 	example.chart.sh \
 	exim.chart.sh \
 	hddtemp.chart.sh \
 	libreswan.chart.sh \
-	load_average.chart.sh \
-	mem_apps.chart.sh \
 	mysql.chart.sh \
 	nginx.chart.sh \
 	nut.chart.sh \

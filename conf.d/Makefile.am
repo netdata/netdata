@@ -155,17 +155,14 @@ dist_chartsconfig_DATA = \
     charts.d/cpufreq.conf \
     charts.d/exim.conf \
     charts.d/libreswan.conf \
-    charts.d/load_average.conf \
     charts.d/mysql.conf \
     charts.d/nut.conf \
     charts.d/phpfpm.conf \
     charts.d/sensors.conf \
     charts.d/tomcat.conf \
     charts.d/ap.conf \
-    charts.d/cpu_apps.conf \
     charts.d/example.conf \
     charts.d/hddtemp.conf \
-    charts.d/mem_apps.conf \
     charts.d/nginx.conf \
     charts.d/opensips.conf \
     charts.d/postfix.conf \
