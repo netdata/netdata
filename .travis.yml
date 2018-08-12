@@ -36,7 +36,7 @@ before_install:
 # Run
 before_script:
  # Download keys - builds of tags check for a recognised signature
- - ./packaging/gpg-recv-key phil@firehol.org "9CCE 9A8D 5328 FBD6 CE29  6DCC 63DF 1E44 D829 797E"
+ - ./packaging/gpg-recv-key phil@firehol.org "0762 9FF7 89EA 6156 012F  9F50 C406 9602 1359 9237"
  - ./packaging/gpg-recv-key costa@tsaousis.gr "4DFF 624A E564 3B51 2872  1F40 29CA 3358 89B9 A863"
  # Run the commit hooks in case the developer didn't
  - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
