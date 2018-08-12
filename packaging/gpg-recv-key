@@ -1,0 +1,65 @@
+#!/bin/sh
+
+if [ ! "$KEYSERVER" ]
+then
+  echo "No KEYSERVER environment set, e.g.:"
+  echo "  export KEYSERVER=hkps://hkps.pool.sks-keyservers.net"
+  exit 1
+fi
+
+debug=""
+if [ "$debug" ]
+then
+  if [ ! "$GNUPGHOME" ]
+  then
+    echo "No GNUPGHOME environment set, e.g.:"
+    echo "  export GNUPGHOME=$HOME/.gnupg"
+    exit 1
+  fi
+
+  if [ ! -d "$GNUPGHOME" ]
+  then
+    mkdir -p "$GNUPGHOME"
+    chmod 700 "$GNUPGHOME"
+  fi
+fi
+
+keyuid="$1"
+fingerprint="$2"
+
+# Modern GPG can import key by fingerprint but the version available
+# within travis currently does not, so we extract the short version and
+# check it matches manually
+key=`echo $fingerprint | cut -f7-10 -d' ' | tr -d ' '`
+
+gpg --keyserver "$KEYSERVER" --recv-key "$key" || exit 1
+gpg --fingerprint "$key" > /tmp/keystatus.$$
+status=$?
+
+cat /tmp/keystatus.$$
+if [ $status -ne 0 ]
+then
+  rm -f /tmp/keystatus.$$
+  exit 2
+fi
+
+if ! grep -q "^uid.*<$keyuid>" /tmp/keystatus.$$
+then
+  rm -f /tmp/keystatus.$$
+  echo "Did not find expected uid $keyuid"
+  exit 3
+fi
+
+echo "uid looks good"
+
+if ! grep -q " $fingerprint$" /tmp/keystatus.$$
+then
+  rm -f /tmp/keystatus.$$
+  echo "Did not find expected fingerprint $fingerprint"
+  exit 3
+fi
+
+echo "Fingerprint looks good"
+
+rm -f /tmp/keystatus.$$
+exit 0
