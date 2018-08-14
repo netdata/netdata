@@ -106,10 +106,6 @@ int do_proc_softirqs(int update_every, usec_t dt) {
         irr->id = procfile_lineword(ff, l, 0);
         if(unlikely(!irr->id || !irr->id[0])) continue;
 
-        size_t idlen = strlen(irr->id);
-        if(unlikely(idlen && irr->id[idlen - 1] == ':'))
-            irr->id[idlen - 1] = '\0';
-
         int c;
         for(c = 0; c < cpus ;c++) {
             if(likely((c + 1) < (int)words))
