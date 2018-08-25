@@ -56,6 +56,7 @@ dist_pythonconfig_DATA = \
     python.d/megacli.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
+    python.d/monit.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
     python.d/nginx_plus.conf \
