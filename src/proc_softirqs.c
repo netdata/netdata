@@ -60,7 +60,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/softirqs");
-        ff = procfile_open(config_get("plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get("plugin:proc:/proc/softirqs", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -105,10 +105,6 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
         irr->id = procfile_lineword(ff, l, 0);
         if(unlikely(!irr->id || !irr->id[0])) continue;
-
-        size_t idlen = strlen(irr->id);
-        if(unlikely(idlen && irr->id[idlen - 1] == ':'))
-            irr->id[idlen - 1] = '\0';
 
         int c;
         for(c = 0; c < cpus ;c++) {

@@ -61,7 +61,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff))
         return 1;
@@ -109,10 +109,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         irr->id = procfile_lineword(ff, l, 0);
         if(unlikely(!irr->id || !irr->id[0])) continue;
 
-        size_t idlen = strlen(irr->id);
-        if(unlikely(idlen && irr->id[idlen - 1] == ':'))
-            irr->id[idlen - 1] = '\0';
-
         int c;
         for(c = 0; c < cpus ;c++) {
             if(likely((c + 1) < (int)words))
@@ -126,7 +122,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         if(unlikely(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words)) {
             strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
             size_t nlen = strlen(irr->name);
-            idlen = strlen(irr->id);
+            size_t idlen = strlen(irr->id);
             if(likely(nlen + 1 + idlen <= MAX_INTERRUPT_NAME)) {
                 irr->name[nlen] = '_';
                 strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen - 1);
