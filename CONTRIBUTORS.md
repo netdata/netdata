@@ -105,3 +105,5 @@ username|name|email (optional)
 @alibo|Ali Borhani|aliborhani1@gmail.com
 @Nani-o|Sofiane Medjkoune|sofiane@medjkoune.fr
 @n0guest|Evgeniy K.|ask@osshelp.ru
+@amichelic|Adalbert Michelic|
+@abalabahaha|abalabahaha|hi@abal.moe
