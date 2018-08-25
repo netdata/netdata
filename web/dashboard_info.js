@@ -196,6 +196,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>memcached</b>. Memcached is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.'
     },
 
+    'monit': {
+        title: 'monit',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Statuses of checks in <b>monit</b>. Monit is a utility for managing and monitoring processes, programs, files, directories and filesystems on a Unix system. Monit conducts automatic maintenance and repair and can execute meaningful causal actions in error situations.'
+    },
+
     'mysql': {
         title: 'MySQL',
         icon: '<i class="fas fa-database"></i>',
