@@ -374,6 +374,7 @@ class WebUpstream:
         return peer
 
     def peers_stats(self, peers):
+        peers = {int(peer['id']): peer for peer in peers}
         data = dict()
         for peer in self.peers.values():
             if not peer.active:
