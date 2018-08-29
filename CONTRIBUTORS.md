@@ -105,3 +105,4 @@ username|name|email (optional)
 @alibo|Ali Borhani|aliborhani1@gmail.com
 @Nani-o|Sofiane Medjkoune|sofiane@medjkoune.fr
 @abalabahaha|abalabahaha|hi@abal.moe
+@jonfairbanks|Jon Fairbanks
