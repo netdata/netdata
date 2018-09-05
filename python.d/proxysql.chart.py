@@ -168,28 +168,6 @@ class Service(MySQLService):
 
         return to_netdata or None
 
-    def _generate_backend(self, data):
-        return {
-            'hostgroup': data[0],
-            'srv_host': data[1],
-            'srv_port': data[2],
-            'status': data[3],
-            'connused': data[4],
-            'connfree': data[5],
-            'connok': data[6],
-            'connerr': data[7],
-            'queries': data[8],
-            'bytes_data_sent': data[9],
-            'bytes_data_recv': data[10],
-            'latency_us': data[11]
-        }
-
-    def _generate_backend_name(self, backend):
-        hostgroup = backend['hostgroup'].replace(' ', '_').lower()
-        host = backend['srv_host'].replace('.', '_')
-
-        return "%s_%s_%s" % (hostgroup, host, backend['srv_port'])
-
     def _add_backend_dimensions(self, name):
         self.charts['pool_status'].add_dimension(
             [name + '_status', name, 'absolute'])
@@ -210,7 +188,32 @@ class Service(MySQLService):
         self.charts['pool_connection_error'].add_dimension(
             [name + '_connerr', name, 'incremental'])
 
-    def _convert_status(self, status):
+    @staticmethod
+    def _generate_backend(data):
+        return {
+            'hostgroup': data[0],
+            'srv_host': data[1],
+            'srv_port': data[2],
+            'status': data[3],
+            'connused': data[4],
+            'connfree': data[5],
+            'connok': data[6],
+            'connerr': data[7],
+            'queries': data[8],
+            'bytes_data_sent': data[9],
+            'bytes_data_recv': data[10],
+            'latency_us': data[11]
+        }
+
+    @staticmethod
+    def _generate_backend_name(backend):
+        hostgroup = backend['hostgroup'].replace(' ', '_').lower()
+        host = backend['srv_host'].replace('.', '_')
+
+        return "%s_%s_%s" % (hostgroup, host, backend['srv_port'])
+
+    @staticmethod
+    def _convert_status(status):
         if status in STATUS:
             return STATUS[status]
         return -1
