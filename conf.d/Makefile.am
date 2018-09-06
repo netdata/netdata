@@ -37,6 +37,7 @@ dist_pythonconfig_DATA = \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
     python.d/dnsdist.conf \
+    python.d/dockerd.conf \
     python.d/dovecot.conf \
     python.d/elasticsearch.conf \
     python.d/example.conf \
@@ -102,6 +103,7 @@ dist_healthconfig_DATA = \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
+    health.d/dockerd.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/fping.conf \

@@ -526,6 +526,35 @@ localhost:
     X-API-Key: 'dnsdist-api-key'
 ```
 
+---
+
+# docker
+
+Module monitor docker health metrics.
+
+**Requirement:**
+* `docker` package
+
+Following charts are drawn:
+
+1. **running containers**
+ * count
+
+2. **healthy containers**
+ * count
+
+3. **unhealthy containers**
+ * count
+
+### configuration
+
+```yaml
+ update_every : 1
+ priority     : 60000
+ ```
+
+---
+
 # dovecot
 
 This module provides statistics information from dovecot server.
@@ -1037,15 +1066,15 @@ It produces:
 
 6. **Requests In Processing** in requests
  * processing
- 
+
 7. **Public Cache Hits** in hits/s
  * hits
- 
+
 8. **Private Cache Hits** in hits/s
  * hits
- 
+
 9. **Static Hits** in hits/s
- * hits 
+ * hits
 
 
 ### configuration
@@ -1150,8 +1179,8 @@ Module collects adapter, physical drives and battery stats.
 To grab stats it executes:
  * `sudo -n megacli -LDPDInfo -aAll`
  * `sudo -n megacli -AdpBbuCmd -a0`
- 
- 
+
+
 It produces:
 
 1. **Adapter State**
@@ -2026,9 +2055,9 @@ Powerdns charts:
 
 4. **Latency**
  * latency
- 
+
  Powerdns Recursor charts:
- 
+
  1. **Questions In**
  * questions
  * ipv6-questions
