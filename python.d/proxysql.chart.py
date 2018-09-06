@@ -16,6 +16,8 @@ QUERY_GLOBAL = 'SELECT Variable_Name, Variable_Value FROM stats_mysql_global'
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_connection_pool
 QUERY_CONNECTION_POOL = 'SELECT hostgroup, srv_host, srv_port, status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries, Bytes_data_sent, Bytes_data_recv, Latency_us FROM stats_mysql_connection_pool'
 
+# https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_commands_counters
+QUERY_COMMANDS = 'SELECT Command, Total_Time_us, Total_cnt FROM stats_mysql_commands_counters'
 
 GLOBAL_STATS = [
     'client_connections_aborted',
@@ -42,6 +44,8 @@ ORDER = [
     'active_transactions',
     'questions',
     'pool_overall_net',
+    'commands_count',
+    'commands_duration',
     'pool_status',
     'pool_net',
     'pool_queries',
@@ -115,6 +119,14 @@ CHARTS = {
     'pool_connection_error': {
         'options': [None, 'ProxySQL error connections', 'connections', 'pool_connections', 'proxysql.pool_error_connections', 'line'],
         'lines': [
+        ]},
+    'commands_count': {
+        'options': [None, 'ProxySQL Commands', 'commands', 'commands', 'proxysql.commands_count', 'line'],
+        'lines': [
+        ]},
+    'commands_duration': {
+        'options': [None, 'ProxySQL Commands Duration', 'ms', 'commands', 'proxysql.commands_duration', 'line'],
+        'lines': [
         ]}
 }
 
@@ -125,7 +137,8 @@ class Service(MySQLService):
         self.order = ORDER
         self.definitions = CHARTS
         self.queries = dict(global_status=QUERY_GLOBAL,
-                            connection_pool_status=QUERY_CONNECTION_POOL)
+                            connection_pool_status=QUERY_CONNECTION_POOL,
+                            commands_status=QUERY_COMMANDS)
 
     def _get_data(self):
         raw_data = self._get_raw_data(description=True)
@@ -141,10 +154,11 @@ class Service(MySQLService):
                 if key.lower() in GLOBAL_STATS:
                     to_netdata[key.lower()] = global_status[key]
 
-        to_netdata['bytes_data_recv'] = 0
-        to_netdata['bytes_data_sent'] = 0
-
         if 'connection_pool_status' in raw_data:
+
+            to_netdata['bytes_data_recv'] = 0
+            to_netdata['bytes_data_sent'] = 0
+
             for record in raw_data['connection_pool_status'][0]:
                 backend = self._generate_backend(record)
                 name = self._generate_backend_name(backend)
@@ -166,6 +180,19 @@ class Service(MySQLService):
                     if key == 'bytes_data_sent':
                         to_netdata['bytes_data_sent'] += int(backend[key])
 
+        if 'commands_status' in raw_data:
+            for record in raw_data['commands_status'][0]:
+                cmd = record[0].lower()
+                cmd_duration = record[1]
+                cmd_count = record[2]
+
+                if len(self.charts) > 0:
+                    if (cmd + '_count') not in self.charts['commands_count']:
+                        self._add_command_dimensions(cmd)
+
+                    to_netdata[cmd + '_count'] = cmd_count
+                    to_netdata[cmd + '_duration'] = cmd_duration
+
         return to_netdata or None
 
     def _add_backend_dimensions(self, name):
@@ -178,7 +205,7 @@ class Service(MySQLService):
         self.charts['pool_queries'].add_dimension(
             [name + '_queries', name, 'incremental'])
         self.charts['pool_latency'].add_dimension(
-            [name + '_latency_us', name, 'absolute', 0, 1000])
+            [name + '_latency_us', name, 'absolute', 1, 1000])
         self.charts['pool_connection_used'].add_dimension(
             [name + '_connused', name, 'absolute'])
         self.charts['pool_connection_free'].add_dimension(
@@ -187,6 +214,12 @@ class Service(MySQLService):
             [name + '_connok', name, 'incremental'])
         self.charts['pool_connection_error'].add_dimension(
             [name + '_connerr', name, 'incremental'])
+
+    def _add_command_dimensions(self, cmd):
+        self.charts['commands_count'].add_dimension(
+            [cmd + '_count', cmd, 'incremental'])
+        self.charts['commands_duration'].add_dimension(
+            [cmd + '_duration', cmd, 'incremental', 1, 1000])
 
     @staticmethod
     def _generate_backend(data):

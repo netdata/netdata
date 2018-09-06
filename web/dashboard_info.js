@@ -2234,6 +2234,14 @@ netdataDashboard.context = {
 
     'proxysql.pool_error_connections': {
         info: 'The number of connections weren\'t established successfully.'
+    },
+
+    'proxysql.commands_count': {
+        info: 'The total number of commands of that type executed'
+    },
+
+    'proxysql.commands_duration': {
+        info: 'The total time spent executing commands of that type, in ms'
     }
 
     // ------------------------------------------------------------------------
