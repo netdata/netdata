@@ -479,7 +479,7 @@ progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]
 then
-    run ./autogen.sh || exit 1
+    run autoreconf -ivf || exit 1
 fi
 
 run ./configure \
