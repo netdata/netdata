@@ -5,9 +5,6 @@
 cppcheck=$(which cppcheck 2>/dev/null || command -v cppcheck 2>/dev/null)
 [ -z "${cppcheck}" ] && echo >&2 "install cppcheck." && exit 1
 
-[ -x "/home/costa/src/cppcheck.git/cppcheck" ] && \
-	cppcheck="/home/costa/src/cppcheck.git/cppcheck"
-
 processors=$(grep -c ^processor /proc/cpuinfo)
 [ $(( processors )) -lt 1 ] && processors=1
 
