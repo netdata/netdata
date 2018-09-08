@@ -45,7 +45,7 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: config\.status$/d' \
 	-e '/: config\.h.*$/d' \
 	-e '/: Makefile$/d' \
-	-e '/: hooks$/d' \
+	-e '/: .githooks$/d' \
 	-e '/: packaging$/d' \
 	-e '/: stamp-h1$/d' \
 	-e '/: README\.md$/d' \
