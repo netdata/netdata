@@ -74,10 +74,7 @@ SUBDIRS = \
 dist_noinst_DATA= \
 	cppcheck.sh \
 	configs.signatures \
-	Dockerfile \
-	Dockerfile.alpine \
-	Dockerfile.aarch64 \
-	Dockerfile.armv7hf \
+	docker \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
@@ -87,7 +84,6 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	docker-build.sh \
 	kickstart.sh \
 	kickstart-static64.sh \
 	netdata-installer.sh \
