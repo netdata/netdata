@@ -5,7 +5,7 @@ The programs in this folder are used when packaging from within git
 and are not included in source or binary packages.
 
 For the most part they are used from the git commit hooks (copy
-`../hooks/*` to `../.git/hooks` to automate checking and the release
+`../.githooks/*` to `../.git/hooks` to automate checking and the release
 process.
 
 The check-files script pulls in `*.functions` and `*/*.functions` to
