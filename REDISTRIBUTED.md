@@ -1,7 +1,7 @@
 # Netdata
 
 Copyright 2016-2017, Costa Tsaousis.
-Copyright 2017, Netdata Inc.
+Copyright 2017-2018, Netdata Inc.
 Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 Netdata uses SPDX license tags to identify the license for it's files.
