@@ -1,0 +1,8 @@
+# Global code owner
+* @ktsaou
+
+# owner(s) of all python files
+*.py @l2isbad
+
+# docker builds owner
+docker/ @paulfantom
