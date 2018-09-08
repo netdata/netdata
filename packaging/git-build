@@ -47,7 +47,7 @@ then
 fi
 
 set -e
-./autogen.sh
+autoreconf -ivf
 ./configure --enable-maintainer-mode 
 set +e
 make dist
