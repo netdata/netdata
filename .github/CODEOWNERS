@@ -1,6 +1,10 @@
 # Global code owner
 * @ktsaou
 
+# ownership of C code
+*.c @ktsaou
+*.h @ktsaou
+
 # owner(s) of all python files
 *.py @l2isbad
 
