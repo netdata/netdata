@@ -28,6 +28,7 @@ RestartSec=30
 OOMScoreAdjust=1000
 
 # Valid policies: other (the system default) | batch | idle | fifo | rr
+# To give netdata the max priority, set CPUSchedulingPolicy=rr and CPUSchedulingPriority=99
 CPUSchedulingPolicy=idle
 
 # This sets the scheduling priority (for policies: rr and fifo).
