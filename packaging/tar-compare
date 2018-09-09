@@ -58,7 +58,7 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: iprange$/d' \
 	-e '/: .*\.o$/d' \
 	-e '/: CMakeLists.txt/d' \
-	-e '/: profile$/d' \
+	-e '/: tests$/d' \
 	-e '/python.d: python-modules-installer\.sh\.in$/d' \
 	-e '/: .travis.yml/d' > $MYTMP/out
 
