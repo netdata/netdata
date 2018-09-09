@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0+ */
 /*
  * 1. build netdata (as normally)
- * 2. cd profile/
+ * 2. cd tests/profile/
  * 3. compile with:
- *    gcc -O3 -Wall -Wextra -I ../src/ -I ../ -o benchmark-dictionary benchmark-dictionary.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o -pthread
+ *    gcc -O3 -Wall -Wextra -I ../../src/ -I ../../ -o benchmark-dictionary benchmark-dictionary.c ../../src/dictionary.o ../../src/log.o ../../src/avl.o ../../src/common.o -pthread
  *
  */
 
