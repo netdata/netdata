@@ -9,7 +9,7 @@ User=netdata
 Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
-ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
+ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D -W set global 'process scheduling policy' 'keep' -W set global 'OOM score' 'keep'
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
 PermissionsStartOnly=true
@@ -25,20 +25,17 @@ RestartSec=30
 # netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
 # To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
 # Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-#OOMScoreAdjust=0
+OOMScoreAdjust=1000
 
-# By default netdata switches to scheduling policy idle, which makes it use CPU, only
-# when there is spare available.
 # Valid policies: other (the system default) | batch | idle | fifo | rr
-#CPUSchedulingPolicy=other
+# To give netdata the max priority, set CPUSchedulingPolicy=rr and CPUSchedulingPriority=99
+CPUSchedulingPolicy=idle
 
-# This sets the maximum scheduling priority netdata can set (for policies: rr and fifo).
-# netdata (via [global].process scheduling priority in netdata.conf) can only lower this value.
+# This sets the scheduling priority (for policies: rr and fifo).
 # Priority gets values 1 (lowest) to 99 (highest).
 #CPUSchedulingPriority=1
 
-# For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata.
-# netdata (via [global].process nice level in netdata.conf) can only increase the value set here.
+# For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata (-20 highest to 19 lowest).
 #Nice=0
 
 [Install]
