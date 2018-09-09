@@ -4,8 +4,8 @@ sudo: true
 
 # C includes autotools and make by default
 language: c
-#services:
-#  - docker
+services:
+  - docker
 
 addons:
   apt:
@@ -25,10 +25,19 @@ stages:
 
 jobs:
   include:
-#    - stage: "lint"
-#      name: "pylint"
+    - stage: "lint"
+      name: "python"
+      install: skip
+      script: docker run --rm -v $(pwd):/code eeacms/pylint || echo "OK"
+    - name: "javascript"
+      install: skip
+      script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/**/*.js || echo "OK"
+#    - name: "css"
 #      install: skip
-#      script: docker run --rm -v $(pwd):/code eeacms/pylint
+#      script: docker run --rm -v $(pwd)/web:/code eeacms/csslint || echo "OK"
+    - name: "bash"
+      install: skip
+      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.4.7 -c 'for file in $(find /project/ -type f -name "*.sh"); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi' || echo "OK"
     - stage: "test"
       name: "C"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
@@ -50,8 +59,6 @@ jobs:
       name: "Docker"
       script: docker/build.sh
       env: REPOSITORY="firehol/netdata"
-      services:
-        - docker
     - name: "GitHub"
       script: .travis/github_package.sh
       deploy:
