@@ -52,7 +52,9 @@ class Service(SimpleService):
             return False
         try:
             self.connect()
-        except (mcrcon.MCRconException, socket.error):
+        except (mcrcon.MCRconException, socket.error) as err:
+            self.error('Error connecting.')
+            self.error(repr(err))
             return False
         return True
 
@@ -67,7 +69,9 @@ class Service(SimpleService):
                 pass
             self.console.connect(self.host, self.port, self.password)
             self.alive = True
-        except (mcrcon.MCRconException, socket.error):
+        except (mcrcon.MCRconException, socket.error) as err:
+            self.error('Error connecting.')
+            self.error(repr(err))
             return False
         return True
 
