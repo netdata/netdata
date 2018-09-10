@@ -108,3 +108,4 @@ username|name|email (optional)
 @amichelic|Adalbert Michelic|
 @abalabahaha|abalabahaha|hi@abal.moe
 @illes|Illes S.|
+@jonfairbanks|Jon Fairbanks
