@@ -558,12 +558,58 @@ static void excluded_record_ids_parse(const char *s) {
     }
 }
 
+static int *excluded_status_record_ids = NULL;
+size_t excluded_status_record_ids_length = 0;
+
+static void excluded_status_record_ids_parse(const char *s) {
+    if(!s) return;
+
+    while(*s) {
+        while(*s && !isdigit(*s)) s++;
+
+        if(isdigit(*s)) {
+            char *e;
+            unsigned long n = strtoul(s, &e, 10);
+            s = e;
+
+            if(n != 0) {
+                excluded_status_record_ids = realloc(excluded_status_record_ids, (excluded_status_record_ids_length + 1) * sizeof(int));
+                if(!excluded_status_record_ids) {
+                    fprintf(stderr, "freeipmi.plugin: failed to allocate memory. Exiting.");
+                    exit(1);
+                }
+                excluded_status_record_ids[excluded_status_record_ids_length++] = (int)n;
+            }
+        }
+    }
+
+    if(debug) {
+        fprintf(stderr, "freeipmi.plugin: excluded status record ids:");
+        size_t i;
+        for(i = 0; i < excluded_status_record_ids_length; i++) {
+            fprintf(stderr, " %d", excluded_status_record_ids[i]);
+        }
+        fprintf(stderr, "\n");
+    }
+}
+
 
 static int excluded_record_ids_check(int record_id) {
     size_t i;
 
     for(i = 0; i < excluded_record_ids_length; i++) {
         if(excluded_record_ids[i] == record_id)
+            return 1;
+    }
+
+    return 0;
+}
+
+static int excluded_status_record_ids_check(int record_id) {
+    size_t i;
+
+    for(i = 0; i < excluded_status_record_ids_length; i++) {
+        if(excluded_status_record_ids[i] == record_id)
             return 1;
     }
 
@@ -641,6 +687,10 @@ static void netdata_get_sensor(
             sn->ignore = 1;
             break;
     }
+
+    // check if it is excluded
+    if(excluded_status_record_ids_check(record_id))
+        return;
 
     switch(sensor_state) {
         case IPMI_MONITORING_STATE_NOMINAL:
@@ -1537,6 +1587,9 @@ int main (int argc, char **argv) {
                     "  ignore N1,N2,N3,...     sensor IDs to ignore\n"
                     "                          default: none\n"
                     "\n"
+                    "  ignore-status N1,N2,N3,... sensor IDs to ignore status (nominal/warning/critical)\n"
+                    "                          default: none\n"
+                    "\n"
                     "  -v\n"
                     "  -V\n"
                     "  version                 print version and exit\n"
@@ -1595,6 +1648,10 @@ int main (int argc, char **argv) {
         }
         else if(i < argc && strcmp("ignore", argv[i]) == 0) {
             excluded_record_ids_parse(argv[++i]);
+            continue;
+        }
+        else if(i < argc && strcmp("ignore-status", argv[i]) == 0) {
+            excluded_status_record_ids_parse(argv[++i]);
             continue;
         }
 

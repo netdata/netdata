@@ -3,13 +3,13 @@
 cpus=$(grep ^processor </proc/cpuinfo| wc -l)
 [ -z "${cpus}" ] && cpus=1
 
-token=
-[ -f .coverity-token ] && token="$(<.coverity-token)"
+token="${COVERITY_SCAN_TOKEN}"
+[ -z "${token}" -a -f .coverity-token ] && token="$(<.coverity-token)"
 [ -z "${token}" ] && \
-	echo >&2 "Save the coverity token to .coverity-token" && \
+	echo >&2 "Save the coverity token to .coverity-token or export it as COVERITY_SCAN_TOKEN." && \
 	exit 1
 
-echo >&2 "Coverity token: ${token}"
+# echo >&2 "Coverity token: ${token}"
 
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 [ -z "${covbuild}" -a -f .coverity-build ] && covbuild="$(<.coverity-build)"
