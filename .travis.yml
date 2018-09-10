@@ -22,7 +22,7 @@ jobs:
       script: docker run --rm -v $(pwd):/code eeacms/pylint || echo "OK"
     - name: "javascript"
       install: skip
-      script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/**/*.js || echo "OK"
+      script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/web/*.js /code/plugins.d/node.d.plugin/*.js /code/node.d/*.js /code/node.d/node_modules/netdata.js
 #    - name: "css"
 #      install: skip
 #      script: docker run --rm -v $(pwd)/web:/code eeacms/csslint || echo "OK"
