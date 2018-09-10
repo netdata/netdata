@@ -99,15 +99,15 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         }
     }
 
-    if(devnull && is_stdaccess) {
-        fd = -1;
-        fp = NULL;
-    }
-
     // if there is a level-2 file pointer
     // flush it before switching the level-1 fds
     if(fp)
         fflush(fp);
+
+    if(devnull && is_stdaccess) {
+        fd = -1;
+        fp = NULL;
+    }
 
     if(fd != f && fd != -1) {
         // it automatically closes
@@ -139,10 +139,10 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
 
 void reopen_all_log_files() {
     if(stdout_filename)
-        stdout = open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
+        open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
 
     if(stderr_filename)
-        stderr = open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+        open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
     if(stdaccess_filename)
          stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
@@ -150,10 +150,10 @@ void reopen_all_log_files() {
 
 void open_all_log_files() {
     // disable stdin
-    stdin = open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
+    open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
 
-    stdout = open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-    stderr = open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+    open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
+    open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
     stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
 
