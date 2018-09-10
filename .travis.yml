@@ -7,21 +7,16 @@ language: c
 services:
   - docker
 
-addons:
-  apt:
-    packages:
-      - gnupg
-      - libcap2-bin
-      - zlib1g-dev
-      - uuid-dev
-      - fakeroot
-
 stages:
   - lint
   - test
   - build
   - name: release
     if: branch = master AND type != pull_request
+
+
+install: 
+  - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
 
 jobs:
   include:
