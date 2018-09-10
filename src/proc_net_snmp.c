@@ -526,8 +526,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
 
             words = procfile_linewords(ff, l);
-            if(words < 3) {
-                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 3+ params, read %zu.", words);
+            if(words < 2) {
+                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
