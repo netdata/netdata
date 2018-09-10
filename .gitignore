@@ -103,12 +103,12 @@ src/cppcheck-build/
 
 # debugging / profiling
 makeself/debug/
-profile/benchmark-dictionary
-profile/benchmark-registry
-profile/test-eval
-profile/benchmark-line-parsing
-profile/benchmark-procfile-parser
-profile/statsd-stress
+tests/profile/benchmark-dictionary
+tests/profile/benchmark-registry
+tests/profile/test-eval
+tests/profile/benchmark-line-parsing
+tests/profile/benchmark-procfile-parser
+tests/profile/statsd-stress
 oprofile_data/
 vgcore.*
 callgrind.out.*
