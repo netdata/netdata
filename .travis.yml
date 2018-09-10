@@ -14,10 +14,6 @@ stages:
   - name: release
     if: branch = master AND type != pull_request
 
-
-install: 
-  - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
-
 jobs:
   include:
     - stage: "lint"
@@ -43,11 +39,11 @@ jobs:
 #      script: tests/run_nodejs.sh
     - stage: "build"
       name: "linux"
+      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
     - name: "OSX"
+      install: brew install fakeroot ossp-uuid
       script: 
-        - brew update
-        - brew install fakeroot ossp-uuid xz
         - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
       os: osx
     - stage: "release"
@@ -55,7 +51,24 @@ jobs:
       script: docker/build.sh
       env: REPOSITORY="firehol/netdata"
     - name: "GitHub"
-      script: .travis/github_package.sh
+      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+      script:
+        - eval "$(ssh-agent -s)"
+        - ./.travis/decrypt-if-have-key decb6f6387c4
+        - export KEYSERVER=ipv4.pool.sks-keyservers.net
+        - ./packaging/gpg-recv-key phil@firehol.org "0762 9FF7 89EA 6156 012F  9F50 C406 9602 1359 9237"
+        - ./packaging/gpg-recv-key costa@tsaousis.gr "4DFF 624A E564 3B51 2872  1F40 29CA 3358 89B9 A863"
+        # Run the commit hooks in case the developer didn't
+        - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
+        - fakeroot ./packaging/git-build
+        # Make sure stdout is in blocking mode. If we don't, then conda create will barf during downloads.
+        # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
+        - python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+        # make self-extractor
+        - ./makeself/build-x86_64-static.sh
+        - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
+        - for i in *.gz.run; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
+        - ./.travis/deploy-if-have-key
       deploy:
         - provider: releases
           draft: true
@@ -69,38 +82,6 @@ jobs:
           on:
             repo: firehol/netdata
             tags: true
-
-
-##
-## Setup environment
-#before_install:
-# - eval "$(ssh-agent -s)"
-# - ./.travis/decrypt-if-have-key decb6f6387c4
-# - export KEYSERVER=ipv4.pool.sks-keyservers.net
-##
-## Run
-#before_script:
-# # Download keys - builds of tags check for a recognised signature
-# - ./packaging/gpg-recv-key phil@firehol.org "0762 9FF7 89EA 6156 012F  9F50 C406 9602 1359 9237"
-# - ./packaging/gpg-recv-key costa@tsaousis.gr "4DFF 624A E564 3B51 2872  1F40 29CA 3358 89B9 A863"
-# # Run the commit hooks in case the developer didn't
-# - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
-#script:
-#  # make release packages
-#  - fakeroot ./packaging/git-build
-#  # Make sure stdout is in blocking mode. If we don't, then conda create will barf during downloads.
-#  # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
-#  - python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
-#  # make self-extractor
-#  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./makeself/build-x86_64-static.sh; fi
-#  # test build and installer
-#  - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-##
-## Deploy as required
-#after_success:
-#  - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
-#  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then for i in *.gz.run; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done; fi
-#  - ./.travis/deploy-if-have-key
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
