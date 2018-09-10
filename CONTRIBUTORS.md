@@ -107,4 +107,5 @@ username|name|email (optional)
 @n0guest|Evgeniy K.|ask@osshelp.ru
 @amichelic|Adalbert Michelic|
 @abalabahaha|abalabahaha|hi@abal.moe
+@plasticrake|Patrick Seal
 @jonfairbanks|Jon Fairbanks
