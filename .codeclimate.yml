@@ -82,7 +82,7 @@ plugins:
 exclude_patterns:
   - ".gitignore"
   - "conf.d/"
-  - "hooks/"
+  - ".githooks/"
   - "tests/"
   - "m4/"
   - "web/css/"
