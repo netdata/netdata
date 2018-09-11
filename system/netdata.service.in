@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0+
 [Unit]
 Description=Real time performance monitoring
+
+# append here other services you want netdata to wait for them to start
 After=network.target httpd.service squid.service nfs-server.service mysqld.service mysql.service named.service postfix.service chronyd.service
 
 [Service]
@@ -9,9 +11,11 @@ User=netdata
 Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
+PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
 ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid -D -W set global 'process scheduling policy' 'keep' -W set global 'OOM score' 'keep'
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
+ExecStopPost=[ -f @localstatedir_POST@/run/netdata/netdata.pid ] && rm @localstatedir_POST@/run/netdata/netdata.pid
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
