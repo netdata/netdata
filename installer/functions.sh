@@ -1,3 +1,4 @@
+# shellcheck disable=SC2148 disable=SC2034 disable=SC1091 disable=SC2059
 # no shebang necessary - this is a library to be sourced
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -107,7 +108,7 @@ netdata_banner() {
 
     start="$(( ${#l2} / 2 - 4 ))"
     [ $(( start + ${#msg} + 4 )) -gt ${#l2} ] && start=$((${#l2} - ${#msg} - 4))
-    end=$(( ${start} + ${#msg} + 4 ))
+    end=$(( start + ${#msg} + 4 ))
 
     echo >&2
     echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
@@ -164,12 +165,12 @@ pidof() {
 # portable delete recursively interactively
 
 portable_deletedir_recursively_interactively() {
-    if [ ! -z "$1" -a -d "$1" ]
-        then
+    if [ ! -z "$1" ] && [ -d "$1" ]
+    then
         if [ "$(uname -s)" = "Darwin" ]
         then
             echo >&2
-            read >&2 -p "Press ENTER to recursively delete directory '$1' > "
+            read >&2 -r -p "Press ENTER to recursively delete directory '$1' > "
             echo >&2 "Deleting directory '$1' ..."
             run rm -R "$1"
         else
@@ -195,22 +196,23 @@ portable_find_processors() {
         # freebsd
         SYSTEM_CPUS=$(sysctl hw.ncpu 2>/dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
     fi
-    [ -z "${SYSTEM_CPUS}" -o $(( SYSTEM_CPUS )) -lt 1 ] && SYSTEM_CPUS=1
+    [ -z "${SYSTEM_CPUS}" ] || [ $(( SYSTEM_CPUS )) -lt 1 ] && SYSTEM_CPUS=1
 }
 portable_find_processors
 
 # -----------------------------------------------------------------------------
 
 run_ok() {
-    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \\n\\n"
 }
 
 run_failed() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \\n\\n"
 }
 
 ESCAPED_PRINT_METHOD=
 printf "%q " test >/dev/null 2>&1
+# shellcheck disable=2181 
 [ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
     if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]
@@ -227,7 +229,7 @@ run() {
     local user="${USER--}" dir="${PWD}" info info_console
 
     if [ "${UID}" = "0" ]
-        then
+    then
         info="[root ${dir}]# "
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
     else
@@ -235,24 +237,25 @@ run() {
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
     fi
 
+    # shellcheck disable=SC2129
     printf >> "${run_logfile}" "${info}"
     escaped_print >> "${run_logfile}" "${@}"
     printf >> "${run_logfile}" " ... "
 
     printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
     escaped_print >&2 "${@}"
-    printf >&2 "${TPUT_RESET}\n"
+    printf >&2 "${TPUT_RESET}\\n"
 
     "${@}"
 
     local ret=$?
     if [ ${ret} -ne 0 ]
-        then
+    then
         run_failed
-        printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
+        printf >> "${run_logfile}" "FAILED with exit code %s\\n" "$ret"
     else
         run_ok
-        printf >> "${run_logfile}" "OK\n"
+        printf >> "${run_logfile}" "OK\\n"
     fi
 
     return ${ret}
@@ -263,7 +266,7 @@ portable_check_user_exists() {
     local username="${1}" found=
 
     if [ ! -z "${getent_cmd}" ]
-        then
+    then
         "${getent_cmd}" passwd "${username}" >/dev/null 2>&1
         return $?
     fi
@@ -277,7 +280,7 @@ portable_check_group_exists() {
     local groupname="${1}" found=
 
     if [ ! -z "${getent_cmd}" ]
-        then
+    then
         "${getent_cmd}" group "${groupname}" >/dev/null 2>&1
         return $?
     fi
@@ -291,7 +294,7 @@ portable_check_user_in_group() {
     local username="${1}" groupname="${2}" users=
 
     if [ ! -z "${getent_cmd}" ]
-        then
+    then
         users="$(getent group "${groupname}" | cut -d ':' -f 4)"
     else
         users="$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)"
@@ -307,11 +310,13 @@ portable_add_user() {
     [ -z "${homedir}" ] && homedir="/tmp"
 
     portable_check_user_exists "${username}"
+    # shellcheck disable=SC2181
     [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
     echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
-    local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
+    local nologin
+    nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
     # Linux
     if check_cmd useradd
@@ -340,6 +345,7 @@ portable_add_group() {
     local groupname="${1}"
 
     portable_check_group_exists "${groupname}"
+    # shellcheck disable=SC2181
     [ $? -eq 0 ] && echo >&2 "Group '${groupname}' already exists." && return 0
 
     echo >&2 "Adding ${groupname} user group ..."
@@ -370,11 +376,12 @@ portable_add_user_to_group() {
     local groupname="${1}" username="${2}"
 
     portable_check_group_exists "${groupname}"
+    # shellcheck disable=SC2181
     [ $? -ne 0 ] && echo >&2 "Group '${groupname}' does not exist." && return 1
 
     # find the user is already in the group
     if portable_check_user_in_group "${username}" "${groupname}"
-        then
+    then
         # username is already there
         echo >&2 "User '${username}' is already in group '${groupname}'."
         return 0
@@ -407,19 +414,22 @@ portable_add_user_to_group() {
 
 iscontainer() {
     # man systemd-detect-virt
-    local cmd=$(which_cmd systemd-detect-virt)
-    if [ ! -z "${cmd}" -a -x "${cmd}" ]
-        then
+    local cmd
+    cmd=$(which_cmd systemd-detect-virt)
+    if [ ! -z "${cmd}" ] && [ -x "${cmd}" ]
+    then
         "${cmd}" --container >/dev/null 2>&1 && return 0
     fi
 
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
-    local pid=$( cat /proc/1/sched 2>/dev/null | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
+    local pid
+    pid=$( head -n 1 /proc/1/sched 2>/dev/null | { IFS='(),#:' read -r name pid th threads; echo "$pid"; } )
     pid=$(( pid + 0 ))
     [ ${pid} -ne 1 ] && return 0
 
     # lxc sets environment variable 'container'
+    # shellcheck disable=SC2154
     [ ! -z "${container}" ] && return 0
 
     # docker creates /.dockerenv
@@ -429,7 +439,7 @@ iscontainer() {
     # ubuntu and debian supply /bin/running-in-container
     # https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
     if [ -x "/bin/running-in-container" ]
-        then
+    then
         "/bin/running-in-container" >/dev/null 2>&1 && return 0
     fi
 
@@ -444,10 +454,10 @@ issystemd() {
 
     # if there is no systemctl command, it is not systemd
     systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
-    [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
+    ([ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]) && return 1
 
     # if pid 1 is systemd, it is systemd
-    [ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
+    [ "$(basename "$(readlink /proc/1/exe)" 2>/dev/null)" = "systemd" ] && return 0
 
     # -- ubuntu runs systemd as init ---
     ## if systemd is not running, it is not systemd
@@ -458,7 +468,7 @@ issystemd() {
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
     for p in ${pids}
     do
-        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+        ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
 
         # if pid of systemd is in our namespace, it is systemd
         [ ! -z "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
@@ -473,30 +483,29 @@ install_non_systemd_init() {
 
     local key="unknown"
     if [ -f /etc/os-release ]
-        then
+    then
         source /etc/os-release || return 1
         key="${ID}-${VERSION_ID}"
 
     elif [ -f /etc/redhat-release ]
-        then
+    then
         key=$(</etc/redhat-release)
     fi
 
-    if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
-        then
+    if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]
+    then
         if [[ "${key}" =~ ^(gentoo|alpine).* ]]
-            then
+        then
             echo >&2 "Installing OpenRC init file..."
             run cp system/netdata-openrc /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
             run rc-update add netdata default && \
             return 0
         
-        elif [ "${key}" = "debian-7" \
-            -o "${key}" = "ubuntu-12.04" \
-            -o "${key}" = "ubuntu-14.04" \
-            ]
-            then
+        elif [ "${key}" = "debian-7" ] ||\
+             [ "${key}" = "ubuntu-12.04" ] || \
+             [ "${key}" = "ubuntu-14.04" ]
+        then
             echo >&2 "Installing LSB init file..."
             run cp system/netdata-lsb /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
@@ -504,7 +513,7 @@ install_non_systemd_init() {
             run update-rc.d netdata enable && \
             return 0
         elif [[ "${key}" =~ ^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).* ]]
-            then
+        then
             echo >&2 "Installing init.d file..."
             run cp system/netdata-init-d /etc/init.d/netdata && \
             run chmod 755 /etc/init.d/netdata && \
@@ -515,7 +524,7 @@ install_non_systemd_init() {
             return 1
         fi
     elif [ -f /etc/init.d/netdata ]
-        then
+    then
         echo >&2 "file '/etc/init.d/netdata' already exists."
         return 0
     else
@@ -529,7 +538,8 @@ NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
 install_netdata_service() {
-    local uname="$(uname 2>/dev/null)"
+    local uname
+    uname="$(uname 2>/dev/null)"
 
     if [ "${UID}" -eq 0 ]
     then
@@ -537,7 +547,7 @@ install_netdata_service() {
         then
 
             if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]
-                then
+            then
                 echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
                 return 0
             else
@@ -602,8 +612,8 @@ install_netdata_service() {
 pidisnetdata() {
     if [ -d /proc/self ]
     then
-        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
-        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+        ([ -z "$1" ] || [ ! -f "/proc/$1/stat" ]) && return 1
+        [ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
         return 1
     fi
     return 0
@@ -612,20 +622,20 @@ pidisnetdata() {
 stop_netdata_on_pid() {
     local pid="${1}" ret=0 count=0
 
-    pidisnetdata ${pid} || return 0
+    pidisnetdata "${pid}" || return 0
 
-    printf >&2 "Stopping netdata on pid ${pid} ..."
-    while [ ! -z "$pid" -a ${ret} -eq 0 ]
+    printf >&2 "Stopping netdata on pid %s ..." "$pid"
+    while [ ! -z "$pid" ] && [ ${ret} -eq 0 ]
     do
         if [ ${count} -gt 45 ]
-            then
+        then
             echo >&2 "Cannot stop the running netdata on pid ${pid}."
             return 1
         fi
 
         count=$(( count + 1 ))
 
-        run kill ${pid} 2>/dev/null
+        run kill "${pid}" 2>/dev/null
         ret=$?
 
         test ${ret} -eq 0 && printf >&2 "." && sleep 2
@@ -654,11 +664,11 @@ netdata_pids() {
         $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
         $(pidof netdata 2>/dev/null)
     do
-        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+        ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
 
-        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
-            then
-            pidisnetdata ${p} && echo "${p}"
+        if [ -z "${myns}" ] || [ -z "${ns}" ] || [ "${myns}" = "${ns}" ]
+        then
+            pidisnetdata "${p}" && echo "${p}"
         fi
     done
 }
@@ -667,7 +677,7 @@ stop_all_netdata() {
     local p
     for p in $(netdata_pids)
     do
-        stop_netdata_on_pid ${p}
+        stop_netdata_on_pid "${p}"
     done
 }
 
@@ -683,12 +693,12 @@ restart_netdata() {
     progress "Start netdata"
 
     if [ "${UID}" -eq 0 ]
-        then
+    then
         service netdata stop
         stop_all_netdata
         service netdata restart && started=1
 
-        if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+        if [ ${started} -eq 1 ] && [ "$(netdata_pids)" ]
         then
             echo >&2 "Ooops! it seems netdata is not started."
             started=0
@@ -700,7 +710,7 @@ restart_netdata() {
         fi
     fi
 
-    if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+    if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]
     then
         echo >&2 "Hm... it seems netdata is still not started."
         started=0
@@ -722,17 +732,17 @@ restart_netdata() {
 # install netdata logrotate
 
 install_netdata_logrotate() {
-    if [ ${UID} -eq 0 ]
-        then
+    if [ "${UID}" -eq 0 ]
+    then
         if [ -d /etc/logrotate.d ]
-            then
+        then
             if [ ! -f /etc/logrotate.d/netdata ]
-                then
+            then
                 run cp system/netdata.logrotate /etc/logrotate.d/netdata
             fi
             
             if [ -f /etc/logrotate.d/netdata ]
-                then
+            then
                 run chmod 644 /etc/logrotate.d/netdata
             fi
 
@@ -750,7 +760,7 @@ fix_netdata_conf() {
     local owner="${1}"
 
     if [ "${UID}" -eq 0 ]
-        then
+    then
         run chown "${owner}" "${filename}"
     fi
     run chmod 0664 "${filename}"
@@ -760,7 +770,7 @@ generate_netdata_conf() {
     local owner="${1}" filename="${2}" url="${3}"
 
     if [ ! -s "${filename}" ]
-        then
+    then
         cat >"${filename}" <<EOFCONF
 # netdata can generate its own config.
 # Get it with:
@@ -780,7 +790,7 @@ download_netdata_conf() {
     local owner="${1}" filename="${2}" url="${3}"
 
     if [ ! -s "${filename}" ]
-        then
+    then
         echo >&2
         echo >&2 "-------------------------------------------------------------------------------"
         echo >&2
@@ -798,15 +808,15 @@ download_netdata_conf() {
         run curl -s -o "${filename}.new" "${url}"
         ret=$?
 
-        if [ ${ret} -ne 0 -o ! -s "${filename}.new" ]
-            then
+        if [ ${ret} -ne 0 ] || [ ! -s "${filename}.new" ]
+        then
             # try wget
             run wget -O "${filename}.new" "${url}"
             ret=$?
         fi
 
-        if [ ${ret} -eq 0 -a -s "${filename}.new" ]
-            then
+        if [ ${ret} -eq 0 ] && [ -s "${filename}.new" ]
+        then
             run mv "${filename}.new" "${filename}"
             run_ok "New configuration saved for you to edit at ${filename}"
         else
@@ -829,16 +839,16 @@ NETDATA_ADDED_TO_GROUPS=""
 add_netdata_user_and_group() {
     local homedir="${1}" g
 
-    if [ ${UID} -eq 0 ]
-        then
+    if [ "${UID}" -eq 0 ]
+    then
         portable_add_group netdata || return 1
         portable_add_user netdata "${homedir}"  || return 1
 
         for g in ${NETDATA_WANTED_GROUPS}
         do
-            portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+            portable_add_user_to_group "${g}" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
         done
-
+        # shellcheck disable=SC2193
         [ ~netdata = / ] && cat <<USERMOD
 
 The netdata user has its home directory set to /
