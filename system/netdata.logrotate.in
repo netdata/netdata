@@ -7,6 +7,6 @@
 	notifempty
 	sharedscripts
 	postrotate
-		/bin/kill -HUP `cat @localstatedir_POST@/run/netdata.pid 2>/dev/null` 2>/dev/null || true
+		/bin/kill -HUP `cat @localstatedir_POST@/run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
 	endscript
 }
