@@ -1,9 +1,11 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
+# shellcheck disable=SC2034 disable=SC2059
 
 umask 022
 
 # make sure UID is set
+# shellcheck disable=SC2155
 [ -z "${UID}" ] && export UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -91,15 +93,16 @@ progress() {
 }
 
 run_ok() {
-    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \\n\\n"
 }
 
 run_failed() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \\n\\n"
 }
 
 ESCAPED_PRINT_METHOD=
 printf "%q " test >/dev/null 2>&1
+# shellcheck disable=SC2181
 [ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
     if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]
@@ -124,24 +127,25 @@ run() {
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
     fi
 
+    # shellcheck disable=SC2129
     printf >> "${run_logfile}" "${info}"
     escaped_print >> "${run_logfile}" "${@}"
     printf >> "${run_logfile}" " ... "
 
     printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
     escaped_print >&2 "${@}"
-    printf >&2 "${TPUT_RESET}\n"
+    printf >&2 "${TPUT_RESET}\\n"
 
     "${@}"
 
     local ret=$?
     if [ ${ret} -ne 0 ]
         then
-        run_failed
-        printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
+        run_failed "${@}"
+        printf >> "${run_logfile}" "FAILED with exit code ${ret}\\n"
     else
-        run_ok
-        printf >> "${run_logfile}" "OK\n"
+        run_ok "${@}"
+        printf >> "${run_logfile}" "OK\\n"
     fi
 
     return ${ret}
@@ -151,7 +155,7 @@ run() {
 # ---------------------------------------------------------------------------------------------------------------------
 
 fatal() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \\n\\n"
     exit 1
 }
 
@@ -177,12 +181,12 @@ progress "Checking the latest version of static build..."
 BASE='https://raw.githubusercontent.com/firehol/binary-packages/master'
 
 LATEST=
-if [ ! -z "${curl}" -a -x "${curl}" ]
+if [ ! -z "${curl}" ] && [ -x "${curl}" ]
 then
-    LATEST="$(run ${curl} "${BASE}/netdata-latest.gz.run")"
-elif [ ! -z "${wget}" -a -x "${wget}" ]
+    LATEST="$(run "${curl}" "${BASE}/netdata-latest.gz.run")"
+elif [ ! -z "${wget}" ] && [ -x "${wget}" ]
 then
-    LATEST="$(run ${wget} -O - "${BASE}/netdata-latest.gz.run")"
+    LATEST="$(run "${wget}" -O - "${BASE}/netdata-latest.gz.run")"
 else
     fatal "curl or wget are needed for this script to work."
 fi
@@ -197,19 +201,19 @@ fi
 progress "Downloading static netdata binary: ${LATEST}"
 
 ret=1
-if [ ! -z "${curl}" -a -x "${curl}" ]
+if [ ! -z "${curl}" ] && [ -x "${curl}" ]
 then
-    run ${curl} "${BASE}/${LATEST}" >"/tmp/${LATEST}"
+    run "${curl}" "${BASE}/${LATEST}" >"/tmp/${LATEST}"
     ret=$?
-elif [ ! -z "${wget}" -a -x "${wget}" ]
+elif [ ! -z "${wget}" ] && [ -x "${wget}" ]
 then
-    run ${wget} -O "/tmp/${LATEST}" "${BASE}/${LATEST}"
+    run "${wget}" -O "/tmp/${LATEST}" "${BASE}/${LATEST}"
     ret=$?
 else
     fatal "curl or wget are needed for this script to work."
 fi
 
-if [ ${ret} -ne 0 -o ! -s "/tmp/${LATEST}" ]
+if [ ${ret} -ne 0 ] || [ ! -s "/tmp/${LATEST}" ]
 	then
 	fatal "Failed to download the latest static binary version of netdata."
 fi
@@ -220,7 +224,7 @@ opts=
 inner_opts=
 while [ ! -z "${1}" ]
 do
-    if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" -o "${1}" = "--accept" ]
+    if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]
     then
         opts="${opts} --accept"
     elif [ "${1}" = "--dont-start-it" ]
@@ -240,10 +244,11 @@ progress "Installing netdata"
 
 sudo=
 [ "${UID}" != "0" ] && sudo="sudo"
-run ${sudo} sh "/tmp/${LATEST}" ${opts} ${inner_opts}
+run ${sudo} sh "/tmp/${LATEST}" "${opts}" "${inner_opts}"
 
+# shellcheck disable=SC2181
 if [ $? -eq 0 ]
-	then
+then
 	rm "/tmp/${LATEST}"
 else
 	echo >&2 "NOTE: did not remove: /tmp/${LATEST}"
