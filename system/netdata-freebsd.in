@@ -30,7 +30,7 @@ netdata_prestart()
 
 netdata_poststop()
 {
-	rm "${pidfile}"
+	[ -f "${pidfile}" ] && rm "${pidfile}"
 	return 0
 }
 
