@@ -74,7 +74,7 @@ class Service(UrlService):
 
     @staticmethod
     def _recursive_pins(keys):
-        return len([k for k in keys if keys[k]["Type"] == b"recursive"])
+        return sum( 1 for k in keys if keys[k]["Type"] == b"recursive" )
 
     @staticmethod
     def _dehumanize(store_max):
