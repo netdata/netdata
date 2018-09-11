@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
