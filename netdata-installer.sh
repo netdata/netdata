@@ -1069,6 +1069,12 @@ if [ -f /etc/systemd/system/netdata.service ]
     run rm -i /etc/systemd/system/netdata.service
 fi
 
+if [ -f /lib/systemd/system/netdata.service ]
+    then
+    echo "Deleting /lib/systemd/system/netdata.service ..."
+    run rm -i /lib/systemd/system/netdata.service
+fi
+
 if [ -f /etc/init.d/netdata ]
     then
     echo "Deleting /etc/init.d/netdata ..."
