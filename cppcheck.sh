@@ -17,7 +17,7 @@ cd "${base}/src" || exit 1
 
 file="${1}"
 shift
-[ "${file}" = "${base}" -o -z "${file}" ] && file="${base}/src"
+([ "${file}" = "${base}" ] || [ -z "${file}" ]) && file="${base}/src"
 
 "${cppcheck}" \
 	-j ${processors} \

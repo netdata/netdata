@@ -14,7 +14,7 @@ fi
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 if [ -f Dockerfile ]; then
-    cd ../
+    cd ../ || exit 1
 fi
 
 for ARCH in i386 armhf aarch64 amd64; do

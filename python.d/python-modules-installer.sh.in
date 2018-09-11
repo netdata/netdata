@@ -43,7 +43,7 @@ do
 done
 
 
-if [ ! -z "${target}" -a ! -d "${target}" ]
+if [ ! -z "${target}" ] && [ ! -d "${target}" ]
 then
     echo >&2 "Cannot find directory: '${target}'"
     exit 1
@@ -75,9 +75,7 @@ echo >&2 "Working for python version ${pv} (pip command: '${pip}')"
 echo >&2 "Installing netdata python modules in: '${target}'"
 
 run() {
-    printf "Running command:\n# "
-    printf "%q " "${@}"
-    printf "\n"
+    printf "Running command:\\n# %q \\n" "${@}"
     "${@}"
 }
 
