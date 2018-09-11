@@ -20,7 +20,7 @@
 : "${NETDATA_START_AFTER_SERVICES:=apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors}"
 
 extra_started_commands="reload rotate save"
-pidfile="/run/netdata/netdata.pid"
+pidfile="@localstatedir_POST@/run/netdata/netdata.pid"
 command="@sbindir_POST@/netdata"
 command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
 start_stop_daemon_args="-u ${NETDATA_OWNER}"
@@ -36,7 +36,7 @@ depend() {
     need net
     after ${NETDATA_START_AFTER_SERVICES}
 
-    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata /run/netdata
+    checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
 }
 
 reload() {
