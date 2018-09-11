@@ -309,25 +309,51 @@ static inline int is_major_enabled(int major) {
     return (int)major_configs[major];
 }
 
-static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix) {
-    char filename[FILENAME_MAX + 1];
+static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
     int found = 0;
-
-    result_size--;
 
     DIR *dir = opendir(path);
     if (!dir) {
         error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'. Disabling device-mapper support.", disk, major, minor, path);
-        goto cleanup;
+        goto failed;
     }
 
     struct dirent *de = NULL;
     while ((de = readdir(dir))) {
-        if(de->d_type == DT_LNK || de->d_type == DT_BLK) {
+        if(de->d_type == DT_DIR) {
+            if((de->d_name[0] == '.' && de->d_name[1] == '\0') || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))
+                continue;
+
+            if(depth <= 0) {
+                error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s'. Ignoring path.", disk, major, minor, path);
+                break;
+            }
+            else {
+                char *path_nested = NULL;
+                char *prefix_nested = NULL;
+
+                {
+                    char buffer[FILENAME_MAX + 1];
+                    snprintfz(buffer, FILENAME_MAX, "%s/%s", path, de->d_name);
+                    path_nested = strdupz(buffer);
+
+                    snprintfz(buffer, FILENAME_MAX, "%s%s%s", (prefix)?prefix:"", (prefix)?prefix:"_", de->d_name);
+                    prefix_nested = strdupz(buffer);
+                }
+
+                found = get_disk_name_from_path(path_nested, result, result_size, major, minor, disk, prefix_nested, depth - 1);
+                freez(path_nested);
+                freez(prefix_nested);
+
+                if(found) break;
+            }
+        }
+        else if(de->d_type == DT_LNK || de->d_type == DT_BLK) {
+            char filename[FILENAME_MAX + 1];
 
             if(de->d_type == DT_LNK) {
                 snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
-                ssize_t len = readlink(filename, result, result_size);
+                ssize_t len = readlink(filename, result, result_size - 1);
                 if(len <= 0) {
                     error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
                     continue;
@@ -361,7 +387,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
             // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
-            snprintfz(result, result_size, "%s%s", (prefix)?prefix:"", de->d_name);
+            snprintfz(result, result_size - 1, "%s%s", (prefix)?prefix:"", de->d_name);
             found = 1;
             break;
         }
@@ -369,7 +395,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
     closedir(dir);
 
 
-cleanup:
+failed:
 
     if(!found)
         result[0] = '\0';
@@ -380,10 +406,10 @@ cleanup:
 static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
     char result[FILENAME_MAX + 1] = "";
 
-    if(!path_to_device_mapper || !*path_to_device_mapper || !get_disk_name_from_path(path_to_device_mapper, result, FILENAME_MAX + 1, major, minor, disk, NULL))
-        if(!path_to_device_label || !*path_to_device_label || !get_disk_name_from_path(path_to_device_label, result, FILENAME_MAX + 1, major, minor, disk, NULL))
-            if(!path_to_veritas_volume_groups || !*path_to_veritas_volume_groups || !get_disk_name_from_path(path_to_veritas_volume_groups, result, FILENAME_MAX + 1, major, minor, disk, "vx_appvg_"))
-                if(name_disks_by_id != CONFIG_BOOLEAN_YES || !path_to_device_id || !*path_to_device_id || !get_disk_name_from_path(path_to_device_id, result, FILENAME_MAX + 1, major, minor, disk, NULL))
+    if(!path_to_device_mapper || !*path_to_device_mapper || !get_disk_name_from_path(path_to_device_mapper, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
+        if(!path_to_device_label || !*path_to_device_label || !get_disk_name_from_path(path_to_device_label, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
+            if(!path_to_veritas_volume_groups || !*path_to_veritas_volume_groups || !get_disk_name_from_path(path_to_veritas_volume_groups, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
+                if(name_disks_by_id != CONFIG_BOOLEAN_YES || !path_to_device_id || !*path_to_device_id || !get_disk_name_from_path(path_to_device_id, result, FILENAME_MAX + 1, major, minor, disk, "vx", 2))
                     strncpy(result, disk, FILENAME_MAX);
 
     if(!result[0])
@@ -799,7 +825,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         path_to_device_id = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/disk/by-id", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/vx/dsk/appvg", netdata_configured_host_prefix);
-        path_to_veritas_volume_groups = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/vx/dsk/appvg", buffer);
+        path_to_veritas_volume_groups = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/vx/dsk", buffer);
 
         name_disks_by_id = config_get_boolean(CONFIG_SECTION_DISKSTATS, "name disks by id", name_disks_by_id);
 
