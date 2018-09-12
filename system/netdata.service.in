@@ -15,6 +15,8 @@ PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
 ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid -D -W set global 'process scheduling policy' 'keep' -W set global 'OOM score' 'keep'
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
+ExecStartPre=/bin/mkdir -p @localstatedir_POST@/run/netdata
+ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/run/netdata
 #ExecStopPost=/bin/rm @localstatedir_POST@/run/netdata/netdata.pid
 PermissionsStartOnly=true
 
