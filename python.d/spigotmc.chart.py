@@ -100,6 +100,8 @@ class Service(SimpleService):
             self.error('Connection is dead.')
             self.alive = False
             return None
+        except (TypeError, LookupError):
+            self.error('Unable to process TPS values.')
         try:
             raw = self.console.command('list')
             # The above command returns a string that looks like this:
@@ -112,4 +114,6 @@ class Service(SimpleService):
             self.error('Connection is dead.')
             self.alive = False
             return None
+        except (TypeError, LookupError):
+            self.error('Unable to process user counts.')
         return data
