@@ -47,7 +47,7 @@ example_get() {
 	example_value4=$((8192 + (RANDOM * 16383 / 32767) ))
 
 	if [ $example_count -gt 0 ]
-		then
+	then
 		example_count=$((example_count - 1))
 
 		[ $example_last -gt 16383 ] && example_value4=$((example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)))
@@ -55,8 +55,14 @@ example_get() {
 	else
 		example_count=$((1 + (RANDOM * 5 / 32767) ))
 
-		[ $example_last -gt 16383 -a $example_value4 -gt 16383 ] && example_value4=$((example_value4 - 16383))
-		[ $example_last -le 16383 -a $example_value4 -lt 16383 ] && example_value4=$((example_value4 + 16383))
+		if [ $example_last -gt 16383 ] && [ $example_value4 -gt 16383 ]
+		then
+			example_value4=$((example_value4 - 16383))
+		fi
+		if [ $example_last -le 16383 ] && [ $example_value4 -lt 16383 ]
+		then
+			example_value4=$((example_value4 + 16383))
+		fi
 	fi
 	example_last=$example_value4
 
