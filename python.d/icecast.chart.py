@@ -24,6 +24,8 @@ CHARTS = {
 
 
 class Source:
+    __slots__ = ('name', 'is_active', 'listeners')
+
     def __init__(self, idx, data):
         self.name = 'source_{0}'.format(idx)
         self.is_active = data.get('stream_start') and data.get('server_name')

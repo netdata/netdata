@@ -124,6 +124,8 @@ def find_batteries(d):
 
 
 class Adapter:
+    __slots__ = ('id', 'state')
+
     def __init__(self, n, state):
         self.id = n
         self.state = int(state == 'Degraded')
@@ -135,6 +137,8 @@ class Adapter:
 
 
 class PD:
+    __slots__ = ('id', 'media_err', 'predict_fail')
+
     def __init__(self, n, media_err, predict_fail):
         self.id = n
         self.media_err = media_err
@@ -148,6 +152,8 @@ class PD:
 
 
 class Battery:
+    __slots__ = ('id', 'rel_charge', 'cycle_count')
+
     def __init__(self, adapt_id, rel_charge, cycle_count):
         self.id = adapt_id
         self.rel_charge = rel_charge
@@ -162,6 +168,8 @@ class Battery:
 
 # TODO: hardcoded sudo...
 class Megacli:
+    __slots__ = ('s', 'm', 'sudo_check', 'disk_info', 'battery_info')
+
     def __init__(self):
         self.s = find_binary('sudo')
         self.m = find_binary('megacli')

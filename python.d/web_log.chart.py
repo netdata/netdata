@@ -317,6 +317,8 @@ class Service(LogService):
 
 
 class Web:
+    __slots__ = ('service', 'order', 'definitions', 'pre_filter', 'storage', 'data')
+
     def __init__(self, service):
         self.service = service
         self.order = ORDER_WEB[:]
@@ -762,6 +764,8 @@ class Web:
 
 
 class ApacheCache:
+    __slots__ = ('service', 'order', 'definitions')
+
     def __init__(self, service):
         self.service = service
         self.order = ORDER_APACHE_CACHE
@@ -788,6 +792,8 @@ class ApacheCache:
 
 
 class Squid:
+    __slots__ = ('service', 'order', 'definitions', 'pre_filter', 'storage', 'data')
+
     def __init__(self, service):
         self.service = service
         self.order = ORDER_SQUID

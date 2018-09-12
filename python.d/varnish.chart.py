@@ -133,6 +133,8 @@ CHARTS = {
 
 
 class Parser:
+    __slots__ = ('re_default', 're_backend')
+
     _backend_new = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
     _backend_old = re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)')
     _default = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')

@@ -25,6 +25,8 @@ RE = re.compile(r'\/dev\/([^|]+)\|([^|]+)\|([0-9]+|SLP|UNK)\|')
 
 
 class Disk:
+    __slots__ = ('id', 'name', 'temp')
+
     def __init__(self, id_, name, temp):
         self.id = id_.split('/')[-1]
         self.name = name.replace(' ', '_')

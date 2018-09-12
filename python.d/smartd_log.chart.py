@@ -130,6 +130,8 @@ def handle_os_error(method):
 
 
 class SmartAttribute(object):
+    __slots__ = ('id', 'normalized', '_raw')
+
     def __init__(self, idx, normalized, raw):
         self.id = idx
         self.normalized = normalized
@@ -150,6 +152,8 @@ class SmartAttribute(object):
 
 
 class DiskLogFile:
+    __slots__ = ('path', 'size')
+
     def __init__(self, path):
         self.path = path
         self.size = os.path.getsize(path)
@@ -171,6 +175,8 @@ class DiskLogFile:
 
 
 class Disk:
+    __slots__ = ('log_file', 'name', 'age', 'status', 'attributes')
+
     def __init__(self, full_path, age):
         self.log_file = DiskLogFile(full_path)
         self.name = os.path.basename(full_path).split('.')[-3]
