@@ -3,212 +3,198 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0+
 
-import bisect
+import re
+import os
 
+from collections import defaultdict
 from glob import glob
-from re import compile as r_compile
-from os import access as is_accessible, R_OK
-from os.path import isdir, getsize
-
 
 from bases.FrameworkServices.LogService import LogService
 
-priority = 60000
-retries = 60
-REGEX_JAILS = r_compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
-REGEX_DATA = r_compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>U|B)[a-z]+ (?P<ipaddr>\d{1,3}(?:\.\d{1,3}){3})')
-ORDER = ['jails_bans', 'jails_in_jail']
+
+ORDER = [
+    'jails_bans',
+    'jails_in_jail',
+]
 
 
-class Service(LogService):
-    """
-    fail2ban log class
-    Reads logs line by line
-    Jail auto detection included
-    It produces following charts:
-    * Bans per second for every jail
-    * Banned IPs for every jail (since the last restart of netdata)
-    """
-    def __init__(self, configuration=None, name=None):
-        LogService.__init__(self, configuration=configuration, name=name)
-        self.order = ORDER
-        self.definitions = dict()
-        self.log_path = self.configuration.get('log_path', '/var/log/fail2ban.log')
-        self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
-        self.conf_dir = self.configuration.get('conf_dir', '/etc/fail2ban/jail.d/')
-        self.exclude = self.configuration.get('exclude')
-
-    def _get_data(self):
-        """
-        Parse new log lines
-        :return: dict
-        """
-        raw = self._get_raw_data()
-        if raw is None:
-            return None
-        elif not raw:
-            return self.to_netdata
-
-        # Fail2ban logs looks like
-        # 2016-12-25 12:36:04,711 fail2ban.actions[2455]: WARNING [ssh] Ban 178.156.32.231
-        for row in raw:
-            match = REGEX_DATA.search(row)
-            if match:
-                match_dict = match.groupdict()
-                jail, action, ipaddr = match_dict['jail'], match_dict['action'], match_dict['ipaddr']
-                if jail in self.jails_list:
-                    if action == 'B':
-                        self.to_netdata[jail] += 1
-                        if address_not_in_jail(self.banned_ips[jail], ipaddr, self.to_netdata[jail + '_in_jail']):
-                            self.to_netdata[jail + '_in_jail'] += 1
-                    else:
-                        if ipaddr in self.banned_ips[jail]:
-                            self.banned_ips[jail].remove(ipaddr)
-                            self.to_netdata[jail + '_in_jail'] -= 1
-
-        return self.to_netdata
-
-    def check(self):
-        """
-        :return: bool
-
-        Check if the "log_path" is not empty and readable
-        """
-
-        if not (is_accessible(self.log_path, R_OK) and getsize(self.log_path) != 0):
-            self.error('%s is not readable or empty' % self.log_path)
-            return False
-        self.jails_list, self.to_netdata, self.banned_ips = self.jails_auto_detection_()
-        self.definitions = create_definitions_(self.jails_list)
-        self.info('Jails: %s' % self.jails_list)
-        return True
-
-    def jails_auto_detection_(self):
-        """
-        return: <tuple>
-
-        * jails_list - list of enabled jails (['ssh', 'apache', ...])
-        * to_netdata - dict ({'ssh': 0, 'ssh_in_jail': 0, ...})
-        * banned_ips - here will be stored all the banned ips ({'ssh': ['1.2.3.4', '5.6.7.8', ...], ...})
-        """
-        raw_jails_list = list()
-        jails_list = list()
-
-        for raw_jail in parse_configuration_files_(self.conf_path, self.conf_dir, self.error):
-            raw_jails_list.extend(raw_jail)
-
-        for jail, status in raw_jails_list:
-            if status == 'true' and jail not in jails_list:
-                jails_list.append(jail)
-            elif status == 'false' and jail in jails_list:
-                jails_list.remove(jail)
-        # If for some reason parse failed we still can START with default jails_list.
-        jails_list = list(set(jails_list) - set(self.exclude.split()
-                                                if isinstance(self.exclude, str) else list())) or ['ssh']
-
-        to_netdata = dict([(jail, 0) for jail in jails_list])
-        to_netdata.update(dict([(jail + '_in_jail', 0) for jail in jails_list]))
-        banned_ips = dict([(jail, list()) for jail in jails_list])
-
-        return jails_list, to_netdata, banned_ips
-
-
-def create_definitions_(jails_list):
+def charts(jails):
     """
     Chart definitions creating
     """
 
-    definitions = {
-        'jails_bans': {'options': [None, 'Jails Ban Statistics', 'bans/s', 'bans', 'jail.bans', 'line'],
-                       'lines': []},
-        'jails_in_jail': {'options': [None, 'Banned IPs (since the last restart of netdata)', 'IPs',
-                                      'in jail', 'jail.in_jail', 'line'],
-                          'lines': []}}
-    for jail in jails_list:
-        definitions['jails_bans']['lines'].append([jail, jail, 'incremental'])
-        definitions['jails_in_jail']['lines'].append([jail + '_in_jail', jail, 'absolute'])
+    ch = {
+        ORDER[0]:
+            {
+                'options':
+                    [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
+                'lines': []
+            },
+        ORDER[1]:
+            {
+                'options':
+                    [None, 'Banned IPs (since the last restart of netdata)', 'IPs','in jail', 'jail.in_jail', 'line'],
+                'lines':
+                    []
+            },
+    }
+    for jail in jails:
+        ch[ORDER[0]]['lines'].append([jail, jail, 'incremental'])
+        ch[ORDER[1]]['lines'].append(['{0}_in_jail'.format(jail), jail, 'absolute'])
 
-    return definitions
-
-
-def parse_configuration_files_(jails_conf_path, jails_conf_dir, print_error):
-    """
-    :param jails_conf_path: <str>
-    :param jails_conf_dir: <str>
-    :param print_error: <function>
-    :return: <tuple>
-
-    Uses "find_jails_in_files" function to find all jails in the "jails_conf_dir" directory
-    and in the "jails_conf_path"
-
-    All files must endswith ".local" or ".conf"
-    Return order is important.
-    According man jail.conf it should be
-    * jail.conf
-    * jail.d/*.conf (in alphabetical order)
-    * jail.local
-    * jail.d/*.local (in alphabetical order)
-    """
-    path_conf, path_local, dir_conf, dir_local = list(), list(), list(), list()
-
-    # Parse files in the directory
-    if not (isinstance(jails_conf_dir, str) and isdir(jails_conf_dir)):
-        print_error('%s is not a directory' % jails_conf_dir)
-    else:
-        dir_conf = list(filter(lambda conf: is_accessible(conf, R_OK), glob(jails_conf_dir + '/*.conf')))
-        dir_local = list(filter(lambda local: is_accessible(local, R_OK), glob(jails_conf_dir + '/*.local')))
-        if not (dir_conf or dir_local):
-            print_error('%s is empty or not readable' % jails_conf_dir)
-        else:
-            dir_conf, dir_local = (find_jails_in_files(dir_conf, print_error),
-                                   find_jails_in_files(dir_local, print_error))
-
-    # Parse .conf and .local files
-    if isinstance(jails_conf_path, str) and jails_conf_path.endswith(('.local', '.conf')):
-        path_conf, path_local = (find_jails_in_files([jails_conf_path.split('.')[0] + '.conf'], print_error),
-                                 find_jails_in_files([jails_conf_path.split('.')[0] + '.local'], print_error))
-
-    return path_conf, dir_conf, path_local, dir_local
+    return ch
 
 
-def find_jails_in_files(list_of_files, print_error):
-    """
-    :param list_of_files: <list>
-    :param print_error: <function>
-    :return: <list>
+RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
 
-    Open a file and parse it to find all (enabled and disabled) jails
-    The output is a list of tuples:
-    [('ssh', 'true'), ('apache', 'false'), ...]
-    """
-    jails_list = list()
-    for conf in list_of_files:
-        if is_accessible(conf, R_OK):
-            with open(conf, 'rt') as f:
-                raw_data = f.readlines()
-            data = ' '.join(line for line in raw_data if line.startswith(('[', 'enabled')))
-            jails_list.extend(REGEX_JAILS.findall(data))
-        else:
-            print_error('%s is not readable or not exist' % conf)
-    return jails_list
+# Example:
+# 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 195.201.88.33
+# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Ban 217.59.246.27
+RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban) (?P<ip>[a-f0-9.:]+)')
+
+DEFAULT_JAILS = [
+    "ssh",
+]
 
 
-def address_not_in_jail(pool, address, pool_size):
-    """
-    :param pool: <list>
-    :param address: <str>
-    :param pool_size: <int>
-    :return: bool
+class Service(LogService):
+    def __init__(self, configuration=None, name=None):
+        LogService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
+        self.definitions = dict()
 
-    Checks if the address is in the pool.
-    If not address will be added
-    """
-    index = bisect.bisect_left(pool, address)
-    if index < pool_size:
-        if pool[index] == address:
+        self.log_path = self.configuration.get('log_path', '/var/log/fail2ban.log')
+        self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
+        self.conf_dir = self.configuration.get('conf_dir', '/etc/fail2ban/jail.d/')
+        self.exclude = self.configuration.get('exclude', str())
+
+        self.monitoring_jails = list()
+        self.banned_ips = defaultdict(set)
+        self.data = dict()
+
+    def check(self):
+        """
+        :return: bool
+        """
+        if not self.conf_path.endswith((".conf", ".local")):
+            self.error("{0} is a wrong conf path name, must be *.conf or *.local".format(self.conf_path))
             return False
-        bisect.insort_left(pool, address)
+
+        if not os.access(self.log_path, os.R_OK):
+            self.error('{0} is not readable'.format(self.log_path))
+            return False
+
+        if os.path.getsize(self.log_path) == 0:
+            self.error('{0} is empty'.format(self.log_path))
+            return False
+
+        self.monitoring_jails = self.jails_auto_detection()
+        for jail in self.monitoring_jails:
+            self.data[jail] = 0
+            self.data["{0}_in_jail".format(jail)] = 0
+
+        self.definitions = charts(self.monitoring_jails)
+        self.info('monitoring jails: {0}'.format(self.monitoring_jails))
+
         return True
-    else:
-        bisect.insort_left(pool, address)
-        return True
+
+    def get_data(self):
+        """
+        :return: dict
+        """
+        raw = self._get_raw_data()
+
+        if not raw:
+            return None if raw is None else self.data
+
+        for row in raw:
+            match = RE_DATA.search(row)
+
+            if not match:
+                continue
+
+            match = match.groupdict()
+
+            if match["jail"] not in self.monitoring_jails:
+                continue
+
+            jail, action, ip = match['jail'], match['action'], match['ip']
+
+            if action == "Ban":
+                self.data[jail] += 1
+                if ip not in self.banned_ips[jail]:
+                    self.banned_ips[jail].add(ip)
+                    self.data["{0}_in_jail".format(jail)] += 1
+            else:
+                if ip in self.banned_ips[jail]:
+                    self.banned_ips[jail].remove(ip)
+                    self.data["{0}_in_jail".format(jail)] -= 1
+
+            return self.data
+
+    def get_files_from_dir(self, dir_path, suffix):
+        """
+        :return: list
+        """
+        if not os.path.isdir(dir_path):
+            self.error("{0} is not a directory".format(dir_path))
+            return list()
+
+        return glob("{0}/*.{1}".format(self.conf_dir, suffix))
+
+    def get_jails_from_file(self, file_path):
+        """
+        :return: list
+        """
+        if not os.access(file_path, os.R_OK):
+            self.error("{0} is not readable or not exist".format(file_path))
+            return list()
+
+        with open(file_path, 'rt') as f:
+            lines = f.readlines()
+            raw = " ".join(line for line in lines if line.startswith(('[', 'enabled')))
+
+        match = RE_JAILS.findall(raw)
+        # Result: [('ssh', 'true'), ('dropbear', 'true'), ('pam-generic', 'true'), ...]
+
+        if not match:
+            self.debug("{0} parse failed".format(file_path))
+            return list()
+
+        return match
+
+    def jails_auto_detection(self):
+        """
+        :return: list
+
+        Parses jail configuration files. Returns list of enabled jails.
+        According man jail.conf parse order must be
+        * jail.conf
+        * jail.d/*.conf (in alphabetical order)
+        * jail.local
+        * jail.d/*.local (in alphabetical order)
+        """
+        jails_files, all_jails, active_jails = list(), list(), list()
+
+        jails_files.append("{0}.conf".format(self.conf_path.rsplit(".")[0]))
+        jails_files.extend(self.get_files_from_dir(self.conf_dir, "conf"))
+        jails_files.append("{0}.local".format(self.conf_path.rsplit(".")[0]))
+        jails_files.extend(self.get_files_from_dir(self.conf_dir, "local"))
+
+        self.debug("config files to parse: {0}".format(jails_files))
+
+        for f in jails_files:
+            all_jails.extend(self.get_jails_from_file(f))
+
+        exclude = self.exclude.split()
+
+        for name, status in all_jails:
+            if name in exclude:
+                continue
+
+            if status == "true" and name not in active_jails:
+                active_jails.append(name)
+            elif status == "false" and name in active_jails:
+                active_jails.remove(name)
+
+        return active_jails or DEFAULT_JAILS
