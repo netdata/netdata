@@ -6,8 +6,8 @@
 import re
 import os
 
-from glob import glob
 from collections import defaultdict, namedtuple
+from glob import glob
 
 from bases.FrameworkServices.LogService import LogService
 
@@ -27,7 +27,7 @@ def charts(jails):
         ORDER[0]:
             {
                 'options':
-                    [None, 'Jails Ban Statistics', 'bans/s', 'bans', 'jail.bans', 'line'],
+                    [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
                 'lines': []
             },
         ORDER[1]:
@@ -148,7 +148,7 @@ class Service(LogService):
             self.error("{0} is not a directory".format(dir_path))
             return list()
 
-        return [f for f in glob("{0}/*.{1}".format(self.conf_dir, suffix))]
+        return glob("{0}/*.{1}".format(self.conf_dir, suffix))
 
     def get_jails_from_file(self, file_path):
         """
