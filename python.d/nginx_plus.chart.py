@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: nginx_plus netdata python.d module
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 import re
 
@@ -373,6 +374,7 @@ class WebUpstream:
         return peer
 
     def peers_stats(self, peers):
+        peers = {int(peer['id']): peer for peer in peers}
         data = dict()
         for peer in self.peers.values():
             if not peer.active:

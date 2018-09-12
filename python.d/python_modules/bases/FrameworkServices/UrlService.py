@@ -2,6 +2,7 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 import urllib3
 
@@ -24,6 +25,10 @@ class UrlService(SimpleService):
         self.proxy_url = self.configuration.get('proxy_url')
         self.header = self.configuration.get('header')
         self.request_timeout = self.configuration.get('timeout', 1)
+        self.tls_verify = self.configuration.get('tls_verify')
+        self.tls_ca_file = self.configuration.get('tls_ca_file')
+        self.tls_key_file = self.configuration.get('tls_key_file')
+        self.tls_cert_file = self.configuration.get('tls_cert_file')
         self._manager = None
 
     def __make_headers(self, **header_kw):
@@ -60,9 +65,21 @@ class UrlService(SimpleService):
         else:
             manager = urllib3.PoolManager
             params = dict(headers=header)
+        tls_cert_file = self.tls_cert_file
+        if tls_cert_file:
+            params['cert_file'] = tls_cert_file
+            # NOTE: key_file is useless without cert_file, but
+            #       cert_file may include the key as well.
+            tls_key_file = self.tls_key_file
+            if tls_key_file:
+                params['key_file'] = tls_key_file
+        tls_ca_file = self.tls_ca_file
+        if tls_ca_file:
+            params['ca_certs'] = tls_ca_file
         try:
             url = header_kw.get('url') or self.url
-            if url.startswith('https'):
+            if url.startswith('https') and not self.tls_verify and not tls_ca_file:
+                params['ca_certs'] = None
                 return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
             return manager(**params)
         except (urllib3.exceptions.ProxySchemeUnknown, TypeError) as error:
@@ -77,13 +94,13 @@ class UrlService(SimpleService):
         try:
             status, data = self._get_raw_data_with_status(url, manager)
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
-            self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
+            self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
             return None
 
         if status == 200:
-            return data.decode()
+            return data
         else:
-            self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=status))
+            self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
             return None
 
     def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True):
@@ -99,7 +116,9 @@ class UrlService(SimpleService):
                                    retries=retries,
                                    headers=manager.headers,
                                    redirect=redirect)
-        return response.status, response.data
+        if isinstance(response.data, str):
+            return response.status, response.data
+        return response.status, response.data.decode()
 
     def check(self):
         """

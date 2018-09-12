@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
     struct timeval tv;
-    if(unlikely(gettimeofday(&tv, NULL) == -1))
+    if(unlikely(gettimeofday(&tv, NULL) == -1)) {
+        error("gettimeofday() failed.");
         return -1;
+    }
     ts->tv_sec = tv.tv_sec;
     ts->tv_nsec = (tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC;
     return 0;
@@ -13,15 +16,19 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
 
 static inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1))
+    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
+    }
     return ts.tv_sec;
 }
 
 static inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1))
+    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
+    }
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
@@ -29,6 +36,7 @@ static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        error("clock_gettime(%d, &timespec) failed.", clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
         return -1;
@@ -99,39 +107,51 @@ inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
 
 inline void heartbeat_init(heartbeat_t *hb)
 {
-    *hb = 0ULL;
+    hb->monotonic = hb->realtime = 0ULL;
 }
 
-usec_t heartbeat_next(heartbeat_t *hb, usec_t tick)
-{
-    heartbeat_t now = now_monotonic_usec();
-    usec_t next = now - (now % tick) + tick;
+// waits for the next heartbeat
+// it waits using the monotonic clock
+// it returns the dt using the realtime clock
 
-    while(now < next) {
-        sleep_usec(next - now);
-        now = now_monotonic_usec();
+usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
+    heartbeat_t now;
+    now.monotonic = now_monotonic_usec();
+    now.realtime  = now_realtime_usec();
+
+    usec_t next_monotonic = now.monotonic - (now.monotonic % tick) + tick;
+
+    while(now.monotonic < next_monotonic) {
+        sleep_usec(next_monotonic - now.monotonic);
+        now.monotonic = now_monotonic_usec();
+        now.realtime  = now_realtime_usec();
     }
 
-    if(likely(*hb != 0ULL)) {
-        usec_t dt = now - *hb;
-        *hb = now;
+    if(likely(hb->realtime != 0ULL)) {
+        usec_t dt_monotonic = now.monotonic - hb->monotonic;
+        usec_t dt_realtime  = now.realtime - hb->realtime;
 
-        if(unlikely(dt >= tick + tick / 2)) {
+        hb->monotonic = now.monotonic;
+        hb->realtime  = now.realtime;
+
+        if(unlikely(dt_monotonic >= tick + tick / 2)) {
             errno = 0;
-            error("heartbeat missed %llu microseconds", dt - tick);
+            error("heartbeat missed %llu monotonic microseconds", dt_monotonic - tick);
         }
 
-        return dt;
+        return dt_realtime;
     }
     else {
-        *hb = now;
+        hb->monotonic = now.monotonic;
+        hb->realtime  = now.realtime;
         return 0ULL;
     }
 }
 
-inline usec_t heartbeat_dt_usec(heartbeat_t *hb)
-{
-    if(!*hb)
-        return 0ULL;
-    return now_monotonic_usec() - *hb;
+// returned the elapsed time, since the last heartbeat
+// using the monotonic clock
+
+inline usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb) {
+    if(!hb || !hb->monotonic) return 0ULL;
+    return now_monotonic_usec() - hb->monotonic;
 }

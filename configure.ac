@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 AC_PREREQ(2.60)
 
@@ -131,7 +132,7 @@ AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
 AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
-AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
+AC_CHECK_FUNCS([sched_setscheduler sched_getscheduler sched_getparam sched_get_priority_min sched_get_priority_max getpriority setpriority nice])
 AC_CHECK_FUNCS([recvmmsg])
 
 AC_TYPE_INT8_T
@@ -153,6 +154,10 @@ AC_HEADER_MAJOR
 AC_HEADER_RESOLV
 
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
+AC_CHECK_HEADERS_ONCE([sys/vfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statvfs.h])
+AC_CHECK_HEADERS_ONCE([sys/mount.h])
 
 if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)

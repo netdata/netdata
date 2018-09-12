@@ -4,6 +4,7 @@
  * ========================================================================
  * Copyright 2014 Min Hur, The New York Times Company
  * Licensed under MIT
+ * SPDX-License-Identifier: MIT
  * ======================================================================== */
 .checkbox label .toggle,.checkbox-inline .toggle{margin-left:-20px;margin-right:5px}
 .toggle{position:relative;overflow:hidden}

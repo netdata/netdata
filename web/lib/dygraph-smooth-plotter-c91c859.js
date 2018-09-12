@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 (function() {
 "use strict";
 

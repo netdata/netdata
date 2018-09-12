@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# SPDX-License-Identifier: GPL-3.0+
 
 import xml.etree.ElementTree as ET
 
@@ -53,21 +54,21 @@ CHARTS = {
         'options': [None, "Eden Memory Usage", "MB", "memory", "tomcat.jvm_eden", "area"],
         'lines': [
             ["eden_used", 'used', "absolute", 1, 1048576],
-            ["eden_commited", 'commited', "absolute", 1, 1048576],
+            ["eden_committed", 'committed', "absolute", 1, 1048576],
             ["eden_max", 'max', "absolute", 1, 1048576]
         ]},
     'jvm_survivor': {
         'options': [None, "Survivor Memory Usage", "MB", "memory", "tomcat.jvm_survivor", "area"],
         'lines': [
             ["survivor_used", 'used', "absolute", 1, 1048576],
-            ["survivor_commited", 'commited', "absolute", 1, 1048576],
+            ["survivor_committed", 'committed', "absolute", 1, 1048576],
             ["survivor_max", 'max', "absolute", 1, 1048576]
         ]},
     'jvm_tenured': {
         'options': [None, "Tenured Memory Usage", "MB", "memory", "tomcat.jvm_tenured", "area"],
         'lines': [
             ["tenured_used", 'used', "absolute", 1, 1048576],
-            ["tenured_commited", 'commited', "absolute", 1, 1048576],
+            ["tenured_committed", 'committed', "absolute", 1, 1048576],
             ["tenured_max", 'max', "absolute", 1, 1048576]
         ]},
 }
@@ -115,27 +116,27 @@ class Service(UrlService):
                 name = pool.get('name')
                 if 'Eden Space' in name:
                     data['eden_used'] = pool.get('usageUsed')
-                    data['eden_commited'] = pool.get('usageCommitted')
+                    data['eden_committed'] = pool.get('usageCommitted')
                     data['eden_max'] = pool.get('usageMax')
                 elif 'Survivor Space' in name:
                     data['survivor_used'] = pool.get('usageUsed')
-                    data['survivor_commited'] = pool.get('usageCommitted')
+                    data['survivor_committed'] = pool.get('usageCommitted')
                     data['survivor_max'] = pool.get('usageMax')
                 elif 'Tenured Gen' in name or 'Old Gen' in name:
                     data['tenured_used'] = pool.get('usageUsed')
-                    data['tenured_commited'] = pool.get('usageCommitted')
+                    data['tenured_committed'] = pool.get('usageCommitted')
                     data['tenured_max'] = pool.get('usageMax')
                 elif name == 'Code Cache':
                     data['code_cache_used'] = pool.get('usageUsed')
-                    data['code_cache_commited'] = pool.get('usageCommitted')
+                    data['code_cache_committed'] = pool.get('usageCommitted')
                     data['code_cache_max'] = pool.get('usageMax')
                 elif name == 'Compressed':
                     data['compressed_used'] = pool.get('usageUsed')
-                    data['compressed_commited'] = pool.get('usageCommitted')
+                    data['compressed_committed'] = pool.get('usageCommitted')
                     data['compressed_max'] = pool.get('usageMax')
                 elif name == 'Metaspace':
                     data['metaspace_used'] = pool.get('usageUsed')
-                    data['metaspace_commited'] = pool.get('usageCommitted')
+                    data['metaspace_committed'] = pool.get('usageCommitted')
                     data['metaspace_max'] = pool.get('usageMax')
 
             if connector:

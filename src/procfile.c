@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 #include "procfile.h"
 
@@ -6,6 +7,8 @@
 #define PFWORDS_INCREASE_STEP 200
 #define PFLINES_INCREASE_STEP 10
 #define PROCFILE_INCREMENT_BUFFER 512
+
+int procfile_open_flags = O_RDONLY;
 
 int procfile_adaptive_initial_allocation = 0;
 
@@ -391,7 +394,7 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
     debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
-    int fd = open(filename, O_RDONLY, 0666);
+    int fd = open(filename, procfile_open_flags, 0666);
     if(unlikely(fd == -1)) {
         if(unlikely(!(flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot open file '%s'", filename);
         return NULL;
@@ -427,7 +430,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         close(ff->fd);
     }
 
-    ff->fd = open(filename, O_RDONLY, 0666);
+    ff->fd = open(filename, procfile_open_flags, 0666);
     if(unlikely(ff->fd == -1)) {
         procfile_close(ff);
         return NULL;

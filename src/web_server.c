@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 // this file includes 3 web servers:
@@ -335,12 +336,13 @@ static void web_client_release(struct web_client *w) {
 
 static void web_client_initialize_connection(struct web_client *w) {
     int flag = 1;
-    if(setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+
+    if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
+        debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
-    if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+    if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
+        debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
 
@@ -407,6 +409,7 @@ static struct web_client *web_client_create_on_listenfd(int listener) {
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
+long web_client_streaming_rate_t = 0L;
 
 static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
     struct web_client *w = ptr;

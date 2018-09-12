@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -476,13 +477,19 @@ RRDSET *rrdset_create_custom(
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     RRDSET *st = rrdset_find_on_create(host, fullid);
-    if(st) return st;
+    if(st) {
+        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        return st;
+    }
 
     rrdhost_wrlock(host);
 
     st = rrdset_find_on_create(host, fullid);
     if(st) {
         rrdhost_unlock(host);
+        rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
         return st;
     }
 
@@ -581,8 +588,8 @@ RRDSET *rrdset_create_custom(
                     memset(st, 0, size);
                 }
                 else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future. Clearing it.", fullfilename);
-                    memset(st, 0, size);
+                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
+                    st->last_updated.tv_sec = now;
                 }
 
                 // make sure the database is aligned
@@ -645,6 +652,7 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
     rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
@@ -710,7 +718,7 @@ RRDSET *rrdset_create_custom(
 // RRDSET - data collection iteration control
 
 inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
-    if(unlikely(!st->last_collected_time.tv_sec || !microseconds)) {
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (rrdset_flag_check_noatomic(st, RRDSET_FLAG_SYNC_CLOCK)))) {
         // call the full next_usec() function
         rrdset_next_usec(st, microseconds);
         return;
@@ -723,13 +731,36 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     struct timeval now;
     now_realtime_timeval(&now);
 
+    #ifdef NETDATA_INTERNAL_CHECKS
+    char *discard_reason = NULL;
+    usec_t discarded = microseconds;
+    #endif
+
+    if(unlikely(rrdset_flag_check_noatomic(st, RRDSET_FLAG_SYNC_CLOCK))) {
+        // the chart needs to be re-synced to current time
+        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+
+        // discard the microseconds supplied
+        microseconds = 0;
+
+        #ifdef NETDATA_INTERNAL_CHECKS
+        if(!discard_reason) discard_reason = "SYNC CLOCK FLAG";
+        #endif
+    }
+
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // the first entry
         microseconds = st->update_every * USEC_PER_SEC;
+        #ifdef NETDATA_INTERNAL_CHECKS
+        if(!discard_reason) discard_reason = "FIRST DATA COLLECTION";
+        #endif
     }
     else if(unlikely(!microseconds)) {
         // no dt given by the plugin
         microseconds = dt_usec(&now, &st->last_collected_time);
+        #ifdef NETDATA_INTERNAL_CHECKS
+        if(!discard_reason) discard_reason = "NO USEC GIVEN BY COLLECTOR";
+        #endif
     }
     else {
         // microseconds has the time since the last collection
@@ -748,18 +779,52 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             last_updated_time_align(st);
 
             microseconds    = st->update_every * USEC_PER_SEC;
+            #ifdef NETDATA_INTERNAL_CHECKS
+            if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
+            #endif
         }
-        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 10 * USEC_PER_SEC))) {
+        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 5 * USEC_PER_SEC))) {
             // oops! the database is too far behind
             info("RRD database for chart '%s' on host '%s' is %0.5" LONG_DOUBLE_MODIFIER " secs in the past (counter #%zu, update #%zu). Adjusting it to current time.", st->id, st->rrdhost->hostname, (LONG_DOUBLE)since_last_usec / USEC_PER_SEC, st->counter, st->counter_done);
 
             microseconds = (usec_t)since_last_usec;
+            #ifdef NETDATA_INTERNAL_CHECKS
+            if(!discard_reason) discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
+            #endif
         }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(since_last_usec > 0 && (susec_t)microseconds < since_last_usec) {
+            static __thread susec_t min_delta = USEC_PER_SEC * 3600, permanent_min_delta = 0;
+            static __thread time_t last_t = 0;
+
+            // the first time initialize it so that it will make the check later
+            if(last_t == 0) last_t = now.tv_sec + 60;
+
+            susec_t delta = since_last_usec - (susec_t)microseconds;
+            if(delta < min_delta) min_delta = delta;
+
+            if(now.tv_sec >= last_t + 60) {
+                last_t = now.tv_sec;
+
+                if(min_delta > permanent_min_delta) {
+                    info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    permanent_min_delta = min_delta;
+                }
+
+                min_delta = USEC_PER_SEC * 3600;
+            }
+        }
+#endif
     }
 
     #ifdef NETDATA_INTERNAL_CHECKS
     debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
     rrdset_debug(st, "NEXT: %llu microseconds", microseconds);
+
+    if(discarded && discarded != microseconds)
+        info("host '%s', chart '%s': discarded data collection time of %llu usec, replaced with %llu usec, reason: '%s'", st->rrdhost->hostname, st->id, discarded, microseconds, discard_reason?discard_reason:"UNDEFINED");
+
     #endif
 
     st->usec_since_last_update = microseconds;

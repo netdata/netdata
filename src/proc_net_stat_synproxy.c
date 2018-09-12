@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define RRD_TYPE_NET_STAT_NETFILTER         "netfilter"
@@ -70,7 +71,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , "entries"
                     , "proc"
                     , "net/stat/synproxy"
-                    , 3304
+                    , NETDATA_CHART_PRIO_SYNPROXY + 4
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -100,7 +101,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , "SYN/s"
                     , "proc"
                     , "net/stat/synproxy"
-                    , 3301
+                    , NETDATA_CHART_PRIO_SYNPROXY + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -130,7 +131,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , "connections/s"
                     , "proc"
                     , "net/stat/synproxy"
-                    , 3303
+                    , NETDATA_CHART_PRIO_SYNPROXY + 3
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -160,7 +161,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , "cookies/s"
                     , "proc"
                     , "net/stat/synproxy"
-                    , 3302
+                    , NETDATA_CHART_PRIO_SYNPROXY + 2
                     , update_every
                     , RRDSET_TYPE_LINE
             );

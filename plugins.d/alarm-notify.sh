@@ -3,7 +3,7 @@
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
-# GPL v3+
+# SPDX-License-Identifier: GPL-3.0+
 #
 # Script to send alarm notifications for netdata
 #
@@ -26,10 +26,14 @@
 #  - pagerduty.com notifications by Jim Cooley @jimcooley #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
+#  - fleep notifications by @Ferroin
 #  - custom notifications by @ktsaou
+#  - syslog messages by @Ferroin
+#  - Microsoft Team notification by @tioumen
 
 # -----------------------------------------------------------------------------
 # testing notifications
+
 
 if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
 then
@@ -44,6 +48,7 @@ then
 
     id=1
     last="CLEAR"
+    test_res=0
     for x in "WARNING" "CRITICAL"  "CLEAR"
     do
         echo >&2
@@ -53,6 +58,7 @@ then
         if [ $? -ne 0 ]
         then
             echo >&2 "# FAILED"
+            test_res=1
         else
             echo >&2 "# OK"
         fi
@@ -61,7 +67,7 @@ then
         id=$((id + 1))
     done
 
-    exit 1
+    exit $test_res
 fi
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
@@ -214,7 +220,7 @@ fi
 images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
-curl_options=
+curl_options=""
 
 # needed commands
 # if empty they will be searched in the system path
@@ -223,6 +229,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_MSTEAM="YES"
 SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
@@ -236,13 +243,26 @@ SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
+SEND_FLEEP="YES"
 SEND_IRC="YES"
+SEND_AWSSNS="YES"
+SEND_SYSLOG="NO"
 SEND_CUSTOM="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# Microsoft Team configs
+MSTEAM_WEBHOOK_URL=
+DEFAULT_RECIPIENT_MSTEAM=
+declare -A role_recipients_msteam=()
+
+# rocketchat configs
+ROCKETCHAT_WEBHOOK_URL=
+DEFAULT_RECIPIENT_ROCKETCHAT=
+declare -A role_recipients_rocketchat=()
 
 # alerta configs
 ALERTA_WEBHOOK_URL=
@@ -310,6 +330,20 @@ PD_SERVICE_KEY=
 DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
 
+# fleep.io configs
+FLEEP_SENDER="${host}"
+DEFAULT_RECIPIENT_FLEEP=
+declare -A role_recipients_fleep=()
+
+# Amazon SNS configs
+DEFAULT_RECIPIENT_AWSSNS=
+AWSSNS_MESSAGE_FORMAT=
+declare -A role_recipients_awssns=()
+
+# syslog configs
+SYSLOG_FACILITY=
+declare -A role_recipients_syslog=()
+
 # custom configs
 DEFAULT_RECIPIENT_CUSTOM=
 declare -A role_recipients_custom=()
@@ -318,6 +352,7 @@ declare -A role_recipients_custom=()
 EMAIL_SENDER=
 DEFAULT_RECIPIENT_EMAIL="root"
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
+EMAIL_THREADING=
 declare -A role_recipients_email=()
 
 # irc configs
@@ -405,6 +440,8 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_msteam=()
+declare -A arr_rocketchat=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
 declare -A arr_discord=()
@@ -418,7 +455,10 @@ declare -A arr_email=()
 declare -A arr_custom=()
 declare -A arr_messagebird=()
 declare -A arr_kavenegar=()
+declare -A arr_fleep=()
 declare -A arr_irc=()
+declare -A arr_syslog=()
+declare -A arr_awssns=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -500,6 +540,22 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # Microsoft Team
+    a="${role_recipients_msteam[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MSTEAM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality msteam "${r}" && arr_msteam[${r/|*/}]="1"
+    done
+
+    # rocketchat
+    a="${role_recipients_rocketchat[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality rocketchat "${r}" && arr_rocketchat[${r/|*/}]="1"
+    done
+
     # alerta
     a="${role_recipients_alerta[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ALERTA}"
@@ -531,13 +587,37 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
-    
+
+    # fleep.io
+    a="${role_recipients_fleep[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLEEP}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality fleep "${r}" && arr_fleep[${r/|*/}]="1"
+    done
+
     # irc
     a="${role_recipients_irc[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
+    done
+
+    # amazon sns
+    a="${role_recipients_awssns[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_AWSSNS}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality awssns "${r}" && arr_awssns[${r/|*/}]="1"
+    done
+
+    # syslog
+    a="${role_recipients_syslog[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality syslog "${r}" && arr_syslog[${r/|*/}]="1"
     done
 
     # custom
@@ -553,6 +633,14 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of Microsoft team recipients (channels)
+to_msteam="${!arr_msteam[*]}"
+[ -z "${to_msteam}" ] && SEND_MSTEAM="NO"
+
+# build the list of rocketchat recipients (channels)
+to_rocketchat="${!arr_rocketchat[*]}"
+[ -z "${to_rocketchat}" ] && SEND_ROCKETCHAT="NO"
 
 # build the list of alerta recipients (channels)
 to_alerta="${!arr_alerta[*]}"
@@ -598,6 +686,10 @@ to_telegram="${!arr_telegram[*]}"
 to_pd="${!arr_pd[*]}"
 [ -z "${to_pd}" ] && SEND_PD="NO"
 
+# build the list of fleep recipients (conversation webhooks)
+to_fleep="${!arr_fleep[*]}"
+[ -z "${to_fleep}" ] && SEND_FLEEP="NO"
+
 # build the list of custom recipients
 to_custom="${!arr_custom[*]}"
 [ -z "${to_custom}" ] && SEND_CUSTOM="NO"
@@ -615,11 +707,22 @@ done
 to_irc="${!arr_irc[*]}"
 [ -z "${to_irc}" ] && SEND_IRC="NO"
 
+# build the list of awssns recipients (facilities, servers, and prefixes)
+to_awssns="${!arr_awssns[*]}"
+[ -z "${to_awssns}" ] && SEND_AWSSNS="NO"
+
+# build the list of syslog recipients (facilities, servers, and prefixes)
+to_syslog="${!arr_syslog[*]}"
+[ -z "${to_syslog}" ] && SEND_SYSLOG="NO"
+
 # -----------------------------------------------------------------------------
 # verify the delivery methods supported
 
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
+
+# check rocketchat
+[ -z "${ROCKETCHAT_WEBHOOK_URL}" ] && SEND_ROCKETCHAT="NO"
 
 # check alerta
 [ -z "${ALERTA_WEBHOOK_URL}" ] && SEND_ALERTA="NO"
@@ -657,6 +760,9 @@ to_irc="${!arr_irc[*]}"
 # check irc
 [ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
+# check fleep
+[ -z "${FLEEP_SERVER}" -o -z "${FLEEP_SENDER}" ] && SEND_FLEEP="NO"
+
 # check pagerduty.com
 # if we need pd-send, check for the pd-send command
 # https://www.pagerduty.com/docs/guides/agent-install-guide/
@@ -674,6 +780,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_ROCKETCHAT}"  = "YES" \
         -o "${SEND_ALERTA}"      = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
@@ -684,7 +791,9 @@ if [ \( \
         -o "${SEND_TELEGRAM}"    = "YES" \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
+        -o "${SEND_FLEEP}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
+        -o "${SEND_MSTEAM}"        = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -695,6 +804,8 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_MSTEAM="NO"
+        SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
         SEND_DISCORD="NO"
@@ -703,6 +814,7 @@ if [ \( \
         SEND_MESSAGEBIRD="NO"
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
+        SEND_FLEEP="NO"
         SEND_CUSTOM="NO"
     fi
 fi
@@ -718,11 +830,34 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
     fi
 fi
 
+# if we need logger, check for the logger command
+if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
+    then
+    logger="$(which logger 2>/dev/null || command -v logger 2>/dev/null)"
+    if [ -z "${logger}" ]
+        then
+        debug "Cannot find logger command in the system path. Disabling syslog notifications."
+        SEND_SYSLOG="NO"
+    fi
+fi
+
+# if we need aws, check for the aws command
+if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
+    then
+    aws="$(which aws 2>/dev/null || command -v aws 2>/dev/null)"
+    if [ -z "${aws}" ]
+        then
+        debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+        SEND_AWSSNS="NO"
+    fi
+fi
+
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_ROCKETCHAT}"     != "YES" \
     -a "${SEND_ALERTA}"         != "YES" \
     -a "${SEND_FLOCK}"          != "YES" \
     -a "${SEND_DISCORD}"        != "YES" \
@@ -733,8 +868,12 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHBULLET}"     != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
+    -a "${SEND_FLEEP}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
+    -a "${SEND_AWSSNS}"         != "YES" \
+    -a "${SEND_SYSLOG}"         != "YES" \
+    -a "${SEND_MSTEAM}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -743,8 +882,18 @@ fi
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
 
-date="$(date --date=@${when} 2>/dev/null)"
-[ -z "${date}" ] && date="$(date 2>/dev/null)"
+date=$(date --date=@${when} "${date_format}" 2>/dev/null)
+[ -z "${date}" ] && date=$(date "${date_format}" 2>/dev/null)
+[ -z "${date}" ] && date=$(date --date=@${when} 2>/dev/null)
+[ -z "${date}" ] && date=$(date 2>/dev/null)
+
+# ----------------------------------------------------------------------------
+# prepare some extra headers if we've been asked to thread e-mails
+if [ "${SEND_EMAIL}" == "YES" -a "${EMAIL_THREADING}" == "YES" ] ; then
+    email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\nReferences: <${chart}-${name}@${host}>"
+else
+    email_thread_headers=
+fi
 
 # -----------------------------------------------------------------------------
 # function to URL encode a string
@@ -830,39 +979,42 @@ duration4human() {
 # email sender
 
 send_email() {
-    local ret= opts=
+    local ret= opts=() sender_email="${EMAIL_SENDER}" sender_name=
     if [ "${SEND_EMAIL}" = "YES" ]
         then
 
         if [ ! -z "${EMAIL_SENDER}" ]
             then
-            if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
-                then
-                # the name includes single quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
-            elif [[ "${EMAIL_SENDER}" =~ \'.*\'\ \<.*\> ]]
+            if [[ "${EMAIL_SENDER}" =~ ^\".*\"\ \<.*\>$ ]]
                 then
                 # the name includes double quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
-            elif [[ "${EMAIL_SENDER}" =~ .*\ \<.*\> ]]
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '"' -f 2)"
+            elif [[ "${EMAIL_SENDER}" =~ ^\'.*\'\ \<.*\>$ ]]
+                then
+                # the name includes single quotes
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d "'" -f 2)"
+            elif [[ "${EMAIL_SENDER}" =~ ^.*\ \<.*\>$ ]]
                 then
                 # the name does not have any quotes
-                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)'"
-            else
-                # no name at all
-                opts=" -f ${EMAIL_SENDER}"
+                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
             fi
         fi
+
+        [ ! -z "${sender_email}" ] && opts+=(-f "${sender_email}")
+        [ ! -z "${sender_name}" ]  && opts+=(-F "${sender_name}")
 
         if [ "${debug}" = "1" ]
             then
             echo >&2 "--- BEGIN sendmail command ---"
-            printf >&2 "%q " "${sendmail}" -t ${opts}
+            printf >&2 "%q " "${sendmail}" -t "${opts[@]}"
             echo >&2
             echo >&2 "--- END sendmail command ---"
         fi
 
-        "${sendmail}" -t ${opts}
+        "${sendmail}" -t "${opts[@]}"
         ret=$?
 
         if [ ${ret} -eq 0 ]
@@ -1242,6 +1394,65 @@ send_telegram() {
 }
 
 # -----------------------------------------------------------------------------
+# Microsoft Team sender
+
+send_msteam() {
+
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_MSTEAM}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}";;
+        CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}";;
+        CLEAR)    icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}";;
+        *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
+    esac
+
+    for channel in ${channels}
+    do
+        ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
+        ## Online designer : https://acdesignerbeta.azurewebsites.net/
+        payload="$(cat <<EOF
+        {
+            "@context": "http://schema.org/extensions",
+            "@type": "MessageCard",
+            "themeColor": "${color}",
+            "title": "$icon Alert ${status} from netdata for ${host}",
+            "text": "${host} ${status_message}, ${chart} (_${family}_), *${alarm}*",
+            "potentialAction": [
+            {
+                "@type": "OpenUri",
+                "name": "Netdata",
+                "targets": [
+                { "os": "default", "uri": "${goto_url}" }
+                ]
+            }
+            ]
+        }
+EOF
+        )"
+
+	# Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+	webhook="${webhook//CHANNEL/${channel}}"
+
+	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
 # slack sender
 
 send_slack() {
@@ -1297,6 +1508,71 @@ EOF
             sent=$((sent + 1))
         else
             error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# rocketchat sender
+
+send_rocketchat() {
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_ROCKETCHAT}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
+    esac
+
+    for channel in ${channels}
+    do
+        payload="$(cat <<EOF
+        {
+            "channel": "#${channel}",
+            "alias": "netdata on ${host}",
+            "avatar": "${images_base_url}/images/seo-performance-128.png",
+            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "attachments": [
+                {
+                    "color": "${color}",
+                    "title": "${alarm}",
+                    "title_link": "${goto_url}",
+                    "text": "${info}",
+                    "fields": [
+                        {
+                            "title": "${chart}",
+                            "short": true,
+                            "value": "chart"
+                        },
+                        {
+                            "title": "${family}",
+                            "short": true,
+                            "value": "family"
+                        }
+                    ],
+                    "thumb_url": "${image}",
+                    "ts": "${when}"
+                }
+            ]
+        }
+EOF
+        )"
+
+        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
         fi
     done
 
@@ -1471,6 +1747,36 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# fleep sender
+
+send_fleep() {
+    local httpcode sent=0 webhooks="${1}" data message
+    if [ "${SEND_FLEEP}" = "YES" ] ; then
+            message="${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}"
+
+            for hook in "${webhooks}" ; do
+                data="{ "
+                data="${data} 'message': '${message}', "
+                data="${data} 'user': '${FLEEP_SENDER}' "
+                data="${data} }"
+
+                httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
+
+                if [ "${httpcode}" = "200" ] ; then
+                    info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
+                    sent=$((sent + 1))
+                else
+                    error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP error code ${httpcode}."
+                fi
+            done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # irc sender
 
 send_irc() {
@@ -1508,6 +1814,106 @@ send_irc() {
     [ ${sent} -gt 0 ] && return 0
     
     return 1
+}
+
+# -----------------------------------------------------------------------------
+# Amazon SNS sender
+
+send_awssns() {
+    local targets="${1}" message='' sent=0 region=''
+    local default_format="${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+    [ "${SEND_AWSSNS}" = "YES" ] || return 1
+
+    message=${AWSSNS_MESSAGE_FORMAT:-${default_format}}
+
+    for target in ${targets} ; do
+        # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
+        region="$(echo ${target} | cut -f 4 -d ':')"
+        ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
+        if [ $? = 0 ]; then
+            info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'" 
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# syslog sender
+
+send_syslog() {
+    local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
+    local priority='' message='' host='' port='' prefix=''
+    local temp1='' temp2=''
+
+    [ "${SEND_SYSLOG}" = "YES" ] || return 1
+
+    if [ "${status}" = "CRITICAL" ] ; then
+        level='crit'
+    elif [ "${status}" = "WARNING" ] ; then
+        level='warning'
+    fi
+
+    for target in ${targets} ; do
+        priority="${facility}.${level}"
+        message=''
+        host=''
+        port=''
+        prefix=''
+        temp1=''
+        temp2=''
+
+        prefix=$(echo ${target} | cut -d '/' -f 2)
+        temp1=$(echo ${target} | cut -d '/' -f 1)
+
+        if [ ${prefix} != ${temp1} ] ; then
+            if (echo ${temp1} | grep -q '@' ) ; then
+                temp2=$(echo ${temp1} | cut -d '@' -f 1)
+                host=$(echo ${temp1} | cut -d '@' -f 2)
+
+                if [ ${temp2} != ${host} ] ; then
+                    priority=${temp2}
+                fi
+
+                port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+
+                if ( echo ${host} | grep -E -q '\[.*\]' ) ; then
+                    if ( echo ${port} | grep -q ']' ) ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+                    fi
+                else
+                    if [ ${port} = ${host} ] ; then
+                        port=''
+                    else
+                        host=$(echo ${host} | cut -d ':' -f 1)
+                    fi
+                fi
+            else
+                priority=${temp1}
+            fi
+        fi
+
+        message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
+
+        if [ ${host} ] ; then
+            logger_options="${logger_options} -n ${host}"
+            if [ ${port} ] ; then
+                logger_options="${logger_options} -P ${port}"
+            fi
+        fi
+
+        ${logger} -p ${priority} ${logger_options} "${message}"
+    done
+
+    return $?
 }
 
 
@@ -1609,6 +2015,24 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the Microsoft notification
+
+# Microsoft team aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_msteam "${MSTEAM_WEBHOOK_URL}" "${to_msteam}"
+SENT_MSTEAM=$?
+
+# -----------------------------------------------------------------------------
+# send the rocketchat notification
+
+# rocketchat aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_rocketchat "${ROCKETCHAT_WEBHOOK_URL}" "${to_rocketchat}"
+SENT_ROCKETCHAT=$?
 
 # -----------------------------------------------------------------------------
 # send the alerta notification
@@ -1725,6 +2149,12 @@ send_pd "${to_pd}"
 SENT_PD=$?
 
 # -----------------------------------------------------------------------------
+# send the fleep message
+
+send_fleep "${to_fleep}"
+SENT_FLEEP=$?
+
+# -----------------------------------------------------------------------------
 # send the irc message
 
 send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
@@ -1769,6 +2199,22 @@ SENT_HIPCHAT=$?
 
 
 # -----------------------------------------------------------------------------
+# send the Amazon SNS message
+
+send_awssns ${to_awssns}
+
+SENT_AWSSNS=$?
+
+
+# -----------------------------------------------------------------------------
+# send the syslog message
+
+send_syslog ${to_syslog}
+
+SENT_SYSLOG=$?
+
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -1776,6 +2222,7 @@ To: ${to_email}
 Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
 Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
 
 This is a MIME-encoded multipart message
 
@@ -1897,6 +2344,8 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_MSTEAM}       -eq 0 \
+    -o ${SENT_ROCKETCHAT}   -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
     -o ${SENT_DISCORD}      -eq 0 \
@@ -1907,8 +2356,11 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
+    -o ${SENT_FLEEP}        -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
+    -o ${SENT_AWSSNS}       -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
+    -o ${SENT_SYSLOG}       -eq 0 \
     ]
     then
     # we did send something

@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
-#define DEFAULT_EXCLUDED_FILESYSTEMS ""
+#define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
@@ -359,7 +360,7 @@ void *proc_diskspace_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {
-        duration = heartbeat_dt_usec(&hb);
+        duration = heartbeat_monotonic_dt_to_now_usec(&hb);
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;

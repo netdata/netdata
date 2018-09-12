@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
@@ -194,6 +195,7 @@ netdata_SOURCES += \
 	proc_net_rpc_nfsd.c \
 	proc_net_snmp.c \
 	proc_net_snmp6.c \
+	proc_net_sctp_snmp.c \
 	proc_net_sockstat.c \
 	proc_net_sockstat6.c \
 	proc_net_softnet_stat.c \

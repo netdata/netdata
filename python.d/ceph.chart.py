@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: ceph netdata python.d module
 # Author: Luis Eduardo (lets00)
+# SPDX-License-Identifier: GPL-3.0+
 
 try:
     import rados

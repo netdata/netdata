@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
@@ -26,15 +27,6 @@ dist_web_DATA = \
 	sitemap.xml \
 	tv.html \
 	version.txt \
-	$(NULL)
-
-webolddir=$(webdir)/old
-dist_webold_DATA = \
-	old/datasource.html \
-	old/index.html \
-	old/index.js \
-	old/netdata.js \
-	old/theme.css \
 	$(NULL)
 
 weblibdir=$(webdir)/lib
@@ -93,6 +85,7 @@ dist_webimages_DATA = \
 	images/animated.gif \
 	images/check-mark-2-128-green.png \
 	images/check-mark-2-multi-size-green.ico \
+	images/netdata.svg \
 	images/post.png \
 	images/seo-performance-16.png \
 	images/seo-performance-24.png \

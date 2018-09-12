@@ -1,9 +1,9 @@
 # no need for shebang - this file is loaded from charts.d.plugin
+# SPDX-License-Identifier: GPL-3.0+
 
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
-# GPL v3+
 #
 
 # if this chart is called X.chart.sh, then all functions and global variables

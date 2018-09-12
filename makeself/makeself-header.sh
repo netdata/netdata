@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0+
 cat << EOF  > "$archname"
 #!/bin/sh
 # This script was generated using Makeself $MS_VERSION

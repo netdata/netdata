@@ -8,7 +8,7 @@ source "installer/functions.sh" || exit 1
 
 set -e
 
-run ./autogen.sh
+run autoreconf -ivf
 run ./configure --enable-maintainer-mode
 run make dist
 

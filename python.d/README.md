@@ -131,7 +131,6 @@ Module provides server and tube level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
- * `python-yaml`
 
 **Server statistics:**
 
@@ -288,6 +287,35 @@ local:
 ```
 
 If no configuration is given, module will attempt to read named.stats file  at `/var/log/bind/named.stats`
+
+---
+
+# boinc
+
+This module monitors task counts for the Berkely Open Infrastructure
+Networking Computing (BOINC) distributed computing client using the same
+RPC interface that the BOINC monitoring GUI does.
+
+It provides charts tracking the total number of tasks and active tasks,
+as well as ones tracking each of the possible states for tasks.
+
+### configuration
+
+BOINC requires use of a password to access it's RPC interface.  You can
+find this password in the `gui_rpc_auth.cfg` file in your BOINC directory.
+
+By default, the module will try to auto-detect the password by looking
+in `/var/lib/boinc` for this file (this is the location most Linux
+distributions use for a system-wide BOINC installation), so things may
+just work without needing configuration for the local system.
+
+You can monitor remote systems as well:
+
+```yaml
+remote:
+  hostname: some-host
+  password: some-password
+```
 
 ---
 
@@ -982,6 +1010,108 @@ The module will not work If no configuration is given.
 
 ---
 
+# litespeed
+
+Module monitor litespeed web server performance metrics.
+
+It produces:
+
+1. **Network Throughput HTTP** in kilobits/s
+ * in
+ * out
+
+2. **Network Throughput HTTPS** in kilobits/s
+ * in
+ * out
+
+3. **Connections HTTP** in connections
+ * free
+ * used
+
+4. **Connections HTTPS** in connections
+ * free
+ * used
+
+5. **Requests** in requests/s
+ * requests
+
+6. **Requests In Processing** in requests
+ * processing
+ 
+7. **Public Cache Hits** in hits/s
+ * hits
+ 
+8. **Private Cache Hits** in hits/s
+ * hits
+ 
+9. **Static Hits** in hits/s
+ * hits 
+
+
+### configuration
+```yaml
+local:
+  path  : 'PATH'
+```
+
+If no configuration is given, module will use "/tmp/lshttpd/".
+
+---
+
+# logind
+
+THis module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+
+It provides the following charts:
+
+1. **Sessions** Tracks the total number of sessions.
+  * Graphical: Local graphical sessions (running X11, or Wayland, or something else).
+  * Console: Local console sessions.
+  * Remote: Remote sessions.
+
+2. **Users** Tracks total number of unique user logins of each type.
+  * Graphical
+  * Console
+  * Remote
+
+3. **Seats** Total number of seats in use.
+  * Seats
+
+### configuration
+
+This module needs no configuration.  Just make sure the netdata user
+can run the `loginctl` command and get a session list without having to
+specify a path.
+
+This will work with any command that can output data in the _exact_
+same format as `loginctl list-sessions --no-legend`.  If you have some
+other command you want to use that outputs data in this format, you can
+specify it using the `command` key like so:
+
+```yaml
+command: '/path/to/other/command'
+```
+
+### notes
+
+* This module's ability to track logins is dependent on what PAM services
+are configured to register sessions with logind.  In particular, for
+most systems, it will only track TTY logins, local desktop logins,
+and logins through remote shell connections.
+
+* The users chart counts _usernames_ not UID's.  This is potentially
+important in configurations where multiple users have the same UID.
+
+* The users chart counts any given user name up to once for _each_ type
+of login.  So if the same user has a graphical and a console login on a
+system, they will show up once in the graphical count, and once in the
+console count.
+
+* Because the data collection process is rather expensive, this plugin
+is currently disabled by default, and needs to be explicitly enabled in
+`/etc/netdata/python.d.conf` before it will run.
+
+---
 
 # mdstat
 
@@ -1007,6 +1137,35 @@ It produces:
 
 ### configuration
 No configuration is needed.
+
+---
+
+# megacli
+
+Module collects adapter, physical drives and battery stats.
+
+**Requirements:**
+ * `netdata` user needs to be able to be able to sudo the `megacli` program without password
+
+To grab stats it executes:
+ * `sudo -n megacli -LDPDInfo -aAll`
+ * `sudo -n megacli -AdpBbuCmd -a0`
+ 
+ 
+It produces:
+
+1. **Adapter State**
+
+2. **Physical Drives Media Errors**
+
+3. **Physical Drives Predictive Failures**
+
+4. **Battery Relative State of Charge**
+
+5. **Battery Cycle Count**
+
+### configuration
+Battery stats disabled by default in the module configuration file.
 
 ---
 
@@ -1222,6 +1381,39 @@ If no configuration is given, module will attempt to connect to mongodb daemon o
 
 ---
 
+# monit
+
+Monit monitoring module. Data is grabbed from stats XML interface (exsists for a long time, but not mentioned in official documentation). Mostly this plugin shows statuses of monit targets, i.e. [statuses of specified checks](https://mmonit.com/monit/documentation/monit.html#Service-checks).
+
+1. **Filesystems**
+ * Filesystems
+ * Directories
+ * Files
+ * Pipes
+
+2. **Applications**
+ * Processes (+threads/childs)
+ * Programs
+
+3. **Network**
+ * Hosts (+latency)
+ * Network interfaces
+
+### configuration
+
+Sample:
+
+```yaml
+local:
+  name     : 'local'
+  url     : 'http://localhost:2812'
+  user:    : admin
+  pass:    : monit
+```
+
+If no configuration is given, module will attempt to connect to monit as `http://localhost:2812`.
+
+---
 
 # mysql
 
@@ -1278,7 +1470,7 @@ It will produce following charts (if data is available):
 
 You can provide, per server, the following:
 
-1. username which have access to database (deafults to 'root')
+1. username which have access to database (defaults to 'root')
 2. password (defaults to none)
 3. mysql my.cnf configuration file
 4. mysql socket (optional)
@@ -1745,7 +1937,7 @@ Module monitors one or more postgres servers.
 
 **Requirements:**
 
- * `python-psycopg2` package. You have to install to manually.
+ * `python-psycopg2` package. You have to install it manually.
 
 Following charts are drawn:
 
@@ -1812,7 +2004,7 @@ When no configuration file is found, module tries to connect to TCP/IP socket: `
 
 Module monitor powerdns performance and health metrics.
 
-Following charts are drawn:
+Powerdns charts:
 
 1. **Queries and Answers**
  * udp-queries
@@ -1834,6 +2026,45 @@ Following charts are drawn:
 
 4. **Latency**
  * latency
+ 
+ Powerdns Recursor charts:
+ 
+ 1. **Questions In**
+ * questions
+ * ipv6-questions
+ * tcp-queries
+
+2. **Questions Out**
+ * all-outqueries
+ * ipv6-outqueries
+ * tcp-outqueries
+ * throttled-outqueries
+
+3. **Answer Times**
+ * answers-slow
+ * answers0-1
+ * answers1-10
+ * answers10-100
+ * answers100-1000
+
+4. **Timeouts**
+ * outgoing-timeouts
+ * outgoing4-timeouts
+ * outgoing6-timeouts
+
+5. **Drops**
+ * over-capacity-drops
+
+6. **Cache Usage**
+ * cache-hits
+ * cache-misses
+ * packetcache-hits
+ * packetcache-misses
+
+7. **Cache Size**
+ * cache-entries
+ * packetcache-entries
+ * negcache-entries
 
 ### configuration
 
@@ -1844,6 +2075,55 @@ local:
   header   :
     X-API-Key: 'change_me'
 ```
+
+---
+
+# puppet
+
+Monitor status of Puppet Server and Puppet DB.
+
+Following charts are drawn:
+
+1. **JVM Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+2. **JVM Non-Heap**
+ * committed (allocated from OS)
+ * used (actual use)
+3. **CPU Usage**
+ * execution
+ * GC (taken by garbage collection)
+4. **File Descriptors**
+ * max
+ * used
+
+
+### configuration
+
+```yaml
+puppetdb:
+    url: 'https://fqdn.example.com:8081'
+    tls_cert_file: /path/to/client.crt
+    tls_key_file: /path/to/client.key
+    autodetection_retry: 1
+    retries: 3600
+
+puppetserver:
+    url: 'https://fqdn.example.com:8140'
+    autodetection_retry: 1
+    retries: 3600
+```
+
+When no configuration is given then `https://fqdn.example.com:8140` is
+tried without any retries.
+
+### notes
+
+* Exact Fully Qualified Domain Name of the node should be used.
+* Usually Puppet Server/DB startup time is VERY long. So, there should
+  be quite reasonable retry count.
+* Secure PuppetDB config may require client certificate. Not applies
+  to default PuppetDB configuration though.
 
 ---
 
@@ -2024,6 +2304,29 @@ For detailed configuration information please read [`sensors.conf`](https://gith
 There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
 We are tracking such cases in issue [#827](https://github.com/firehol/netdata/issues/827).
 Please join this discussion for help.
+
+---
+
+# spigotmc
+
+This module does some really basic monitoring for Spigot Minecraft servers.
+
+It provides two charts, one tracking server-side ticks-per-second in
+1, 5 and 15 minute averages, and one tracking the number of currently
+active users.
+
+This is not compatible with Spigot plugins which change the format of
+the data returned by the `tps` or `list` console commands.
+
+### configuration
+
+```yaml
+host: localhost
+port: 25575
+password: pass
+```
+
+By default, a connection to port 25575 on the local system is attempted with an empty password.
 
 ---
 
@@ -2227,6 +2530,83 @@ Without configuration, module attempts to connect to `http://localhost:8080/heal
 
 ---
 
+# Unbound
+
+Monitoring uses the remote control interface to fetch statistics.
+
+Provides the following charts:
+
+1. **Queries Processed**
+ * Ratelimited
+ * Cache Misses
+ * Cache Hits
+ * Expired
+ * Prefetched
+ * Recursive
+
+2. **Request List**
+ * Average Size
+ * Max Size
+ * Overwritten Requests
+ * Overruns
+ * Current Size
+ * User Requests
+
+3. **Recursion Timings**
+ * Average recursion processing time
+ * Median recursion processing time
+
+If extended stats are enabled, also provides:
+
+4. **Cache Sizes**
+ * Message Cache
+ * RRset Cache
+ * Infra Cache
+ * DNSSEC Key Cache
+ * DNSCrypt Shared Secret Cache
+ * DNSCrypt Nonce Cache
+
+### configuration
+
+Unbound must be manually configured to enable the remote-control protocol.
+Check the Unbound documentation for info on how to do this.  Additionally,
+if you want to take advantage of the autodetection this plugin offers,
+you will need to make sure your `unbound.conf` file only uses spaces for
+indentation (the default config shipped by most distributions uses tabs
+instead of spaces).
+
+Once you have the Unbound control protocol enabled, you need to make sure
+that either the certificate and key are readable by Netdata (if you're
+using the regular control interface), or that the socket is accessible
+to Netdata (if you're using a UNIX socket for the contorl interface).
+
+By default, for the local system, everything can be auto-detected
+assuming Unbound is configured correctly and has been told to listen
+on the loopback interface or a UNIX socket.  This is done by looking
+up info in the Unbound config file specified by the `ubconf` key.
+
+To enable extended stats for a given job, add `extended: yes` to the
+definition.
+
+You can also enable per-thread charts for a given job by adding
+`per_thread: yes` to the definition.  Note that the numbe rof threads
+is only checked on startup.
+
+A basic local configuration with extended statistics and per-thread
+charts looks like this:
+
+```yaml
+local:
+    ubconf: /etc/unbound/unbound.conf
+    extended: yes
+    per_thread: yes
+```
+
+While it's a bit more complicated to set up correctly, it is recommended
+that you use a UNIX socket as it provides far better performance.
+
+---
+
 # varnish cache
 
 Module uses the `varnishstat` command to provide varnish cache statistics.
@@ -2294,6 +2674,20 @@ It produces:
 ### configuration
 
 No configuration is needed.
+
+---
+
+# w1sensor
+
+Data from 1-Wire sensors.
+On Linux these are supported by the wire, w1_gpio, and w1_therm modules.
+Currently temperature sensors are supported and automatically detected.
+
+Charts are created dynamically based on the number of detected sensors.
+
+### configuration
+
+For detailed configuration information please read [`w1sensor.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
 
 ---
 

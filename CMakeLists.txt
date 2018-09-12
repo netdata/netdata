@@ -1,4 +1,5 @@
 
+# SPDX-License-Identifier: GPL-3.0+
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
@@ -49,6 +50,7 @@ set(NETDATA_LINUX_FILES
         src/proc_net_rpc_nfsd.c
         src/proc_net_snmp.c
         src/proc_net_snmp6.c
+        src/proc_net_sctp_snmp.c
         src/proc_net_sockstat.c
         src/proc_net_sockstat6.c
         src/proc_net_softnet_stat.c
@@ -241,7 +243,7 @@ include_directories(AFTER .)
 add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
 
 add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES})
-target_link_libraries (netdata m z uuid ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (netdata m z uuid mnl netfilter_acct ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(netdata_freebsd ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
 target_link_libraries (netdata_freebsd m z uuid ${CMAKE_THREAD_LIBS_INIT})

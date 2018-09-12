@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 typedef struct btrfs_disk {
@@ -171,12 +172,16 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
             snprintfz(filename, FILENAME_MAX, "%s/%s/size", path, de->d_name);
             d->size_filename = strdupz(filename);
 
-            // for disks
-            snprintfz(filename, FILENAME_MAX, "%s/%s/queue/hw_sector_size", path, de->d_name);
+            // for bcache
+            snprintfz(filename, FILENAME_MAX, "%s/%s/bcache/../queue/hw_sector_size", path, de->d_name);
             struct stat sb;
-            if(stat(filename, &sb) == -1)
-                // for partitions
-                snprintfz(filename, FILENAME_MAX, "%s/%s/../queue/hw_sector_size", path, de->d_name);
+            if(stat(filename, &sb) == -1) {
+                // for disks
+                snprintfz(filename, FILENAME_MAX, "%s/%s/queue/hw_sector_size", path, de->d_name);
+                if(stat(filename, &sb) == -1)
+                    // for partitions
+                    snprintfz(filename, FILENAME_MAX, "%s/%s/../queue/hw_sector_size", path, de->d_name);
+            }
 
             d->hw_sector_size_filename = strdupz(filename);
 
@@ -538,7 +543,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
 
                 snprintf(id, RRD_ID_LENGTH_MAX, "disk_%s", node->id);
                 snprintf(name, RRD_ID_LENGTH_MAX, "disk_%s", node->label);
-                snprintf(title, 200, "BTRFS Disk Allocation for %s", node->label);
+                snprintf(title, 200, "BTRFS Physical Disk Allocation for %s", node->label);
 
                 netdata_fix_chart_id(id);
                 netdata_fix_chart_name(name);
@@ -558,13 +563,13 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                node->rd_allocation_disks_unallocated = rrddim_add(node->st_allocation_disks, "unallocated", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_data_used = rrddim_add(node->st_allocation_disks, "data_used", "data used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_data_free = rrddim_add(node->st_allocation_disks, "data_free", "data free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_metadata_used = rrddim_add(node->st_allocation_disks, "meta_used", "meta used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_unallocated   = rrddim_add(node->st_allocation_disks, "unallocated", NULL,      1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_data_free     = rrddim_add(node->st_allocation_disks, "data_free", "data free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_data_used     = rrddim_add(node->st_allocation_disks, "data_used", "data used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 node->rd_allocation_disks_metadata_free = rrddim_add(node->st_allocation_disks, "meta_free", "meta free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_system_used = rrddim_add(node->st_allocation_disks, "sys_used", "sys used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_system_free = rrddim_add(node->st_allocation_disks, "sys_free", "sys free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_metadata_used = rrddim_add(node->st_allocation_disks, "meta_used", "meta used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_system_free   = rrddim_add(node->st_allocation_disks, "sys_free",  "sys free",  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_system_used   = rrddim_add(node->st_allocation_disks, "sys_used",  "sys used",  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(node->st_allocation_disks);
 

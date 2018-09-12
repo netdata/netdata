@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 import logging
 import traceback

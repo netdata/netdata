@@ -3,7 +3,7 @@
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
-# GPL v3+
+# SPDX-License-Identifier: GPL-3.0+
 #
 # This script is a helper to allow netdata collect tc data.
 # tc output parsing has been implemented in C, inside netdata

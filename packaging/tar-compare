@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0+
 
 # When provided with a git repo, which has been used to produce a
 # distribution tar.gz (with make dist) and the resultant tar-file,
@@ -44,7 +45,7 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: config\.status$/d' \
 	-e '/: config\.h.*$/d' \
 	-e '/: Makefile$/d' \
-	-e '/: hooks$/d' \
+	-e '/: .githooks$/d' \
 	-e '/: packaging$/d' \
 	-e '/: stamp-h1$/d' \
 	-e '/: README\.md$/d' \
@@ -57,7 +58,7 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: iprange$/d' \
 	-e '/: .*\.o$/d' \
 	-e '/: CMakeLists.txt/d' \
-	-e '/: profile$/d' \
+	-e '/: tests$/d' \
 	-e '/python.d: python-modules-installer\.sh\.in$/d' \
 	-e '/: .travis.yml/d' > $MYTMP/out
 

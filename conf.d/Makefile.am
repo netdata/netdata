@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
@@ -29,6 +30,7 @@ dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/beanstalk.conf \
     python.d/bind_rndc.conf \
+    python.d/boinc.conf \
     python.d/ceph.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \
@@ -48,9 +50,13 @@ dist_pythonconfig_DATA = \
     python.d/icecast.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
+    python.d/litespeed.conf \
+    python.d/logind.conf \
     python.d/mdstat.conf \
+    python.d/megacli.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
+    python.d/monit.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
     python.d/nginx_plus.conf \
@@ -62,17 +68,21 @@ dist_pythonconfig_DATA = \
     python.d/postfix.conf \
     python.d/postgres.conf \
     python.d/powerdns.conf \
+    python.d/puppet.conf \
     python.d/rabbitmq.conf \
     python.d/redis.conf \
     python.d/retroshare.conf \
     python.d/samba.conf \
     python.d/sensors.conf \
     python.d/springboot.conf \
+    python.d/spigotmc.conf \
     python.d/squid.conf \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \
     python.d/traefik.conf \
+    python.d/unbound.conf \
     python.d/varnish.conf \
+    python.d/w1sensor.conf \
     python.d/web_log.conf \
     $(NULL)
 
@@ -80,9 +90,12 @@ healthconfigdir=$(configdir)/health.d
 
 dist_healthconfig_DATA = \
     health.d/apache.conf \
+    health.d/apcupsd.conf \
     health.d/backend.conf \
+    health.d/bcache.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
+    health.d/boinc.conf \
     health.d/btrfs.conf \
     health.d/ceph.conf \
     health.d/cpu.conf \
@@ -100,6 +113,7 @@ dist_healthconfig_DATA = \
     health.d/isc_dhcpd.conf \
     health.d/lighttpd.conf \
     health.d/mdstat.conf \
+    health.d/megacli.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
     health.d/mongodb.conf \

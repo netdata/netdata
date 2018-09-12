@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 
 var netdataDashboard = window.netdataDashboard || {};
 
@@ -47,6 +48,12 @@ netdataDashboard.menu = {
         title: 'IPv6 Networking',
         icon: '<i class="fas fa-cloud"></i>',
         info: 'Metrics for the IPv6 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv6" target="_blank">Internet Protocol version 6 (IPv6)</a> is the most recent version of the Internet Protocol (IP), the communications protocol that provides an identification and location system for computers on networks and routes traffic across the Internet. IPv6 was developed by the Internet Engineering Task Force (IETF) to deal with the long-anticipated problem of IPv4 address exhaustion. IPv6 is intended to replace IPv4.'
+    },
+
+    'sctp': {
+        title: 'SCTP Networking',
+        icon: '<i class="fas fa-cloud"></i>',
+        info: '<a href="https://en.wikipedia.org/wiki/Stream_Control_Transmission_Protocol" target="_blank">Stream Control Transmission Protocol (SCTP)</a> is a computer network protocol which operates at the transport layer and serves a role similar to the popular protocols TCP and UDP. SCTP provides some of the features of both UDP and TCP: it is message-oriented like UDP and ensures reliable, in-sequence transport of messages with congestion control like TCP. It differs from those protocols by providing multi-homing and redundant paths to increase resilience and reliability.'
     },
 
     'ipvs': {
@@ -187,6 +194,12 @@ netdataDashboard.menu = {
         title: 'memcached',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>memcached</b>. Memcached is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.'
+    },
+
+    'monit': {
+        title: 'monit',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Statuses of checks in <b>monit</b>. Monit is a utility for managing and monitoring processes, programs, files, directories and filesystems on a Unix system. Monit conducts automatic maintenance and repair and can execute meaningful causal actions in error situations.'
     },
 
     'mysql': {
@@ -359,6 +372,36 @@ netdataDashboard.menu = {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
         info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
+    },
+
+    'spigotmc': {
+        title: 'Spigot MC',
+        icon: '<i class="fas fa-eye"></i>',
+        info: 'Provides basic performance statistics for the <b><a href="https://www.spigotmc.org/">Spigot Minecraft</a></b> server.'
+    },
+
+    'unbound': {
+        title: 'Unbound',
+        icon: '<i class="fas fa-tag"></i>',
+        info: undefined
+    },
+
+    'boinc': {
+        title: 'BOINC',
+        icon: '<i class="fas fa-microchip"></i>',
+        info: 'Provides task counts for <b><a href="http://boinc.berkeley.edu/">BOINC</a></b> distributed computing clients.'
+    },
+
+    'w1sensor': {
+        title: '1-Wire Sensors',
+        icon: '<i class="fas fa-thermometer-half"></i>',
+        info: 'Data derived from <a href="https://en.wikipedia.org/wiki/1-Wire">1-Wire</a> sensors.  Currently temperature sensors are automatically detected.'
+    },
+
+    'logind': {
+        title: 'Logind',
+        icon: '<i class="fas fa-user"></i>',
+        info: undefined
     }
 };
 
@@ -466,7 +509,7 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
         }
@@ -476,7 +519,7 @@ netdataDashboard.submenu = {
         title: 'softnet',
         info: function(os) {
             if(os === 'linux')
-                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
@@ -1905,7 +1948,8 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the spac elisted as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.'
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the spac elisted as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        colors: [ NETDATA.colors[12] ]
     },
 
     'btrfs.data': {
@@ -2064,6 +2108,74 @@ netdataDashboard.context = {
 
     'ntpd.peer_precision': {
         height: 0.2
+    },
+
+    'spigotmc.tps': {
+        info: 'The running 1, 5, and 15 minute average number of server ticks per second.  An idealized server will show 20.0 for all values, but in practice this almost never happens.  Typical servers should show approximately 19.98-20.0 here.  Lower values indicate progressively more server-side lag (and thus that you need better hardware for your server or a lower user limit).  For every 0.05 ticks below 20, redstone clocks will lag behind by approximately 0.25%.  Values below approximately 19.50 may interfere with complex free-running redstone circuits and will noticeably slow down growth.'
+    },
+
+    'spigotmc.users': {
+        info: 'THe number of currently connect users on the monitored Spigot server.'
+    },
+
+    'unbound.queries': {
+        info: 'Shows the number of queries being processed of each type. Note that <code>Recursive</code> queries are also accounted as cache misses.'
+    },
+
+    'unbound.reqlist': {
+        info: 'Shows various stats about Unbound\'s internal request list.'
+    },
+
+    'unbound.recursion': {
+        info: 'Average and median time to complete recursive name resolution.'
+    },
+
+    'unbound.cache': {
+        info: 'The number of items in each of the various caches.'
+    },
+
+    'unbound.threads.queries': {
+        height: 0.2
+    },
+
+    'unbound.threads.reqlist': {
+        height: 0.2
+    },
+
+    'unbound.threads.recursion': {
+        height: 0.2
+    },
+
+    'boinc.tasks': {
+        info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
+    },
+
+    'boinc.states': {
+        info: 'Counts of tasks in each task state.  The normal sequence of states is <code>New</code>, <code>Downloading</code>, <code>Ready to Run</code>, <code>Uploading</code>, <code>Uploaded</code>.  Tasks which are marked <code>Ready to Run</code> may be actively running, or may be waiting to be scheduled.  <code>Compute Errors</code> are tasks which failed for some reason during execution.  <code>Aborted</code> tasks were manually cancelled, and will not be processed.  <code>Failed Uploads</code> are otherwise finished tasks which failed to upload to the server, and usually indicate networking issues.'
+    },
+
+    'boinc.sched': {
+        info: 'Counts of active tasks in each scheduling state.  <code>Scheduled</code> tasks are the ones which will run if the system is permitted to process tasks.  <code>Preempted</code> tasks are on standby, and will run if a <code>Scheduled</code> task stops running for some reason.  <code>Uninitialized</code> tasks should never be present, and indicate tha the scheduler has not tried to schedule them yet.'
+    },
+
+    'boinc.process': {
+        info: 'Counts of active tasks in each process state.  <code>Executing</code> tasks are running right now.  <code>Suspended</code> tasks have an associated process, but are not currently running (either because the system isn\'t processing any tasks right now, or because they have been preempted by higher priority tasks).  <code>Quit</code> tasks are exiting gracefully.  <code>Aborted</code> tasks exceeded some resource limit, and are being shut down.  <code>Copy Pending</code> tasks are waiting on a background file transfer to finish.  <code>Uninitialized</code> tasks do not have an associated process yet.'
+    },
+
+    'w1sensor.temp': {
+        info: 'Temperature derived from 1-Wire temperature sensors.'
+    },
+
+    'logind.sessions': {
+        info: 'Shows the number of active sessions of each type tracked by logind.'
+    },
+
+    'logind.users': {
+        info: 'Shows the number of active users of each type tracked by logind.'
+    },
+
+    'logind.seats': {
+        info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
     }
 
     // ------------------------------------------------------------------------

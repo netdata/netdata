@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0+
 swagger: '2.0'
 info:
   title: NetData API

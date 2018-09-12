@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0+
 
 # set the host to connect to
 if [ ! -z "$1" ]

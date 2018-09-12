@@ -4,7 +4,7 @@
 # detect container and virtual machine interfaces
 #
 # (C) 2017 Costa Tsaousis
-# GPL v3+
+# SPDX-License-Identifier: GPL-3.0+
 #
 # This script is called as root (by cgroup-network), with either a pid, or a cgroup path.
 # It tries to find all the network interfaces that belong to the same cgroup.

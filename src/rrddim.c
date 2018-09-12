@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -47,6 +48,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     rd->hash_name = simple_hash(rd->name);
     rrddimvar_rename_all(rd);
     rd->exposed = 0;
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
     return 1;
 }
 
@@ -58,6 +60,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     rd->algorithm = algorithm;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
     return 1;
 }
 
@@ -69,6 +72,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     rd->multiplier = multiplier;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
     return 1;
 }
 
@@ -80,6 +84,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     rd->divisor = divisor;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
     return 1;
 }
 
@@ -87,6 +92,11 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // RRDDIM create a dimension
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
+    rrdset_wrlock(st);
+
+    rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
@@ -96,6 +106,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rrddim_set_multiplier(st, rd, multiplier);
         rrddim_set_divisor(st, rd, divisor);
 
+        rrdset_unlock(st);
         return rd;
     }
 
@@ -236,7 +247,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->rrdset = st;
 
     // append this dimension
-    rrdset_wrlock(st);
     if(!st->dimensions)
         st->dimensions = rd;
     else {
@@ -268,11 +278,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
     }
 
-    rrdset_unlock(st);
-
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
+    rrdset_unlock(st);
     return(rd);
 }
 

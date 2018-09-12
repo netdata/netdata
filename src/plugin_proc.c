@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 static struct proc_module {
@@ -37,6 +38,7 @@ static struct proc_module {
         { .name = "/proc/net/netstat", .dim = "netstat", .func = do_proc_net_netstat }, // this has to be before /proc/net/snmp, because there is a shared metric
         { .name = "/proc/net/snmp", .dim = "snmp", .func = do_proc_net_snmp },
         { .name = "/proc/net/snmp6", .dim = "snmp6", .func = do_proc_net_snmp6 },
+        { .name = "/proc/net/sctp/snmp", .dim = "sctp", .func = do_proc_net_sctp_snmp },
         { .name = "/proc/net/softnet_stat", .dim = "softnet", .func = do_proc_net_softnet_stat },
         { .name = "/proc/net/ip_vs/stats", .dim = "ipvs", .func = do_proc_net_ip_vs_stats },
 
@@ -107,7 +109,7 @@ void *proc_main(void *ptr) {
             debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-            pm->duration = heartbeat_dt_usec(&hb) - duration;
+            pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
 
             if(unlikely(netdata_exit)) break;

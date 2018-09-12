@@ -2,13 +2,17 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0+
 
 from threading import Thread
+from time import sleep
 
 try:
-    from time import sleep, monotonic as time
+    from time import monotonic as time
 except ImportError:
-    from time import sleep, time
+    from bases.monotonic import AVAILABLE, time
+    if not AVAILABLE:
+        from time import time
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print

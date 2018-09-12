@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # Description: web log netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 import bisect
 import re
 import os
-import sys
 
 from collections import namedtuple, defaultdict
 from copy import deepcopy
@@ -15,6 +15,11 @@ try:
 except ImportError:
     from itertools import ifilter as filter
     from itertools import ifilterfalse as filterfalse
+
+try:
+    from sys import maxint
+except ImportError:
+    from sys import maxsize as maxint
 
 from bases.collection import read_last_line
 from bases.FrameworkServices.LogService import LogService
@@ -257,6 +262,7 @@ SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods',
 
 REQUEST_REGEX = re.compile(r'(?P<method>[A-Z]+) (?P<url>[^ ]+) [A-Z]+/(?P<http_version>\d(?:.\d)?)')
 
+MIME_TYPES = ['application', 'audio', 'example', 'font', 'image', 'message', 'model', 'multipart', 'text', 'video']
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -367,7 +373,7 @@ class Web:
         histogram = self.configuration.get('histogram', None)
         if isinstance(histogram, list):
             self.storage['bucket_index'] = histogram[:]
-            self.storage['bucket_index'].append(sys.maxint)
+            self.storage['bucket_index'].append(maxint)
             self.storage['buckets'] = [0] * (len(histogram) + 1)
             self.storage['upstream_buckets'] = [0] * (len(histogram) + 1)
             hist_lines = self.definitions['response_time_hist']['lines']
@@ -596,7 +602,7 @@ class Web:
         We are here only if "custom_log_format" is in logs. We need to make sure:
         1. "custom_log_format" is a dict
         2. "pattern" in "custom_log_format" and pattern is <str> instance
-        3. if "time_multiplier" is in "custom_log_format" it must be <int> instance
+        3. if "time_multiplier" is in "custom_log_format" it must be <int> or <float> instance
 
         If all parameters is ok we need to make sure:
         1. Pattern search is success
@@ -623,8 +629,8 @@ class Web:
 
         resp_time_func = self.configuration.get('custom_log_format', dict()).get('time_multiplier') or 0
 
-        if not isinstance(resp_time_func, int):
-            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer')
+        if not isinstance(resp_time_func, (int, float)):
+            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer or a float')
 
         try:
             regex = re.compile(pattern)
@@ -811,8 +817,8 @@ class Squid:
                                            r' (?P<method>[A-Z_]+)'
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
-                                           r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
-                                           r' (?P<mime_type>[^\n]+)')
+                                           r' (?P<hier_code>[A-Z_]+)/[\da-z.:-]+'
+                                           r' (?P<mime_type>[A-Za-z-]*)')
 
         match = self.storage['regex'].search(last_line)
         if not match:
@@ -833,7 +839,7 @@ class Squid:
                 'func_dim': None},
             'mime_type': {
                 'chart': 'squid_mime_type',
-                'func_dim_id': lambda v: v.split('/')[0],
+                'func_dim_id': lambda v: str.lower(v) if str.lower(v) in MIME_TYPES else 'unknown',
                 'func_dim': None}}
         if not self.configuration.get('all_time', True):
             self.order.remove('squid_clients_all')

@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
@@ -9,6 +10,7 @@ CLEANFILES = \
 	netdata-init-d \
 	netdata-lsb \
 	netdata-freebsd \
+	netdata.plist \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -22,6 +24,7 @@ nodist_noinst_DATA = \
 	netdata-init-d \
 	netdata-lsb \
 	netdata-freebsd \
+	netdata.plist \
 	$(NULL)
 
 dist_noinst_DATA = \
@@ -31,5 +34,6 @@ dist_noinst_DATA = \
 	netdata-init-d.in \
 	netdata-lsb.in \
 	netdata-freebsd.in \
+	netdata.plist.in \
 	netdata.conf \
 	$(NULL)

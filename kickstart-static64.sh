@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0+
 
 umask 022
+
+# make sure UID is set
+[ -z "${UID}" ] && export UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh

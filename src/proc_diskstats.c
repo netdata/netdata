@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
 #define RRD_TYPE_DISK "disk"
@@ -48,6 +49,12 @@ static struct disk {
     char *bcache_filename_stats_total_cache_bypass_hits;
     char *bcache_filename_stats_total_cache_bypass_misses;
     char *bcache_filename_stats_total_cache_readaheads;
+    char *bcache_filename_cache_read_races;
+    char *bcache_filename_cache_io_errors;
+    char *bcache_filename_priority_stats;
+
+    usec_t bcache_priority_stats_update_every_usec;
+    usec_t bcache_priority_stats_elapsed_usec;
 
     RRDSET *st_io;
     RRDDIM *rd_io_reads;
@@ -111,6 +118,17 @@ static struct disk {
     RRDDIM *rd_bcache_readaheads;
     RRDDIM *rd_bcache_rate_writeback;
 
+    RRDSET *st_bcache_cache_allocations;
+    RRDDIM *rd_bcache_cache_allocations_unused;
+    RRDDIM *rd_bcache_cache_allocations_clean;
+    RRDDIM *rd_bcache_cache_allocations_dirty;
+    RRDDIM *rd_bcache_cache_allocations_metadata;
+    RRDDIM *rd_bcache_cache_allocations_unknown;
+
+    RRDSET *st_bcache_cache_read_races;
+    RRDDIM *rd_bcache_cache_read_races;
+    RRDDIM *rd_bcache_cache_io_errors;
+
     struct disk *next;
 } *disk_root = NULL;
 
@@ -126,6 +144,7 @@ static char *path_to_device_mapper = NULL;
 static char *path_to_device_label = NULL;
 static char *path_to_device_id = NULL;
 static int name_disks_by_id = CONFIG_BOOLEAN_NO;
+static int global_bcache_priority_stats_update_every = 0; // disabled by default
 
 static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         global_enable_performance_for_physical_disks = CONFIG_BOOLEAN_AUTO,
@@ -168,6 +187,98 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
     }
 
     return 0;
+}
+
+void bcache_read_priority_stats(struct disk *d, const char *family, int update_every, usec_t dt) {
+    static procfile *ff = NULL;
+    static char *separators = " \t:%[]";
+
+    static ARL_BASE *arl_base = NULL;
+
+    static unsigned long long unused;
+    static unsigned long long clean;
+    static unsigned long long dirty;
+    static unsigned long long metadata;
+    static unsigned long long unknown;
+
+    // check if it is time to update this metric
+    d->bcache_priority_stats_elapsed_usec += dt;
+    if(likely(d->bcache_priority_stats_elapsed_usec < d->bcache_priority_stats_update_every_usec)) return;
+    d->bcache_priority_stats_elapsed_usec = 0;
+
+    // initialize ARL
+    if(unlikely(!arl_base)) {
+        arl_base = arl_create("bcache/priority_stats", NULL, 60);
+        arl_expect(arl_base, "Unused", &unused);
+        arl_expect(arl_base, "Clean", &clean);
+        arl_expect(arl_base, "Dirty", &dirty);
+        arl_expect(arl_base, "Metadata", &metadata);
+    }
+
+    ff = procfile_reopen(ff, d->bcache_filename_priority_stats, separators, PROCFILE_FLAG_DEFAULT);
+    if(likely(ff)) ff = procfile_readall(ff);
+    if(unlikely(!ff)) {
+        separators = " \t:%[]";
+        return;
+    }
+
+    // do not reset the separators on every iteration
+    separators = NULL;
+
+    arl_begin(arl_base);
+    unused = clean = dirty = metadata = unknown = 0;
+
+    size_t lines = procfile_lines(ff), l;
+
+    for(l = 0; l < lines ;l++) {
+        size_t words = procfile_linewords(ff, l);
+        if(unlikely(words < 2)) {
+            if(unlikely(words)) error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
+            continue;
+        }
+
+        if(unlikely(arl_check(arl_base,
+                procfile_lineword(ff, l, 0),
+                procfile_lineword(ff, l, 1)))) break;
+    }
+
+    unknown = 100 - unused - clean - dirty - metadata;
+
+    // create / update the cache allocations chart
+    {
+        if(unlikely(!d->st_bcache_cache_allocations)) {
+            d->st_bcache_cache_allocations = rrdset_create_localhost(
+                    "disk_bcache_cache_alloc"
+                    , d->device
+                    , d->disk
+                    , family
+                    , "disk.bcache_cache_alloc"
+                    , "BCache Cache Allocations"
+                    , "percentage"
+                    , "proc"
+                    , "diskstats"
+                    , 2120
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            d->rd_bcache_cache_allocations_unused    = rrddim_add(d->st_bcache_cache_allocations, "unused",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_dirty     = rrddim_add(d->st_bcache_cache_allocations, "dirty",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_clean     = rrddim_add(d->st_bcache_cache_allocations, "clean",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_metadata  = rrddim_add(d->st_bcache_cache_allocations, "metadata",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_bcache_cache_allocations_unknown   = rrddim_add(d->st_bcache_cache_allocations, "undefined",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            d->bcache_priority_stats_update_every_usec = update_every * USEC_PER_SEC;
+        }
+        else rrdset_next(d->st_bcache_cache_allocations);
+
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unused, unused);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_dirty, dirty);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_clean, clean);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_metadata, metadata);
+        rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unknown, unknown);
+        rrdset_done(d->st_bcache_cache_allocations);
+    }
 }
 
 static inline int is_major_enabled(int major) {
@@ -532,6 +643,24 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         else
             error("bcache file '%s' cannot be read.", buffer2);
 
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/priority_stats", buffer); // only one cache is supported by bcache
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_priority_stats = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/internal/cache_read_races", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_cache_read_races = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
+        snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/io_errors", buffer);
+        if(access(buffer2, R_OK) == 0)
+            d->bcache_filename_cache_io_errors = strdupz(buffer2);
+        else
+            error("bcache file '%s' cannot be read.", buffer2);
+
         snprintfz(buffer2, FILENAME_MAX, "%s/dirty_data", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_dirty_data = strdupz(buffer2);
@@ -628,6 +757,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
         global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "bcache for all disks", global_do_bcache);
+        global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
         global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
         
@@ -1112,6 +1242,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     stats_total_cache_hit_ratio = 0,
                     cache_available_percent = 0,
                     cache_readaheads = 0,
+                    cache_read_races = 0,
+                    cache_io_errors = 0,
                     cache_congested = 0,
                     dirty_data = 0,
                     writeback_rate = 0;
@@ -1160,11 +1292,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(d->bcache_filename_stats_total_cache_readaheads)
                 cache_readaheads = bcache_read_number_with_units(d->bcache_filename_stats_total_cache_readaheads);
 
+            if(d->bcache_filename_cache_read_races)
+                read_single_number_file(d->bcache_filename_cache_read_races, &cache_read_races);
+
+            if(d->bcache_filename_cache_io_errors)
+                read_single_number_file(d->bcache_filename_cache_io_errors, &cache_io_errors);
+
+            if(d->bcache_filename_priority_stats && global_bcache_priority_stats_update_every >= 1)
+                bcache_read_priority_stats(d, family, global_bcache_priority_stats_update_every, dt);
 
             // update the charts
 
             {
-
                 if(unlikely(!d->st_bcache_hit_ratio)) {
                     d->st_bcache_hit_ratio = rrdset_create_localhost(
                             "disk_bcache_hit_ratio"
@@ -1271,6 +1410,34 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrddim_set_by_pointer(d->st_bcache_usage, d->rd_bcache_available_percent, cache_available_percent);
                 rrdset_done(d->st_bcache_usage);
+            }
+
+            {
+
+                if(unlikely(!d->st_bcache_cache_read_races)) {
+                    d->st_bcache_cache_read_races = rrdset_create_localhost(
+                            "disk_bcache_cache_read_races"
+                            , d->device
+                            , d->disk
+                            , family
+                            , "disk.bcache_cache_read_races"
+                            , "BCache Cache Read Races"
+                            , "operations/s"
+                            , "proc"
+                            , "diskstats"
+                            , 2126
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    d->rd_bcache_cache_read_races = rrddim_add(d->st_bcache_cache_read_races, "races",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    d->rd_bcache_cache_io_errors  = rrddim_add(d->st_bcache_cache_read_races, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+                else rrdset_next(d->st_bcache_cache_read_races);
+
+                rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_read_races, cache_read_races);
+                rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_io_errors, cache_io_errors);
+                rrdset_done(d->st_bcache_cache_read_races);
             }
 
             if(d->do_bcache == CONFIG_BOOLEAN_YES || (d->do_bcache == CONFIG_BOOLEAN_AUTO && (stats_total_cache_hits != 0 || stats_total_cache_misses != 0 || stats_total_cache_miss_collisions != 0))) {
@@ -1421,6 +1588,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             freez(t->bcache_filename_stats_total_cache_bypass_hits);
             freez(t->bcache_filename_stats_total_cache_bypass_misses);
             freez(t->bcache_filename_stats_total_cache_readaheads);
+            freez(t->bcache_filename_cache_read_races);
+            freez(t->bcache_filename_cache_io_errors);
+            freez(t->bcache_filename_priority_stats);
 
             freez(t->disk);
             freez(t->device);

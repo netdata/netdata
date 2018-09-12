@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0+
 //
 // Created by costa on 09/07/17.
 //

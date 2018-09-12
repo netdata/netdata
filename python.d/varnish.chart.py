@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description:  varnish netdata python.d module
 # Author: l2isbad
+# SPDX-License-Identifier: GPL-3.0+
 
 import re
 

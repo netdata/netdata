@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """
 Low-level helpers for the SecureTransport bindings.
 

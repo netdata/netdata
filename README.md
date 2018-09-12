@@ -368,7 +368,5 @@ Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
 
 netdata is [GPLv3+](LICENSE).
 
-It re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/LICENSE-REDISTRIBUTED.md).
+Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/REDISTRIBUTED.md).
 
-
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata?ref=badge_large)

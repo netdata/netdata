@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0+
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
     python-modules-installer.sh \
@@ -16,6 +17,7 @@ dist_python_DATA = \
     apache.chart.py \
     beanstalk.chart.py \
     bind_rndc.chart.py \
+    boinc.chart.py \
     ceph.chart.py \
     chrony.chart.py \
     couchdb.chart.py \
@@ -36,9 +38,13 @@ dist_python_DATA = \
     icecast.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
+    litespeed.chart.py \
+    logind.chart.py \
     mdstat.chart.py \
+    megacli.chart.py \
     memcached.chart.py \
     mongodb.chart.py \
+    monit.chart.py \
     mysql.chart.py \
     nginx.chart.py \
     nginx_plus.chart.py \
@@ -50,17 +56,21 @@ dist_python_DATA = \
     postfix.chart.py \
     postgres.chart.py \
     powerdns.chart.py \
+    puppet.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
     retroshare.chart.py \
     samba.chart.py \
     sensors.chart.py \
+    spigotmc.chart.py \
     springboot.chart.py \
     squid.chart.py \
     smartd_log.chart.py \
     tomcat.chart.py \
     traefik.chart.py \
+    unbound.chart.py \
     varnish.chart.py \
+    w1sensor.chart.py \
     web_log.chart.py \
     $(NULL)
 
@@ -77,6 +87,7 @@ dist_bases_DATA = \
     python_modules/bases/collection.py \
     python_modules/bases/loaders.py \
     python_modules/bases/loggers.py \
+    python_modules/bases/monotonic.py \
     $(NULL)
 
 bases_framework_servicesdir=$(basesdir)/FrameworkServices
@@ -95,6 +106,8 @@ dist_third_party_DATA = \
     python_modules/third_party/__init__.py \
     python_modules/third_party/ordereddict.py \
     python_modules/third_party/lm_sensors.py \
+    python_modules/third_party/mcrcon.py \
+    python_modules/third_party/boinc_client.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
