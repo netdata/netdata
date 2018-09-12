@@ -112,6 +112,7 @@ dist_healthconfig_DATA = \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
     health.d/lighttpd.conf \
+    health.d/load.conf \
     health.d/mdstat.conf \
     health.d/megacli.conf \
     health.d/memcached.conf \
