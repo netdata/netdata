@@ -699,14 +699,8 @@ NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
-NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
-NETDATA_WEB_GROUP="${NETDATA_GROUP}"
-if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]
-then
-    NETDATA_WEB_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
-    [ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
-fi
-NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_WEB_GROUP}" )"
+NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${ROOT_USER}" )"
+NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_GROUP}" )"
 
 # port
 defport=19999
