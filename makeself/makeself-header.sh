@@ -290,7 +290,7 @@ do
 	echo CRCsum=\"\$CRCsum\"
 	echo MD5sum=\"\$MD5\"
 	echo OLDUSIZE=$USIZE
-	echo OLDSKIP=`$(( SKIP + 1))
+	echo OLDSKIP=$(( SKIP + 1))
 	exit 0
 	;;
     --lsm)
