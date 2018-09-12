@@ -26,7 +26,7 @@ mync() {
 listen_save_replay_forever() {
 	local file="${1}" port="${2}" real_backend_host="${3}" real_backend_port="${4}" ret delay=1 started ended
 
-	while [ 1 ]
+	while true
 	do
 		log "Starting nc to listen on port ${port} and save metrics to ${file}"
 		
@@ -36,7 +36,7 @@ listen_save_replay_forever() {
 		
 		if [ -s "${file}" ]
 			then
-			if [ ! -z "${real_backend_host}" -a ! -z "${real_backend_port}" ]
+			if [ ! -z "${real_backend_host}" ] && [ ! -z "${real_backend_port}" ]
 				then
 				log "Attempting to send the metrics to the real backend at ${real_backend_host}:${real_backend_port}"
 				
@@ -78,6 +78,7 @@ if [ "${MODE}" = "start" ]
 	# only one can use the same file/port at a time
 	{
 		flock -n 9
+		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]
 			then
 			log "Cannot get exclusive lock on file ${FILE}.lock - Am I running multiple times?"
@@ -87,7 +88,7 @@ if [ "${MODE}" = "start" ]
 		# save our PID to the lock file
 		echo "$$" >"${FILE}.lock"
 
-		listen_save_replay_forever "${FILE}" ${MY_PORT} ${BACKEND_HOST} ${BACKEND_PORT}
+		listen_save_replay_forever "${FILE}" "${MY_PORT}" "${BACKEND_HOST}" "${BACKEND_PORT}"
 		ret=$?
 
 		log "listener exited."
@@ -104,11 +105,12 @@ elif [ "${MODE}" = "stop" ]
 
 	{
 		flock -n 9
+		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]
 			then
-			pid=$(<${FILE}.lock)
+			pid=$(<"${FILE}".lock)
 			log "Killing process ${pid}..."
-			kill -TERM -${pid}
+			kill -TERM "-${pid}"
 			exit 0
 		fi
 
