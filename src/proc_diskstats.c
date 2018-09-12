@@ -310,6 +310,8 @@ static inline int is_major_enabled(int major) {
 }
 
 static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
+    info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
+
     int found = 0;
 
     DIR *dir = opendir(path);
@@ -325,7 +327,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 continue;
 
             if(depth <= 0) {
-                error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s'. Ignoring path.", disk, major, minor, path);
+                error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s/%s'. Ignoring path.", disk, major, minor, path, de->d_name);
                 break;
             }
             else {
@@ -376,16 +378,16 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
             }
 
             if((sb.st_mode & S_IFMT) != S_IFBLK) {
-                // info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
+                info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
                 continue;
             }
 
             if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor) {
-                // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
+                info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
                 continue;
             }
 
-            // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
+            info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
             snprintfz(result, result_size - 1, "%s%s", (prefix)?prefix:"", de->d_name);
             found = 1;
