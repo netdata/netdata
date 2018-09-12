@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
 
-. $(dirname "${0}")/functions.sh
+# shellcheck disable=SC1090
+. "$(dirname "${0}")/functions.sh"
 
 export LC_ALL=C
 umask 002
@@ -29,6 +30,7 @@ done
 progress "Checking new configuration files"
 
 declare -A configs_signatures=()
+# shellcheck disable=SC1091
 . system/configs.signatures
 
 if [ ! -d etc/netdata ]
@@ -37,6 +39,7 @@ if [ ! -d etc/netdata ]
 fi
 
 md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+# shellcheck disable=SC2044 #FIXME do not use 'find' to provide elements to 'for' loop
 for x in $(find etc.new -type f)
 do
     # find it relative filename
@@ -62,6 +65,7 @@ do
     if [ ! -z "${md5sum}" ]
         then
         # find the checksum of the existing file
+        # shellcheck disable=SC2002
         md5="$(cat "${t}" | ${md5sum} | cut -d ' ' -f 1)"
         #echo >&2 "md5: ${md5}"
 
@@ -87,6 +91,7 @@ progress "Add user netdata to required user groups"
 NETDATA_USER="root"
 NETDATA_GROUP="root"
 add_netdata_user_and_group "/opt/netdata"
+# shellcheck disable=SC2181
 if [ $? -eq 0 ]
     then
     NETDATA_USER="netdata"
@@ -151,7 +156,7 @@ dir_should_be_link() {
     fi
 
     run ln -s "${t}" "${d}"
-    cd "${old}"
+    cd "${old}" || return
 }
 
 dir_should_be_link .   bin    sbin
@@ -204,6 +209,7 @@ then
     progress "starting netdata"
 
     restart_netdata "/opt/netdata/bin/netdata"
+    # shellcheck disable=SC2181
     if [ $? -eq 0 ]
         then
         download_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"

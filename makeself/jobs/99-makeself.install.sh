@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
 
-. $(dirname "${0}")/../functions.sh "${@}" || exit 1
+# shellcheck disable=SC1090
+. "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
 run cd "${NETDATA_SOURCE_PATH}" || exit 1
 
@@ -75,7 +76,7 @@ run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 # -----------------------------------------------------------------------------
 # move etc to protect the destination when unpacked
 
-if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
+if [ ! -z "${NETDATA_INSTALL_PATH}" ] && [ -d "${NETDATA_INSTALL_PATH}/etc" ]
     then
     if [ -d "${NETDATA_INSTALL_PATH}/etc.new" ]
         then
@@ -121,7 +122,7 @@ run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     "${NETDATA_INSTALL_PATH}.gz.run" \
     "netdata, the real-time performance and health monitoring system" \
     ./system/post-installer.sh \
-    ${NULL}
+    "${NULL}"
 
 run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 

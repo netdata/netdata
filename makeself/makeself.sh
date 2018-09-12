@@ -74,6 +74,7 @@
 # This software is released under the terms of the GNU GPL version 2 and above
 # Please read the license at http://www.gnu.org/copyleft/gpl.html
 #
+# shellcheck disable=SC1090,SC1117,SC2002,SC2003,SC2006,SC2034,SC2039,SC2046,SC2066,SC2069,SC2086
 
 MS_VERSION=2.3.1
 MS_COMMAND="$0"

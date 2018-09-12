@@ -1,4 +1,6 @@
+#!/bin/bash
 # SPDX-License-Identifier: GPL-3.0+
+# shellcheck disable=SC2154 disable=SC1117
 cat << EOF  > "$archname"
 #!/bin/sh
 # This script was generated using Makeself $MS_VERSION
@@ -288,7 +290,7 @@ do
 	echo CRCsum=\"\$CRCsum\"
 	echo MD5sum=\"\$MD5\"
 	echo OLDUSIZE=$USIZE
-	echo OLDSKIP=`expr $SKIP + 1`
+	echo OLDSKIP=$(( SKIP + 1))
 	exit 0
 	;;
     --lsm)
