@@ -52,7 +52,7 @@ jobs:
       env: REPOSITORY="firehol/netdata"
     - name: "GitHub"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: ./travis/create_artifacts.sh
+      script: ./.travis/create_artifacts.sh
       deploy:
         - provider: releases
           draft: true
