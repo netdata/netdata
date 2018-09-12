@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
+# shellcheck disable=SC2155
 
 # -----------------------------------------------------------------------------
 
@@ -38,9 +39,7 @@ fetch() {
     
     if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]
         then
-        cd "${NETDATA_MAKESELF_PATH}/tmp"
-        run tar -zxpf "${tar}"
-        cd -
+        ( cd "${NETDATA_MAKESELF_PATH}/tmp"; run tar -zxpf "${tar}" )
     fi
 
     run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
@@ -49,6 +48,7 @@ fetch() {
 # -----------------------------------------------------------------------------
 
 # load the functions of the netdata-installer.sh
+# shellcheck disable=SC1090
 . "${NETDATA_SOURCE_PATH}/installer/functions.sh"
 
 # -----------------------------------------------------------------------------
