@@ -267,6 +267,7 @@ declare -A configs_signatures=(
   ['598f9814966a9e2fe48e8218151d3fa6']='stream.conf'
   ['59dded33e3adfe622f36c557a4f4bed7']='health.d/net.conf'
   ['59dea5e3872e5fe4e6c535b216c516b4']='health.d/disks.conf'
+  ['5b5588b00d6829908c2c5ea3220cfa1c']='health.d/load.conf'
   ['5b917d894bb6a755d59264e9d48e9d56']='fping.conf'
   ['5bbef0708f5eff4d4a53aaf35fc48a62']='health.d/disks.conf'
   ['5bf51bb24fb41db9b1e448bd060d3f8c']='apps_groups.conf'
