@@ -1,5 +1,6 @@
 # no shebang necessary - this is a library to be sourced
 # SPDX-License-Identifier: GPL-3.0+
+# shellcheck disable=SC1091,SC1117,SC2002,SC2004,SC2034,SC2046,SC2059,SC2086,SC2129,SC2148,SC2154,SC2155,SC2162,SC2166,SC2181,SC2193
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
