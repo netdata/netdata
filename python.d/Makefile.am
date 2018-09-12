@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0+
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
-    python-modules-installer.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -9,7 +8,6 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_python_SCRIPTS = \
-    python-modules-installer.sh \
     $(NULL)
 
 dist_python_DATA = \

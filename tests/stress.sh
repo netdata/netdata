@@ -3,16 +3,17 @@
 
 # set the host to connect to
 if [ ! -z "$1" ]
-	then
+then
 	host="$1"
 else
 	host="http://127.0.0.1:19999"
 fi
 echo "using netdata server at: $host"
 
+# shellcheck disable=SC2207 disable=SC1117
 charts=($(curl "$host/netdata.conf" 2>/dev/null | grep "^\[" | cut -d '[' -f 2 | cut -d ']' -f 1 | grep -v ^global$ | grep -v "^plugin" | sort -u))
 if [ "${#charts[@]}" -eq 0 ]
-	then
+then
 	echo "Cannot download charts from server: $host"
 	exit 1
 fi
@@ -27,7 +28,7 @@ entries="$(curl "$host/netdata.conf" 2>/dev/null | grep "history = " | head -n 1
 [ $entries -gt 3600 ] && entries=3600
 
 if [ $entries -ne 3600 ]
-	then
+then
 	echo >&2 "You are running a test for a history of $entries entries."
 fi
 
@@ -42,19 +43,20 @@ duration=$((now - first))
 file="$(mktemp /tmp/netdata-stress-XXXXXXXX)"
 cleanup() {
 	echo "cleanup"
-	[ -f $file ] && rm $file
+	[ -f "$file" ] && rm "$file"
 }
 trap cleanup EXIT
 
-while [ 1 = 1 ]
+while true
 do
-	echo "curl --compressed --keepalive-time 120 --header \"Connection: keep-alive\" \\" >$file
+	echo "curl --compressed --keepalive-time 120 --header \"Connection: keep-alive\" \\" >"$file"
+	# shellcheck disable=SC2034
 	for x in {1..100}
 	do
 		dt=$((RANDOM * duration / 32767))
 		st=$((RANDOM * duration / 32767))
 		et=$(( st + dt ))
-		[ $et -gt $now ] && st=$(( now - dt ))
+		[ $et -gt "$now" ] && st=$(( now - dt ))
 
 		points=$((RANDOM * 2000 / 32767 + 2))
 		st=$((first + st))
@@ -70,6 +72,6 @@ do
 		format="${formats[$format]}"
 
 		echo "--url \"$host/api/v1/data?chart=$chart&mode=$mode&format=$format&options=$options&after=$st&before=$et&points=$points\" \\"
-	done >>$file
-	bash $file >/dev/null
+	done >>"$file"
+	bash "$file" >/dev/null
 done
