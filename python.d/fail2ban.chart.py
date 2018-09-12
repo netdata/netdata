@@ -6,7 +6,7 @@
 import re
 import os
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from glob import glob
 
 from bases.FrameworkServices.LogService import LogService
@@ -51,14 +51,6 @@ RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
 # 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 195.201.88.33
 # 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Ban 217.59.246.27
 RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban) (?P<ip>[a-f0-9.:]+)')
-
-PARSED = namedtuple(
-    "PARSED",
-    [
-        "jail",
-        "action",
-        "ip",
-    ])
 
 DEFAULT_JAILS = [
     "ssh",
@@ -126,17 +118,17 @@ class Service(LogService):
             if match["jail"] not in self.monitoring_jails:
                 continue
 
-            parsed = PARSED(match['jail'], match['action'], match['ip'])
+            jail, action, ip = match['jail'], match['action'], match['ip']
 
-            if parsed.action == "Ban":
-                self.data[parsed.jail] += 1
-                if parsed.ip not in self.banned_ips[parsed.jail]:
-                    self.banned_ips[parsed.jail].add(parsed.ip)
-                    self.data["{0}_in_jail".format(parsed.jail)] += 1
+            if action == "Ban":
+                self.data[jail] += 1
+                if ip not in self.banned_ips[jail]:
+                    self.banned_ips[jail].add(ip)
+                    self.data["{0}_in_jail".format(jail)] += 1
             else:
-                if parsed.ip in self.banned_ips[parsed.jail]:
-                    self.banned_ips[parsed.jail].remove(parsed.ip)
-                    self.data["{0}_in_jail".format(parsed.jail)] -= 1
+                if ip in self.banned_ips[jail]:
+                    self.banned_ips[jail].remove(ip)
+                    self.data["{0}_in_jail".format(jail)] -= 1
 
             return self.data
 
