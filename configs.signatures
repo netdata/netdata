@@ -672,6 +672,7 @@ declare -A configs_signatures=(
   ['e449e5582279742496550df14b6fca95']='health.d/entropy.conf'
   ['e4ed13f996434ac17b40a2228c96283b']='python.d/tomcat.conf'
   ['e5f32f54d6d6728f21f9ac26f37d6573']='python.d/example.conf'
+  ['e707ad89a146004ae281d66a4e01e5c1']='health.d/load.conf'
   ['e70a7ee4999f30c6ceb75f31088a3a34']='python.d/powerdns.conf'
   ['e734c5951a8764d4d9de046dd7cf7407']='health.d/softnet.conf'
   ['e7ae3f2b00b9e5178acfe4f5e46228b7']='health.d/tcp_resets.conf'
