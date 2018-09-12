@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
 #
 # Run me with:
@@ -23,6 +23,8 @@
 # 2. download netdata source code in /usr/src/netdata.git
 #
 # 3. install netdata
+#
+# shellcheck disable=SC2034 disable=SC2059
 
 umask 022
 
@@ -113,15 +115,16 @@ progress() {
 }
 
 run_ok() {
-    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \\n\\n"
 }
 
 run_failed() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \\n\\n"
 }
 
 ESCAPED_PRINT_METHOD=
 printf "%q " test >/dev/null 2>&1
+# shellcheck disable=2181
 [ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
     if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]
@@ -138,7 +141,7 @@ run() {
     local user="${USER--}" dir="${PWD}" info info_console
 
     if [ "${UID}" = "0" ]
-        then
+    then
         info="[root ${dir}]# "
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
     else
@@ -146,24 +149,25 @@ run() {
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
     fi
 
+    # shellcheck disable=SC2129
     printf >> "${run_logfile}" "${info}"
     escaped_print >> "${run_logfile}" "${@}"
     printf >> "${run_logfile}" " ... "
 
     printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
     escaped_print >&2 "${@}"
-    printf >&2 "${TPUT_RESET}\n"
+    printf >&2 "${TPUT_RESET}\\n"
 
     "${@}"
 
     local ret=$?
     if [ ${ret} -ne 0 ]
-        then
-        run_failed
-        printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
+    then
+        run_failed "${@}"
+        printf >> "${run_logfile}" "FAILED with exit code %s\\n" "${ret}"
     else
-        run_ok
-        printf >> "${run_logfile}" "OK\n"
+        run_ok "${@}"
+        printf >> "${run_logfile}" "OK\\n"
     fi
 
     return ${ret}
@@ -174,7 +178,7 @@ run() {
 # collect system information
 
 fatal() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \\n\\n"
     exit 1
 }
 
@@ -187,8 +191,9 @@ bash="$(which_cmd bash)"
 if [ -z "${BASH_VERSION}" ]
 then
     # we don't run under bash
-    if [ ! -z "${bash}" -a -x "${bash}" ]
+    if [ ! -z "${bash}" ] && [ -x "${bash}" ]
     then
+        # shellcheck disable=SC2016
         BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
     fi
 else
@@ -236,7 +241,7 @@ do
     then
         PACKAGES_INSTALLER_OPTIONS="netdata-all"
         shift 1
-    elif [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
+    elif [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ]
     then
         INTERACTIVE=0
         shift 1
@@ -264,7 +269,7 @@ fi
 # echo "PACKAGES_INSTALLER_OPTIONS=${PACKAGES_INSTALLER_OPTIONS}"
 # echo "NETDATA_INSTALLER_OPTIONS=${NETDATA_INSTALLER_OPTIONS} ${*}"
 
-if [ "${OS}" = "GNU/Linux" -o "${SYSTEM}" = "Linux" ]
+if [ "${OS}" = "GNU/Linux" ] || [ "${SYSTEM}" = "Linux" ]
 then
     if [ "${HAS_BASH4}" = "1" ]
     then
@@ -274,7 +279,7 @@ then
         progress "Downloading script to detect required packages..."
         if [ ! -z "${curl}" ]
         then
-            run ${curl} "${url}" >"${tmp}" || fatal "Cannot download ${url}"
+            run "${curl}" "${url}" >"${tmp}" || fatal "Cannot download ${url}"
         elif [ ! -z "${wget}" ]
         then
             run "${wget}" -O - "${url}" >"${tmp}" || fatal "Cannot download ${url}"
@@ -287,7 +292,7 @@ then
         if [ -s "${tmp}" ]
         then
             progress "Running downloaded script to detect required packages..."
-            run ${sudo} "${bash}" "${tmp}" ${PACKAGES_INSTALLER_OPTIONS} || ask=1
+            run "${sudo}" "${bash}" "${tmp}" "${PACKAGES_INSTALLER_OPTIONS}" || ask=1
             rm "${tmp}"
         else
             rm "${tmp}"
@@ -297,7 +302,7 @@ then
         if [ "${ask}" = "1" ]
         then
             echo >&2 "It failed to install all the required packages, but I can try to install netdata."
-            read -p "Press ENTER to continue to netdata installation > "
+            read -r -p "Press ENTER to continue to netdata installation > "
             progress "OK, let's give it a try..."
         fi
     else
@@ -321,20 +326,20 @@ fi
 git="$(which_cmd git)"
 
 NETDATA_SOURCE_DIR=
-if [ ! -z "${git}" -a -x "${git}" ]
+if [ ! -z "${git}" ] && [ -x "${git}" ]
 then
-    [ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
+    [ ! -d "${SOURCE_DST}" ] && run "${sudo}" mkdir -p "${SOURCE_DST}"
 
     if [ ! -d "${SOURCE_DST}/netdata.git" ]
     then
         progress "Downloading netdata source code..."
-        run ${sudo} ${git} clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
+        run "${sudo}" "${git}" clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
         cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
     else
         progress "Updating netdata source code..."
         cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
-        run ${sudo} ${git} fetch --all || fatal "Cannot fetch netdata source updates"
-        run ${sudo} ${git} reset --hard origin/master || fatal "Cannot update netdata source tree"
+        run "${sudo}" "${git}" fetch --all || fatal "Cannot fetch netdata source updates"
+        run "${sudo}" "${git}" reset --hard origin/master || fatal "Cannot update netdata source tree"
     fi
     NETDATA_SOURCE_DIR="${SOURCE_DST}/netdata.git"
 else
@@ -345,7 +350,7 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # install netdata from source
 
-if [ ! -z "${NETDATA_SOURCE_DIR}" -a -d "${NETDATA_SOURCE_DIR}" ]
+if [ ! -z "${NETDATA_SOURCE_DIR}" ] && [ -d "${NETDATA_SOURCE_DIR}" ]
 then
     cd "${NETDATA_SOURCE_DIR}" || fatal "Cannot cd to netdata source tree"
 
