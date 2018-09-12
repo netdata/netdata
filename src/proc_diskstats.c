@@ -410,8 +410,8 @@ static inline char *get_disk_name(unsigned long major, unsigned long minor, char
 
     if(!path_to_device_mapper || !*path_to_device_mapper || !get_disk_name_from_path(path_to_device_mapper, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
         if(!path_to_device_label || !*path_to_device_label || !get_disk_name_from_path(path_to_device_label, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
-            if(!path_to_veritas_volume_groups || !*path_to_veritas_volume_groups || !get_disk_name_from_path(path_to_veritas_volume_groups, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
-                if(name_disks_by_id != CONFIG_BOOLEAN_YES || !path_to_device_id || !*path_to_device_id || !get_disk_name_from_path(path_to_device_id, result, FILENAME_MAX + 1, major, minor, disk, "vx", 2))
+            if(!path_to_veritas_volume_groups || !*path_to_veritas_volume_groups || !get_disk_name_from_path(path_to_veritas_volume_groups, result, FILENAME_MAX + 1, major, minor, disk, "vx", 2))
+                if(name_disks_by_id != CONFIG_BOOLEAN_YES || !path_to_device_id || !*path_to_device_id || !get_disk_name_from_path(path_to_device_id, result, FILENAME_MAX + 1, major, minor, disk, NULL, 0))
                     strncpy(result, disk, FILENAME_MAX);
 
     if(!result[0])
