@@ -28,7 +28,7 @@ jobs:
       script: docker run --rm -v $(pwd)/web:/code eeacms/csslint sh -c "csslint /code/*.css" || echo "OK"
     - name: "bash"
       install: skip
-      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.4.7 -c 'for file in $(find /project/ -type f -name "*.sh"); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi' || echo "OK"
+      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /project/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi' || echo "OK"
     - stage: "test"
       name: "C"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
