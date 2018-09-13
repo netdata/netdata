@@ -389,7 +389,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
             //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
-            snprintfz(result, result_size - 1, "%s%s", (prefix)?prefix:"", de->d_name);
+            snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
             found = 1;
             break;
         }
