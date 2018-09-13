@@ -23,7 +23,7 @@ exim_check() {
         exim_command="${EXIM_CMD}"
     fi
 
-	if [ $(${exim_command} -bpc 2>&1 | grep -c denied) -ne 0 ]
+	if [ "$(${exim_command} -bpc 2>&1 | grep -c denied)" -ne 0 ]
 	then
 		error "permission denied - please set 'queue_list_requires_admin = false' in your exim options file"
 		return 1
@@ -42,7 +42,7 @@ EOF
 
 exim_update() {
     echo "BEGIN exim_local.qemails $1"
-    echo "SET emails = " $(run ${exim_command} -bpc)
+    echo "SET emails = $(run "${exim_command}" -bpc)"
     echo "END"
     return 0
 }
