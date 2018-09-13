@@ -71,6 +71,7 @@ dist_pythonconfig_DATA = \
     python.d/puppet.conf \
     python.d/rabbitmq.conf \
     python.d/redis.conf \
+    python.d/rethinkdbs.conf \
     python.d/retroshare.conf \
     python.d/samba.conf \
     python.d/sensors.conf \
