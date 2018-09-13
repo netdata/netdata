@@ -57,6 +57,7 @@ dist_python_DATA = \
     puppet.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
+    rethinkdbs.chart.py \
     retroshare.chart.py \
     samba.chart.py \
     sensors.chart.py \

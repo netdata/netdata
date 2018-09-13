@@ -220,6 +220,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>redis</b>. Redis (REmote DIctionary Server) is a software project that implements data structure servers. It is open-source, networked, in-memory, and stores keys with optional durability.'
     },
 
+     'rethinkdbs': {
+        title: 'RethinkDB',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance metrics for <b>rethinkdb</b>. RethinkDB is the first open-source scalable database built for realtime applications'
+    },
+
     'retroshare': {
         title: 'RetroShare',
         icon: '<i class="fas fa-share-alt"></i>',
