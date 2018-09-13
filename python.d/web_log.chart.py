@@ -340,8 +340,7 @@ class Web:
                      'resp_time_upstream_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
                      'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0,
-                     'port_80': 0, 'port_443': 0}
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
 
     def __getattr__(self, item):
         return getattr(self.service, item)
