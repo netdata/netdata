@@ -6,6 +6,29 @@
 # lists files which appear in one or the other only, to help check
 # for missing EXTRA_DIST entries in Makefile.am files.
 
+# Note: this list uses shell globbing, i.e. an * matches any number of
+# subdirectories, so it is somewhat different to e.g. .gitignore
+ignore=$(tr '\n' '|' <<'END'
+autom4te.cache/*
+CMakeLists.txt
+config.h
+config.log
+config.status
+.git/*
+.githooks/*
+Makefile
+*/Makefile
+makeself/README.md
+netdata-*.tar.*
+packaging/*
+src/.deps/*
+stamp-h1
+tests/profile/*
+.travis.yml
+web/images/README.md
+END
+)
+
 scriptname=tar-compare
 if ! MYTMP=$(mktemp -d -t $scriptname-XXXXXX)
 then
@@ -29,38 +52,27 @@ trap cleanup 0
 
 if [ $# -ne 2 ]
 then
-  echo "tar-compare git-dir tar-gz-file"
+  echo "Usage: tar-compare git-dir tar-gz-file"
   exit 1
 fi
 
 mkdir $MYTMP/unpack
-tar xfzC "$2" $MYTMP/unpack
-diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
-	-e '/: autom4te\.cache$/d' \
-	-e '/: \.deps$/d' \
-	-e '/: \.git$/d' \
-	-e '/: \.gitattributes$/d' \
-	-e '/: \.gitignore$/d' \
-	-e '/: config\.log$/d' \
-	-e '/: config\.status$/d' \
-	-e '/: config\.h.*$/d' \
-	-e '/: Makefile$/d' \
-	-e '/: .githooks$/d' \
-	-e '/: packaging$/d' \
-	-e '/: stamp-h1$/d' \
-	-e '/: README\.md$/d' \
-	-e '/: tmp-anchor-links$/d' \
-	-e '/: tmp-manproc$/d' \
-	-e '/: .*\.tar\.gz$/d' \
-	-e '/: .*\.tar\.bz2$/d' \
-	-e '/: .*\.tar\.xz$/d' \
-	-e '/: unittest$/d' \
-	-e '/: iprange$/d' \
-	-e '/: .*\.o$/d' \
-	-e '/: CMakeLists.txt/d' \
-	-e '/: tests$/d' \
-	-e '/: .travis.yml/d' > $MYTMP/out
+tar xfzC "$2" $MYTMP/unpack || exit
+(cd "$1" && find . -type f | sort > $MYTMP/git-list)
+(cd "$MYTMP/unpack"/* && find . -type f | sort > $MYTMP/tar-list)
 
-cat $MYTMP/out
-test -s $MYTMP/out && exit 1
+comm -23 $MYTMP/git-list $MYTMP/tar-list | cut -f2- -d'/' > $MYTMP/only-in-git
+
+while read name
+do
+  eval "case $name in $ignore,) : ;; *) echo 'In git but not tar: $name' >> '$MYTMP/out' ;; esac"
+done < $MYTMP/only-in-git
+
+if [ -s $MYTMP/out ]
+then
+  cat $MYTMP/out
+  echo "Release tarfile differs from git content unexpectedly."
+  echo "Ensure all files are packaged, or ignored by packaging/tar-compare"
+  exit 1
+fi
 exit 0
