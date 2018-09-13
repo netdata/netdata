@@ -87,8 +87,6 @@ try_build() {
   git diff --staged | patch -p1 -d "$MYTMP/build"
   (cd $MYTMP/build; ./packaging/git-build || touch $MYTMP/fail)
   if [ -f $MYTMP/fail ]; then return 1; fi
-  (cd $MYTMP/build; ./packaging/tar-compare . *.tar.gz || touch $MYTMP/fail)
-  if [ -f $MYTMP/fail ]; then return 1; fi
   touch $MYTMP/success
   return 0
 }

@@ -50,6 +50,5 @@ set -e
 autoreconf -ivf
 ./configure --enable-maintainer-mode 
 set +e
-make dist
-status=$?
-exit $status
+make dist || exit
+./packaging/tar-compare . netdata-*.tar.gz || exit
