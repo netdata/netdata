@@ -370,6 +370,7 @@ class Plugin(object):
             self.cleanup()
             self.autodetect_retry()
 
+            # FIXME: https://github.com/firehol/netdata/issues/3817
             if self.runs_counter % GC_COLLECT_EVERY == 0:
                 gc.collect()
 
