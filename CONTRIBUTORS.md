@@ -105,4 +105,8 @@ username|name|email (optional)
 @alibo|Ali Borhani|aliborhani1@gmail.com
 @Nani-o|Sofiane Medjkoune|sofiane@medjkoune.fr
 @abalabahaha|abalabahaha|hi@abal.moe
+@illes|Illes S.|
+@plasticrake|Patrick Seal
+@jonfairbanks|Jon Fairbanks
+@pjz|Paul Jimenez|pj@place.org
 @jgrossiord|Julien Grossiord|julien@grossiord.net
