@@ -133,8 +133,8 @@ CHARTS_WEB = {
         'options': [None, 'Requests Per Port', 'requests/s', 'port',
                     'web_log.port', 'stacked'],
         'lines': [
-            ['80', 'http', 'incremental', 1, 1],
-            ['443', 'https', 'incremental', 1, 1]
+            ['port_80', 'http', 'incremental', 1, 1],
+            ['port_443', 'https', 'incremental', 1, 1]
         ]},
     'vhost': {
         'options': [None, 'Requests Per Vhost', 'requests/s', 'vhost',
@@ -341,7 +341,7 @@ class Web:
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
                      'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
                      'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0,
-                     '80': 0, '443': 0}
+                     'port_80': 0, 'port_443': 0}
 
     def __getattr__(self, item):
         return getattr(self.service, item)
@@ -724,8 +724,8 @@ class Web:
         if match_dict.get('port'):
             if match_dict['port'] not in self.data:
                 self.charts['port'].add_dimension([match_dict['port'],
-                                                           match_dict['port'],
-                                                           'incremental'])
+                                                   match_dict['port'],
+                                                   'incremental'])
                 self.data[match_dict['port']] = 0
             self.data[match_dict['port']] += 1
         # requests per vhost
@@ -733,8 +733,8 @@ class Web:
             dim_id = match_dict['vhost'].replace('.', '_')
             if dim_id not in self.data:
                 self.charts['vhost'].add_dimension([dim_id,
-                                                           match_dict['vhost'],
-                                                           'incremental'])
+                                                   match_dict['vhost'],
+                                                   'incremental'])
                 self.data[dim_id] = 0
             self.data[dim_id] += 1
 
