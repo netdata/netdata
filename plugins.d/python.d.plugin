@@ -85,7 +85,7 @@ class Job(object):
         self.recheck_every = self.job.configuration.pop('autodetection_retry')
         self.checked = False  # used in Plugin.check_job()
         self.created = False  # used in Plugin.create_job_charts()
-        if OVERRIDE_UPDATE_EVERY:
+        if self.job.update_every < int(OVERRIDE_UPDATE_EVERY):
             self.job.update_every = int(OVERRIDE_UPDATE_EVERY)
 
     def __getattr__(self, item):
