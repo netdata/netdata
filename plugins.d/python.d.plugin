@@ -8,6 +8,7 @@ echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
+import gc
 import os
 import sys
 import threading
@@ -16,6 +17,7 @@ from re import sub
 from sys import version_info, argv
 from time import sleep
 
+GC_COLLECT_EVERY = 300
 
 PY_VERSION = version_info[:2]
 PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
@@ -367,6 +369,9 @@ class Plugin(object):
             sleep(self.sleep_time)
             self.cleanup()
             self.autodetect_retry()
+
+            if self.runs_counter % GC_COLLECT_EVERY == 0:
+                gc.collect()
 
     def cleanup(self):
         for job in self.dead_jobs:
