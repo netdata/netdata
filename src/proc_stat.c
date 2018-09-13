@@ -122,6 +122,8 @@ int do_proc_stat(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, do_core_throttle_count = -1, do_package_throttle_count = -1, do_scaling_cur_freq = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL;
+    static RRDSETVAR *cpus_var = NULL;
+    size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
         do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
@@ -197,6 +199,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
 
             size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
+            if(core > 0) cores_found = core;
 
             if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
                 char *id;
@@ -309,6 +312,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                     cpu_chart->rd_iowait     = rrddim_add(cpu_chart->st, "iowait",     NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     cpu_chart->rd_idle       = rrddim_add(cpu_chart->st, "idle",       NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(cpu_chart->st, "idle");
+
+                    if(unlikely(core == 0 && cpus_var == NULL))
+                        cpus_var = rrdsetvar_custom_chart_variable_create(cpu_chart->st, "processors");
                 }
                 else rrdset_next(cpu_chart->st);
 
@@ -553,6 +559,9 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
     }
+
+    if(cpus_var)
+        rrdsetvar_custom_chart_variable_set(cpus_var, cores_found);
 
     return 0;
 }

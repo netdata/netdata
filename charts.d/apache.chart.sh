@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -82,12 +83,11 @@ apache_detect() {
 	[ -z "${apache_key_idleworkers}" ] && error "missing 'IdleWorkers' from apache server: ${*}" && return 1
 	[ -z "${apache_key_scoreboard}"  ] && error "missing 'Scoreboard' from apache server: ${*}" && return 1
 
-	if [ ! -z "${apache_key_connstotal}" \
-		-a ! -z "${apache_key_connsasyncwriting}" \
-		-a ! -z "${apache_key_connsasynckeepalive}" \
-		-a ! -z "${apache_key_connsasyncclosing}" \
-		]
-		then
+	if [ ! -z "${apache_key_connstotal}" ] && \
+	   [ ! -z "${apache_key_connsasyncwriting}" ] && \
+	   [ ! -z "${apache_key_connsasynckeepalive}" ] && \
+	   [ ! -z "${apache_key_connsasyncclosing}" ]
+	then
 		apache_has_conns=1
 	else
 		apache_has_conns=0
@@ -98,16 +98,17 @@ apache_detect() {
 
 apache_get() {
 	local oIFS="${IFS}" ret
+	# shellcheck disable=2207
 	IFS=$':\n' apache_response=($(run curl -Ss ${apache_curl_opts} "${apache_url}"))
 	ret=$?
 	IFS="${oIFS}"
 
-	[ $ret -ne 0 -o "${#apache_response[@]}" -eq 0 ] && return 1
+	([ $ret -ne 0 ] || [ "${#apache_response[@]}" -eq 0 ]) && return 1
 
 	# the last line on the apache output is "Scoreboard"
 	# we use this label to detect that the output has a new word count
-	if [ ${apache_keys_detected} -eq 0 -o "${apache_response[${apache_key_scoreboard}]}" != "Scoreboard" ]
-		then
+	if [ ${apache_keys_detected} -eq 0 ] || [ "${apache_response[${apache_key_scoreboard}]}" != "Scoreboard" ]
+	then
 		apache_detect "${apache_response[@]}" || return 1
 		apache_keys_detected=1
 	fi
@@ -127,21 +128,20 @@ apache_get() {
 	apache_busyworkers="${apache_response[${apache_key_busyworkers}]}"
 	apache_idleworkers="${apache_response[${apache_key_idleworkers}]}"
 
-	if [ -z "${apache_accesses}" \
-		-o -z "${apache_kbytes}" \
-		-o -z "${apache_reqpersec}" \
-		-o -z "${apache_bytespersec}" \
-		-o -z "${apache_bytesperreq}" \
-		-o -z "${apache_busyworkers}" \
-		-o -z "${apache_idleworkers}" \
-		]
-		then
+	if [ -z "${apache_accesses}" ] || \
+	   [ -z "${apache_kbytes}" ] || \
+	   [ -z "${apache_reqpersec}" ] || \
+	   [ -z "${apache_bytespersec}" ] || \
+	   [ -z "${apache_bytesperreq}" ] || \
+	   [ -z "${apache_busyworkers}" ]
+	   [ -z "${apache_idleworkers}" ]
+	then
 		error "empty values got from apache server: ${apache_response[*]}"
 		return 1
 	fi
 
 	if [ ${apache_has_conns} -eq 1 ]
-		then
+	then
 		apache_connstotal="${apache_response[${apache_key_connstotal}]}"
 		apache_connsasyncwriting="${apache_response[${apache_key_connsasyncwriting}]}"
 		apache_connsasynckeepalive="${apache_response[${apache_key_connsasynckeepalive}]}"
@@ -155,8 +155,10 @@ apache_get() {
 apache_check() {
 
 	apache_get
+	# shellcheck disable=2181
 	if [ $? -ne 0 ]
-		then
+	then
+		# shellcheck disable=2154
 		error "cannot find stub_status on URL '${apache_url}'. Please set apache_url='http://apache.server:80/server-status?auto' in $confd/apache.conf"
 		return 1
 	fi
@@ -187,7 +189,7 @@ DIMENSION sent '' incremental 8 1
 EOF
 
 	if [ ${apache_has_conns} -eq 1 ]
-		then
+	then
 		cat <<EOF2
 CHART apache_local.connections '' "apache Connections" "connections" connections apache.connections line $((apache_priority + 2)) $apache_update_every
 DIMENSION connections '' absolute 1 1
@@ -203,7 +205,6 @@ EOF2
 
 # _update is called continuously, to collect the values
 apache_update() {
-	local reqs net
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).
 
@@ -237,7 +238,7 @@ END
 VALUESEOF
 
 	if [ ${apache_has_conns} -eq 1 ]
-		then
+	then
 	cat <<VALUESEOF2
 BEGIN apache_local.connections $1
 SET connections = $((apache_connstotal))

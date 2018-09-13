@@ -5,7 +5,7 @@
 
 from bases.collection import safe_print
 
-CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type']
+CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type', 'hidden']
 DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor', 'hidden']
 VARIABLE_PARAMS = ['id', 'value']
 
@@ -14,9 +14,9 @@ DIMENSION_ALGORITHMS = ['absolute', 'incremental', 'percentage-of-absolute-row',
 
 CHART_BEGIN = 'BEGIN {type}.{id} {since_last}\n'
 CHART_CREATE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
-               "{chart_type} {priority} {update_every} '' 'python.d.plugin' '{module_name}'\n"
+               "{chart_type} {priority} {update_every} '{hidden}' 'python.d.plugin' '{module_name}'\n"
 CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
-               "{chart_type} {priority} {update_every} 'obsolete'\n"
+               "{chart_type} {priority} {update_every} '{hidden} obsolete'\n"
 
 
 DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden}'\n"
@@ -152,6 +152,8 @@ class Chart:
                                          id=self.params['id'])
         if self.params.get('chart_type') not in CHART_TYPES:
             self.params['chart_type'] = 'absolute'
+        hidden = str(self.params.get('hidden', ''))
+        self.params['hidden'] = 'hidden' if hidden == 'hidden' else ''
 
         self.dimensions = list()
         self.variables = set()

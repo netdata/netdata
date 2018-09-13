@@ -56,6 +56,7 @@ dist_pythonconfig_DATA = \
     python.d/megacli.conf \
     python.d/memcached.conf \
     python.d/mongodb.conf \
+    python.d/monit.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
     python.d/nginx_plus.conf \
@@ -70,6 +71,7 @@ dist_pythonconfig_DATA = \
     python.d/puppet.conf \
     python.d/rabbitmq.conf \
     python.d/redis.conf \
+    python.d/rethinkdbs.conf \
     python.d/retroshare.conf \
     python.d/samba.conf \
     python.d/sensors.conf \
@@ -111,6 +113,7 @@ dist_healthconfig_DATA = \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
     health.d/lighttpd.conf \
+    health.d/load.conf \
     health.d/mdstat.conf \
     health.d/megacli.conf \
     health.d/memcached.conf \

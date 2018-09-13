@@ -3,10 +3,12 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0+
 
+import json
+import threading
+
 from collections import namedtuple
-from json import loads
 from socket import gethostbyname, gaierror
-from threading import Thread
+
 try:
         from queue import Queue
 except ImportError:
@@ -16,8 +18,6 @@ from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
-priority = 60000
-retries = 60
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 
@@ -125,15 +125,43 @@ LATENCY = {
 }
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['search_performance_total', 'search_performance_current', 'search_performance_time',
-         'search_latency', 'index_performance_total', 'index_performance_current', 'index_performance_time',
-         'index_latency', 'index_translog_operations', 'index_translog_size', 'index_segments_count', 'index_segments_memory_writer',
-         'index_segments_memory', 'jvm_mem_heap', 'jvm_mem_heap_bytes', 'jvm_buffer_pool_count',
-         'jvm_direct_buffers_memory', 'jvm_mapped_buffers_memory', 'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
-         'host_metrics_http', 'host_metrics_transport', 'thread_pool_queued', 'thread_pool_rejected',
-         'fielddata_cache', 'fielddata_evictions_tripped', 'cluster_health_status', 'cluster_health_nodes',
-         'cluster_health_shards', 'cluster_stats_nodes', 'cluster_stats_query_cache', 'cluster_stats_docs',
-         'cluster_stats_store', 'cluster_stats_indices_shards']
+ORDER = [
+    'search_performance_total',
+    'search_performance_current',
+    'search_performance_time',
+    'search_latency',
+    'index_performance_total',
+    'index_performance_current',
+    'index_performance_time',
+    'index_latency',
+    'index_translog_operations',
+    'index_translog_size',
+    'index_segments_count',
+    'index_segments_memory_writer',
+    'index_segments_memory',
+    'jvm_mem_heap',
+    'jvm_mem_heap_bytes',
+    'jvm_buffer_pool_count',
+    'jvm_direct_buffers_memory',
+    'jvm_mapped_buffers_memory',
+    'jvm_gc_count',
+    'jvm_gc_time',
+    'host_metrics_file_descriptors',
+    'host_metrics_http',
+    'host_metrics_transport',
+    'thread_pool_queued',
+    'thread_pool_rejected',
+    'fielddata_cache',
+    'fielddata_evictions_tripped',
+    'cluster_health_status',
+    'cluster_health_nodes',
+    'cluster_health_shards',
+    'cluster_stats_nodes',
+    'cluster_stats_query_cache',
+    'cluster_stats_docs',
+    'cluster_stats_store',
+    'cluster_stats_indices_shards',
+]
 
 CHARTS = {
     'search_performance_total': {
@@ -449,8 +477,8 @@ class Service(UrlService):
         for method in self.methods:
             if not method.run:
                 continue
-            th = Thread(target=method.get_data,
-                        args=(queue, method.url))
+            th = threading.Thread(target=method.get_data,
+                                  args=(queue, method.url))
             th.start()
             threads.append(th)
 
@@ -471,7 +499,11 @@ class Service(UrlService):
         if not raw_data:
             return queue.put(dict())
 
-        data = loads(raw_data)
+        data = self.json_reply(raw_data)
+
+        if not data:
+            return queue.put(dict())
+
         to_netdata = fetch_data_(raw_data=data,
                                  metrics=HEALTH_STATS)
 
@@ -493,7 +525,11 @@ class Service(UrlService):
         if not raw_data:
             return queue.put(dict())
 
-        data = loads(raw_data)
+        data = self.json_reply(raw_data)
+
+        if not data:
+            return queue.put(dict())
+
         to_netdata = fetch_data_(raw_data=data,
                                  metrics=CLUSTER_STATS)
 
@@ -510,7 +546,10 @@ class Service(UrlService):
         if not raw_data:
             return queue.put(dict())
 
-        data = loads(raw_data)
+        data = self.json_reply(raw_data)
+
+        if not data:
+            return queue.put(dict())
 
         node = list(data['nodes'].keys())[0]
         to_netdata = fetch_data_(raw_data=data['nodes'][node],
@@ -529,6 +568,13 @@ class Service(UrlService):
                                                         / to_netdata['process_max_file_descriptors'] * 1000)
 
         return queue.put(to_netdata)
+
+    def json_reply(self, reply):
+        try:
+            return json.loads(reply)
+        except ValueError as err:
+            self.error(err)
+            return None
 
     def find_avg(self, total, spent_time, key):
         if key not in self.latency:

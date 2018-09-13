@@ -1,0 +1,5 @@
+FROM alpine:latest
+
+RUN apk add gcc make autoconf automake pkgconfig zlib-dev libuuid git
+
+COPY . /code
