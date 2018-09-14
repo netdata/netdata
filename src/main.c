@@ -57,13 +57,15 @@ struct netdata_static_thread static_threads[] = {
 #elif defined(__APPLE__)
     // macOS internal plugins
     {"PLUGIN[macos]",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
+#elif defined(__OpenBSD__)
+    // OpenBSD internal plugins
 #else
     // linux internal plugins
     {"PLUGIN[proc]",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
     {"PLUGIN[diskspace]",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
     {"PLUGIN[cgroup]",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
     {"PLUGIN[tc]",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
-#endif /* __FreeBSD__, __APPLE__*/
+#endif /* __FreeBSD__, __APPLE__, __OpenBSD__ */
 
     // common plugins for all systems
     {"PLUGIN[idlejitter]",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
@@ -1012,7 +1014,7 @@ int main(int argc, char **argv) {
     if(getrlimit(RLIMIT_NOFILE, &rlimit_nofile) != 0)
         error("getrlimit(RLIMIT_NOFILE) failed");
     else
-        info("resources control: allowed file descriptors: soft = %zu, max = %zu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
+        info("resources control: allowed file descriptors: soft = %llu, max = %llu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)

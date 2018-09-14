@@ -24,9 +24,9 @@
 
 #else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
+#if !(defined(__FreeBSD__) || defined(__APPLE__) || defined(__OpenBSD__))
 #include <malloc.h>
-#endif /* __FreeBSD__ || __APPLE__ */
+#endif /* __FreeBSD__ || __APPLE__ || __OpenBSD__ */
 
 #endif
 

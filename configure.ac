@@ -172,6 +172,10 @@ freebsd*)
     build_target=freebsd
     CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
+openbsd*)
+    build_target=openbsd
+    CFLAGS="${CFLAGS} -I/usr/local/include"
+    ;;
 darwin*)
     build_target=macos
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"

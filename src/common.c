@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "common.h"
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__OpenBSD__)
 #define INHERIT_NONE 0
-#endif /* __APPLE__ */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#endif /* __APPLE__ || __OpenBSD__ */
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__OpenBSD__)
 #    define O_NOATIME     0
 #    define MADV_DONTFORK INHERIT_NONE
-#endif /* __FreeBSD__ || __APPLE__*/
+#endif /* __FreeBSD__ || __APPLE__ || __OpenBSD__ */
 
 char *netdata_configured_hostname    = NULL;
 char *netdata_configured_config_dir  = NULL;

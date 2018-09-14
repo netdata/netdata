@@ -886,7 +886,7 @@ static int rrdpush_receive(int fd
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             host->health_delay_up_to = now_realtime_sec() + alarms_delay;
-            info("Postponing health checks for %ld seconds, on host '%s', because it was just connected."
+            info("Postponing health checks for %lld seconds, on host '%s', because it was just connected."
             , alarms_delay
             , host->hostname
             );

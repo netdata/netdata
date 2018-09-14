@@ -490,11 +490,11 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
         info("data collection thread exiting");
 
         if (cd->pid) {
-            siginfo_t info;
+            int status_info;
             info("killing child process pid %d", cd->pid);
             if (killpid(cd->pid, SIGTERM) != -1) {
                 info("waiting for child process pid %d to exit...", cd->pid);
-                waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
+                waitpid(cd->pid, &status_info, 0);
             }
             cd->pid = 0;
         }

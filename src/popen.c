@@ -165,37 +165,59 @@ int mypclose(FILE *fp, pid_t pid) {
 
     errno = 0;
 
-    siginfo_t info;
-    if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
-        switch(info.si_code) {
-            case CLD_EXITED:
-                if(info.si_status)
-                    error("child pid %d exited with code %d.", info.si_pid, info.si_status);
-                return(info.si_status);
-
-            case CLD_KILLED:
-                error("child pid %d killed by signal %d.", info.si_pid, info.si_status);
-                return(-1);
-
-            case CLD_DUMPED:
-                error("child pid %d core dumped by signal %d.", info.si_pid, info.si_status);
-                return(-2);
-
-            case CLD_STOPPED:
-                error("child pid %d stopped by signal %d.", info.si_pid, info.si_status);
-                return(0);
-
-            case CLD_TRAPPED:
-                error("child pid %d trapped by signal %d.", info.si_pid, info.si_status);
-                return(-4);
-
-            case CLD_CONTINUED:
-                error("child pid %d continued by signal %d.", info.si_pid, info.si_status);
-                return(0);
-
-            default:
-                error("child pid %d gave us a SIGCHLD with code %d and status %d.", info.si_pid, info.si_code, info.si_status);
-                return(-5);
+#ifdef __OpenBSD__
+    int options = 0;
+#else
+    int options = WEXITED;
+#endif
+    int proc_status;
+    if(waitpid(pid, &proc_status, options) > 0) {
+        if(WIFSIGNALED(proc_status)) {
+            int term_sig = WTERMSIG(proc_status);
+            // These classifications are derived from:
+            // https://en.wikipedia.org/wiki/Unix_signal#POSIX_signals
+            // and from the OpenBSD and FreeBSD manual pages
+            switch(term_sig) {
+                case SIGINT:
+                case SIGKILL:
+                case SIGALRM:
+                case SIGPIPE:
+                case SIGPROF:
+                case SIGUSR1:
+                case SIGUSR2:
+                case SIGVTALRM:
+                    error("child pid %d killed by signal %d.", pid, term_sig);
+                    return(-1);
+                case SIGABRT:
+                case SIGSEGV:
+                case SIGILL:
+                case SIGBUS:
+                case SIGFPE:
+                case SIGQUIT:
+                case SIGSYS:
+                case SIGXCPU:
+                case SIGXFSZ:
+                    error("child pid %d core dumped by signal %d.", pid, term_sig);
+                    return(-2);
+                case SIGSTOP:
+                case SIGTSTP:
+                case SIGTTIN:
+                case SIGTTOU:
+                    error("child pid %d stopped by signal %d.", pid, term_sig);
+                    return(0);
+                case SIGTRAP:
+                    error("child pid %d trapped by signal %d.", pid, term_sig);
+                    return(-4);
+                case SIGCHLD:
+                default:
+                    error("child pid %d gave us signal %d.", pid, term_sig);
+                    return(-5);
+            }
+        } else if(WIFEXITED(proc_status)) {
+            int exit_status = WEXITSTATUS(proc_status);
+            if(exit_status)
+                error("child pid %d exited with code %d.", pid, exit_status);
+            return(exit_status);
         }
     }
     else

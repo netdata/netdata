@@ -21,8 +21,8 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
         "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
         "\t\t\t\"chart_type\": \"%s\",\n"
         "\t\t\t\"duration\": %ld,\n"
-        "\t\t\t\"first_entry\": %ld,\n"
-        "\t\t\t\"last_entry\": %ld,\n"
+        "\t\t\t\"first_entry\": %lld,\n"
+        "\t\t\t\"last_entry\": %lld,\n"
         "\t\t\t\"update_every\": %d,\n"
         "\t\t\t\"dimensions\": {\n"
         , st->id
@@ -315,7 +315,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
                     "\t\t\"name\":\"%s\",\n"
                     "\t\t\"context\":\"%s\",\n"
                     "\t\t\"units\":\"%s\",\n"
-                    "\t\t\"last_updated\": %ld,\n"
+                    "\t\t\"last_updated\": %lld,\n"
                     "\t\t\"dimensions\": {"
                     , chart_counter?",":""
                     , st->id

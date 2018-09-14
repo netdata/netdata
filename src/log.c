@@ -208,7 +208,7 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %lld seconds).\n"
                     , date
                     , program_name
                     , program_name
@@ -230,7 +230,7 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
+            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %lld seconds). Preventing more logs from process '%s' for %lld seconds.\n"
                     , date
                     , program_name
                     , counter
@@ -337,7 +337,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
-    int __errno = errno;
+    int errno_bak = errno;
 
     va_list args;
 
@@ -361,9 +361,9 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     vfprintf( stderr, fmt, args );
     va_end( args );
 
-    if(__errno) {
+    if(errno_bak) {
         char buf[1024];
-        fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        fprintf(stderr, " (errno %d, %s)\n", errno_bak, strerror_result(strerror_r(errno_bak, buf, 1023), buf));
         errno = 0;
     }
     else

@@ -369,7 +369,7 @@ void *health_main(void *ptr) {
         if(unlikely(check_if_resumed_from_suspention())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension."
+            info("Postponing alarm checks for %lld seconds, because it seems that the system was just resumed from suspension."
             , hibernation_delay
             );
         }
@@ -383,7 +383,7 @@ void *health_main(void *ptr) {
 
             if(unlikely(apply_hibernation_delay)) {
 
-                info("Postponing health checks for %ld seconds, on host '%s'."
+                info("Postponing health checks for %lld seconds, on host '%s'."
                      , hibernation_delay
                      , host->hostname
                 );
