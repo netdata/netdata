@@ -238,7 +238,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         struct host_variables_callback_options opts = {
                 .host = host,
                 .wb = wb,
-                .labels = labels,
+                .labels = (labels[0] == ',')?&labels[1]:labels,
                 .timestamps = timestamps,
                 .help = help,
                 .types = types,
