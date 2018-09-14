@@ -369,9 +369,12 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value);
+extern calculated_number rrdvar_custom_host_variable_get(RRDHOST *host, RRDVAR *rv);
+extern int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data);
 
 extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
 extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, calculated_number value);
+extern calculated_number rrdsetvar_custom_chart_variable_get(RRDSETVAR *rv);
 
 extern void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock);
 

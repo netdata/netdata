@@ -110,6 +110,75 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable)
 
 #define PROMETHEUS_ELEMENT_MAX 256
 #define PROMETHEUS_LABELS_MAX 1024
+#define PROMETHEUS_VARIABLE_MAX 256
+
+struct host_variables_callback_options {
+    RRDHOST *host;
+    BUFFER *wb;
+    int timestamps;
+    int help;
+    int types;
+    const char *prefix;
+    const char *labels;
+    int host_header_printed;
+    char name[PROMETHEUS_VARIABLE_MAX+1];
+};
+
+static int print_host_variables(RRDVAR *rv, void *data) {
+    struct host_variables_callback_options *opts = data;
+
+    if(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED) {
+        if(!opts->host_header_printed) {
+            opts->host_header_printed = 1;
+
+            if(opts->help) {
+                buffer_sprintf(opts->wb, "\n# COMMENT global host variables\n");
+            }
+        }
+
+        calculated_number value = rrdvar_custom_host_variable_get(opts->host, rv);
+        if(isnan(value) || isinf(value)) {
+            if(opts->help)
+                buffer_sprintf(opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value))?"NAN":"INF");
+
+            return 0;
+        }
+
+        char *label_pre = "";
+        char *label_post = "";
+        if(opts->labels && *opts->labels) {
+            label_pre = "{";
+            label_post = "}";
+        }
+
+        prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
+
+        if(opts->timestamps)
+            buffer_sprintf(opts->wb
+                           , "%s_host_var_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
+                           , opts->prefix
+                           , opts->name
+                           , label_pre
+                           , opts->labels
+                           , label_post
+                           , value
+                           , rv->last_updated * 1000ULL
+            );
+        else
+            buffer_sprintf(opts->wb, "%s_host_var_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
+                           , opts->prefix
+                           , opts->name
+                           , label_pre
+                           , opts->labels
+                           , label_post
+                           , value
+            );
+
+        return 1;
+    }
+
+    return 0;
+}
 
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, uint32_t options, time_t after, time_t before, int allhosts, int help, int types, int names, int timestamps) {
     rrdhost_rdlock(host);
@@ -164,6 +233,21 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         }
     }
 
+    // send custom variables set for the host
+    {
+        struct host_variables_callback_options opts = {
+                .host = host,
+                .wb = wb,
+                .labels = labels,
+                .timestamps = timestamps,
+                .help = help,
+                .types = types,
+                .prefix = prefix,
+                .host_header_printed = 0
+        };
+        foreach_host_variable_callback(host, print_host_variables, &opts);
+    }
+
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
@@ -201,6 +285,41 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                , st->family
                                , st->units
                 );
+
+            /*
+             * FIXME
+             * WE SHOULD USE THE INDEX TO TRAVERSE THE CHART VARIABLES, LIKE THE HOST ONES
+             * SINCE THIS LINKED LIST IS SUPPOSED TO BE USED EXCLUSIVELY BY THE THREAD THAT
+             * CONTROLS THE CHART !
+            // send custom variables set for the chart
+            RRDSETVAR *rs;
+            for(rs = st->variables; rs ; rs = rs->next) {
+                if(rs->options & RRDVAR_OPTION_ALLOCATED) {
+                    if(timestamps)
+                        buffer_sprintf(wb
+                            , "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                            , prefix
+                            , context
+                            , rs->variable
+                            , chart
+                            , family
+                            , labels
+                            , rrdsetvar_custom_chart_variable_get(rs)
+                            , timeval_msec(&st->last_collected_time)
+                    );
+                    else
+                        buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " CALCULATED_NUMBER_FORMAT "\n"
+                            , prefix
+                            , context
+                            , rs->variable
+                            , chart
+                            , family
+                            , labels
+                            , rrdsetvar_custom_chart_variable_get(rs)
+                    );
+                }
+            }
+             */
 
             // for each dimension
             RRDDIM *rd;

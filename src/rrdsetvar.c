@@ -182,3 +182,15 @@ void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, calculated_number value)
         }
     }
 }
+
+calculated_number rrdsetvar_custom_chart_variable_get(RRDSETVAR *rs) {
+    if(unlikely(!(rs->options & RRDVAR_OPTION_ALLOCATED))) {
+        error("RRDSETVAR: requested to get variable '%s' of chart '%s' on host '%s' but the variable is not a custom one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname);
+    }
+    else {
+        calculated_number *v = rs->value;
+        return *v;
+    }
+
+    return NAN;
+}
