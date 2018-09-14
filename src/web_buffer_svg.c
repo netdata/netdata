@@ -509,7 +509,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
@@ -539,7 +539,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
@@ -566,7 +566,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
