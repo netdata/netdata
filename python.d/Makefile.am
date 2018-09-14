@@ -86,7 +86,6 @@ dist_bases_DATA = \
     python_modules/bases/collection.py \
     python_modules/bases/loaders.py \
     python_modules/bases/loggers.py \
-    python_modules/bases/monotonic.py \
     $(NULL)
 
 bases_framework_servicesdir=$(basesdir)/FrameworkServices
@@ -107,6 +106,7 @@ dist_third_party_DATA = \
     python_modules/third_party/lm_sensors.py \
     python_modules/third_party/mcrcon.py \
     python_modules/third_party/boinc_client.py \
+    python_modules/third_party/monotonic.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2

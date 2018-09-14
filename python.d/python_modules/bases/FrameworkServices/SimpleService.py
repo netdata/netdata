@@ -7,12 +7,7 @@
 from threading import Thread
 from time import sleep
 
-try:
-    from time import monotonic as time
-except ImportError:
-    from bases.monotonic import AVAILABLE, time
-    if not AVAILABLE:
-        from time import time
+from third_party.monotonic import monotonic
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
@@ -172,7 +167,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                    'retries: {retries}'.format(freq=job.FREQ, retries=job.RETRIES_MAX - job.RETRIES))
 
         while True:
-            job.START_RUN = time()
+            job.START_RUN = monotonic()
 
             job.NEXT_RUN = job.START_RUN - (job.START_RUN % job.FREQ) + job.FREQ + job.PENALTY
 
@@ -193,7 +188,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 if not self.manage_retries():
                     return
             else:
-                job.ELAPSED = int((time() - job.START_RUN) * 1e3)
+                job.ELAPSED = int((monotonic() - job.START_RUN) * 1e3)
                 job.PREV_UPDATE = job.START_RUN
                 job.RETRIES, job.PENALTY = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
@@ -257,7 +252,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             self.debug('sleeping for {sleep_time} to reach frequency of {freq} sec'.format(sleep_time=sleep_time,
                                                                                            freq=job.FREQ + job.PENALTY))
             sleep(sleep_time)
-            job.START_RUN = time()
+            job.START_RUN = monotonic()
 
     def get_data(self):
         return self._get_data()
