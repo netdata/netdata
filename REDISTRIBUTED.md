@@ -203,3 +203,8 @@ connectivity is not available.
     Copyright (C) 2015 Barnaby Gale
     [MIT License](https://raw.githubusercontent.com/barneygale/MCRcon/master/COPYING.txt)
 
+- [monotonic](https://github.com/atdt/monotonic)
+
+    Copyright 2014, 2015, 2016 Ori Livneh <ori@wikimedia.org>
+    [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
