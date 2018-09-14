@@ -69,7 +69,7 @@ username|name|email (optional)
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
 @philwhineray|Phil Whineray|
-@paulfantom|Pawel Krupa|pawel@krupa.net.pl
+@paulfantom|Paweł Krupa|pawel@krupa.net.pl
 @Ferroin|Austin S. Hemmelgarn|ahferroin7@gmail.com
 @glensc|Elan Ruusamäe|
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
