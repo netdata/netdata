@@ -17,6 +17,7 @@ from re import sub
 from sys import version_info, argv
 from time import sleep
 
+GC_RUN = True
 GC_COLLECT_EVERY = 300
 
 PY_VERSION = version_info[:2]
@@ -204,6 +205,8 @@ class Plugin(object):
         self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
         if error:
             Logger.error('"python.d.conf" configuration file not found. Using defaults.')
+        self.do_gc = self.config.get("gc_run", GC_RUN)
+        self.gc_interval = self.config.get("gc_interval", GC_COLLECT_EVERY)
 
         if not self.config.get('enabled', True):
             run_and_exit(Logger.info)('DISABLED in configuration file.')
@@ -363,8 +366,9 @@ class Plugin(object):
             self.autodetect_retry()
 
             # FIXME: https://github.com/firehol/netdata/issues/3817
-            if self.runs_counter % GC_COLLECT_EVERY == 0:
-                gc.collect()
+            if self.do_gc and self.runs_counter % self.gc_interval == 0:
+                v = gc.collect()
+                Logger.debug("GC full collection run result: {0}".format(v))
 
     def cleanup(self):
         for job in self.dead_jobs:
