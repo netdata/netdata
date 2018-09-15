@@ -245,7 +245,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
-    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR)) {
+    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR && rv->type == RRDVAR_TYPE_CALCULATED)) {
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent
