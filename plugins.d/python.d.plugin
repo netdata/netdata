@@ -232,26 +232,18 @@ class Plugin(object):
             mod_name = mod[:-len(MODULE_EXTENSION)]
             mod_path = CHARTS_PY_DIR + mod
             conf_path = ''.join([CHARTS_PY_CONFIG_DIR, mod_name, '.conf'])
-
-            if DEBUG:
+            if any(
+                [
+                    self.config.get('default_run', True) and self.config.get(mod_name, True),
+                    (not self.config.get('default_run')) and self.config.get(mod_name),
+                ]
+            ):
                 yield RawModule(
                     name=mod_name,
                     path=mod_path,
                     conf_path=conf_path,
+                    explicitly_enabled=self.config.get(mod_name),
                 )
-            else:
-                if any(
-                    [
-                        self.config.get('default_run', True) and self.config.get(mod_name, True),
-                        (not self.config.get('default_run')) and self.config.get(mod_name),
-                    ]
-                ):
-                    yield RawModule(
-                        name=mod_name,
-                        path=mod_path,
-                        conf_path=conf_path,
-                        explicitly_enabled=self.config.get(mod_name),
-                    )
 
     def load_and_initialize_modules(self):
         for mod in self.enabled_modules():
