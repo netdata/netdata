@@ -60,14 +60,14 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
             error("RRDVAR: Attempted to delete variable '%s' from host '%s', but it is not found.", rv->name, host->hostname);
     }
 
-    if(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)
+    if(rv->options & RRDVAR_OPTION_ALLOCATED)
         freez(rv->value);
 
     freez(rv->name);
     freez(rv);
 }
 
-inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, void *value) {
+inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
     uint32_t hash = simple_hash(variable);
@@ -80,6 +80,7 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
         rv->name = variable;
         rv->hash = hash;
         rv->type = type;
+        rv->options = options;
         rv->value = value;
         rv->last_updated = now_realtime_sec();
 
@@ -133,7 +134,7 @@ static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *t
     calculated_number *v = callocz(1, sizeof(calculated_number));
     *v = NAN;
 
-    RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name, RRDVAR_TYPE_CALCULATED_ALLOCATED, v);
+    RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
     if(unlikely(!rv)) {
         free(v);
         debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
@@ -156,7 +157,7 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
 }
 
 void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value) {
-    if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
+    if(rv->type != RRDVAR_TYPE_CALCULATED || !(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR) || !(rv->options & RRDVAR_OPTION_ALLOCATED))
         error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
     else {
         calculated_number *v = rv->value;
@@ -171,18 +172,6 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_numbe
     }
 }
 
-calculated_number rrdvar_custom_host_variable_get(RRDHOST *host, RRDVAR *rv) {
-    (void)host;
-
-    if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
-        error("requested to get variable '%s' but the variable is not a custom one.", rv->name);
-    else {
-        calculated_number *v = rv->value;
-        return *v;
-    }
-    return NAN;
-}
-
 int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data) {
     return avl_traverse_lock(&host->rrdvar_root_index, (int (*)(void *, void *))callback, data);
 }
@@ -190,9 +179,8 @@ int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, vo
 // ----------------------------------------------------------------------------
 // RRDVAR lookup
 
-static calculated_number rrdvar2number(RRDVAR *rv) {
+calculated_number rrdvar2number(RRDVAR *rv) {
     switch(rv->type) {
-        case RRDVAR_TYPE_CALCULATED_ALLOCATED:
         case RRDVAR_TYPE_CALCULATED: {
             calculated_number *n = (calculated_number *)rv->value;
             return *n;
