@@ -153,7 +153,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
 
         if(opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
             buffer_sprintf(opts->wb
-                           , "%s_host_var_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
+                           , "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
                            , opts->prefix
                            , opts->name
                            , label_pre
@@ -163,7 +163,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
                            , rv->last_updated * 1000ULL
             );
         else
-            buffer_sprintf(opts->wb, "%s_host_var_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
+            buffer_sprintf(opts->wb, "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
                            , opts->prefix
                            , opts->name
                            , label_pre
