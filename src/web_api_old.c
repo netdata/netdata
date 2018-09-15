@@ -148,7 +148,7 @@ int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *u
 
     if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
         buffer_sprintf(w->response.data,
-                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%lld',table:",
+                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%zd',table:",
                 google_responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
     }
 

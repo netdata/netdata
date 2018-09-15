@@ -208,7 +208,7 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %lld seconds).\n"
+            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %zd seconds).\n"
                     , date
                     , program_name
                     , program_name
@@ -230,7 +230,7 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %lld seconds). Preventing more logs from process '%s' for %lld seconds.\n"
+            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %zd seconds). Preventing more logs from process '%s' for %zd seconds.\n"
                     , date
                     , program_name
                     , counter

@@ -1014,7 +1014,7 @@ int main(int argc, char **argv) {
     if(getrlimit(RLIMIT_NOFILE, &rlimit_nofile) != 0)
         error("getrlimit(RLIMIT_NOFILE) failed");
     else
-        info("resources control: allowed file descriptors: soft = %llu, max = %llu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
+        info("resources control: allowed file descriptors: soft = %zu, max = %zu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
