@@ -15,10 +15,10 @@ typedef enum rrdvar_type {
 } RRDVAR_TYPE;
 
 typedef enum rrdvar_options {
-    RRDVAR_OPTION_DEFAULT          = (0 << 0),
+    RRDVAR_OPTION_DEFAULT          = 0,
     RRDVAR_OPTION_ALLOCATED        = (1 << 0), // the value ptr is allocated (not a reference)
-    RRDVAR_OPTION_CUSTOM_HOST_VAR  = (2 << 0), // this is a custom host variable, not associated with a dimension
-    RRDVAR_OPTION_CUSTOM_CHART_VAR = (3 << 0)  // this is a custom chart variable, not associated with a dimension
+    RRDVAR_OPTION_CUSTOM_HOST_VAR  = (1 << 1), // this is a custom host variable, not associated with a dimension
+    RRDVAR_OPTION_CUSTOM_CHART_VAR = (1 << 2)  // this is a custom chart variable, not associated with a dimension
 } RRDVAR_OPTIONS;
 
 // the variables as stored in the variables indexes

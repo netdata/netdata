@@ -23,10 +23,9 @@
 // 5. repeats the above forever.
 //
 
-const char *backend_prefix = "netdata";
-int backend_send_names = 1;
-int backend_update_every = 10;
-uint32_t backend_options = BACKEND_SOURCE_DATA_AVERAGE;
+const char *global_backend_prefix = "netdata";
+int global_backend_update_every = 10;
+BACKEND_OPTIONS global_backend_options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
 // ----------------------------------------------------------------------------
 // helper functions for backends
@@ -53,7 +52,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
         , time_t *first_timestamp   // the first point of the database used in this response
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
@@ -133,7 +132,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
         return NAN;
     }
 
-    if(unlikely((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_SUM))
+    if(unlikely(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM))
         return sum;
 
     return sum / (calculated_number)counter;
@@ -173,27 +172,26 @@ static inline int format_dimension_collected_graphite_plaintext(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
     (void)after;
     (void)before;
-    (void)options;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
-    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(chart_name, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
             b
-            , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n"
+            , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %llu\n"
             , prefix
             , hostname
             , chart_name
             , dimension_name
             , rd->last_collected_value
-            , (uint32_t)rd->last_collected_time.tv_sec
+            , (unsigned long long)rd->last_collected_time.tv_sec
     );
 
     return 1;
@@ -208,29 +206,29 @@ static inline int format_dimension_stored_graphite_plaintext(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
-    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(chart_name, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
     time_t first_t = after, last_t = before;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
 
     if(!isnan(value)) {
 
         buffer_sprintf(
                 b
-                , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n"
+                , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n"
                 , prefix
                 , hostname
                 , chart_name
                 , dimension_name
                 , value
-                , (uint32_t) last_t
+                , (unsigned long long) last_t
         );
 
         return 1;
@@ -255,25 +253,24 @@ static inline int format_dimension_collected_opentsdb_telnet(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
     (void)after;
     (void)before;
-    (void)options;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
-    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(chart_name, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
     buffer_sprintf(
             b
-            , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n"
+            , "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n"
             , prefix
             , chart_name
             , dimension_name
-            , (uint32_t)rd->last_collected_time.tv_sec
+            , (unsigned long long)rd->last_collected_time.tv_sec
             , rd->last_collected_value
             , hostname
             , (host->tags)?" ":""
@@ -292,27 +289,27 @@ static inline int format_dimension_stored_opentsdb_telnet(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
 
     time_t first_t = after, last_t = before;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
-    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
-    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(chart_name, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
     if(!isnan(value)) {
 
         buffer_sprintf(
                 b
-                , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n"
+                , "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n"
                 , prefix
                 , chart_name
                 , dimension_name
-                , (uint32_t) last_t
+                , (unsigned long long) last_t
                 , value
                 , hostname
                 , (host->tags)?" ":""
@@ -341,12 +338,12 @@ static inline int format_dimension_collected_json_plaintext(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
     (void)after;
     (void)before;
-    (void)options;
+    (void)backend_options;
 
     const char *tags_pre = "", *tags_post = "", *tags = host->tags;
     if(!tags) tags = "";
@@ -378,7 +375,7 @@ static inline int format_dimension_collected_json_plaintext(
         "\"name\":\"%s\","
         "\"value\":" COLLECTED_NUMBER_FORMAT ","
 
-        "\"timestamp\": %u}\n",
+        "\"timestamp\": %llu}\n",
             prefix,
             hostname,
             tags_pre, tags, tags_post,
@@ -394,7 +391,7 @@ static inline int format_dimension_collected_json_plaintext(
             rd->name,
             rd->last_collected_value,
 
-            (uint32_t)rd->last_collected_time.tv_sec
+            (unsigned long long) rd->last_collected_time.tv_sec
     );
 
     return 1;
@@ -409,12 +406,12 @@ static inline int format_dimension_stored_json_plaintext(
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
 
     time_t first_t = after, last_t = before;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
 
     if(!isnan(value)) {
         const char *tags_pre = "", *tags_post = "", *tags = host->tags;
@@ -447,7 +444,7 @@ static inline int format_dimension_stored_json_plaintext(
             "\"name\":\"%s\","
             "\"value\":" CALCULATED_NUMBER_FORMAT ","
 
-            "\"timestamp\": %u}\n", 
+            "\"timestamp\": %llu}\n",
                 prefix,
                 hostname,
                 tags_pre, tags, tags_post,
@@ -461,9 +458,9 @@ static inline int format_dimension_stored_json_plaintext(
 
                 rd->id,
                 rd->name,
-                value, 
-                
-                (uint32_t) last_t
+                value,
+
+                (unsigned long long) last_t
         );
         
         return 1;
@@ -482,7 +479,7 @@ static inline int process_json_response(BUFFER *b) {
 static SIMPLE_PATTERN *charts_pattern = NULL;
 static SIMPLE_PATTERN *hosts_pattern = NULL;
 
-inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+inline int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
@@ -504,7 +501,7 @@ inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
         return 0;
     }
 
-    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
@@ -512,24 +509,24 @@ inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
     return 1;
 }
 
-inline uint32_t backend_parse_data_source(const char *source, uint32_t mode) {
+inline BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options) {
     if(!strcmp(source, "raw") || !strcmp(source, "as collected") || !strcmp(source, "as-collected") || !strcmp(source, "as_collected") || !strcmp(source, "ascollected")) {
-        mode |= BACKEND_SOURCE_DATA_AS_COLLECTED;
-        mode &= ~(BACKEND_SOURCE_BITS ^ BACKEND_SOURCE_DATA_AS_COLLECTED);
+        backend_options |= BACKEND_SOURCE_DATA_AS_COLLECTED;
+        backend_options &= ~(BACKEND_OPTIONS_SOURCE_BITS ^ BACKEND_SOURCE_DATA_AS_COLLECTED);
     }
     else if(!strcmp(source, "average")) {
-        mode |= BACKEND_SOURCE_DATA_AVERAGE;
-        mode &= ~(BACKEND_SOURCE_BITS ^ BACKEND_SOURCE_DATA_AVERAGE);
+        backend_options |= BACKEND_SOURCE_DATA_AVERAGE;
+        backend_options &= ~(BACKEND_OPTIONS_SOURCE_BITS ^ BACKEND_SOURCE_DATA_AVERAGE);
     }
     else if(!strcmp(source, "sum") || !strcmp(source, "volume")) {
-        mode |= BACKEND_SOURCE_DATA_SUM;
-        mode &= ~(BACKEND_SOURCE_BITS ^ BACKEND_SOURCE_DATA_SUM);
+        backend_options |= BACKEND_SOURCE_DATA_SUM;
+        backend_options &= ~(BACKEND_OPTIONS_SOURCE_BITS ^ BACKEND_SOURCE_DATA_SUM);
     }
     else {
         error("BACKEND: invalid data source method '%s'.", source);
     }
 
-    return mode;
+    return backend_options;
 }
 
 static void backends_main_cleanup(void *ptr) {
@@ -547,7 +544,7 @@ void *backends_main(void *ptr) {
     int default_port = 0;
     int sock = -1;
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
-    int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
+    int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
     // ------------------------------------------------------------------------
@@ -557,35 +554,39 @@ void *backends_main(void *ptr) {
             .tv_sec = 0,
             .tv_usec = 0
     };
-    int enabled             = config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", 0);
-    const char *source      = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
-    const char *type        = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
-    const char *destination = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
-    backend_prefix          = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
-    const char *hostname    = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
-    backend_update_every    = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", backend_update_every);
-    int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
-    long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", backend_update_every * 2 * 1000);
-    backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
+    int enabled                 = config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", 0);
+    const char *source          = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
+    const char *type            = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
+    const char *destination     = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
+    global_backend_prefix       = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
+    const char *hostname        = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
+    global_backend_update_every = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", global_backend_update_every);
+    int buffer_on_failures      = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
+    long timeoutms              = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", global_backend_update_every * 2 * 1000);
+
+    if(config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", (global_backend_options & BACKEND_OPTION_SEND_NAMES)))
+        global_backend_options |= BACKEND_OPTION_SEND_NAMES;
+    else
+        global_backend_options &= ~BACKEND_OPTION_SEND_NAMES;
 
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    hosts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
+    hosts_pattern  = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
 
     // ------------------------------------------------------------------------
     // validate configuration options
     // and prepare for sending data to our backend
 
-    backend_options = backend_parse_data_source(source, backend_options);
+    global_backend_options = backend_parse_data_source(source, global_backend_options);
 
     if(timeoutms < 1) {
-        error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, backend_update_every * 2 * 1000);
-        timeoutms = backend_update_every * 2 * 1000;
+        error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, global_backend_update_every * 2 * 1000);
+        timeoutms = global_backend_update_every * 2 * 1000;
     }
     timeout.tv_sec  = (timeoutms * 1000) / 1000000;
     timeout.tv_usec = (timeoutms * 1000) % 1000000;
 
-    if(!enabled || backend_update_every < 1)
+    if(!enabled || global_backend_update_every < 1)
         goto cleanup;
 
     // ------------------------------------------------------------------------
@@ -596,7 +597,7 @@ void *backends_main(void *ptr) {
         default_port = 2003;
         backend_response_checker = process_graphite_response;
 
-        if((backend_options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_graphite_plaintext;
         else
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
@@ -607,7 +608,7 @@ void *backends_main(void *ptr) {
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
 
-        if((backend_options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
         else
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
@@ -618,7 +619,7 @@ void *backends_main(void *ptr) {
         default_port = 5448;
         backend_response_checker = process_json_response;
 
-        if ((backend_options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_json_plaintext;
         else
             backend_request_formatter = format_dimension_stored_json_plaintext;
@@ -655,18 +656,18 @@ void *backends_main(void *ptr) {
             chart_backend_reconnects = 0,
             chart_backend_latency = 0;
 
-    RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, backend_update_every, RRDSET_TYPE_LINE);
+    RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, global_backend_update_every, RRDSET_TYPE_LINE);
     rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_metrics, "lost",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_metrics, "sent",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *chart_bytes = rrdset_create_localhost("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", "backends", NULL, 130610, backend_update_every, RRDSET_TYPE_AREA);
+    RRDSET *chart_bytes = rrdset_create_localhost("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", "backends", NULL, 130610, global_backend_update_every, RRDSET_TYPE_AREA);
     rrddim_add(chart_bytes, "buffered", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "lost",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "sent",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "received", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *chart_ops = rrdset_create_localhost("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", "backends", NULL, 130630, backend_update_every, RRDSET_TYPE_LINE);
+    RRDSET *chart_ops = rrdset_create_localhost("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", "backends", NULL, 130630, global_backend_update_every, RRDSET_TYPE_LINE);
     rrddim_add(chart_ops, "write",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_ops, "discard",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_ops, "reconnect", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -680,11 +681,11 @@ void *backends_main(void *ptr) {
      *
      * issue #1432 and https://www.softlab.ntua.gr/facilities/documentation/unix/unix-socket-faq/unix-socket-faq-2.html
      *
-    RRDSET *chart_latency = rrdset_create_localhost("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", "backends", NULL, 130620, backend_update_every, RRDSET_TYPE_AREA);
+    RRDSET *chart_latency = rrdset_create_localhost("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", "backends", NULL, 130620, global_backend_update_every, RRDSET_TYPE_AREA);
     rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
     */
 
-    RRDSET *chart_rusage = rrdset_create_localhost("netdata", "backend_thread_cpu", NULL, "backend", NULL, "NetData Backend Thread CPU usage", "milliseconds/s", "backends", NULL, 130630, backend_update_every, RRDSET_TYPE_STACKED);
+    RRDSET *chart_rusage = rrdset_create_localhost("netdata", "backend_thread_cpu", NULL, "backend", NULL, "NetData Backend Thread CPU usage", "milliseconds/s", "backends", NULL, 130630, global_backend_update_every, RRDSET_TYPE_STACKED);
     rrddim_add(chart_rusage, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     rrddim_add(chart_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
 
@@ -692,9 +693,9 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // prepare the backend main loop
 
-    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, backend_update_every, hostname, backend_prefix);
+    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
 
-    usec_t step_ut = backend_update_every * USEC_PER_SEC;
+    usec_t step_ut = global_backend_update_every * USEC_PER_SEC;
     time_t after = now_realtime_sec();
     int failures = 0;
     heartbeat_t hb;
@@ -747,7 +748,7 @@ void *backends_main(void *ptr) {
 
             RRDSET *st;
             rrdset_foreach_read(st, host) {
-                if(likely(backends_can_send_rrdset(backend_options, st))) {
+                if(likely(backends_can_send_rrdset(global_backend_options, st))) {
                     rrdset_rdlock(st);
 
                     count_charts++;
@@ -755,7 +756,7 @@ void *backends_main(void *ptr) {
                     RRDDIM *rd;
                     rrddim_foreach_read(rd, st) {
                         if (likely(rd->last_collected_time.tv_sec >= after)) {
-                            chart_buffered_metrics += backend_request_formatter(b, backend_prefix, host, __hostname, st, rd, after, before, backend_options);
+                            chart_buffered_metrics += backend_request_formatter(b, global_backend_prefix, host, __hostname, st, rd, after, before, global_backend_options);
                             count_dims++;
                         }
                         else {
