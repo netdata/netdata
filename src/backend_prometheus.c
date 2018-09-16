@@ -115,9 +115,11 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable)
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
+    BACKEND_OPTIONS backend_options;
     PROMETHEUS_OUTPUT_OPTIONS output_options;
     const char *prefix;
     const char *labels;
+    time_t now;
     int host_header_printed;
     char name[PROMETHEUS_VARIABLE_MAX+1];
 };
@@ -160,7 +162,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
                            , opts->labels
                            , label_post
                            , value
-                           , rv->last_updated * 1000ULL
+                           , ((rv->last_updated) ? rv->last_updated : opts->now) * 1000ULL
             );
         else
             buffer_sprintf(opts->wb, "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
@@ -237,8 +239,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                 .host = host,
                 .wb = wb,
                 .labels = (labels[0] == ',')?&labels[1]:labels,
+                .backend_options = backend_options,
                 .output_options = output_options,
                 .prefix = prefix,
+                .now = now_realtime_sec(),
                 .host_header_printed = 0
         };
         foreach_host_variable_callback(host, print_host_variables, &opts);

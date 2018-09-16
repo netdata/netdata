@@ -261,7 +261,7 @@ struct prometheus_output_options {
         { "types",      PROMETHEUS_OUTPUT_TYPES      },
         { "names",      PROMETHEUS_OUTPUT_NAMES      },
         { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
-        { "variables",  PROMETHEUS_OUTPUT_VARIABLES   },
+        { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
 
         // terminator
         { NULL, PROMETHEUS_OUTPUT_NONE },
