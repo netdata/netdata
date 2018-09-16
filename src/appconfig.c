@@ -494,10 +494,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             error("CONFIG: ignoring line %d of file '%s', name is empty.", line, filename);
             continue;
         }
-        if(!value) {
-            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', value is empty.", line, filename);
-            continue;
-        }
+
+        if(!value) value = "";
 
         struct config_option *cv = appconfig_option_index_find(co, name, 0);
 
