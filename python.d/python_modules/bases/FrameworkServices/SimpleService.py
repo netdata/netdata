@@ -56,6 +56,7 @@ class SimpleService(LimitedLogger, OldVersionCompatibility, object):
         self.module_name = self.__module__
         self.job_name = configuration.pop('job_name')
         self.override_name = configuration.pop('override_name')
+        self.autodetection_retry = self.configuration.pop('autodetection_retry')
         self.fake_name = None
 
         self._runtime_counters = RuntimeCounters(configuration=configuration)
