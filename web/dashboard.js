@@ -2080,7 +2080,7 @@ var NETDATA = window.NETDATA || {};
                     return this.xAxisFormat.format(d);
                 };
 
-                var d = new Date();
+                //var d = new Date();
                 //var t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
 
                 ret = true;
