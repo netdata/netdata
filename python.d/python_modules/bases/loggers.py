@@ -140,7 +140,7 @@ class BaseLogger(object):
         self.logger.critical(' '.join(map(str, msg)), **kwargs)
 
 
-class PythonDLogger(object):
+class Logger(object):
     def __init__(self, logger_name=PYTHON_D_LOG_NAME, log_fmt=PYTHON_D_LOG_LINE_FORMAT):
         """
         :param logger_name: <str>
@@ -155,11 +155,11 @@ class PythonDLogger(object):
 
     @property
     def log_traceback(self):
-        return PythonDLogger._LOG_TRACEBACK
+        return Logger._LOG_TRACEBACK
 
     @log_traceback.setter
     def log_traceback(self, value):
-        PythonDLogger._LOG_TRACEBACK = value
+        Logger._LOG_TRACEBACK = value
 
     def debug(self, *msg):
         self.logger.debug(*msg, extra={'module_name': self.module_name,
@@ -188,19 +188,19 @@ class PythonDLogger(object):
                                        'job_name': self.job_name or self.module_name})
 
 
-class PythonDLimitedLogger(PythonDLogger):
+class LimitedLogger(Logger):
     @limiter()
     def info(self, *msg):
-        PythonDLogger.info(self, *msg)
+        Logger.info(self, *msg)
 
     @limiter()
     def warning(self, *msg):
-        PythonDLogger.warning(self, *msg)
+        Logger.warning(self, *msg)
 
     @limiter()
     def error(self, *msg):
-        PythonDLogger.error(self, *msg)
+        Logger.error(self, *msg)
 
     @limiter()
     def alert(self, *msg):
-        PythonDLogger.alert(self, *msg)
+        Logger.alert(self, *msg)
