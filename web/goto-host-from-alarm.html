@@ -22,6 +22,13 @@
 <script type="text/javascript" src="dashboard.js?v20170724-7"></script>
 
 <script>
+function escapeUserInputXss(s) {
+    return s.toString().replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '#27;');
+}
+
 var urlOptions = {
     host: null,
     chart: null,
@@ -87,7 +94,7 @@ function gotoServerValidateUrl(id, guid, url) {
     var finalURL = netdataURL(url);
 
     setTimeout(function() {
-        document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + finalURL + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+        document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + escapeUserInputXss(finalURL) + '" target="_blank">' + escapeUserInputXss(url) + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 
         NETDATA.registry.hello(url, function(data) {
             if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
@@ -100,7 +107,7 @@ function gotoServerValidateUrl(id, guid, url) {
                     if(gotoServerMiddleClick) {
                         window.open(finalURL);
                         gotoServerMiddleClick = false;
-                        document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
+                        document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + escapeUserInputXss(finalURL) + '">' + escapeUserInputXss(url) + '</a></b><br/>(check your pop-up blocker if it fails)';
                     }
                     else {
                         document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + url + '</small>';
@@ -185,13 +192,13 @@ var netdataRegistryCallback = function(machines_array) {
         }
     }
 
-    document.getElementById('bodylog').innerHTML = "Sorry... your account is not linked to a netdata server named: <b>" + urlOptions.host + '</b>';
+    document.getElementById('bodylog').innerHTML = "Sorry... your account is not linked to a netdata server named: <b>" + escapeUserInputXss(urlOptions.host) + '</b>';
 };
 
 netdataQueryParse();
 </script>
 <body>
-<div class="container" id="">
+<div class="container">
     <div id="bodylog" style="padding-top: 8vmax; font-size: 2.0vmax;">
         <span id="message">Please wait...</span>
 

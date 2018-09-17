@@ -580,7 +580,7 @@
         // control the welcome modal and analytics
         var this_is_demo = null;
 
-        function xssFix(s) {
+        function escapeUserInputXss(s) {
             return s.toString().replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
@@ -1112,7 +1112,7 @@
 
         function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
-                url = xssFix(document.location.toString());
+                url = document.location.toString();
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
@@ -1121,7 +1121,7 @@
 
             // console.log('netdataURL: ' + url + hash);
 
-            return url + hash;
+            return escapeUserInputXss(url + hash);
         }
 
         function netdataReload(url) {
