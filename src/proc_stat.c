@@ -122,7 +122,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, do_core_throttle_count = -1, do_package_throttle_count = -1, do_scaling_cur_freq = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL;
-    static RRDSETVAR *cpus_var = NULL;
+    static RRDVAR *cpus_var = NULL;
     size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
@@ -314,7 +314,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                     rrddim_hide(cpu_chart->st, "idle");
 
                     if(unlikely(core == 0 && cpus_var == NULL))
-                        cpus_var = rrdsetvar_custom_chart_variable_create(cpu_chart->st, "processors");
+                        cpus_var = rrdvar_custom_host_variable_create(localhost, "active_processors");
                 }
                 else rrdset_next(cpu_chart->st);
 
@@ -561,7 +561,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     }
 
     if(cpus_var)
-        rrdsetvar_custom_chart_variable_set(cpus_var, cores_found);
+        rrdvar_custom_host_variable_set(localhost, cpus_var, cores_found);
 
     return 0;
 }

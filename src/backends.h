@@ -2,21 +2,27 @@
 #ifndef NETDATA_BACKENDS_H
 #define NETDATA_BACKENDS_H 1
 
-#define BACKEND_SOURCE_DATA_AS_COLLECTED 0x00000001
-#define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
-#define BACKEND_SOURCE_DATA_SUM          0x00000004
+typedef enum backend_options {
+    BACKEND_OPTION_NONE              = 0,
 
-#define BACKEND_SOURCE_BITS (BACKEND_SOURCE_DATA_AS_COLLECTED|BACKEND_SOURCE_DATA_AVERAGE|BACKEND_SOURCE_DATA_SUM)
+    BACKEND_SOURCE_DATA_AS_COLLECTED = (1 << 0),
+    BACKEND_SOURCE_DATA_AVERAGE      = (1 << 1),
+    BACKEND_SOURCE_DATA_SUM          = (1 << 2),
 
-extern int backend_send_names;
-extern int backend_update_every;
-extern uint32_t backend_options;
-extern const char *backend_prefix;
+    BACKEND_OPTION_SEND_NAMES        = (1 << 16)
+} BACKEND_OPTIONS;
+
+#define BACKEND_OPTIONS_SOURCE_BITS (BACKEND_SOURCE_DATA_AS_COLLECTED|BACKEND_SOURCE_DATA_AVERAGE|BACKEND_SOURCE_DATA_SUM)
+#define BACKEND_OPTIONS_DATA_SOURCE(backend_options) (backend_options & BACKEND_OPTIONS_SOURCE_BITS)
+
+extern int global_backend_update_every;
+extern BACKEND_OPTIONS global_backend_options;
+extern const char *global_backend_prefix;
 
 extern void *backends_main(void *ptr);
 
-extern int backends_can_send_rrdset(uint32_t options, RRDSET *st);
-extern uint32_t backend_parse_data_source(const char *source, uint32_t mode);
+extern int backends_can_send_rrdset(BACKEND_OPTIONS options, RRDSET *st);
+extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS mode);
 
 extern calculated_number backend_calculate_value_from_stored_data(
         RRDSET *st                  // the chart
