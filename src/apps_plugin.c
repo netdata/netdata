@@ -1360,7 +1360,7 @@ int file_descriptor_compare(void* a, void* b) {
         return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
 }
 
-int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
+// int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
 
 avl_tree all_files_index = {
         NULL,
