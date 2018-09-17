@@ -213,7 +213,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.serverDefault = netdataServer;
     else {
         var s = NETDATA._scriptSource();
-        if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)*$/g, "");
+        if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js\?.*$/g, "");
         else {
             console.log('WARNING: Cannot detect the URL of the netdata server.');
             NETDATA.serverDefault = null;
@@ -2080,8 +2080,8 @@ var NETDATA = window.NETDATA || {};
                     return this.xAxisFormat.format(d);
                 };
 
-                var d = new Date();
-                var t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
+                //var d = new Date();
+                //var t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
 
                 ret = true;
             }
@@ -2212,7 +2212,7 @@ var NETDATA = window.NETDATA || {};
                 'milliseconds': {
                     check: function (max) { return NETDATA.options.current.seconds_as_time && max < 1000; },
                     convert: function(milliseconds) {
-                        tms = Math.round(milliseconds * 10);
+                        var tms = Math.round(milliseconds * 10);
                         milliseconds = Math.floor(tms / 10);
 
                         tms -= milliseconds * 10;
@@ -2404,7 +2404,7 @@ var NETDATA = window.NETDATA || {};
                             }
 
                             return value / tdivider;
-                        }
+                        };
                     }
                     else {
                         // the caller did not give data-common-units
@@ -3081,7 +3081,7 @@ var NETDATA = window.NETDATA || {};
 
         var invisibleSearchableText = function() {
             return '<span style="position:absolute; opacity: 0; width: 0px;">' + that.id + '</span>';
-        }
+        };
 
         /* init() private
          * initialize state variables
@@ -4079,10 +4079,7 @@ var NETDATA = window.NETDATA || {};
                 if(typeof label === 'undefined') continue;
                 if(typeof this.element_legend_childs.series[label] === 'undefined') continue;
 
-                if(show_undefined)
-                    this.legendSetLabelValue(label, null);
-                else
-                    this.legendSetLabelValue(label, this.data.view_latest_values[i]);
+                this.legendSetLabelValue(label, this.data.view_latest_values[i]);
             }
         };
 
@@ -4882,7 +4879,7 @@ var NETDATA = window.NETDATA || {};
                 this.__redraw_on_unhide = true;
 
                 if(this.debug === true)
-                    this.log("drawn while not visible")
+                    this.log("drawn while not visible");
             }
 
             if(this.selected === true)

@@ -1984,7 +1984,7 @@ void update_systemd_services_charts(
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
             if(unlikely(!cg->rd_cpu))
-                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, hz, RRD_ALGORITHM_INCREMENTAL);
+                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
@@ -2253,8 +2253,8 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                rrddim_add(cg->st_cpu, "user", NULL, 100, hz, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_cpu, "system", NULL, 100, hz, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
             }
             else
                 rrdset_next(cg->st_cpu);

@@ -400,7 +400,7 @@ extern pid_t pid_max;
 extern pid_t get_system_pid_max(void);
 
 /* Number of ticks per second */
-extern unsigned int hz;
+extern unsigned int system_hz;
 extern void get_system_HZ(void);
 
 extern int recursively_delete_dir(const char *path, const char *reason);
