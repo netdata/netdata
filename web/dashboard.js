@@ -213,7 +213,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.serverDefault = netdataServer;
     else {
         var s = NETDATA._scriptSource();
-        if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js\?.*$/g, "");
+        if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
         else {
             console.log('WARNING: Cannot detect the URL of the netdata server.');
             NETDATA.serverDefault = null;
