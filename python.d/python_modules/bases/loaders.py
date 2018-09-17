@@ -35,7 +35,10 @@ def dict_constructor(loader, node):
     return OrderedDict(loader.construct_pairs(node))
 
 
-def safe_load(stream):
+YamlSafeLoader.add_constructor(DEFAULT_MAPPING_TAG, dict_constructor)
+
+
+def yaml_load(stream):
     loader = YamlSafeLoader(stream)
     try:
         return loader.get_single_data()
@@ -43,41 +46,27 @@ def safe_load(stream):
         loader.dispose()
 
 
-YamlSafeLoader.add_constructor(DEFAULT_MAPPING_TAG, dict_constructor)
+def load_module(name, path):
+    module = SourceFileLoader(name, path)
+    if isinstance(module, types.ModuleType):
+        return module
+    return module.load_module()
 
 
-class YamlOrderedLoader:
-    @staticmethod
-    def load_config_from_file(file_name):
-        opened, loaded = False, False
-        try:
-            stream = open(file_name, 'r')
-            opened = True
-            loader = YamlSafeLoader(stream)
-            loaded = True
-            parsed = loader.get_single_data() or dict()
-        except Exception as error:
-            return dict(), error
-        else:
-            return parsed, None
-        finally:
-            if opened:
-                stream.close()
-            if loaded:
-                loader.dispose()
+def safe_load_module(name, path):
+    try:
+        return load_module(name, path), None
+    except Exception as error:
+        return None, error
 
 
-class SourceLoader:
-    @staticmethod
-    def load_module_from_file(name, path):
-        try:
-            loaded = SourceFileLoader(name, path)
-            if isinstance(loaded, types.ModuleType):
-                return loaded, None
-            return loaded.load_module(), None
-        except Exception as error:
-            return None, error
+def load_config(file_name):
+    with open(file_name, 'r') as stream:
+        return yaml_load(stream)
 
 
-class ModuleAndConfigLoader(YamlOrderedLoader, SourceLoader):
-    pass
+def safe_load_config(file_name):
+    try:
+        return load_config(file_name), None
+    except Exception as error:
+        return None, error
