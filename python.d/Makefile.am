@@ -23,6 +23,7 @@ dist_python_DATA = \
     cpuidle.chart.py \
     dns_query_time.chart.py \
     dnsdist.chart.py \
+    dockerd.chart.py \
     dovecot.chart.py \
     elasticsearch.chart.py \
     example.chart.py \
