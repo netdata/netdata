@@ -752,53 +752,55 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
-    snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+    snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
-    FILE *fp = mypopen(buffer, &cgroup_pid);
-    if(fp) {
-        char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
-            trim(s);
-
-            if(*s && *s != '\n') {
-                char *t = s;
-                while(*t && *t != ' ') t++;
-                if(*t == ' ') {
-                    *t = '\0';
-                    t++;
-                }
-
-                if(!*s) {
-                    error("CGROUP: empty host interface returned by script");
-                    continue;
-                }
-
-                if(!*t) {
-                    error("CGROUP: empty guest interface returned by script");
-                    continue;
-                }
-
-                struct cgroup_network_interface *i = callocz(1, sizeof(struct cgroup_network_interface));
-                i->host_device = strdupz(s);
-                i->container_device = strdupz(t);
-                i->next = cg->interfaces;
-                cg->interfaces = i;
-
-                info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
-
-                // register a device rename to proc_net_dev.c
-                netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
-            }
-        }
-
-        mypclose(fp, cgroup_pid);
-        // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", command, cg->id);
+    FILE *fp = mypopen(command, &cgroup_pid);
+    if(!fp) {
+        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
+        return;
     }
-    else
-        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
+
+    char *s;
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+        trim(s);
+
+        if(*s && *s != '\n') {
+            char *t = s;
+            while(*t && *t != ' ') t++;
+            if(*t == ' ') {
+                *t = '\0';
+                t++;
+            }
+
+            if(!*s) {
+                error("CGROUP: empty host interface returned by script");
+                continue;
+            }
+
+            if(!*t) {
+                error("CGROUP: empty guest interface returned by script");
+                continue;
+            }
+
+            struct cgroup_network_interface *i = callocz(1, sizeof(struct cgroup_network_interface));
+            i->host_device = strdupz(s);
+            i->container_device = strdupz(t);
+            i->next = cg->interfaces;
+            cg->interfaces = i;
+
+            info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
+
+            // register a device rename to proc_net_dev.c
+            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
+        }
+    }
+
+    mypclose(fp, cgroup_pid);
+    // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
 }
 
 static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
@@ -846,14 +848,15 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+    char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
 
-    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", buffer, cg->id);
-    FILE *fp = mypopen(buffer, &cgroup_pid);
+    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->id);
+    FILE *fp = mypopen(command, &cgroup_pid);
     if(fp) {
-        // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
+        // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", command, cg->id);
+        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
         char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
         // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
         mypclose(fp, cgroup_pid);
@@ -873,7 +876,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         }
     }
     else
-        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
+        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
 }
 
 static inline struct cgroup *cgroup_add(const char *id) {

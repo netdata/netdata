@@ -459,17 +459,18 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     if(setresuid(0, 0, 0) == -1)
         error("setresuid(0, 0, 0) failed.");
 
-    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
+        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
     else
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
+        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
 
-    info("running: %s", buffer);
+    info("running: %s", command);
 
     pid_t cgroup_pid;
-    FILE *fp = mypopene(buffer, &cgroup_pid, environment);
+    FILE *fp = mypopene(command, &cgroup_pid, environment);
     if(fp) {
+        char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
         char *s;
         while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
             trim(s);
@@ -490,7 +491,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
         mypclose(fp, cgroup_pid);
     }
     else
-        error("cannot execute cgroup-network helper script: %s", buffer);
+        error("cannot execute cgroup-network helper script: %s", command);
 }
 
 int is_valid_path_symbol(char c) {
