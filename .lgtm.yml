@@ -1,0 +1,11 @@
+# docs: https://lgtm.com/help/lgtm/lgtm.yml-configuration-file
+
+path_classifiers:
+  test:
+    - exclude: python.d/python_modules/third_party/*
+    - exclude: python.d/python_modules/urllib3/*
+    - exclude: python.d/python_modules/pyyaml2/*
+    - exclude: python.d/python_modules/pyyaml3/*
+queries:
+  - exclude: cpp/command-line-injection
+  - exclude: cpp/fixme-comment
