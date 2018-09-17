@@ -2,7 +2,7 @@
 #include "common.h"
 
 struct per_core_single_number_file {
-    char found:1;
+    unsigned char found:1;
     const char *filename;
     int fd;
     collected_number value;
