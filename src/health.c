@@ -179,9 +179,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         error("HEALTH: Cannot popen(\"%s\", \"r\").", command_to_run);
         goto done;
     }
-    debug(D_HEALTH, "HEALTH reading from command");
-    char *s = fgets(command_to_run, FILENAME_MAX, fp);
-    (void)s;
+    debug(D_HEALTH, "HEALTH reading from command (discarding command's output)");
+    char buffer[100 + 1];
+    while(fgets(buffer, 100, fp) != NULL) ;
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 

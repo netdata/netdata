@@ -858,7 +858,7 @@ void *tc_main(void *ptr) {
 
     struct rusage thread;
 
-    char buffer[TC_LINE_MAX+1] = "";
+    char command[FILENAME_MAX + 1];
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
 
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
@@ -877,23 +877,24 @@ void *tc_main(void *ptr) {
 #endif
     uint32_t first_hash;
 
-    snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
-    char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
+    snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
+    char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
     while(!netdata_exit) {
         FILE *fp;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
-        snprintfz(buffer, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
-        debug(D_TC_LOOP, "executing '%s'", buffer);
+        snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
+        debug(D_TC_LOOP, "executing '%s'", command);
 
-        fp = mypopen(buffer, (pid_t *)&tc_child_pid);
+        fp = mypopen(command, (pid_t *)&tc_child_pid);
         if(unlikely(!fp)) {
-            error("TC: Cannot popen(\"%s\", \"r\").", buffer);
+            error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
+        char buffer[TC_LINE_MAX+1] = "";
         while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
             if(unlikely(netdata_exit)) break;
 
