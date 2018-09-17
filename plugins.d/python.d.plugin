@@ -299,7 +299,7 @@ class ModuleChecker(multiprocessing.Process, Logger):
             conf = JobConf()
             conf.set_defaults_from_module(module)
             conf.set_defaults_from_config(module_config)
-            conf.set_defaults_from_config(module_config[job_name])
+            conf.update(module_config[job_name])
             conf.set_job_name(job_name)
             conf.set_override_name(conf.pop('name'))
 
@@ -348,7 +348,7 @@ class PythonD(Logger):
         self.tasks = list()
         self.results = list()
         self.task_queue = multiprocessing.JoinableQueue()
-        # multiprocessing.Queue().empty() can be bugged
+        # TODO multiprocessing.Queue().empty() bugged?
         self.result_queue = multiprocessing.JoinableQueue()
 
     def shutdown(self, msg=str()):
