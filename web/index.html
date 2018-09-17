@@ -572,8 +572,20 @@
         // enable registry updates
         var netdataRegistry = true;
 
+        // forward definition only - not used here
+        var netdataServer = undefined;
+        var netdataServerStatic = undefined;
+        var netdataCheckXSS = undefined;
+
         // control the welcome modal and analytics
         var this_is_demo = null;
+
+        function xssFix(s) {
+            return s.toString().replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '#27;');
+        }
 
         // --------------------------------------------------------------------
         // urlOptions
@@ -693,7 +705,7 @@
                     urlOptions.highlight = true;
                 }
                 else
-                    urlOptions.highlight = false
+                    urlOptions.highlight = false;
 
                 switch(urlOptions.mode) {
                     case 'print':
@@ -1071,7 +1083,7 @@
             a1 += '<li role="separator" class="divider"></li>';
 
             el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>'
+            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
 
             document.getElementById('mynetdata_servers').innerHTML = el;
             document.getElementById('mynetdata_servers2').innerHTML = el;
@@ -1100,7 +1112,7 @@
 
         function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
-                url = document.location.toString();
+                url = xssFix(document.location.toString());
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
@@ -1820,9 +1832,9 @@
                 var hi = 0, hlen = hcharts.length;
                 while(hi < hlen) {
                     if(typeof hcharts[hi] === 'function')
-                        head += hcharts[hi](netdataDashboard.os, chart.id).replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
+                        head += hcharts[hi](netdataDashboard.os, chart.id).replace(/CHART_DURATION/g, duration.toString()).replace(/CHART_UNIQUE_ID/g, chart.id);
                     else
-                        head += hcharts[hi].replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
+                        head += hcharts[hi].replace(/CHART_DURATION/g, duration.toString()).replace(/CHART_UNIQUE_ID/g, chart.id);
                     hi++;
                 }
             }
@@ -2173,7 +2185,7 @@
                         dimensions = ' of the sum of all dimensions ';
 
                     if(typeof alarm.lookup_dimensions !== 'undefined') {
-                        var d = alarm.lookup_dimensions.replace('|', ',');
+                        var d = alarm.lookup_dimensions.replace(/|/g, ',');
                         var x = d.split(',');
                         if(x.length > 1)
                             dimensions = 'of the sum of dimensions <code>' + alarm.lookup_dimensions + '</code> ';
@@ -2184,7 +2196,7 @@
                     return '<code>' + alarm.lookup_method + '</code> '
                         + dimensions + ', of chart <code>' + alarm.chart + '</code>'
                         + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, { space: '&nbsp;' }) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, { space: '&nbsp;' }) + '</code>'
-                        + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
+                        + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(/ /g, ',&nbsp;') + '</code>'):'')
                         + '.';
                 }
 
@@ -2268,7 +2280,6 @@
                 }
 
                 // find the proper family of each alarm
-                var now = Date.now();
                 var x, family, alarm;
                 var count_active = 0;
                 var count_all = 0;
@@ -2759,7 +2770,7 @@
         }
 
         function alarmsCallback(data) {
-            var count = 0;
+            var count = 0, x;
             for(x in data.alarms) {
                 if(!data.alarms.hasOwnProperty(x)) continue;
 
@@ -3269,7 +3280,7 @@
                     loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
                     $('#loadSnapshotModal').modal('hide');
 
-                    netdataShowAlarms === false;
+                    netdataShowAlarms = false;
                     netdataRegistry = false;
                     netdataServer = tmpSnapshotData.server;
                     NETDATA.serverDefault = netdataServer;
@@ -3517,7 +3528,7 @@
                 var start_date = new Date(start_ms);
                 var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + '-' + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
 
-                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  saveSnapshotViewDuration.toString() + '.snapshot'
+                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  saveSnapshotViewDuration.toString() + '.snapshot';
                 saveSnapshotSetCompression(saveSnapshotCompression);
 
                 var min = options.update_every;
@@ -3647,7 +3658,7 @@
                         var data = state.data;
                         state.data = null;
                         data.state = null;
-                        str = JSON.stringify(data);
+                        var str = JSON.stringify(data);
 
                         if (typeof str === 'string') {
                             var cstr = compress(str);
@@ -4406,7 +4417,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverStatic + 'dashboard_info.js?v20180628-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20180916-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -4472,7 +4483,7 @@
 
             document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
             return false;
-        }
+        };
 
         // our entry point
         // var netdataStarted = performance.now();
@@ -5662,7 +5673,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-dismiss="modal">keep it</button>
-                    <a href="#" onclick="notifyForDeleteRegistry(true); return false;" type="button" class="btn btn-danger">delete it</a>
+                    <a href="#" onclick="notifyForDeleteRegistry(); return false;" type="button" class="btn btn-danger">delete it</a>
                 </div>
             </div>
         </div>
@@ -5698,7 +5709,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-dismiss="modal">cancel</button>
-                    <a href="#" onclick="notifyForSwitchRegistry(true); return false;" type="button" class="btn btn-danger">impersonate</a>
+                    <a href="#" onclick="notifyForSwitchRegistry(); return false;" type="button" class="btn btn-danger">impersonate</a>
                 </div>
             </div>
         </div>
@@ -5729,6 +5740,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180628-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180916-1"></script>
 </body>
 </html>

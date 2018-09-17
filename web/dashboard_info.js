@@ -17,7 +17,8 @@ netdataDashboard.menu = {
     'services': {
         title: 'systemd Services',
         icon: '<i class="fas fa-cogs"></i>',
-        info: 'Resources utilization of systemd services. netdata monitors all systemd services via cgroups (the resources accounting used by containers). '
+        info: 'Resources utilization of systemd services. netdata monitors all systemd services via CGROUPS ' +
+            '(the resources accounting used by containers). '
     },
 
     'ap': {
@@ -29,7 +30,15 @@ netdataDashboard.menu = {
     'tc': {
         title: 'Quality of Service',
         icon: '<i class="fas fa-globe"></i>',
-        info: 'Netdata collects and visualizes <code>tc</code> class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
+        info: 'Netdata collects and visualizes <code>tc</code> class utilization using its ' +
+            '<a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. ' +
+            'If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, ' +
+            'netdata automatically collects interface and class names. If your QoS configuration includes overheads ' +
+            'calculation, the values shown here will include these overheads (the total bandwidth for the same ' +
+            'interface as reported in the Network Interfaces section, will be lower than the total bandwidth ' +
+            'reported here). QoS data collection may have a slight time difference compared to the interface ' +
+            '(QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds ' +
+            'should be justified).'
     },
 
     'net': {
@@ -41,7 +50,13 @@ netdataDashboard.menu = {
     'ipv4': {
         title: 'IPv4 Networking',
         icon: '<i class="fas fa-cloud"></i>',
-        info: 'Metrics for the IPv4 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv4" target="_blank">Internet Protocol version 4 (IPv4)</a> is the fourth version of the Internet Protocol (IP). It is one of the core protocols of standards-based internetworking methods in the Internet. IPv4 is a connectionless protocol for use on packet-switched networks. It operates on a best effort delivery model, in that it does not guarantee delivery, nor does it assure proper sequencing or avoidance of duplicate delivery. These aspects, including data integrity, are addressed by an upper layer transport protocol, such as the Transmission Control Protocol (TCP).'
+        info: 'Metrics for the IPv4 stack of the system. ' +
+            '<a href="https://en.wikipedia.org/wiki/IPv4" target="_blank">Internet Protocol version 4 (IPv4)</a> is ' +
+            'the fourth version of the Internet Protocol (IP). It is one of the core protocols of standards-based ' +
+            'internetworking methods in the Internet. IPv4 is a connectionless protocol for use on packet-switched ' +
+            'networks. It operates on a best effort delivery model, in that it does not guarantee delivery, nor does ' +
+            'it assure proper sequencing or avoidance of duplicate delivery. These aspects, including data integrity, ' +
+            'are addressed by an upper layer transport protocol, such as the Transmission Control Protocol (TCP).'
     },
 
     'ipv6': {
@@ -220,7 +235,7 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>redis</b>. Redis (REmote DIctionary Server) is a software project that implements data structure servers. It is open-source, networked, in-memory, and stores keys with optional durability.'
     },
 
-     'rethinkdbs': {
+    'rethinkdbs': {
         title: 'RethinkDB',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>rethinkdb</b>. RethinkDB is the first open-source scalable database built for realtime applications'
@@ -412,7 +427,6 @@ netdataDashboard.menu = {
 };
 
 
-
 // ----------------------------------------------------------------------------
 // submenus
 
@@ -513,8 +527,8 @@ netdataDashboard.submenu = {
 
     'system.softnet_stat': {
         title: 'softnet',
-        info: function(os) {
-            if(os === 'linux')
+        info: function (os) {
+            if (os === 'linux')
                 return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for CPUs SoftIRQs related to network receive work.';
@@ -523,8 +537,8 @@ netdataDashboard.submenu = {
 
     'cpu.softnet_stat': {
         title: 'softnet',
-        info: function(os) {
-            if(os === 'linux')
+        info: function (os) {
+            if (os === 'linux')
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code> and/or <code>net.core.netdev_budget_usecs</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
@@ -572,7 +586,6 @@ netdataDashboard.submenu = {
 };
 
 
-
 // ----------------------------------------------------------------------------
 // chart
 
@@ -587,7 +600,7 @@ netdataDashboard.submenu = {
 //
 netdataDashboard.context = {
     'system.cpu': {
-        info: function(os) {
+        info: function (os) {
             void(os);
             return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
@@ -602,10 +615,10 @@ netdataDashboard.context = {
     },
 
     'system.io': {
-        info: function(os) {
+        info: function (os) {
             var s = 'Total Disk I/O, for all physical disks. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.';
 
-            if(os === 'linux')
+            if (os === 'linux')
                 return s + ' Physical are all the disks that are listed in <code>/sys/block</code>, but do not exist in <code>/sys/devices/virtual/block</code>.';
             else
                 return s;
@@ -664,10 +677,10 @@ netdataDashboard.context = {
     },
 
     'system.net': {
-        info: function(os) {
+        info: function (os) {
             var s = 'Total bandwidth of all physical network interfaces. This does not include <code>lo</code>, VPNs, network bridges, IFB devices, bond interfaces, etc. Only the bandwidth of physical network interfaces is aggregated.';
 
-            if(os === 'linux')
+            if (os === 'linux')
                 return s + ' Physical are all the network interfaces that are listed in <code>/proc/net/dev</code>, but do not exist in <code>/sys/devices/virtual/net</code>.';
             else
                 return s;
@@ -725,9 +738,9 @@ netdataDashboard.context = {
 
     'mem.ksm_ratios': {
         heads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Savings"'
@@ -743,7 +756,7 @@ netdataDashboard.context = {
     },
 
     'mem.pgfaults': {
-    	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory.'
+        info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory.'
     },
 
     'mem.committed': {
@@ -894,10 +907,10 @@ netdataDashboard.context = {
 
     'tc.qos': {
         heads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
 
-                if(id.match(/.*-ifb$/))
+                if (id.match(/.*-ifb$/))
                     return netdataDashboard.gaugeChart('Inbound', '12%', '', '#5555AA');
                 else
                     return netdataDashboard.gaugeChart('Outbound', '12%', '', '#AA9900');
@@ -910,9 +923,9 @@ netdataDashboard.context = {
 
     'net.net': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                if(id.match(/^cgroup_.*/)) {
+                if (id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
                         iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
@@ -925,9 +938,9 @@ netdataDashboard.context = {
                 else
                     return '';
             },
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                if(id.match(/^cgroup_.*/)) {
+                if (id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
                         iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
@@ -942,16 +955,16 @@ netdataDashboard.context = {
             }
         ],
         heads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                if(!id.match(/^cgroup_.*/))
+                if (!id.match(/^cgroup_.*/))
                     return netdataDashboard.gaugeChart('Received', '12%', 'received');
                 else
                     return '';
             },
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                if(!id.match(/^cgroup_.*/))
+                if (!id.match(/^cgroup_.*/))
                     return netdataDashboard.gaugeChart('Sent', '12%', 'sent');
                 else
                     return '';
@@ -1044,38 +1057,38 @@ netdataDashboard.context = {
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +
-        '<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
-        '<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
-        '<li><strong>slow queries</strong> counts the number of statements that took more than <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_long_query_time" target="_blank">long_query_time</a> seconds to be executed.' +
-        ' For more information about slow queries check the mysql <a href="http://dev.mysql.com/doc/refman/5.7/en/slow-query-log.html" target="_blank">slow query log</a>.</li>' +
-        '</ul>'
+            '<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
+            '<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
+            '<li><strong>slow queries</strong> counts the number of statements that took more than <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_long_query_time" target="_blank">long_query_time</a> seconds to be executed.' +
+            ' For more information about slow queries check the mysql <a href="http://dev.mysql.com/doc/refman/5.7/en/slow-query-log.html" target="_blank">slow query log</a>.</li>' +
+            '</ul>'
     },
 
     'mysql.handlers': {
         info: 'Usage of the internal handlers of mysql. This chart provides very good insights of what the mysql server is actually doing.' +
-        ' (if the chart is not showing all these dimensions it is because they are zero - set <strong>Which dimensions to show?</strong> to <strong>All</strong> from the dashboard settings, to render even the zero values)<ul>' +
-        '<li><strong>commit</strong>, the number of internal <a href="http://dev.mysql.com/doc/refman/5.7/en/commit.html" target="_blank">COMMIT</a> statements.</li>' +
-        '<li><strong>delete</strong>, the number of times that rows have been deleted from tables.</li>' +
-        '<li><strong>prepare</strong>, a counter for the prepare phase of two-phase commit operations.</li>' +
-        '<li><strong>read first</strong>, the number of times the first entry in an index was read. A high value suggests that the server is doing a lot of full index scans; e.g. <strong>SELECT col1 FROM foo</strong>, with col1 indexed.</li>' +
-        '<li><strong>read key</strong>, the number of requests to read a row based on a key. If this value is high, it is a good indication that your tables are properly indexed for your queries.</li>' +
-        '<li><strong>read next</strong>, the number of requests to read the next row in key order. This value is incremented if you are querying an index column with a range constraint or if you are doing an index scan.</li>' +
-        '<li><strong>read prev</strong>, the number of requests to read the previous row in key order. This read method is mainly used to optimize <strong>ORDER BY ... DESC</strong>.</li>' +
-        '<li><strong>read rnd</strong>, the number of requests to read a row based on a fixed position. A high value indicates you are doing a lot of queries that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins that do not use keys properly.</li>' +
-        '<li><strong>read rnd next</strong>, the number of requests to read the next row in the data file. This value is high if you are doing a lot of table scans. Generally this suggests that your tables are not properly indexed or that your queries are not written to take advantage of the indexes you have.</li>' +
-        '<li><strong>rollback</strong>, the number of requests for a storage engine to perform a rollback operation.</li>' +
-        '<li><strong>savepoint</strong>, the number of requests for a storage engine to place a savepoint.</li>' +
-        '<li><strong>savepoint rollback</strong>, the number of requests for a storage engine to roll back to a savepoint.</li>' +
-        '<li><strong>update</strong>, the number of requests to update a row in a table.</li>' +
-        '<li><strong>write</strong>, the number of requests to insert a row in a table.</li>' +
-        '</ul>'
+            ' (if the chart is not showing all these dimensions it is because they are zero - set <strong>Which dimensions to show?</strong> to <strong>All</strong> from the dashboard settings, to render even the zero values)<ul>' +
+            '<li><strong>commit</strong>, the number of internal <a href="http://dev.mysql.com/doc/refman/5.7/en/commit.html" target="_blank">COMMIT</a> statements.</li>' +
+            '<li><strong>delete</strong>, the number of times that rows have been deleted from tables.</li>' +
+            '<li><strong>prepare</strong>, a counter for the prepare phase of two-phase commit operations.</li>' +
+            '<li><strong>read first</strong>, the number of times the first entry in an index was read. A high value suggests that the server is doing a lot of full index scans; e.g. <strong>SELECT col1 FROM foo</strong>, with col1 indexed.</li>' +
+            '<li><strong>read key</strong>, the number of requests to read a row based on a key. If this value is high, it is a good indication that your tables are properly indexed for your queries.</li>' +
+            '<li><strong>read next</strong>, the number of requests to read the next row in key order. This value is incremented if you are querying an index column with a range constraint or if you are doing an index scan.</li>' +
+            '<li><strong>read prev</strong>, the number of requests to read the previous row in key order. This read method is mainly used to optimize <strong>ORDER BY ... DESC</strong>.</li>' +
+            '<li><strong>read rnd</strong>, the number of requests to read a row based on a fixed position. A high value indicates you are doing a lot of queries that require sorting of the result. You probably have a lot of queries that require MySQL to scan entire tables or you have joins that do not use keys properly.</li>' +
+            '<li><strong>read rnd next</strong>, the number of requests to read the next row in the data file. This value is high if you are doing a lot of table scans. Generally this suggests that your tables are not properly indexed or that your queries are not written to take advantage of the indexes you have.</li>' +
+            '<li><strong>rollback</strong>, the number of requests for a storage engine to perform a rollback operation.</li>' +
+            '<li><strong>savepoint</strong>, the number of requests for a storage engine to place a savepoint.</li>' +
+            '<li><strong>savepoint rollback</strong>, the number of requests for a storage engine to roll back to a savepoint.</li>' +
+            '<li><strong>update</strong>, the number of requests to update a row in a table.</li>' +
+            '<li><strong>write</strong>, the number of requests to insert a row in a table.</li>' +
+            '</ul>'
     },
 
     'mysql.table_locks': {
         info: 'MySQL table locks counters: <ul>' +
-        '<li><strong>immediate</strong>, the number of times that a request for a table lock could be granted immediately.</li>' +
-        '<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
-        '</ul>'
+            '<li><strong>immediate</strong>, the number of times that a request for a table lock could be granted immediately.</li>' +
+            '<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
+            '</ul>'
     },
 
     // ------------------------------------------------------------------------
@@ -1084,57 +1097,57 @@ netdataDashboard.context = {
 
     'postgres.db_stat_blks': {
         info: 'Blocks reads from disk or cache.<ul>' +
-        '<li><strong>blks_read:</strong> number of disk blocks read in this database.</li>' +
-        '<li><strong>blks_hit:</strong> number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system&#39;s file system cache)</li>' +
-        '</ul>'
+            '<li><strong>blks_read:</strong> number of disk blocks read in this database.</li>' +
+            '<li><strong>blks_hit:</strong> number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system&#39;s file system cache)</li>' +
+            '</ul>'
     },
     'postgres.db_stat_tuple_write': {
         info: '<ul><li>Number of rows inserted/updated/deleted.</li>' +
-        '<li><strong>conflicts:</strong> number of queries canceled due to conflicts with recovery in this database. (Conflicts occur only on standby servers; see <a href="https://www.postgresql.org/docs/10/static/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW" target="_blank">pg_stat_database_conflicts</a> for details.)</li>' +
-        '</ul>'
+            '<li><strong>conflicts:</strong> number of queries canceled due to conflicts with recovery in this database. (Conflicts occur only on standby servers; see <a href="https://www.postgresql.org/docs/10/static/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW" target="_blank">pg_stat_database_conflicts</a> for details.)</li>' +
+            '</ul>'
     },
     'postgres.db_stat_temp_bytes': {
         info: 'Temporary files can be created on disk for sorts, hashes, and temporary query results.'
     },
     'postgres.db_stat_temp_files': {
         info: '<ul>' +
-        '<li><strong>files:</strong> number of temporary files created by queries. All temporary files are counted, regardless of why the temporary file was created (e.g., sorting or hashing).</li>' +
-        '</ul>'
+            '<li><strong>files:</strong> number of temporary files created by queries. All temporary files are counted, regardless of why the temporary file was created (e.g., sorting or hashing).</li>' +
+            '</ul>'
     },
     'postgres.archive_wal': {
-         info: 'WAL archiving.<ul>' +
-        '<li><strong>total:</strong> total files.</li>' +
-        '<li><strong>ready:</strong> WAL waiting to be archived.</li>' +
-        '<li><strong>done:</strong> WAL successfully archived' +
-        'Ready WAL can indicate archive_command is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>.</li>' +
-        '</ul>'
+        info: 'WAL archiving.<ul>' +
+            '<li><strong>total:</strong> total files.</li>' +
+            '<li><strong>ready:</strong> WAL waiting to be archived.</li>' +
+            '<li><strong>done:</strong> WAL successfully archived. ' +
+            'Ready WAL can indicate archive_command is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>.</li>' +
+            '</ul>'
     },
     'postgres.checkpointer': {
         info: 'Number of checkpoints.<ul>' +
-        '<li><strong>scheduled:</strong> when checkpoint_timeout is reached.</li>' +
-        '<li><strong>requested:</strong> when max_wal_size is reached.</li>' +
-        '</ul>' +
-        'For more information see <a href="https://www.postgresql.org/docs/current/static/wal-configuration.html" target="_blank">WAL Configuration</a>.'
+            '<li><strong>scheduled:</strong> when checkpoint_timeout is reached.</li>' +
+            '<li><strong>requested:</strong> when max_wal_size is reached.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/static/wal-configuration.html" target="_blank">WAL Configuration</a>.'
     },
     'postgres.autovacuum': {
-        info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon.' +
-        'For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
+        info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon. ' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
     },
     'postgres.standby_delta': {
         info: 'Streaming replication delta.<ul>' +
-        '<li><strong>sent_delta:</strong> replication delta sent to standby.</li>' +
-        '<li><strong>write_delta:</strong> replication delta written to disk by this standby.</li>' +
-        '<li><strong>flush_delta:</strong> replication delta flushed to disk by this standby server.</li>' +
-        '<li><strong>replay_delta:</strong> replication delta replayed into the database on this standby server.</li>' +
-        '</ul>' +
-        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#SYNCHRONOUS-REPLICATION" target="_blank">Synchronous Replication</a>.'
+            '<li><strong>sent_delta:</strong> replication delta sent to standby.</li>' +
+            '<li><strong>write_delta:</strong> replication delta written to disk by this standby.</li>' +
+            '<li><strong>flush_delta:</strong> replication delta flushed to disk by this standby server.</li>' +
+            '<li><strong>replay_delta:</strong> replication delta replayed into the database on this standby server.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#SYNCHRONOUS-REPLICATION" target="_blank">Synchronous Replication</a>.'
     },
     'postgres.replication_slot': {
         info: 'Replication slot files.<ul>' +
-        '<li><strong>wal_keeped:</strong> WAL files retained by each replication slots.</li>' +
-        '<li><strong>pg_replslot_files:</strong> files present in pg_replslot.</li>' +
-        '</ul>' +
-        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
+            '<li><strong>wal_keeped:</strong> WAL files retained by each replication slots.</li>' +
+            '<li><strong>pg_replslot_files:</strong> files present in pg_replslot.</li>' +
+            '</ul>' +
+            'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS" target="_blank">Replication Slots</a>.'
     },
 
 
@@ -1164,9 +1177,9 @@ netdataDashboard.context = {
 
     'apache.workers': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
                     + ' data-gauge-max-value="100"'
@@ -1225,9 +1238,9 @@ netdataDashboard.context = {
 
     'lighttpd.workers': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
                     + ' data-gauge-max-value="100"'
@@ -1281,7 +1294,7 @@ netdataDashboard.context = {
 
     'httpcheck.responsetime': {
         info: 'The <code>response time</code> describes the time passed between request and response. ' +
-        'Currently, the accuracy of the response time is low and should be used as reference only.'
+            'Currently, the accuracy of the response time is low and should be used as reference only.'
     },
 
     'httpcheck.responselength': {
@@ -1291,8 +1304,8 @@ netdataDashboard.context = {
     'httpcheck.status': {
         valueRange: "[0, 1]",
         info: 'This chart verifies the response of the webserver. Each status dimension will have a value of <code>1</code> if triggered. ' +
-        'Dimension <code>success</code> is <code>1</code> only if all constraints are satisfied.' +
-        'This chart is most useful for alarms or third-party apps.'
+            'Dimension <code>success</code> is <code>1</code> only if all constraints are satisfied. ' +
+            'This chart is most useful for alarms or third-party apps.'
     },
 
     // ------------------------------------------------------------------------
@@ -1316,9 +1329,9 @@ netdataDashboard.context = {
     'retroshare.peers': {
         info: 'Number of (connected) RetroShare friends.',
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="peers_connected"'
                     + ' data-append-options="friends"'
                     + ' data-chart-library="easypiechart"'
@@ -1355,9 +1368,9 @@ netdataDashboard.context = {
 
     'cgroup.cpu': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="CPU"'
                     + ' data-units="%"'
@@ -1374,9 +1387,9 @@ netdataDashboard.context = {
 
     'cgroup.mem_usage': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Memory"'
                     + ' data-units="MB"'
@@ -1393,9 +1406,9 @@ netdataDashboard.context = {
 
     'cgroup.throttle_io': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="read"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Read Disk I/O"'
@@ -1408,9 +1421,9 @@ netdataDashboard.context = {
                     + ' data-colors="' + NETDATA.colors[2] + '"'
                     + ' role="application"></div>';
             },
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="write"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Write Disk I/O"'
@@ -1548,9 +1561,9 @@ netdataDashboard.context = {
     'web_log.response_statuses': {
         info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="success"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Successful"'
@@ -1566,9 +1579,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="redirect"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Redirects"'
@@ -1584,9 +1597,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="bad"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Bad Requests"'
@@ -1602,9 +1615,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="error"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Server Errors"'
@@ -1624,20 +1637,20 @@ netdataDashboard.context = {
 
     'web_log.response_codes': {
         info: 'Web server responses by code family. ' +
-        'According to the standards <code>1xx</code> are informational responses, ' +
-        '<code>2xx</code> are successful responses, ' +
-        '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
-        '<code>4xx</code> are bad requests, ' +
-        '<code>5xx</code> are internal server errors, ' +
-        '<code>other</code> are non-standard responses, ' +
-        '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+            'According to the standards <code>1xx</code> are informational responses, ' +
+            '<code>2xx</code> are successful responses, ' +
+            '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
+            '<code>4xx</code> are bad requests, ' +
+            '<code>5xx</code> are internal server errors, ' +
+            '<code>other</code> are non-standard responses, ' +
+            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.response_time': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="avg"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Average Response Time"'
@@ -1675,15 +1688,15 @@ netdataDashboard.context = {
 
     'web_log.squid_response_statuses': {
         info: 'Squid responses by type. ' +
-        '<code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>000</b>, <b>304</b>, ' +
-        '<code>error</code> includes <b>5xx</b> and <b>6xx</b>, ' +
-        '<code>redirect</code> includes <b>3xx</b> except <b>304</b>, ' +
-        '<code>bad</code> includes <b>4xx</b>, ' +
-        '<code>other</code> are all the other responses.',
+            '<code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>000</b>, <b>304</b>, ' +
+            '<code>error</code> includes <b>5xx</b> and <b>6xx</b>, ' +
+            '<code>redirect</code> includes <b>3xx</b> except <b>304</b>, ' +
+            '<code>bad</code> includes <b>4xx</b>, ' +
+            '<code>other</code> are all the other responses.',
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="success"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Successful"'
@@ -1699,9 +1712,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="redirect"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Redirects"'
@@ -1717,9 +1730,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="bad"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Bad Requests"'
@@ -1735,9 +1748,9 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
 
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="error"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Server Errors"'
@@ -1757,22 +1770,22 @@ netdataDashboard.context = {
 
     'web_log.squid_response_codes': {
         info: 'Web server responses by code family. ' +
-        'According to HTTP standards <code>1xx</code> are informational responses, ' +
-        '<code>2xx</code> are successful responses, ' +
-        '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
-        '<code>4xx</code> are bad requests, ' +
-        '<code>5xx</code> are internal server errors. ' +
-        'Squid also defines <code>000</code> mostly for UDP requests, and ' +
-        '<code>6xx</code> for broken upstream servers sending wrong headers. ' +
-        'Finally, <code>other</code> are non-standard responses, and ' +
-        '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+            'According to HTTP standards <code>1xx</code> are informational responses, ' +
+            '<code>2xx</code> are successful responses, ' +
+            '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
+            '<code>4xx</code> are bad requests, ' +
+            '<code>5xx</code> are internal server errors. ' +
+            'Squid also defines <code>000</code> mostly for UDP requests, and ' +
+            '<code>6xx</code> for broken upstream servers sending wrong headers. ' +
+            'Finally, <code>other</code> are non-standard responses, and ' +
+            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.squid_duration': {
         mainheads: [
-            function(os, id) {
+            function (os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="avg"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Average Response Time"'
@@ -1803,55 +1816,55 @@ netdataDashboard.context = {
 
     'web_log.squid_transport_methods': {
         info: 'Break down per delivery method: <code>TCP</code> are requests on the HTTP port (usually 3128), ' +
-        '<code>UDP</code> are requests on the ICP port (usually 3130), or HTCP port (usually 4128). ' +
-        'If ICP logging was disabled using the log_icp_queries option, no ICP replies will be logged. ' +
-        '<code>NONE</code> are used to state that squid delivered an unusual response or no response at all. ' +
-        'Seen with cachemgr requests and errors, usually when the transaction fails before being classified into one of the above outcomes. ' +
-        'Also seen with responses to <code>CONNECT</code> requests.'
+            '<code>UDP</code> are requests on the ICP port (usually 3130), or HTCP port (usually 4128). ' +
+            'If ICP logging was disabled using the log_icp_queries option, no ICP replies will be logged. ' +
+            '<code>NONE</code> are used to state that squid delivered an unusual response or no response at all. ' +
+            'Seen with cachemgr requests and errors, usually when the transaction fails before being classified into one of the above outcomes. ' +
+            'Also seen with responses to <code>CONNECT</code> requests.'
     },
 
     'web_log.squid_code': {
         info: 'These are combined squid result status codes. A break down per component is given in the following charts. ' +
-        'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs">squid documentation about them</a>.'
+            'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs">squid documentation about them</a>.'
     },
 
     'web_log.squid_handling_opts': {
         info: 'These tags are optional and describe why the particular handling was performed or where the request came from. ' +
-        '<code>CLIENT</code> means that the client request placed limits affecting the response. Usually seen with client issued a <b>no-cache</b>, or analogous cache control command along with the request. Thus, the cache has to validate the object.' +
-        '<code>IMS</code> states that the client sent a revalidation (conditional) request. ' +
-        '<code>ASYNC</code>, is used when the request was generated internally by Squid. Usually this is background fetches for cache information exchanges, background revalidation from stale-while-revalidate cache controls, or ESI sub-objects being loaded. ' +
-        '<code>SWAPFAIL</code> is assigned when the object was believed to be in the cache, but could not be accessed. A new copy was requested from the server. ' +
-        '<code>REFRESH</code> when a revalidation (conditional) request was sent to the server. ' +
-        '<code>SHARED</code> when this request was combined with an existing transaction by collapsed forwarding. NOTE: the existing request is not marked as SHARED. ' +
-        '<code>REPLY</code> when particular handling was requested in the HTTP reply from server or peer. Usually seen on DENIED due to http_reply_access ACLs preventing delivery of servers response object to the client.'
+            '<code>CLIENT</code> means that the client request placed limits affecting the response. Usually seen with client issued a <b>no-cache</b>, or analogous cache control command along with the request. Thus, the cache has to validate the object.' +
+            '<code>IMS</code> states that the client sent a revalidation (conditional) request. ' +
+            '<code>ASYNC</code>, is used when the request was generated internally by Squid. Usually this is background fetches for cache information exchanges, background revalidation from stale-while-revalidate cache controls, or ESI sub-objects being loaded. ' +
+            '<code>SWAPFAIL</code> is assigned when the object was believed to be in the cache, but could not be accessed. A new copy was requested from the server. ' +
+            '<code>REFRESH</code> when a revalidation (conditional) request was sent to the server. ' +
+            '<code>SHARED</code> when this request was combined with an existing transaction by collapsed forwarding. NOTE: the existing request is not marked as SHARED. ' +
+            '<code>REPLY</code> when particular handling was requested in the HTTP reply from server or peer. Usually seen on DENIED due to http_reply_access ACLs preventing delivery of servers response object to the client.'
     },
 
     'web_log.squid_object_types': {
         info: 'These tags are optional and describe what type of object was produced. ' +
-        '<code>NEGATIVE</code> is only seen on HIT responses, indicating the response was a cached error response. e.g. <b>404 not found</b>. ' +
-        '<code>STALE</code> means the object was cached and served stale. This is usually caused by stale-while-revalidate or stale-if-error cache controls. ' +
-        '<code>OFFLINE</code> when the requested object was retrieved from the cache during offline_mode. The offline mode never validates any object. ' +
-        '<code>INVALID</code> when an invalid request was received. An error response was delivered indicating what the problem was. ' +
-        '<code>FAIL</code> is only seen on <code>REFRESH</code> to indicate the revalidation request failed. The response object may be the server provided network error or the stale object which was being revalidated depending on stale-if-error cache control. ' +
-        '<code>MODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a new modified object. ' +
-        '<code>UNMODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a <b>304</b> (Not Modified) status, which was relayed to the client. ' +
-        '<code>REDIRECT</code> when squid generated an HTTP redirect response to this request.'
+            '<code>NEGATIVE</code> is only seen on HIT responses, indicating the response was a cached error response. e.g. <b>404 not found</b>. ' +
+            '<code>STALE</code> means the object was cached and served stale. This is usually caused by stale-while-revalidate or stale-if-error cache controls. ' +
+            '<code>OFFLINE</code> when the requested object was retrieved from the cache during offline_mode. The offline mode never validates any object. ' +
+            '<code>INVALID</code> when an invalid request was received. An error response was delivered indicating what the problem was. ' +
+            '<code>FAIL</code> is only seen on <code>REFRESH</code> to indicate the revalidation request failed. The response object may be the server provided network error or the stale object which was being revalidated depending on stale-if-error cache control. ' +
+            '<code>MODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a new modified object. ' +
+            '<code>UNMODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a <b>304</b> (Not Modified) status, which was relayed to the client. ' +
+            '<code>REDIRECT</code> when squid generated an HTTP redirect response to this request.'
     },
 
     'web_log.squid_cache_events': {
         info: 'These tags are optional and describe whether the response was loaded from cache, network, or otherwise. ' +
-        '<code>HIT</code> when the response object delivered was the local cache object. ' +
-        '<code>MEM</code> when the response object came from memory cache, avoiding disk accesses. Only seen on HIT responses. ' +
-        '<code>MISS</code> when the response object delivered was the network response object. ' +
-        '<code>DENIED</code> when the request was denied by access controls. ' +
-        '<code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request (sent during "-Y" startup, or during frequent failures, a cache in hit only mode will return either UDP_HIT or UDP_MISS_NOFETCH. Neighbours will thus only fetch hits). ' +
-        '<code>TUNNEL</code> when a binary tunnel was established for this transaction.'
+            '<code>HIT</code> when the response object delivered was the local cache object. ' +
+            '<code>MEM</code> when the response object came from memory cache, avoiding disk accesses. Only seen on HIT responses. ' +
+            '<code>MISS</code> when the response object delivered was the network response object. ' +
+            '<code>DENIED</code> when the request was denied by access controls. ' +
+            '<code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request (sent during "-Y" startup, or during frequent failures, a cache in hit only mode will return either UDP_HIT or UDP_MISS_NOFETCH. Neighbours will thus only fetch hits). ' +
+            '<code>TUNNEL</code> when a binary tunnel was established for this transaction.'
     },
 
     'web_log.squid_transport_errors': {
         info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
-        '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
-        '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
+            '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
+            '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
     },
 
     // ------------------------------------------------------------------------
@@ -1868,7 +1881,7 @@ netdataDashboard.context = {
         commonMax: true,
         valueRange: "[0, 100]",
         info: 'The <code>Autonomy</code> is the percentage of how autonomous the installation is. An autonomy of 100 % means that the installation is producing more energy than it is needed. ' +
-        'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
+            'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
     },
 
     'fronius.energy.today': {
@@ -1891,14 +1904,14 @@ netdataDashboard.context = {
 
     'portcheck.latency': {
         info: 'The <code>latency</code> describes the time spent connecting to a TCP port. No data is sent or received. ' +
-        'Currently, the accuracy of the latency is low and should be used as reference only.'
+            'Currently, the accuracy of the latency is low and should be used as reference only.'
     },
 
     'portcheck.status': {
         valueRange: "[0, 1]",
         info: 'The <code>status</code> chart verifies the availability of the service. ' +
-        'Each status dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> only if connection could be established.' +
-        'This chart is most useful for alarms and third-party apps.'
+            'Each status dimension will have a value of <code>1</code> if triggered. Dimension <code>success</code> is <code>1</code> only if connection could be established. ' +
+            'This chart is most useful for alarms and third-party apps.'
     },
 
     // ------------------------------------------------------------------------
@@ -1929,8 +1942,15 @@ netdataDashboard.context = {
     },
 
     'chrony.residualfreq': {
-        info: 'This shows the <code>residual frequency</code> for the currently selected reference source. It reflects any difference between what the measurements from the reference source indicate the frequency should be and the frequency currently being used.' +
-        'The reason this is not always zero is that a smoothing procedure is applied to the frequency. Each time a measurement from the reference source is obtained and a new residual frequency computed, the estimated accuracy of this residual is compared with the estimated accuracy (see <code>skew</code>) of the existing frequency value. A weighted average is computed for the new frequency, with weights depending on these accuracies. If the measurements from the reference source follow a consistent trend, the residual will be driven to zero over time.',
+        info: 'This shows the <code>residual frequency</code> for the currently selected reference source. ' +
+            'It reflects any difference between what the measurements from the reference source indicate the ' +
+            'frequency should be and the frequency currently being used. The reason this is not always zero is ' +
+            'that a smoothing procedure is applied to the frequency. Each time a measurement from the reference ' +
+            'source is obtained and a new residual frequency computed, the estimated accuracy of this residual ' +
+            'is compared with the estimated accuracy (see <code>skew</code>) of the existing frequency value. ' +
+            'A weighted average is computed for the new frequency, with weights depending on these accuracies. ' +
+            'If the measurements from the reference source follow a consistent trend, the residual will be ' +
+            'driven to zero over time.',
         height: 0.5,
         colors: NETDATA.colors[3]
     },
@@ -1955,7 +1975,7 @@ netdataDashboard.context = {
 
     'btrfs.disk': {
         info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the spac elisted as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
-        colors: [ NETDATA.colors[12] ]
+        colors: [NETDATA.colors[12]]
     },
 
     'btrfs.data': {
