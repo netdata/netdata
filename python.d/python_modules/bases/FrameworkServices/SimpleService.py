@@ -4,14 +4,13 @@
 # Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
-from threading import Thread
 from time import sleep
 
 from third_party.monotonic import monotonic
 
 from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
-from bases.loggers import PythonDLimitedLogger
+from bases.loggers import LimitedLogger
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
@@ -38,7 +37,7 @@ class RuntimeCounters:
         return self.START_RUN < self.NEXT_RUN
 
 
-class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, object):
+class SimpleService(LimitedLogger, OldVersionCompatibility, object):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
@@ -48,9 +47,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :param configuration: <dict>
         :param name: <str>
         """
-        Thread.__init__(self)
-        self.daemon = True
-        PythonDLimitedLogger.__init__(self)
+        LimitedLogger.__init__(self)
         OldVersionCompatibility.__init__(self)
         self.configuration = configuration
         self.order = list()
@@ -74,9 +71,12 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
     @property
     def name(self):
-        if self.job_name:
-            return '_'.join([self.module_name, self.override_name or self.job_name])
-        return self.module_name
+        if self.override_name:
+            return '{0}_{1}'.format(self.module_name, self.override_name)
+        elif self.job_name != self.module_name:
+            return '{0}_{1}'.format(self.module_name, self.job_name)
+        else:
+            return self.module_name
 
     def actual_name(self):
         return self.fake_name or self.name

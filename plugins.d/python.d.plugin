@@ -8,394 +8,556 @@ echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
+import gc
 import os
 import sys
+import re
 import threading
+import multiprocessing
 
-from re import sub
-from sys import version_info, argv
+from collections import namedtuple
 from time import sleep
 
 
-PY_VERSION = version_info[:2]
-PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
-CHARTS_PY_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR', os.path.dirname(__file__)) + '/../python.d') + '/'
-CHARTS_PY_CONFIG_DIR = PLUGIN_CONFIG_DIR + 'python.d/'
-PYTHON_MODULES_DIR = CHARTS_PY_DIR + 'python_modules'
+PLUGINS_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR', os.path.dirname(__file__)) + '/../python.d') + '/'
+PYTHOND_MODULES_DIR = os.path.join(PLUGINS_DIR, "python_modules")
+PYTHOND_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
+PLUGINS_CONFIG_DIR = PYTHOND_CONFIG_DIR + 'python.d/'
 
-sys.path.append(PYTHON_MODULES_DIR)
+sys.path.append(PYTHOND_MODULES_DIR)
 
-from bases.loaders import ModuleAndConfigLoader
-from bases.loggers import PythonDLogger
-from bases.collection import setdefault_values, run_and_exit
+from bases.loaders import safe_load_module, safe_load_config
+from bases.loggers import Logger
 
 try:
     from collections import OrderedDict
 except ImportError:
     from third_party.ordereddict import OrderedDict
 
-BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
-               'retries': 60,
-               'priority': 60000,
-               'autodetection_retry': 0,
-               'chart_cleanup': 10,
-               'name': str()}
 
+# FIXME
+OBSOLETED_PLUGINS = [
+    'apache_cache',  # replaced by web_log
+    'gunicorn_log',  # replaced by web_log
+    'nginx_log',     # replaced by web_log
+]
 
-MODULE_EXTENSION = '.chart.py'
-OBSOLETE_MODULES = ['apache_cache', 'gunicorn_log', 'nginx_log']
+PLUGINS_SUFFIX = '.chart.py'
 
+# All modules from plugins directory (*.chart.py)
+ALL_PLUGINS = [
+    m[:-len(PLUGINS_SUFFIX)] for m in sorted(os.listdir(PLUGINS_DIR))
+    if m.endswith(PLUGINS_SUFFIX) and m[:-len(PLUGINS_SUFFIX)] not in OBSOLETED_PLUGINS
+]
 
-def module_ok(m):
-    return m.endswith(MODULE_EXTENSION) and m[:-len(MODULE_EXTENSION)] not in OBSOLETE_MODULES
+JOB_BASE_CONF = {
+    'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
+    'retries': 60,
+    'priority': 60000,
+    'autodetection_retry': 0,
+    'chart_cleanup': 10,
+    'name': str(),
+}
 
-
-ALL_MODULES = [m for m in sorted(os.listdir(CHARTS_PY_DIR)) if module_ok(m)]
+PYTHOND_BASE_CONF = {
+        'enabled': True,
+        'default_run': True,
+        'gc_run': True,
+        'gc_interval': 300,
+}
 
 
 def parse_cmd():
-    debug = 'debug' in argv[1:]
-    trace = 'trace' in argv[1:]
-    override_update_every = next((arg for arg in argv[1:] if arg.isdigit() and int(arg) > 1), False)
-    modules = [''.join([m, MODULE_EXTENSION]) for m in argv[1:] if ''.join([m, MODULE_EXTENSION]) in ALL_MODULES]
-    return debug, trace, override_update_every, modules or ALL_MODULES
+    class ParsedCmd:
+        def __init__(self):
+            self.debug = False
+            self.trace = False
+            self.update_every = 1
+            self.plugins = ALL_PLUGINS
+
+    parsed = ParsedCmd()
+
+    cmd = sys.argv[:][1:]
+
+    if cmd and cmd[0].isdigit():
+        parsed.update_every = int(cmd.pop(0))
+
+    if 'debug' in cmd:
+        parsed.debug = True
+        cmd.remove('debug')
+
+    if 'trace' in cmd:
+        parsed.debug = True
+        cmd.remove('trace')
+
+    if cmd:
+        parsed.plugins = cmd
+
+    return parsed
 
 
-def multi_job_check(config):
-    return next((True for key in config if isinstance(config[key], dict)), False)
+CMD = parse_cmd()
 
 
-class RawModule:
-    def __init__(self, name, path, conf_path, explicitly_enabled=True):
-        self.name = name
-        self.path = path
-        self.conf_path = conf_path
-        self.explicitly_enabled = explicitly_enabled
+def load_config(path, name):
+    """
+
+    :param path:
+    :param name:
+    :return:
+    """
+    return safe_load_config('{0}{1}.conf'.format(path, name))
 
 
-class Job(object):
-    def __init__(self, initialized_job, job_id):
+def load_module(module_name):
+    """
+
+    :param module_name:
+    :return:
+    """
+    return safe_load_module(
+        module_name,
+        os.path.join(PLUGINS_DIR, '{0}{1}'.format(module_name, PLUGINS_SUFFIX)),
+    )
+
+
+Task = namedtuple(
+    "Task",
+    [
+        "module_name",
+        "is_enabled",  # explicitly enabled in python.d.conf
+    ]
+)
+
+Result = namedtuple(
+    "Result",
+    [
+        "module_name",
+        "jobs_configs"
+    ]
+)
+
+
+class JobConf(OrderedDict):
+    """
+
+    """
+    def __init__(self):
+        OrderedDict.__init__(self)
+        self.update(JOB_BASE_CONF)
+
+    def set_defaults_from_module(self, module):
+        for k in [k for k in JOB_BASE_CONF if hasattr(module, k)]:
+            self[k] = getattr(module, k)
+
+    def set_defaults_from_config(self, module_config):
+        for k in [k for k in JOB_BASE_CONF if k in module_config]:
+                self[k] = module_config[k]
+
+    def set_job_name(self, name):
+        self['job_name'] = re.sub(r'\s+', '_', name)
+
+    def set_override_name(self, name):
+        self['override_name'] = re.sub(r'\s+', '_', name)
+
+    def to_dict(self):
+        d = OrderedDict()
+        d.update(self)
+        return d
+
+
+class ModuleChecker(multiprocessing.Process, Logger):
+    """
+
+    """
+    def __init__(self, task_queue, result_queue):
+        multiprocessing.Process.__init__(self)
+        Logger.__init__(self)
+        self.job_name = 'checker'
+        self.tasks = task_queue
+        self.results = result_queue
+
+    def run(self):
         """
-        :param initialized_job: instance of <Class Service>
-        :param job_id: <str>
-        """
-        self.job = initialized_job
-        self.id = job_id  # key in Modules.jobs()
-        self.module_name = self.job.__module__  # used in Plugin.delete_job()
-        self.recheck_every = self.job.configuration.pop('autodetection_retry')
-        self.checked = False  # used in Plugin.check_job()
-        self.created = False  # used in Plugin.create_job_charts()
-        if OVERRIDE_UPDATE_EVERY:
-            self.job.update_every = int(OVERRIDE_UPDATE_EVERY)
 
-    def __getattr__(self, item):
-        return getattr(self.job, item)
-
-    def __repr__(self):
-        return self.job.__repr__()
-
-    def is_dead(self):
-        return bool(self.ident) and not self.is_alive()
-
-    def not_launched(self):
-        return not bool(self.ident)
-
-    def is_autodetect(self):
-        return self.recheck_every
-
-
-class Module(object):
-    def __init__(self, service, config):
-        """
-        :param service: <Module>
-        :param config: <dict>
-        """
-        self.service = service
-        self.name = service.__name__
-        self.config = self.jobs_configurations_builder(config)
-        self.jobs = OrderedDict()
-        self.counter = 1
-
-        self.initialize_jobs()
-
-    def __repr__(self):
-        return "<Class Module '{name}'>".format(name=self.name)
-
-    def __iter__(self):
-        return iter(OrderedDict(self.jobs).values())
-
-    def __getitem__(self, item):
-        return self.jobs[item]
-
-    def __delitem__(self, key):
-        del self.jobs[key]
-
-    def __len__(self):
-        return len(self.jobs)
-
-    def __bool__(self):
-        return bool(self.jobs)
-
-    def __nonzero__(self):
-        return self.__bool__()
-
-    def jobs_configurations_builder(self, config):
-        """
-        :param config: <dict>
         :return:
         """
-        counter = 0
-        job_base_config = dict()
+        while True:
+            task = self.tasks.get()
+            if task is None:
+                self.done_task()
+                break
 
-        for attr in BASE_CONFIG:
-            job_base_config[attr] = config.pop(attr, getattr(self.service, attr, BASE_CONFIG[attr]))
+            result = self.do_task(task)
+            if result:
+                self.put_result(result)
+            self.done_task()
 
-        if not config:
-            config = {str(): dict()}
-        elif not multi_job_check(config):
-            config = {str(): config}
+    def done_task(self):
+        self.tasks.task_done()
 
-        for job_name in config:
-            if not isinstance(config[job_name], dict):
-                continue
+    def put_result(self, result):
+        self.results.put(result)
 
-            job_config = setdefault_values(config[job_name], base_dict=job_base_config)
-            job_name = sub(r'\s+', '_', job_name)
-            config[job_name]['name'] = sub(r'\s+', '_', config[job_name]['name'])
-            counter += 1
-            job_id = 'job' + str(counter).zfill(3)
-
-            yield job_id, job_name, job_config
-
-    def initialize_jobs(self):
+    def do_task(self, task):
         """
+
+        :param task:
         :return:
         """
-        for job_id, job_name, job_config in self.config:
-            job_config['job_name'] = job_name
-            job_config['override_name'] = job_config.pop('name')
+
+        def has_auto_detect_job(confs):
+            return bool([True for conf in confs if conf['autodetection_retry'] > 0])
+
+        module, err = load_module(task.module_name)
+
+        # FIX ME
+        if err is not None:
+            return None
+        else:
+            pass
+
+        # FIX ME
+        if not (hasattr(module, 'Service') and callable(getattr(module, 'Service'))):
+            return None
+
+        # FIX ME
+        if getattr(module, 'disabled_by_default', False):
+            return None
+
+        config, err = load_config(PLUGINS_CONFIG_DIR, task.module_name)
+
+        # FIX ME
+        if err is not None:
+            pass
+        else:
+            pass
+
+        configs = self.job_configs_builder(module, config or dict())
+
+        # There is no reason to run job.check() if at least on job is "autodetect"
+        if has_auto_detect_job(configs):
+            return Result(module_name=module.__name__, jobs_configs=configs)
+
+        return self.check_module(module, configs)
+
+    def check_module(self, module, configs):
+        """
+
+        :param module:
+        :param configs:
+        :return:
+        """
+        jobs_configs = list()
+
+        for idx, config in enumerate(configs):
+            try:
+                # SimpleService pops some values, so we have to copy here.
+                # Shallow copy is ok.
+                job = module.Service(configuration=OrderedDict(config))
+            # FIX ME
+            except Exception as error:
+                self.error(error)
+                return None
 
             try:
-                initialized_job = self.service.Service(configuration=job_config)
+                if not job.check():
+                    continue
+            # FIX ME
             except Exception as error:
-                Logger.error("job initialization: '{module_name} {job_name}' "
-                             "=> ['FAILED'] ({error})".format(module_name=self.name,
-                                                              job_name=job_name,
-                                                              error=error))
+                self.error(error)
+                return None
+
+            # FIX ME
+            jobs_configs = configs[idx:]
+            break
+
+        if not jobs_configs:
+            return None
+
+        return Result(module_name=module.__name__, jobs_configs=jobs_configs)
+
+    @staticmethod
+    def job_configs_builder(module, module_config):
+        """
+
+        :param module:
+        :param module_config:
+        :return:
+        """
+
+        jobs_configs = list()
+
+        for job_name in module_config:
+            if not isinstance(module_config[job_name], dict):
                 continue
-            else:
-                Logger.debug("job initialization: '{module_name} {job_name}' "
-                             "=> ['OK']".format(module_name=self.name,
-                                                job_name=job_name or self.name))
-                self.jobs[job_id] = Job(initialized_job=initialized_job,
-                                        job_id=job_id)
-        del self.config
-        del self.service
+            conf = JobConf()
+            conf.set_defaults_from_module(module)
+            conf.set_defaults_from_config(module_config)
+            conf.set_defaults_from_config(module_config[job_name])
+            conf.set_job_name(job_name)
+            conf.set_override_name(conf.pop('name'))
+
+            jobs_configs.append(conf)
+
+        # FIX ME
+        if len(jobs_configs) == 0:
+            conf = JobConf()
+            conf.set_defaults_from_module(module)
+            # FIX ME
+            conf.update(module_config)
+            conf.set_job_name(module.__name__)
+            conf.set_override_name(conf.pop('name'))
+
+            jobs_configs.append(conf)
+        elif len(jobs_configs) == 1:
+            conf = jobs_configs[0]
+            conf.set_job_name(module.__name__)
+
+        return [conf.to_dict() for conf in jobs_configs]
 
 
-class Plugin(object):
+class JobThread(threading.Thread):
+    """
+
+    """
+    def __init__(self, job):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.job = job
+
+    def run(self):
+        self.job.run()
+
+
+class PythonD(Logger):
+    """
+
+    """
     def __init__(self):
-        self.loader = ModuleAndConfigLoader()
-        self.modules = OrderedDict()
-        self.sleep_time = 1
-        self.runs_counter = 0
-        self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
-        if error:
-            Logger.error('"python.d.conf" configuration file not found. Using defaults.')
+        Logger.__init__(self)
+        self.job_name = 'main'
+        self.conf = dict(PYTHOND_BASE_CONF)
+        self.runs = 0
+        self.auto_detect_jobs = list()
+        self.tasks = list()
+        self.results = list()
+        self.task_queue = multiprocessing.JoinableQueue()
+        self.result_queue = multiprocessing.Queue()
 
-        if not self.config.get('enabled', True):
-            run_and_exit(Logger.info)('DISABLED in configuration file.')
+    def shutdown(self, msg=str()):
+        if msg:
+            self.info(msg)
+        print("FINISHED\n")
+        exit(1)
 
-        self.load_and_initialize_modules()
-        if not self.modules:
-            run_and_exit(Logger.info)('No modules to run. Exit...')
+    def setup(self):
+        """
 
-    def __iter__(self):
-        return iter(OrderedDict(self.modules).values())
+        :return:
 
-    @property
-    def jobs(self):
-        return (job for mod in self for job in mod)
+        result: populated enabled_modules list (list of named tuples)
+        """
+        conf, err = load_config(PYTHOND_CONFIG_DIR, "python.d")
 
-    @property
-    def dead_jobs(self):
-        return (job for job in self.jobs if job.is_dead())
+        if err is not None:
+            self.error('"python.d.conf" configuration file not found. Using defaults.')
+        else:
+            self.conf.update(conf)
 
-    @property
-    def autodetect_jobs(self):
-        return [job for job in self.jobs if job.not_launched()]
+        if not self.conf['enabled']:
+            self.shutdown('disabled in configuration file.')
 
-    def enabled_modules(self):
-        for mod in MODULES_TO_RUN:
-            mod_name = mod[:-len(MODULE_EXTENSION)]
-            mod_path = CHARTS_PY_DIR + mod
-            conf_path = ''.join([CHARTS_PY_CONFIG_DIR, mod_name, '.conf'])
+        wrong_modules = set(CMD.plugins) - set(ALL_PLUGINS)
 
-            if DEBUG:
-                yield RawModule(
-                    name=mod_name,
-                    path=mod_path,
-                    conf_path=conf_path,
+        if wrong_modules:
+            self.shutdown('wrong modules: {0}'.format(list(wrong_modules)))
+
+        for name in CMD.plugins:
+            cond1 = self.conf['default_run'] and self.conf.get(name, True)
+            cond2 = (not self.conf['default_run']) and self.conf.get(name)
+
+            if cond1 or cond2:
+                self.tasks.append(
+                    Task(module_name=name, is_enabled=self.conf.get(name))
                 )
             else:
-                if any(
-                    [
-                        self.config.get('default_run', True) and self.config.get(mod_name, True),
-                        (not self.config.get('default_run')) and self.config.get(mod_name),
-                    ]
-                ):
-                    yield RawModule(
-                        name=mod_name,
-                        path=mod_path,
-                        conf_path=conf_path,
-                        explicitly_enabled=self.config.get(mod_name),
-                    )
+                self.debug('plugin "{0}" disabled in configuration file'.format(name))
+        return
 
-    def load_and_initialize_modules(self):
-        for mod in self.enabled_modules():
+    def main(self):
+        """
 
-            # Load module from file ------------------------------------------------------------
-            loaded_module, error = self.loader.load_module_from_file(mod.name, mod.path)
-            log = Logger.error if error else Logger.debug
-            log("module load source: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
-                                                                           module_name=mod.name))
-            if error:
-                Logger.error("load source error : {0}".format(error))
-                continue
+        :return:
+        """
+        if not self.tasks:
+            self.shutdown('No plugins to run. Exit...')
 
-            # Load module config from file ------------------------------------------------------
-            loaded_config, error = self.loader.load_config_from_file(mod.conf_path)
-            log = Logger.error if error else Logger.debug
-            log("module load config: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
-                                                                           module_name=mod.name))
-            if error:
-                Logger.error('load config error : {0}'.format(error))
+        worker = ModuleChecker(self.task_queue, self.result_queue)
+        self.enqueue_tasks()
+        worker.start()
 
-            # Skip disabled modules
-            if getattr(loaded_module, 'disabled_by_default', False) and not mod.explicitly_enabled:
-                Logger.info("module '{0}' disabled by default".format(loaded_module.__name__))
-                continue
+        # wait until all task are processed
+        self.task_queue.join()
 
-            # Module initialization ---------------------------------------------------
+        self.get_results()
 
-            initialized_module = Module(service=loaded_module, config=loaded_config)
-            Logger.debug("module status: '{module_name}' => [{status}] "
-                         "(jobs: {jobs_number})".format(status='OK' if initialized_module else 'FAILED',
-                                                        module_name=initialized_module.name,
-                                                        jobs_number=len(initialized_module)))
-            if initialized_module:
-                self.modules[initialized_module.name] = initialized_module
+        # cleanup
+        worker.join()
+        self.result_queue.close()
+        self.result_queue.join_thread()
+
+        if not self.results:
+            self.shutdown('No jobs to run. Exit...')
+
+        self.launch_jobs()
+        self.serve()
+
+    def enqueue_tasks(self):
+        for task in self.tasks:
+            self.task_queue.put(task)
+        # shutdown marker
+        self.task_queue.put(None)
+
+    def get_results(self):
+        while not self.result_queue.empty():
+            self.results.append(self.result_queue.get())
+
+    def launch_jobs(self):
+        """
+
+        :return:
+        """
+        started = dict()
+
+        for result in self.results:
+            mod_name, configs = result.module_name, result.jobs_configs
+            started[mod_name] = list()
+
+            for config in configs:
+
+                job = self.init_job(mod_name, config)
+
+                if job is None:
+                    # skip the whole module in case of Exception in init()
+                    self.error('module "{0}" skipped'.format(mod_name))
+                    break
+
+                if job.name in started[mod_name]:
+                    job.info('dropped (already served by another job)')
+                    continue
+
+                checked = self.check_job(job)
+
+                if checked is None:
+                    # unhandled exception
+                    continue
+                elif checked:
+                    started[mod_name].append(job.name)
+                else:
+                    # auto detected jobs counts as started
+                    if config['autodetection_retry'] > 0:
+                        started[mod_name].append(job.name)
+                        self.auto_detect_jobs.append(job)
+                    continue
+
+                if not self.create_job(job):
+                    continue
+
+                self.start_job(job)
+
+    def init_job(self, module_name, job_config):
+        try:
+            # returned from sys.path if already imported
+            mod, _ = load_module(module_name)
+            job = mod.Service(job_config)
+        except Exception as error:
+            self.error('plugin "{0}" init() unhandled exception: {1}'.format(module_name, error))
+            return None
+        else:
+            return job
 
     @staticmethod
     def check_job(job):
-        """
-        :param job: <Job>
-        :return:
-        """
         try:
-            check_ok = bool(job.check())
+            ok = job.check()
         except Exception as error:
-            job.error('check() unhandled exception: {error}'.format(error=error))
+            job.error('check() unhandled exception: {0}'.format(error))
             return None
         else:
-            return check_ok
+            log = job.error if ok else job.info
+            log('check() => [{0}]'.format('OK' if ok else 'FAIL'))
+            return ok
 
     @staticmethod
-    def create_job_charts(job):
-        """
-        :param job: <Job>
-        :return:
-        """
+    def create_job(job):
         try:
-            create_ok = job.create()
+            ok = job.create()
         except Exception as error:
-            job.error('create() unhandled exception: {error}'.format(error=error))
-            return False
+            job.error('create() unhandled exception: {0}'.format(error))
+            return None
         else:
-            return create_ok
+            log = job.error if ok else job.info
+            log('create() => [{0}]'.format('OK' if ok else 'FAIL'))
+            return ok
 
-    def delete_job(self, job):
+    @staticmethod
+    def start_job(job):
         """
-        :param job: <Job>
+
+        :param job:
         :return:
         """
-        del self.modules[job.module_name][job.id]
+        if job.update_every < int(CMD.update_every):
+            job.update_every = int(CMD.update_every)
+        JobThread(job).start()
 
-    def run_check(self):
-        checked = list()
-        for job in self.jobs:
-            if job.name in checked:
-                job.info('check() => [DROPPED] (already served by another job)')
-                self.delete_job(job)
-                continue
-            ok = self.check_job(job)
-            if ok:
-                job.info('check() => [OK]')
-                checked.append(job.name)
-                job.checked = True
-                continue
-            if not job.is_autodetect() or ok is None:
-                job.info('check() => [FAILED]')
-                self.delete_job(job)
-            else:
-                job.info('check() => [RECHECK] (autodetection_retry: {0})'.format(job.recheck_every))
+    def retry_job(self, job):
+        """
 
-    def run_create(self):
-        for job in self.jobs:
-            if not job.checked:
-                #  skip autodetection_retry jobs
-                continue
-            ok = self.create_job_charts(job)
-            if ok:
-                job.debug('create() => [OK] (charts: {0})'.format(len(job.charts)))
-                job.created = True
-                continue
-            job.error('create() => [FAILED] (charts: {0})'.format(len(job.charts)))
-            self.delete_job(job)
+        :param job:
+        :return:
+        """
+        v = job.configuration['autodetection_retry']
+        if not self.runs % v == 0:
+            return False
 
-    def start(self):
-        self.run_check()
-        self.run_create()
-        for job in self.jobs:
-            if job.created:
-                job.start()
+        if self.check_job(job) and self.check_create(job):
+            self.start_job(job)
+            return True
 
+        return False
+
+    def serve(self):
+        """
+
+        :return:
+        """
         while True:
-            if threading.active_count() <= 1 and not self.autodetect_jobs:
-                run_and_exit(Logger.info)('FINISHED')
+            self.runs += 1
 
-            sleep(self.sleep_time)
-            self.cleanup()
-            self.autodetect_retry()
+            if threading.active_count() <= 1 and not self.auto_detect_jobs:
+                self.shutdown()
 
-    def cleanup(self):
-        for job in self.dead_jobs:
-            self.delete_job(job)
-        for mod in self:
-            if not mod:
-                del self.modules[mod.name]
+            sleep(1)
 
-    def autodetect_retry(self):
-        self.runs_counter += self.sleep_time
-        for job in self.autodetect_jobs:
-            if self.runs_counter % job.recheck_every == 0:
-                checked = self.check_job(job)
-                if checked:
-                    created = self.create_job_charts(job)
-                    if not created:
-                        self.delete_job(job)
-                        continue
-                    job.start()
+            if self.conf['gc_run'] and self.runs % self.conf['gc_interval'] == 0:
+                v = gc.collect()
+                self.debug('GC collection run result: {0}'.format(v))
+
+            self.auto_detect_jobs = [job for job in self.auto_detect_jobs if not self.retry_job(job)]
 
 
 if __name__ == '__main__':
-    DEBUG, TRACE, OVERRIDE_UPDATE_EVERY, MODULES_TO_RUN = parse_cmd()
-    Logger = PythonDLogger()
-    if DEBUG:
-        Logger.logger.severity = 'DEBUG'
-    if TRACE:
-        Logger.log_traceback = True
-    Logger.info('Using python {version}'.format(version=PY_VERSION[0]))
+    pythond = PythonD()
 
-    plugin = Plugin()
-    plugin.start()
+    if CMD.debug:
+        pythond.logger.severity = 'DEBUG'
+
+    if CMD.trace:
+        pythond.log_traceback = True
+
+    pythond.info('Using python {0}'.format(sys.version[2:][0]))
+
+    pythond.setup()
+    pythond.main()
