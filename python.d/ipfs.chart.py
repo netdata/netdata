@@ -110,8 +110,8 @@ class Service(UrlService):
                 [('peers', 'Peers', len)],
             '/api/v0/stats/repo':
                 [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
-            '/api/v0/pin/ls':
-                [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
+#            '/api/v0/pin/ls':
+#                [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
         }
         r = dict()
         for suburl in cfg:
