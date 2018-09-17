@@ -9,7 +9,7 @@ import sys
 from copy import deepcopy
 
 from bases.FrameworkServices.SocketService import SocketService
-from bases.loaders import YamlOrderedLoader
+from bases.loaders import safe_load_config
 
 PRECISION = 1000
 
@@ -199,7 +199,8 @@ class Service(SocketService):
     def _auto_config(self):
         if self.ubconf and os.access(self.ubconf, os.R_OK):
             self.debug('Unbound config: {0}'.format(self.ubconf))
-            conf = YamlOrderedLoader.load_config_from_file(self.ubconf)[0]
+            conf, _ = safe_load_config(self.ubconf)
+            conf = conf or dict()
             if self.ext is None:
                 if 'extended-statistics' in conf['server']:
                     self.ext = conf['server']['extended-statistics']
