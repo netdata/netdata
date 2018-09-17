@@ -21,6 +21,15 @@ inline void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, cons
     // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, (unsigned long long)*d);
 }
 
+inline void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name;
+    (void)hash;
+
+    register ssize_t *d = dst;
+    *d = (ssize_t)str2ll(value, NULL);
+    // fprintf(stderr, "name '%s' with hash %u and value '%s' is %zd\n", name, hash, value, *d);
+}
+
 // create a new ARL
 ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks) {
     ARL_BASE *base = callocz(1, sizeof(ARL_BASE));

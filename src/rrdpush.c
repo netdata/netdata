@@ -135,7 +135,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the chart local custom variables
     RRDSETVAR *rs;
     for(rs = st->variables; rs ;rs = rs->next) {
-        if(unlikely(rs->options && RRDVAR_OPTION_ALLOCATED)) {
+        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
             calculated_number *value = (calculated_number *) rs->value;
 
             buffer_sprintf(
@@ -245,7 +245,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
-    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
+    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR && rv->type == RRDVAR_TYPE_CALCULATED)) {
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent

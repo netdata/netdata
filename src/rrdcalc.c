@@ -65,15 +65,18 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
-    rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
-    rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
 
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
-    rc->hostname = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->hostname = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR, &rc->value);
+
+    if(rc->hostid && !rc->hostname)
+        rc->hostid->options |= RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR;
 
     if(!rc->units) rc->units = strdupz(st->units);
 

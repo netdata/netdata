@@ -117,6 +117,7 @@ extern void arl_begin(ARL_BASE *base);
 
 extern void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst);
 extern void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
+extern void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst);
 
 // check a keyword against the ARL
 // this is to be called for each keyword read from source data

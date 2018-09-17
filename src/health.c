@@ -522,6 +522,11 @@ void *health_main(void *ptr) {
                         );
 
                         rc->value = rc->calculation->result;
+
+                        if(rc->local) rc->local->last_updated = now;
+                        if(rc->family) rc->family->last_updated = now;
+                        if(rc->hostid) rc->hostid->last_updated = now;
+                        if(rc->hostname) rc->hostname->last_updated = now;
                     }
                 }
             }

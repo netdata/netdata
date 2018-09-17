@@ -44,6 +44,10 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
     RRDSET *st = rs->rrdset;
     RRDHOST *host = st->rrdhost;
 
+    RRDVAR_OPTIONS options = rs->options;
+    if(rs->options & RRDVAR_OPTION_ALLOCATED)
+        options &= ~ RRDVAR_OPTION_ALLOCATED;
+
     // ------------------------------------------------------------------------
     // free the old ones (if any)
 
@@ -61,17 +65,17 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 
     // ------------------------------------------------------------------------
     // CHART
-    rs->var_local       = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rs->variable, rs->type, rs->value);
+    rs->var_local       = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rs->variable, rs->type, options, rs->value);
 
     // ------------------------------------------------------------------------
     // FAMILY
-    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_fullid,   rs->type, rs->value);
-    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_fullname, rs->type, rs->value);
+    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_fullid,   rs->type, options, rs->value);
+    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_fullname, rs->type, options, rs->value);
 
     // ------------------------------------------------------------------------
     // HOST
-    rs->var_host        = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullid,   rs->type, rs->value);
-    rs->var_host_name   = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullname, rs->type, rs->value);
+    rs->var_host        = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullid,   rs->type, options, rs->value);
+    rs->var_host_name   = rrdvar_create_and_index("host",   &host->rrdvar_root_index, rs->key_fullname, rs->type, options, rs->value);
 }
 
 RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
@@ -144,7 +148,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
     for(rs = st->variables; rs ; rs = rs->next) {
         if(hash == rs->hash && strcmp(n, rs->variable) == 0) {
             rrdset_unlock(st);
-            if(rs->options & RRDVAR_OPTION_ALLOCATED) {
+            if(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) {
                 free(n);
                 return rs;
             }
@@ -161,7 +165,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
     calculated_number *v = mallocz(sizeof(calculated_number));
     *v = NAN;
 
-    rs = rrdsetvar_create(st, n, RRDVAR_TYPE_CALCULATED, v, RRDVAR_OPTION_ALLOCATED);
+    rs = rrdsetvar_create(st, n, RRDVAR_TYPE_CALCULATED, v, RRDVAR_OPTION_ALLOCATED|RRDVAR_OPTION_CUSTOM_CHART_VAR);
     rrdset_unlock(st);
 
     free(n);
@@ -169,8 +173,8 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
 }
 
 void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, calculated_number value) {
-    if(unlikely(!(rs->options & RRDVAR_OPTION_ALLOCATED))) {
-        error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname, value);
+    if(rs->type != RRDVAR_TYPE_CALCULATED || !(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) || !(rs->options & RRDVAR_OPTION_ALLOCATED)) {
+        error("RRDSETVAR: requested to set variable '%s' of chart '%s' on host '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom chart one.", rs->variable, rs->rrdset->id, rs->rrdset->rrdhost->hostname, value);
     }
     else {
         calculated_number *v = rs->value;

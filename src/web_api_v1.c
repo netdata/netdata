@@ -253,12 +253,26 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
+struct prometheus_output_options {
+    char *name;
+    PROMETHEUS_OUTPUT_OPTIONS flag;
+} prometheus_output_flags_root[] = {
+        { "help",       PROMETHEUS_OUTPUT_HELP       },
+        { "types",      PROMETHEUS_OUTPUT_TYPES      },
+        { "names",      PROMETHEUS_OUTPUT_NAMES      },
+        { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
+        { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
+
+        // terminator
+        { NULL, PROMETHEUS_OUTPUT_NONE },
+};
+
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
-    int help = 0, types = 0, timestamps = 1, names = backend_send_names; // prometheus options
     const char *prometheus_server = w->client_ip;
-    uint32_t prometheus_options = backend_options;
-    const char *prometheus_prefix = backend_prefix;
+    uint32_t prometheus_backend_options = global_backend_options;
+    PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?PROMETHEUS_OUTPUT_NAMES:0);
+    const char *prometheus_prefix = global_backend_prefix;
 
     while(url) {
         char *value = mystrsep(&url, "?&");
@@ -280,30 +294,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             else
                 format = 0;
         }
-        else if(!strcmp(name, "help")) {
-            if(!strcmp(value, "yes"))
-                help = 1;
-            else
-                help = 0;
-        }
-        else if(!strcmp(name, "types")) {
-            if(!strcmp(value, "yes"))
-                types = 1;
-            else
-                types = 0;
-        }
-        else if(!strcmp(name, "names")) {
-            if(!strcmp(value, "yes"))
-                names = 1;
-            else
-                names = 0;
-        }
-        else if(!strcmp(name, "timestamps")) {
-            if(!strcmp(value, "yes"))
-                timestamps = 1;
-            else
-                timestamps = 0;
-        }
         else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
@@ -311,7 +301,20 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             prometheus_prefix = value;
         }
         else if(!strcmp(name, "data") || !strcmp(name, "source") || !strcmp(name, "data source") || !strcmp(name, "data-source") || !strcmp(name, "data_source") || !strcmp(name, "datasource")) {
-            prometheus_options = backend_parse_data_source(value, prometheus_options);
+            prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
+        }
+        else {
+            int i;
+            for(i = 0; prometheus_output_flags_root[i].name ; i++) {
+                if(!strcmp(name, prometheus_output_flags_root[i].name)) {
+                    if(!strcmp(value, "yes") || !strcmp(value, "1") || !strcmp(value, "true"))
+                        prometheus_output_options |= prometheus_output_flags_root[i].flag;
+                    else
+                        prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
+
+                    break;
+                }
+            }
         }
     }
 
@@ -331,12 +334,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_backend_options, prometheus_output_options);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names, timestamps);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_backend_options, prometheus_backend_options);
             return 200;
 
         default:
