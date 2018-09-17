@@ -24,8 +24,8 @@
 }
 */
 
-var url = require('url');
-var http = require('http');
+require('url');
+require('http');
 var netdata = require('netdata');
 
 if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plugin');
