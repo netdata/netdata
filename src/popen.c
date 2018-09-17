@@ -68,7 +68,7 @@ FILE *mypopen(const char *command, volatile pid_t *pidptr)
 
     // close all files
     int i;
-    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
+    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
         if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
 
     // move the pipe to stdout
@@ -137,7 +137,7 @@ FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
 
     // close all files
     int i;
-    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
+    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
         if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
 
     // move the pipe to stdout
