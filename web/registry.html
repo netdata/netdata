@@ -115,11 +115,11 @@ var netdataRegistryCallback = function(machines_array) {
         while(len--) {
             var u = machines[len];
 
-            var status = "enabled";
+            //var status = "enabled";
             found++;
 
-            if(u.guid === NETDATA.registry.machine_guid)
-                status = "disabled"
+            //if(u.guid === NETDATA.registry.machine_guid)
+            //    status = "disabled";
 
             el += registryAddServer(u);
             a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
@@ -148,7 +148,7 @@ var netdataRegistryCallback = function(machines_array) {
     a1 += '<li role="separator" class="divider"></li>';
 
     el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-    a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>'
+    a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>';
 
     document.getElementById('mynetdata_servers').innerHTML = el;
     //document.getElementById('mynetdata_servers2').innerHTML = el;
