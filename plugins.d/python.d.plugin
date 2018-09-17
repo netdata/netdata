@@ -69,6 +69,9 @@ PYTHOND_BASE_CONF = {
 
 def parse_cmd():
     class ParsedCmd:
+        """
+
+        """
         def __init__(self):
             self.debug = False
             self.trace = False
@@ -186,6 +189,8 @@ class ModuleChecker(multiprocessing.Process, Logger):
             task = self.tasks.get()
             if task is None:
                 self.done_task()
+                # shutdown marker
+                self.put_result(None)
                 break
 
             result = self.do_task(task)
@@ -343,7 +348,8 @@ class PythonD(Logger):
         self.tasks = list()
         self.results = list()
         self.task_queue = multiprocessing.JoinableQueue()
-        self.result_queue = multiprocessing.Queue()
+        # multiprocessing.Queue().empty() can be bugged
+        self.result_queue = multiprocessing.JoinableQueue()
 
     def shutdown(self, msg=str()):
         if msg:
@@ -404,8 +410,6 @@ class PythonD(Logger):
 
         # cleanup
         worker.join()
-        self.result_queue.close()
-        self.result_queue.join_thread()
 
         if not self.results:
             self.shutdown('No jobs to run. Exit...')
@@ -420,8 +424,13 @@ class PythonD(Logger):
         self.task_queue.put(None)
 
     def get_results(self):
-        while not self.result_queue.empty():
-            self.results.append(self.result_queue.get())
+        while True:
+            result = self.result_queue.get()
+            self.result_queue.task_done()
+            if result is None:
+                self.result_queue.join()
+                break
+            self.results.append(result)
 
     def launch_jobs(self):
         """
