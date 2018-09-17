@@ -278,7 +278,6 @@ class JobThread(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.job = job
-        self.recheck_every = None
 
     def run(self):
         self.job.run()
@@ -460,7 +459,7 @@ class PythonD(Logger):
         JobThread(job).start()
 
     def retry_job(self, job):
-        if not self.runs % job.recheck_every == 0:
+        if not self.runs % job.recheck_every() == 0:
             return False
 
         if self.check_job(job) and self.check_create(job):
