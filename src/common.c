@@ -1291,7 +1291,7 @@ pid_t get_system_pid_max(void) {
     #endif /* __APPLE__, __FreeBSD__ */
 }
 
-unsigned int hz;
+unsigned int system_hz;
 void get_system_HZ(void) {
     long ticks;
 
@@ -1299,7 +1299,7 @@ void get_system_HZ(void) {
         error("Cannot get system clock ticks");
     }
 
-    hz = (unsigned int) ticks;
+    system_hz = (unsigned int) ticks;
 }
 
 /*

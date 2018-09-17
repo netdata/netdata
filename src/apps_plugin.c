@@ -345,11 +345,11 @@ struct pid_stat {
     int fds_size;                   // the size of the fds array
 
     int children_count;             // number of processes directly referencing this
-    char keep:1;                    // 1 when we need to keep this process in memory even after it exited
+    unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
     int keeploops;                  // increases by 1 every time keep is 1 and updated 0
-    char updated:1;                 // 1 when the process is currently running
-    char merged:1;                  // 1 when it has been merged to its parent
-    char read:1;                    // 1 when we have already read this process for this iteration
+    unsigned char updated:1;        // 1 when the process is currently running
+    unsigned char merged:1;         // 1 when it has been merged to its parent
+    unsigned char read:1;           // 1 when we have already read this process for this iteration
 
     int sortlist;                   // higher numbers = top on the process tree
                                     // each process gets a unique number
@@ -2856,7 +2856,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = processors * hz * RATES_DETAIL;
+    kernel_uint_t max_time = processors * system_hz * RATES_DETAIL;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -3163,7 +3163,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, system_hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
@@ -3193,20 +3193,20 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
     }
 
     fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
         fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
         }
     }
 
