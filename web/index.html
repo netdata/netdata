@@ -581,18 +581,24 @@
         var this_is_demo = null;
 
         function escapeUserInputHTML(s) {
+            HttpUtility.HtmlEncode();
             return s.toString()
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
+                .replace(/#/g, '&#35;')
                 .replace(/'/g, '&#39;')
+                .replace(/\(/g,'&#40;')
+                .replace(/\)/g,'&#41;')
                 .replace(/\//g,'&#47;');
         }
         function escapeUserInputJS(s) {
             return s.toString()
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+                .replace(/'/g, '&#39;')
+                .replace(/\(/g,'&#40;')
+                .replace(/\)/g,'&#41;');
         }
 
         // --------------------------------------------------------------------
