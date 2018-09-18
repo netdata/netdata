@@ -6,14 +6,13 @@ extraction:
   javascript:
     index:
       filters:
-        - exclude: "node.d/node_modules/lib/*"
-        - exclude: "node.d/node_modules/lib/ber/*"
+        - exclude: "node.d/node_modules/lib"
         - exclude: "node.d/node_modules/asn1-ber.js"
         - exclude: "node.d/node_modules/extend.js"
         - exclude: "node.d/node_modules/net-snmp.js"
         - exclude: "node.d/node_modules/pixl-xml.js"
-        - exclude: "web/lib/*"
-        - exclude: "tests/*"
+        - exclude: "web/lib"
+        - exclude: "tests"
 
   # docs: https://lgtm.com/help/lgtm/python-extraction
   python:
@@ -23,9 +22,9 @@ extraction:
       version: 3
     index:
       filters:
-        - exclude: "python.d/python_modules/third_party/*"
-        - exclude: "python.d/python_modules/urllib3/*"
-        - exclude: "python.d/python_modules/pyyaml2/*"
-        - exclude: "python.d/python_modules/pyyaml3/*"
-        - exclude: "tests/*"
+        - exclude: "python.d/python_modules/third_party"
+        - exclude: "python.d/python_modules/urllib3"
+        - exclude: "python.d/python_modules/pyyaml2"
+        - exclude: "python.d/python_modules/pyyaml3"
+        - exclude: "tests"
 
