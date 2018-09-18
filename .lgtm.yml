@@ -21,7 +21,6 @@ extraction:
       packages: urllib3 pyyaml3
     python_setup:
       version: 3
-      setup.py: false
     index:
       filters:
         - exclude: "python.d/python_modules/third_party/**"
