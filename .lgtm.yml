@@ -17,8 +17,8 @@ extraction:
 
   # docs: https://lgtm.com/help/lgtm/python-extraction
   python:
-    prepare:
-      packages: urllib3 pyyaml3
+    #prepare:
+    #  packages: urllib3 pyyaml3
     python_setup:
       version: 3
     index:
