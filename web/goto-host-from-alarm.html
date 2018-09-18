@@ -124,7 +124,7 @@ function gotoServerValidateUrl(id, guid, url) {
                     }
                     else {
                         document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
-                        document.location = finalURL;
+                        document.location = escapeUserInputJS(finalURL);
                     }
                 }
             }
@@ -140,7 +140,7 @@ function gotoServerValidateUrl(id, guid, url) {
 
                     if(thisIsHttps === true && urlsInHttp > 0) {
                         document.getElementById('gotoServerResponse').innerHTML += '<br/>redirecting myself to HTTP to allow checking';
-                        document.location = document.location.toString().replace('https://', 'http://');
+                        document.location = escapeUserInputJS(document.location.toString().replace('https://', 'http://'));
                     }
                 }
             }
