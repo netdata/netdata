@@ -11,7 +11,7 @@ from bases.FrameworkServices.UrlService import UrlService
 # update_every = 2
 priority = 60000
 retries = 60
-pinapi = 0
+pinapi = False
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
@@ -62,6 +62,7 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
         self.__storage_max = None
+        self.do_pinapi = self.configuration.get('pinapi')
 
     def _get_json(self, sub_url):
         """
@@ -112,7 +113,7 @@ class Service(UrlService):
             '/api/v0/stats/repo':
                 [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
         }
-        if pinapi == 1:
+        if pinapi:
                 cfg.update({
                     '/api/v0/pin/ls':
                         [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
