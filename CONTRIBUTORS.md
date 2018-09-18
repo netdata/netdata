@@ -48,7 +48,7 @@ original creation and that he is legally entitled to grant the above license.
 
 ## signature
 
-Since Sep 17th 2018, we use https://cla-assistant.io/firehol/netdata for signing the CLA, on all pull request.
+Since Sep 17th 2018, we use https://cla-assistant.io/firehol/netdata for signing the CLA, on all pull requests.
 Old contributors can sign the CLA at any time using this link.
 
 ## HISTORICAL SIGNATURES
