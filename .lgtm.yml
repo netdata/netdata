@@ -13,4 +13,5 @@ path_classifiers:
     - exclude: node.d/node_modules/pixl-xml.js
     - exclude: web/lib/**
     - exclude: web/css/**
+    - exclude: tests/**
 
