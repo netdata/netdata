@@ -580,11 +580,24 @@
         // control the welcome modal and analytics
         var this_is_demo = null;
 
-        function escapeUserInputXss(s) {
-            return s.toString().replace(/</g, '&lt;')
+        function escapeUserInputHTML(s) {
+            return s.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '#27;');
+                .replace(/#/g, '&#35;')
+                .replace(/'/g, '&#39;')
+                .replace(/\(/g,'&#40;')
+                .replace(/\)/g,'&#41;')
+                .replace(/\//g,'&#47;');
+        }
+        function escapeUserInputJS(s) {
+            return s.toString()
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/\(/g,'&#40;')
+                .replace(/\)/g,'&#41;');
         }
 
         // --------------------------------------------------------------------
@@ -1102,7 +1115,8 @@
                             document.location.hostname.endsWith('.mynetdata.io') ||
                             document.location.hostname.endsWith('.netdata.rocks') ||
                             document.location.hostname.endsWith('.firehol.org') ||
-                            document.location.hostname.endsWith('.netdata.online'))
+                            document.location.hostname.endsWith('.netdata.online') ||
+                            document.location.hostname.endsWith('.netdata.cloud'))
                             this_is_demo = true;
                 }
             }
@@ -1112,7 +1126,8 @@
 
         function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
-                url = document.location.toString();
+                // url = document.location.toString();
+                url = '';
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
@@ -1121,7 +1136,7 @@
 
             // console.log('netdataURL: ' + url + hash);
 
-            return escapeUserInputXss(url + hash);
+            return url + hash;
         }
 
         function netdataReload(url) {
@@ -1141,13 +1156,13 @@
         var gotoServerMiddleClick = false;
         var gotoServerStop = false;
         function gotoServerValidateUrl(id, guid, url) {
-            var penaldy = 0;
+            var penalty = 0;
             var error = 'failed';
 
             if(document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
                 // we penalize https only if the current url is http
                 // to allow the user walk through all its servers.
-                penaldy = 500;
+                penalty = 500;
 
             else if(document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
                 error = 'can\'t check';
@@ -1155,7 +1170,7 @@
             var finalURL = netdataURL(url);
 
             setTimeout(function() {
-                document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + finalURL + '" target="_blank">' + url + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+                document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + escapeUserInputJS(finalURL) + '" target="_blank">' + escapeUserInputHTML(url) + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
 
                 NETDATA.registry.hello(url, function(data) {
                     if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
@@ -1168,10 +1183,10 @@
                             if(gotoServerMiddleClick) {
                                 window.open(finalURL, '_blank');
                                 gotoServerMiddleClick = false;
-                                document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + finalURL + '">' + url + '</a></b><br/>(check your pop-up blocker if it fails)';
+                                document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + escapeUserInputJS(finalURL) + '">' + escapeUserInputHTML(url) + '</a></b><br/>(check your pop-up blocker if it fails)';
                             }
                             else {
-                                document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + url + '</small>';
+                                document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
                                 document.location = finalURL;
                             }
                         }
@@ -1188,7 +1203,7 @@
                         }
                     }
                 });
-            }, (id * 50) + penaldy);
+            }, (id * 50) + penalty);
         }
 
         function gotoServerModalHandler(guid) {
@@ -5740,6 +5755,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180917-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180918-1"></script>
 </body>
 </html>
