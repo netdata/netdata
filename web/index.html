@@ -1115,7 +1115,8 @@
                             document.location.hostname.endsWith('.mynetdata.io') ||
                             document.location.hostname.endsWith('.netdata.rocks') ||
                             document.location.hostname.endsWith('.firehol.org') ||
-                            document.location.hostname.endsWith('.netdata.online'))
+                            document.location.hostname.endsWith('.netdata.online') ||
+                            document.location.hostname.endsWith('.netdata.cloud'))
                             this_is_demo = true;
                 }
             }
@@ -1125,7 +1126,8 @@
 
         function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
-                url = document.location.toString();
+                // url = document.location.toString();
+                url = '';
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
