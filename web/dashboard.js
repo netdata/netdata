@@ -118,7 +118,7 @@ var NETDATA = window.NETDATA || {};
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '#27;');
+                .replace(/'/g, '&#39;');
         },
 
         object: function(name, obj, ignore_regex) {

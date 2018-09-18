@@ -586,13 +586,13 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '#27;')
-                .replace(/\//g,'#2F;');
+                .replace(/'/g, '&#39;')
+                .replace(/\//g,'&#47;')
         }
         function escapeUserInputJS(s) {
             return s.toString()
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '#27;')
+                .replace(/'/g, '&#39;')
         }
 
         // --------------------------------------------------------------------
@@ -5748,6 +5748,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180917-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180918-1"></script>
 </body>
 </html>
