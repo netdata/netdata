@@ -6,4 +6,11 @@ path_classifiers:
     - exclude: python.d/python_modules/urllib3/*
     - exclude: python.d/python_modules/pyyaml2/*
     - exclude: python.d/python_modules/pyyaml3/*
-    
+    - exclude: node.d/node_modules/lib/*
+    - exclude: node.d/node_modules/asn1-ber.js
+    - exclude: node.d/node_modules/extend.js
+    - exclude: node.d/node_modules/net-snmp.js
+    - exclude: node.d/node_modules/pixl-xml.js
+    - exclude: web/lib/*
+    - exclude: web/css/*
+
