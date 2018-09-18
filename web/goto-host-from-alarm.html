@@ -28,13 +28,13 @@ function escapeUserInputHTML(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '#27;')
-        .replace(/\//g,'#2F;');
+        .replace(/'/g, '&#39;')
+        .replace(/\//g,'&#47;');
 }
 function escapeUserInputJS(s) {
     return s.toString()
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '#27;')
+        .replace(/'/g, '&#39;');
 }
 
 var urlOptions = {

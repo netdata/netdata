@@ -587,12 +587,12 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;')
-                .replace(/\//g,'&#47;')
+                .replace(/\//g,'&#47;');
         }
         function escapeUserInputJS(s) {
             return s.toString()
                 .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;')
+                .replace(/'/g, '&#39;');
         }
 
         // --------------------------------------------------------------------
