@@ -40,10 +40,9 @@ struct ipc_status {
 /*
  *  The last arg of semctl is a union semun, but where is it defined? X/OPEN
  *  tells us to define it ourselves, but until recently Linux include files
- *  would also define it.  OpenBSD still defines it, and provides no feature
- *  test #define.
+ *  would also define it.
  */
-#if !defined(HAVE_UNION_SEMUN) && !defined(__OpenBSD__)
+#ifndef HAVE_UNION_SEMUN
 /* according to X/OPEN we have to define it ourselves */
 union semun {
     int val;
