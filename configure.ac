@@ -186,6 +186,7 @@ darwin*)
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
+AM_CONDITIONAL([OPENBSD], [test "${build_target}" = "openbsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([${build_target}])
@@ -346,7 +347,7 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # apps.plugin
 
 AC_MSG_CHECKING([if apps.plugin should be enabled])
-if test "${build_target}" != "macos"; then
+if test "${build_target}" != "macos" && "${build_target}" != "openbsd"; then
     enable_plugin_apps="yes"
 else
     enable_plugin_apps="no"

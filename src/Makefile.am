@@ -172,6 +172,9 @@ netdata_SOURCES += \
 	macos_fw.c \
 	$(NULL)
 else
+if OPENBSD
+netdata_SOURCES += $(NULL)
+else
 netdata_SOURCES += \
 	ipc.c \
 	ipc.h \
@@ -218,6 +221,7 @@ netdata_SOURCES += \
 	$(NULL)
 endif
 endif
+endif
 
 netdata_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
@@ -251,10 +255,14 @@ apps_plugin_SOURCES += \
 	plugin_freebsd.h \
 	$(NULL)
 else
+if OPENBSD
+apps_plugin_SOURCES += $(NULL)
+else
 apps_plugin_SOURCES += \
 	adaptive_resortable_list.c \
 	adaptive_resortable_list.h \
 	$(NULL)
+endif
 endif
 
 apps_plugin_LDADD = \
