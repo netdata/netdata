@@ -11,7 +11,6 @@ from bases.FrameworkServices.UrlService import UrlService
 # update_every = 2
 priority = 60000
 retries = 60
-pinapi = False
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
@@ -113,7 +112,7 @@ class Service(UrlService):
             '/api/v0/stats/repo':
                 [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
         }
-        if pinapi:
+        if self.do_pinapi:
                 cfg.update({
                     '/api/v0/pin/ls':
                         [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
