@@ -165,13 +165,8 @@ int mypclose(FILE *fp, pid_t pid) {
 
     errno = 0;
 
-#ifdef __OpenBSD__
-    int options = 0;
-#else
-    int options = WEXITED;
-#endif
     int proc_status;
-    if(waitpid(pid, &proc_status, options) > 0) {
+    if(waitpid(pid, &proc_status, 0) > 0) {
         if(WIFSIGNALED(proc_status)) {
             int term_sig = WTERMSIG(proc_status);
             // These classifications are derived from:
