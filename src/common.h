@@ -315,7 +315,6 @@ typedef enum rrdcalc_status {
 #include "plugins_d.h"
 #include "statsd.h"
 #include "rrd2json.h"
-#include "rrd2json_api_old.h"
 #include "web_client.h"
 #include "web_server.h"
 #include "registry.h"
@@ -330,7 +329,6 @@ typedef enum rrdcalc_status {
 #include "adaptive_resortable_list.h"
 #include "rrdpush.h"
 #include "web_api_v1.h"
-#include "web_api_old.h"
 
 extern char *netdata_configured_hostname;
 extern char *netdata_configured_config_dir;

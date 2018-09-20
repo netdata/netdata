@@ -136,8 +136,6 @@ set(NETDATA_COMMON_FILES
         src/rrd.h
         src/rrd2json.c
         src/rrd2json.h
-        src/rrd2json_api_old.c
-        src/rrd2json_api_old.h
         src/rrdcalc.c
         src/rrdcalctemplate.c
         src/rrddim.c
@@ -167,8 +165,6 @@ set(NETDATA_COMMON_FILES
         src/unit_test.h
         src/url.c
         src/url.h
-        src/web_api_old.c
-        src/web_api_old.h
         src/web_api_v1.c
         src/web_api_v1.h
         src/web_buffer.c
