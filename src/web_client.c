@@ -343,10 +343,6 @@ int mysendfile(struct web_client *w, char *filename) {
     // skip leading slashes
     while (*filename == '/') filename++;
 
-    // if the filename contain known paths, skip them
-    if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0)
-        filename = &filename[strlen(WEB_PATH_FILE) + 1];
-
     // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
@@ -417,7 +413,7 @@ int mysendfile(struct web_client *w, char *filename) {
         if(errno == EBUSY || errno == EAGAIN) {
             error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
             w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
+            buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
             return 307;

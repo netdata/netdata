@@ -259,6 +259,18 @@
 #define GUID_LEN 36
 
 // ----------------------------------------------------------------------------
+
+typedef enum rrdcalc_status {
+    RRDCALC_STATUS_REMOVED       = -2,
+    RRDCALC_STATUS_UNDEFINED     = -1,
+    RRDCALC_STATUS_UNINITIALIZED =  0,
+    RRDCALC_STATUS_CLEAR         =  1,
+    RRDCALC_STATUS_RAISED        =  2,
+    RRDCALC_STATUS_WARNING       =  3,
+    RRDCALC_STATUS_CRITICAL      =  4
+} RRDCALC_STATUS;
+
+// ----------------------------------------------------------------------------
 // netdata include files
 
 #include "clocks.h"
@@ -294,16 +306,6 @@
 #include "plugin_proc_diskspace.h"
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
-
-typedef enum rrdcalc_status {
-    RRDCALC_STATUS_REMOVED       = -2,
-    RRDCALC_STATUS_UNDEFINED     = -1,
-    RRDCALC_STATUS_UNINITIALIZED =  0,
-    RRDCALC_STATUS_CLEAR         =  1,
-    RRDCALC_STATUS_RAISED        =  2,
-    RRDCALC_STATUS_WARNING       =  3,
-    RRDCALC_STATUS_CRITICAL      =  4
-} RRDCALC_STATUS;
 
 #include "eval.h"
 #include "health.h"

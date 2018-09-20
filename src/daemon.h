@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_DAEMON_H
 #define NETDATA_DAEMON_H 1
 

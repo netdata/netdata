@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "plugin_freebsd.h"
 
 static struct freebsd_module {
     const char *name;
