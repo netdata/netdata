@@ -8,7 +8,7 @@ project(netdata C)
 
 find_package (Threads)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1 -fstack-protector-all")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 -fstack-protector-all")
 
 set(NETDATA_FREEBSD_FILES
         src/plugin_freebsd.c
