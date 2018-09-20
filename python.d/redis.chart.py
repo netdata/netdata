@@ -191,7 +191,7 @@ class Service(SocketService):
         except (KeyError, ZeroDivisionError):
             data['hit_rate'] = 0
 
-        if data.get('redis_version'):
+        if data.get('redis_version') and data.get('rdb_bgsave_in_progress'):
             self.get_data_redis_specific(data)
 
         return data

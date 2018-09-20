@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
+# shellcheck disable=SC1090,SC1091,SC1117,SC2002,SC2034,SC2044,SC2046,SC2086,SC2129,SC2162,SC2166,SC2181
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -479,7 +480,7 @@ progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]
 then
-    run ./autogen.sh || exit 1
+    run autoreconf -ivf || exit 1
 fi
 
 run ./configure \
@@ -1067,6 +1068,12 @@ if [ -f /etc/systemd/system/netdata.service ]
     then
     echo "Deleting /etc/systemd/system/netdata.service ..."
     run rm -i /etc/systemd/system/netdata.service
+fi
+
+if [ -f /lib/systemd/system/netdata.service ]
+    then
+    echo "Deleting /lib/systemd/system/netdata.service ..."
+    run rm -i /lib/systemd/system/netdata.service
 fi
 
 if [ -f /etc/init.d/netdata ]

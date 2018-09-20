@@ -178,7 +178,7 @@ def web_upstream_charts(wu):
         ]
     }
     for peer in wu:
-        charts['web_upstream_{0}_{1}_responses'.format(wu.name, peer.id)] = {
+        charts['web_upstream_{0}_{1}_responses'.format(wu.name, peer.server)] = {
             'options': [None, 'Peer "{0}" Responses'.format(peer.real_server), 'responses/s', family,
                         'nginx_plus.web_upstream_peer_responses', 'stacked'],
             'lines': [
@@ -210,7 +210,7 @@ def web_upstream_charts(wu):
         ]
     }
     for peer in wu:
-        charts['web_upstream_{0}_{1}_net'.format(wu.name, peer.id)] = {
+        charts['web_upstream_{0}_{1}_net'.format(wu.name, peer.server)] = {
             'options': [None, 'Peer "{0}" Traffic'.format(peer.real_server), 'kilobits/s', family,
                         'nginx_plus.web_upstream_peer_traffic', 'area'],
             'lines': [
@@ -220,7 +220,7 @@ def web_upstream_charts(wu):
         }
     # Response Time
     for peer in wu:
-        charts['web_upstream_{0}_{1}_timings'.format(wu.name, peer.id)] = {
+        charts['web_upstream_{0}_{1}_timings'.format(wu.name, peer.server)] = {
             'options': [None, 'Peer "{0}" Timings'.format(peer.real_server), 'ms', family,
                         'nginx_plus.web_upstream_peer_timings', 'line'],
             'lines': [
@@ -374,6 +374,7 @@ class WebUpstream:
         return peer
 
     def peers_stats(self, peers):
+        peers = {int(peer['id']): peer for peer in peers}
         data = dict()
         for peer in self.peers.values():
             if not peer.active:

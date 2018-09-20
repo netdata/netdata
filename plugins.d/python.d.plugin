@@ -8,6 +8,7 @@ echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
+import gc
 import os
 import sys
 import threading
@@ -16,6 +17,8 @@ from re import sub
 from sys import version_info, argv
 from time import sleep
 
+GC_RUN = True
+GC_COLLECT_EVERY = 300
 
 PY_VERSION = version_info[:2]
 PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
@@ -85,7 +88,7 @@ class Job(object):
         self.recheck_every = self.job.configuration.pop('autodetection_retry')
         self.checked = False  # used in Plugin.check_job()
         self.created = False  # used in Plugin.create_job_charts()
-        if OVERRIDE_UPDATE_EVERY:
+        if self.job.update_every < int(OVERRIDE_UPDATE_EVERY):
             self.job.update_every = int(OVERRIDE_UPDATE_EVERY)
 
     def __getattr__(self, item):
@@ -202,6 +205,8 @@ class Plugin(object):
         self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
         if error:
             Logger.error('"python.d.conf" configuration file not found. Using defaults.')
+        self.do_gc = self.config.get("gc_run", GC_RUN)
+        self.gc_interval = self.config.get("gc_interval", GC_COLLECT_EVERY)
 
         if not self.config.get('enabled', True):
             run_and_exit(Logger.info)('DISABLED in configuration file.')
@@ -230,26 +235,18 @@ class Plugin(object):
             mod_name = mod[:-len(MODULE_EXTENSION)]
             mod_path = CHARTS_PY_DIR + mod
             conf_path = ''.join([CHARTS_PY_CONFIG_DIR, mod_name, '.conf'])
-
-            if DEBUG:
+            if any(
+                [
+                    self.config.get('default_run', True) and self.config.get(mod_name, True),
+                    (not self.config.get('default_run')) and self.config.get(mod_name),
+                ]
+            ):
                 yield RawModule(
                     name=mod_name,
                     path=mod_path,
                     conf_path=conf_path,
+                    explicitly_enabled=self.config.get(mod_name),
                 )
-            else:
-                if any(
-                    [
-                        self.config.get('default_run', True) and self.config.get(mod_name, True),
-                        (not self.config.get('default_run')) and self.config.get(mod_name),
-                    ]
-                ):
-                    yield RawModule(
-                        name=mod_name,
-                        path=mod_path,
-                        conf_path=conf_path,
-                        explicitly_enabled=self.config.get(mod_name),
-                    )
 
     def load_and_initialize_modules(self):
         for mod in self.enabled_modules():
@@ -367,6 +364,11 @@ class Plugin(object):
             sleep(self.sleep_time)
             self.cleanup()
             self.autodetect_retry()
+
+            # FIXME: https://github.com/firehol/netdata/issues/3817
+            if self.do_gc and self.runs_counter % self.gc_interval == 0:
+                v = gc.collect()
+                Logger.debug("GC full collection run result: {0}".format(v))
 
     def cleanup(self):
         for job in self.dead_jobs:

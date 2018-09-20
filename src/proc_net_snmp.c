@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 #define RRD_TYPE_NET_SNMP           "ipv4"
@@ -103,7 +104,6 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
              *arl_udplite = NULL;
 
     static RRDVAR *tcp_max_connections_var = NULL;
-    static ssize_t last_max_connections = 0;
 
     if(unlikely(!arl_ip)) {
         do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp", "ipv4 packets", CONFIG_BOOLEAN_AUTO);
@@ -182,7 +182,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         // arl_expect(arl_tcp, "RtoAlgorithm", &snmp_root.tcp_RtoAlgorithm);
         // arl_expect(arl_tcp, "RtoMin", &snmp_root.tcp_RtoMin);
         // arl_expect(arl_tcp, "RtoMax", &snmp_root.tcp_RtoMax);
-        arl_expect(arl_tcp, "MaxConn", &snmp_root.tcp_MaxConn);
+        arl_expect_custom(arl_tcp, "MaxConn", arl_callback_ssize_t, &snmp_root.tcp_MaxConn);
         arl_expect(arl_tcp, "ActiveOpens", &snmp_root.tcp_ActiveOpens);
         arl_expect(arl_tcp, "PassiveOpens", &snmp_root.tcp_PassiveOpens);
         arl_expect(arl_tcp, "AttemptFails", &snmp_root.tcp_AttemptFails);
@@ -526,8 +526,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
 
             words = procfile_linewords(ff, l);
-            if(words < 3) {
-                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 3+ params, read %zu.", words);
+            if(words < 2) {
+                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
@@ -670,10 +670,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(snmp_root.tcp_MaxConn != last_max_connections) {
-                last_max_connections = snmp_root.tcp_MaxConn;
-                rrdvar_custom_host_variable_set(localhost, tcp_max_connections_var, last_max_connections);
-            }
+            // this is smart enough to update it, only when it is changed
+            rrdvar_custom_host_variable_set(localhost, tcp_max_connections_var, snmp_root.tcp_MaxConn);
 
             // --------------------------------------------------------------------
 

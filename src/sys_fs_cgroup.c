@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // ----------------------------------------------------------------------------
@@ -72,7 +73,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_update_every < localhost->rrd_update_every)
         cgroup_update_every = localhost->rrd_update_every;
 
-    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every * cgroup_update_every);
+    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
@@ -752,53 +753,55 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
-    snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+    snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
-    FILE *fp = mypopen(buffer, &cgroup_pid);
-    if(fp) {
-        char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
-            trim(s);
-
-            if(*s && *s != '\n') {
-                char *t = s;
-                while(*t && *t != ' ') t++;
-                if(*t == ' ') {
-                    *t = '\0';
-                    t++;
-                }
-
-                if(!*s) {
-                    error("CGROUP: empty host interface returned by script");
-                    continue;
-                }
-
-                if(!*t) {
-                    error("CGROUP: empty guest interface returned by script");
-                    continue;
-                }
-
-                struct cgroup_network_interface *i = callocz(1, sizeof(struct cgroup_network_interface));
-                i->host_device = strdupz(s);
-                i->container_device = strdupz(t);
-                i->next = cg->interfaces;
-                cg->interfaces = i;
-
-                info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
-
-                // register a device rename to proc_net_dev.c
-                netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
-            }
-        }
-
-        mypclose(fp, cgroup_pid);
-        // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", command, cg->id);
+    FILE *fp = mypopen(command, &cgroup_pid);
+    if(!fp) {
+        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
+        return;
     }
-    else
-        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
+
+    char *s;
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+        trim(s);
+
+        if(*s && *s != '\n') {
+            char *t = s;
+            while(*t && *t != ' ') t++;
+            if(*t == ' ') {
+                *t = '\0';
+                t++;
+            }
+
+            if(!*s) {
+                error("CGROUP: empty host interface returned by script");
+                continue;
+            }
+
+            if(!*t) {
+                error("CGROUP: empty guest interface returned by script");
+                continue;
+            }
+
+            struct cgroup_network_interface *i = callocz(1, sizeof(struct cgroup_network_interface));
+            i->host_device = strdupz(s);
+            i->container_device = strdupz(t);
+            i->next = cg->interfaces;
+            cg->interfaces = i;
+
+            info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
+
+            // register a device rename to proc_net_dev.c
+            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
+        }
+    }
+
+    mypclose(fp, cgroup_pid);
+    // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
 }
 
 static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
@@ -846,14 +849,15 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
-    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+    char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
 
-    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", buffer, cg->id);
-    FILE *fp = mypopen(buffer, &cgroup_pid);
+    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->id);
+    FILE *fp = mypopen(command, &cgroup_pid);
     if(fp) {
-        // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
+        // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", command, cg->id);
+        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
         char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
         // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
         mypclose(fp, cgroup_pid);
@@ -873,7 +877,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         }
     }
     else
-        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
+        error("CGROUP: cannot popen(\"%s\", \"r\").", command);
 }
 
 static inline struct cgroup *cgroup_add(const char *id) {
@@ -1984,7 +1988,7 @@ void update_systemd_services_charts(
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
             if(unlikely(!cg->rd_cpu))
-                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, hz, RRD_ALGORITHM_INCREMENTAL);
+                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
@@ -2253,8 +2257,8 @@ void update_cgroup_charts(int update_every) {
                         , RRDSET_TYPE_STACKED
                 );
 
-                rrddim_add(cg->st_cpu, "user", NULL, 100, hz, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_cpu, "system", NULL, 100, hz, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
             }
             else
                 rrdset_next(cg->st_cpu);

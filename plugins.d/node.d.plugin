@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-':' //; exec "$(command -v nodejs || command -v node || command -v js || echo "ERROR node.js IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@"
+':' //; exec "$(command -v nodejs || command -v node || echo "ERROR node IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@"
 
 // shebang hack from:
 // http://unix.stackexchange.com/questions/65235/universal-node-js-shebang

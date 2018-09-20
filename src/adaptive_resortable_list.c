@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "adaptive_resortable_list.h"
+
+#include "common.h"
 
 // the default processor() of the ARL
 // can be overwritten at arl_create()
@@ -19,6 +20,15 @@ inline void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, cons
     register kernel_uint_t *d = dst;
     *d = str2kernel_uint_t(value);
     // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, (unsigned long long)*d);
+}
+
+inline void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name;
+    (void)hash;
+
+    register ssize_t *d = dst;
+    *d = (ssize_t)str2ll(value, NULL);
+    // fprintf(stderr, "name '%s' with hash %u and value '%s' is %zd\n", name, hash, value, *d);
 }
 
 // create a new ARL

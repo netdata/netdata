@@ -1,12 +1,11 @@
 # Netdata
 
 Copyright 2016-2017, Costa Tsaousis.
-Copyright 2017, Netdata Inc.
+Copyright 2017-2018, Netdata Inc.
 Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 Netdata uses SPDX license tags to identify the license for it's files.
-Individual licenses referenced in the tags can be found in [the LICENSES
-directory](LICENSES/).
+Individual licenses referenced in the tags are available [on SPDX project site](http://spdx.org/licenses/).
 
 ---
 
@@ -203,4 +202,9 @@ connectivity is not available.
 
     Copyright (C) 2015 Barnaby Gale
     [MIT License](https://raw.githubusercontent.com/barneygale/MCRcon/master/COPYING.txt)
+
+- [monotonic](https://github.com/atdt/monotonic)
+
+    Copyright 2014, 2015, 2016 Ori Livneh <ori@wikimedia.org>
+    [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 

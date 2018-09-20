@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -30,13 +31,14 @@ hddtemp_create() {
 		local all
 		all=$(nc $hddtemp_host $hddtemp_port )
 		unset hddtemp_disks
-		hddtemp_disks=( `grep -Po '/dev/[^|]+' <<< "$all" | cut -c 6-` )
+		# shellcheck disable=SC2190,SC2207
+		hddtemp_disks=( $(grep -Po '/dev/[^|]+' <<< "$all" | cut -c 6-) )
 	fi
 #	local disk_names
 #	disk_names=(`sed -e 's/||/\n/g;s/^|//' <<< "$all" | cut -d '|' -f2 | tr ' ' '_'`)
 
 	echo "CHART hddtemp.temperature 'disks_temp' 'temperature' 'Celsius' 'Disks temperature' 'hddtemp.temp' line $((hddtemp_priority)) $hddtemp_update_every"
-	for i in `seq 0 $((${#hddtemp_disks[@]}-1))`; do
+	for i in $(seq 0 $((${#hddtemp_disks[@]}-1))); do
 #		echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
 		echo "DIMENSION ${hddtemp_disks[$i]} '' absolute 1 1"
 	done
@@ -44,13 +46,14 @@ hddtemp_create() {
 }
 
 # _update is called continuously, to collect the values
-hddtemp_last=0
-hddtemp_count=0
+#hddtemp_last=0
+#hddtemp_count=0
 hddtemp_update() {
 #        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
 #	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
 	OLD_IFS=$IFS
 	set -f
+	# shellcheck disable=SC2207
 	IFS="|" all=( $(nc $hddtemp_host $hddtemp_port 2>/dev/null) )
 	set +f
 	IFS=$OLD_IFS

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
 #include "registry_internals.h"
 
 int registry_init(void) {

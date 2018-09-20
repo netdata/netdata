@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -588,8 +589,8 @@ RRDSET *rrdset_create_custom(
                     memset(st, 0, size);
                 }
                 else if(st->last_updated.tv_sec > now + update_every) {
-                    error("File %s refers to the future. Clearing it.", fullfilename);
-                    memset(st, 0, size);
+                    error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now));
+                    st->last_updated.tv_sec = now;
                 }
 
                 // make sure the database is aligned

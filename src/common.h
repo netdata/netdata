@@ -259,6 +259,18 @@
 #define GUID_LEN 36
 
 // ----------------------------------------------------------------------------
+
+typedef enum rrdcalc_status {
+    RRDCALC_STATUS_REMOVED       = -2,
+    RRDCALC_STATUS_UNDEFINED     = -1,
+    RRDCALC_STATUS_UNINITIALIZED =  0,
+    RRDCALC_STATUS_CLEAR         =  1,
+    RRDCALC_STATUS_RAISED        =  2,
+    RRDCALC_STATUS_WARNING       =  3,
+    RRDCALC_STATUS_CRITICAL      =  4
+} RRDCALC_STATUS;
+
+// ----------------------------------------------------------------------------
 // netdata include files
 
 #include "clocks.h"
@@ -295,16 +307,6 @@
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
-typedef enum rrdcalc_status {
-    RRDCALC_STATUS_REMOVED       = -2,
-    RRDCALC_STATUS_UNDEFINED     = -1,
-    RRDCALC_STATUS_UNINITIALIZED =  0,
-    RRDCALC_STATUS_CLEAR         =  1,
-    RRDCALC_STATUS_RAISED        =  2,
-    RRDCALC_STATUS_WARNING       =  3,
-    RRDCALC_STATUS_CRITICAL      =  4
-} RRDCALC_STATUS;
-
 #include "eval.h"
 #include "health.h"
 
@@ -315,7 +317,6 @@ typedef enum rrdcalc_status {
 #include "plugins_d.h"
 #include "statsd.h"
 #include "rrd2json.h"
-#include "rrd2json_api_old.h"
 #include "web_client.h"
 #include "web_server.h"
 #include "registry.h"
@@ -330,7 +331,6 @@ typedef enum rrdcalc_status {
 #include "adaptive_resortable_list.h"
 #include "rrdpush.h"
 #include "web_api_v1.h"
-#include "web_api_old.h"
 
 extern char *netdata_configured_hostname;
 extern char *netdata_configured_config_dir;
@@ -400,7 +400,7 @@ extern pid_t pid_max;
 extern pid_t get_system_pid_max(void);
 
 /* Number of ticks per second */
-extern unsigned int hz;
+extern unsigned int system_hz;
 extern void get_system_HZ(void);
 
 extern int recursively_delete_dir(const char *path, const char *reason);

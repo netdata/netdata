@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_GLOBAL_STATISTICS_H
 #define NETDATA_GLOBAL_STATISTICS_H 1
 

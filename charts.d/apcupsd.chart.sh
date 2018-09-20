@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -43,11 +44,12 @@ apcupsd_check() {
     for host in "${!apcupsd_sources[@]}"
     do
         run apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
+        # shellcheck disable=2181
         if [ $? -ne 0 ]
         then
             error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
             failed=$((failed + 1))
-        elif [ $(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }') != "ONLINE" ]
+        elif [ "$(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }')" != "ONLINE" ]
         then
             error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
             failed=$((failed + 1))
@@ -183,6 +185,7 @@ END {
 	print \"SET time = \" time;
 	print \"END\"
 }"
+	# shellcheck disable=SC2181
         if [ $? -ne 0 ]
         then
             failed=$((failed + 1))

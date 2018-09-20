@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 #include <sys/sem.h>
@@ -167,7 +168,7 @@ int do_ipc(int update_every, usec_t dt) {
     static int initialized = 0, read_limits_next = -1;
     static struct ipc_limits limits;
     static struct ipc_status status;
-    static RRDSETVAR *arrays_max = NULL, *semaphores_max = NULL;
+    static RRDVAR *arrays_max = NULL, *semaphores_max = NULL;
     static RRDSET *st_semaphores = NULL, *st_arrays = NULL;
     static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
 
@@ -224,8 +225,8 @@ int do_ipc(int update_every, usec_t dt) {
         }
 
         // variables
-        semaphores_max = rrdsetvar_custom_chart_variable_create(st_semaphores, "ipc.semaphores.max");
-        arrays_max     = rrdsetvar_custom_chart_variable_create(st_arrays, "ipc.semaphores.arrays.max");
+        semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc_semaphores_max");
+        arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc_semaphores_arrays_max");
     }
 
     if(unlikely(read_limits_next < 0)) {
@@ -233,8 +234,8 @@ int do_ipc(int update_every, usec_t dt) {
             error("Unable to fetch semaphore limits.");
         }
         else {
-            if(semaphores_max) rrdsetvar_custom_chart_variable_set(semaphores_max, limits.semmns);
-            if(arrays_max)     rrdsetvar_custom_chart_variable_set(arrays_max,     limits.semmni);
+            if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
+            if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max,     limits.semmni);
 
             st_arrays->red = limits.semmni;
             st_semaphores->red = limits.semmns;

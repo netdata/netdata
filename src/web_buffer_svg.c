@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
@@ -10,7 +11,7 @@
  * https://github.com/badges/shields/blob/master/measure-text.js
 */
 
-double verdana11_widths[256] = {
+static double verdana11_widths[256] = {
     [0] = 0.0,
     [1] = 0.0,
     [2] = 0.0,
@@ -509,7 +510,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
@@ -539,7 +540,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
@@ -566,7 +567,7 @@ inline char *format_value_and_unit(char *value_string, size_t value_string_len, 
             return value_string;
         }
         else if(isnan(value) || isinf(value)) {
-            snprintfz(value_string, value_string_len, "%s", "never");
+            snprintfz(value_string, value_string_len, "%s", "undefined");
             return value_string;
         }
 
