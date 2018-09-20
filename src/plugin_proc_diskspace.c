@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_proc_diskspace.h"
+#include "common.h"
 
 #define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl"

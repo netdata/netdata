@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "adaptive_resortable_list.h"
+
+#include "common.h"
 
 // the default processor() of the ARL
 // can be overwritten at arl_create()

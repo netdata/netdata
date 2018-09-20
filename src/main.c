@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "main.h"
+#include "common.h"
 
 extern void *cgroups_main(void *ptr);
 

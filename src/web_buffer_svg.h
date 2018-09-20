@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_WEB_BUFFER_SVG_H
 #define NETDATA_WEB_BUFFER_SVG_H 1
 

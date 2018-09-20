@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_checks.h"
+#include "common.h"
 
 #ifdef NETDATA_INTERNAL_CHECKS
 

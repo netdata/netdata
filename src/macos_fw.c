@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_macos.h"
+#include "common.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>

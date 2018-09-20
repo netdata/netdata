@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "registry.h"
+#include "common.h"
 #include "registry_internals.h"
 
 #define REGISTRY_STATUS_OK "ok"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #define NETDATA_RRD_INTERNALS 1
-#include "rrd.h"
+#include "common.h"
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;

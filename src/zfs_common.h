@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_ZFS_COMMON_H
 #define NETDATA_ZFS_COMMON_H 1
 

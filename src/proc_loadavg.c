@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_proc.h"
+#include "common.h"
 
 // linux calculates this once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5

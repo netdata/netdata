@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "unit_test.h"
+#include "common.h"
 
 static int check_number_printing(void) {
     struct {

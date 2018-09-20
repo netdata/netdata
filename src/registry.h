@@ -46,8 +46,6 @@
 //      (i.e. start tracking them only when they access a non-demo machine)
 //    - [DONE] do not track custom dashboards by default
 
-#include "common.h"
-
 #ifndef NETDATA_REGISTRY_H
 #define NETDATA_REGISTRY_H 1
 

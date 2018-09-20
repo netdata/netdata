@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "backend_prometheus.h"
+#include "common.h"
 
 // ----------------------------------------------------------------------------
 // PROMETHEUS

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_PROC_SELF_MOUNTINFO_H
 #define NETDATA_PROC_SELF_MOUNTINFO_H 1
 

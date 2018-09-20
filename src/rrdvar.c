@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #define NETDATA_HEALTH_INTERNALS
-#include "rrd.h"
+#include "common.h"
 
 // ----------------------------------------------------------------------------
 // RRDVAR management

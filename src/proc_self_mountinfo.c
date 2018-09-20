@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "proc_self_mountinfo.h"
+#include "common.h"
 
 // ----------------------------------------------------------------------------
 // taken from gnulib/mountlist.c

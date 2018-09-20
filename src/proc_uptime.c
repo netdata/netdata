@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_proc.h"
+#include "common.h"
 
 static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE

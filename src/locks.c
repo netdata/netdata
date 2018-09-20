@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "locks.h"
+#include "common.h"
 
 // ----------------------------------------------------------------------------
 // automatic thread cancelability management, based on locks

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_LOCKS_H
 #define NETDATA_LOCKS_H 1
 

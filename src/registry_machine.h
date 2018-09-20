@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "registry_internals.h"
-
 #ifndef NETDATA_REGISTRY_MACHINE_H
 #define NETDATA_REGISTRY_MACHINE_H 1
 

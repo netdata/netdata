@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "signals.h"
+#include "common.h"
 
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,

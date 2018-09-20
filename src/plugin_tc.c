@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "plugin_tc.h"
+
+#include "common.h"
 
 #define RRD_TYPE_TC "tc"
 

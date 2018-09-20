@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_proc.h"
+#include "common.h"
 
 typedef struct btrfs_disk {
     char *name;

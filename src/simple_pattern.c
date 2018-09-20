@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "simple_pattern.h"
+#include "common.h"
 
 struct simple_pattern {
     const char *match;

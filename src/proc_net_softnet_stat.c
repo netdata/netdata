@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "plugin_proc.h"
+#include "common.h"
 
 static inline char *softnet_column_name(size_t column) {
     switch(column) {

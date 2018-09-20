@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "dictionary.h"
+#include "common.h"
 
 // ----------------------------------------------------------------------------
 // dictionary statistics

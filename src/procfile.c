@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "procfile.h"
+#include "common.h"
 
 #define PF_PREFIX "PROCFILE"
 

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_CLOCKS_H
 #define NETDATA_CLOCKS_H 1
 

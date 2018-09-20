@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "popen.h"
+#include "common.h"
 
 /*
 struct mypopen {

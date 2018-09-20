@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "web_client.h"
+#include "common.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers

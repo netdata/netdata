@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "common.h"
-
 #ifndef NETDATA_BACKEND_PROMETHEUS_H
 #define NETDATA_BACKEND_PROMETHEUS_H 1
 

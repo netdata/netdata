@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "daemon.h"
+#include "common.h"
 #include <sched.h>
 
 char pidfile[FILENAME_MAX + 1] = "";
