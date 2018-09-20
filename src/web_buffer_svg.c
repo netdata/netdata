@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
@@ -10,7 +11,7 @@
  * https://github.com/badges/shields/blob/master/measure-text.js
 */
 
-double verdana11_widths[256] = {
+static double verdana11_widths[256] = {
     [0] = 0.0,
     [1] = 0.0,
     [2] = 0.0,

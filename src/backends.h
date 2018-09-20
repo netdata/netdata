@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_BACKENDS_H
 #define NETDATA_BACKENDS_H 1
 
@@ -21,15 +22,15 @@ extern const char *global_backend_prefix;
 
 extern void *backends_main(void *ptr);
 
-extern int backends_can_send_rrdset(BACKEND_OPTIONS options, RRDSET *st);
-extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS mode);
+extern int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st);
+extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options);
 
 extern calculated_number backend_calculate_value_from_stored_data(
         RRDSET *st                  // the chart
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , uint32_t backend_options  // BACKEND_SOURCE_* bitmap
         , time_t *first_timestamp   // the timestamp of the first point used in this response
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 );
