@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "plugin_proc.h"
 
 struct per_core_single_number_file {
     unsigned char found:1;

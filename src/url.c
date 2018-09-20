@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "url.h"
 
 // ----------------------------------------------------------------------------
 // URL encode / decode

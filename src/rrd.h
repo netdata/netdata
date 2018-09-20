@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
@@ -567,8 +570,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
-        , int health_enabled
-        , int rrdpush_enabled
+        , unsigned int health_enabled
+        , unsigned int rrdpush_enabled
         , char *rrdpush_destination
         , char *rrdpush_api_key
 );

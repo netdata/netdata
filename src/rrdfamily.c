@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_RRD_INTERNALS 1
-#include "common.h"
+#include "rrd.h"
 
 // ----------------------------------------------------------------------------
 // RRDFAMILY index

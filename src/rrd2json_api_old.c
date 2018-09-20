@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "rrd2json_api_old.h"
 
 unsigned long rrdset_info2json_api_old(RRDSET *st, char *options, BUFFER *wb) {
     time_t now = now_realtime_sec();

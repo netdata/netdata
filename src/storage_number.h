@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_STORAGE_NUMBER_H
-#define NETDATA_STORAGE_NUMBER_H
+#define NETDATA_STORAGE_NUMBER_H 1
 
 #ifdef NETDATA_WITHOUT_LONG_DOUBLE
 

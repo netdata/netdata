@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "web_buffer.h"
 
 #define BUFFER_OVERFLOW_EOF "EOF"
 

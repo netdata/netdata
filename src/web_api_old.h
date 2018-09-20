@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
-#ifndef NETDATA_WEB_API_OLD_H
-#define NETDATA_WEB_API_OLD_H
 
 #include "common.h"
+
+#ifndef NETDATA_WEB_API_OLD_H
+#define NETDATA_WEB_API_OLD_H 1
 
 extern int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *url, int datasource_type);
 extern int web_client_api_old_data_request_json(RRDHOST *host, struct web_client *w, char *url);

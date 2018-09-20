@@ -23,6 +23,7 @@
  *     - a J1900 celeron processor can process 23.000+ files / sec.
 */
 
+#include "common.h"
 
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1

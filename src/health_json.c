@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_HEALTH_INTERNALS
-#include "common.h"
+#include "health.h"
 
 static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
     if(value && *value) {

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0+
-#ifndef NETDATA_HEALTH_H
-#define NETDATA_HEALTH_H
 
-extern int default_health_enabled;
+#include "common.h"
+
+#ifndef NETDATA_HEALTH_H
+#define NETDATA_HEALTH_H 1
+
+extern unsigned int default_health_enabled;
 
 extern int rrdvar_compare(void *a, void *b);
 

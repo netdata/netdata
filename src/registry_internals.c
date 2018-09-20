@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "registry_internals.h"
 
 struct registry registry;

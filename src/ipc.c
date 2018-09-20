@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "ipc.h"
 
 #include <sys/sem.h>
 #include <sys/msg.h>

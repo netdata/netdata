@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_WEB_API_V1_H
-#define NETDATA_WEB_API_V1_H
+#define NETDATA_WEB_API_V1_H 1
 
 extern int web_client_api_request_v1_data_group(char *name, int def);
 extern uint32_t web_client_api_request_v1_data_options(char *o);

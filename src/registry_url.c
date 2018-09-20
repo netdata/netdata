@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "registry_internals.h"
+
+#include "registry_url.h"
 
 // ----------------------------------------------------------------------------
 // REGISTRY_URL

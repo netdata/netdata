@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "registry.h"
 
 #ifndef NETDATA_REGISTRY_INTERNALS_H_H
-#define NETDATA_REGISTRY_INTERNALS_H_H
+#define NETDATA_REGISTRY_INTERNALS_H_H 1
 
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01

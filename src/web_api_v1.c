@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "web_api_v1.h"
 
 static struct {
     const char *name;

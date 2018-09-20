@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_RRD_INTERNALS 1
-#include "common.h"
+#include "rrd.h"
 
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_HEALTH_INTERNALS
-#include "common.h"
+#include "health.h"
 
 // ----------------------------------------------------------------------------
 // health alarm log load/save

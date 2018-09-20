@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "plugin_proc.h"
 
 int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
     (void)dt;

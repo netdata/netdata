@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_PLUGIN_TC_H
 #define NETDATA_PLUGIN_TC_H 1
 

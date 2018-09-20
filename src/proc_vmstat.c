@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "plugin_proc.h"
 
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;

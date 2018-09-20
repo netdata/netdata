@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
+
+#include "common.h"
+
 #ifndef NETDATA_LOCKS_H
-#define NETDATA_LOCKS_H
+#define NETDATA_LOCKS_H 1
 
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER

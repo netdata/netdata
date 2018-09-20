@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "storage_number.h"
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags)
 {

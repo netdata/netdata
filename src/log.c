@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
-#include "common.h"
+
+#include "log.h"
 
 int web_server_is_multithreaded = 1;
 
