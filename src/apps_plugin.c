@@ -1760,20 +1760,20 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds_size = fdid + MAX_SPARE_FDS;
         }
 
+        // get fd information
+        sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
+        ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
+
+        if(unlikely(l == -1)) {
+            if(debug_enabled || (p->target && p->target->debug_enabled))
+                error("Cannot read link %s", fdname);
+
+            continue;
+        }
+        else
+            linkname[l] = '\0';
+
         if(unlikely(p->fds[fdid] == 0)) {
-            // we don't know this fd, get it
-
-            sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
-            ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
-            if(unlikely(l == -1)) {
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    error("Cannot read link %s", fdname);
-
-                continue;
-            }
-            else
-                linkname[l] = '\0';
-
             file_counter++;
 
             // if another process already has this, we will get
@@ -1786,8 +1786,13 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             // FIXME: we could compare the inode as returned by readdir dirent structure
             // UPDATE: no we cannot use inodes - under /proc inodes don't change when the link is changed
 
-        else
-            p->fds[fdid] = -p->fds[fdid];
+        else {
+            struct file_descriptor *fd = file_descriptor_find(linkname, 0);
+            // only flip when fd hash has been found in all_files_index
+            // to make sure it carries the same link
+            if(fd)
+                p->fds[fdid] = -p->fds[fdid];
+        }
     }
 
     closedir(fds);
@@ -3066,7 +3071,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 #endif
-    
+
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
