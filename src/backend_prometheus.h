@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #ifndef NETDATA_BACKEND_PROMETHEUS_H
-#define NETDATA_BACKEND_PROMETHEUS_H
+#define NETDATA_BACKEND_PROMETHEUS_H 1
 
 typedef enum prometheus_output_flags {
     PROMETHEUS_OUTPUT_NONE       = 0,

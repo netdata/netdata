@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // ----------------------------------------------------------------------------
@@ -653,8 +654,8 @@ void *backends_main(void *ptr) {
             chart_transmission_failures = 0,
             chart_data_lost_events = 0,
             chart_lost_bytes = 0,
-            chart_backend_reconnects = 0,
-            chart_backend_latency = 0;
+            chart_backend_reconnects = 0;
+            // chart_backend_latency = 0;
 
     RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, global_backend_update_every, RRDSET_TYPE_LINE);
     rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -794,8 +795,8 @@ void *backends_main(void *ptr) {
         chart_transmission_failures =
         chart_data_lost_events =
         chart_lost_bytes =
-        chart_backend_reconnects =
-        chart_backend_latency = 0;
+        chart_backend_reconnects = 0;
+        // chart_backend_latency = 0;
 
         if(unlikely(netdata_exit)) break;
 
@@ -845,13 +846,13 @@ void *backends_main(void *ptr) {
         // if we are not connected, connect to a backend server
 
         if(unlikely(sock == -1)) {
-            usec_t start_ut = now_monotonic_usec();
+            // usec_t start_ut = now_monotonic_usec();
             size_t reconnects = 0;
 
             sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
 
             chart_backend_reconnects += reconnects;
-            chart_backend_latency += now_monotonic_usec() - start_ut;
+            // chart_backend_latency += now_monotonic_usec() - start_ut;
         }
 
         if(unlikely(netdata_exit)) break;
@@ -861,14 +862,14 @@ void *backends_main(void *ptr) {
 
         if(likely(sock != -1)) {
             size_t len = buffer_strlen(b);
-            usec_t start_ut = now_monotonic_usec();
+            // usec_t start_ut = now_monotonic_usec();
             int flags = 0;
 #ifdef MSG_NOSIGNAL
             flags += MSG_NOSIGNAL;
 #endif
 
             ssize_t written = send(sock, buffer_tostring(b), len, flags);
-            chart_backend_latency += now_monotonic_usec() - start_ut;
+            // chart_backend_latency += now_monotonic_usec() - start_ut;
             if(written != -1 && (size_t)written == len) {
                 // we sent the data successfully
                 chart_transmission_successes++;

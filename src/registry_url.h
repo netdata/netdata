@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
-#ifndef NETDATA_REGISTRY_URL_H
-#define NETDATA_REGISTRY_URL_H
 
-#include "registry_internals.h"
+#ifndef NETDATA_REGISTRY_URL_H
+#define NETDATA_REGISTRY_URL_H 1
 
 // ----------------------------------------------------------------------------
 // URL structures

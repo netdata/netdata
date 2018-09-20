@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // ----------------------------------------------------------------------------
@@ -1058,33 +1059,33 @@ static inline EVAL_NODE *parse_full_expression(const char **string, int *error) 
 // ----------------------------------------------------------------------------
 // public API
 
-int expression_evaluate(EVAL_EXPRESSION *exp) {
-    exp->error = EVAL_ERROR_OK;
+int expression_evaluate(EVAL_EXPRESSION *expression) {
+    expression->error = EVAL_ERROR_OK;
 
-    buffer_reset(exp->error_msg);
-    exp->result = eval_node(exp, (EVAL_NODE *)exp->nodes, &exp->error);
+    buffer_reset(expression->error_msg);
+    expression->result = eval_node(expression, (EVAL_NODE *)expression->nodes, &expression->error);
 
-    if(unlikely(isnan(exp->result))) {
-        if(exp->error == EVAL_ERROR_OK)
-            exp->error = EVAL_ERROR_VALUE_IS_NAN;
+    if(unlikely(isnan(expression->result))) {
+        if(expression->error == EVAL_ERROR_OK)
+            expression->error = EVAL_ERROR_VALUE_IS_NAN;
     }
-    else if(unlikely(isinf(exp->result))) {
-        if(exp->error == EVAL_ERROR_OK)
-            exp->error = EVAL_ERROR_VALUE_IS_INFINITE;
+    else if(unlikely(isinf(expression->result))) {
+        if(expression->error == EVAL_ERROR_OK)
+            expression->error = EVAL_ERROR_VALUE_IS_INFINITE;
     }
-    else if(unlikely(exp->error == EVAL_ERROR_UNKNOWN_VARIABLE)) {
+    else if(unlikely(expression->error == EVAL_ERROR_UNKNOWN_VARIABLE)) {
         // although there is an unknown variable
         // the expression was evaluated successfully
-        exp->error = EVAL_ERROR_OK;
+        expression->error = EVAL_ERROR_OK;
     }
 
-    if(exp->error != EVAL_ERROR_OK) {
-        exp->result = NAN;
+    if(expression->error != EVAL_ERROR_OK) {
+        expression->result = NAN;
 
-        if(buffer_strlen(exp->error_msg))
-            buffer_strcat(exp->error_msg, "; ");
+        if(buffer_strlen(expression->error_msg))
+            buffer_strcat(expression->error_msg, "; ");
 
-        buffer_sprintf(exp->error_msg, "failed to evaluate expression with error %d (%s)", exp->error, expression_strerror(exp->error));
+        buffer_sprintf(expression->error_msg, "failed to evaluate expression with error %d (%s)", expression->error, expression_strerror(expression->error));
         return 0;
     }
 
@@ -1135,14 +1136,14 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
     return exp;
 }
 
-void expression_free(EVAL_EXPRESSION *exp) {
-    if(!exp) return;
+void expression_free(EVAL_EXPRESSION *expression) {
+    if(!expression) return;
 
-    if(exp->nodes) eval_node_free((EVAL_NODE *)exp->nodes);
-    freez((void *)exp->source);
-    freez((void *)exp->parsed_as);
-    buffer_free(exp->error_msg);
-    freez(exp);
+    if(expression->nodes) eval_node_free((EVAL_NODE *)expression->nodes);
+    freez((void *)expression->source);
+    freez((void *)expression->parsed_as);
+    buffer_free(expression->error_msg);
+    freez(expression);
 }
 
 const char *expression_strerror(int error) {

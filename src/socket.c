@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -46,12 +47,14 @@ int sock_setreuse(int fd, int reuse) {
 }
 
 int sock_setreuse_port(int fd, int reuse) {
-    int ret = -1;
+    int ret;
 
 #ifdef SO_REUSEPORT
     ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
     if(ret == -1 && errno != ENOPROTOOPT)
         error("failed to set SO_REUSEPORT on socket %d", fd);
+#else
+    ret = -1;
 #endif
 
     return ret;
@@ -81,7 +84,7 @@ int sock_enlarge_out(int fd) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-char *strdup_client_description(int family, const char *protocol, const char *ip, int port) {
+char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port) {
     char buffer[100 + 1];
 
     switch(family) {
@@ -149,7 +152,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     return sock;
 }
 
-int create_listen_socket4(int socktype, const char *ip, int port, int listen_backlog) {
+int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
     debug(D_LISTENER, "LISTENER: IPv4 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
@@ -245,7 +248,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     return sock;
 }
 
-static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, int port) {
+static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, uint16_t port) {
     if(sockets->opened >= MAX_LISTEN_FDS) {
         error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
         close(fd);
@@ -297,7 +300,7 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
-static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, int default_port, int listen_backlog) {
+static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
     int added = 0;
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
@@ -397,10 +400,10 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         int fd = -1;
-        int family = -1;
+        int family;
 
         char rip[INET_ADDRSTRLEN + INET6_ADDRSTRLEN] = "INVALID";
-        int rport = default_port;
+        uint16_t rport = default_port;
 
         family = rp->ai_addr->sa_family;
         switch (family) {
@@ -447,12 +450,14 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 
     sockets->backlog = (int) config_get_number(sockets->config_section, "listen backlog", sockets->backlog);
 
-    int old_port = sockets->default_port;
-    sockets->default_port = (int) config_get_number(sockets->config_section, "default port", sockets->default_port);
-    if(sockets->default_port < 1 || sockets->default_port > 65535) {
-        error("LISTENER: Invalid listen port %d given. Defaulting to %d.", sockets->default_port, old_port);
-        sockets->default_port = (int) config_set_number(sockets->config_section, "default port", old_port);
+    long long int old_port = sockets->default_port;
+    long long int new_port = config_get_number(sockets->config_section, "default port", sockets->default_port);
+    if(new_port < 1 || new_port > 65535) {
+        error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
+        sockets->default_port = (uint16_t) config_set_number(sockets->config_section, "default port", old_port);
     }
+    else sockets->default_port = (uint16_t)new_port;
+
     debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 
     char *s = config_get(sockets->config_section, "bind to", sockets->default_bind_to);
@@ -969,10 +974,10 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port
-                             , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
-                             , void  (*del_callback)(POLLINFO *pi)
-                             , int   (*rcv_callback)(POLLINFO *pi, short int *events)
-                             , int   (*snd_callback)(POLLINFO *pi, short int *events)
+                             , void *(*add_callback)(POLLINFO * /*pi*/, short int * /*events*/, void * /*data*/)
+                             , void  (*del_callback)(POLLINFO * /*pi*/)
+                             , int   (*rcv_callback)(POLLINFO * /*pi*/, short int * /*events*/)
+                             , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
                              , void *data
 ) {
     debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
@@ -1350,11 +1355,11 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 }
 
 void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
-        , void  (*del_callback)(POLLINFO *pi)
-        , int   (*rcv_callback)(POLLINFO *pi, short int *events)
-        , int   (*snd_callback)(POLLINFO *pi, short int *events)
-        , void  (*tmr_callback)(void *timer_data)
+        , void *(*add_callback)(POLLINFO * /*pi*/, short int * /*events*/, void * /*data*/)
+        , void  (*del_callback)(POLLINFO * /*pi*/)
+        , int   (*rcv_callback)(POLLINFO * /*pi*/, short int * /*events*/)
+        , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
+        , void  (*tmr_callback)(void * /*timer_data*/)
         , SIMPLE_PATTERN *access_list
         , void *data
         , time_t tcp_request_timeout_seconds

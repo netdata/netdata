@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
-#define NETDATA_ADAPTIVE_RESORTABLE_LIST_H
+#define NETDATA_ADAPTIVE_RESORTABLE_LIST_H 1
 
 /*
  * ADAPTIVE RE-SORTABLE LIST
@@ -37,8 +38,6 @@
  * DO NOT USE THIS IF THE A NAME/KEYWORD MAY APPEAR MORE THAN
  * ONCE IN THE SOURCE DATA SET.
  */
-
-#include "common.h"
 
 #define ARL_ENTRY_FLAG_FOUND    0x01    // the entry has been found in the source data
 #define ARL_ENTRY_FLAG_EXPECTED 0x02    // the entry is expected by the program

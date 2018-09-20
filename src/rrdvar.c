@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -126,7 +127,7 @@ void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock) {
 // ----------------------------------------------------------------------------
 // CUSTOM HOST VARIABLES
 
-inline int rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data) {
+inline int rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void * /*rrdvar*/, void * /*data*/), void *data) {
     return avl_traverse_lock(&host->rrdvar_root_index, callback, data);
 }
 
@@ -172,7 +173,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_numbe
     }
 }
 
-int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data) {
+int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR * /*rv*/, void * /*data*/), void *data) {
     return avl_traverse_lock(&host->rrdvar_root_index, (int (*)(void *, void *))callback, data);
 }
 

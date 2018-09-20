@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_SIGNALS_H
-#define NETDATA_SIGNALS_H
+#define NETDATA_SIGNALS_H 1
 
 extern void signals_init(void);
 extern void signals_block(void);

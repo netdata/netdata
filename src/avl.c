@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0+
+
 #include "common.h"
 
 /* ------------------------------------------------------------------------- */
@@ -44,7 +45,7 @@ avl *avl_insert(avl_tree *tree, avl *item) {
     avl *p, *q; /* Iterator, and parent. */
     avl *n;     /* Newly inserted node. */
     avl *w;     /* New root of rebalanced subtree. */
-    int dir;                /* Direction to descend. */
+    unsigned char dir; /* Direction to descend. */
 
     unsigned char da[AVL_MAX_HEIGHT]; /* Cached comparison results. */
     int k = 0;              /* Number of cached results. */
@@ -61,7 +62,7 @@ avl *avl_insert(avl_tree *tree, avl *item) {
 
         if (p->avl_balance != 0)
             z = q, y = p, k = 0;
-        da[k++] = dir = (cmp > 0);
+        da[k++] = dir = (unsigned char)(cmp > 0);
     }
 
     n = q->avl_link[dir] = item;
@@ -149,7 +150,7 @@ avl *avl_remove(avl_tree *tree, avl *item) {
     k = 0;
     p = (avl *) &tree->root;
     for(cmp = -1; cmp != 0; cmp = tree->compar(item, p)) {
-        int dir = (cmp > 0);
+        unsigned char dir = (unsigned char)(cmp > 0);
 
         pa[k] = p;
         da[k++] = dir;
@@ -283,7 +284,7 @@ avl *avl_remove(avl_tree *tree, avl *item) {
 // ---------------------------
 // traversing
 
-int avl_walker(avl *node, int (*callback)(void *entry, void *data), void *data) {
+int avl_walker(avl *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     int total = 0, ret = 0;
 
     if(node->avl_link[0]) {
@@ -305,9 +306,9 @@ int avl_walker(avl *node, int (*callback)(void *entry, void *data), void *data) 
     return total;
 }
 
-int avl_traverse(avl_tree *t, int (*callback)(void *entry, void *data), void *data) {
-    if(t->root)
-        return avl_walker(t->root, callback, data);
+int avl_traverse(avl_tree *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+    if(tree->root)
+        return avl_walker(tree->root, callback, data);
     else
         return 0;
 }
@@ -348,16 +349,16 @@ void avl_unlock(avl_tree_lock *t) {
 // ---------------------------
 // operations with locking
 
-void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
-    avl_init(&t->avl_tree, compar);
+void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
+    avl_init(&tree->avl_tree, compar);
 
 #ifndef AVL_WITHOUT_PTHREADS
     int lock;
 
 #ifdef AVL_LOCK_WITH_MUTEX
-    lock = netdata_mutex_init(&t->mutex, NULL);
+    lock = netdata_mutex_init(&tree->mutex, NULL);
 #else
-    lock = netdata_rwlock_init(&t->rwlock);
+    lock = netdata_rwlock_init(&tree->rwlock);
 #endif
 
     if(lock != 0)
@@ -366,38 +367,38 @@ void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b)) {
 #endif /* AVL_WITHOUT_PTHREADS */
 }
 
-avl *avl_search_lock(avl_tree_lock *t, avl *a) {
-    avl_read_lock(t);
-    avl *ret = avl_search(&t->avl_tree, a);
-    avl_unlock(t);
+avl *avl_search_lock(avl_tree_lock *tree, avl *item) {
+    avl_read_lock(tree);
+    avl *ret = avl_search(&tree->avl_tree, item);
+    avl_unlock(tree);
     return ret;
 }
 
-avl * avl_remove_lock(avl_tree_lock *t, avl *a) {
-    avl_write_lock(t);
-    avl *ret = avl_remove(&t->avl_tree, a);
-    avl_unlock(t);
+avl * avl_remove_lock(avl_tree_lock *tree, avl *item) {
+    avl_write_lock(tree);
+    avl *ret = avl_remove(&tree->avl_tree, item);
+    avl_unlock(tree);
     return ret;
 }
 
-avl *avl_insert_lock(avl_tree_lock *t, avl *a) {
-    avl_write_lock(t);
-    avl * ret = avl_insert(&t->avl_tree, a);
-    avl_unlock(t);
+avl *avl_insert_lock(avl_tree_lock *tree, avl *item) {
+    avl_write_lock(tree);
+    avl * ret = avl_insert(&tree->avl_tree, item);
+    avl_unlock(tree);
     return ret;
 }
 
-int avl_traverse_lock(avl_tree_lock *t, int (*callback)(void *entry, void *data), void *data) {
+int avl_traverse_lock(avl_tree_lock *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     int ret;
-    avl_read_lock(t);
-    ret = avl_traverse(&t->avl_tree, callback, data);
-    avl_unlock(t);
+    avl_read_lock(tree);
+    ret = avl_traverse(&tree->avl_tree, callback, data);
+    avl_unlock(tree);
     return ret;
 }
 
-void avl_init(avl_tree *t, int (*compar)(void *a, void *b)) {
-    t->root = NULL;
-    t->compar = compar;
+void avl_init(avl_tree *tree, int (*compar)(void * /*a*/, void * /*b*/)) {
+    tree->root = NULL;
+    tree->compar = compar;
 }
 
 // ------------------
