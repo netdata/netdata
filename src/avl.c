@@ -284,7 +284,7 @@ avl *avl_remove(avl_tree *tree, avl *item) {
 // ---------------------------
 // traversing
 
-int avl_walker(avl *node, int (*callback)(void * /*entry*/, void */*data*/), void *data) {
+int avl_walker(avl *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
     int total = 0, ret = 0;
 
     if(node->avl_link[0]) {
