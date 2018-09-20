@@ -128,7 +128,7 @@ class Service(UrlService):
                 if service_category == 'process':
                     for subnode in ('uptime', 'threads', 'children'):
                         subnode_value = service_node.find(subnode)
-                        if subnode_value == None:
+                        if subnode_value is None:
                             continue
                         if subnode == 'uptime' and int(subnode_value.text) < 0:
                             self.debug('Skipping bugged metrics with negative uptime (monit before v5.16')
@@ -140,7 +140,7 @@ class Service(UrlService):
 
                 if service_category == 'host':
                     subnode_value = service_node.find('./icmp/responsetime')
-                    if subnode_value == None:
+                    if subnode_value is None:
                         continue
                     dimension_key = 'host_latency_{0}'.format(service_name)
                     if dimension_key not in self.charts['host_latency']:
