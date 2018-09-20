@@ -131,7 +131,6 @@ Module provides server and tube level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
- * `python-yaml`
 
 **Server statistics:**
 
@@ -526,6 +525,35 @@ localhost:
   header:
     X-API-Key: 'dnsdist-api-key'
 ```
+
+---
+
+# docker
+
+Module monitor docker health metrics.
+
+**Requirement:**
+* `docker` package
+
+Following charts are drawn:
+
+1. **running containers**
+ * count
+
+2. **healthy containers**
+ * count
+
+3. **unhealthy containers**
+ * count
+
+### configuration
+
+```yaml
+ update_every : 1
+ priority     : 60000
+ ```
+
+---
 
 # dovecot
 
@@ -1038,15 +1066,15 @@ It produces:
 
 6. **Requests In Processing** in requests
  * processing
- 
+
 7. **Public Cache Hits** in hits/s
  * hits
- 
+
 8. **Private Cache Hits** in hits/s
  * hits
- 
+
 9. **Static Hits** in hits/s
- * hits 
+ * hits
 
 
 ### configuration
@@ -1151,8 +1179,8 @@ Module collects adapter, physical drives and battery stats.
 To grab stats it executes:
  * `sudo -n megacli -LDPDInfo -aAll`
  * `sudo -n megacli -AdpBbuCmd -a0`
- 
- 
+
+
 It produces:
 
 1. **Adapter State**
@@ -1382,6 +1410,39 @@ If no configuration is given, module will attempt to connect to mongodb daemon o
 
 ---
 
+# monit
+
+Monit monitoring module. Data is grabbed from stats XML interface (exsists for a long time, but not mentioned in official documentation). Mostly this plugin shows statuses of monit targets, i.e. [statuses of specified checks](https://mmonit.com/monit/documentation/monit.html#Service-checks).
+
+1. **Filesystems**
+ * Filesystems
+ * Directories
+ * Files
+ * Pipes
+
+2. **Applications**
+ * Processes (+threads/childs)
+ * Programs
+
+3. **Network**
+ * Hosts (+latency)
+ * Network interfaces
+
+### configuration
+
+Sample:
+
+```yaml
+local:
+  name     : 'local'
+  url     : 'http://localhost:2812'
+  user:    : admin
+  pass:    : monit
+```
+
+If no configuration is given, module will attempt to connect to monit as `http://localhost:2812`.
+
+---
 
 # mysql
 
@@ -1972,7 +2033,7 @@ When no configuration file is found, module tries to connect to TCP/IP socket: `
 
 Module monitor powerdns performance and health metrics.
 
-Following charts are drawn:
+Powerdns charts:
 
 1. **Queries and Answers**
  * udp-queries
@@ -1994,6 +2055,45 @@ Following charts are drawn:
 
 4. **Latency**
  * latency
+
+ Powerdns Recursor charts:
+
+ 1. **Questions In**
+ * questions
+ * ipv6-questions
+ * tcp-queries
+
+2. **Questions Out**
+ * all-outqueries
+ * ipv6-outqueries
+ * tcp-outqueries
+ * throttled-outqueries
+
+3. **Answer Times**
+ * answers-slow
+ * answers0-1
+ * answers1-10
+ * answers10-100
+ * answers100-1000
+
+4. **Timeouts**
+ * outgoing-timeouts
+ * outgoing4-timeouts
+ * outgoing6-timeouts
+
+5. **Drops**
+ * over-capacity-drops
+
+6. **Cache Usage**
+ * cache-hits
+ * cache-misses
+ * packetcache-hits
+ * packetcache-misses
+
+7. **Cache Size**
+ * cache-entries
+ * packetcache-entries
+ * negcache-entries
 
 ### configuration
 
@@ -2153,6 +2253,41 @@ localhost:
 ```
 
 When no configuration file is found, module tries to connect to TCP/IP socket: `localhost:6379`.
+
+---
+
+# rethinkdb
+
+Module monitor rethinkdb health metrics.
+
+Following charts are drawn:
+
+1. **Connected Servers**
+ * connected
+ * missing
+
+2. **Active Clients**
+ * active
+
+3. **Queries** per second
+ * queries
+
+4. **Documents** per second
+ * documents
+
+### configuration
+
+```yaml
+
+localhost:
+  name     : 'local'
+  host     : '127.0.0.1'
+  port     : 28015
+  user     : "user"
+  password : "pass"
+```
+
+When no configuration file is found, module tries to connect to `127.0.0.1:28015`.
 
 ---
 

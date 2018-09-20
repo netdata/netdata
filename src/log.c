@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 int web_server_is_multithreaded = 1;
@@ -57,7 +58,7 @@ static inline void log_unlock() {
     netdata_mutex_unlock(&log_mutex);
 }
 
-int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
+static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_syslog, int is_stdaccess, int *fd_ptr) {
     int f, devnull = 0;
 
     if(!filename || !*filename || !strcmp(filename, "none") ||  !strcmp(filename, "/dev/null")) {
@@ -76,8 +77,10 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
     // don't do anything if the user is willing
     // to have the standard one
     if(!strcmp(filename, "system")) {
-        if(fd != -1 && fp != &stdaccess)
-            return fd;
+        if(fd != -1 && !is_stdaccess) {
+            if(fd_ptr) *fd_ptr = fd;
+            return fp;
+        }
 
         filename = "stderr";
     }
@@ -92,19 +95,20 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
         f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
         if(f == -1) {
             error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
-            return fd;
+            if(fd_ptr) *fd_ptr = fd;
+            return fp;
         }
-    }
-
-    if(devnull && fp == &stdaccess) {
-        fd = -1;
-        *fp = NULL;
     }
 
     // if there is a level-2 file pointer
     // flush it before switching the level-1 fds
-    if(fp && *fp)
-        fflush(*fp);
+    if(fp)
+        fflush(fp);
+
+    if(devnull && is_stdaccess) {
+        fd = -1;
+        fp = NULL;
+    }
 
     if(fd != f && fd != -1) {
         // it automatically closes
@@ -112,44 +116,46 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
         if (t == -1) {
             error("Cannot dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
             close(f);
-            return fd;
+            if(fd_ptr) *fd_ptr = fd;
+            return fp;
         }
         // info("dup2() new fd %d to old fd %d for '%s'", f, fd, filename);
         close(f);
     }
     else fd = f;
 
-    if(fp && !*fp) {
-        *fp = fdopen(fd, "a");
-        if (!*fp)
+    if(!fp) {
+        fp = fdopen(fd, "a");
+        if (!fp)
             error("Cannot fdopen() fd %d ('%s')", fd, filename);
         else {
-            if (setvbuf(*fp, NULL, _IOLBF, 0) != 0)
+            if (setvbuf(fp, NULL, _IOLBF, 0) != 0)
                 error("Cannot set line buffering on fd %d ('%s')", fd, filename);
         }
     }
 
-    return fd;
+    if(fd_ptr) *fd_ptr = fd;
+    return fp;
 }
 
 void reopen_all_log_files() {
     if(stdout_filename)
-        open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
+        open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
 
     if(stderr_filename)
-        open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
+        open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
     if(stdaccess_filename)
-        stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
+         stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
 
 void open_all_log_files() {
     // disable stdin
-    open_log_file(STDIN_FILENO, (FILE **)&stdin, "/dev/null", NULL);
+    open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
 
-    open_log_file(STDOUT_FILENO, (FILE **)&stdout, stdout_filename, &output_log_syslog);
-    open_log_file(STDERR_FILENO, (FILE **)&stderr, stderr_filename, &error_log_syslog);
-    stdaccess_fd = open_log_file(stdaccess_fd, (FILE **)&stdaccess, stdaccess_filename, &access_log_syslog);
+    open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
+    open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+    stdaccess = open_log_file(stdaccess_fd, stdaccess, stdaccess_filename, &access_log_syslog, 1, &stdaccess_fd);
 }
 
 // ----------------------------------------------------------------------------

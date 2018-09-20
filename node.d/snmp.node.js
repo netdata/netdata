@@ -276,14 +276,16 @@ netdata.processors.snmp = {
 
                         switch(varbinds[i].type) {
                             case net_snmp.ObjectType.OctetString:
-                                if(service.snmp_oids_index[varbinds[i].oid].type !== 'title')
+                                if(service.snmp_oids_index[varbinds[i].oid].type !== 'title') {
                                     // parse floating point values, exposed as strings
                                     value = parseFloat(varbinds[i].value) * 1000;
-                                    if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as float in string)");
-                                else
+                                    if (__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as float in string)");
+                                }
+                                else {
                                     // just use the string
                                     value = varbinds[i].value;
-                                    if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as string)");
+                                    if (__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as string)");
+                                }
                                 break;
 
                             case net_snmp.ObjectType.Counter64:

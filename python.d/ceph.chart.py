@@ -9,6 +9,7 @@ try:
 except ImportError:
     CEPH = False
 
+import os
 import json
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -26,8 +27,8 @@ CHARTS = {
     'general_usage': {
         'options': [None, 'Ceph General Space', 'KB', 'general', 'ceph.general_usage', 'stacked'],
         'lines': [
-            ['general_available', 'avail', 'absolute', 1, 1024],
-            ['general_usage', 'used', 'absolute', 1, 1024]
+            ['general_available', 'avail', 'absolute'],
+            ['general_usage', 'used', 'absolute']
         ]
     },
     'general_objects': {
@@ -118,6 +119,20 @@ class Service(SimpleService):
             return False
         if not (self.config_file and self.keyring_file):
             self.error('config_file and/or keyring_file is not defined')
+            return False
+
+        # Verify files and permissions
+        if not (os.access(self.config_file, os.F_OK)):
+            self.error('{0} does not exist'.format(self.config_file))
+            return False
+        if not (os.access(self.keyring_file, os.F_OK)):
+            self.error('{0} does not exist'.format(self.keyring_file))
+            return False
+        if not (os.access(self.config_file, os.R_OK)):
+            self.error('Ceph plugin does not read {0}, define read permission.'.format(self.config_file))
+            return False
+        if not (os.access(self.keyring_file, os.R_OK)):
+            self.error('Ceph plugin does not read {0}, define read permission.'.format(self.keyring_file))
             return False
         try:
             self.cluster = rados.Rados(conffile=self.config_file,

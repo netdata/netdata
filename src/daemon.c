@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 #include <sched.h>
 
@@ -152,6 +153,10 @@ static void oom_score_adj(void) {
     s = config_get(CONFIG_SECTION_GLOBAL, "OOM score", s);
     if(s && *s && (isdigit(*s) || *s == '-' || *s == '+'))
         wanted_score = atoll(s);
+    else if(s && !strcmp(s, "keep")) {
+        info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);
+        return;
+    }
     else {
         info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
         return;
@@ -203,8 +208,6 @@ static void process_nice_level(void) {
 #endif // HAVE_NICE
 };
 
-#ifdef HAVE_SCHED_SETSCHEDULER
-
 #define SCHED_FLAG_NONE                      0x00
 #define SCHED_FLAG_PRIORITY_CONFIGURABLE     0x01 // the priority is user configurable
 #define SCHED_FLAG_KEEP_AS_IS                0x04 // do not attempt to set policy, priority or nice()
@@ -228,8 +231,8 @@ struct sched_def {
 #endif
 
 #ifdef SCHED_OTHER
-        { "nice",  SCHED_OTHER, 0, SCHED_FLAG_USE_NICE },
         { "other", SCHED_OTHER, 0, SCHED_FLAG_USE_NICE },
+        { "nice",  SCHED_OTHER, 0, SCHED_FLAG_USE_NICE },
 #endif
 
 #ifdef SCHED_RR
@@ -252,6 +255,55 @@ struct sched_def {
         { NULL, 0, 0, 0 }
 };
 
+
+#ifdef HAVE_SCHED_GETSCHEDULER
+static void sched_getscheduler_report(void) {
+    int sched = sched_getscheduler(0);
+    if(sched == -1) {
+        error("Cannot get my current process scheduling policy.");
+        return;
+    }
+    else {
+        int i;
+        for(i = 0 ; scheduler_defaults[i].name ; i++) {
+            if(scheduler_defaults[i].policy == sched) {
+                if(scheduler_defaults[i].flags & SCHED_FLAG_PRIORITY_CONFIGURABLE) {
+                    struct sched_param param;
+                    if(sched_getparam(0, &param) == -1) {
+                        error("Cannot get the process scheduling priority for my policy '%s'", scheduler_defaults[i].name);
+                        return;
+                    }
+                    else {
+                        info("Running with process scheduling policy '%s', priority %d", scheduler_defaults[i].name, param.sched_priority);
+                    }
+                }
+                else if(scheduler_defaults[i].flags & SCHED_FLAG_USE_NICE) {
+                    #ifdef HAVE_GETPRIORITY
+                    int n = getpriority(PRIO_PROCESS, 0);
+                    info("Running with process scheduling policy '%s', nice level %d", scheduler_defaults[i].name, n);
+                    #else // !HAVE_GETPRIORITY
+                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                    #endif // !HAVE_GETPRIORITY
+                }
+                else {
+                    info("Running with process scheduling policy '%s'", scheduler_defaults[i].name);
+                }
+
+                return;
+            }
+        }
+    }
+}
+#else // !HAVE_SCHED_GETSCHEDULER
+static void sched_getscheduler_report(void) {
+#ifdef HAVE_GETPRIORITY
+    info("Running with priority %d", getpriority(PRIO_PROCESS, 0));
+#endif // HAVE_GETPRIORITY
+}
+#endif // !HAVE_SCHED_GETSCHEDULER
+
+#ifdef HAVE_SCHED_SETSCHEDULER
+
 static void sched_setscheduler_set(void) {
 
     if(scheduler_defaults[0].name) {
@@ -271,7 +323,7 @@ static void sched_setscheduler_set(void) {
                 flags = scheduler_defaults[i].flags;
 
                 if(flags & SCHED_FLAG_KEEP_AS_IS)
-                    return;
+                    goto report;
 
                 if(flags & SCHED_FLAG_PRIORITY_CONFIGURABLE)
                     priority = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
@@ -311,18 +363,21 @@ static void sched_setscheduler_set(void) {
         else {
             info("Adjusted netdata scheduling policy to %s (%d), with priority %d.", name, policy, priority);
             if(!(flags & SCHED_FLAG_USE_NICE))
-                return;
+                goto report;
         }
     }
 
 fallback:
     process_nice_level();
+
+report:
+    sched_getscheduler_report();
 }
-#else
+#else // !HAVE_SCHED_SETSCHEDULER
 static void sched_setscheduler_set(void) {
     process_nice_level();
 }
-#endif
+#endif // !HAVE_SCHED_SETSCHEDULER
 
 int become_daemon(int dont_fork, const char *user)
 {

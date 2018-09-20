@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 static size_t default_stacksize = 0, wanted_stacksize = 0;

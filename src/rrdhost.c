@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
@@ -117,8 +118,8 @@ RRDHOST *rrdhost_create(const char *hostname,
                         int update_every,
                         long entries,
                         RRD_MEMORY_MODE memory_mode,
-                        int health_enabled,
-                        int rrdpush_enabled,
+                        unsigned int health_enabled,
+                        unsigned int rrdpush_enabled,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
                         int is_localhost
@@ -133,7 +134,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
-    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key);
+    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
 
@@ -324,8 +325,8 @@ RRDHOST *rrdhost_find_or_create(
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
-        , int health_enabled
-        , int rrdpush_enabled
+        , unsigned int health_enabled
+        , unsigned int rrdpush_enabled
         , char *rrdpush_destination
         , char *rrdpush_api_key
 ) {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_EVAL_H
-#define NETDATA_EVAL_H
+#define NETDATA_EVAL_H 1
 
 #define EVAL_MAX_VARIABLE_NAME_LENGTH 300
 
@@ -60,7 +61,7 @@ typedef struct eval_expression {
 extern EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error);
 
 // free all resources allocated for an expression
-extern void expression_free(EVAL_EXPRESSION *op);
+extern void expression_free(EVAL_EXPRESSION *expression);
 
 // convert an error code to a message
 extern const char *expression_strerror(int error);

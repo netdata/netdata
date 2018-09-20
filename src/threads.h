@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_THREADS_H
-#define NETDATA_THREADS_H
+#define NETDATA_THREADS_H 1
 
 extern pid_t gettid(void);
 

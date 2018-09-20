@@ -1,70 +1,80 @@
+---
 dist: trusty
 sudo: true
-#
+
 # C includes autotools and make by default
 language: c
 services:
   - docker
-os:
-  - linux
-  - osx
-compiler:
- - gcc
- - clang
-#
-# Extra packages
-addons:
-  apt:
-    packages:
-    - gnupg
-    - libcap2-bin
-    - zlib1g-dev
-    - uuid-dev
-    - fakeroot
-#
-# Setup environment
-before_install:
- - eval "$(ssh-agent -s)"
- - ./.travis/decrypt-if-have-key decb6f6387c4
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew uninstall gnupg || echo; brew install gpg; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fakeroot; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ossp-uuid; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install xz; fi
-#
-# Run
-before_script:
- - gpg --import packaging/gpg.keys
- # Run the commit hooks in case the developer didn't
- - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
-script:
-   # make release packages
- - fakeroot ./packaging/git-build
-   # Make sure stdout is in blocking mode. If we don't, then conda create will barf during downloads.
-   # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
- - python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
-   # make self-extractor
- - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./makeself/build-x86_64-static.sh; fi
-   # test build and installer
- - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-#
-# Deploy as required
-after_success:
-  - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then for i in *.gz.run; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done; fi
-  - ./.travis/deploy-if-have-key
-deploy:
-  # Upload results to GitHub (tag only)
-  - provider: releases
-    draft: true
-    api_key:
-      secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
-    skip_cleanup: true
-    file_glob: true
-    file:
-      - "netdata*.tar.*"
-      - "netdata*.gz.run*"
-    on:
-      condition: $CC = gcc && $TRAVIS_OS_NAME = linux
-      repo: firehol/netdata
-      tags: true
+
+stages:
+  - lint
+  - test
+  - build
+  - name: release
+    if: branch = master AND type != pull_request
+
+jobs:
+  include:
+    - stage: "lint"
+      name: "python"
+      install: skip
+      script: docker run --rm -v $(pwd):/code eeacms/pylint || echo "OK"
+    - name: "javascript"
+      install: skip
+      script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/web/*.js /code/plugins.d/node.d.plugin/*.js /code/node.d/*.js /code/node.d/node_modules/netdata.js
+    - name: "css"
+      install: skip
+      script: docker run --rm -v $(pwd)/web:/code eeacms/csslint sh -c "csslint /code/*.css" || echo "OK"
+    - name: "bash"
+      install: skip
+      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /project/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi' || echo "OK"
+    - stage: "test"
+      name: "C"
+      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
+      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+#      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
+#    - name: "Node.js"
+#      script: tests/run_nodejs.sh
+    - stage: "build"
+      name: "ubuntu 14.04 (not containerized)"
+      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
+      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
+    - name: "ubuntu 18.04"
+      script: ./.travis/containerized_build.sh ubuntu1804
+    - name: "CentOS 7"
+      script: ./.travis/containerized_build.sh centos7
+    - name: "CentOS 6"
+      script: ./.travis/containerized_build.sh centos6
+# TODO: cannot run installer without bash
+#    - name: "alpine"
+#      script: ./.travis/containerized_build.sh alpine
+    - name: "OSX"
+      install: brew install fakeroot ossp-uuid
+      script: 
+        - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+      os: osx
+    - stage: "release"
+      name: "Docker"
+      script: docker/build.sh
+      env: REPOSITORY="firehol/netdata"
+    - name: "GitHub"
+      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+      script: ./.travis/create_artifacts.sh
+      deploy:
+        - provider: releases
+          draft: true
+          api_key:
+            secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
+          skip_cleanup: true
+          file_glob: true
+          file:
+            - "netdata*.tar.*"
+            - "netdata*.gz.run*"
+          on:
+            repo: firehol/netdata
+            tags: true
+
+notifications:
+  webhooks: https://app.fossa.io/hooks/travisci

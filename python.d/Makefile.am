@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0+
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
-    python-modules-installer.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -9,7 +8,6 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_python_SCRIPTS = \
-    python-modules-installer.sh \
     $(NULL)
 
 dist_python_DATA = \
@@ -25,6 +23,7 @@ dist_python_DATA = \
     cpuidle.chart.py \
     dns_query_time.chart.py \
     dnsdist.chart.py \
+    dockerd.chart.py \
     dovecot.chart.py \
     elasticsearch.chart.py \
     example.chart.py \
@@ -44,6 +43,7 @@ dist_python_DATA = \
     megacli.chart.py \
     memcached.chart.py \
     mongodb.chart.py \
+    monit.chart.py \
     mysql.chart.py \
     nginx.chart.py \
     nginx_plus.chart.py \
@@ -58,6 +58,7 @@ dist_python_DATA = \
     puppet.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
+    rethinkdbs.chart.py \
     retroshare.chart.py \
     samba.chart.py \
     sensors.chart.py \
@@ -86,7 +87,6 @@ dist_bases_DATA = \
     python_modules/bases/collection.py \
     python_modules/bases/loaders.py \
     python_modules/bases/loggers.py \
-    python_modules/bases/monotonic.py \
     $(NULL)
 
 bases_framework_servicesdir=$(basesdir)/FrameworkServices
@@ -107,6 +107,7 @@ dist_third_party_DATA = \
     python_modules/third_party/lm_sensors.py \
     python_modules/third_party/mcrcon.py \
     python_modules/third_party/boinc_client.py \
+    python_modules/third_party/monotonic.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2

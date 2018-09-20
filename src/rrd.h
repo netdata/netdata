@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
@@ -104,8 +105,8 @@ typedef struct rrdfamily RRDFAMILY;
 
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
-    RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
-    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1   // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_FLAG_HIDDEN                          = (1 << 0),  // this dimension will not be offered to callers
+    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = (1 << 1)   // do not offer RESET or OVERFLOW info to callers
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -160,8 +161,8 @@ struct rrddim {
     size_t collections_counter;                     // the number of times we added values to this rrdim
     size_t unused[10];
 
-    int updated:1;                                  // 1 when the dimension has been updated since the last processing
-    int exposed:1;                                  // 1 when set what have sent this dimension to the central netdata
+    unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
+    unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata
 
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
@@ -441,20 +442,20 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush
 
-    int rrdpush_send_enabled:1;                     // 1 when this host sends metrics to another netdata
+    unsigned int rrdpush_send_enabled:1;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
-    volatile int rrdpush_sender_spawn:1;            // 1 when the sender thread has been spawn
+    volatile unsigned int rrdpush_sender_spawn:1;   // 1 when the sender thread has been spawn
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
 
-    volatile int rrdpush_sender_connected:1;        // 1 when the sender is ready to push metrics
+    volatile unsigned int rrdpush_sender_connected:1; // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
 
-    volatile int rrdpush_sender_error_shown:1;      // 1 when we have logged a communication error
-    volatile int rrdpush_sender_join:1;             // 1 when we have to join the sending thread
+    volatile unsigned int rrdpush_sender_error_shown:1; // 1 when we have logged a communication error
+    volatile unsigned int rrdpush_sender_join:1;    // 1 when we have to join the sending thread
 
     // metrics may be collected asynchronously
     // these synchronize all the threads willing the write to our sending buffer
@@ -474,7 +475,7 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    int health_enabled:1;                           // 1 when this host has health enabled
+    unsigned int health_enabled:1;                  // 1 when this host has health enabled
     time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
     char *health_default_exec;                      // the full path of the alarms notifications program
     char *health_default_recipient;                 // the default recipient for all alarms
@@ -567,8 +568,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
-        , int health_enabled
-        , int rrdpush_enabled
+        , unsigned int health_enabled
+        , unsigned int rrdpush_enabled
         , char *rrdpush_destination
         , char *rrdpush_api_key
 );

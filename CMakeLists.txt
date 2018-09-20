@@ -8,7 +8,7 @@ project(netdata C)
 
 find_package (Threads)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1 -fstack-protector-all")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 -fstack-protector-all")
 
 set(NETDATA_FREEBSD_FILES
         src/plugin_freebsd.c
@@ -136,8 +136,6 @@ set(NETDATA_COMMON_FILES
         src/rrd.h
         src/rrd2json.c
         src/rrd2json.h
-        src/rrd2json_api_old.c
-        src/rrd2json_api_old.h
         src/rrdcalc.c
         src/rrdcalctemplate.c
         src/rrddim.c
@@ -167,8 +165,6 @@ set(NETDATA_COMMON_FILES
         src/unit_test.h
         src/url.c
         src/url.h
-        src/web_api_old.c
-        src/web_api_old.h
         src/web_api_v1.c
         src/web_api_v1.h
         src/web_buffer.c
@@ -188,6 +184,8 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/apps_plugin.c
         src/avl.c
         src/avl.h
+        src/adaptive_resortable_list.c
+        src/adaptive_resortable_list.h
         src/common.c
         src/common.h
         src/clocks.c
@@ -199,6 +197,8 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/log.h
         src/procfile.c
         src/procfile.h
+        src/threads.c
+        src/threads.h
         src/web_buffer.c
         src/web_buffer.h
         config.h
@@ -217,6 +217,8 @@ set(FREEIPMI_PLUGIN_SOURCE_FILES
         src/log.h
         src/procfile.c
         src/procfile.h
+        src/threads.c
+        src/threads.h
         config.h
         )
 
@@ -231,8 +233,16 @@ set(CGROUP_NETWORK_SOURCE_FILES
         src/locks.h
         src/log.c
         src/log.h
+        src/popen.c
+        src/popen.h
         src/procfile.c
         src/procfile.h
+        src/signals.c
+        src/signals.h
+        src/storage_number.c
+        src/storage_number.h
+        src/threads.c
+        src/threads.h
         src/web_buffer.c
         src/web_buffer.h
         config.h
@@ -252,10 +262,10 @@ add_executable(netdata_macos ${NETDATA_COMMON_FILES} ${NETDATA_MACOS_FILES})
 target_link_libraries (netdata_macos m z uuid ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/inlined.h)
-target_link_libraries (apps.plugin m ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (apps.plugin m cap ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
-target_link_libraries (freeipmi.plugin ipmimonitoring)
+target_link_libraries (freeipmi.plugin ipmimonitoring ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(cgroup-network ${CGROUP_NETWORK_SOURCE_FILES})
 target_link_libraries (cgroup-network m ${CMAKE_THREAD_LIBS_INIT})

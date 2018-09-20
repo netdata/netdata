@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
-int default_health_enabled = 1;
+unsigned int default_health_enabled = 1;
 
 // ----------------------------------------------------------------------------
 // health initialization
@@ -16,7 +17,7 @@ inline char *health_config_dir(void) {
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!(default_health_enabled = config_get_boolean(CONFIG_SECTION_HEALTH, "enabled", 1))) {
+    if(!(default_health_enabled = (unsigned int)config_get_boolean(CONFIG_SECTION_HEALTH, "enabled", default_health_enabled))) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
@@ -179,9 +180,9 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         error("HEALTH: Cannot popen(\"%s\", \"r\").", command_to_run);
         goto done;
     }
-    debug(D_HEALTH, "HEALTH reading from command");
-    char *s = fgets(command_to_run, FILENAME_MAX, fp);
-    (void)s;
+    debug(D_HEALTH, "HEALTH reading from command (discarding command's output)");
+    char buffer[100 + 1];
+    while(fgets(buffer, 100, fp) != NULL) ;
     ae->exec_code = mypclose(fp, command_pid);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
 
@@ -522,6 +523,11 @@ void *health_main(void *ptr) {
                         );
 
                         rc->value = rc->calculation->result;
+
+                        if(rc->local) rc->local->last_updated = now;
+                        if(rc->family) rc->family->last_updated = now;
+                        if(rc->hostid) rc->hostid->last_updated = now;
+                        if(rc->hostname) rc->hostname->last_updated = now;
                     }
                 }
             }

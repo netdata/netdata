@@ -37,8 +37,8 @@ statistics-channels {
 };
 */
 
-var url = require('url');
-var http = require('http');
+require('url');
+require('http');
 var XML = require('pixl-xml');
 var netdata = require('netdata');
 
@@ -80,11 +80,11 @@ var named = {
                     multiplier: multiplier, // the multiplier
                     divisor: divisor,       // the divisor
                     hidden: false           // is hidden (boolean)
-                }
+                };
             }
         }
 
-        if(found === false)
+        if(!found)
             return null;
 
         chart = service.chart(id, chart);

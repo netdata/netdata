@@ -14,7 +14,8 @@
 
 DAEMON="netdata"
 DAEMON_PATH=@sbindir_POST@
-PIDFILE=@localstatedir_POST@/run/$DAEMON.pid
+PIDFILE_PATH=@localstatedir_POST@/run/netdata
+PIDFILE=$PIDFILE_PATH/$DAEMON.pid
 DAEMONOPTS="-P $PIDFILE"
 STOP_TIMEOUT="60"
 
@@ -25,6 +26,7 @@ LOCKFILE=/var/lock/subsys/$DAEMON
 service_start()
 {
 	[ -x $DAEMON_PATH ] || exit 5
+	[ ! -d $PIDFILE_PATH ] && mkdir -p $PIDFILE_PATH
 	echo -n "Starting $DAEMON..."
 	daemon $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?

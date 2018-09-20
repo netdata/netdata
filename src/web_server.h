@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_WEB_SERVER_H
 #define NETDATA_WEB_SERVER_H 1
-
-#define WEB_PATH_FILE               "file"
-#define WEB_PATH_DATA               "data"
-#define WEB_PATH_DATASOURCE         "datasource"
-#define WEB_PATH_GRAPH              "graph"
 
 #ifndef API_LISTEN_PORT
 #define API_LISTEN_PORT 19999
