@@ -342,6 +342,8 @@ struct pid_stat {
     // kernel_uint_t io_cancelled_write_bytes;
 
     int *fds;                       // array of fds it uses
+    char * *fd_paths;               // array of fd paths
+    int *fd_last_readlink;          // array of last fd readlink check timestamps
     int fds_size;                   // the size of the fds array
 
     int children_count;             // number of processes directly referencing this
@@ -691,7 +693,10 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
 
     struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
     p->fds = callocz(sizeof(int), MAX_SPARE_FDS);
+    p->fd_paths = callocz(sizeof(char *), MAX_SPARE_FDS);
+    p->fd_last_readlink = callocz(sizeof(int), MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
+
 
     if(likely(root_of_pids))
         root_of_pids->prev = p;
@@ -705,6 +710,18 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     all_pids_count++;
 
     return p;
+}
+
+static inline void free_fd_paths(struct pid_stat *p) {
+    char * *fd = p->fd_paths;
+    char * *end = &p->fd_paths[p->fds_size];
+    while(fd < end) {
+        if(*fd) {
+            freez(*fd);
+            *fd = 0;
+        }
+        fd++;
+    }
 }
 
 static inline void del_pid_entry(pid_t pid) {
@@ -724,6 +741,9 @@ static inline void del_pid_entry(pid_t pid) {
     if(p->prev) p->prev->next = p->next;
 
     freez(p->fds);
+    freez(p->fd_last_readlink);
+    free_fd_paths(p);
+    freez(p->fd_paths);
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
@@ -1046,7 +1066,6 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     return 1;
 #endif
 }
-
 
 // ----------------------------------------------------------------------------
 
@@ -1585,6 +1604,12 @@ static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
     while(fd < end) *fd++ = 0;
 }
 
+static inline void zero_pid_fdnames(struct pid_stat *p, int first, int size) {
+    char * *fd = &p->fd_paths[first];
+    char * *end = &p->fd_paths[first + size];
+    while(fd < end) *fd++ = 0;
+}
+
 static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     (void)ptr;
 #ifdef __FreeBSD__
@@ -1754,17 +1779,44 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             );
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
+            p->fd_paths = reallocz(p->fd_paths, (fdid + MAX_SPARE_FDS) * sizeof(char *));
+            p->fd_last_readlink = reallocz(p->fd_last_readlink, (fdid + MAX_SPARE_FDS) * sizeof(int));
 
             // and initialize it
             zero_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
+            zero_pid_fdnames(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
             p->fds_size = fdid + MAX_SPARE_FDS;
         }
 
-        if(unlikely(p->fds[fdid] == 0)) {
-            // we don't know this fd, get it
+        int ts = (int) now_monotonic_sec();
+        int update_link = 0;
+        // interval at which update the link for a particular fd
+        // TODO: make configurable
+        const int READLINK_INTERVAL = 5;
 
+        if(unlikely(p->fds[fdid] == 0)) {
+            // get fd information, cache fd filename
             sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
+            file_counter++;
+
+            if(p->fd_paths[fdid] > 0)
+                freez(p->fd_paths[fdid]);
+            p->fd_paths[fdid] = strdupz(fdname);
+
+            p->fd_last_readlink[fdid] = ts;
+            update_link = 1;
+        }
+        else {
+            strncpy(fdname, p->fd_paths[fdid], FILENAME_MAX + 1);
+            if((ts - p->fd_last_readlink[fdid]) > READLINK_INTERVAL) {
+                p->fd_last_readlink[fdid] = ts;
+                update_link = 1;
+            }
+        }
+
+        if(update_link) {
             ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
+
             if(unlikely(l == -1)) {
                 if(debug_enabled || (p->target && p->target->debug_enabled))
                     error("Cannot read link %s", fdname);
@@ -1773,21 +1825,21 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             }
             else
                 linkname[l] = '\0';
-
-            file_counter++;
-
-            // if another process already has this, we will get
-            // the same id
-            p->fds[fdid] = file_descriptor_find_or_add(linkname);
         }
 
-            // else make it positive again, we need it
-            // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir dirent structure
-            // UPDATE: no we cannot use inodes - under /proc inodes don't change when the link is changed
-
-        else
-            p->fds[fdid] = -p->fds[fdid];
+        if(unlikely(p->fds[fdid] == 0))
+            p->fds[fdid] = file_descriptor_find_or_add(linkname);
+        else {
+            if(update_link) {
+                struct file_descriptor *fd = file_descriptor_find(linkname, 0);
+                // only flip when fd hash has been found in all_files_index
+                // to make sure it carries the same link
+                if(fd)
+                    p->fds[fdid] = -p->fds[fdid];
+            // if linkname hasn't been fetched in this iteration, keep the FD
+            } else
+                p->fds[fdid] = -p->fds[fdid];
+        }
     }
 
     closedir(fds);
@@ -3066,7 +3118,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 #endif
-    
+
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
