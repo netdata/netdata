@@ -253,11 +253,14 @@ size_t
 
 struct pid_fd {
     int fd;
+
+#ifndef __FreeBSD__
     ino_t inode;
     char *filename;
     uint32_t link_hash;
     size_t cache_iterations_counter;
     size_t cache_iterations_reset;
+#endif
 };
 
 struct pid_stat {
@@ -737,12 +740,14 @@ static inline void del_pid_entry(pid_t pid) {
     if(p->prev) p->prev->next = p->next;
 
     // free the filename
+#ifndef __FreeBSD__
     {
         size_t i;
         for(i = 0; i < p->fds_size; i++)
             if(p->fds[i].filename)
                 freez(p->fds[i].filename);
     }
+#endif
     freez(p->fds);
 
     freez(p->fds_dirname);
@@ -1582,10 +1587,13 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
 
 static inline void clear_pid_fd(struct pid_fd *pfd) {
     pfd->fd = 0;
+
+    #ifndef __FreeBSD__
     pfd->link_hash = 0;
     pfd->inode = 0;
     pfd->cache_iterations_counter = 0;
     pfd->cache_iterations_reset = 0;
+#endif
 }
 
 static inline void make_all_pid_fds_negative(struct pid_stat *p) {
@@ -1616,7 +1624,9 @@ static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     size_t i = first;
 
     while(pfd < pfdend) {
+#ifndef __FreeBSD__
         pfd->filename = NULL;
+#endif
         clear_pid_fd(pfd);
         pfd++;
         i++;
