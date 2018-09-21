@@ -52,6 +52,7 @@ debug() {
 # -----------------------------------------------------------------------------
 
 [ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 CONFIG="${NETDATA_CONFIG_DIR}/cgroups-names.conf"
 CGROUP="${1}"
 NAME=
@@ -83,13 +84,13 @@ function docker_get_name_classic {
 
 function docker_get_name_api {
     local id="${1}"
-    if [ ! -S "/var/run/docker.sock" ]
+    if [ ! -S "${DOCKER_HOST}" ]
         then
-        warning "Can't find /var/run/docker.sock"
+        warning "Can't find ${DOCKER_HOST}"
         return 1
     fi
     info "Running API command: /containers/${id}/json"
-    JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | grep '^{.*')
+    JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\r\n" | nc -U ${DOCKER_HOST} | grep '^{.*')
     NAME=$(echo $JSON | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
     return 0
 }
