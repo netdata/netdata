@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // this is an async I/O implementation of the web server request parser
@@ -342,10 +343,6 @@ int mysendfile(struct web_client *w, char *filename) {
     // skip leading slashes
     while (*filename == '/') filename++;
 
-    // if the filename contain known paths, skip them
-    if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0)
-        filename = &filename[strlen(WEB_PATH_FILE) + 1];
-
     // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
@@ -416,7 +413,7 @@ int mysendfile(struct web_client *w, char *filename) {
         if(errno == EBUSY || errno == EAGAIN) {
             error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
             w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
+            buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
             return 307;
@@ -1127,11 +1124,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     static uint32_t
             hash_api = 0,
             hash_netdata_conf = 0,
-            hash_data = 0,
-            hash_datasource = 0,
-            hash_graph = 0,
-            hash_list = 0,
-            hash_all_json = 0,
             hash_host = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1141,11 +1133,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     if(unlikely(!hash_api)) {
         hash_api = simple_hash("api");
         hash_netdata_conf = simple_hash("netdata.conf");
-        hash_data = simple_hash(WEB_PATH_DATA);
-        hash_datasource = simple_hash(WEB_PATH_DATASOURCE);
-        hash_graph = simple_hash(WEB_PATH_GRAPH);
-        hash_list = simple_hash("list");
-        hash_all_json = simple_hash("all.json");
         hash_host = simple_hash("host");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
@@ -1166,26 +1153,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         else if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {                    // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
             return web_client_switch_host(host, w, url);
-        }
-        else if(unlikely(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0)) {             // old API "data"
-            debug(D_WEB_CLIENT_ACCESS, "%llu: old API data request...", w->id);
-            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_data_request_json);
-        }
-        else if(unlikely(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0)) { // old API "datasource"
-            debug(D_WEB_CLIENT_ACCESS, "%llu: old API datasource request...", w->id);
-            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_data_request_jsonp);
-        }
-        else if(unlikely(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0)) {           // old API "graph"
-            debug(D_WEB_CLIENT_ACCESS, "%llu: old API graph request...", w->id);
-            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_graph_request);
-        }
-        else if(unlikely(hash == hash_list && strcmp(tok, "list") == 0)) {                    // old API "list"
-            debug(D_WEB_CLIENT_ACCESS, "%llu: old API list request...", w->id);
-            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_list_request);
-        }
-        else if(unlikely(hash == hash_all_json && strcmp(tok, "all.json") == 0)) {            // old API "all.json"
-            debug(D_WEB_CLIENT_ACCESS, "%llu: old API all.json request...", w->id);
-            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_all_json);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!web_client_can_access_netdataconf(w)))

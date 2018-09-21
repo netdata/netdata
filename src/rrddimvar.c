@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
@@ -118,8 +119,8 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $id
     // - $name
 
-    rs->var_local_id           = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_id, rs->type, rs->value);
-    rs->var_local_name         = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_name, rs->type, rs->value);
+    rs->var_local_id           = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_id, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_local_name         = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_name, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
 
     // FAMILY VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -130,10 +131,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-context.id
     // - $chart-context.name
 
-    rs->var_family_id          = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_id, rs->type, rs->value);
-    rs->var_family_name        = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_name, rs->type, rs->value);
-    rs->var_family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_contextid, rs->type, rs->value);
-    rs->var_family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_contextname, rs->type, rs->value);
+    rs->var_family_id          = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_id, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_family_name        = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_name, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_family_contextid   = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_contextid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_family_contextname = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rs->key_contextname, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
 
     // HOST VARIABLES FOR THIS DIMENSION
     // -----------------------------------
@@ -144,10 +145,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    rs->var_host_chartidid      = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidid, rs->type, rs->value);
-    rs->var_host_chartidname    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidname, rs->type, rs->value);
-    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnameid, rs->type, rs->value);
-    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnamename, rs->type, rs->value);
+    rs->var_host_chartidid      = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_host_chartidname    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidname, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnameid, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
+    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnamename, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
 }
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options) {

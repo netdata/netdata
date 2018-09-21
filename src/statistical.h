@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_STATISTICAL_H
-#define NETDATA_STATISTICAL_H
+#define NETDATA_STATISTICAL_H 1
 
 extern LONG_DOUBLE average(const LONG_DOUBLE *series, size_t entries);
 extern LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t period);

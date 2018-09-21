@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 #define STATSD_CHART_PREFIX "statsd"
@@ -262,13 +263,13 @@ static struct statsd {
     SIMPLE_PATTERN *charts_for;
 
     size_t tcp_idle_timeout;
-    size_t decimal_detail;
+    collected_number decimal_detail;
     size_t private_charts;
     size_t max_private_charts;
     size_t max_private_charts_hard;
     RRD_MEMORY_MODE private_charts_memory_mode;
     long private_charts_rrd_history_entries;
-    int private_charts_hidden;
+    unsigned int private_charts_hidden:1;
 
     STATSD_APP *apps;
     size_t recvmmsg_size;
@@ -2186,9 +2187,9 @@ void *statsd_main(void *ptr) {
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
     statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
-    statsd.decimal_detail = (size_t)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
+    statsd.decimal_detail = (collected_number)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
     statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);
-    statsd.private_charts_hidden = (int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
+    statsd.private_charts_hidden = (unsigned int)config_get_boolean(CONFIG_SECTION_STATSD, "private charts hidden", statsd.private_charts_hidden);
 
     statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {

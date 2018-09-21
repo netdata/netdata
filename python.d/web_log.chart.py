@@ -29,7 +29,7 @@ ORDER_APACHE_CACHE = ['apache_cache']
 
 ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth',
              'response_time', 'response_time_hist', 'response_time_upstream', 'response_time_upstream_hist',
-             'requests_per_url', 'requests_per_user_defined', 'http_method', 'http_version',
+             'requests_per_url', 'requests_per_user_defined', 'http_method', 'vhost', 'port', 'http_version',
              'requests_per_ipproto', 'clients', 'clients_all']
 
 ORDER_SQUID = ['squid_response_statuses', 'squid_response_codes', 'squid_detailed_response_codes',
@@ -128,6 +128,18 @@ CHARTS_WEB = {
                     'web_log.requests_per_user_defined', 'stacked'],
         'lines': [
             ['user_pattern_other', 'other', 'incremental', 1, 1]
+        ]},
+    'port': {
+        'options': [None, 'Requests Per Port', 'requests/s', 'port',
+                    'web_log.port', 'stacked'],
+        'lines': [
+            ['port_80', 'http', 'incremental', 1, 1],
+            ['port_443', 'https', 'incremental', 1, 1]
+        ]},
+    'vhost': {
+        'options': [None, 'Requests Per Vhost', 'requests/s', 'vhost',
+                    'web_log.vhost', 'stacked'],
+        'lines': [
         ]}
 }
 
@@ -705,6 +717,23 @@ class Web:
                 self.charts['http_version'].add_dimension([dim_id,
                                                            match_dict['http_version'],
                                                            'incremental'])
+                self.data[dim_id] = 0
+            self.data[dim_id] += 1
+        # requests per port number
+        if match_dict.get('port'):
+            if match_dict['port'] not in self.data:
+                self.charts['port'].add_dimension([match_dict['port'],
+                                                   match_dict['port'],
+                                                   'incremental'])
+                self.data[match_dict['port']] = 0
+            self.data[match_dict['port']] += 1
+        # requests per vhost
+        if match_dict.get('vhost'):
+            dim_id = match_dict['vhost'].replace('.', '_')
+            if dim_id not in self.data:
+                self.charts['vhost'].add_dimension([dim_id,
+                                                   match_dict['vhost'],
+                                                   'incremental'])
                 self.data[dim_id] = 0
             self.data[dim_id] += 1
 

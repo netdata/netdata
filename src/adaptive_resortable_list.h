@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
-#define NETDATA_ADAPTIVE_RESORTABLE_LIST_H
+#define NETDATA_ADAPTIVE_RESORTABLE_LIST_H 1
 
 /*
  * ADAPTIVE RE-SORTABLE LIST
@@ -37,8 +38,6 @@
  * DO NOT USE THIS IF THE A NAME/KEYWORD MAY APPEAR MORE THAN
  * ONCE IN THE SOURCE DATA SET.
  */
-
-#include "common.h"
 
 #define ARL_ENTRY_FLAG_FOUND    0x01    // the entry has been found in the source data
 #define ARL_ENTRY_FLAG_EXPECTED 0x02    // the entry is expected by the program
@@ -117,6 +116,7 @@ extern void arl_begin(ARL_BASE *base);
 
 extern void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst);
 extern void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
+extern void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst);
 
 // check a keyword against the ARL
 // this is to be called for each keyword read from source data

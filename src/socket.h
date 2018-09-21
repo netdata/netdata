@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
 
@@ -9,7 +10,7 @@
 typedef struct listen_sockets {
     const char *config_section;         // the netdata configuration section to read settings from
     const char *default_bind_to;        // the default bind to configuration string
-    int default_port;                   // the default port to use
+    uint16_t default_port;              // the default port to use
     int backlog;                        // the default listen backlog to use
 
     size_t opened;                      // the number of sockets opened
@@ -20,7 +21,7 @@ typedef struct listen_sockets {
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
 } LISTEN_SOCKETS;
 
-extern char *strdup_client_description(int family, const char *protocol, const char *ip, int port);
+extern char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
 
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);

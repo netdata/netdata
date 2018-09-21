@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 // this file includes 3 web servers:
@@ -579,7 +580,8 @@ static void web_client_multi_threaded_web_server_release_clients(void) {
 static void web_client_multi_threaded_web_server_stop_all_threads(void) {
     struct web_client *w;
 
-    int found = 1, max = 2 * USEC_PER_SEC, step = 50000;
+    int found = 1;
+    usec_t max = 2 * USEC_PER_SEC, step = 50000;
     for(w = web_clients_cache.used; w ; w = w->next) {
         if(w->running) {
             found++;
@@ -1217,7 +1219,8 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    int i, found = 0, max = 2 * USEC_PER_SEC, step = 50000;
+    int i, found = 0;
+    usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
     // we start from 1, - 0 is self
     for(i = 1; i < static_threaded_workers_count; i++) {

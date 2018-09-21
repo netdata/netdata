@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 /*
@@ -31,12 +32,12 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
-int default_rrdpush_enabled = 0;
+unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 
 int rrdpush_init() {
-    default_rrdpush_enabled     = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
+    default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
@@ -135,7 +136,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the chart local custom variables
     RRDSETVAR *rs;
     for(rs = st->variables; rs ;rs = rs->next) {
-        if(unlikely(rs->options && RRDVAR_OPTION_ALLOCATED)) {
+        if(unlikely(rs->type == RRDVAR_TYPE_CALCULATED && rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
             calculated_number *value = (calculated_number *) rs->value;
 
             buffer_sprintf(
@@ -245,7 +246,7 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
-    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
+    if(unlikely(rv->options & RRDVAR_OPTION_CUSTOM_HOST_VAR && rv->type == RRDVAR_TYPE_CALCULATED)) {
         rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent
@@ -798,8 +799,8 @@ static int rrdpush_receive(int fd
                 , update_every
                 , history
                 , mode
-                , (health_enabled != CONFIG_BOOLEAN_NO)
-                , (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+                , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
+                , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
                 , rrdpush_destination
                 , rrdpush_api_key
         );

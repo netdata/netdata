@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
+
 #include <mach/mach.h>
 
 int do_macos_mach_smi(int update_every, usec_t dt) {

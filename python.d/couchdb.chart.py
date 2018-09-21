@@ -25,7 +25,7 @@ METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 OVERVIEW_STATS = [
     'couchdb.database_reads.value',
     'couchdb.database_writes.value',
-    'couchdb.httpd.view_reads.value'
+    'couchdb.httpd.view_reads.value',
     'couchdb.httpd_request_methods.COPY.value',
     'couchdb.httpd_request_methods.DELETE.value',
     'couchdb.httpd_request_methods.GET.value',

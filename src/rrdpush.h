@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0+
-#ifndef NETDATA_RRDPUSH_H
-#define NETDATA_RRDPUSH_H
 
-extern int default_rrdpush_enabled;
+#ifndef NETDATA_RRDPUSH_H
+#define NETDATA_RRDPUSH_H 1
+
+extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;
 extern char *default_rrdpush_api_key;
 extern unsigned int remote_clock_resync_iterations;

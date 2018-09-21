@@ -104,8 +104,6 @@ netdata_SOURCES = \
 	rrd.h \
 	rrd2json.c \
 	rrd2json.h \
-	rrd2json_api_old.c \
-	rrd2json_api_old.h \
 	rrdcalc.c \
 	rrdcalctemplate.c \
 	rrddim.c \
@@ -135,8 +133,6 @@ netdata_SOURCES = \
 	unit_test.h \
 	url.c \
 	url.h \
-	web_api_old.c \
-	web_api_old.h \
 	web_api_v1.c \
 	web_api_v1.h \
 	web_buffer.c \

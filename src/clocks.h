@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_CLOCKS_H
 #define NETDATA_CLOCKS_H 1
 
@@ -109,7 +110,7 @@ extern time_t now_boottime_sec(void);
 extern usec_t now_boottime_usec(void);
 
 
-extern usec_t timeval_usec(struct timeval *ts);
+extern usec_t timeval_usec(struct timeval *tv);
 extern msec_t timeval_msec(struct timeval *tv);
 
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);

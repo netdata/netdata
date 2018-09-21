@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #ifndef NETDATA_ZFS_COMMON_H
-#define NETDATA_ZFS_COMMON_H
+#define NETDATA_ZFS_COMMON_H 1
 
 #define ZFS_FAMILY_SIZE "size"
 #define ZFS_FAMILY_EFFICIENCY "efficiency"

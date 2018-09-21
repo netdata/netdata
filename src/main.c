@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+
 #include "common.h"
 
 extern void *cgroups_main(void *ptr);
@@ -149,7 +150,7 @@ void web_server_config_options(void) {
 }
 
 
-int killpid(pid_t pid, int sig)
+int killpid(pid_t pid, int signal)
 {
     int ret = -1;
     debug(D_EXIT, "Request to kill pid %d", pid);
@@ -172,7 +173,7 @@ int killpid(pid_t pid, int sig)
     }
     else {
         errno = 0;
-        ret = kill(pid, sig);
+        ret = kill(pid, signal);
         if(ret == -1) {
             switch(errno) {
                 case ESRCH:
@@ -196,7 +197,8 @@ int killpid(pid_t pid, int sig)
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
-    int i, found = 0, max = 5 * USEC_PER_SEC, step = 100000;
+    int i, found = 0;
+    usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
@@ -326,7 +328,8 @@ int help(int exitcode) {
 
 // TODO: Remove this function with the nix major release.
 void remove_option(int opt_index, int *argc, char **argv) {
-    int i = opt_index;
+    int i;
+
     // remove the options.
     do {
         *argc = *argc - 1;
