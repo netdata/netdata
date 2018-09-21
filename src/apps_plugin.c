@@ -3448,6 +3448,7 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
+#ifndef __FreeBSD__
         if(strcmp("fds-cache-secs", argv[i]) == 0) {
             if(argc <= i + 1) {
                 fprintf(stderr, "Parameter 'fds-cache-secs' requires a number as argument.\n");
@@ -3458,6 +3459,7 @@ static void parse_args(int argc, char **argv)
             if(max_fds_cache_seconds < 0) max_fds_cache_seconds = 0;
             continue;
         }
+#endif
 
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
@@ -3528,6 +3530,7 @@ static void parse_args(int argc, char **argv)
                     " without-files     enable / disable reporting files, sockets, pipes\n"
                     "                   (default is enabled)\n"
                     "\n"
+#ifndef __FreeBSD__
                     " fds-cache-secs N  cache the files of processed for N seconds\n"
                     "                   caching is adaptive per file (when a file\n"
                     "                   is found, it starts at 0 and while the file\n"
@@ -3535,10 +3538,13 @@ static void parse_args(int argc, char **argv)
                     "                   max given)\n"
                     "                   (default is %d seconds)\n"
                     "\n"
+#endif
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
+#ifndef __FreeBSD__
                     , max_fds_cache_seconds
+#endif
             );
             exit(1);
         }
