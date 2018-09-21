@@ -700,14 +700,16 @@ static int read_apps_groups_conf(const char *file)
 
 // ----------------------------------------------------------------------------
 // struct pid_stat management
+static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
     if(unlikely(all_pids[pid]))
         return all_pids[pid];
 
     struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
-    p->fds = callocz(sizeof(struct pid_fd), MAX_SPARE_FDS);
+    p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
+    init_pid_fds(p, 0, p->fds_size);
 
     if(likely(root_of_pids))
         root_of_pids->prev = p;
@@ -2671,7 +2673,7 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
-    int c, size = p->fds_size;
+    size_t c, size = p->fds_size;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
