@@ -389,7 +389,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
     va_start( args, fmt );
     if(debug_flags) fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
-    else            fprintf(stderr, "%s: %s FATAL : %s :", date, program_name, netdata_thread_tag());
+    else            fprintf(stderr, "%s: %s FATAL : %s : ", date, program_name, netdata_thread_tag());
     vfprintf( stderr, fmt, args );
     va_end( args );
 
