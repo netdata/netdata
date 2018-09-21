@@ -188,12 +188,12 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resetting logging for process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            fprintf(stderr, "%s: %s Resetting logging for process '%s' (prevented %lu logs in the last %lld seconds).\n"
                     , date
                     , program_name
                     , program_name
                     , prevented
-                    , now - start
+                    , (long long)(now - start)
             );
         }
 
@@ -209,12 +209,12 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %zd seconds).\n"
+            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %lld seconds).\n"
                     , date
                     , program_name
                     , program_name
                     , prevented
-                    , error_log_throttle_period
+                    , (long long)error_log_throttle_period
             );
         }
 
@@ -231,15 +231,15 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %zd seconds). Preventing more logs from process '%s' for %zd seconds.\n"
+            fprintf(stderr, "%s: %s Too many logs (%lu logs in %lld seconds, threshold is set to %lu logs in %lld seconds). Preventing more logs from process '%s' for %lld seconds.\n"
                     , date
                     , program_name
                     , counter
-                    , now - start
+                    , (long long)(now - start)
                     , error_log_errors_per_period
-                    , error_log_throttle_period
+                    , (long long)(error_log_throttle_period)
                     , program_name
-                    , start + error_log_throttle_period - now);
+                    , (long long)(start + error_log_throttle_period - now));
         }
 
         prevented++;
