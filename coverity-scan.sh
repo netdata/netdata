@@ -38,7 +38,7 @@ make clean || exit 1
 echo >&2 "Compressing data..."
 tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 
-echo >&2 "Sending analysis..."
+echo >&2 "Sending analysis for version ${version} ..."
 curl --progress-bar --form token="${token}" \
   --form email=costa@tsaousis.gr \
   --form file=@netdata-coverity-analysis.tgz \
