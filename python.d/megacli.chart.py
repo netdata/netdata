@@ -166,8 +166,8 @@ class Megacli:
         self.s = find_binary('sudo')
         self.m = find_binary('megacli')
         self.sudo_check = [self.s, '-n', '-v']
-        self.disk_info = [self.s, '-n', self.m, '-LDPDInfo', '-aAll']
-        self.battery_info = [self.s, '-n', self.m, '-AdpBbuCmd', '-a0']
+        self.disk_info = [self.s, '-n', self.m, '-LDPDInfo', '-aAll', '-NoLog']
+        self.battery_info = [self.s, '-n', self.m, '-AdpBbuCmd', '-a0', '-NoLog']
 
     def __bool__(self):
         return bool(self.s and self.m)
