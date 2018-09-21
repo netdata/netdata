@@ -1089,7 +1089,7 @@ If no configuration is given, module will use "/tmp/lshttpd/".
 
 # logind
 
-THis module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+This module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
 
 It provides the following charts:
 
