@@ -1684,7 +1684,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds_size = fdid + MAX_SPARE_FDS;
         }
 
-        if (unlikely(p->fds[fdid] == 0)) {
+        if (unlikely(p->fds[fdid].fd == 0)) {
             // we don't know this fd, get it
 
             switch (fds->kf_type) {
@@ -1740,12 +1740,11 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
             // if another process already has this, we will get
             // the same id
-            p->fds[fdid] = file_descriptor_find_or_add(fdsname, 0);
+            p->fds[fdid].fd = file_descriptor_find_or_add(fdsname, 0);
         }
 
             // else make it positive again, we need it
-            // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir dirent structure
+            // of course, the actual file may have changed
 
         else
             p->fds[fdid].fd = -p->fds[fdid].fd;
