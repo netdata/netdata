@@ -805,7 +805,7 @@ and restart/reload your FREERADIUS server.
 
 The `go_expvar` module can monitor any Go application that exposes its metrics with the use of `expvar` package from the Go standard library.
 
-`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts. Please see the [wiki page](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications) for more info.
+`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts. Please see the [wiki page](https://github.com/netdata/netdata/wiki/Monitoring-Go-Applications) for more info.
 
 For the memory statistics, it produces the following charts:
 
@@ -833,7 +833,7 @@ For the memory statistics, it produces the following charts:
 
 ### configuration
 
-Please see the [wiki page](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications#using-netdata-go_expvar-module) for detailed info about module configuration.
+Please see the [wiki page](https://github.com/netdata/netdata/wiki/Monitoring-Go-Applications#using-netdata-go_expvar-module) for detailed info about module configuration.
 
 ---
 
@@ -2361,12 +2361,12 @@ Charts are created dynamically.
 
 ### configuration
 
-For detailed configuration information please read [`sensors.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/sensors.conf) file.
+For detailed configuration information please read [`sensors.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/sensors.conf) file.
 
 ### possible issues
 
 There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
-We are tracking such cases in issue [#827](https://github.com/firehol/netdata/issues/827).
+We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
 Please join this discussion for help.
 
 ---
@@ -2423,7 +2423,7 @@ It produces following charts:
 
 ### configuration
 
-Please see the [Monitoring Java Spring Boot Applications](https://github.com/firehol/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
+Please see the [Monitoring Java Spring Boot Applications](https://github.com/netdata/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
 
 ---
 
@@ -2751,7 +2751,7 @@ Charts are created dynamically based on the number of detected sensors.
 
 ### configuration
 
-For detailed configuration information please read [`w1sensor.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
+For detailed configuration information please read [`w1sensor.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
 
 ---
 

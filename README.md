@@ -1,4 +1,4 @@
-# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+# netdata [![Build Status](https://travis-ci.org/netdata/netdata.svg?branch=master)](https://travis-ci.org/netdata/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
@@ -13,15 +13,15 @@ disrupting their core function._
 netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata)
-[![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Ffirehol%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
 
 ---
 
 ## User base
 *Docker pulls*<br/>
-[![Docker titpetric/netdata Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=docker%20pulls%20titpetric/netdata)](https://hub.docker.com/r/titpetric/netdata/) [![Docker firehol/netdata Pulls](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=docker%20pulls%20firehol/netdata)](https://hub.docker.com/r/firehol/netdata/)
+[![Docker titpetric/netdata Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=docker%20pulls%20titpetric/netdata)](https://hub.docker.com/r/titpetric/netdata/) [![Docker firehol/netdata Pulls](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=docker%20pulls%20firehol/netdata)](https://hub.docker.com/r/firehol/netdata/) [![Docker netdata/netdata Pulls](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=docker%20pulls%20netdata/netdata)](https://hub.docker.com/r/netdata/netdata/)
 
-*Since May 16th 2016 (the date the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item) was released):*<br/>
+*Since May 16th 2016 (the date the [global public netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item) was released):*<br/>
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 *in the last 24 hours:*<br/>
@@ -31,7 +31,7 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## News
 
-`Mar 27th, 2018` - **[netdata v1.10.0 released!](https://github.com/firehol/netdata/releases)**
+`Mar 27th, 2018` - **[netdata v1.10.0 released!](https://github.com/netdata/netdata/releases)**
 
  - new web server, a lot faster and more secure
  - updated all javascript libraries to their latest versions (fixed compatibility issues - now netdata chart can now be embedded on **Atlassian Confluence** pages and remain fully interactive!)
@@ -314,7 +314,7 @@ This is a list of what it currently monitors:
   global and per tube monitoring
 
 - **statsd**<br/>
-  [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
+  [netdata is a fully featured statsd server](https://github.com/netdata/netdata/wiki/statsd)
 
 - **ceph**<br/>
   OSD usage, Pool usage, number of objects, etc.
@@ -334,7 +334,7 @@ Click it to to interact with it (it has direct links to documentation).
 
 ## Installation
 
-Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system.
+Use our **[automatic installer](https://github.com/netdata/netdata/wiki/Installation)** to build and install it on your system.
 
 It should run on **any Linux** system (including IoT). It has been tested on:
 
@@ -354,17 +354,17 @@ It should run on **any Linux** system (including IoT). It has been tested on:
 
 ## Interaction with netdata
 
-After installation, you can interact with netdata using **[CLI](https://github.com/firehol/netdata/wiki/Command-Line-Options)** and web dashboards.
+After installation, you can interact with netdata using **[CLI](https://github.com/netdata/netdata/wiki/Command-Line-Options)** and web dashboards.
 The default port of dashboard is 19999. To access the web dashboard on localhost, use: http://localhost:19999
 
 ---
 
 ## Documentation
 
-Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
+Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.
 
 ## License
 
 netdata is [GPLv3+](LICENSE).
 
-Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/REDISTRIBUTED.md).
+Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).

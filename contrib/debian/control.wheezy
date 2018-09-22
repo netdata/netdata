@@ -9,7 +9,7 @@ Section: net
 Priority: optional
 Maintainer: Costa Tsaousis <costa@tsaousis.gr>
 Standards-Version: 3.9.6
-Homepage: https://github.com/firehol/netdata/wiki
+Homepage: https://github.com/netdata/netdata/wiki
 
 Package: netdata
 Architecture: any

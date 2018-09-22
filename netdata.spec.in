@@ -85,7 +85,7 @@ Version:	@PACKAGE_RPM_VERSION@
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/firehol/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+Source0:	https://github.com/netdata/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
@@ -233,10 +233,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %changelog
 * Tue Mar 27 2018 Costa Tsaousis <costa@tsaousis.gr> - 1.10.0-1
   Please check full changelog at github.
-  https://github.com/firehol/netdata/releases
+  https://github.com/netdata/netdata/releases
 * Sun Dec 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.9.0-1
   Please check full changelog at github.
-  https://github.com/firehol/netdata/releases
+  https://github.com/netdata/netdata/releases
 * Sun Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
   This is mainly a bugfix release.
   Please check full changelog at github.

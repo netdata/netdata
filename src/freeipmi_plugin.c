@@ -1602,7 +1602,7 @@ int main (int argc, char **argv) {
                     " options ipmi_si kipmid_max_busy_us=10\n"
                     "\n"
                     " For more information:\n"
-                    " https://github.com/firehol/netdata/wiki/monitoring-IPMI\n"
+                    " https://github.com/netdata/netdata/wiki/monitoring-IPMI\n"
                     "\n"
                     , VERSION
                     , netdata_update_every
