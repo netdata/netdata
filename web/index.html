@@ -1066,9 +1066,9 @@
 
             if(!found) {
                 if(machines)
-                    el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+                    el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
                 else
-                    el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+                    el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
 
                 a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
@@ -1095,7 +1095,7 @@
             el += '<li role="separator" class="divider"></li>';
             a1 += '<li role="separator" class="divider"></li>';
 
-            el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
+            el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
             a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
 
             document.getElementById('mynetdata_servers').innerHTML = el;
@@ -1114,6 +1114,8 @@
                     if(document.location.hostname.endsWith('.my-netdata.io') ||
                             document.location.hostname.endsWith('.mynetdata.io') ||
                             document.location.hostname.endsWith('.netdata.rocks') ||
+                            document.location.hostname.endsWith('.netdata.ai') ||
+                            document.location.hostname.endsWith('.netdata.live') ||
                             document.location.hostname.endsWith('.firehol.org') ||
                             document.location.hostname.endsWith('.netdata.online') ||
                             document.location.hostname.endsWith('.netdata.cloud'))
@@ -1967,8 +1969,8 @@
                 html += mhead + shtml + '</div></div><hr role="separator"/>';
             }
 
-            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
-            sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
+            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
+            sidebar += '<li class=""><a href="https://github.com/netdata/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
             sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
             sidebar += '</ul>';
             div.innerHTML = html;
@@ -2153,7 +2155,7 @@
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
-            var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/firehol/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
+            var footer = '<hr/><a href="https://github.com/netdata/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
 
             loadClipboard(function() {});
 
@@ -2982,7 +2984,7 @@
             versionLog('Downloading latest git commit id info from github...');
 
             $.ajax({
-                url: 'https://api.github.com/repos/firehol/netdata/commits',
+                url: 'https://api.github.com/repos/netdata/netdata/commits',
                 async: true,
                 cache: false
             })
@@ -3032,21 +3034,21 @@
 
                 if(sha1 === null) {
                     save = false;
-                    versionLog('<p><big>Failed to get your netdata git commit id!</big></p><p>You can always get the latest netdata from <a href="https://github.com/firehol/netdata" target="_blank">its github page</a>.</p>');
+                    versionLog('<p><big>Failed to get your netdata git commit id!</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
                 }
                 else if(sha2 === null) {
                     save = false;
-                    versionLog('<p><big>Failed to get the latest git commit id from github.</big></p><p>You can always get the latest netdata from <a href="https://github.com/firehol/netdata" target="_blank">its github page</a>.</p>');
+                    versionLog('<p><big>Failed to get the latest git commit id from github.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
                 }
                 else if(sha1 === sha2) {
                     save = true;
-                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
+                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
                 }
                 else {
                     save = true;
-                    var compare = 'https://github.com/firehol/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
+                    var compare = 'https://github.com/netdata/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
 
-                    versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/firehol/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
+                    versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
 
                     document.getElementById('update_badge').innerHTML = '!';
                 }
@@ -4432,7 +4434,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverStatic + 'dashboard_info.js?v20180916-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20180922-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -4552,7 +4554,7 @@
                     <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
                     <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/netdata/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
                     <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
                     <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
                     <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fas fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
@@ -4615,13 +4617,13 @@
         <div class="row">
             <div class="col-md-10" role="main">
                 <div class="p">
-                    <big><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></big><br/>
+                    <big><a href="https://github.com/netdata/netdata/wiki" target="_blank">netdata</a></big><br/>
                     <i class="fas fa-copyright"></i> Copyright 2016-2018, <a href="mailto:costa@tsaousis.gr">Costa Tsaousis</a>.<br/>
                     Released under <a href="http://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3 or later</a>.<br/>
                 </div>
                 <div class="p">
                     <small>
-                        <a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a> uses the following third party tools on this dashboard:
+                        <a href="https://github.com/netdata/netdata/wiki" target="_blank">netdata</a> uses the following third party tools on this dashboard:
 
                         <i class="fas fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
                         <i class="fas fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
@@ -4896,14 +4898,14 @@
                         </div>
                     </div>
                     <div class="p">
-                        <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b>
+                        <b><a href="https://github.com/netdata/netdata/wiki" target="_blank">netdata</a></b>
                         is a new way to monitor your systems and applications, to get <strong>real-time insights</strong>
                         of what is really happening and what affects performance.
                         It is carefully optimised to be a real-time system, without interfering in any way,
                         to the core function of your systems.
                     </div>
                     <div class="p">
-                        <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b>
+                        <b><a href="https://github.com/netdata/netdata/wiki" target="_blank">netdata</a></b>
                         has been designed to monitor <strong>massive amounts of metrics, per server, per second</strong>.
                         When installed, it might come up with 1k to 3k metrics, but we have been testing it with 100k
                         metrics, all collected per second, and still the cpu utilisation remained negligible.
@@ -4913,9 +4915,9 @@
                         better understanding of the underlying technologies and mechanisms.
                     </div>
                     <div class="p">
-                        <b><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></b> is free,
+                        <b><a href="https://github.com/netdata/netdata/wiki" target="_blank">netdata</a></b> is free,
                         open-source software. If you decide to use it,
-                        <strong><a href="https://github.com/firehol/netdata/wiki/a-github-star-is-important" target="_blank">it is important to give netdata a star at GitHub</a></strong>.
+                        <strong><a href="https://github.com/netdata/netdata/wiki/a-github-star-is-important" target="_blank">it is important to give netdata a star at GitHub</a></strong>.
                     </div>
                     <div class="p">
                         Enjoy real-time performance monitoring!
@@ -5654,7 +5656,7 @@
                         For progress reports and key netdata updates: <strong><a href="https://twitter.com/linuxnetdata" target="_blank">follow netdata on <i class="fab fa-twitter"></i> twitter</a></strong>.
                         <br/>
                         You can also <a href="https://www.facebook.com/linuxnetdata/" target="_blank">follow netdata on <i class="fab fa-facebook"></i> facebook</a>,
-                        or <a href="https://github.com/firehol/netdata" target="_blank">watch netdata on <i class="fab fa-github"></i> github</a>.
+                        or <a href="https://github.com/netdata/netdata" target="_blank">watch netdata on <i class="fab fa-github"></i> github</a>.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -5755,6 +5757,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180918-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180922-1"></script>
 </body>
 </html>

@@ -33,7 +33,7 @@ cd $(dirname "$0") || exit 1
 # download it and run from it
 if [ ! -f ../netdata-installer.sh ]
 then
-    git clone https://github.com/firehol/netdata.git netdata.git || exit 1
+    git clone https://github.com/netdata/netdata.git netdata.git || exit 1
     cd netdata.git/makeself || exit 1
     ./build.sh "$@"
     exit $?

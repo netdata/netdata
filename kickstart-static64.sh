@@ -175,7 +175,7 @@ wget="$(which_cmd wget)"
 
 progress "Checking the latest version of static build..."
 
-BASE='https://raw.githubusercontent.com/firehol/binary-packages/master'
+BASE='https://raw.githubusercontent.com/netdata/binary-packages/master'
 
 LATEST=
 if [ ! -z "${curl}" -a -x "${curl}" ]

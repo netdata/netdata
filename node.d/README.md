@@ -111,7 +111,7 @@ The charts are configurable, however, the provided default configuration collect
  
 ### configuration
 
-The default configuration is provided in [netdata/conf.d/node.d/stiebeleltron.conf.md](https://github.com/firehol/netdata/blob/master/conf.d/node.d/stiebeleltron.conf.md). Just change the `update_every` (if necessary) and hostnames. **You may have to adapt the configuration to suit your needs and setup** (which might be different).
+The default configuration is provided in [netdata/conf.d/node.d/stiebeleltron.conf.md](https://github.com/netdata/netdata/blob/master/conf.d/node.d/stiebeleltron.conf.md). Just change the `update_every` (if necessary) and hostnames. **You may have to adapt the configuration to suit your needs and setup** (which might be different).
 
 If no configuration is given, the module will be disabled. Each `update_every` is optional, the default is `10`.
 
