@@ -36,3 +36,14 @@ for ARCH in amd64 i386 armhf aarch64; do
     docker push "${REPOSITORY}:${ARCH}${VERSION}"
 done
 docker push "${REPOSITORY}:latest"
+
+# TODO: Remove it after we decide to deprecate firehol/netdata docker repo
+if [ "$REPOSITORY" != "netdata" ]; then
+    echo "$OLD_DOCKER_PASSWORD" | docker login -u "$OLD_DOCKER_USERNAME" --password-stdin   
+    for ARCH in amd64 i386 armhf aarch64; do
+        docker tag ${REPOSITORY}:${ARCH}${VERSION} firehol/netdata:${ARCH}${VERSION}
+        docker push "firehol/netdata:${ARCH}${VERSION}"
+    done
+    docker tag "${REPOSITORY}:latest"
+    docker push "firehol/netdata:latest"
+fi
