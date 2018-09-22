@@ -128,9 +128,9 @@ var netdataRegistryCallback = function(machines_array) {
 
     if(!found) {
         if(machines)
-            el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+            el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
         else
-            el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+            el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
 
         a1 += '<li><a href="#">&nbsp;</a></li>';
 
@@ -147,7 +147,7 @@ var netdataRegistryCallback = function(machines_array) {
     el += '<li role="separator" class="divider"></li>';
     a1 += '<li role="separator" class="divider"></li>';
 
-    el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
+    el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
     a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-cog" aria-hidden="true" style="color: #999;"></i></a></li>';
 
     document.getElementById('mynetdata_servers').innerHTML = el;

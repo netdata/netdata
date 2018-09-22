@@ -10,7 +10,7 @@ This collector supports:
 - each SNMP device may have a different update frequency
 - each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
 
-The source code of the plugin is [here](https://github.com/firehol/netdata/blob/master/node.d/snmp.node.js).
+The source code of the plugin is [here](https://github.com/netdata/netdata/blob/master/node.d/snmp.node.js).
 
 ## Configuration
 

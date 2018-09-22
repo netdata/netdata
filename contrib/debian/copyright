@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Netdata
 Upstream-Contact: Costa Tsaousis <costa@tsaousis.gr>
-Source: https://github.com/firehol/netdata
+Source: https://github.com/netdata/netdata
 
 Files: *
 Copyright: 2014-2016, Costa Tsaousis

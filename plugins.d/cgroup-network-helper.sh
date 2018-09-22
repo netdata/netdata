@@ -103,7 +103,7 @@ set_source() {
 
 # cgroup-network can detect veth interfaces by itself (written in C).
 # If you seek for a shell version of what it does, check this:
-# https://github.com/firehol/netdata/issues/474#issuecomment-317866709
+# https://github.com/netdata/netdata/issues/474#issuecomment-317866709
 
 
 # -----------------------------------------------------------------------------

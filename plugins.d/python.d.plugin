@@ -365,7 +365,7 @@ class Plugin(object):
             self.cleanup()
             self.autodetect_retry()
 
-            # FIXME: https://github.com/firehol/netdata/issues/3817
+            # FIXME: https://github.com/netdata/netdata/issues/3817
             if self.do_gc and self.runs_counter % self.gc_interval == 0:
                 v = gc.collect()
                 Logger.debug("GC full collection run result: {0}".format(v))

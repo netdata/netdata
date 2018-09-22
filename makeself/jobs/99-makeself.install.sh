@@ -13,18 +13,18 @@ ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
 if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
     then
     NOWNER="${ORIGIN/git@github.com:/}"
-    NOWNER="${NOWNER/\/netdata*/}"
+    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
 
 elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
     then
     NOWNER="${ORIGIN/https:\/\/github.com\//}"
-    NOWNER="${NOWNER/\/netdata*/}"
+    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
 fi
 
 # make sure it does not have any slashes in it
 NOWNER="${NOWNER//\//_}"
 
-if [ "${NOWNER}" = "firehol" ]
+if [ "${NOWNER}" = "netdata" ]
     then
     NOWNER=
 else

@@ -399,15 +399,6 @@ autotools 2.60 or later is required
 Sorry, you do not seem to have autotools 2.60 or later, which is
 required to build from the git sources of netdata.
 
-You can either install a suitable version of autotools and automake
-or download a netdata package which does not have these dependencies.
-
-Source packages where autotools have already been run are available
-here:
-       https://firehol.org/download/netdata/
-
-The unsigned/master folder tracks the head of the git tree and released
-packages are also available.
 EOF
         exit 1
     fi
@@ -453,7 +444,7 @@ You may need to check these:
 
 If you still cannot get it to build, ask for help at github:
 
-   https://github.com/firehol/netdata/issues
+   https://github.com/netdata/netdata/issues
 
 
 EOF
@@ -975,7 +966,7 @@ Update check on the dashboard, will not work.
 If you want to have version update check, please re-install it
 following the procedure in:
 
-https://github.com/firehol/netdata/wiki/Installation
+https://github.com/netdata/netdata/wiki/Installation
 
 VERMSG
 fi

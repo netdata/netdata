@@ -192,10 +192,10 @@ connectivity is not available.
     [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
 
 
-- [Utilities for writing code that runs on Python 2 and 3](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+- [Utilities for writing code that runs on Python 2 and 3](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
 
     Copyright (c) 2010-2015 Benjamin Peterson
-    [MIT License](https://github.com/firehol/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+    [MIT License](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
 
 
 - [mcrcon](https://github.com/barneygale/MCRcon)
