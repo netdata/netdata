@@ -58,7 +58,7 @@ jobs:
     - stage: "release"
       name: "Docker"
       script: docker/build.sh
-      env: REPOSITORY="firehol/netdata"
+      env: REPOSITORY="netdata/netdata"
     - name: "GitHub"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: ./.travis/create_artifacts.sh
@@ -73,7 +73,7 @@ jobs:
             - "netdata*.tar.*"
             - "netdata*.gz.run*"
           on:
-            repo: firehol/netdata
+            repo: netdata/netdata
             tags: true
 
 notifications:
