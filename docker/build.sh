@@ -44,6 +44,6 @@ if [ "$REPOSITORY" != "netdata" ]; then
         docker tag ${REPOSITORY}:${ARCH}${VERSION} firehol/netdata:${ARCH}${VERSION}
         docker push "firehol/netdata:${ARCH}${VERSION}"
     done
-    docker tag "${REPOSITORY}:latest"
+    docker tag "${REPOSITORY}:latest" "firehol/netdata:latest"
     docker push "firehol/netdata:latest"
 fi
