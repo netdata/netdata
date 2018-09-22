@@ -347,7 +347,7 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 # apps.plugin
 
 AC_MSG_CHECKING([if apps.plugin should be enabled])
-if test "${build_target}" != "macos" && "${build_target}" != "openbsd"; then
+if test "${build_target}" != "macos" -a "${build_target}" != "openbsd"; then
     enable_plugin_apps="yes"
 else
     enable_plugin_apps="no"

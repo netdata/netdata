@@ -9,6 +9,9 @@
 #    define O_NOATIME     0
 #    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ || __APPLE__ || __OpenBSD__ */
+#ifdef __OpenBSD__
+#include <sys/sysctl.h>
+#endif
 
 char *netdata_configured_hostname    = NULL;
 char *netdata_configured_config_dir  = NULL;
@@ -1213,6 +1216,21 @@ long get_system_cpus(void) {
         }
 
         return processors;
+    #elif __OpenBSD__
+        int mib[2], tmp_processors;
+        size_t len;
+
+        mib[0] = CTL_HW;
+        mib[1] = HW_NCPU;
+        len = sizeof(tmp_processors);
+
+        if (sysctl(mib, 2, &tmp_processors, &len, NULL, 0) == -1) {
+            error("Assuming system has %d processors.", processors);
+        } else {
+            processors = tmp_processors;
+        }
+
+        return processors;
     #else
 
     char filename[FILENAME_MAX + 1];
@@ -1245,7 +1263,7 @@ long get_system_cpus(void) {
     debug(D_SYSTEM, "System has %d processors.", processors);
     return processors;
 
-    #endif /* __APPLE__, __FreeBSD__ */
+    #endif /* __APPLE__, __FreeBSD__, __OpenBSD__ */
 }
 
 pid_t pid_max = 32768;
@@ -1265,6 +1283,13 @@ pid_t get_system_pid_max(void) {
             pid_max = tmp_pid_max;
         }
 
+        return pid_max;
+    #elif __OpenBSD__
+        // OpenBSD does not assign sequential PIDs as processes are started.
+        // Each process will get a random PID from between 0 and 99999, as
+        // defined in /usr/include/sys/proc.h (#define PID_MAX 99999).
+        // This value is not adjustable without recompiling the kernel.
+        pid_max = 99999;
         return pid_max;
     #else
 
@@ -1289,7 +1314,7 @@ pid_t get_system_pid_max(void) {
     pid_max = (pid_t) max;
     return pid_max;
 
-    #endif /* __APPLE__, __FreeBSD__ */
+    #endif /* __APPLE__, __FreeBSD__, __OpenBSD__ */
 }
 
 unsigned int system_hz;
