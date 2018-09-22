@@ -19,6 +19,6 @@ fakeroot ./packaging/git-build
 python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
 # make self-extractor
 ./makeself/build-x86_64-static.sh
-for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
-for i in *.gz.run; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
+for i in *.tar.gz; do sha512sum -b $i > $i.sha; done
+for i in *.gz.run; do sha512sum -b $i > $i.sha; done
 ./.travis/deploy-if-have-key
