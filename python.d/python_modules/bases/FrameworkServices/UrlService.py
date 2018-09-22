@@ -23,6 +23,7 @@ class UrlService(SimpleService):
         self.proxy_user = self.configuration.get('proxy_user')
         self.proxy_password = self.configuration.get('proxy_pass')
         self.proxy_url = self.configuration.get('proxy_url')
+        self.method = self.configuration.get('method', 'GET')
         self.header = self.configuration.get('header')
         self.request_timeout = self.configuration.get('timeout', 1)
         self.tls_verify = self.configuration.get('tls_verify')
@@ -110,7 +111,7 @@ class UrlService(SimpleService):
         """
         url = url or self.url
         manager = manager or self._manager
-        response = manager.request(method='GET',
+        response = manager.request(method=self.method,
                                    url=url,
                                    timeout=self.request_timeout,
                                    retries=retries,
