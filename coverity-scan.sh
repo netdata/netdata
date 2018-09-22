@@ -44,4 +44,4 @@ curl --progress-bar --form token="${token}" \
   --form file=@netdata-coverity-analysis.tgz \
   --form version="${version}" \
   --form description="netdata, real-time performance monitoring, done right." \
-  https://scan.coverity.com/builds?project=netdata%2Fnetdata
+  https://scan.coverity.com/builds?project=firehol%2Fnetdata
