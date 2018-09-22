@@ -3,6 +3,8 @@
 # author  : paulfantom
 # Cross-arch docker build helper script
 
+set +e
+
 REPOSITORY="${REPOSITORY:-netdata}"
 
 if [ ${VERSION+x} ]; then
@@ -25,11 +27,11 @@ docker tag "${REPOSITORY}:${ARCH}${VERSION}" "${REPOSITORY}:latest"
 # Push images to registry
 if [ -z ${DOCKER_USERNAME+x} ]; then
     echo "No docker hub username  specified. Exiting without pushing images to registry"
-    exit 0
+    exit 1
 fi
 if [ -z ${DOCKER_PASSWORD+x} ]; then
     echo "No docker hub password specified. Exiting without pushing images to registry"
-    exit 0
+    exit 1
 fi
 echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 for ARCH in amd64 i386 armhf aarch64; do
