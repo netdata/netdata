@@ -825,7 +825,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 static RRDDIM *rd_EstabResets = NULL,
                               *rd_OutRsts = NULL,
                               *rd_AttemptFails = NULL,
-                              *rd_TCPSynRetrans = NULL;
+                              *rd_TCPSynRetrans = NULL,
+                              *rd_TCPReqQFullDrop = NULL;
 
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost(
@@ -844,17 +845,19 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd_EstabResets   = rrddim_add(st, "EstabResets",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_OutRsts       = rrddim_add(st, "OutRsts",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_AttemptFails  = rrddim_add(st, "AttemptFails",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_TCPSynRetrans = rrddim_add(st, "TCPSynRetrans", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_EstabResets     = rrddim_add(st, "EstabResets",     NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_OutRsts         = rrddim_add(st, "OutRsts",         NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_AttemptFails    = rrddim_add(st, "AttemptFails",    NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPSynRetrans   = rrddim_add(st, "TCPSynRetrans",   "SysRetrans",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPReqQFullDrop = rrddim_add(st, "TCPReqQFullDrop", "ReqQFullDrop", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_EstabResets,   (collected_number)snmp_root.tcp_EstabResets);
-                rrddim_set_by_pointer(st, rd_OutRsts,       (collected_number)snmp_root.tcp_OutRsts);
-                rrddim_set_by_pointer(st, rd_AttemptFails,  (collected_number)snmp_root.tcp_AttemptFails);
-                rrddim_set_by_pointer(st, rd_TCPSynRetrans, tcpext_TCPSynRetrans);
+                rrddim_set_by_pointer(st, rd_EstabResets,     (collected_number)snmp_root.tcp_EstabResets);
+                rrddim_set_by_pointer(st, rd_OutRsts,         (collected_number)snmp_root.tcp_OutRsts);
+                rrddim_set_by_pointer(st, rd_AttemptFails,    (collected_number)snmp_root.tcp_AttemptFails);
+                rrddim_set_by_pointer(st, rd_TCPSynRetrans,   tcpext_TCPSynRetrans);
+                rrddim_set_by_pointer(st, rd_TCPReqQFullDrop, tcpext_TCPReqQFullDrop);
                 rrdset_done(st);
             }
         }
