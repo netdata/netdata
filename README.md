@@ -11,13 +11,13 @@
 
 It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.
 
-### Netdata core values
+### netdata core values
 
 we value                    |netdata...
 :--------------------------:|:----
 high resolution metrics     |collects all metrics **every single second**
 unlimited metrics           |collects **thousands of metrics** per monitored node
-real-time visualization     |presents interactive web dashboards with **sub-second latency**, collection to visualization
+real-time visualization     |dashboards run with **sub-second latency**, collection to visualization
 powerful anomaly detection  |has a **distributed watchdog** embedded in it, running on all monitored nodes
 visual anomaly detection    |dashboards are optimized for **spotting anomalies**, across all metrics
 meaningful presentation     |dashboards present **all metrics in a structured, easy to understand, way**
