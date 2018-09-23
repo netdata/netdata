@@ -1,15 +1,15 @@
 # netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata)
-[![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:cpp)
-[![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:javascript)
-[![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:python)
-
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
 
 It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata)
+[![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:cpp)
+[![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:javascript)
+[![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:python)
 
 ### netdata core values
 
