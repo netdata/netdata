@@ -25,13 +25,13 @@ meaningful presentation     |dashboards present **all metrics in a structured, e
 zero configuration          |**auto-detects** all metrics and comes with dozens of alarms
 resource utilization        |core is **optimized C code**, using <1% utilization of single CPU core
 
-We packaged all the above, together with:
+netdata also supports:
  
- - support for monitoring **ephemeral nodes** and **auto-scaled containers**,
+ - monitoring **ephemeral nodes** and **auto-scaled containers**,
  - **integration** with existing monitoring infrastructure (time-series databases like `prometheus`, `graphite`, `opentsdb`) and third-party event notification methods
 (like `slack`, `pagerduty`, `pushover`, and dozens more),
- - support for building hierarchies of monitored nodes via real-time metrics streaming between them,
- - support for embedding charts and dashboards on third party web sites and applications, such as Atlassian's Confluence.
+ - building hierarchies of monitored nodes via **real-time metrics streaming** between them,
+ - embedding charts and dashboards on third party web sites and applications, such as [Atlassian's Confluence](https://github.com/netdata/netdata/wiki/Custom-Dashboard-with-Confluence).
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
