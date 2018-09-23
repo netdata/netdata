@@ -1,4 +1,4 @@
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC1117,SC2154,SC2086
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -35,8 +35,10 @@ opensips_check() {
 	fi
 
 	# check once if the command works
-	local x="$(opensips_get_stats | grep "^opensips_core_")"
-	if [ ! $? -eq 0 -o -z "$x" ]
+	local x
+	x="$(opensips_get_stats | grep "^opensips_core_")"
+	# shellcheck disable=SC2181
+	if [ ! $? -eq 0 ] || [ -z "$x" ]
 	then
 		error "cannot get global status. Please set opensips_opts='options' whatever needed to get connected to opensips server, in $confd/opensips.conf"
 		return 1
@@ -219,6 +221,7 @@ opensips_update() {
 
 	opensips_command_failed=0
 	eval "local $(opensips_get_stats)"
+	# shellcheck disable=SC2181
 	[ $? -ne 0 ] && return 1
 
 	[ $opensips_command_failed -eq 1 ] && error "failed to get values, disabling." && return 1

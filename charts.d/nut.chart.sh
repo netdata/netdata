@@ -56,21 +56,23 @@ nut_check() {
 	for x in $nut_ups
 	do
 		nut_get "$x" >/dev/null
+		# shellcheck disable=SC2181
 		if [ $? -eq 0 ]
+		then
+			if [ ! -z "${nut_names[${x}]}" ]
 			then
-				if [ ! -z "${nut_names[${x}]}" ]
-				then
-					nut_ids[$x]="$( fixid "${nut_names[${x}]}" )"
-				else
- 					nut_ids[$x]="$( fixid "$x" )"
-				fi
+				nut_ids[$x]="$( fixid "${nut_names[${x}]}" )"
+			else
+				nut_ids[$x]="$( fixid "$x" )"
+			fi
 			continue
 		fi
 		error "cannot get information for NUT UPS '$x'."
 	done
 
 	if [ ${#nut_ids[@]} -eq 0 ]
-		then
+	then
+		# shellcheck disable=SC2154
 		error "Cannot find UPSes - please set nut_ups='ups_name' in $confd/nut.conf"
 		return 1
 	fi
@@ -230,7 +232,8 @@ END {
 		print \"END\"
 	}
 }"
-		[ $? -ne 0 ] && unset nut_ids[$i] && error "failed to get values for '$i', disabling it."
+		# shellcheck disable=2181
+		[ $? -ne 0 ] && unset "nut_ids[$i]" && error "failed to get values for '$i', disabling it."
 	done
 
 	[ ${#nut_ids[@]} -eq 0 ] && error "no UPSes left active." && return 1
