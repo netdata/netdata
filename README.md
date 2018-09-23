@@ -8,9 +8,17 @@
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
-It provides **unparalleled insights, in real-time (per second resolution)**, of everything
-happening on the system it runs (including applications such as web and database servers),
+It provides **unparalleled insights** (unlimited metrics), **in real-time** (per second resolution),
+of everything happening on the system it runs (including applications such as web and database servers),
 using **modern interactive web dashboards**.
+
+**netdata** auto-detects all metrics and comes with dozens of **alarms** that detect common
+issues and anomalies, so that it can be used, to troubleshoot performance issues,
+with **zero configuration**.
+
+**netdata** can be integrated with existing monitoring infrastructure
+(time-series databases such as prometheus, graphite, opentsdb),
+third party event notification methods (slack, pagerduty, pushover, etc).
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
