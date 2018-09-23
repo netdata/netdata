@@ -8,7 +8,7 @@
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
-It provides **unparalleled insights** (unlimited metrics), **in real-time** (per second resolution),
+It provides **unparalleled insights** (unlimited metrics), **in real-time** (per second resolution, with sub-second latency collection to visualization),
 of everything happening on the system it runs (including applications such as web and database servers),
 using **modern interactive web dashboards**.
 
