@@ -12,12 +12,13 @@ It provides **unparalleled insights** (unlimited metrics), **in real-time** (per
 of everything happening on the system it runs (including applications such as web and database servers),
 using **modern interactive web dashboards**.
 
-**netdata** auto-detects all metrics and comes with dozens of **alarms** that detect common
-issues and anomalies, so that it can troubleshoot performance issues with **zero configuration**.
+netdata **auto-detects** all metrics and comes with dozens of **alarms** that detect common
+issues and anomalies, so that it can troubleshoot performance issues and verify the health of a system with **zero configuration**.
 
-**netdata** can be integrated with existing monitoring infrastructure
-(time-series databases such as prometheus, graphite, opentsdb),
-third party event notification methods (slack, pagerduty, pushover, etc).
+netdata supports monitoring **ephemeral nodes** and **auto-scaled containers**,
+can be **integrated** with existing monitoring infrastructure (time-series databases such
+as `prometheus`, `graphite`, `opentsdb`) and third-party event notification methods
+(like `slack`, `pagerduty`, `pushover`, and many more).
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
