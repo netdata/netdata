@@ -43,7 +43,7 @@ The following python.d modules are supported:
 
 # apache
 
-This module will monitor one or more apache servers depending on configuration.
+This module will monitor one or more Apache servers depending on configuration.
 
 **Requirements:**
  * apache with enabled `mod_status`
@@ -127,7 +127,7 @@ If no configuration is given, module will attempt to read log file at `/var/log/
 
 # beanstalk
 
-Module provides server and tube level statistics:
+Module provides server and tube-level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
@@ -464,12 +464,12 @@ each state.
 ---
 # dns_query_time
 
-This module provides dns query time statistics.
+This module provides DNS query time statistics.
 
 **Requirement:**
 * `python-dnspython` package
 
-It produces one aggregate chart or one chart per dns server, showing the query time.
+It produces one aggregate chart or one chart per DNS server, showing the query time.
 
 ---
 
@@ -557,12 +557,12 @@ Following charts are drawn:
 
 # dovecot
 
-This module provides statistics information from dovecot server.
+This module provides statistics information from Dovecot server.
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
 
 **Requirement:**
-Dovecot unix socket with R/W permissions for user netdata or dovecot with configured TCP/IP socket.
+Dovecot UNIX socket with R/W permissions for user netdata or Dovecot with configured TCP/IP socket.
 
 Module gives information with following charts:
 
@@ -602,7 +602,7 @@ Module gives information with following charts:
 10. **hits** - number of cache hits
  * hits
 
-11. **attempts** - authorization attemts
+11. **attempts** - authorization attempts
  * success
  * failure
 
@@ -631,7 +631,7 @@ If no configuration is given, module will attempt to connect to dovecot using un
 
 # elasticsearch
 
-Module monitor elasticsearch performance and health metrics
+This module monitors Elasticsearch performance and health metrics.
 
 It produces:
 
@@ -646,7 +646,7 @@ It produces:
  * Indexing and flushing latency
 
 3. **Memory usage and garbace collection** charts:
- * JVM heap currently in use, commited
+ * JVM heap currently in use, committed
  * Count of garbage collections
  * Time spent on garbage collections
 
@@ -1089,7 +1089,7 @@ If no configuration is given, module will use "/tmp/lshttpd/".
 
 # logind
 
-THis module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+This module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
 
 It provides the following charts:
 
@@ -1997,7 +1997,7 @@ Following charts are drawn:
  * cache
 
 8. **Transactions on db** transactions/s
- * commited
+ * committed
  * rolled back
 
 9. **Tuples written to db** writes/s
@@ -2796,7 +2796,7 @@ It produces following charts:
 
 9. **IP protocols** requests/s (requests per ip protocol version)
 
-10. **Curent Poll Unique Client IPs** unique ips/s (unique client IPs per data collection iteration)
+10. **Current Poll Unique Client IPs** unique ips/s (unique client IPs per data collection iteration)
 
 11. **All Time Unique Client IPs** unique ips/s (unique client IPs since the last restart of netdata)
 
