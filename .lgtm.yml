@@ -3,6 +3,7 @@
 path_classifiers:
   library:
     - python.d/python_modules/third_party/*
+    - python.d/python_modules/urllib3/
     - python.d/python_modules/urllib3/*
     - python.d/python_modules/urllib3/util/*
     - python.d/python_modules/urllib3/packages/*
