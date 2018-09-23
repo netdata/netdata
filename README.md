@@ -9,7 +9,7 @@
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
 
-It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including applications such as web and database servers), using **modern interactive web dashboards**.
+It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.
 
 ### Netdata core values
 
