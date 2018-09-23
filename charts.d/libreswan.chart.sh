@@ -143,7 +143,7 @@ libreswan_update_one() {
 
 	[ -z "${id}" ] && libreswan_create_one "${name}"
 
-	uptime=$(( libreswan_now - ${libreswan_established_add_time[${n}]} ))
+	uptime=$(( libreswan_now - libreswan_established_add_time[n] ))
 	[ ${uptime} -lt 0 ] && uptime=0
 
 		# write the result of the work.

@@ -57,7 +57,8 @@ mysql_check() {
 		shift
 	fi
 
-	[ -z "${mysql_cmd}" ] && mysql_cmd="$(command -v mysql 2>/dev/null)"
+        # shellcheck disable=SC2230
+	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql 2>/dev/null || command -v mysql 2>/dev/null)"
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then

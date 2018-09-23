@@ -5,14 +5,15 @@
 umask 022
 
 # make sure UID is set
+# shellcheck disable=SC2155
 [ -z "${UID}" ] && export UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {

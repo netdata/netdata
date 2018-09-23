@@ -43,7 +43,7 @@ docker push "${REPOSITORY}:latest"
 if [ "$REPOSITORY" != "netdata" ]; then
     echo "$OLD_DOCKER_PASSWORD" | docker login -u "$OLD_DOCKER_USERNAME" --password-stdin   
     for ARCH in amd64 i386 armhf aarch64; do
-        docker tag ${REPOSITORY}:${ARCH}${VERSION} firehol/netdata:${ARCH}${VERSION}
+        docker tag "${REPOSITORY}:${ARCH}${VERSION}" "firehol/netdata:${ARCH}${VERSION}"
         docker push "firehol/netdata:${ARCH}${VERSION}"
     done
     docker tag "${REPOSITORY}:latest" "firehol/netdata:latest"
