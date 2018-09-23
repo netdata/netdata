@@ -1,12 +1,19 @@
 # Global code owner
 * @ktsaou
 
-# ownership of C code
+# C code
 *.c @ktsaou
 *.h @ktsaou
 
-# owner(s) of all python files
+# python files
 *.py @l2isbad
+plugins.d/python.d.plugin @l2isbad
+conf.d/python.d/ @l2isbad
 
-# docker builds owner
+# docker builds
 docker/ @paulfantom
+
+# CI and automation
+.travis/ @paulfantom
+.travis.yml @paulfantom
+.lgtm.yml @paulfantom
