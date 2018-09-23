@@ -8,23 +8,34 @@
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
-It provides **unparalleled insights** (unlimited metrics), **in real-time** (per second resolution, with sub-second latency collection to visualization),
-of everything happening on the system it runs (including applications such as web and database servers),
-using **modern interactive web dashboards**.
 
-netdata **auto-detects** all metrics and comes with dozens of **alarms** that detect common
-issues and anomalies, so that it can troubleshoot performance issues and verify the health of systems with **zero configuration**.
+It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including applications such as web and database servers), using **modern interactive web dashboards**.
 
-netdata supports monitoring **ephemeral nodes** and **auto-scaled containers**,
+Netdata core values are:
+
+we value                    |netdata...
+:--------------------------:|:----
+high resolution metrics     |collects all metrics **every single second**
+unlimited metrics           |collects **thousands of metrics** per monitored node
+real-time visualization     |presents interactive web dashboards with **sub-second latency**, collection to visualization
+powerfull anomaly detection |has a **distributed watchdog** embedded in it, running on all monitored nodes
+visual anomaly detection    |dashboards are optmized for **spotting anomalies**, across all metrics
+meaningful presentation     |dashboards present **all metrics in a structured, easy to understand, way**
+zero configuration          |**auto-detects** all metrics and comes with dozens of alarms
+resource utilization        |core is **optimized C code**, using <1% utilization of single CPU core
+
+Also, netdata supports monitoring **ephemeral nodes** and **auto-scaled containers**,
 can be **integrated** with existing monitoring infrastructure (time-series databases such
 as `prometheus`, `graphite`, `opentsdb`) and third-party event notification methods
-(like `slack`, `pagerduty`, `pushover`, and many more).
+(like `slack`, `pagerduty`, `pushover`, and many more),
+it supports building hierarchies of monitored nodes via metrics streaming between them,
+and its dashboards can be embedded on third party web sites and applications.
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
 disrupting their core function._
 
-netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
+netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata)
 [![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
