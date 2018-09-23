@@ -1,28 +1,30 @@
 # docs: https://lgtm.com/help/lgtm/lgtm.yml-configuration-file
 
 path_classifiers:
+  library:
+    - python.d/python_modules/third_party/*
+    - python.d/python_modules/urllib3/
+    - python.d/python_modules/urllib3/*
+    - python.d/python_modules/urllib3/util/*
+    - python.d/python_modules/urllib3/packages/*
+    - python.d/python_modules/urllib3/packages/backports/*
+    - python.d/python_modules/urllib3/packages/ssl_match_hostname/*
+    - python.d/python_modules/urllib3/contrib/*
+    - python.d/python_modules/urllib3/contrib/_securetransport/*
+    - python.d/python_modules/pyyaml2/*
+    - python.d/python_modules/pyyaml3/*
+    - node.d/node_modules/lib/*
+    - node.d/node_modules/lib/ber/*
+    - node.d/node_modules/asn1-ber.js
+    - node.d/node_modules/extend.js
+    - node.d/node_modules/net-snmp.js
+    - node.d/node_modules/pixl-xml.js
+    - web/lib/*
+    - web/css/*
   test:
-    - exclude: python.d/python_modules/third_party/*
-    - exclude: python.d/python_modules/urllib3/*
-    - exclude: python.d/python_modules/urllib3/util/*
-    - exclude: python.d/python_modules/urllib3/packages/*
-    - exclude: python.d/python_modules/urllib3/packages/backports/*
-    - exclude: python.d/python_modules/urllib3/packages/ssl_match_hostname/*
-    - exclude: python.d/python_modules/urllib3/contrib/*
-    - exclude: python.d/python_modules/urllib3/contrib/_securetransport/*
-    - exclude: python.d/python_modules/pyyaml2/*
-    - exclude: python.d/python_modules/pyyaml3/*
-    - exclude: node.d/node_modules/lib/*
-    - exclude: node.d/node_modules/lib/ber/*
-    - exclude: node.d/node_modules/asn1-ber.js
-    - exclude: node.d/node_modules/extend.js
-    - exclude: node.d/node_modules/net-snmp.js
-    - exclude: node.d/node_modules/pixl-xml.js
-    - exclude: web/lib/*
-    - exclude: web/css/*
-    - exclude: tests/web/*
-    - exclude: tests/web/lib/*
-    - exclude: tests/web/fixtures/*
-    - exclude: tests/profile/*
-    - exclude: tests/node.d/*
-    - exclude: tests/*
+    - tests/web/*
+    - tests/web/lib/*
+    - tests/web/fixtures/*
+    - tests/profile/*
+    - tests/node.d/*
+    - tests/*
