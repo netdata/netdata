@@ -1,30 +1,23 @@
-# docs: https://lgtm.com/help/lgtm/lgtm.yml-configuration-file
-
+---
+# LGTM does a good job at classifying files, but sometimes it needs some help.
+# To classify files which shouldn't be checked we need to define where such
+# files are located and manually assign them one of possible categories:
+#   docs, generated, library, template, test
+# More information can be found in lgtm documentation:
+# https://help.semmle.com/lgtm-enterprise/user/help/file-classification.html#built-in-tags
+# https://lgtm.com/help/lgtm/lgtm.yml-configuration-file
 path_classifiers:
   library:
-    - python.d/python_modules/third_party/*
+    - python.d/python_modules/third_party/
     - python.d/python_modules/urllib3/
-    - python.d/python_modules/urllib3/*
-    - python.d/python_modules/urllib3/util/*
-    - python.d/python_modules/urllib3/packages/*
-    - python.d/python_modules/urllib3/packages/backports/*
-    - python.d/python_modules/urllib3/packages/ssl_match_hostname/*
-    - python.d/python_modules/urllib3/contrib/*
-    - python.d/python_modules/urllib3/contrib/_securetransport/*
-    - python.d/python_modules/pyyaml2/*
-    - python.d/python_modules/pyyaml3/*
-    - node.d/node_modules/lib/*
-    - node.d/node_modules/lib/ber/*
+    - python.d/python_modules/pyyaml2/
+    - python.d/python_modules/pyyaml3/
+    - node.d/node_modules/lib/
     - node.d/node_modules/asn1-ber.js
     - node.d/node_modules/extend.js
     - node.d/node_modules/net-snmp.js
     - node.d/node_modules/pixl-xml.js
-    - web/lib/*
-    - web/css/*
+    - web/lib/
+    - web/css/
   test:
-    - tests/web/*
-    - tests/web/lib/*
-    - tests/web/fixtures/*
-    - tests/profile/*
-    - tests/node.d/*
-    - tests/*
+    - tests/
