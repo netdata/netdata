@@ -46,6 +46,10 @@ fi
 
 ssh-keyscan -H firehol.org >> ~/.ssh/known_hosts
 ssh travis@firehol.org mkdir -p uploads/netdata/$TRAVIS_BRANCH/
-scp -p *.tar.* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
-scp -p *.gz.run* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.tar.gz travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.tar.gz.sha travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.tar.gz.asc travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.gz.run travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.gz.run.sha travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.gz.run.asc travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
 ssh travis@firehol.org touch uploads/netdata/$TRAVIS_BRANCH/complete.txt
