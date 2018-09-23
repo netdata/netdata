@@ -4,16 +4,16 @@ Copyright 2016-2017, Costa Tsaousis.
 Copyright 2017-2018, Netdata Inc.
 Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
-Netdata uses SPDX license tags to identify the license for it's files.
-Individual licenses referenced in the tags are available [on SPDX project site](http://spdx.org/licenses/).
+Netdata uses SPDX license tags to identify the license for its files.
+Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
 
 ---
 
 ## Re-distributed software
 
-Netdata re-distributes the following third party software.
+Netdata re-distributes the following third-party software.
 We have decided to re-distribute all these, instead of using them
-through a CDN, to allow netdata to work in cases where internet
+through a CDN, to allow netdata to work in cases where Internet
 connectivity is not available.
 
 - [Dygraphs](http://dygraphs.com/)
@@ -28,7 +28,7 @@ connectivity is not available.
     [MIT License](https://github.com/rendro/easy-pie-chart/blob/master/LICENSE)
 
 
-- [Guage.js](http://bernii.github.io/gauge.js/)
+- [Gauge.js](http://bernii.github.io/gauge.js/)
 
     Copyright, Bernard Kobos
     [MIT License](http://bernii.github.io/gauge.js/)
@@ -207,4 +207,3 @@ connectivity is not available.
 
     Copyright 2014, 2015, 2016 Ori Livneh <ori@wikimedia.org>
     [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
-
