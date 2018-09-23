@@ -37,6 +37,24 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## News
 
+`Sep 18, 2018` - **netdata has its own organization**
+
+Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.
+
+Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.  
+
+---
+
+<img src="https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png">
+
+`Jun 16, 2018` - **netdata in CNCF**
+
+Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://deploy-preview-842--landscape.netlify.com/grouping=no&sort=stars).
+
+Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.
+
+---
+
 `Mar 27th, 2018` - **[netdata v1.10.0 released!](https://github.com/netdata/netdata/releases)**
 
  - new web server, a lot faster and more secure
