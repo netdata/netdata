@@ -12,7 +12,9 @@ stages:
   - test
   - build
   - name: release
-    if: branch = master AND type != pull_request
+    if: branch = master AND \
+        type != pull_request AND \
+        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ )
 
 jobs:
   include:
@@ -39,7 +41,7 @@ jobs:
 #      script: tests/run_nodejs.sh
     - name: "coverity"
       script: coverity-scan.sh || echo "FAILED"
-      if: type == "cron"
+      if: type = "cron"
     - stage: "build"
       name: "ubuntu 14.04 (not containerized)"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
@@ -61,11 +63,9 @@ jobs:
       name: "Docker"
       script: docker/build.sh
       env: REPOSITORY="netdata/netdata"
-      if: type == "cron"
     - name: "GitHub"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: .travis/create_artifacts.sh
-      if: type == "cron"
       deploy:
         - provider: releases
           draft: true
