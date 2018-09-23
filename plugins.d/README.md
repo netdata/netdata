@@ -182,7 +182,7 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
     is the number of microseconds since the last update of the chart,
     it is optional.
 
-    Under heavy system load, the system may have some latency transfering
+    Under heavy system load, the system may have some latency transferring
     data from the plugins to netdata via the pipe. This number improves
     accuracy significantly, since the plugin is able to calculate the
     duration between its iterations better than netdata.
