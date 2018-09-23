@@ -13,8 +13,7 @@ of everything happening on the system it runs (including applications such as we
 using **modern interactive web dashboards**.
 
 **netdata** auto-detects all metrics and comes with dozens of **alarms** that detect common
-issues and anomalies, so that it can be used, to troubleshoot performance issues,
-with **zero configuration**.
+issues and anomalies, so that it can troubleshoot performance issues with **zero configuration**.
 
 **netdata** can be integrated with existing monitoring infrastructure
 (time-series databases such as prometheus, graphite, opentsdb),
