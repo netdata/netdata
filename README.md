@@ -1,16 +1,43 @@
-# netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+# netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+[![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade)
+[![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:cpp)
+[![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:javascript)
+[![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/firehol/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/firehol/netdata/context:python)
+
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
-It provides **unparalleled insights, in real-time**, of everything happening on the
-system it runs (including applications such as web and database servers), using
-**modern interactive web dashboards**.
+
+It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.
+
+### netdata core values
+
+we value                    |netdata...
+:--------------------------:|:----
+high resolution metrics     |collects all metrics **every single second**
+unlimited metrics           |collects **thousands of metrics** per monitored node
+real-time visualization     |dashboards run with **sub-second latency**, collection to visualization
+powerful anomaly detection  |has a **distributed watchdog** embedded in it, running on all monitored nodes
+visual anomaly detection    |dashboards are optimized for **spotting anomalies**, across all metrics
+meaningful presentation     |dashboards present **all metrics in a structured, easy to understand, way**
+zero configuration          |**auto-detects** all metrics and comes with dozens of alarms
+resource utilization        |core is **optimized C code**, using <1% utilization of single CPU core
+
+netdata also supports:
+ 
+ - monitoring **ephemeral nodes** and **auto-scaled containers**,
+ - **integration** with existing monitoring infrastructure (time-series databases like `prometheus`, `graphite`, `opentsdb`) and third-party event notification methods
+(like `slack`, `pagerduty`, `pushover`, and dozens more),
+ - building hierarchies of monitored nodes via **real-time metrics streaming** between them,
+ - embedding charts and dashboards on third party web sites and applications, such as [Atlassian's Confluence](https://github.com/netdata/netdata/wiki/Custom-Dashboard-with-Confluence).
 
 _netdata is **fast** and **efficient**, designed to permanently run on all systems
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
 disrupting their core function._
 
-netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
+netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata)
 [![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
@@ -36,6 +63,24 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 ---
 
 ## News
+
+`Sep 18, 2018` - **netdata has its own organization**
+
+Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.
+
+Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.  
+
+---
+
+<img src="https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png">
+
+`Jun 16, 2018` - **netdata in CNCF**
+
+Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://deploy-preview-842--landscape.netlify.com/grouping=no&sort=stars).
+
+Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.
+
+---
 
 `Mar 27th, 2018` - **[netdata v1.10.0 released!](https://github.com/netdata/netdata/releases)**
 
