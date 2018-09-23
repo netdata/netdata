@@ -895,9 +895,11 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 #endif
 
     cmdline[bytes] = '\0';
-    for(i = 0; i < bytes ; i++)
+    for(i = 0; i < bytes ; i++) {
         if(unlikely(!cmdline[i])) cmdline[i] = ' ';
+    }
 
+    if(p->cmdline) freez(p->cmdline);
     p->cmdline = strdupz(cmdline);
 
     debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
@@ -906,6 +908,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
 cleanup:
     // copy the command to the command line
+    if(p->cmdline) freez(p->cmdline);
     p->cmdline = strdupz(p->comm);
     return 0;
 }
@@ -1808,10 +1811,10 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             p->fds_size = (size_t)fdid + MAX_SPARE_FDS;
         }
 
-        if(unlikely(p->fds[fdid].fd != 0 && de->d_ino != p->fds[fdid].inode)) {
+        if(unlikely(p->fds[fdid].fd < 0 && de->d_ino != p->fds[fdid].inode)) {
             // inodes do not match, clear the previous entry
             inodes_changed_counter++;
-            file_descriptor_not_used(p->fds[fdid].fd);
+            file_descriptor_not_used(-p->fds[fdid].fd);
             clear_pid_fd(&p->fds[fdid]);
         }
 
@@ -1836,8 +1839,8 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
             if(debug_enabled || (p->target && p->target->debug_enabled))
                 error("Cannot read link %s", p->fds[fdid].filename);
 
-            if(unlikely(p->fds[fdid].fd)) {
-                file_descriptor_not_used(p->fds[fdid].fd);
+            if(unlikely(p->fds[fdid].fd < 0)) {
+                file_descriptor_not_used(-p->fds[fdid].fd);
                 clear_pid_fd(&p->fds[fdid]);
             }
 
@@ -1848,10 +1851,10 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
         uint32_t link_hash = simple_hash(linkname);
 
-        if(unlikely(p->fds[fdid].fd && p->fds[fdid].link_hash != link_hash)) {
+        if(unlikely(p->fds[fdid].fd < 0 && p->fds[fdid].link_hash != link_hash)) {
             // the link changed
             links_changed_counter++;
-            file_descriptor_not_used(p->fds[fdid].fd);
+            file_descriptor_not_used(-p->fds[fdid].fd);
             clear_pid_fd(&p->fds[fdid]);
         }
 
