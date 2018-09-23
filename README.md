@@ -13,7 +13,7 @@ of everything happening on the system it runs (including applications such as we
 using **modern interactive web dashboards**.
 
 netdata **auto-detects** all metrics and comes with dozens of **alarms** that detect common
-issues and anomalies, so that it can troubleshoot performance issues and verify the health of a system with **zero configuration**.
+issues and anomalies, so that it can troubleshoot performance issues and verify the health of systems with **zero configuration**.
 
 netdata supports monitoring **ephemeral nodes** and **auto-scaled containers**,
 can be **integrated** with existing monitoring infrastructure (time-series databases such
