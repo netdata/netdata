@@ -38,7 +38,7 @@ class RuntimeCounters:
         return self.START_RUN < self.NEXT_RUN
 
 
-class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, object):
+class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
