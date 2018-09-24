@@ -14,7 +14,8 @@ stages:
   - name: release
     if: branch = master AND \
         type != pull_request AND \
-        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ )
+        type = cron
+#        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ ) # TODO allow creating release on commit message
 
 jobs:
   include:
@@ -40,7 +41,8 @@ jobs:
 #    - name: "Node.js"
 #      script: tests/run_nodejs.sh
     - name: "coverity"
-      script: INSTALL_COVERITY="true" ./coverity-scan.sh
+      script: ./coverity-scan.sh
+      env: INSTALL_COVERITY="true"
       if: type = "cron"
     - stage: "build"
       name: "ubuntu 14.04 (not containerized)"
