@@ -12,7 +12,11 @@ stages:
   - test
   - build
   - name: release
-    if: branch = master AND type != pull_request
+    if: branch = master AND type = cron
+# TODO allow creating release on commit message
+#        type = master AND \    
+#        type != pull_request AND \
+#        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ )
 
 jobs:
   include:
@@ -37,6 +41,10 @@ jobs:
 #      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
 #    - name: "Node.js"
 #      script: tests/run_nodejs.sh
+    - name: "coverity"
+      script: ./coverity-scan.sh
+      env: INSTALL_COVERITY="true"
+      if: type = cron
     - stage: "build"
       name: "ubuntu 14.04 (not containerized)"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
@@ -52,8 +60,7 @@ jobs:
 #      script: ./.travis/containerized_build.sh alpine
     - name: "OSX"
       install: brew install fakeroot ossp-uuid
-      script: 
-        - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
       os: osx
     - stage: "release"
       name: "Docker"
@@ -61,7 +68,7 @@ jobs:
       env: REPOSITORY="netdata/netdata"
     - name: "GitHub"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: ./.travis/create_artifacts.sh
+      script: .travis/create_artifacts.sh
       deploy:
         - provider: releases
           draft: true
