@@ -44,7 +44,7 @@ jobs:
     - name: "coverity"
       script: ./coverity-scan.sh
       env: INSTALL_COVERITY="true"
-      if: type = "cron"
+      if: type = cron
     - stage: "build"
       name: "ubuntu 14.04 (not containerized)"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
