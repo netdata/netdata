@@ -10,14 +10,51 @@ from bases.FrameworkServices.MySQLService import MySQLService
 priority = 60000
 retries = 60
 
+
+def query(table, *params):
+    return 'SELECT {params} FROM {table}'.format(table=table, params=', '.join(params))
+
+
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_global
-QUERY_GLOBAL = 'SELECT Variable_Name, Variable_Value FROM stats_mysql_global'
+QUERY_GLOBAL = query("stats_mysql_global",
+                     "Variable_Name",
+                     "Variable_Value",
+                     )
 
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_connection_pool
-QUERY_CONNECTION_POOL = 'SELECT hostgroup, srv_host, srv_port, status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries, Bytes_data_sent, Bytes_data_recv, Latency_us FROM stats_mysql_connection_pool'
+QUERY_CONNECTION_POOL = query("stats_mysql_connection_pool",
+                              "hostgroup",
+                              "srv_host",
+                              "srv_port",
+                              "status",
+                              "ConnUsed",
+                              "ConnFree",
+                              "ConnOK",
+                              "ConnERR",
+                              "Queries",
+                              "Bytes_data_sent",
+                              "Bytes_data_recv",
+                              "Latency_us",
+                              )
 
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_commands_counters
-QUERY_COMMANDS = 'SELECT Command, Total_Time_us, Total_cnt FROM stats_mysql_commands_counters'
+QUERY_COMMANDS = query("stats_mysql_commands_counters",
+                       "Command",
+                       "Total_Time_us",
+                       "Total_cnt",
+                       "cnt_100us",
+                       "cnt_500us",
+                       "cnt_1ms",
+                       "cnt_5ms",
+                       "cnt_10ms",
+                       "cnt_50ms",
+                       "cnt_100ms",
+                       "cnt_500ms",
+                       "cnt_1s",
+                       "cnt_5s",
+                       "cnt_10s",
+                       "cnt_INFs",
+                       )
 
 GLOBAL_STATS = [
     'client_connections_aborted',
@@ -54,6 +91,21 @@ ORDER = [
     'pool_connection_free',
     'pool_connection_ok',
     'pool_connection_error']
+
+HISTOGRAM_ORDER = [
+    '100us',
+    '500us',
+    '1ms',
+    '5ms',
+    '10ms',
+    '50ms',
+    '100ms',
+    '500ms',
+    '1s',
+    '5s',
+    '10s',
+    'inf',
+]
 
 STATUS = {
     "ONLINE": 1,
@@ -182,16 +234,19 @@ class Service(MySQLService):
 
         if 'commands_status' in raw_data:
             for record in raw_data['commands_status'][0]:
-                cmd = record[0].lower()
-                cmd_duration = record[1]
-                cmd_count = record[2]
+                cmd = self._generate_command_stats(record)
 
                 if len(self.charts) > 0:
-                    if (cmd + '_count') not in self.charts['commands_count']:
-                        self._add_command_dimensions(cmd)
+                    if (cmd['name'] + '_count') not in self.charts['commands_count']:
+                        self._add_command_dimensions(cmd['name'])
+                        self._add_histogram_chart(cmd)
 
-                    to_netdata[cmd + '_count'] = cmd_count
-                    to_netdata[cmd + '_duration'] = cmd_duration
+                    to_netdata[cmd['name'] + '_count'] = cmd['count']
+                    to_netdata[cmd['name'] + '_duration'] = cmd['duration']
+                    for record in cmd['histogram']:
+                        dimId = 'commands_histogram_' + \
+                            cmd['name'] + '_' + record
+                        to_netdata[dimId] = cmd['histogram'][record]
 
         return to_netdata or None
 
@@ -221,6 +276,26 @@ class Service(MySQLService):
         self.charts['commands_duration'].add_dimension(
             [cmd + '_duration', cmd, 'incremental', 1, 1000])
 
+    def _add_histogram_chart(self, cmd):
+        chart = self.charts.add_chart(self._histogram_chart(cmd))
+
+        for histogram in HISTOGRAM_ORDER:
+            id = 'commands_histogram_' + cmd['name'] + '_' + histogram
+            chart.add_dimension(
+                [id, histogram, 'incremental'])
+
+    @staticmethod
+    def _histogram_chart(cmd):
+        return [
+            'commands_historgram_' + cmd['name'],
+            None,
+            cmd['name'] + ' Command Histogram',
+            'commands',
+            'commands_histogram',
+            'proxysql.commands_histogram_' + cmd['name'],
+            'stacked',
+        ]
+
     @staticmethod
     def _generate_backend(data):
         return {
@@ -236,6 +311,28 @@ class Service(MySQLService):
             'bytes_data_sent': data[9],
             'bytes_data_recv': data[10],
             'latency_us': data[11]
+        }
+
+    @staticmethod
+    def _generate_command_stats(data):
+        return {
+            'name': data[0].lower(),
+            'duration': data[1],
+            'count': data[2],
+            'histogram': {
+                '100us': data[3],
+                '500us': data[4],
+                '1ms': data[5],
+                '5ms': data[6],
+                '10ms': data[7],
+                '50ms': data[8],
+                '100ms': data[9],
+                '500ms': data[10],
+                '1s': data[11],
+                '5s': data[12],
+                '10s': data[13],
+                'inf': data[14],
+            },
         }
 
     @staticmethod
