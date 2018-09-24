@@ -12,10 +12,11 @@ stages:
   - test
   - build
   - name: release
-    if: branch = master AND \
-        type != pull_request AND \
-        type = cron
-#        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ ) # TODO allow creating release on commit message
+    if: branch = master AND type = cron
+# TODO allow creating release on commit message
+#        type = master AND \    
+#        type != pull_request AND \
+#        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ )
 
 jobs:
   include:
