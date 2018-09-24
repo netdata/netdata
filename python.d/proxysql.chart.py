@@ -243,10 +243,10 @@ class Service(MySQLService):
 
                     to_netdata[cmd['name'] + '_count'] = cmd['count']
                     to_netdata[cmd['name'] + '_duration'] = cmd['duration']
-                    for record in cmd['histogram']:
+                    for histogram in cmd['histogram']:
                         dimId = 'commands_histogram_' + \
-                            cmd['name'] + '_' + record
-                        to_netdata[dimId] = cmd['histogram'][record]
+                            cmd['name'] + '_' + histogram
+                        to_netdata[dimId] = cmd['histogram'][histogram]
 
         return to_netdata or None
 
