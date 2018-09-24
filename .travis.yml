@@ -40,7 +40,7 @@ jobs:
 #    - name: "Node.js"
 #      script: tests/run_nodejs.sh
     - name: "coverity"
-      script: coverity-scan.sh || echo "FAILED"
+      script: INSTALL_COVERITY="true" ./coverity-scan.sh
       if: type = "cron"
     - stage: "build"
       name: "ubuntu 14.04 (not containerized)"
