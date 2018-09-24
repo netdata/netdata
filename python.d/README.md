@@ -2096,35 +2096,35 @@ It produces:
   * in
   * out
 4. **Status (backends)**
-  * <backends>
+  * Backends
     * `1=ONLINE`: backend server is fully operational
     * `2=SHUNNED`: backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold
     * `3=OFFLINE_SOFT`: when a server is put into OFFLINE_SOFT mode, new incoming connections aren't accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend
     * `4=OFFLINE_HARD`: when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren't accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work
     * `-1`: Unknkown status
 5. **Bandwith (backends)**
-  * <backends>
+  * Backends
     * in
     * out
 6. **Queries (backends)**
-  * <backends>
+  * Backends
     * queries
 7. **Latency (backends)**
-  * <backends>
+  * Backends
     * ping time
 8. **Pool connections (backends)**
-  * <backends>
+  * Backends
     * Used: The number of connections are currently used by ProxySQL for sending queries to the backend server.
     * Free: The number of connections are currently free.
     * Established/OK: The number of connections were established successfully.
     * Error: The number of connections weren't established successfully.
 9. **Commands**
-  * <commands>
+  * Commands
     * Count
     * Duration (Total duration for each command)
 10. **Commands Histogram**
-  * <commands>
-    * cnt_100us, cnt_500us, ..., cnt_10s, cnt_INFs: the total number of commands of the given type which executed within the specified time limit and the previous one.
+  * Commands
+    * 100us, 500us, ..., 10s, inf: the total number of commands of the given type which executed within the specified time limit and the previous one.
 
 ### configuration
 
