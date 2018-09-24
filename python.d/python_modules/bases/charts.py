@@ -307,6 +307,12 @@ class Dimension:
             return self.id == other
         return self.id == other.id
 
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(repr(self))
+
     def create(self):
         return DIMENSION_CREATE.format(**self.params)
 
@@ -362,6 +368,9 @@ class ChartVariable:
         if isinstance(other, ChartVariable):
             return self.id == other.id
         return False
+
+    def __ne__(self, other):
+        return not self == other
 
     def __hash__(self):
         return hash(repr(self))
