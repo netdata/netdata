@@ -333,7 +333,8 @@ typedef enum rrdcalc_status {
 #include "web_api_v1.h"
 
 extern char *netdata_configured_hostname;
-extern char *netdata_configured_config_dir;
+extern char *netdata_configured_user_config_dir;
+extern char *netdata_configured_stock_config_dir;
 extern char *netdata_configured_log_dir;
 extern char *netdata_configured_plugins_dir_base;
 extern char *netdata_configured_plugins_dir;

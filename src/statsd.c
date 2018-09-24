@@ -2245,7 +2245,7 @@ void *statsd_main(void *ptr) {
     // read custom application definitions
     {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/statsd.d", netdata_configured_config_dir);
+        snprintfz(filename, FILENAME_MAX, "%s/statsd.d", netdata_configured_user_config_dir);
         statsd_readdir(filename);
     }
 

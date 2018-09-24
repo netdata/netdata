@@ -460,12 +460,13 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",    CONFIG_DIR);
-    netdata_configured_log_dir     = config_get(CONFIG_SECTION_GLOBAL, "log directory",       LOG_DIR);
-    netdata_configured_web_dir     = config_get(CONFIG_SECTION_GLOBAL, "web files directory", WEB_DIR);
-    netdata_configured_cache_dir   = config_get(CONFIG_SECTION_GLOBAL, "cache directory",     CACHE_DIR);
-    netdata_configured_varlib_dir  = config_get(CONFIG_SECTION_GLOBAL, "lib directory",       VARLIB_DIR);
-    netdata_configured_home_dir    = config_get(CONFIG_SECTION_GLOBAL, "home directory",      CACHE_DIR);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       CONFIG_DIR);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", LIBCONFIG_DIR);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          LOG_DIR);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    WEB_DIR);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        CACHE_DIR);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          VARLIB_DIR);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         CACHE_DIR);
 
     {
         char plugins_dirs[(FILENAME_MAX * 2) + 1];
@@ -596,15 +597,16 @@ void set_global_environment() {
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
-    setenv("NETDATA_HOSTNAME"   , netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR" , verify_required_directory(netdata_configured_config_dir),  1);
-    setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_plugins_dir), 1);
-    setenv("NETDATA_WEB_DIR"    , verify_required_directory(netdata_configured_web_dir),     1);
-    setenv("NETDATA_CACHE_DIR"  , verify_required_directory(netdata_configured_cache_dir),   1);
-    setenv("NETDATA_LIB_DIR"    , verify_required_directory(netdata_configured_varlib_dir),  1);
-    setenv("NETDATA_LOG_DIR"    , verify_required_directory(netdata_configured_log_dir),     1);
-    setenv("HOME"               , verify_required_directory(netdata_configured_home_dir),    1);
-    setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
+    setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
+    setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
+    setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
+    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_plugins_dir),      1);
+    setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
+    setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
+    setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
+    setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
+    setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
+    setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
     get_system_timezone();
 
@@ -902,8 +904,8 @@ int main(int argc, char **argv) {
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
         // files using relative filenames
-        if(chdir(netdata_configured_config_dir) == -1)
-            fatal("Cannot cd to '%s'", netdata_configured_config_dir);
+        if(chdir(netdata_configured_user_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
     }
 
     char *user = NULL;
@@ -940,7 +942,7 @@ int main(int argc, char **argv) {
         // load stream.conf
         {
             char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s/stream.conf", netdata_configured_config_dir);
+            snprintfz(filename, FILENAME_MAX, "%s/stream.conf", netdata_configured_user_config_dir);
             appconfig_load(&stream_config, filename, 0);
         }
 

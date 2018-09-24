@@ -10,16 +10,17 @@
 #    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ || __APPLE__*/
 
-char *netdata_configured_hostname    = NULL;
-char *netdata_configured_config_dir  = NULL;
-char *netdata_configured_log_dir     = NULL;
-char *netdata_configured_plugins_dir = NULL;
-char *netdata_configured_web_dir     = NULL;
-char *netdata_configured_cache_dir   = NULL;
-char *netdata_configured_varlib_dir  = NULL;
-char *netdata_configured_home_dir    = NULL;
-char *netdata_configured_host_prefix = NULL;
-char *netdata_configured_timezone    = NULL;
+char *netdata_configured_hostname         = NULL;
+char *netdata_configured_user_config_dir  = NULL;
+char *netdata_configured_stock_config_dir = NULL;
+char *netdata_configured_log_dir          = NULL;
+char *netdata_configured_plugins_dir      = NULL;
+char *netdata_configured_web_dir          = NULL;
+char *netdata_configured_cache_dir        = NULL;
+char *netdata_configured_varlib_dir       = NULL;
+char *netdata_configured_home_dir         = NULL;
+char *netdata_configured_host_prefix      = NULL;
+char *netdata_configured_timezone         = NULL;
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;

@@ -10,7 +10,7 @@ unsigned int default_health_enabled = 1;
 
 inline char *health_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_config_dir);
+    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
 }
 
