@@ -93,7 +93,7 @@ def battery_charts(bats):
 
 
 RE_ADAPTER = re.compile(
-    r'Adapter #([0-9]+) State\s+: ([a-zA-Z]+)'
+    r'Adapter #([0-9]+) State(?:\s+)?: ([a-zA-Z]+)'
 )
 
 RE_VD = re.compile(
