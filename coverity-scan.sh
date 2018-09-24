@@ -27,7 +27,7 @@ if [ -z "${covbuild}" ]; then
 	        sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
         	export PATH=${PATH}:/opt/coverity/bin/
         else
-		echo "Saving command the full filename of cov-build in .coverity-build"
+		echo "Save command the full filename of cov-build in .coverity-build"
 		exit 1
 	fi
 fi
