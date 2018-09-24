@@ -828,9 +828,24 @@ netdataDashboard.context = {
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
     },
 
-    'ipv4.tcplistenissues': {
-        info: '<b>overflows</b> (or <code>ListenOverflows</code>) is the number of incoming connections that could not be handled because the receive queue of the application was full (for both IPv4 and IPv6).'
-            + ' <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming connections that could not be handled, including SYN floods, overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
+    'ipv4.tcp_syn_queue': {
+        info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
+            'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
+            'is not configured to fall back to SYN cookies*. Overflows are usually caused by SYN flood DoS attacks ' +
+            '(i.e. someone sends lots of SYN packets and never completes the handshakes). ' +
+            '<b>drops</b> (or <code>TcpExtTCPReqQFullDrop</code>) is the number of connections dropped because the ' +
+            'SYN queue was full and SYN cookies were disabled. ' +
+            '<b>cookies</b> (or <code>TcpExtTCPReqQFullDoCookies</code>) is the number of SYN cookies sent because the ' +
+            'SYN queue was full.'
+    },
+
+    'ipv4.tcp_accept_queue': {
+        info: 'The <b>accept queue</b> of the kernel holds the fully established TCP connections, waiting to be handled ' +
+            'by the listening application. <b>overflows</b> (or <code>ListenOverflows</code>) is the number of ' +
+            'established connections that could not be handled because the receive queue of the listening application ' +
+            'was full (for both IPv4 and IPv6). <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming ' +
+            'connections that could not be handled, including SYN floods, overflows, out of memory, security issues, ' +
+            'no route to destination, reception of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
     },
 
     // ------------------------------------------------------------------------

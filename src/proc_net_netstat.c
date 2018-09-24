@@ -3,7 +3,6 @@
 #include "common.h"
 
 unsigned long long tcpext_TCPSynRetrans = 0;
-unsigned long long tcpext_TCPReqQFullDrop = 0;
 
 static void parse_line_pair(procfile *ff, ARL_BASE *base, size_t header_line, size_t values_line) {
     size_t hwords = procfile_linewords(ff, header_line);
@@ -26,7 +25,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     static int do_bandwidth = -1, do_inerrors = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1, do_bcast_p = -1, do_ecn = -1, \
         do_tcpext_reorder = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1, do_tcpext_memory = -1,
-        do_tcpext_listen = -1;
+        do_tcpext_syn_queue = -1, do_tcpext_accept_queue = -1;
 
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
     static procfile *ff = NULL;
@@ -105,7 +104,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     // IPv4 TCP memory pressures
     static unsigned long long tcpext_TCPMemoryPressures = 0;
 
-    // shared tcpext_TCPReqQFullDrop
+    static unsigned long long tcpext_TCPReqQFullDrop = 0;
+    static unsigned long long tcpext_TCPReqQFullDoCookies = 0;
+
     // shared: tcpext_TCPSynRetrans
 
 
@@ -126,7 +127,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_ofo        = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
         do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_listen     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP listen issues", CONFIG_BOOLEAN_AUTO);
+
+        do_tcpext_syn_queue    = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN queue", CONFIG_BOOLEAN_YES);
+        do_tcpext_accept_queue = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP accept queue", CONFIG_BOOLEAN_YES);
 
         arl_ipext  = arl_create("netstat/ipext", NULL, 60);
         arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
@@ -208,14 +211,18 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             arl_expect(arl_tcpext, "TCPMemoryPressures", &tcpext_TCPMemoryPressures);
         }
 
-        if(do_tcpext_listen != CONFIG_BOOLEAN_NO) {
+        if(do_tcpext_accept_queue != CONFIG_BOOLEAN_NO) {
             arl_expect(arl_tcpext, "ListenOverflows", &tcpext_ListenOverflows);
             arl_expect(arl_tcpext, "ListenDrops",     &tcpext_ListenDrops);
         }
 
+        if(do_tcpext_syn_queue != CONFIG_BOOLEAN_NO) {
+            arl_expect(arl_tcpext, "TCPReqQFullDrop",      &tcpext_TCPReqQFullDrop);
+            arl_expect(arl_tcpext, "TCPReqQFullDoCookies", &tcpext_TCPReqQFullDoCookies);
+        }
+
         // shared metrics
         arl_expect(arl_tcpext, "TCPSynRetrans", &tcpext_TCPSynRetrans);
-        arl_expect(arl_tcpext, "TCPReqQFullDrop", &tcpext_TCPReqQFullDrop);
     }
 
     if(unlikely(!ff)) {
@@ -725,21 +732,23 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_listen == CONFIG_BOOLEAN_YES || (do_tcpext_listen == CONFIG_BOOLEAN_AUTO && (tcpext_ListenOverflows || tcpext_ListenDrops))) {
-                do_tcpext_listen = CONFIG_BOOLEAN_YES;
+            if(do_tcpext_syn_queue == CONFIG_BOOLEAN_YES || (do_tcpext_syn_queue == CONFIG_BOOLEAN_AUTO && (tcpext_TCPReqQFullDrop || tcpext_TCPReqQFullDoCookies))) {
+                do_tcpext_syn_queue = CONFIG_BOOLEAN_YES;
 
-                static RRDSET *st_listen = NULL;
-                static RRDDIM *rd_overflows = NULL, *rd_drops = NULL;
+                static RRDSET *st_syn_queue = NULL;
+                static RRDDIM
+                        *rd_TCPReqQFullDrop = NULL,
+                        *rd_TCPReqQFullDoCookies = NULL;
 
-                if(unlikely(!st_listen)) {
+                if(unlikely(!st_syn_queue)) {
 
-                    st_listen = rrdset_create_localhost(
+                    st_syn_queue = rrdset_create_localhost(
                             "ipv4"
-                            , "tcplistenissues"
+                            , "tcp_syn_queue"
                             , NULL
                             , "tcp"
                             , NULL
-                            , "TCP Listen Socket Issues"
+                            , "TCP SYN Queue Issues"
                             , "packets/s"
                             , "proc"
                             , "net/netstat"
@@ -748,17 +757,56 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    rd_overflows = rrddim_add(st_listen, "ListenOverflows", "overflows",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_drops     = rrddim_add(st_listen, "ListenDrops",     "drops",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPReqQFullDrop      = rrddim_add(st_syn_queue, "TCPReqQFullDrop",      "drops",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPReqQFullDoCookies = rrddim_add(st_syn_queue, "TCPReqQFullDoCookies", "cookies", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else
-                    rrdset_next(st_listen);
+                    rrdset_next(st_syn_queue);
 
-                rrddim_set_by_pointer(st_listen, rd_overflows, tcpext_ListenOverflows);
-                rrddim_set_by_pointer(st_listen, rd_drops,     tcpext_ListenDrops);
+                rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDrop,      tcpext_TCPReqQFullDrop);
+                rrddim_set_by_pointer(st_syn_queue, rd_TCPReqQFullDoCookies, tcpext_TCPReqQFullDoCookies);
 
-                rrdset_done(st_listen);
+                rrdset_done(st_syn_queue);
             }
+
+            // --------------------------------------------------------------------
+
+            if(do_tcpext_accept_queue == CONFIG_BOOLEAN_YES || (do_tcpext_accept_queue == CONFIG_BOOLEAN_AUTO && (tcpext_ListenOverflows || tcpext_ListenDrops))) {
+                do_tcpext_accept_queue = CONFIG_BOOLEAN_YES;
+
+                static RRDSET *st_accept_queue = NULL;
+                static RRDDIM *rd_overflows = NULL,
+                    *rd_drops = NULL;
+
+                if(unlikely(!st_accept_queue)) {
+
+                    st_accept_queue = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcp_accept_queue"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP Accept Queue Issues"
+                            , "packets/s"
+                            , "proc"
+                            , "net/netstat"
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 16
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_overflows = rrddim_add(st_accept_queue, "ListenOverflows", "overflows", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_drops     = rrddim_add(st_accept_queue, "ListenDrops",     "drops",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+                else
+                    rrdset_next(st_accept_queue);
+
+                rrddim_set_by_pointer(st_accept_queue, rd_overflows, tcpext_ListenOverflows);
+                rrddim_set_by_pointer(st_accept_queue, rd_drops,     tcpext_ListenDrops);
+
+                rrdset_done(st_accept_queue);
+            }
+
         }
     }
 
