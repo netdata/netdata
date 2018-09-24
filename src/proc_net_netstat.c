@@ -128,8 +128,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
         do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
 
-        do_tcpext_syn_queue    = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN queue", CONFIG_BOOLEAN_YES);
-        do_tcpext_accept_queue = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP accept queue", CONFIG_BOOLEAN_YES);
+        do_tcpext_syn_queue    = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_accept_queue = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP accept queue", CONFIG_BOOLEAN_AUTO);
 
         arl_ipext  = arl_create("netstat/ipext", NULL, 60);
         arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
