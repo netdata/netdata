@@ -2101,7 +2101,7 @@ It produces:
     * `2=SHUNNED`: backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold
     * `3=OFFLINE_SOFT`: when a server is put into OFFLINE_SOFT mode, new incoming connections aren't accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend
     * `4=OFFLINE_HARD`: when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren't accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work
-    * `-1`: Unknkown status
+    * `-1`: Unknown status
 5. **Bandwith (backends)**
   * Backends
     * in
