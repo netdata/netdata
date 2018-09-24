@@ -185,6 +185,12 @@ class Disk:
             return self.name == other.name
         return self.name == other
 
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(repr(self))
+
     @handle_os_error
     def is_active(self):
         return (time() - os.path.getmtime(self.log_file.path)) / 60 < self.age
