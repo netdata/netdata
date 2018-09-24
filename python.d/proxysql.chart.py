@@ -280,9 +280,9 @@ class Service(MySQLService):
         chart = self.charts.add_chart(self._histogram_chart(cmd))
 
         for histogram in HISTOGRAM_ORDER:
-            id = 'commands_histogram_' + cmd['name'] + '_' + histogram
+            dimId = 'commands_histogram_' + cmd['name'] + '_' + histogram
             chart.add_dimension(
-                [id, histogram, 'incremental'])
+                [dimId, histogram, 'incremental'])
 
     @staticmethod
     def _histogram_chart(cmd):
