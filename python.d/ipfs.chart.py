@@ -27,31 +27,43 @@ CHARTS = {
     'bandwidth': {
         'options': [None, 'IPFS Bandwidth', 'kbits/s', 'Bandwidth', 'ipfs.bandwidth', 'line'],
         'lines': [
-            ["in", None, "absolute", 8, 1000],
-            ["out", None, "absolute", -8, 1000]
-        ]},
+            ['in', None, 'absolute', 8, 1000],
+            ['out', None, 'absolute', -8, 1000]
+        ]
+    },
     'peers': {
         'options': [None, 'IPFS Peers', 'peers', 'Peers', 'ipfs.peers', 'line'],
         'lines': [
-            ["peers", None, 'absolute']
-        ]},
+            ['peers', None, 'absolute']
+        ]
+    },
     'repo_size': {
         'options': [None, 'IPFS Repo Size', 'GB', 'Size', 'ipfs.repo_size', 'area'],
         'lines': [
-            ["avail", None, "absolute", 1, 1e9],
-            ["size", None, "absolute", 1, 1e9],
-        ]},
+            ['avail', None, 'absolute', 1, 1e9],
+            ['size', None, 'absolute', 1, 1e9],
+        ]
+    },
     'repo_objects': {
         'options': [None, 'IPFS Repo Objects', 'objects', 'Objects', 'ipfs.repo_objects', 'line'],
         'lines': [
-            ["objects", None, "absolute", 1, 1],
-            ["pinned", None, "absolute", 1, 1],
-            ["recursive_pins", None, "absolute", 1, 1]
-        ]},
+            ['objects', None, 'absolute', 1, 1],
+            ['pinned', None, 'absolute', 1, 1],
+            ['recursive_pins', None, 'absolute', 1, 1]
+        ]
+    }
 }
 
-SI_zeroes = {'k': 3, 'm': 6, 'g': 9, 't': 12,
-             'p': 15, 'e': 18, 'z': 21, 'y': 24}
+SI_zeroes = {
+    'k': 3,
+    'm': 6,
+    'g': 9,
+    't': 12,
+    'p': 15,
+    'e': 18,
+    'z': 21,
+    'y': 24
+}
 
 
 class Service(UrlService):
@@ -75,7 +87,7 @@ class Service(UrlService):
 
     @staticmethod
     def _recursive_pins(keys):
-        return sum( 1 for k in keys if keys[k]["Type"] == b"recursive" )
+        return sum(1 for k in keys if keys[k]['Type'] == b'recursive')
 
     @staticmethod
     def _dehumanize(store_max):
