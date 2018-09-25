@@ -113,7 +113,7 @@ class Service(UrlService):
         self.debug('Content: \n\n{content}\n'.format(content=content))
         if status in self.status_codes_accepted:
             if self.regex and self.regex.search(content) is None:
-                self.debug('No match for regex '{regex}' found'.format(regex=self.regex.pattern))
+                self.debug('No match for regex "{regex}" found'.format(regex=self.regex.pattern))
                 data[HTTP_BAD_CONTENT] = 1
             else:
                 data[HTTP_SUCCESS] = 1
