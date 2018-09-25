@@ -16,10 +16,10 @@ ORDER = ['listeners']
 
 CHARTS = {
     'listeners': {
-        'options': [None, 'Number Of Listeners', 'listeners',
-                    'listeners', 'icecast.listeners', 'line'],
+        'options': [None, 'Number Of Listeners', 'listeners', 'listeners', 'icecast.listeners', 'line'],
         'lines': [
-        ]}
+        ]
+    }
 }
 
 
@@ -87,7 +87,7 @@ class Service(UrlService):
         try:
             data = json.loads(raw_data)
         except ValueError as error:
-            self.error("JSON decode error:", error)
+            self.error('JSON decode error:', error)
             return None
 
         return data['icestats'].get('source')
