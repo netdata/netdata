@@ -36,56 +36,50 @@ CHARTS = {
             ['nms_dropped_queries', 'dropped_queries', 'incremental'],
         ]},
     'incoming_queries': {
-        'options': [None, 'Incoming Queries', 'queries', 'incoming queries',
-                    'bind_rndc.incoming_queries', 'line'],
+        'options': [None, 'Incoming Queries', 'queries', 'incoming queries', 'bind_rndc.incoming_queries', 'line'],
         'lines': [
         ]},
     'outgoing_queries': {
-        'options': [None, 'Outgoing Queries', 'queries', 'outgoing queries',
-                    'bind_rndc.outgoing_queries', 'line'],
+        'options': [None, 'Outgoing Queries', 'queries', 'outgoing queries', 'bind_rndc.outgoing_queries', 'line'],
         'lines': [
         ]},
     'named_stats_size': {
-        'options': [None, 'Named Stats File Size', 'MB', 'file size',
-                    'bind_rndc.stats_size', 'line'],
+        'options': [None, 'Named Stats File Size', 'MB', 'file size', 'bind_rndc.stats_size', 'line'],
         'lines': [
             ['stats_size', None, 'absolute', 1, 1 << 20]
-        ]}
+        ]
+    }
 }
 
 NMS = {
-    'nms_requests':
-        ['IPv4 requests received',
-         'IPv6 requests received',
-         'TCP requests received',
-         'requests with EDNS(0) receive'],
-    'nms_responses':
-        ['responses sent',
-         'truncated responses sent',
-         'responses with EDNS(0) sent',
-         'requests with unsupported EDNS version received'],
-    'nms_failure':
-        ['other query failures',
-         'queries resulted in SERVFAIL'],
-    'nms_auth_answer':
-        ['queries resulted in authoritative answer'],
-    'nms_non_auth_answer':
-        ['queries resulted in non authoritative answer'],
-    'nms_nxrrset':
-        ['queries resulted in nxrrset'],
-    'nms_success':
-        ['queries resulted in successful answer'],
-    'nms_nxdomain':
-        ['queries resulted in NXDOMAIN'],
-    'nms_recursion':
-        ['queries caused recursion'],
-    'nms_duplicate':
-        ['duplicate queries received'],
-    'nms_rejected_queries':
-        ['auth queries rejected',
-         'recursive queries rejected'],
-    'nms_dropped_queries':
-        ['queries dropped']
+    'nms_requests': [
+        'IPv4 requests received',
+        'IPv6 requests received',
+        'TCP requests received',
+        'requests with EDNS(0) receive'
+    ],
+    'nms_responses': [
+        'responses sent',
+        'truncated responses sent',
+        'responses with EDNS(0) sent',
+        'requests with unsupported EDNS version received'
+    ],
+    'nms_failure': [
+        'other query failures',
+        'queries resulted in SERVFAIL'
+    ],
+    'nms_auth_answer': ['queries resulted in authoritative answer'],
+    'nms_non_auth_answer': ['queries resulted in non authoritative answer'],
+    'nms_nxrrset': ['queries resulted in nxrrset'],
+    'nms_success': ['queries resulted in successful answer'],
+    'nms_nxdomain': ['queries resulted in NXDOMAIN'],
+    'nms_recursion': ['queries caused recursion'],
+    'nms_duplicate': ['duplicate queries received'],
+    'nms_rejected_queries': [
+        'auth queries rejected',
+        'recursive queries rejected'
+    ],
+    'nms_dropped_queries': ['queries dropped']
 }
 
 STATS = ['Name Server Statistics', 'Incoming Queries', 'Outgoing Queries']
