@@ -21,43 +21,50 @@ MEMSTATS_CHARTS = {
         'lines': [
             ['memstats_heap_alloc', 'alloc', 'absolute', 1, 1024],
             ['memstats_heap_inuse', 'inuse', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'memstats_stack': {
         'options': ['stack', 'memory: size of stack memory structures', 'kB', 'memstats',
                     'expvar.memstats.stack', 'line'],
         'lines': [
             ['memstats_stack_inuse', 'inuse', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'memstats_mspan': {
         'options': ['mspan', 'memory: size of mspan memory structures', 'kB', 'memstats',
                     'expvar.memstats.mspan', 'line'],
         'lines': [
             ['memstats_mspan_inuse', 'inuse', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'memstats_mcache': {
         'options': ['mcache', 'memory: size of mcache memory structures', 'kB', 'memstats',
                     'expvar.memstats.mcache', 'line'],
         'lines': [
             ['memstats_mcache_inuse', 'inuse', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'memstats_live_objects': {
         'options': ['live_objects', 'memory: number of live objects', 'objects', 'memstats',
                     'expvar.memstats.live_objects', 'line'],
         'lines': [
             ['memstats_live_objects', 'live']
-        ]},
+        ]
+    },
     'memstats_sys': {
         'options': ['sys', 'memory: size of reserved virtual address space', 'kB', 'memstats',
                     'expvar.memstats.sys', 'line'],
         'lines': [
             ['memstats_sys', 'sys', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'memstats_gc_pauses': {
         'options': ['gc_pauses', 'memory: average duration of GC pauses', 'ns', 'memstats',
                     'expvar.memstats.gc_pauses', 'line'],
         'lines': [
             ['memstats_gc_pauses', 'avg']
-        ]},
+        ]
+    }
 }
 
 MEMSTATS_ORDER = ['memstats_heap', 'memstats_stack', 'memstats_mspan', 'memstats_mcache',
