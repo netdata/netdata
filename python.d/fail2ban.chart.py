@@ -24,19 +24,16 @@ def charts(jails):
     """
 
     ch = {
-        ORDER[0]:
-            {
+        ORDER[0]: {
                 'options':
                     [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
                 'lines': []
-            },
-        ORDER[1]:
-            {
-                'options':
-                    [None, 'Banned IPs (since the last restart of netdata)', 'IPs','in jail', 'jail.in_jail', 'line'],
-                'lines':
-                    []
-            },
+        },
+        ORDER[1]: {
+                'options': [None, 'Banned IPs (since the last restart of netdata)', 'IPs', 'in jail',
+                            'jail.in_jail', 'line'],
+                'lines': []
+        },
     }
     for jail in jails:
         ch[ORDER[0]]['lines'].append([jail, jail, 'incremental'])
@@ -53,7 +50,7 @@ RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
 RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban) (?P<ip>[a-f0-9.:]+)')
 
 DEFAULT_JAILS = [
-    "ssh",
+    'ssh',
 ]
 
 
@@ -76,8 +73,8 @@ class Service(LogService):
         """
         :return: bool
         """
-        if not self.conf_path.endswith((".conf", ".local")):
-            self.error("{0} is a wrong conf path name, must be *.conf or *.local".format(self.conf_path))
+        if not self.conf_path.endswith(('.conf', '.local')):
+            self.error('{0} is a wrong conf path name, must be *.conf or *.local'.format(self.conf_path))
             return False
 
         if not os.access(self.log_path, os.R_OK):
@@ -91,7 +88,7 @@ class Service(LogService):
         self.monitoring_jails = self.jails_auto_detection()
         for jail in self.monitoring_jails:
             self.data[jail] = 0
-            self.data["{0}_in_jail".format(jail)] = 0
+            self.data['{0}_in_jail'.format(jail)] = 0
 
         self.definitions = charts(self.monitoring_jails)
         self.info('monitoring jails: {0}'.format(self.monitoring_jails))
@@ -115,20 +112,20 @@ class Service(LogService):
 
             match = match.groupdict()
 
-            if match["jail"] not in self.monitoring_jails:
+            if match['jail'] not in self.monitoring_jails:
                 continue
 
             jail, action, ip = match['jail'], match['action'], match['ip']
 
-            if action == "Ban":
+            if action == 'Ban':
                 self.data[jail] += 1
                 if ip not in self.banned_ips[jail]:
                     self.banned_ips[jail].add(ip)
-                    self.data["{0}_in_jail".format(jail)] += 1
+                    self.data['{0}_in_jail'.format(jail)] += 1
             else:
                 if ip in self.banned_ips[jail]:
                     self.banned_ips[jail].remove(ip)
-                    self.data["{0}_in_jail".format(jail)] -= 1
+                    self.data['{0}_in_jail'.format(jail)] -= 1
 
             return self.data
 
@@ -137,28 +134,28 @@ class Service(LogService):
         :return: list
         """
         if not os.path.isdir(dir_path):
-            self.error("{0} is not a directory".format(dir_path))
+            self.error('{0} is not a directory'.format(dir_path))
             return list()
 
-        return glob("{0}/*.{1}".format(self.conf_dir, suffix))
+        return glob('{0}/*.{1}'.format(self.conf_dir, suffix))
 
     def get_jails_from_file(self, file_path):
         """
         :return: list
         """
         if not os.access(file_path, os.R_OK):
-            self.error("{0} is not readable or not exist".format(file_path))
+            self.error('{0} is not readable or not exist'.format(file_path))
             return list()
 
         with open(file_path, 'rt') as f:
             lines = f.readlines()
-            raw = " ".join(line for line in lines if line.startswith(('[', 'enabled')))
+            raw = ' '.join(line for line in lines if line.startswith(('[', 'enabled')))
 
         match = RE_JAILS.findall(raw)
         # Result: [('ssh', 'true'), ('dropbear', 'true'), ('pam-generic', 'true'), ...]
 
         if not match:
-            self.debug("{0} parse failed".format(file_path))
+            self.debug('{0} parse failed'.format(file_path))
             return list()
 
         return match
@@ -176,12 +173,12 @@ class Service(LogService):
         """
         jails_files, all_jails, active_jails = list(), list(), list()
 
-        jails_files.append("{0}.conf".format(self.conf_path.rsplit(".")[0]))
-        jails_files.extend(self.get_files_from_dir(self.conf_dir, "conf"))
-        jails_files.append("{0}.local".format(self.conf_path.rsplit(".")[0]))
-        jails_files.extend(self.get_files_from_dir(self.conf_dir, "local"))
+        jails_files.append('{0}.conf'.format(self.conf_path.rsplit('.')[0]))
+        jails_files.extend(self.get_files_from_dir(self.conf_dir, 'conf'))
+        jails_files.append('{0}.local'.format(self.conf_path.rsplit('.')[0]))
+        jails_files.extend(self.get_files_from_dir(self.conf_dir, 'local'))
 
-        self.debug("config files to parse: {0}".format(jails_files))
+        self.debug('config files to parse: {0}'.format(jails_files))
 
         for f in jails_files:
             all_jails.extend(self.get_jails_from_file(f))
@@ -192,9 +189,9 @@ class Service(LogService):
             if name in exclude:
                 continue
 
-            if status == "true" and name not in active_jails:
+            if status == 'true' and name not in active_jails:
                 active_jails.append(name)
-            elif status == "false" and name in active_jails:
+            elif status == 'false' and name in active_jails:
                 active_jails.remove(name)
 
         return active_jails or DEFAULT_JAILS
