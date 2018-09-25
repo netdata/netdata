@@ -1434,8 +1434,31 @@ failed:
 }
 
 char *strdupz_path_subpath(const char *path, const char *subpath) {
+    if(unlikely(!path || !*path)) path = ".";
+    if(unlikely(!subpath)) subpath = "";
+
+    // skip trailing slashes in path
+    size_t len = strlen(path);
+    while(len > 0 && path[len - 1] == '/') len--;
+
+    // skip leading slashes in subpath
+    while(subpath && subpath[0] == '/') subpath++;
+
+    // if the last character in path is / and (there is a subpath or path is now empty)
+    // keep the trailing slash in path and remove the additional slash
+    char *slash = "/";
+    if(path[len] == '/' && (*subpath || len == 0)) {
+        slash = "";
+        len++;
+    }
+    else if(!*subpath) {
+        // there is no subpath
+        // no need for trailing slash
+        slash = "";
+    }
+
     char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/%s", path, (subpath)?subpath:"");
+    snprintfz(buffer, FILENAME_MAX, "%.*s%s%s", (int)len, path, slash, (subpath)?subpath:"");
     return strdupz(buffer);
 }
 
