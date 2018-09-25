@@ -26,6 +26,7 @@ if [ -z "${covbuild}" ]; then
         	tar -x -C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
 	        sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
         	export PATH=${PATH}:/opt/coverity/bin/
+                covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
         else
 		echo "Save command the full filename of cov-build in .coverity-build"
 		exit 1
