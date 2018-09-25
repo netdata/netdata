@@ -117,13 +117,14 @@ info "started from '$PROGRAM_FILE' with options: $*"
 # netdata exposes a few environment variables for us
 
 [ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="$(dirname "${0}")/../../../../usr/lib/netdata/conf.d"
 
 pluginsd="${NETDATA_PLUGINS_DIR}"
-confd="${NETDATA_CONFIG_DIR}"
+stockconfd="${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}"
+userconfd="${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}"
+olduserconfd="${NETDATA_USER_CONFIG_DIR}"
 chartsd="$pluginsd/../charts.d"
-
-myconfig="$confd/$PROGRAM_NAME.conf"
 
 minimum_update_frequency="${NETDATA_UPDATE_EVERY-1}"
 update_every=${minimum_update_frequency}    # this will be overwritten by the command line
@@ -236,17 +237,27 @@ mysleep="sleep"
 # -----------------------------------------------------------------------------
 # load my configuration
 
-if [ -f "$myconfig" ]
+for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}.conf" "${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf"
+do
+    if [ -f "$myconfig" ]
     then
-    . "$myconfig"
-    [ $? -ne 0 ] && fatal "cannot load $myconfig"
+        . "$myconfig"
+        if [ $? -ne 0 ]
+        then
+            fatal "cannot load $myconfig"
+        else
+            info "configuration file '$myconfig' loaded."
+        fi
+    else
+        info "configuration file '$myconfig' not found."
+    fi
+done
 
-    time_divisor=$((time_divisor))
-    [ $time_divisor -lt 10 ] && time_divisor=10
-    [ $time_divisor -gt 100 ] && time_divisor=100
-else
-    info "configuration file '$myconfig' not found. Using defaults."
-fi
+# make sure time_divisor is right
+time_divisor=$((time_divisor))
+[ $time_divisor -lt 10 ] && time_divisor=10
+[ $time_divisor -gt 100 ] && time_divisor=100
+
 
 # we check for the timeout command, after we load our
 # configuration, so that the user may overwrite the
@@ -412,7 +423,7 @@ all_enabled_charts() {
 
         if [ ! "${enabled}" = "${required}" ]
         then
-            info "is disabled. Add a line with $chart=$required in $myconfig to enable it (or remove the line that disables it)."
+            info "is disabled. Add a line with $chart=$required in '${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf' to enable it (or remove the line that disables it)."
         else
             debug "is enabled for auto-detection."
             local charts="$charts $chart"
@@ -448,18 +459,18 @@ all_enabled_charts() {
         fi
 
         # check its config
-        #if [ -f "$confd/$chart.conf" ]
+        #if [ -f "$userconfd/$chart.conf" ]
         #then
-        #   if [ ! -z "$( cat "$confd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
+        #   if [ ! -z "$( cat "$userconfd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
         #   then
-        #       error "module's $chart config $confd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
+        #       error "module's $chart config $userconfd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
         #       continue
         #   fi
         #fi
 
         #if [ $dryrunner -eq 1 ]
         #   then
-        #   "$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$confd/$chart.conf" >/dev/null
+        #   "$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$userconfd/$chart.conf" >/dev/null
         #   if [ $? -ne 0 ]
         #   then
         #       error "module's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
@@ -489,16 +500,29 @@ do
 
     . "$chartsd/$chart.chart.sh"
 
-    if [ -f "$confd/$PROGRAM_NAME/$chart.conf" ]
+    # first load the stock config
+    if [ -f "$stockconfd/$chart.conf" ]
     then
-        debug "loading module configuration: '$confd/$PROGRAM_NAME/$chart.conf'"
-        . "$confd/$PROGRAM_NAME/$chart.conf"
-    elif [ -f "$confd/$chart.conf" ]
-    then
-        debug "loading module configuration: '$confd/$chart.conf'"
-        . "$confd/$chart.conf"
+        debug "loading module configuration: '$stockconfd/$chart.conf'"
+        . "$stockconfd/$chart.conf"
     else
-        warning "configuration file '$confd/$PROGRAM_NAME/$chart.conf' not found. Using defaults."
+        debug "not found module configuration: '$stockconfd/$chart.conf'"
+    fi
+
+    # then load the user config (it overwrites the stock)
+    if [ -f "$userconfd/$chart.conf" ]
+    then
+        debug "loading module configuration: '$userconfd/$chart.conf'"
+        . "$userconfd/$chart.conf"
+    else
+        debug "not found module configuration: '$userconfd/$chart.conf'"
+
+        if [ -f "$olduserconfd/$chart.conf" ]
+        then
+            # support for very old netdata that had the charts.d module configs in /etc/netdata
+            info "loading module configuration from obsolete location: '$olduserconfd/$chart.conf'"
+            . "$olduserconfd/$chart.conf"
+        fi
     fi
 
     eval "dt=\$$chart$suffix_update_every"
