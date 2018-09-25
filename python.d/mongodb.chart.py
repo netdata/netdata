@@ -32,7 +32,8 @@ REPL_SET_STATES = [
     ('6', 'unknown'),
     ('9', 'rollback'),
     ('10', 'removed'),
-    ('0', 'startup')]
+    ('0', 'startup')
+]
 
 
 def multiply_by_100(value):
@@ -142,12 +143,37 @@ DBSTATS = [
 ]
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['read_operations', 'write_operations', 'active_clients', 'journaling_transactions',
-         'journaling_volume', 'background_flush_average', 'background_flush_last', 'background_flush_rate',
-         'wiredtiger_read', 'wiredtiger_write', 'cursors', 'connections', 'memory', 'page_faults',
-         'queued_requests', 'record_moves', 'wiredtiger_cache', 'wiredtiger_pages_evicted', 'asserts',
-         'locks_collection', 'locks_database', 'locks_global', 'locks_metadata', 'locks_oplog',
-         'dbstats_objects', 'tcmalloc_generic', 'tcmalloc_metrics', 'command_total_rate', 'command_failed_rate']
+ORDER = [
+    'read_operations',
+    'write_operations',
+    'active_clients',
+    'journaling_transactions',
+    'journaling_volume',
+    'background_flush_average',
+    'background_flush_last',
+    'background_flush_rate',
+    'wiredtiger_read',
+    'wiredtiger_write',
+    'cursors',
+    'connections',
+    'memory',
+    'page_faults',
+    'queued_requests',
+    'record_moves',
+    'wiredtiger_cache',
+    'wiredtiger_pages_evicted',
+    'asserts',
+    'locks_collection',
+    'locks_database',
+    'locks_global',
+    'locks_metadata',
+    'locks_oplog',
+    'dbstats_objects',
+    'tcmalloc_generic',
+    'tcmalloc_metrics',
+    'command_total_rate',
+    'command_failed_rate'
+]
 
 CHARTS = {
     'read_operations': {
@@ -156,7 +182,8 @@ CHARTS = {
         'lines': [
             ['query', None, 'incremental'],
             ['getmore', None, 'incremental']
-        ]},
+        ]
+    },
     'write_operations': {
         'options': [None, 'Received write requests', 'requests/s', 'throughput metrics',
                     'mongodb.write_operations', 'line'],
@@ -164,57 +191,66 @@ CHARTS = {
             ['insert', None, 'incremental'],
             ['update', None, 'incremental'],
             ['delete', None, 'incremental']
-        ]},
+        ]
+    },
     'active_clients': {
         'options': [None, 'Clients with read or write operations in progress or queued', 'clients',
                     'throughput metrics', 'mongodb.active_clients', 'line'],
         'lines': [
             ['activeClients_readers', 'readers', 'absolute'],
             ['activeClients_writers', 'writers', 'absolute']
-        ]},
+        ]
+    },
     'journaling_transactions': {
         'options': [None, 'Transactions that have been written to the journal', 'commits',
                     'database performance', 'mongodb.journaling_transactions', 'line'],
         'lines': [
             ['commits', None, 'absolute']
-        ]},
+        ]
+    },
     'journaling_volume': {
         'options': [None, 'Volume of data written to the journal', 'MB', 'database performance',
                     'mongodb.journaling_volume', 'line'],
         'lines': [
             ['journaledMB', 'volume', 'absolute', 1, 100]
-        ]},
+        ]
+    },
     'background_flush_average': {
         'options': [None, 'Average time taken by flushes to execute', 'ms', 'database performance',
                     'mongodb.background_flush_average', 'line'],
         'lines': [
             ['average_ms', 'time', 'absolute', 1, 100]
-        ]},
+        ]
+    },
     'background_flush_last': {
         'options': [None, 'Time taken by the last flush operation to execute', 'ms', 'database performance',
                     'mongodb.background_flush_last', 'line'],
         'lines': [
             ['last_ms', 'time', 'absolute', 1, 100]
-        ]},
+        ]
+    },
     'background_flush_rate': {
         'options': [None, 'Flushes rate', 'flushes', 'database performance', 'mongodb.background_flush_rate', 'line'],
         'lines': [
             ['flushes', 'flushes', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'wiredtiger_read': {
         'options': [None, 'Read tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_read', 'stacked'],
         'lines': [
             ['wiredTigerRead_available', 'available', 'absolute', 1, 1],
             ['wiredTigerRead_out', 'inuse', 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'wiredtiger_write': {
         'options': [None, 'Write tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_write', 'stacked'],
         'lines': [
             ['wiredTigerWrite_available', 'available', 'absolute', 1, 1],
             ['wiredTigerWrite_out', 'inuse', 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'cursors': {
         'options': [None, 'Currently openned cursors, cursors with timeout disabled and timed out cursors',
                     'cursors', 'database performance', 'mongodb.cursors', 'stacked'],
@@ -222,14 +258,16 @@ CHARTS = {
             ['cursor_total', 'openned', 'absolute', 1, 1],
             ['noTimeout', None, 'absolute', 1, 1],
             ['timedOut', None, 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'connections': {
         'options': [None, 'Currently connected clients and unused connections', 'connections',
                     'resource utilization', 'mongodb.connections', 'stacked'],
         'lines': [
             ['connections_available', 'unused', 'absolute', 1, 1],
             ['connections_current', 'connected', 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'memory': {
         'options': [None, 'Memory metrics', 'MB', 'resource utilization', 'mongodb.memory', 'stacked'],
         'lines': [
@@ -237,26 +275,30 @@ CHARTS = {
             ['resident', None, 'absolute', 1, 1],
             ['nonmapped', None, 'absolute', 1, 1],
             ['mapped', None, 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'page_faults': {
         'options': [None, 'Number of times MongoDB had to fetch data from disk', 'request/s',
                     'resource utilization', 'mongodb.page_faults', 'line'],
         'lines': [
             ['page_faults', None, 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'queued_requests': {
         'options': [None, 'Currently queued read and write requests', 'requests', 'resource saturation',
                     'mongodb.queued_requests', 'line'],
         'lines': [
             ['currentQueue_readers', 'readers', 'absolute', 1, 1],
             ['currentQueue_writers', 'writers', 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'record_moves': {
         'options': [None, 'Number of times documents had to be moved on-disk', 'number',
                     'resource saturation', 'mongodb.record_moves', 'line'],
         'lines': [
             ['moves', None, 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'asserts': {
         'options': [
             None,
@@ -267,32 +309,36 @@ CHARTS = {
             ['warning', None, 'incremental', 1, 1],
             ['regular', None, 'incremental', 1, 1],
             ['user', None, 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'wiredtiger_cache': {
         'options': [None, 'The percentage of the wiredTiger cache that is in use and cache with dirty bytes',
                     'percent', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
             ['wiredTiger_percent_clean', 'inuse', 'absolute', 1, 1000],
             ['wiredTiger_percent_dirty', 'dirty', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'wiredtiger_pages_evicted': {
         'options': [None, 'Pages evicted from the cache',
                     'pages', 'resource utilization', 'mongodb.wiredtiger_pages_evicted', 'stacked'],
         'lines': [
             ['unmodified', None, 'absolute', 1, 1],
             ['modified', None, 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'dbstats_objects': {
         'options': [None, 'Number of documents in the database among all the collections', 'documents',
                     'storage size metrics', 'mongodb.dbstats_objects', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'tcmalloc_generic': {
         'options': [None, 'Tcmalloc generic metrics', 'MB', 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
         'lines': [
             ['current_allocated_bytes', 'allocated', 'absolute', 1, 1048576],
             ['heap_size', 'heap_size', 'absolute', 1, 1048576]
-        ]},
+        ]
+    },
     'tcmalloc_metrics': {
         'options': [None, 'Tcmalloc metrics', 'KB', 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
         'lines': [
@@ -302,7 +348,8 @@ CHARTS = {
             ['pageheap_unmapped_bytes', 'pageheap_unmapped', 'absolute', 1, 1024],
             ['thread_cache_free_bytes', 'thread_cache_free', 'absolute', 1, 1024],
             ['transfer_cache_free_bytes', 'transfer_cache_free', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'command_total_rate': {
         'options': [None, 'Commands total rate', 'commands/s', 'commands', 'mongodb.command_total_rate', 'stacked'],
         'lines': [
@@ -313,7 +360,8 @@ CHARTS = {
             ['findAndModify_total', 'findAndModify', 'incremental', 1, 1],
             ['insert_total', 'insert', 'incremental', 1, 1],
             ['update_total', 'update', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'command_failed_rate': {
         'options': [None, 'Commands failed rate', 'commands/s', 'commands', 'mongodb.command_failed_rate', 'stacked'],
         'lines': [
@@ -324,7 +372,8 @@ CHARTS = {
             ['findAndModify_failed', 'findAndModify', 'incremental', 1, 1],
             ['insert_failed', 'insert', 'incremental', 1, 1],
             ['update_failed', 'update', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'locks_collection': {
         'options': [None, 'Collection lock. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_collection', 'stacked'],
@@ -333,7 +382,8 @@ CHARTS = {
             ['Collection_W', 'exclusive', 'incremental'],
             ['Collection_r', 'intent_shared', 'incremental'],
             ['Collection_w', 'intent_exclusive', 'incremental']
-        ]},
+        ]
+    },
     'locks_database': {
         'options': [None, 'Database lock. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_database', 'stacked'],
@@ -342,7 +392,8 @@ CHARTS = {
             ['Database_W', 'exclusive', 'incremental'],
             ['Database_r', 'intent_shared', 'incremental'],
             ['Database_w', 'intent_exclusive', 'incremental']
-        ]},
+        ]
+    },
     'locks_global': {
         'options': [None, 'Global lock. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_global', 'stacked'],
@@ -351,21 +402,24 @@ CHARTS = {
             ['Global_W', 'exclusive', 'incremental'],
             ['Global_r', 'intent_shared', 'incremental'],
             ['Global_w', 'intent_exclusive', 'incremental']
-        ]},
+        ]
+    },
     'locks_metadata': {
         'options': [None, 'Metadata lock. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_metadata', 'stacked'],
         'lines': [
             ['Metadata_R', 'shared', 'incremental'],
             ['Metadata_w', 'intent_exclusive', 'incremental']
-        ]},
+        ]
+    },
     'locks_oplog': {
         'options': [None, 'Lock on the oplog. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_oplog', 'stacked'],
         'lines': [
             ['oplog_r', 'intent_shared', 'incremental'],
             ['oplog_w', 'intent_exclusive', 'incremental']
-        ]}
+        ]
+    }
 }
 
 
@@ -565,9 +619,9 @@ class Service(SimpleService):
         raw_data['getReplicationInfo'] = dict()
         try:
             raw_data['getReplicationInfo']['ASCENDING'] = self.connection.local.oplog.rs.find().sort(
-                "$natural", ASCENDING).limit(1)[0]
+                '$natural', ASCENDING).limit(1)[0]
             raw_data['getReplicationInfo']['DESCENDING'] = self.connection.local.oplog.rs.find().sort(
-                "$natural", DESCENDING).limit(1)[0]
+                '$natural', DESCENDING).limit(1)[0]
             return raw_data
         except PyMongoError:
             return None
