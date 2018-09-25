@@ -23,7 +23,7 @@ if [ -z "${covbuild}" ]; then
 		echo "Installing coverity..."
 		mkdir /tmp/coverity
         	curl -SL --data "token=${token}&project=netdata%2Fnetdata" https://scan.coverity.com/download/linux64 > /tmp/coverity_tool.tar.gz
-        	tar -x-C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
+        	tar -x -C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
 	        sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
         	export PATH=${PATH}:/opt/coverity/bin/
         else
