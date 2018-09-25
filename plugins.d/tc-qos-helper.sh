@@ -107,10 +107,10 @@ fi
 # -----------------------------------------------------------------------------
 
 [ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="$(dirname "${0}")/../../../../var/lib/netdata/conf.d"
 
 plugins_dir="${NETDATA_PLUGINS_DIR}"
-config_dir="${NETDATA_CONFIG_DIR}"
 tc="$(which tc 2>/dev/null || command -v tc 2>/dev/null)"
 
 
@@ -139,9 +139,20 @@ update_every=$((t))
 # -----------------------------------------------------------------------------
 # allow the user to override our defaults
 
-if [ -f "${config_dir}/tc-qos-helper.conf" ]
+if [ -f "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" ]
     then
-    source "${config_dir}/tc-qos-helper.conf"
+    info "Loading '${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf'"
+    source "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf"
+else
+    warning "File '${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf' not found."
+fi
+
+if [ -f "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf" ]
+    then
+    info "Loading '${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf'"
+    source "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"
+else
+    warning "File '${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf' not found."
 fi
 
 case "${tc_show}" in
