@@ -8,7 +8,7 @@ unsigned int default_health_enabled = 1;
 // ----------------------------------------------------------------------------
 // health initialization
 
-inline char *health_config_dir(void) {
+inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
@@ -36,7 +36,7 @@ void health_reload_host(RRDHOST *host) {
     if(unlikely(!host->health_enabled))
         return;
 
-    char *path = health_config_dir();
+    char *path = health_user_config_dir();
     char *stock_path = health_stock_config_dir();
 
     // free all running alarms
