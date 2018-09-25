@@ -599,6 +599,7 @@ void set_global_environment() {
 
     setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
     setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
+    setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
     setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_plugins_dir),      1);
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
