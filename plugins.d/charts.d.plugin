@@ -232,7 +232,8 @@ mysleep="sleep"
 # if found and included, this file overwrites loopsleepms()
 # and current_time_ms() with a high resolution timer function
 # for precise looping.
-. "$pluginsd/loopsleepms.sh.inc"
+source "$pluginsd/loopsleepms.sh.inc"
+[ $? -ne 0 ] && error "Failed to load '$pluginsd/loopsleepms.sh.inc'."
 
 # -----------------------------------------------------------------------------
 # load my configuration
@@ -241,15 +242,15 @@ for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}.conf" "${NETDATA_US
 do
     if [ -f "$myconfig" ]
     then
-        . "$myconfig"
+        source "$myconfig"
         if [ $? -ne 0 ]
         then
-            fatal "cannot load $myconfig"
+            error "Config file '$myconfig' loaded with errors."
         else
-            info "configuration file '$myconfig' loaded."
+            info "Configuration file '$myconfig' loaded."
         fi
     else
-        info "configuration file '$myconfig' not found."
+        warning "Configuration file '$myconfig' not found."
     fi
 done
 
@@ -498,13 +499,15 @@ do
 
     debug "loading module: '$chartsd/$chart.chart.sh'"
 
-    . "$chartsd/$chart.chart.sh"
+    source "$chartsd/$chart.chart.sh"
+    [ $? -ne 0 ] && warning "Module '$chartsd/$chart.chart.sh' loaded with errors."
 
     # first load the stock config
     if [ -f "$stockconfd/$chart.conf" ]
     then
         debug "loading module configuration: '$stockconfd/$chart.conf'"
-        . "$stockconfd/$chart.conf"
+        source "$stockconfd/$chart.conf"
+        [ $? -ne 0 ] && warning "Config file '$stockconfd/$chart.conf' loaded with errors."
     else
         debug "not found module configuration: '$stockconfd/$chart.conf'"
     fi
@@ -513,7 +516,8 @@ do
     if [ -f "$userconfd/$chart.conf" ]
     then
         debug "loading module configuration: '$userconfd/$chart.conf'"
-        . "$userconfd/$chart.conf"
+        source "$userconfd/$chart.conf"
+        [ $? -ne 0 ] && warning "Config file '$userconfd/$chart.conf' loaded with errors."
     else
         debug "not found module configuration: '$userconfd/$chart.conf'"
 
@@ -521,7 +525,8 @@ do
         then
             # support for very old netdata that had the charts.d module configs in /etc/netdata
             info "loading module configuration from obsolete location: '$olduserconfd/$chart.conf'"
-            . "$olduserconfd/$chart.conf"
+            source "$olduserconfd/$chart.conf"
+            [ $? -ne 0 ] && warning "Config file '$olduserconfd/$chart.conf' loaded with errors."
         fi
     fi
 
