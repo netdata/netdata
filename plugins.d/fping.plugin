@@ -154,23 +154,19 @@ ping_every="$((update_every * 1000 / 5))"
 fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 
 # -----------------------------------------------------------------------------
-# load the configuration file
+# load the configuration files
 
-if [ -f "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" ]
-then
-    info "Loading '${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf'"
-    source "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf"
-else
-    warning "File '${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf' not found."
-fi
-
-if [ -f "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf" ]
-then
-    info "Loading '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
-    source "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
-else
-    warning "File '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf' not found. You can copy '${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf' and modify it to your needs."
-fi
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        info "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
 
 if [ -z "${hosts}" ]
 then
