@@ -1432,3 +1432,81 @@ failed:
     netdata_configured_host_prefix = "";
     return -1;
 }
+
+char *strdupz_path_subpath(const char *path, const char *subpath) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%s/%s", path, (subpath)?subpath:"");
+    return strdupz(buffer);
+}
+
+int path_is_dir(const char *path, const char *subpath) {
+    char *s = strdupz_path_subpath(path, subpath);
+
+    size_t max_links = 100;
+
+    int is_dir = 0;
+    struct stat statbuf;
+    while(max_links-- && stat(s, &statbuf) == 0) {
+        if((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+            is_dir = 1;
+            break;
+        }
+        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+            char buffer[FILENAME_MAX + 1];
+            ssize_t l = readlink(s, buffer, FILENAME_MAX);
+            if(l > 0) {
+                buffer[l] = '\0';
+                freez(s);
+                s = strdupz(buffer);
+                continue;
+            }
+            else {
+                is_dir = 0;
+                break;
+            }
+        }
+        else {
+            is_dir = 0;
+            break;
+        }
+    }
+
+    freez(s);
+    return is_dir;
+}
+
+int path_is_file(const char *path, const char *subpath) {
+    char *s = strdupz_path_subpath(path, subpath);
+
+    size_t max_links = 100;
+
+    int is_file = 0;
+    struct stat statbuf;
+    while(max_links-- && stat(s, &statbuf) == 0) {
+        if((statbuf.st_mode & S_IFMT) == S_IFREG) {
+            is_file = 1;
+            break;
+        }
+        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+            char buffer[FILENAME_MAX + 1];
+            ssize_t l = readlink(s, buffer, FILENAME_MAX);
+            if(l > 0) {
+                buffer[l] = '\0';
+                freez(s);
+                s = strdupz(buffer);
+                continue;
+            }
+            else {
+                is_file = 0;
+                break;
+            }
+        }
+        else {
+            is_file = 0;
+            break;
+        }
+    }
+
+    freez(s);
+    return is_file;
+}

@@ -852,51 +852,87 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
     return 1;
 }
 
-void health_readdir(RRDHOST *host, const char *path) {
-    if(!host->health_enabled) return;
+void health_readdir(RRDHOST *host, const char *path, const char *stock_path, char *subpath) {
+    if(unlikely(!host->health_enabled)) return;
 
-    size_t pathlen = strlen(path);
+    char *udir = strdupz_path_subpath(path, subpath);
+    char *sdir = strdupz_path_subpath(stock_path, subpath);
 
-    debug(D_HEALTH, "Health configuration reading directory '%s'", path);
+    debug(D_HEALTH, "Health configuration traversing user config directory '%s', stock config directory '%s'", udir, sdir);
 
-    DIR *dir = opendir(path);
+    DIR *dir = opendir(udir);
     if (!dir) {
-        error("Health configuration cannot open directory '%s'.", path);
-        return;
+        error("Health configuration cannot open user config directory '%s'.", udir);
     }
-
-    struct dirent *de = NULL;
-    while ((de = readdir(dir))) {
-        size_t len = strlen(de->d_name);
-
-        if(de->d_type == DT_DIR
-           && (
-                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
+    else {
+        struct dirent *de = NULL;
+        while((de = readdir(dir))) {
+            if(de->d_type == DT_DIR
+               && (   (de->d_name[0] == '.' && de->d_name[1] == '\0')
                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           )) {
-            debug(D_HEALTH, "Ignoring directory '%s'", de->d_name);
-            continue;
+               )) {
+                debug(D_HEALTH, "Health ignoring user config directory '%s/%s'", udir, de->d_name);
+                continue;
+            }
+
+            if(path_is_dir(udir, de->d_name)) {
+                health_readdir(host, udir, sdir, de->d_name);
+                continue;
+            }
+
+            size_t len = strlen(de->d_name);
+            if(path_is_file(udir, de->d_name) &&
+               len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                health_readfile(host, udir, de->d_name);
+            }
+
+            else
+                debug(D_HEALTH, "Health ignoring user config file '%s/%s'", udir, de->d_name);
         }
 
-        else if(de->d_type == DT_DIR) {
-            char *s = mallocz(pathlen + strlen(de->d_name) + 2);
-            strcpy(s, path);
-            strcat(s, "/");
-            strcat(s, de->d_name);
-            health_readdir(host, s);
-            freez(s);
-            continue;
-        }
-
-        else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
-                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-            health_readfile(host, path, de->d_name);
-        }
-
-        else debug(D_HEALTH, "Ignoring file '%s'", de->d_name);
+        closedir(dir);
     }
 
-    closedir(dir);
+    debug(D_HEALTH, "Health configuration traversing stock config directory '%s', user config directory '%s'", sdir, udir);
+
+    dir = opendir(sdir);
+    if (!dir) {
+        error("Health configuration cannot open stock config directory '%s'.", sdir);
+    }
+    else {
+        struct dirent *de = NULL;
+        while((de = readdir(dir))) {
+            if(de->d_type == DT_DIR
+               && (      (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                      || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+               )) {
+                debug(D_HEALTH, "Health ignoring stock config directory '%s/%s'", sdir, de->d_name);
+                continue;
+            }
+
+            if(path_is_dir(sdir, de->d_name)) {
+                // we recurse in stock subdirectory, only when there is no corresponding
+                // user subdirectory - to avoid reading the files twice
+
+                if(!path_is_dir(udir, de->d_name))
+                    health_readdir(host, udir, sdir, de->d_name);
+
+                continue;
+            }
+
+            size_t len = strlen(de->d_name);
+            if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
+               len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                health_readfile(host, sdir, de->d_name);
+            }
+
+            else
+                debug(D_HEALTH, "Health ignoring stock config file '%s/%s'", sdir, de->d_name);
+        }
+
+        closedir(dir);
+    }
+
+    freez(udir);
+    freez(sdir);
 }
-
-

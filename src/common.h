@@ -411,6 +411,10 @@ extern const char *os_type;
 
 extern const char *program_version;
 
+extern char *strdupz_path_subpath(const char *path, const char *subpath);
+extern int path_is_dir(const char *path, const char *subpath);
+extern int path_is_file(const char *path, const char *subpath);
+
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
 #ifdef RUSAGE_CHILDREN
