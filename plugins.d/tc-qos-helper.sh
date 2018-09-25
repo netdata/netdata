@@ -139,21 +139,17 @@ update_every=$((t))
 # -----------------------------------------------------------------------------
 # allow the user to override our defaults
 
-if [ -f "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" ]
-    then
-    info "Loading '${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf'"
-    source "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf"
-else
-    warning "File '${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf' not found."
-fi
-
-if [ -f "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf" ]
-    then
-    info "Loading '${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf'"
-    source "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"
-else
-    warning "File '${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf' not found."
-fi
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        info "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
 
 case "${tc_show}" in
     qdisc|class)
