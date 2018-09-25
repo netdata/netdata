@@ -460,13 +460,13 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       CONFIG_DIR);
-    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", LIBCONFIG_DIR);
-    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          LOG_DIR);
-    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    WEB_DIR);
-    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        CACHE_DIR);
-    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          VARLIB_DIR);
-    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         CACHE_DIR);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       netdata_configured_user_config_dir);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", netdata_configured_stock_config_dir);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          netdata_configured_log_dir);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
 
     {
         char plugins_dirs[(FILENAME_MAX * 2) + 1];
