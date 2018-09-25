@@ -14,66 +14,70 @@ retries = 10
 ORDER = ['system', 'offsets', 'stratum', 'root', 'frequency', 'residualfreq', 'skew']
 
 CHARTS = {
-    # id: {
-    #     'options': [name, title, units, family, context, charttype],
-    #     'lines': [
-    #         [unique_dimension_name, name, algorithm, multiplier, divisor]
-    #     ]}
     'system': {
-        'options': [None, "Chrony System Time Deltas", "microseconds", 'system', 'chrony.system', 'area'],
+        'options': [None, 'Chrony System Time Deltas', 'microseconds', 'system', 'chrony.system', 'area'],
         'lines': [
-            ['timediff',   'system time', 'absolute', 1, 1000]
-        ]},
+            ['timediff', 'system time', 'absolute', 1, 1000]
+        ]
+    },
     'offsets': {
-        'options': [None, "Chrony System Time Offsets", "microseconds", 'system', 'chrony.offsets', 'area'],
+        'options': [None, 'Chrony System Time Offsets', 'microseconds', 'system', 'chrony.offsets', 'area'],
         'lines': [
             ['lastoffset', 'last offset', 'absolute', 1, 1000],
-            ['rmsoffset',  'RMS offset',  'absolute', 1, 1000]
-        ]},
+            ['rmsoffset', 'RMS offset', 'absolute', 1, 1000]
+        ]
+    },
     'stratum': {
-        'options': [None, "Chrony Stratum", "stratum", 'root', 'chrony.stratum', 'line'],
+        'options': [None, 'Chrony Stratum', 'stratum', 'root', 'chrony.stratum', 'line'],
         'lines': [
             ['stratum', None, 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'root': {
-        'options': [None, "Chrony Root Delays", "milliseconds", 'root', 'chrony.root', 'line'],
+        'options': [None, 'Chrony Root Delays', 'milliseconds', 'root', 'chrony.root', 'line'],
         'lines': [
-            ['rootdelay',      'delay',      'absolute', 1, 1000000],
+            ['rootdelay', 'delay', 'absolute', 1, 1000000],
             ['rootdispersion', 'dispersion', 'absolute', 1, 1000000]
-        ]},
+        ]
+    },
     'frequency': {
-        'options': [None, "Chrony Frequency", "ppm", 'frequencies', 'chrony.frequency', 'area'],
+        'options': [None, 'Chrony Frequency', 'ppm', 'frequencies', 'chrony.frequency', 'area'],
         'lines': [
             ['frequency', None, 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'residualfreq': {
-        'options': [None, "Chrony Residual frequency", "ppm", 'frequencies', 'chrony.residualfreq', 'area'],
+        'options': [None, 'Chrony Residual frequency', 'ppm', 'frequencies', 'chrony.residualfreq', 'area'],
         'lines': [
             ['residualfreq', 'residual frequency', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'skew': {
-        'options': [None, "Chrony Skew, error bound on frequency", "ppm", 'frequencies', 'chrony.skew', 'area'],
+        'options': [None, 'Chrony Skew, error bound on frequency', 'ppm', 'frequencies', 'chrony.skew', 'area'],
         'lines': [
             ['skew', None, 'absolute', 1, 1000]
-        ]}
+        ]
+    }
 }
 
-CHRONY = [('Frequency', 'frequency', 1e3),
-          ('Last offset', 'lastoffset', 1e9),
-          ('RMS offset', 'rmsoffset', 1e9),
-          ('Residual freq', 'residualfreq', 1e3),
-          ('Root delay', 'rootdelay', 1e9),
-          ('Root dispersion', 'rootdispersion', 1e9),
-          ('Skew', 'skew', 1e3),
-          ('Stratum', 'stratum', 1),
-          ('System time', 'timediff', 1e9)]
+CHRONY = [
+    ('Frequency', 'frequency', 1e3),
+    ('Last offset', 'lastoffset', 1e9),
+    ('RMS offset', 'rmsoffset', 1e9),
+    ('Residual freq', 'residualfreq', 1e3),
+    ('Root delay', 'rootdelay', 1e9),
+    ('Root dispersion', 'rootdispersion', 1e9),
+    ('Skew', 'skew', 1e3),
+    ('Stratum', 'stratum', 1),
+    ('System time', 'timediff', 1e9)
+]
 
 
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(
             self, configuration=configuration, name=name)
-        self.command = "chronyc -n tracking"
+        self.command = 'chronyc -n tracking'
         self.order = ORDER
         self.definitions = CHARTS
 
