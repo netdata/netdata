@@ -941,9 +941,13 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // load stream.conf
         {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s/stream.conf", netdata_configured_user_config_dir);
-            appconfig_load(&stream_config, filename, 0);
+            char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
+            if(!appconfig_load(&stream_config, filename, 0)) {
+                freez(filename);
+                filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
+                appconfig_load(&stream_config, filename, 0);
+            }
+            freez(filename);
         }
 
 
