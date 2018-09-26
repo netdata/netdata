@@ -115,7 +115,7 @@ def tube_chart_template(name):
              '{0}_connections'.format(name),
              '{0}_commands'.format(name),
              '{0}_pause'.format(name)
-             ]
+    ]
     family = 'tube {0}'.format(name)
 
     charts = {
@@ -123,7 +123,8 @@ def tube_chart_template(name):
             'options': [None, 'Job Rate', 'jobs/s', family, 'beanstalk.jobs_rate', 'area'],
             'lines': [
                 ['_'.join([name, 'total-jobs']), 'jobs', 'incremental']
-            ]},
+            ]
+        },
         order[1]: {
             'options': [None, 'Jobs', 'jobs', family, 'beanstalk.jobs', 'stacked'],
             'lines': [
@@ -132,27 +133,30 @@ def tube_chart_template(name):
                 ['_'.join([name, 'current-jobs-reserved']), 'reserved'],
                 ['_'.join([name, 'current-jobs-delayed']), 'delayed'],
                 ['_'.join([name, 'current-jobs-buried']), 'buried']
-            ]},
+            ]
+        },
         order[2]: {
             'options': [None, 'Connections', 'connections', family, 'beanstalk.connections', 'stacked'],
             'lines': [
                 ['_'.join([name, 'current-using']), 'using'],
                 ['_'.join([name, 'current-waiting']), 'waiting'],
                 ['_'.join([name, 'current-watching']), 'watching']
-            ]},
+            ]
+        },
         order[3]: {
             'options': [None, 'Commands', 'commands/s', family, 'beanstalk.commands', 'stacked'],
             'lines': [
                 ['_'.join([name, 'cmd-delete']), 'deletes', 'incremental'],
                 ['_'.join([name, 'cmd-pause-tube']), 'pauses', 'incremental']
-            ]},
+            ]
+        },
         order[4]: {
             'options': [None, 'Pause', 'seconds', family, 'beanstalk.pause', 'stacked'],
             'lines': [
                 ['_'.join([name, 'pause']), 'since'],
                 ['_'.join([name, 'pause-time-left']), 'left']
-            ]}
-
+            ]
+        }
     }
 
     return order, charts
