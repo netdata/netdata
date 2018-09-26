@@ -306,7 +306,7 @@ static void nfstat_send_metrics() {
                     , "connections/s"
                     , "nfacct"
                     , NULL
-                    , 3001
+                    , NETDATA_CHART_PRIO_NETFILTER + 1
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -342,7 +342,7 @@ static void nfstat_send_metrics() {
                     , "changes/s"
                     , "nfacct"
                     , NULL
-                    , 3002
+                    , NETDATA_CHART_PRIO_NETFILTER + 2
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -379,7 +379,7 @@ static void nfstat_send_metrics() {
                     , "searches/s"
                     , "nfacct"
                     , NULL
-                    , 3010
+                    , NETDATA_CHART_PRIO_NETFILTER + 10
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -416,7 +416,7 @@ static void nfstat_send_metrics() {
                     , "events/s"
                     , "nfacct"
                     , NULL
-                    , 3005
+                    , NETDATA_CHART_PRIO_NETFILTER + 5
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -455,7 +455,7 @@ static void nfstat_send_metrics() {
                     , "expectations/s"
                     , "nfacct"
                     , NULL
-                    , 3003
+                    , NETDATA_CHART_PRIO_NETFILTER + 3
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -675,7 +675,7 @@ static void nfacct_send_metrics() {
                 , "packets/s"
                 , "nfacct"
                 , NULL
-                , 3206
+                , NETDATA_CHART_PRIO_NETFILTER + 206
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -718,7 +718,7 @@ static void nfacct_send_metrics() {
                 , "kilobytes/s"
                 , "nfacct"
                 , NULL
-                , 3207
+                , NETDATA_CHART_PRIO_NETFILTER + 207
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );

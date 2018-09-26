@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-#define RRD_TYPE_NET_SNMP           "ipv4"
+#define RRD_TYPE_NET_SNMP "ipv4"
 
 static struct proc_net_snmp {
     // kernel_uint_t ip_Forwarding;
@@ -726,7 +726,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , NETDATA_CHART_PRIO_IPV4_TCP + 10
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 4
                             , update_every
                             , RRDSET_TYPE_LINE
                     );

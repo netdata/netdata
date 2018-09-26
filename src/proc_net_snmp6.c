@@ -293,7 +293,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "kilobits/s"
                     , "proc"
                     , "net/snmp6"
-                    , 502
+                    , NETDATA_CHART_PRIO_SYSTEM_IPV6
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -329,7 +329,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3000
+                    , NETDATA_CHART_PRIO_IPV6_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -368,7 +368,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3011
+                    , NETDATA_CHART_PRIO_IPV6_FRAGMENTS + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -414,7 +414,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3012
+                    , NETDATA_CHART_PRIO_IPV6_FRAGMENTS + 2
                     , update_every
                     , RRDSET_TYPE_LINE);
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -469,7 +469,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3002
+                    , NETDATA_CHART_PRIO_IPV6_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -518,7 +518,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3601
+                    , NETDATA_CHART_PRIO_IPV6_UDP + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -564,7 +564,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "events/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3701
+                    , NETDATA_CHART_PRIO_IPV6_UDP_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -607,7 +607,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3602
+                    , NETDATA_CHART_PRIO_IPV6_UDPLITE + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -652,7 +652,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "events/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3701
+                    , NETDATA_CHART_PRIO_IPV6_UDPLITE_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -693,7 +693,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "kilobits/s"
                     , "proc"
                     , "net/snmp6"
-                    , 9000
+                    , NETDATA_CHART_PRIO_IPV6_MCAST
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -728,7 +728,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "kilobits/s"
                     , "proc"
                     , "net/snmp6"
-                    , 8000
+                    , NETDATA_CHART_PRIO_IPV6_BCAST
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -763,7 +763,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 9500
+                    , NETDATA_CHART_PRIO_IPV6_MCAST + 1
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -798,7 +798,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10000
+                    , NETDATA_CHART_PRIO_IPV6_ICMP
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -832,7 +832,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "redirects/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10050
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 10
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -888,7 +888,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "errors/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10100
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 20
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -948,7 +948,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10200
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 30
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -998,7 +998,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10300
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 40
                     , update_every
                     , RRDSET_TYPE_LINE);
 
@@ -1047,7 +1047,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10400
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 50
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -1093,7 +1093,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10500
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 60
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -1131,7 +1131,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "reports/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10600
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 70
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -1185,7 +1185,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "messages/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10700
+                    , NETDATA_CHART_PRIO_IPV6_ICMP + 80
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -1243,7 +1243,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 10800
+                    , NETDATA_CHART_PRIO_IPV6_PACKETS + 10
                     , update_every
                     , RRDSET_TYPE_LINE
             );
