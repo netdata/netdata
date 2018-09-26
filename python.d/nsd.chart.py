@@ -17,27 +17,29 @@ ORDER = ['queries', 'zones', 'protocol', 'type', 'transfer', 'rcode']
 
 CHARTS = {
     'queries': {
-        'options': [
-            None, "queries", 'queries/s', 'queries', 'nsd.queries', 'line'],
+        'options': [None, 'queries', 'queries/s', 'queries', 'nsd.queries', 'line'],
         'lines': [
-            ['num_queries', 'queries', 'incremental'],]},
+            ['num_queries', 'queries', 'incremental']
+        ]
+    },
     'zones': {
-        'options': [
-            None, "zones", 'zones', 'zones', 'nsd.zones', 'stacked'],
+        'options': [None, 'zones', 'zones', 'zones', 'nsd.zones', 'stacked'],
         'lines': [
             ['zone_master', 'master', 'absolute'],
-            ['zone_slave', 'slave', 'absolute'],]},
+            ['zone_slave', 'slave', 'absolute']
+        ]
+    },
     'protocol': {
-        'options': [
-            None, "protocol", 'queries/s', 'protocol', 'nsd.protocols', 'stacked'],
+        'options': [None, 'protocol', 'queries/s', 'protocol', 'nsd.protocols', 'stacked'],
         'lines': [
             ['num_udp', 'udp', 'incremental'],
             ['num_udp6', 'udp6', 'incremental'],
             ['num_tcp', 'tcp', 'incremental'],
-            ['num_tcp6', 'tcp6', 'incremental'],]},
+            ['num_tcp6', 'tcp6', 'incremental']
+        ]
+    },
     'type': {
-        'options': [
-            None, "query type", 'queries/s', 'query type', 'nsd.type', 'stacked'],
+        'options': [None, 'query type', 'queries/s', 'query type', 'nsd.type', 'stacked'],
         'lines': [
             ['num_type_A', 'A', 'incremental'],
             ['num_type_NS', 'NS', 'incremental'],
@@ -50,16 +52,18 @@ CHARTS = {
             ['num_type_TXT', 'TXT', 'incremental'],
             ['num_type_AAAA', 'AAAA', 'incremental'],
             ['num_type_SRV', 'SRV', 'incremental'],
-            ['num_type_TYPE255', 'ANY', 'incremental'],]},
+            ['num_type_TYPE255', 'ANY', 'incremental']
+        ]
+    },
     'transfer': {
-        'options': [
-            None, "transfer", 'queries/s', 'transfer', 'nsd.transfer', 'stacked'],
+        'options': [None, 'transfer', 'queries/s', 'transfer', 'nsd.transfer', 'stacked'],
         'lines': [
             ['num_opcode_NOTIFY', 'NOTIFY', 'incremental'],
-            ['num_type_TYPE252', 'AXFR', 'incremental'],]},
+            ['num_type_TYPE252', 'AXFR', 'incremental']
+        ]
+    },
     'rcode': {
-        'options': [
-            None, "return code", 'queries/s', 'return code', 'nsd.rcode', 'stacked'],
+        'options': [None, 'return code', 'queries/s', 'return code', 'nsd.rcode', 'stacked'],
         'lines': [
             ['num_rcode_NOERROR', 'NOERROR', 'incremental'],
             ['num_rcode_FORMERR', 'FORMERR', 'incremental'],
@@ -67,7 +71,9 @@ CHARTS = {
             ['num_rcode_NXDOMAIN', 'NXDOMAIN', 'incremental'],
             ['num_rcode_NOTIMP', 'NOTIMP', 'incremental'],
             ['num_rcode_REFUSED', 'REFUSED', 'incremental'],
-            ['num_rcode_YXDOMAIN', 'YXDOMAIN', 'incremental'],]}
+            ['num_rcode_YXDOMAIN', 'YXDOMAIN', 'incremental']
+        ]
+    }
 }
 
 
@@ -75,7 +81,7 @@ class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(
             self, configuration=configuration, name=name)
-        self.command = "nsd-control stats_noreset"
+        self.command = 'nsd-control stats_noreset'
         self.order = ORDER
         self.definitions = CHARTS
         self.regex = re.compile(r'([A-Za-z0-9.]+)=(\d+)')
