@@ -19,7 +19,8 @@ CHARTS = {
         'options': [None, 'CPU Clock', 'MHz', 'cpufreq', 'cpufreq.cpufreq', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
-        ]}
+        ]
+    }
 }
 
 
@@ -94,7 +95,7 @@ class Service(SimpleService):
             self.assignment[cpu]['accurate'] = path
             self.accurate_last[cpu] = {}
 
-        if len(self.assignment) == 0:
+        if not self.assignment:
             self.accurate_exists = False
 
         for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/scaling_cur_freq'):
@@ -104,7 +105,7 @@ class Service(SimpleService):
                 self.assignment[cpu] = {}
             self.assignment[cpu]['inaccurate'] = path
 
-        if len(self.assignment) == 0:
+        if not self.assignment:
             self.error("couldn't find a method to read cpufreq statistics")
             return False
 
@@ -112,4 +113,3 @@ class Service(SimpleService):
             self.definitions[ORDER[0]]['lines'].append([name, name, 'absolute', 1, 1000])
 
         return True
-
