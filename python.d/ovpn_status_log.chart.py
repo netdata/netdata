@@ -27,6 +27,9 @@ CHARTS = {
     }
 }
 
+TLS_REGEX = r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)')
+STATIC_KEY_REGEX = r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)')
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -35,8 +38,8 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.log_path = self.configuration.get('log_path')
         self.regex = {
-            'tls': r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)'),
-            'static_key': r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)')
+            'tls': TLS_REGEX,
+            'static_key': STATIC_KEY_REGEX
         }
 
     def check(self):
