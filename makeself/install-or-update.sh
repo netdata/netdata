@@ -26,7 +26,7 @@ done
 
 
 # -----------------------------------------------------------------------------
-progress "Checking new configuration files"
+progress "Deleting stock configuration files from user configuration directory"
 
 declare -A configs_signatures=()
 . system/configs.signatures
@@ -37,48 +37,29 @@ if [ ! -d etc/netdata ]
 fi
 
 md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-for x in $(find etc.new -type f)
+for x in $(find etc -type f)
 do
     # find it relative filename
-    f="${x/etc.new\/netdata\//}"
-    t="${x/etc.new\//etc\/}"
-    d=$(dirname "${t}")
+    f="${x/etc\/netdata\//}"
 
-    #echo >&2 "x: ${x}"
-    #echo >&2 "t: ${t}"
-    #echo >&2 "d: ${d}"
-
-    if [ ! -d "${d}" ]
-        then
-        run mkdir -p "${d}"
-    fi
-
-    if [ ! -f "${t}" ]
-        then
-        run cp "${x}" "${t}"
-        continue
-    fi
+    # find the stock filename
+    t="${f/.conf.old/.conf}"
+    t="${f/.conf.orig/.conf}"
 
     if [ ! -z "${md5sum}" ]
         then
         # find the checksum of the existing file
-        md5="$(cat "${t}" | ${md5sum} | cut -d ' ' -f 1)"
+        md5="$( ${md5sum} <"${x}" | cut -d ' ' -f 1)"
         #echo >&2 "md5: ${md5}"
 
         # check if it matches
-        if [ "${configs_signatures[${md5}]}" = "${f}" ]
+        if [ "${configs_signatures[${md5}]}" = "${t}" ]
             then
-            run cp "${x}" "${t}"
+            # it matches the default
+            run rm -f "${x}"
         fi
     fi
-    
-    if ! [[ "${x}" =~ .*\.orig ]]
-        then
-        run mv "${x}" "${t}.orig"
-    fi
 done
-
-run rm -rf etc.new
 
 
 # -----------------------------------------------------------------------------
