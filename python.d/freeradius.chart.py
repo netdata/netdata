@@ -21,7 +21,7 @@ ORDER = ['authentication', 'accounting', 'proxy-auth', 'proxy-acct']
 
 CHARTS = {
     'authentication': {
-        'options': [None, "Authentication", "packets/s", 'Authentication', 'freerad.auth', 'line'],
+        'options': [None, 'Authentication', 'packets/s', 'Authentication', 'freerad.auth', 'line'],
         'lines': [
             ['access-accepts', None, 'incremental'],
             ['access-rejects', None, 'incremental'],
@@ -30,9 +30,10 @@ CHARTS = {
             ['auth-invalid-requests', 'invalid-requests', 'incremental'],
             ['auth-malformed-requests', 'malformed-requests', 'incremental'],
             ['auth-unknown-types', 'unknown-types', 'incremental']
-            ]},
+        ]
+    },
     'accounting': {
-        'options': [None, "Accounting", "packets/s", 'Accounting', 'freerad.acct', 'line'],
+        'options': [None, 'Accounting', 'packets/s', 'Accounting', 'freerad.acct', 'line'],
         'lines': [
             ['accounting-requests', 'requests', 'incremental'],
             ['accounting-responses', 'responses', 'incremental'],
@@ -41,9 +42,10 @@ CHARTS = {
             ['acct-invalid-requests', 'invalid-requests', 'incremental'],
             ['acct-malformed-requests', 'malformed-requests', 'incremental'],
             ['acct-unknown-types', 'unknown-types', 'incremental']
-        ]},
+        ]
+    },
     'proxy-auth': {
-        'options': [None, "Proxy Authentication", "packets/s", 'Authentication', 'freerad.proxy.auth', 'line'],
+        'options': [None, 'Proxy Authentication', 'packets/s', 'Authentication', 'freerad.proxy.auth', 'line'],
         'lines': [
             ['proxy-access-accepts', 'access-accepts', 'incremental'],
             ['proxy-access-rejects', 'access-rejects', 'incremental'],
@@ -52,9 +54,10 @@ CHARTS = {
             ['proxy-auth-invalid-requests', 'invalid-requests', 'incremental'],
             ['proxy-auth-malformed-requests', 'malformed-requests', 'incremental'],
             ['proxy-auth-unknown-types', 'unknown-types', 'incremental']
-        ]},
+        ]
+    },
     'proxy-acct': {
-        'options': [None, "Proxy Accounting", "packets/s", 'Accounting', 'freerad.proxy.acct', 'line'],
+        'options': [None, 'Proxy Accounting', 'packets/s', 'Accounting', 'freerad.proxy.acct', 'line'],
         'lines': [
             ['proxy-accounting-requests', 'requests', 'incremental'],
             ['proxy-accounting-responses', 'responses', 'incremental'],
@@ -63,8 +66,8 @@ CHARTS = {
             ['proxy-acct-invalid-requests', 'invalid-requests', 'incremental'],
             ['proxy-acct-malformed-requests', 'malformed-requests', 'incremental'],
             ['proxy-acct-unknown-types', 'unknown-types', 'incremental']
-        ]}
-
+        ]
+    }
 }
 
 
@@ -106,7 +109,7 @@ class Service(SimpleService):
         """
         result = self._get_raw_data()
         return dict([(elem[0].lower(), int(elem[1])) for elem in findall(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)', result)])
-        
+
     def _get_raw_data(self):
         """
         The following code is equivalent to
