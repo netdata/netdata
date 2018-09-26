@@ -18,22 +18,10 @@ RE_TEMP = re.compile(r' t=(\d+)')
 
 ORDER = ['temp']
 
-# id: {
-#     'options': [name, title, units, family (heading 2), context, charttype],
-#     'lines': [
-#         [unique_dimension_name, name, algorithm, multiplier, divisor]
-#     ]}
 CHARTS = {
     'temp': {
-        'options': [
-            None,
-            '1-Wire Temperature Sensor',
-            'Celsius',
-            'Temperature',
-            'w1sensor.temp',
-            'line'
-        ],
-        # lines are constructed from check
+        'options': [None, '1-Wire Temperature Sensor', 'Celsius', 'Temperature', 'w1sensor.temp', 'line'],
+        'lines': []
     }
 }
 
@@ -46,6 +34,7 @@ THERM_FAMILY = {
     '3b': 'W1_THERM_DS1825',
     '42': 'W1_THERM_DS28EA00',
 }
+
 
 class Service(SimpleService):
     """Provide netdata service for 1-Wire sensors"""
