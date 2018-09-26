@@ -42,6 +42,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <sys/ioctl.h>
+#include <libgen.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
