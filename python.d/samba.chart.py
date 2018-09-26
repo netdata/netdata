@@ -26,67 +26,75 @@ update_every = 5
 priority = 60000
 retries = 60
 
-ORDER = ['syscall_rw','smb2_rw','smb2_create_close','smb2_info','smb2_find','smb2_notify','smb2_sm_count']
+ORDER = [
+    'syscall_rw',
+    'smb2_rw',
+    'smb2_create_close',
+    'smb2_info',
+    'smb2_find',
+    'smb2_notify',
+    'smb2_sm_count'
+]
 
 CHARTS = {
-           'syscall_rw': {
-             'lines': [
-               ['syscall_sendfile_bytes', 'sendfile', 'incremental', 1, 1024],
-               ['syscall_recvfile_bytes', 'recvfile', 'incremental', -1, 1024]
-             ],
-             'options': [None, 'R/Ws', 'kilobytes/s', 'syscall', 'syscall.rw', 'area']
-           },
-           'smb2_rw': {
-             'lines': [
-               ['smb2_read_outbytes', 'readout', 'incremental', 1, 1024],
-               ['smb2_write_inbytes', 'writein', 'incremental', -1, 1024],
-               ['smb2_read_inbytes', 'readin', 'incremental', 1, 1024],
-               ['smb2_write_outbytes', 'writeout', 'incremental', -1, 1024]
-             ],
-             'options': [None, 'R/Ws', 'kilobytes/s', 'smb2', 'smb2.rw', 'area']
-           },
-           'smb2_create_close': {
-             'lines': [
-               ['smb2_create_count', 'create', 'incremental', 1, 1],
-               ['smb2_close_count', 'close', 'incremental', -1, 1]
-             ],
-             'options': [None, 'Create/Close', 'operations/s', 'smb2', 'smb2.create_close', 'line']
-           },
-           'smb2_info': {
-             'lines': [
-               ['smb2_getinfo_count', 'getinfo', 'incremental', 1, 1],
-               ['smb2_setinfo_count', 'setinfo', 'incremental', -1, 1]
-             ],
-             'options': [None, 'Info', 'operations/s', 'smb2', 'smb2.get_set_info', 'line']
-           },
-           'smb2_find': {
-             'lines': [
-               ['smb2_find_count', 'find', 'incremental', 1, 1]
-             ],
-             'options': [None, 'Find', 'operations/s', 'smb2', 'smb2.find', 'line']
-           },
-           'smb2_notify': {
-             'lines': [
-               ['smb2_notify_count', 'notify', 'incremental', 1, 1]
-             ],
-             'options': [None, 'Notify', 'operations/s', 'smb2', 'smb2.notify', 'line']
-           },
-           'smb2_sm_count': {
-             'lines': [
-               ['smb2_tcon_count', 'tcon', 'absolute', 1, 1],
-               ['smb2_negprot_count', 'negprot', 'absolute', 1, 1],
-               ['smb2_tdis_count', 'tdis', 'absolute', 1, 1],
-               ['smb2_cancel_count', 'cancel', 'absolute', 1, 1],
-               ['smb2_logoff_count', 'logoff', 'absolute', 1, 1],
-               ['smb2_flush_count', 'flush', 'absolute', 1, 1],
-               ['smb2_lock_count', 'lock', 'absolute', 1, 1],
-               ['smb2_keepalive_count', 'keepalive', 'absolute', 1, 1],
-               ['smb2_break_count', 'break', 'absolute', 1, 1],
-               ['smb2_sessetup_count', 'sessetup', 'absolute', 1, 1]
-             ],
-             'options': [None, 'Lesser Ops', 'count', 'smb2', 'smb2.sm_counters', 'stacked']
-           }
-         }
+    'syscall_rw': {
+        'options': [None, 'R/Ws', 'kilobytes/s', 'syscall', 'syscall.rw', 'area'],
+        'lines': [
+            ['syscall_sendfile_bytes', 'sendfile', 'incremental', 1, 1024],
+            ['syscall_recvfile_bytes', 'recvfile', 'incremental', -1, 1024]
+        ]
+    },
+    'smb2_rw': {
+        'options': [None, 'R/Ws', 'kilobytes/s', 'smb2', 'smb2.rw', 'area'],
+        'lines': [
+            ['smb2_read_outbytes', 'readout', 'incremental', 1, 1024],
+            ['smb2_write_inbytes', 'writein', 'incremental', -1, 1024],
+            ['smb2_read_inbytes', 'readin', 'incremental', 1, 1024],
+            ['smb2_write_outbytes', 'writeout', 'incremental', -1, 1024]
+        ]
+    },
+    'smb2_create_close': {
+        'options': [None, 'Create/Close', 'operations/s', 'smb2', 'smb2.create_close', 'line'],
+        'lines': [
+            ['smb2_create_count', 'create', 'incremental', 1, 1],
+            ['smb2_close_count', 'close', 'incremental', -1, 1]
+        ]
+    },
+    'smb2_info': {
+        'options': [None, 'Info', 'operations/s', 'smb2', 'smb2.get_set_info', 'line'],
+        'lines': [
+            ['smb2_getinfo_count', 'getinfo', 'incremental', 1, 1],
+            ['smb2_setinfo_count', 'setinfo', 'incremental', -1, 1]
+        ]
+    },
+    'smb2_find': {
+        'options': [None, 'Find', 'operations/s', 'smb2', 'smb2.find', 'line'],
+        'lines': [
+            ['smb2_find_count', 'find', 'incremental', 1, 1]
+        ]
+    },
+    'smb2_notify': {
+        'options': [None, 'Notify', 'operations/s', 'smb2', 'smb2.notify', 'line'],
+        'lines': [
+            ['smb2_notify_count', 'notify', 'incremental', 1, 1]
+        ]
+    },
+    'smb2_sm_count': {
+        'options': [None, 'Lesser Ops', 'count', 'smb2', 'smb2.sm_counters', 'stacked'],
+        'lines': [
+            ['smb2_tcon_count', 'tcon', 'absolute', 1, 1],
+            ['smb2_negprot_count', 'negprot', 'absolute', 1, 1],
+            ['smb2_tdis_count', 'tdis', 'absolute', 1, 1],
+            ['smb2_cancel_count', 'cancel', 'absolute', 1, 1],
+            ['smb2_logoff_count', 'logoff', 'absolute', 1, 1],
+            ['smb2_flush_count', 'flush', 'absolute', 1, 1],
+            ['smb2_lock_count', 'lock', 'absolute', 1, 1],
+            ['smb2_keepalive_count', 'keepalive', 'absolute', 1, 1],
+            ['smb2_break_count', 'break', 'absolute', 1, 1],
+            ['smb2_sessetup_count', 'sessetup', 'absolute', 1, 1]
+        ]
+    }
+}
 
 
 class Service(ExecutableService):
