@@ -211,12 +211,20 @@ class Plugin(object):
         self.modules = OrderedDict()
         self.sleep_time = 1
         self.runs_counter = 0
-        self.config, error = self.loader.load_config_from_file(os.path.join(USER_CONFIG_DIR, 'python.d.conf'))
+
+        user_config = os.path.join(USER_CONFIG_DIR, 'python.d.conf')
+        stock_config = os.path.join(STOCK_CONFIG_DIR, 'python.d.conf')
+
+        Logger.debug("loading '{0}'".format(user_config))
+        self.config, error = self.loader.load_config_from_file(user_config)
+
         if error:
-            self.config, error = self.loader.load_config_from_file(
-                os.path.join(STOCK_CONFIG_DIR, 'python.d.conf'))
+            Logger.error("cannot load '{0}': {1}. Will try stock version.".format(user_config, error))
+            Logger.debug("loading '{0}'".format(stock_config))
+            self.config, error = self.loader.load_config_from_file(stock_config)
         if error:
-            Logger.error('"python.d.conf" configuration file not found. Using defaults.')
+            Logger.error("cannot load '{0}': {1}".format(stock_config, error))
+
         self.do_gc = self.config.get("gc_run", GC_RUN)
         self.gc_interval = self.config.get("gc_interval", GC_COLLECT_EVERY)
 
@@ -271,16 +279,18 @@ class Plugin(object):
                 continue
 
             # Load module config from file ------------------------------------------------------
-            loaded_config, error = self.loader.load_config_from_file(
-                os.path.join(PLUGINS_USER_CONFIG_DIR, mod.name + '.conf'))
+            user_config = os.path.join(PLUGINS_USER_CONFIG_DIR, mod.name + '.conf')
+            stock_config = os.path.join(PLUGINS_STOCK_CONFIG_DIR, mod.name + '.conf')
+
+            Logger.debug("loading '{0}'".format(user_config))
+            loaded_config, error = self.loader.load_config_from_file(user_config)
             if error:
-                loaded_config, error = self.loader.load_config_from_file(
-                    os.path.join(PLUGINS_STOCK_CONFIG_DIR, mod.name + '.conf'))
-            log = Logger.error if error else Logger.debug
-            log("module load config: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
-                                                                           module_name=mod.name))
+                Logger.error("cannot load '{0}' : {1}. Will try stock version.".format(user_config, error))
+                Logger.debug("loading '{0}'".format(stock_config))
+                loaded_config, error = self.loader.load_config_from_file(stock_config)
+
             if error:
-                Logger.error('load config error : {0}'.format(error))
+                Logger.error("cannot load '{0}': {1}".format(stock_config, error))
 
             # Skip disabled modules
             if getattr(loaded_module, 'disabled_by_default', False) and not mod.explicitly_enabled:
