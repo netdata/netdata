@@ -2,8 +2,8 @@
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 # SPDX-License-Identifier: GPL-3.0+
 #
-AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
-ACLOCAL_AMFLAGS = -I m4
+AUTOMAKE_OPTIONS=foreign 1.10
+ACLOCAL_AMFLAGS = -I build/m4
 
 MAINTAINERCLEANFILES= \
 	config.log config.status \
@@ -24,19 +24,22 @@ EXTRA_DIST = \
 	.csslintrc \
 	.eslintignore \
 	.eslintrc \
+	.lgtm.yml \
 	.travis \
-	m4/jemalloc.m4 \
-    m4/ax_c___atomic.m4 \
-    m4/ax_check_enable_debug.m4 \
-    m4/ax_c_mallinfo.m4 \
-    m4/ax_gcc_func_attribute.m4 \
-    m4/ax_check_compile_flag.m4 \
-    m4/ax_c_statement_expressions.m4 \
-    m4/ax_pthread.m4 \
-    m4/ax_c_lto.m4 \
-    m4/ax_c_mallopt.m4 \
-    m4/tcmalloc.m4 \
-    m4/ax_c__generic.m4 \
+	build/build.sh
+	build/Dockerfile
+	build/m4/jemalloc.m4 \
+	build/m4/ax_c___atomic.m4 \
+	build/m4/ax_check_enable_debug.m4 \
+	build/m4/ax_c_mallinfo.m4 \
+	build/m4/ax_gcc_func_attribute.m4 \
+	build/m4/ax_check_compile_flag.m4 \
+	build/m4/ax_c_statement_expressions.m4 \
+	build/m4/ax_pthread.m4 \
+	build/m4/ax_c_lto.m4 \
+	build/m4/ax_c_mallopt.m4 \
+	build/m4/tcmalloc.m4 \
+	build/m4/ax_c__generic.m4 \
 	README.md \
 	CONTRIBUTORS.md \
 	LICENSE \
