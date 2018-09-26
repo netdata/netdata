@@ -550,69 +550,74 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 fi
 
 # -----------------------------------------------------------------------------
-progress "Backup existing netdata configuration before installing it"
-
-if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then
-    declare -A configs_signatures=()
-    if [ -f "configs.signatures" ]
-        then
-        source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
-    fi
-fi
 
-config_signature_matches() {
-    local md5="${1}" file="${2}"
+    progress "Backup existing netdata configuration before installing it"
 
     if [ "${BASH_VERSINFO[0]}" -ge "4" ]
-        then
-        [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
-        return 1
-    fi
-
-    if [ -f "configs.signatures" ]
-        then
-        grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
-        return $?
-    fi
-
-    return 1
-}
-
-# clean up stock config files from the user configuration directory
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f)
-do
-    if [ -f "${x}" ]
-        then
-        # find it relative filename
-        f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
-
-        # find the stock filename
-        t="${f/.conf.installer_backup.*/.conf}"
-        t="${t/.conf.old/.conf}"
-        t="${t/.conf.orig/.conf}"
-
-        if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+    then
+        declare -A configs_signatures=()
+        if [ -f "configs.signatures" ]
             then
-            # we don't have md5sum - keep it
-            echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-        else
-            # find its checksum
-            md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
-
-            if config_signature_matches "${md5}" "${t}"
-                then
-                # it is a stock version - remove it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
-                run rm -f "${x}"
-            else
-                # edited by user - keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
-            fi
+            source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
         fi
     fi
-done
 
+    config_signature_matches() {
+        local md5="${1}" file="${2}"
+
+        if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+            then
+            [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
+            return 1
+        fi
+
+        if [ -f "configs.signatures" ]
+            then
+            grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
+            return $?
+        fi
+
+        return 1
+    }
+
+    # clean up stock config files from the user configuration directory
+    for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f)
+    do
+        if [ -f "${x}" ]
+            then
+            # find it relative filename
+            f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
+
+            # find the stock filename
+            t="${f/.conf.installer_backup.*/.conf}"
+            t="${t/.conf.old/.conf}"
+            t="${t/.conf.orig/.conf}"
+
+            if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+                then
+                # we don't have md5sum - keep it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+            else
+                # find its checksum
+                md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
+
+                if config_signature_matches "${md5}" "${t}"
+                    then
+                    # it is a stock version - remove it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
+                    run rm -f "${x}"
+                else
+                    # edited by user - keep it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
+                fi
+            fi
+        fi
+    done
+
+    touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"

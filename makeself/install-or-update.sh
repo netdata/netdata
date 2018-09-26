@@ -24,43 +24,47 @@ do
     shift
 done
 
+if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]
+then
 
-# -----------------------------------------------------------------------------
-progress "Deleting stock configuration files from user configuration directory"
+    # -----------------------------------------------------------------------------
+    progress "Deleting stock configuration files from user configuration directory"
 
-declare -A configs_signatures=()
-. system/configs.signatures
+    declare -A configs_signatures=()
+    source "system/configs.signatures"
 
-if [ ! -d etc/netdata ]
-    then
-    run mkdir -p etc/netdata
-fi
-
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-for x in $(find etc -type f)
-do
-    # find it relative filename
-    f="${x/etc\/netdata\//}"
-
-    # find the stock filename
-    t="${f/.conf.old/.conf}"
-    t="${t/.conf.orig/.conf}"
-
-    if [ ! -z "${md5sum}" ]
+    if [ ! -d etc/netdata ]
         then
-        # find the checksum of the existing file
-        md5="$( ${md5sum} <"${x}" | cut -d ' ' -f 1)"
-        #echo >&2 "md5: ${md5}"
-
-        # check if it matches
-        if [ "${configs_signatures[${md5}]}" = "${t}" ]
-            then
-            # it matches the default
-            run rm -f "${x}"
-        fi
+        run mkdir -p etc/netdata
     fi
-done
 
+    md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+    for x in $(find etc -type f)
+    do
+        # find it relative filename
+        f="${x/etc\/netdata\//}"
+
+        # find the stock filename
+        t="${f/.conf.old/.conf}"
+        t="${t/.conf.orig/.conf}"
+
+        if [ ! -z "${md5sum}" ]
+            then
+            # find the checksum of the existing file
+            md5="$( ${md5sum} <"${x}" | cut -d ' ' -f 1)"
+            #echo >&2 "md5: ${md5}"
+
+            # check if it matches
+            if [ "${configs_signatures[${md5}]}" = "${t}" ]
+                then
+                # it matches the default
+                run rm -f "${x}"
+            fi
+        fi
+    done
+
+    touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
