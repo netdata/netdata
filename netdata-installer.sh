@@ -500,12 +500,6 @@ run make -j${SYSTEM_CPUS} || exit 1
 
 
 # -----------------------------------------------------------------------------
-progress "Install netdata"
-
-run make install || exit 1
-
-
-# -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
 
 # migrate existing configuration files
@@ -620,6 +614,12 @@ then
 
     touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 fi
+
+# -----------------------------------------------------------------------------
+progress "Install netdata"
+
+run make install || exit 1
+
 
 # -----------------------------------------------------------------------------
 progress "Fix generated files permissions"
