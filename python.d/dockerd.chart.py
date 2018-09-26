@@ -24,19 +24,22 @@ ORDER = [
 
 CHARTS = {
     'running_containers': {
-        'options': [None, 'Number of running containers', 'running containers', 'running containers', 'docker.running_containers', 'line'],
+        'options': [None, 'Number of running containers', 'running containers', 'running containers',
+                    'docker.running_containers', 'line'],
         'lines': [
             ['running_containers', 'running']
         ]
     },
     'healthy_containers': {
-        'options': [None, 'Number of healthy containers', 'healthy containers', 'healthy containers', 'docker.healthy_containers', 'line'],
+        'options': [None, 'Number of healthy containers', 'healthy containers', 'healthy containers',
+                    'docker.healthy_containers', 'line'],
         'lines': [
             ['healthy_containers', 'healthy']
         ]
     },
     'unhealthy_containers': {
-        'options': [None, 'Number of unhealthy containers', 'unhealthy containers', 'unhealthy containers', 'docker.unhealthy_containers', 'line'],
+        'options': [None, 'Number of unhealthy containers', 'unhealthy containers', 'unhealthy containers',
+                    'docker.unhealthy_containers', 'line'],
         'lines': [
             ['unhealthy_containers', 'unhealthy']
         ]
@@ -72,4 +75,3 @@ class Service(SimpleService):
         data['unhealthy_containers'] = len(self.client.containers.list(filters={'health': 'unhealthy'}, sparse=True))
 
         return data or None
-

@@ -110,18 +110,22 @@ HEALTH_STATS = [
 ]
 
 LATENCY = {
-    'query_latency':
-        {'total': 'indices_search_query_total',
-         'spent_time': 'indices_search_query_time_in_millis'},
-    'fetch_latency':
-        {'total': 'indices_search_fetch_total',
-         'spent_time': 'indices_search_fetch_time_in_millis'},
-    'indexing_latency':
-        {'total': 'indices_indexing_index_total',
-         'spent_time': 'indices_indexing_index_time_in_millis'},
-    'flushing_latency':
-        {'total': 'indices_flush_total',
-         'spent_time': 'indices_flush_total_time_in_millis'}
+    'query_latency': {
+        'total': 'indices_search_query_total',
+        'spent_time': 'indices_search_query_time_in_millis'
+    },
+    'fetch_latency': {
+        'total': 'indices_search_fetch_total',
+        'spent_time': 'indices_search_fetch_time_in_millis'
+    },
+    'indexing_latency': {
+        'total': 'indices_indexing_index_total',
+        'spent_time': 'indices_indexing_index_time_in_millis'
+    },
+    'flushing_latency': {
+        'total': 'indices_flush_total',
+        'spent_time': 'indices_flush_total_time_in_millis'
+    }
 }
 
 # charts order (can be overridden if you want less charts, or different order)
@@ -170,27 +174,31 @@ CHARTS = {
         'lines': [
             ['indices_search_query_total', 'queries', 'incremental'],
             ['indices_search_fetch_total', 'fetches', 'incremental']
-        ]},
+        ]
+    },
     'search_performance_current': {
         'options': [None, 'Queries and  Fetches In Progress', 'number of', 'search performance',
                     'elastic.search_performance_current', 'stacked'],
         'lines': [
             ['indices_search_query_current', 'queries', 'absolute'],
             ['indices_search_fetch_current', 'fetches', 'absolute']
-        ]},
+        ]
+    },
     'search_performance_time': {
         'options': [None, 'Time Spent On Queries And Fetches', 'seconds', 'search performance',
                     'elastic.search_performance_time', 'stacked'],
         'lines': [
             ['indices_search_query_time_in_millis', 'query', 'incremental', 1, 1000],
             ['indices_search_fetch_time_in_millis', 'fetch', 'incremental', 1, 1000]
-        ]},
+        ]
+    },
     'search_latency': {
         'options': [None, 'Query And Fetch Latency', 'ms', 'search performance', 'elastic.search_latency', 'stacked'],
         'lines': [
             ['query_latency', 'query', 'absolute', 1, 1000],
             ['fetch_latency', 'fetch', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'index_performance_total': {
         'options': [None, 'Indexed Documents, Index Refreshes, Index Flushes To Disk', 'number of',
                     'indexing performance', 'elastic.index_performance_total', 'stacked'],
@@ -198,13 +206,15 @@ CHARTS = {
             ['indices_indexing_index_total', 'indexed', 'incremental'],
             ['indices_refresh_total', 'refreshes', 'incremental'],
             ['indices_flush_total', 'flushes', 'incremental']
-        ]},
+        ]
+    },
     'index_performance_current': {
         'options': [None, 'Number Of Documents Currently Being Indexed', 'currently indexed',
                     'indexing performance', 'elastic.index_performance_current', 'stacked'],
         'lines': [
             ['indices_indexing_index_current', 'documents', 'absolute']
-        ]},
+        ]
+    },
     'index_performance_time': {
         'options': [None, 'Time Spent On Indexing, Refreshing, Flushing', 'seconds', 'indexing performance',
                     'elastic.index_performance_time', 'stacked'],
@@ -212,40 +222,46 @@ CHARTS = {
             ['indices_indexing_index_time_in_millis', 'indexing', 'incremental', 1, 1000],
             ['indices_refresh_total_time_in_millis', 'refreshing', 'incremental', 1, 1000],
             ['indices_flush_total_time_in_millis', 'flushing', 'incremental', 1, 1000]
-        ]},
+        ]
+    },
     'index_latency': {
         'options': [None, 'Indexing And Flushing Latency', 'ms', 'indexing performance',
                     'elastic.index_latency', 'stacked'],
         'lines': [
             ['indexing_latency', 'indexing', 'absolute', 1, 1000],
             ['flushing_latency', 'flushing', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'index_translog_operations': {
         'options': [None, 'Translog Operations', 'count', 'translog',
                     'elastic.index_translog_operations', 'area'],
         'lines': [
             ['indices_translog_operations', 'total', 'absolute'],
             ['indices_translog_uncommitted_operations', 'uncommited', 'absolute']
-        ]},
+        ]
+    },
     'index_translog_size': {
         'options': [None, 'Translog Size', 'MB', 'translog',
                     'elastic.index_translog_size', 'area'],
         'lines': [
             ['indices_translog_size_in_bytes', 'total', 'absolute', 1, 1048567],
             ['indices_translog_uncommitted_size_in_bytes', 'uncommited', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'index_segments_count': {
         'options': [None, 'Total Number Of Indices Segments', 'count', 'indices segments',
                     'elastic.index_segments_count', 'line'],
         'lines': [
             ['indices_segments_count', 'segments', 'absolute']
-        ]},
+        ]
+    },
     'index_segments_memory_writer': {
         'options': [None, 'Index Writer Memory Usage', 'MB', 'indices segments',
                     'elastic.index_segments_memory_writer', 'area'],
         'lines': [
             ['indices_segments_index_writer_memory_in_bytes', 'total', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'index_segments_memory': {
         'options': [None, 'Indices Segments Memory Usage', 'MB', 'indices segments',
                     'elastic.index_segments_memory', 'stacked'],
@@ -258,54 +274,62 @@ CHARTS = {
             ['indices_segments_doc_values_memory_in_bytes', 'doc values', 'absolute', 1, 1048567],
             ['indices_segments_version_map_memory_in_bytes', 'version map', 'absolute', 1, 1048567],
             ['indices_segments_fixed_bit_set_memory_in_bytes', 'fixed bit set', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'jvm_mem_heap': {
         'options': [None, 'JVM Heap Percentage Currently in Use', 'percent', 'memory usage and gc',
                     'elastic.jvm_heap', 'area'],
         'lines': [
             ['jvm_mem_heap_used_percent', 'inuse', 'absolute']
-        ]},
+        ]
+    },
     'jvm_mem_heap_bytes': {
         'options': [None, 'JVM Heap Commit And Usage', 'MB', 'memory usage and gc',
                     'elastic.jvm_heap_bytes', 'area'],
         'lines': [
             ['jvm_mem_heap_committed_in_bytes', 'commited', 'absolute', 1, 1048576],
             ['jvm_mem_heap_used_in_bytes', 'used', 'absolute', 1, 1048576]
-        ]},
+        ]
+    },
     'jvm_buffer_pool_count': {
         'options': [None, 'JVM Buffers', 'count', 'memory usage and gc',
                     'elastic.jvm_buffer_pool_count', 'line'],
         'lines': [
             ['jvm_buffer_pools_direct_count', 'direct', 'absolute'],
             ['jvm_buffer_pools_mapped_count', 'mapped', 'absolute']
-        ]},
+        ]
+    },
     'jvm_direct_buffers_memory': {
         'options': [None, 'JVM Direct Buffers Memory', 'MB', 'memory usage and gc',
                     'elastic.jvm_direct_buffers_memory', 'area'],
         'lines': [
             ['jvm_buffer_pools_direct_used_in_bytes', 'used', 'absolute', 1, 1048567],
             ['jvm_buffer_pools_direct_total_capacity_in_bytes', 'total capacity', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'jvm_mapped_buffers_memory': {
         'options': [None, 'JVM Mapped Buffers Memory', 'MB', 'memory usage and gc',
                     'elastic.jvm_mapped_buffers_memory', 'area'],
         'lines': [
             ['jvm_buffer_pools_mapped_used_in_bytes', 'used', 'absolute', 1, 1048567],
             ['jvm_buffer_pools_mapped_total_capacity_in_bytes', 'total capacity', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'jvm_gc_count': {
         'options': [None, 'Garbage Collections', 'counts', 'memory usage and gc', 'elastic.gc_count', 'stacked'],
         'lines': [
             ['jvm_gc_collectors_young_collection_count', 'young', 'incremental'],
             ['jvm_gc_collectors_old_collection_count', 'old', 'incremental']
-        ]},
+        ]
+    },
     'jvm_gc_time': {
         'options': [None, 'Time Spent On Garbage Collections', 'ms', 'memory usage and gc',
                     'elastic.gc_time', 'stacked'],
         'lines': [
             ['jvm_gc_collectors_young_collection_time_in_millis', 'young', 'incremental'],
             ['jvm_gc_collectors_old_collection_time_in_millis', 'old', 'incremental']
-        ]},
+        ]
+    },
     'thread_pool_queued': {
         'options': [None, 'Number Of Queued Threads In Thread Pool', 'queued threads', 'queues and rejections',
                     'elastic.thread_pool_queued', 'stacked'],
@@ -315,7 +339,8 @@ CHARTS = {
             ['thread_pool_index_queue', 'index', 'absolute'],
             ['thread_pool_search_queue', 'search', 'absolute'],
             ['thread_pool_merge_queue', 'merge', 'absolute']
-        ]},
+        ]
+    },
     'thread_pool_rejected': {
         'options': [None, 'Rejected Threads In Thread Pool', 'rejected threads', 'queues and rejections',
                     'elastic.thread_pool_rejected', 'stacked'],
@@ -325,19 +350,22 @@ CHARTS = {
             ['thread_pool_index_rejected', 'index', 'absolute'],
             ['thread_pool_search_rejected', 'search', 'absolute'],
             ['thread_pool_merge_rejected', 'merge', 'absolute']
-        ]},
+        ]
+    },
     'fielddata_cache': {
         'options': [None, 'Fielddata Cache', 'MB', 'fielddata cache', 'elastic.fielddata_cache', 'line'],
         'lines': [
             ['indices_fielddata_memory_size_in_bytes', 'cache', 'absolute', 1, 1048576]
-        ]},
+        ]
+    },
     'fielddata_evictions_tripped': {
         'options': [None, 'Fielddata Evictions And Circuit Breaker Tripped Count', 'number of events',
                     'fielddata cache', 'elastic.fielddata_evictions_tripped', 'line'],
         'lines': [
             ['indices_fielddata_evictions', 'evictions', 'incremental'],
             ['indices_fielddata_tripped', 'tripped', 'incremental']
-        ]},
+        ]
+    },
     'cluster_health_nodes': {
         'options': [None, 'Nodes And Tasks Statistics', 'units', 'cluster health API',
                     'elastic.cluster_health_nodes', 'stacked'],
@@ -346,7 +374,8 @@ CHARTS = {
             ['number_of_data_nodes', 'data_nodes', 'absolute'],
             ['number_of_pending_tasks', 'pending_tasks', 'absolute'],
             ['number_of_in_flight_fetch', 'in_flight_fetch', 'absolute']
-        ]},
+        ]
+    },
     'cluster_health_status': {
         'options': [None, 'Cluster Status', 'status', 'cluster health API',
                     'elastic.cluster_health_status', 'area'],
@@ -357,7 +386,8 @@ CHARTS = {
             ['status_foo2', None, 'absolute'],
             ['status_foo3', None, 'absolute'],
             ['status_yellow', 'yellow', 'absolute']
-        ]},
+        ]
+    },
     'cluster_health_shards': {
         'options': [None, 'Shards Statistics', 'shards', 'cluster health API',
                     'elastic.cluster_health_shards', 'stacked'],
@@ -368,7 +398,8 @@ CHARTS = {
             ['delayed_unassigned_shards', 'delayed_unassigned', 'absolute'],
             ['initializing_shards', 'initializing', 'absolute'],
             ['active_shards_percent_as_number', 'active_percent', 'absolute']
-        ]},
+        ]
+    },
     'cluster_stats_nodes': {
         'options': [None, 'Nodes Statistics', 'nodes', 'cluster stats API',
                     'elastic.cluster_nodes', 'stacked'],
@@ -378,52 +409,60 @@ CHARTS = {
             ['nodes_count_total', 'total', 'absolute'],
             ['nodes_count_master_only', 'master_only', 'absolute'],
             ['nodes_count_client', 'client', 'absolute']
-        ]},
+        ]
+    },
     'cluster_stats_query_cache': {
         'options': [None, 'Query Cache Statistics', 'queries', 'cluster stats API',
                     'elastic.cluster_query_cache', 'stacked'],
         'lines': [
             ['indices_query_cache_hit_count', 'hit', 'incremental'],
             ['indices_query_cache_miss_count', 'miss', 'incremental']
-        ]},
+        ]
+    },
     'cluster_stats_docs': {
         'options': [None, 'Docs Statistics', 'count', 'cluster stats API',
                     'elastic.cluster_docs', 'line'],
         'lines': [
             ['indices_docs_count', 'docs', 'absolute']
-        ]},
+        ]
+    },
     'cluster_stats_store': {
         'options': [None, 'Store Statistics', 'MB', 'cluster stats API',
                     'elastic.cluster_store', 'line'],
         'lines': [
             ['indices_store_size_in_bytes', 'size', 'absolute', 1, 1048567]
-        ]},
+        ]
+    },
     'cluster_stats_indices_shards': {
         'options': [None, 'Indices And Shards Statistics', 'count', 'cluster stats API',
                     'elastic.cluster_indices_shards', 'stacked'],
         'lines': [
             ['indices_count', 'indices', 'absolute'],
             ['indices_shards_total', 'shards', 'absolute']
-        ]},
+        ]
+    },
     'host_metrics_transport': {
         'options': [None, 'Cluster Communication Transport Metrics', 'kilobit/s', 'host metrics',
                     'elastic.host_transport', 'area'],
         'lines': [
             ['transport_rx_size_in_bytes', 'in', 'incremental', 8, 1000],
             ['transport_tx_size_in_bytes', 'out', 'incremental', -8, 1000]
-        ]},
+        ]
+    },
     'host_metrics_file_descriptors': {
         'options': [None, 'Available File Descriptors In Percent', 'percent', 'host metrics',
                     'elastic.host_descriptors', 'area'],
         'lines': [
             ['file_descriptors_used', 'used', 'absolute', 1, 10]
-        ]},
+        ]
+    },
     'host_metrics_http': {
         'options': [None, 'Opened HTTP Connections', 'connections', 'host metrics',
                     'elastic.host_http_connections', 'line'],
         'lines': [
             ['http_current_open', 'opened', 'absolute', 1, 1]
-        ]}
+        ]
+    }
 }
 
 
