@@ -223,8 +223,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
 %dir %{_libdir}/%{name}/node.d
-%dir %{_sysconfdir}/%{name}/stats.d
-%dir %{_libdir}/%{name}/stats.d
+%dir %{_sysconfdir}/%{name}/statsd.d
+%dir %{_libdir}/%{name}/statsd.d
 
 
 %if %{with systemd}
