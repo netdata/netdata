@@ -25,95 +25,102 @@ ORDER = [
 
 CHARTS = {
     'net_throughput_http': {
-        'options': [
-            None, 'Network Throughput HTTP', 'kilobits/s', 'net throughput', 'litespeed.net_throughput', 'area'],
+        'options': [None, 'Network Throughput HTTP', 'kilobits/s', 'net throughput',
+                    'litespeed.net_throughput', 'area'],
         'lines': [
-            ["bps_in", "in", "absolute"],
-            ["bps_out", "out", "absolute", -1]
-        ]},
+            ['bps_in', 'in', 'absolute'],
+            ['bps_out', 'out', 'absolute', -1]
+        ]
+    },
     'net_throughput_https': {
-        'options': [
-            None, 'Network Throughput HTTPS', 'kilobits/s', 'net throughput', 'litespeed.net_throughput', 'area'],
+        'options': [None, 'Network Throughput HTTPS', 'kilobits/s', 'net throughput',
+                    'litespeed.net_throughput', 'area'],
         'lines': [
-            ["ssl_bps_in", "in", "absolute"],
-            ["ssl_bps_out", "out", "absolute", -1]
-        ]},
+            ['ssl_bps_in', 'in', 'absolute'],
+            ['ssl_bps_out', 'out', 'absolute', -1]
+        ]
+    },
     'connections_http': {
-        'options': [
-            None, 'Connections HTTP', 'conns', 'connections', 'litespeed.connections', 'stacked'],
+        'options': [None, 'Connections HTTP', 'conns', 'connections', 'litespeed.connections', 'stacked'],
         'lines': [
-            ["conn_free", "free", "absolute"],
-            ["conn_used", "used", "absolute"]
-        ]},
+            ['conn_free', 'free', 'absolute'],
+            ['conn_used', 'used', 'absolute']
+        ]
+    },
     'connections_https': {
-        'options': [
-            None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stacked'],
+        'options': [None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stacked'],
         'lines': [
-            ["ssl_conn_free", "free", "absolute"],
-            ["ssl_conn_used", "used", "absolute"]
-        ]},
+            ['ssl_conn_free', 'free', 'absolute'],
+            ['ssl_conn_used', 'used', 'absolute']
+        ]
+    },
     'requests': {
         'options': [None, 'Requests', 'requests/s', 'requests', 'litespeed.requests', 'line'],
         'lines': [
-            ["requests", None, "absolute", 1, 100]
-        ]},
+            ['requests', None, 'absolute', 1, 100]
+        ]
+    },
     'requests_processing': {
         'options': [None, 'Requests In Processing', 'requests', 'requests', 'litespeed.requests_processing', 'line'],
         'lines': [
-            ["requests_processing", "processing", "absolute"]
-        ]},
+            ['requests_processing', 'processing', 'absolute']
+        ]
+    },
     'pub_cache_hits': {
         'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
         'lines': [
-            ["pub_cache_hits", "hits", "absolute", 1, 100]
-        ]},
+            ['pub_cache_hits', 'hits', 'absolute', 1, 100]
+        ]
+    },
     'private_cache_hits': {
         'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
         'lines': [
-            ["private_cache_hits", "hits", "absolute", 1, 100]
-        ]},
+            ['private_cache_hits', 'hits', 'absolute', 1, 100]
+        ]
+    },
     'static_hits': {
         'options': [None, 'Static Hits', 'hits/s', 'static', 'litespeed.static', 'line'],
         'lines': [
-            ["static_hits", "hits", "absolute", 1, 100]
-        ]},
+            ['static_hits', 'hits', 'absolute', 1, 100]
+        ]
+    }
 }
 
-t = namedtuple("T", ["key", "id", "mul"])
+t = namedtuple('T', ['key', 'id', 'mul'])
 
 T = [
-    t("BPS_IN", "bps_in", 8),
-    t("BPS_OUT", "bps_out", 8),
-    t("SSL_BPS_IN", "ssl_bps_in", 8),
-    t("SSL_BPS_OUT", "ssl_bps_out", 8),
-    t("REQ_PER_SEC", "requests", 100),
-    t("REQ_PROCESSING", "requests_processing", 1),
-    t("PUB_CACHE_HITS_PER_SEC", "pub_cache_hits", 100),
-    t("PRIVATE_CACHE_HITS_PER_SEC", "private_cache_hits", 100),
-    t("STATIC_HITS_PER_SEC", "static_hits", 100),
-    t("PLAINCONN", "conn_used", 1),
-    t("AVAILCONN", "conn_free", 1),
-    t("SSLCONN", "ssl_conn_used", 1),
-    t("AVAILSSL", "ssl_conn_free", 1),
+    t('BPS_IN', 'bps_in', 8),
+    t('BPS_OUT', 'bps_out', 8),
+    t('SSL_BPS_IN', 'ssl_bps_in', 8),
+    t('SSL_BPS_OUT', 'ssl_bps_out', 8),
+    t('REQ_PER_SEC', 'requests', 100),
+    t('REQ_PROCESSING', 'requests_processing', 1),
+    t('PUB_CACHE_HITS_PER_SEC', 'pub_cache_hits', 100),
+    t('PRIVATE_CACHE_HITS_PER_SEC', 'private_cache_hits', 100),
+    t('STATIC_HITS_PER_SEC', 'static_hits', 100),
+    t('PLAINCONN', 'conn_used', 1),
+    t('AVAILCONN', 'conn_free', 1),
+    t('SSLCONN', 'ssl_conn_used', 1),
+    t('AVAILSSL', 'ssl_conn_free', 1),
 ]
 
 RE = re.compile(r'([A-Z_]+): ([0-9.]+)')
 
 ZERO_DATA = {
-    "bps_in": 0,
-    "bps_out": 0,
-    "ssl_bps_in": 0,
-    "ssl_bps_out": 0,
-    "requests": 0,
-    "requests_processing": 0,
-    "pub_cache_hits": 0,
-    "private_cache_hits": 0,
-    "static_hits": 0,
-    "conn_used": 0,
-    "conn_free": 0,
-    "ssl_conn_used": 0,
-    "ssl_conn_free": 0,
-    }
+    'bps_in': 0,
+    'bps_out': 0,
+    'ssl_bps_in': 0,
+    'ssl_bps_out': 0,
+    'requests': 0,
+    'requests_processing': 0,
+    'pub_cache_hits': 0,
+    'private_cache_hits': 0,
+    'static_hits': 0,
+    'conn_used': 0,
+    'conn_free': 0,
+    'ssl_conn_used': 0,
+    'ssl_conn_free': 0,
+}
 
 
 class Service(SimpleService):
@@ -121,7 +128,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.path = self.configuration.get('path', "/tmp/lshttpd/")
+        self.path = self.configuration.get('path', '/tmp/lshttpd/')
         self.files = list()
 
     def check(self):
@@ -129,17 +136,17 @@ class Service(SimpleService):
             self.error('"path" not specified')
             return False
 
-        fs = glob.glob(os.path.join(self.path, ".rtreport*"))
+        fs = glob.glob(os.path.join(self.path, '.rtreport*'))
 
         if not fs:
             self.error('"{0}" has no "rtreport" files or dir is not readable'.format(self.path))
             return None
 
-        self.debug("stats files:", fs)
+        self.debug('stats files:', fs)
 
         for f in fs:
             if not is_readable_file(f):
-                self.error("{0} is not readable".format(f))
+                self.error('{0} is not readable'.format(f))
                 continue
             self.files.append(f)
 
@@ -167,7 +174,7 @@ class Service(SimpleService):
 
 def parse_file(data, lines):
     for line in lines:
-        if not line.startswith(("BPS_IN:", "MAXCONN:", "REQ_RATE []:")):
+        if not line.startswith(('BPS_IN:', 'MAXCONN:', 'REQ_RATE []:')):
             continue
         m = dict(RE.findall(line))
         for v in T:
