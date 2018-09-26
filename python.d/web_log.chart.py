@@ -27,15 +27,43 @@ from bases.FrameworkServices.LogService import LogService
 
 ORDER_APACHE_CACHE = ['apache_cache']
 
-ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth',
-             'response_time', 'response_time_hist', 'response_time_upstream', 'response_time_upstream_hist',
-             'requests_per_url', 'requests_per_user_defined', 'http_method', 'vhost', 'port', 'http_version',
-             'requests_per_ipproto', 'clients', 'clients_all']
+ORDER_WEB = [
+    'response_statuses',
+    'response_codes',
+    'bandwidth',
+    'response_time',
+    'response_time_hist',
+    'response_time_upstream',
+    'response_time_upstream_hist',
+    'requests_per_url',
+    'requests_per_user_defined',
+    'http_method',
+    'vhost',
+    'port',
+    'http_version',
+    'requests_per_ipproto',
+    'clients',
+    'clients_all'
+]
 
-ORDER_SQUID = ['squid_response_statuses', 'squid_response_codes', 'squid_detailed_response_codes',
-               'squid_method', 'squid_mime_type', 'squid_hier_code', 'squid_transport_methods',
-               'squid_transport_errors', 'squid_code', 'squid_handling_opts', 'squid_object_types',
-               'squid_cache_events', 'squid_bytes', 'squid_duration', 'squid_clients', 'squid_clients_all']
+ORDER_SQUID = [
+    'squid_response_statuses',
+    'squid_response_codes',
+    'squid_detailed_response_codes',
+    'squid_method',
+    'squid_mime_type',
+    'squid_hier_code',
+    'squid_transport_methods',
+    'squid_transport_errors',
+    'squid_code',
+    'squid_handling_opts',
+    'squid_object_types',
+    'squid_cache_events',
+    'squid_bytes',
+    'squid_duration',
+    'squid_clients',
+    'squid_clients_all'
+]
 
 CHARTS_WEB = {
     'response_codes': {
@@ -48,24 +76,27 @@ CHARTS_WEB = {
             ['1xx', None, 'incremental'],
             ['0xx', 'other', 'incremental'],
             ['unmatched', None, 'incremental']
-        ]},
+        ]
+    },
     'bandwidth': {
         'options': [None, 'Bandwidth', 'kilobits/s', 'bandwidth', 'web_log.bandwidth', 'area'],
         'lines': [
             ['resp_length', 'received', 'incremental', 8, 1000],
             ['bytes_sent', 'sent', 'incremental', -8, 1000]
-        ]},
+        ]
+    },
     'response_time': {
         'options': [None, 'Processing Time', 'milliseconds', 'timings', 'web_log.response_time', 'area'],
         'lines': [
             ['resp_time_min', 'min', 'incremental', 1, 1000],
             ['resp_time_max', 'max', 'incremental', 1, 1000],
             ['resp_time_avg', 'avg', 'incremental', 1, 1000]
-        ]},
+        ]
+    },
     'response_time_hist': {
         'options': [None, 'Processing Time Histogram', 'requests/s', 'timings', 'web_log.response_time_hist', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'response_time_upstream': {
         'options': [None, 'Processing Time Upstream', 'milliseconds', 'timings',
                     'web_log.response_time_upstream', 'area'],
@@ -73,74 +104,80 @@ CHARTS_WEB = {
             ['resp_time_upstream_min', 'min', 'incremental', 1, 1000],
             ['resp_time_upstream_max', 'max', 'incremental', 1, 1000],
             ['resp_time_upstream_avg', 'avg', 'incremental', 1, 1000]
-        ]},
+        ]
+    },
     'response_time_upstream_hist': {
         'options': [None, 'Processing Time Histogram', 'requests/s', 'timings',
                     'web_log.response_time_upstream_hist', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
         'lines': [
             ['unique_cur_ipv4', 'ipv4', 'incremental', 1, 1],
             ['unique_cur_ipv6', 'ipv6', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'clients_all': {
         'options': [None, 'All Time Unique Client IPs', 'unique ips', 'clients', 'web_log.clients_all', 'stacked'],
         'lines': [
             ['unique_tot_ipv4', 'ipv4', 'absolute', 1, 1],
             ['unique_tot_ipv6', 'ipv6', 'absolute', 1, 1]
-        ]},
+        ]
+    },
     'http_method': {
         'options': [None, 'Requests Per HTTP Method', 'requests/s', 'http methods', 'web_log.http_method', 'stacked'],
         'lines': [
             ['GET', 'GET', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'http_version': {
         'options': [None, 'Requests Per HTTP Version', 'requests/s', 'http versions',
                     'web_log.http_version', 'stacked'],
-        'lines': []},
+        'lines': []
+    },
     'requests_per_ipproto': {
         'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto',
                     'stacked'],
         'lines': [
             ['req_ipv4', 'ipv4', 'incremental', 1, 1],
             ['req_ipv6', 'ipv6', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'response_statuses': {
-        'options': [None, 'Response Statuses', 'requests/s', 'responses', 'web_log.response_statuses',
-                    'stacked'],
+        'options': [None, 'Response Statuses', 'requests/s', 'responses', 'web_log.response_statuses', 'stacked'],
         'lines': [
             ['successful_requests', 'success', 'incremental', 1, 1],
             ['server_errors', 'error', 'incremental', 1, 1],
             ['redirects', 'redirect', 'incremental', 1, 1],
             ['bad_requests', 'bad', 'incremental', 1, 1],
             ['other_requests', 'other', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'requests_per_url': {
-        'options': [None, 'Requests Per Url', 'requests/s', 'urls', 'web_log.requests_per_url',
-                    'stacked'],
+        'options': [None, 'Requests Per Url', 'requests/s', 'urls', 'web_log.requests_per_url', 'stacked'],
         'lines': [
             ['url_pattern_other', 'other', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'requests_per_user_defined': {
         'options': [None, 'Requests Per User Defined Pattern', 'requests/s', 'user defined',
                     'web_log.requests_per_user_defined', 'stacked'],
         'lines': [
             ['user_pattern_other', 'other', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'port': {
-        'options': [None, 'Requests Per Port', 'requests/s', 'port',
-                    'web_log.port', 'stacked'],
+        'options': [None, 'Requests Per Port', 'requests/s', 'port', 'web_log.port', 'stacked'],
         'lines': [
             ['port_80', 'http', 'incremental', 1, 1],
             ['port_443', 'https', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'vhost': {
-        'options': [None, 'Requests Per Vhost', 'requests/s', 'vhost',
-                    'web_log.vhost', 'stacked'],
-        'lines': [
-        ]}
+        'options': [None, 'Requests Per Vhost', 'requests/s', 'vhost', 'web_log.vhost', 'stacked'],
+        'lines': []
+    }
 }
 
 CHARTS_APACHE_CACHE = {
@@ -148,10 +185,11 @@ CHARTS_APACHE_CACHE = {
         'options': [None, 'Apache Cached Responses', 'percent cached', 'cached', 'web_log.apache_cache_cache',
                     'stacked'],
         'lines': [
-            ["hit", 'cache', "percentage-of-absolute-row"],
-            ["miss", None, "percentage-of-absolute-row"],
-            ["other", None, "percentage-of-absolute-row"]
-        ]}
+            ['hit', 'cache', 'percentage-of-absolute-row'],
+            ['miss', None, 'percentage-of-absolute-row'],
+            ['other', None, 'percentage-of-absolute-row']
+        ]
+    }
 }
 
 CHARTS_SQUID = {
@@ -162,13 +200,15 @@ CHARTS_SQUID = {
             ['duration_min', 'min', 'incremental', 1, 1000],
             ['duration_max', 'max', 'incremental', 1, 1000],
             ['duration_avg', 'avg', 'incremental', 1, 1000]
-        ]},
+        ]
+    },
     'squid_bytes': {
         'options': [None, 'Amount Of Data Delivered To The Clients',
                     'kilobits/s', 'squid_bandwidth', 'web_log.squid_bytes', 'area'],
         'lines': [
             ['bytes', 'sent', 'incremental', 8, 1000]
-        ]},
+        ]
+    },
     'squid_response_statuses': {
         'options': [None, 'Response Statuses', 'responses/s', 'squid_responses', 'web_log.squid_response_statuses',
                     'stacked'],
@@ -178,7 +218,8 @@ CHARTS_SQUID = {
             ['redirects', 'redirect', 'incremental', 1, 1],
             ['bad_requests', 'bad', 'incremental', 1, 1],
             ['other_requests', 'other', 'incremental', 1, 1]
-        ]},
+        ]
+    },
     'squid_response_codes': {
         'options': [None, 'Response Codes', 'responses/s', 'squid_responses',
                     'web_log.squid_response_codes', 'stacked'],
@@ -191,90 +232,113 @@ CHARTS_SQUID = {
             ['0xx', None, 'incremental'],
             ['other', None, 'incremental'],
             ['unmatched', None, 'incremental']
-        ]},
+        ]
+    },
     'squid_code': {
         'options': [None, 'Responses Per Cache Result Of The Request',
                     'requests/s', 'squid_squid_cache', 'web_log.squid_code', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_detailed_response_codes': {
         'options': [None, 'Detailed Response Codes',
                     'responses/s', 'squid_responses', 'web_log.squid_detailed_response_codes', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_hier_code': {
         'options': [None, 'Responses Per Hierarchy Code',
                     'requests/s', 'squid_hierarchy', 'web_log.squid_hier_code', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_method': {
         'options': [None, 'Requests Per Method',
                     'requests/s', 'squid_requests', 'web_log.squid_method', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_mime_type': {
         'options': [None, 'Requests Per MIME Type',
                     'requests/s', 'squid_requests', 'web_log.squid_mime_type', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'squid_clients',
                     'web_log.squid_clients', 'stacked'],
         'lines': [
             ['unique_ipv4', 'ipv4', 'incremental'],
             ['unique_ipv6', 'ipv6', 'incremental']
-        ]},
+        ]
+    },
     'squid_clients_all': {
         'options': [None, 'All Time Unique Client IPs', 'unique ips', 'squid_clients',
                     'web_log.squid_clients_all', 'stacked'],
         'lines': [
             ['unique_tot_ipv4', 'ipv4', 'absolute'],
             ['unique_tot_ipv6', 'ipv6', 'absolute']
-        ]},
+        ]
+    },
     'squid_transport_methods': {
         'options': [None, 'Transport Methods', 'requests/s', 'squid_squid_transport',
                     'web_log.squid_transport_methods', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_transport_errors': {
         'options': [None, 'Transport Errors', 'requests/s', 'squid_squid_transport',
                     'web_log.squid_transport_errors', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_handling_opts': {
         'options': [None, 'Handling Opts', 'requests/s', 'squid_squid_cache',
                     'web_log.squid_handling_opts', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_object_types': {
         'options': [None, 'Object Types', 'objects/s', 'squid_squid_cache',
                     'web_log.squid_object_types', 'stacked'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'squid_cache_events': {
         'options': [None, 'Cache Events', 'events/s', 'squid_squid_cache',
                     'web_log.squid_cache_events', 'stacked'],
-        'lines': [
-        ]}
+        'lines': []
+    }
 }
 
 NAMED_PATTERN = namedtuple('PATTERN', ['description', 'func'])
 
 DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
 
-SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods', NONE='squid_transport_methods',
-                   CLIENT='squid_handling_opts', IMS='squid_handling_opts', ASYNC='squid_handling_opts',
-                   SWAPFAIL='squid_handling_opts', REFRESH='squid_handling_opts', SHARED='squid_handling_opts',
-                   REPLY='squid_handling_opts', NEGATIVE='squid_object_types', STALE='squid_object_types',
-                   OFFLINE='squid_object_types', INVALID='squid_object_types', FAIL='squid_object_types',
-                   MODIFIED='squid_object_types', UNMODIFIED='squid_object_types', REDIRECT='squid_object_types',
-                   HIT='squid_cache_events', MEM='squid_cache_events', MISS='squid_cache_events',
-                   DENIED='squid_cache_events', NOFETCH='squid_cache_events', TUNNEL='squid_cache_events',
-                   ABORTED='squid_transport_errors', TIMEOUT='squid_transport_errors')
+SQUID_CODES = {
+    'TCP': 'squid_transport_methods',
+    'UDP': 'squid_transport_methods',
+    'NONE': 'squid_transport_methods',
+    'CLIENT': 'squid_handling_opts',
+    'IMS': 'squid_handling_opts',
+    'ASYNC': 'squid_handling_opts',
+    'SWAPFAIL': 'squid_handling_opts',
+    'REFRESH': 'squid_handling_opts',
+    'SHARED': 'squid_handling_opts',
+    'REPLY': 'squid_handling_opts',
+    'NEGATIVE': 'squid_object_types',
+    'STALE': 'squid_object_types',
+    'OFFLINE': 'squid_object_types',
+    'INVALID': 'squid_object_types',
+    'FAIL': 'squid_object_types',
+    'MODIFIED': 'squid_object_types',
+    'UNMODIFIED': 'squid_object_types',
+    'REDIRECT': 'squid_object_types',
+    'HIT': 'squid_cache_events',
+    'MEM': 'squid_cache_events',
+    'MISS': 'squid_cache_events',
+    'DENIED': 'squid_cache_events',
+    'NOFETCH': 'squid_cache_events',
+    'TUNNEL': 'squid_cache_events',
+    'ABORTED': 'squid_transport_errors',
+    'TIMEOUT': 'squid_transport_errors'
+}
 
 REQUEST_REGEX = re.compile(r'(?P<method>[A-Z]+) (?P<url>[^ ]+) [A-Z]+/(?P<http_version>\d(?:.\d)?)')
 
 MIME_TYPES = ['application', 'audio', 'example', 'font', 'image', 'message', 'model', 'multipart', 'text', 'video']
+
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -301,7 +365,7 @@ class Service(LogService):
         log_types = dict(web=Web, apache_cache=ApacheCache, squid=Squid)
 
         if log_type not in log_types:
-            self.error("bad log type {log_type}. Supported types: {types}".format(log_type=log_type,
+            self.error('bad log type {log_type}. Supported types: {types}'.format(log_type=log_type,
                                                                                   types=log_types.keys()))
             return False
 
@@ -335,12 +399,35 @@ class Web:
         self.definitions = deepcopy(CHARTS_WEB)
         self.pre_filter = check_patterns('filter', self.configuration.get('filter'))
         self.storage = dict()
-        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
-                     'resp_time_avg': 0, 'resp_time_upstream_min': 0, 'resp_time_upstream_max': 0,
-                     'resp_time_upstream_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
-                     '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
-                     'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
+        self.data = {
+            'bytes_sent': 0,
+            'resp_length': 0,
+            'resp_time_min': 0,
+            'resp_time_max': 0,
+            'resp_time_avg': 0,
+            'resp_time_upstream_min': 0,
+            'resp_time_upstream_max': 0,
+            'resp_time_upstream_avg': 0,
+            'unique_cur_ipv4': 0,
+            'unique_cur_ipv6': 0,
+            '2xx': 0,
+            '5xx': 0,
+            '3xx': 0,
+            '4xx': 0,
+            '1xx': 0,
+            '0xx': 0,
+            'unmatched': 0,
+            'req_ipv4': 0,
+            'req_ipv6': 0,
+            'unique_tot_ipv4': 0,
+            'unique_tot_ipv6': 0,
+            'successful_requests': 0,
+            'redirects': 0,
+            'bad_requests': 0,
+            'server_errors': 0,
+            'other_requests': 0,
+            'GET': 0
+        }
 
     def __getattr__(self, item):
         return getattr(self.service, item)
@@ -391,15 +478,15 @@ class Web:
             hist_lines = self.definitions['response_time_hist']['lines']
             upstream_hist_lines = self.definitions['response_time_upstream_hist']['lines']
             for i, le in enumerate(histogram):
-                hist_key = "response_time_hist_%d" % i
-                upstream_hist_key = "response_time_upstream_hist_%d" % i
+                hist_key = 'response_time_hist_%d' % i
+                upstream_hist_key = 'response_time_upstream_hist_%d' % i
                 hist_lines.append([hist_key, str(le), 'incremental', 1, 1])
                 upstream_hist_lines.append([upstream_hist_key, str(le), 'incremental', 1, 1])
 
-            hist_lines.append(["response_time_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
-            upstream_hist_lines.append(["response_time_upstream_hist_%d" % len(histogram), '+Inf', 'incremental', 1, 1])
+            hist_lines.append(['response_time_hist_%d' % len(histogram), '+Inf', 'incremental', 1, 1])
+            upstream_hist_lines.append(['response_time_upstream_hist_%d' % len(histogram), '+Inf', 'incremental', 1, 1])
         elif histogram is not None:
-            self.error("expect histogram list, but was {0}".format(type(histogram)))
+            self.error('expect histogram list, but was {0}'.format(type(histogram)))
 
         if not self.configuration.get('all_time', True):
             self.order.remove('clients_all')
@@ -413,10 +500,11 @@ class Web:
 
             for code in codes:
                 self.order.append('detailed_response_codes%s' % code)
-                self.definitions['detailed_response_codes%s' % code] \
-                    = {'options': [None, 'Detailed Response Codes %s' % code[1:], 'requests/s', 'responses',
-                                   'web_log.detailed_response_codes%s' % code, 'stacked'],
-                       'lines': []}
+                self.definitions['detailed_response_codes%s' % code] = {
+                    'options': [None, 'Detailed Response Codes %s' % code[1:], 'requests/s', 'responses',
+                               'web_log.detailed_response_codes%s' % code, 'stacked'],
+                    'lines': []
+                }
 
         # Add 'requests_per_url' chart if specified in the configuration
         if self.storage['url_pattern']:
@@ -517,8 +605,8 @@ class Web:
             buckets = self.storage['buckets']
             upstream_buckets = self.storage['upstream_buckets']
             for i in range(0, len(self.storage['bucket_index'])):
-                hist_key = "response_time_hist_%d" % i
-                upstream_hist_key = "response_time_upstream_hist_%d" % i
+                hist_key = 'response_time_hist_%d' % i
+                upstream_hist_key = 'response_time_upstream_hist_%d' % i
                 self.data[hist_key] = buckets[i]
                 self.data[upstream_hist_key] = upstream_buckets[i]
 
@@ -823,12 +911,29 @@ class Squid:
         self.definitions = CHARTS_SQUID
         self.pre_filter = check_patterns('filter', self.configuration.get('filter'))
         self.storage = dict()
-        self.data = {'duration_max': 0, 'duration_avg': 0, 'duration_min': 0, 'bytes': 0,
-                     '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0,
-                     'other': 0, 'unmatched': 0, 'unique_ipv4': 0, 'unique_ipv6': 0,
-                     'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0
-                     }
+        self.data = {
+            'duration_max': 0,
+            'duration_avg': 0,
+            'duration_min': 0,
+            'bytes': 0,
+            '0xx': 0,
+            '1xx': 0,
+            '2xx': 0,
+            '3xx': 0,
+            '4xx': 0,
+            '5xx': 0,
+            'other': 0,
+            'unmatched': 0,
+            'unique_ipv4': 0,
+            'unique_ipv6': 0,
+            'unique_tot_ipv4': 0,
+            'unique_tot_ipv6': 0,
+            'successful_requests': 0,
+            'redirects': 0,
+            'bad_requests': 0,
+            'server_errors': 0,
+            'other_requests': 0
+        }
 
     def __getattr__(self, item):
         return getattr(self.service, item)
@@ -854,22 +959,27 @@ class Squid:
             self.error('Regex not matches (%s)' % self.storage['regex'].pattern)
             return False
         self.storage['dynamic'] = {
-            'http_code':
-                {'chart': 'squid_detailed_response_codes',
+            'http_code': {
+                 'chart': 'squid_detailed_response_codes',
                  'func_dim_id': None,
-                 'func_dim': None},
+                 'func_dim': None
+            },
             'hier_code': {
                 'chart': 'squid_hier_code',
                 'func_dim_id': None,
-                'func_dim': lambda v: v.replace('HIER_', '')},
+                'func_dim': lambda v: v.replace('HIER_', '')
+            },
             'method': {
                 'chart': 'squid_method',
                 'func_dim_id': None,
-                'func_dim': None},
+                'func_dim': None
+            },
             'mime_type': {
                 'chart': 'squid_mime_type',
                 'func_dim_id': lambda v: str.lower(v) if str.lower(v) in MIME_TYPES else 'unknown',
-                'func_dim': None}}
+                'func_dim': None
+            }
+        }
         if not self.configuration.get('all_time', True):
             self.order.remove('squid_clients_all')
         return True
@@ -986,6 +1096,7 @@ def get_timings(timings, time):
     timings['summary'] += time
     timings['count'] += 1
 
+
 def get_hist(index, buckets, time):
     """
     :param index:   histogram index (Ex. [10, 50, 100, 150, ...])
@@ -998,6 +1109,7 @@ def get_hist(index, buckets, time):
             buckets[i] += 1
         else:
             break
+
 
 def address_not_in_pool(pool, address, pool_size):
     """
