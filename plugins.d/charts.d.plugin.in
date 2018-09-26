@@ -117,8 +117,8 @@ info "started from '$PROGRAM_FILE' with options: $*"
 # netdata exposes a few environment variables for us
 
 [ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="$(dirname "${0}")/../../../../usr/lib/netdata/conf.d"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 pluginsd="${NETDATA_PLUGINS_DIR}"
 stockconfd="${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}"

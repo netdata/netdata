@@ -21,8 +21,8 @@
 // get NETDATA environment variables
 
 var NETDATA_PLUGINS_DIR = process.env.NETDATA_PLUGINS_DIR || __dirname;
-var NETDATA_USER_CONFIG_DIR = process.env.NETDATA_USER_CONFIG_DIR || __dirname + '/../../../../etc/netdata';
-var NETDATA_STOCK_CONFIG_DIR = process.env.NETDATA_STOCK_CONFIG_DIR || __dirname + '/../../../../var/lib/netdata/conf.d';
+var NETDATA_USER_CONFIG_DIR = process.env.NETDATA_USER_CONFIG_DIR || '@configdir_POST@';
+var NETDATA_STOCK_CONFIG_DIR = process.env.NETDATA_STOCK_CONFIG_DIR || '@libconfigdir_POST@';
 var NETDATA_UPDATE_EVERY = process.env.NETDATA_UPDATE_EVERY || 1;
 var NODE_D_DIR = NETDATA_PLUGINS_DIR + '/../node.d';
 

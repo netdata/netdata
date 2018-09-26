@@ -3,6 +3,19 @@
 # SPDX-License-Identifier: GPL-3.0+
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
+CLEANFILES = \
+	alarm-notify.sh \
+	cgroup-name.sh \
+	charts.d.plugin \
+	fping.plugin \
+	node.d.plugin \
+	python.d.plugin \
+	tc-qos-helper.sh \
+	$(NULL)
+
+include $(top_srcdir)/build/subst.inc
+
+SUFFIXES = .in
 
 dist_plugins_DATA = \
 	README.md \
@@ -21,4 +34,14 @@ dist_plugins_SCRIPTS = \
 	python.d.plugin \
 	tc-qos-helper.sh \
 	loopsleepms.sh.inc \
+	$(NULL)
+
+dist_noinst_DATA = \
+	alarm-notify.sh.in \
+	cgroup-name.sh.in \
+	charts.d.plugin.in \
+	fping.plugin.in \
+	node.d.plugin.in \
+	python.d.plugin.in \
+	tc-qos-helper.sh.in \
 	$(NULL)

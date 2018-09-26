@@ -21,7 +21,7 @@ GC_RUN = True
 GC_COLLECT_EVERY = 300
 
 PY_VERSION = version_info[:2]
-PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
+PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', '@configdir_POST@') + '/'
 CHARTS_PY_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR', os.path.dirname(__file__)) + '/../python.d') + '/'
 CHARTS_PY_CONFIG_DIR = PLUGIN_CONFIG_DIR + 'python.d/'
 PYTHON_MODULES_DIR = CHARTS_PY_DIR + 'python_modules'

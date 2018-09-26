@@ -75,6 +75,14 @@ system/netdata.service
 system/netdata.plist
 system/netdata-freebsd
 
+plugins.d/alarm-notify.sh
+plugins.d/cgroup-name.sh
+plugins.d/charts.d.plugin
+plugins.d/fping.plugin
+plugins.d/node.d.plugin
+plugins.d/python.d.plugin
+plugins.d/tc-qos-helper.sh
+
 # installer generated files
 netdata-uninstaller.sh
 netdata-updater.sh
