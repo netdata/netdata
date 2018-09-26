@@ -417,7 +417,7 @@ extern void health_alarm_log(
         uint32_t flags
 );
 
-extern void health_readdir(RRDHOST *host, const char *path, const char *stock_path, char *subpath);
+extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);
 extern char *health_stock_config_dir(void);
 extern void health_reload_host(RRDHOST *host);
