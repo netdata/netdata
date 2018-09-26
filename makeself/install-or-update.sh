@@ -44,7 +44,7 @@ do
 
     # find the stock filename
     t="${f/.conf.old/.conf}"
-    t="${f/.conf.orig/.conf}"
+    t="${t/.conf.orig/.conf}"
 
     if [ ! -z "${md5sum}" ]
         then
