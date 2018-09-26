@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: PHP-FPM netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
 import json

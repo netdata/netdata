@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: MySQL netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0+
 
 from bases.FrameworkServices.MySQLService import MySQLService
