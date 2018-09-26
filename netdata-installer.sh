@@ -492,10 +492,17 @@ progress "Cleanup compilation directory"
 
 [ -f src/netdata ] && run make clean
 
+
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
 run make -j${SYSTEM_CPUS} || exit 1
+
+
+# -----------------------------------------------------------------------------
+progress "Install netdata"
+
+run make install || exit 1
 
 
 # -----------------------------------------------------------------------------
@@ -572,66 +579,37 @@ config_signature_matches() {
     return 1
 }
 
-# backup user configurations
-installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -name '*.conf' -type f)
+# clean up stock config files from the user configuration directory
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f)
 do
     if [ -f "${x}" ]
         then
-        # make a backup of the configuration file
-        cp -p "${x}" "${x}.old"
+        # find it relative filename
+        f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
+
+        # find the stock filename
+        t="${f/.conf.installer_backup.*/.conf}"
+        t="${t/.conf.old/.conf}"
+        t="${t/.conf.orig/.conf}"
 
         if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
             then
             # we don't have md5sum - keep it
             echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-            run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
         else
-            # find it relative filename
-            f="${x/*\/etc\/netdata\//}"
-
             # find its checksum
-            md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+            md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
 
-            # copy the original
-            if [ -f "conf.d/${f}" ]
+            if config_signature_matches "${md5}" "${t}"
                 then
-                cp "conf.d/${f}" "${x}.orig"
-            fi
-
-            if config_signature_matches "${md5}" "${f}"
-                then
-                # it is a stock version - don't keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
+                # it is a stock version - remove it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
+                run rm -f "${x}"
             else
                 # edited by user - keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
             fi
         fi
-
-    elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        rm -f "${x}.installer_backup.${installer_backup_suffix}"
-    fi
-done
-
-
-# -----------------------------------------------------------------------------
-progress "Install netdata"
-
-run make install || exit 1
-
-
-# -----------------------------------------------------------------------------
-progress "Restore user edited netdata configuration files"
-
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
-do
-    if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        run cp -a "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
-            run rm -f "${x}.installer_backup.${installer_backup_suffix}"
     fi
 done
 
