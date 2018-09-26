@@ -22,63 +22,71 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['requests_total', 'requests_current',
-         'connections_statistics', 'connections_workers',
-         'ssl_handshakes', 'ssl_session_reuses', 'ssl_memory_usage',
-         'processes']
+ORDER = [
+    'requests_total',
+    'requests_current',
+    'connections_statistics',
+    'connections_workers',
+    'ssl_handshakes',
+    'ssl_session_reuses',
+    'ssl_memory_usage',
+    'processes'
+]
 
 CHARTS = {
     'requests_total': {
-        'options': [None, 'Requests Total', 'requests/s',
-                    'requests', 'nginx_plus.requests_total', 'line'],
+        'options': [None, 'Requests Total', 'requests/s', 'requests', 'nginx_plus.requests_total', 'line'],
         'lines': [
             ['requests_total', 'total', 'incremental']
-        ]},
+        ]
+    },
     'requests_current': {
-        'options': [None, 'Requests Current', 'requests',
-                    'requests', 'nginx_plus.requests_current', 'line'],
+        'options': [None, 'Requests Current', 'requests', 'requests', 'nginx_plus.requests_current', 'line'],
         'lines': [
             ['requests_current', 'current']
-        ]},
+        ]
+    },
     'connections_statistics': {
         'options': [None, 'Connections Statistics', 'connections/s',
                     'connections', 'nginx_plus.connections_statistics', 'stacked'],
         'lines': [
             ['connections_accepted', 'accepted', 'incremental'],
             ['connections_dropped', 'dropped', 'incremental']
-        ]},
+        ]
+    },
     'connections_workers': {
         'options': [None, 'Workers Statistics', 'workers',
                     'connections', 'nginx_plus.connections_workers', 'stacked'],
         'lines': [
             ['connections_idle', 'idle'],
             ['connections_active', 'active']
-        ]},
+        ]
+    },
     'ssl_handshakes': {
-        'options': [None, 'SSL Handshakes', 'handshakes/s',
-                    'ssl', 'nginx_plus.ssl_handshakes', 'stacked'],
+        'options': [None, 'SSL Handshakes', 'handshakes/s', 'ssl', 'nginx_plus.ssl_handshakes', 'stacked'],
         'lines': [
             ['ssl_handshakes', 'successful', 'incremental'],
             ['ssl_handshakes_failed', 'failed', 'incremental']
-        ]},
+        ]
+    },
     'ssl_session_reuses': {
-        'options': [None, 'Session Reuses', 'sessions/s',
-                    'ssl', 'nginx_plus.ssl_session_reuses', 'line'],
+        'options': [None, 'Session Reuses', 'sessions/s', 'ssl', 'nginx_plus.ssl_session_reuses', 'line'],
         'lines': [
             ['ssl_session_reuses', 'reused', 'incremental']
-        ]},
+        ]
+    },
     'ssl_memory_usage': {
-        'options': [None, 'Memory Usage', '%',
-                    'ssl', 'nginx_plus.ssl_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', '%', 'ssl', 'nginx_plus.ssl_memory_usage', 'area'],
         'lines': [
             ['ssl_memory_usage', 'usage', 'absolute', 1, 100]
-        ]},
+        ]
+    },
     'processes': {
-        'options': [None, 'Processes', 'processes',
-                    'processes', 'nginx_plus.processes', 'line'],
+        'options': [None, 'Processes', 'processes', 'processes', 'nginx_plus.processes', 'line'],
         'lines': [
             ['processes_respawned', 'respawned']
-        ]}
+        ]
+    }
 }
 
 
@@ -87,17 +95,15 @@ def cache_charts(cache):
     charts = OrderedDict()
 
     charts['{0}_traffic'.format(cache.name)] = {
-        'options': [None, 'Traffic', 'KB', family,
-                    'nginx_plus.cache_traffic', 'stacked'],
+        'options': [None, 'Traffic', 'KB', family, 'nginx_plus.cache_traffic', 'stacked'],
         'lines': [
             ['_'.join([cache.name, 'hit_bytes']), 'served', 'absolute', 1, 1024],
             ['_'.join([cache.name, 'miss_bytes_written']), 'written', 'absolute', 1, 1024],
             ['_'.join([cache.name, 'miss_bytes']), 'bypass', 'absolute', 1, 1024]
-            ]
+        ]
     }
     charts['{0}_memory_usage'.format(cache.name)] = {
-        'options': [None, 'Memory Usage', '%', family,
-                    'nginx_plus.cache_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', '%', family, 'nginx_plus.cache_memory_usage', 'area'],
         'lines': [
             ['_'.join([cache.name, 'memory_usage']), 'usage', 'absolute', 1, 100],
         ]
@@ -161,8 +167,7 @@ def web_upstream_charts(wu):
 
     # Requests
     charts['web_upstream_{name}_requests'.format(name=wu.name)] = {
-        'options': [None, 'Peers Requests', 'requests/s', family,
-                    'nginx_plus.web_upstream_requests', 'line'],
+        'options': [None, 'Peers Requests', 'requests/s', family, 'nginx_plus.web_upstream_requests', 'line'],
         'lines': dimensions('requests', 'incremental')
     }
     # Responses Codes
@@ -191,19 +196,16 @@ def web_upstream_charts(wu):
         }
     # Connections
     charts['web_upstream_{name}_connections'.format(name=wu.name)] = {
-        'options': [None, 'Peers Connections', 'active', family,
-                    'nginx_plus.web_upstream_connections', 'line'],
+        'options': [None, 'Peers Connections', 'active', family, 'nginx_plus.web_upstream_connections', 'line'],
         'lines': dimensions('active')
     }
     charts['web_upstream_{name}_connections_usage'.format(name=wu.name)] = {
-        'options': [None, 'Peers Connections Usage', '%', family,
-                    'nginx_plus.web_upstream_connections_usage', 'line'],
+        'options': [None, 'Peers Connections Usage', '%', family, 'nginx_plus.web_upstream_connections_usage', 'line'],
         'lines': dimensions('connections_usage', d=100)
     }
     # Traffic
     charts['web_upstream_{0}_all_net'.format(wu.name)] = {
-        'options': [None, 'All Peers Traffic', 'kilobits/s', family,
-                    'nginx_plus.web_upstream_all_net', 'area'],
+        'options': [None, 'All Peers Traffic', 'kilobits/s', family, 'nginx_plus.web_upstream_all_net', 'area'],
         'lines': [
             ['{0}_received'.format(wu.name), 'received', 'incremental', 1, 1000],
             ['{0}_sent'.format(wu.name), 'sent', 'incremental', -1, 1000]
@@ -230,30 +232,27 @@ def web_upstream_charts(wu):
         }
     # Memory Usage
     charts['web_upstream_{name}_memory_usage'.format(name=wu.name)] = {
-        'options': [None, 'Memory Usage', '%', family,
-                    'nginx_plus.web_upstream_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', '%', family, 'nginx_plus.web_upstream_memory_usage', 'area'],
         'lines': [
             ['_'.join([wu.name, 'memory_usage']), 'usage', 'absolute', 1, 100]
         ]
     }
     # State
     charts['web_upstream_{name}_status'.format(name=wu.name)] = {
-        'options': [None, 'Peers Status', 'state', family,
-                    'nginx_plus.web_upstream_status', 'line'],
+        'options': [None, 'Peers Status', 'state', family, 'nginx_plus.web_upstream_status', 'line'],
         'lines': dimensions('state')
     }
     # Downtime
     charts['web_upstream_{name}_downtime'.format(name=wu.name)] = {
-        'options': [None, 'Peers Downtime', 'seconds', family,
-                    'nginx_plus.web_upstream_peer_downtime', 'line'],
+        'options': [None, 'Peers Downtime', 'seconds', family, 'nginx_plus.web_upstream_peer_downtime', 'line'],
         'lines': dimensions('downtime', d=1000)
     }
 
     return charts
 
 
-METRICS = dict(
-    SERVER=[
+METRICS = {
+    'SERVER': [
         'processes.respawned',
         'connections.accepted',
         'connections.dropped',
@@ -267,7 +266,7 @@ METRICS = dict(
         'slabs.SSL.pages.free',
         'slabs.SSL.pages.used'
     ],
-    WEB_ZONE=[
+    'WEB_ZONE': [
         'processing',
         'requests',
         'responses.1xx',
@@ -279,7 +278,7 @@ METRICS = dict(
         'received',
         'sent'
     ],
-    WEB_UPSTREAM_PEER=[
+    'WEB_UPSTREAM_PEER': [
         'id',
         'server',
         'name',
@@ -298,7 +297,7 @@ METRICS = dict(
         'received',
         'downtime'
     ],
-    WEB_UPSTREAM_SUMMARY=[
+    'WEB_UPSTREAM_SUMMARY': [
         'responses.1xx',
         'responses.2xx',
         'responses.3xx',
@@ -307,13 +306,13 @@ METRICS = dict(
         'sent',
         'received'
     ],
-    CACHE=[
+    'CACHE': [
         'hit.bytes',  # served
         'miss.bytes_written',  # written
         'miss.bytes'  # bypass
 
     ]
-)
+}
 
 BAD_SYMBOLS = re.compile(r'[:/.-]+')
 
