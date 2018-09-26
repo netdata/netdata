@@ -26,17 +26,18 @@ ORDER = ['pools_utilization', 'pools_active_leases', 'leases_total']
 
 CHARTS = {
     'pools_utilization': {
-        'options': [None, 'Pools Utilization', '%', 'utilization',
-                    'isc_dhcpd.utilization', 'line'],
-        'lines': []},
+        'options': [None, 'Pools Utilization', '%', 'utilization', 'isc_dhcpd.utilization', 'line'],
+        'lines': []
+    },
     'pools_active_leases': {
-        'options': [None, 'Active Leases Per Pool', 'leases', 'active leases',
-                    'isc_dhcpd.active_leases', 'line'],
-        'lines': []},
+        'options': [None, 'Active Leases Per Pool', 'leases', 'active leases', 'isc_dhcpd.active_leases', 'line'],
+        'lines': []
+    },
     'leases_total': {
-        'options': [None, 'All Active Leases', 'leases', 'active leases',
-                    'isc_dhcpd.leases_total', 'line'],
-        'lines': [['leases_total', 'leases', 'absolute']],
+        'options': [None, 'All Active Leases', 'leases', 'active leases', 'isc_dhcpd.leases_total', 'line'],
+        'lines': [
+            ['leases_total', 'leases', 'absolute']
+        ],
         'variables': [
             ['leases_size']
         ]
