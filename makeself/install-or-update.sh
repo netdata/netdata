@@ -151,6 +151,7 @@ dir_should_be_link . var/lib/netdata       netdata-dbs
 dir_should_be_link . var/cache/netdata     netdata-metrics
 dir_should_be_link . var/log/netdata       netdata-logs
 
+dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 
 # -----------------------------------------------------------------------------
 progress "fix permissions"

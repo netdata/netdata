@@ -550,6 +550,7 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 fi
 
 # -----------------------------------------------------------------------------
+deleted_stock_configs=0
 if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then
 
@@ -608,6 +609,7 @@ then
                     # it is a stock version - remove it
                     echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
                     run rm -f "${x}"
+                    deleted_stock_configs=$(( deleted_stock_configs + 1 ))
                 else
                     # edited by user - keep it
                     echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
@@ -692,28 +694,30 @@ NETDATA_LIB_DIR="$( config_option "global" "lib directory" "${NETDATA_PREFIX}/va
 NETDATA_CACHE_DIR="$( config_option "global" "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "global" "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
-NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_USER_CONFIG_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_STOCK_CONFIG_DIR="$( config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 cat <<OPTIONSEOF
 
     Permissions
-    - netdata user     : ${NETDATA_USER}
-    - netdata group    : ${NETDATA_GROUP}
-    - web files user   : ${NETDATA_WEB_USER}
-    - web files group  : ${NETDATA_WEB_GROUP}
-    - root user        : ${ROOT_USER}
+    - netdata user             : ${NETDATA_USER}
+    - netdata group            : ${NETDATA_GROUP}
+    - web files user           : ${NETDATA_WEB_USER}
+    - web files group          : ${NETDATA_WEB_GROUP}
+    - root user                : ${ROOT_USER}
 
     Directories
-    - netdata conf dir : ${NETDATA_CONF_DIR}
-    - netdata log dir  : ${NETDATA_LOG_DIR}
-    - netdata run dir  : ${NETDATA_RUN_DIR}
-    - netdata lib dir  : ${NETDATA_LIB_DIR}
-    - netdata web dir  : ${NETDATA_WEB_DIR}
-    - netdata cache dir: ${NETDATA_CACHE_DIR}
+    - netdata user config dir  : ${NETDATA_USER_CONFIG_DIR}
+    - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
+    - netdata log dir          : ${NETDATA_LOG_DIR}
+    - netdata run dir          : ${NETDATA_RUN_DIR}
+    - netdata lib dir          : ${NETDATA_LIB_DIR}
+    - netdata web dir          : ${NETDATA_WEB_DIR}
+    - netdata cache dir        : ${NETDATA_CACHE_DIR}
 
     Other
-    - netdata port     : ${NETDATA_PORT}
+    - netdata port             : ${NETDATA_PORT}
 
 OPTIONSEOF
 
@@ -728,17 +732,35 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "stats.d"
 do
-    if [ ! -d "${NETDATA_CONF_DIR}/${x}" ]
+    if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]
         then
-        echo >&2 "Creating directory '${NETDATA_CONF_DIR}/${x}'"
-        run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
+        echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
+        run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
     fi
 done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
-run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0755 {} \;
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
+run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
+
+# --- stock conf dir ----
+
+[ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
+
+helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+[ ${deleted_stock_configs} -eq 0 ] && helplink=""
+for link in "orig" "${helplink}"
+do
+    if [ ! -z "${link}" ]
+    then
+        [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
+        run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
+    fi
+done
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
 
 # --- web dir ----
 
