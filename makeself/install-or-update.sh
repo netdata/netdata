@@ -24,6 +24,7 @@ do
     shift
 done
 
+deleted_stock_configs=0
 if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then
 
@@ -59,6 +60,7 @@ then
                 then
                 # it matches the default
                 run rm -f "${x}"
+                deleted_stock_configs=$(( deleted_stock_configs + 1 ))
             fi
         fi
     done
@@ -152,6 +154,11 @@ dir_should_be_link . var/cache/netdata     netdata-metrics
 dir_should_be_link . var/log/netdata       netdata-logs
 
 dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
+
+if [ ${deleted_stock_configs} -gt 0 ]
+then
+    dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d "000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+fi
 
 # -----------------------------------------------------------------------------
 progress "fix permissions"
