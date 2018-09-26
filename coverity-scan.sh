@@ -19,14 +19,15 @@ covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 ([ -z "${covbuild}" ] && [ -f .coverity-build ]) && covbuild="$(<.coverity-build)"
 if [ -z "${covbuild}" ]; then
 	echo "Cannot find 'cov-build' binary in \$PATH."
-	if [ $INSTALL_COVERITY != "" ]; then
+	if [ "${INSTALL_COVERITY}" != "" ]; then
 		echo "Installing coverity..."
 		mkdir /tmp/coverity
-        	curl -SL --data "token=${token}&project=netdata%2Fnetdata" https://scan.coverity.com/download/linux64 > /tmp/coverity_tool.tar.gz
-        	tar -x -C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
-	        sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
-        	export PATH=${PATH}:/opt/coverity/bin/
-        else
+		curl -SL --data "token=${token}&project=netdata%2Fnetdata" https://scan.coverity.com/download/linux64 > /tmp/coverity_tool.tar.gz
+		tar -x -C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
+		sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
+		export PATH=${PATH}:/opt/coverity/bin/
+		covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
+	else
 		echo "Save command the full filename of cov-build in .coverity-build"
 		exit 1
 	fi
