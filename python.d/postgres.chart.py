@@ -21,68 +21,90 @@ update_every = 1
 priority = 60000
 retries = 60
 
-METRICS = dict(
-    DATABASE=['connections',
-              'xact_commit',
-              'xact_rollback',
-              'blks_read',
-              'blks_hit',
-              'tup_returned',
-              'tup_fetched',
-              'tup_inserted',
-              'tup_updated',
-              'tup_deleted',
-              'conflicts',
-              'temp_files',
-              'temp_bytes',
-              'size'],
-    BACKENDS=['backends_active',
-              'backends_idle'],
-    INDEX_STATS=['index_count',
-                 'index_size'],
-    TABLE_STATS=['table_size',
-                 'table_count'],
-    WAL=['written_wal',
-         'recycled_wal',
-         'total_wal'],
-    WAL_WRITES=['wal_writes'],
-    ARCHIVE=['ready_count',
-             'done_count',
-             'file_count'],
-    BGWRITER=['checkpoint_scheduled',
-              'checkpoint_requested',
-              'buffers_checkpoint',
-              'buffers_clean',
-              'maxwritten_clean',
-              'buffers_backend',
-              'buffers_alloc',
-              'buffers_backend_fsync'],
-    LOCKS=['ExclusiveLock',
-           'RowShareLock',
-           'SIReadLock',
-           'ShareUpdateExclusiveLock',
-           'AccessExclusiveLock',
-           'AccessShareLock',
-           'ShareRowExclusiveLock',
-           'ShareLock',
-           'RowExclusiveLock'],
-    AUTOVACUUM=['analyze',
-                'vacuum_analyze',
-                'vacuum',
-                'vacuum_freeze',
-                'brin_summarize'],
-    STANDBY_DELTA=['sent_delta',
-                   'write_delta',
-                   'flush_delta',
-                   'replay_delta'
-                   ],
-    REPSLOT_FILES=['replslot_wal_keep',
-                   'replslot_files']
+METRICS = {
+    'DATABASE': [
+        'connections',
+        'xact_commit',
+        'xact_rollback',
+        'blks_read',
+        'blks_hit',
+        'tup_returned',
+        'tup_fetched',
+        'tup_inserted',
+        'tup_updated',
+        'tup_deleted',
+        'conflicts',
+        'temp_files',
+        'temp_bytes',
+        'size'
+    ],
+    'BACKENDS': [
+        'backends_active',
+        'backends_idle'
+    ],
+    'INDEX_STATS': [
+        'index_count',
+        'index_size'
+    ],
+    'TABLE_STATS': [
+        'table_size',
+        'table_count'
+    ],
+    'WAL': [
+        'written_wal',
+        'recycled_wal',
+        'total_wal'
+    ],
+    'WAL_WRITES': [
+        'wal_writes'
+    ],
+    'ARCHIVE': [
+        'ready_count',
+        'done_count',
+        'file_count'
+    ],
+    'BGWRITER': [
+        'checkpoint_scheduled',
+        'checkpoint_requested',
+        'buffers_checkpoint',
+        'buffers_clean',
+        'maxwritten_clean',
+        'buffers_backend',
+        'buffers_alloc',
+        'buffers_backend_fsync'
+    ],
+    'LOCKS': [
+        'ExclusiveLock',
+        'RowShareLock',
+        'SIReadLock',
+        'ShareUpdateExclusiveLock',
+        'AccessExclusiveLock',
+        'AccessShareLock',
+        'ShareRowExclusiveLock',
+        'ShareLock',
+        'RowExclusiveLock'
+    ],
+    'AUTOVACUUM': [
+        'analyze',
+        'vacuum_analyze',
+        'vacuum',
+        'vacuum_freeze',
+        'brin_summarize'
+    ],
+    'STANDBY_DELTA': [
+        'sent_delta',
+        'write_delta',
+        'flush_delta',
+        'replay_delta'
+    ],
+    'REPSLOT_FILES': [
+        'replslot_wal_keep',
+        'replslot_files'
+    ]
+}
 
-)
-
-QUERIES = dict(
-    WAL="""
+QUERIES = {
+    'WAL': """
 SELECT
   count(*) as total_wal,
   count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
@@ -97,7 +119,7 @@ FROM
   WHERE name ~ '^[0-9A-F]{{24}}$'
   ORDER BY (pg_stat_file('pg_{0}/'||name)).modification, wal.name DESC) sub;
 """,
-    ARCHIVE="""
+    'ARCHIVE': """
 SELECT
     CAST(COUNT(*) AS INT) AS file_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)), 0) AS INT) AS ready_count,
@@ -105,26 +127,26 @@ SELECT
 FROM
     pg_catalog.pg_ls_dir('pg_{0}/archive_status') AS archive_files (archive_file);
 """,
-    BACKENDS="""
+    'BACKENDS': """
 SELECT
     count(*) - (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle') AS backends_active,
     (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle' ) AS backends_idle
 FROM  pg_stat_activity;
 """,
-    TABLE_STATS="""
+    'TABLE_STATS': """
 SELECT
   ((sum(relpages) * 8) * 1024) AS table_size,
   count(1)                     AS table_count
 FROM pg_class
 WHERE relkind IN ('r', 't');
 """,
-    INDEX_STATS="""
+    'INDEX_STATS': """
 SELECT
   ((sum(relpages) * 8) * 1024) AS index_size,
   count(1)                     AS index_count
 FROM pg_class
 WHERE relkind = 'i';""",
-    DATABASE="""
+    'DATABASE': """
 SELECT
   datname AS database_name,
   numbackends AS connections,
@@ -145,7 +167,7 @@ FROM pg_stat_database
 WHERE datname IN %(databases)s
 ;
 """,
-    BGWRITER="""
+    'BGWRITER': """
 SELECT
   checkpoints_timed AS checkpoint_scheduled,
   checkpoints_req AS checkpoint_requested,
@@ -157,7 +179,7 @@ SELECT
   buffers_backend_fsync
 FROM pg_stat_bgwriter;
 """,
-    LOCKS="""
+    'LOCKS': """
 SELECT
   pg_database.datname as database_name,
   mode,
@@ -167,23 +189,23 @@ FROM pg_locks
 GROUP BY datname, mode
 ORDER BY datname, mode;
 """,
-    FIND_DATABASES="""
+    'FIND_DATABASES': """
 SELECT datname
 FROM pg_stat_database
 WHERE has_database_privilege((SELECT current_user), datname, 'connect')
 AND NOT datname ~* '^template\d+';
 """,
-    FIND_STANDBY="""
+    'FIND_STANDBY': """
 SELECT application_name
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL
 GROUP BY application_name;
 """,
-    FIND_REPLICATION_SLOT="""
+    'FIND_REPLICATION_SLOT': """
 SELECT slot_name
 FROM pg_replication_slots;
 """,
-    STANDBY_DELTA="""
+    'STANDBY_DELTA': """
 SELECT application_name,
   pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , sent_{1}) AS sent_delta,
   pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END , write_{1}) AS write_delta,
@@ -192,7 +214,7 @@ SELECT application_name,
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
 """,
-    REPSLOT_FILES="""
+    'REPSLOT_FILES': """
 WITH wal_size AS (
     SELECT current_setting('wal_block_size')::INT * setting::INT AS val
     FROM pg_settings
@@ -214,13 +236,13 @@ FROM (
   CROSS JOIN wal_size s) AS d
 GROUP BY slot_name, slot_type, replslot_wal_keep;
 """,
-    IF_SUPERUSER="""
+    'IF_SUPERUSER': """
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
 """,
-    DETECT_SERVER_VERSION="""
+    'DETECT_SERVER_VERSION': """
 SHOW server_version_num;
 """,
-    AUTOVACUUM="""
+    'AUTOVACUUM': """
 SELECT
   count(*) FILTER (WHERE query LIKE  'autovacuum: ANALYZE%%') AS analyze,
   count(*) FILTER (WHERE query LIKE  'autovacuum: VACUUM ANALYZE%%') AS vacuum_analyze,
@@ -232,11 +254,10 @@ SELECT
 FROM pg_stat_activity
 WHERE query NOT LIKE '%%pg_stat_activity%%';
 """,
-    DIFF_LSN="""
+    'DIFF_LSN': """
 SELECT pg_{0}_{1}_diff(CASE pg_is_in_recovery() WHEN true THEN pg_last_{0}_receive_{1}() ELSE pg_current_{0}_{1}() END, '0/0') as wal_writes ;
 """
-
-)
+}
 
 
 QUERY_STATS = {
@@ -245,11 +266,34 @@ QUERY_STATS = {
     QUERIES['LOCKS']: METRICS['LOCKS']
 }
 
-ORDER = ['db_stat_temp_files', 'db_stat_temp_bytes', 'db_stat_blks', 'db_stat_tuple_returned', 'db_stat_tuple_write',
-         'db_stat_transactions', 'db_stat_connections', 'database_size', 'backend_process', 'index_count', 'index_size',
-         'table_count', 'table_size', 'wal', 'wal_writes', 'archive_wal', 'checkpointer', 'stat_bgwriter_alloc', 'stat_bgwriter_checkpoint',
-         'stat_bgwriter_backend', 'stat_bgwriter_backend_fsync', 'stat_bgwriter_bgwriter', 'stat_bgwriter_maxwritten',
-         'replication_slot', 'standby_delta', 'autovacuum']
+ORDER = [
+    'db_stat_temp_files',
+    'db_stat_temp_bytes',
+    'db_stat_blks',
+    'db_stat_tuple_returned',
+    'db_stat_tuple_write',
+    'db_stat_transactions',
+    'db_stat_connections',
+    'database_size',
+    'backend_process',
+    'index_count',
+    'index_size',
+    'table_count',
+    'table_size',
+    'wal',
+    'wal_writes',
+    'archive_wal',
+    'checkpointer',
+    'stat_bgwriter_alloc',
+    'stat_bgwriter_checkpoint',
+    'stat_bgwriter_backend',
+    'stat_bgwriter_backend_fsync',
+    'stat_bgwriter_bgwriter',
+    'stat_bgwriter_maxwritten',
+    'replication_slot',
+    'standby_delta',
+    'autovacuum'
+]
 
 CHARTS = {
     'db_stat_transactions': {
@@ -258,26 +302,30 @@ CHARTS = {
         'lines': [
             ['xact_commit', 'committed', 'incremental'],
             ['xact_rollback', 'rolled back', 'incremental']
-        ]},
+        ]
+    },
     'db_stat_connections': {
         'options': [None, 'Current connections to db', 'count', 'db statistics', 'postgres.db_stat_connections',
                     'line'],
         'lines': [
             ['connections', 'connections', 'absolute']
-        ]},
+        ]
+    },
     'db_stat_blks': {
         'options': [None, 'Disk blocks reads from db', 'reads/s', 'db statistics', 'postgres.db_stat_blks', 'line'],
         'lines': [
             ['blks_read', 'disk', 'incremental'],
             ['blks_hit', 'cache', 'incremental']
-        ]},
+        ]
+    },
     'db_stat_tuple_returned': {
         'options': [None, 'Tuples returned from db', 'tuples/s', 'db statistics', 'postgres.db_stat_tuple_returned',
                     'line'],
         'lines': [
             ['tup_returned', 'sequential', 'incremental'],
             ['tup_fetched', 'bitmap', 'incremental']
-        ]},
+        ]
+    },
     'db_stat_tuple_write': {
         'options': [None, 'Tuples written to db', 'writes/s', 'db statistics', 'postgres.db_stat_tuple_write', 'line'],
         'lines': [
@@ -285,103 +333,128 @@ CHARTS = {
             ['tup_updated', 'updated', 'incremental'],
             ['tup_deleted', 'deleted', 'incremental'],
             ['conflicts', 'conflicts', 'incremental']
-        ]},
+        ]
+    },
     'db_stat_temp_bytes': {
-        'options': [None, 'Temp files written to disk', 'KB/s', 'db statistics', 'postgres.db_stat_temp_bytes', 'line'],
+        'options': [None, 'Temp files written to disk', 'KB/s', 'db statistics', 'postgres.db_stat_temp_bytes',
+                    'line'],
         'lines': [
             ['temp_bytes', 'size', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'db_stat_temp_files': {
-        'options': [None, 'Temp files written to disk', 'files', 'db statistics', 'postgres.db_stat_temp_files', 'line'],
+        'options': [None, 'Temp files written to disk', 'files', 'db statistics', 'postgres.db_stat_temp_files',
+                    'line'],
         'lines': [
             ['temp_files', 'files', 'incremental']
-        ]},
+        ]
+    },
     'database_size': {
         'options': [None, 'Database size', 'MB', 'database size', 'postgres.db_size', 'stacked'],
         'lines': [
-        ]},
+        ]
+    },
     'backend_process': {
         'options': [None, 'Current Backend Processes', 'processes', 'backend processes', 'postgres.backend_process',
                     'line'],
         'lines': [
             ['backends_active', 'active', 'absolute'],
             ['backends_idle', 'idle', 'absolute']
-        ]},
+        ]
+    },
     'index_count': {
         'options': [None, 'Total indexes', 'index', 'indexes', 'postgres.index_count', 'line'],
         'lines': [
             ['index_count', 'total', 'absolute']
-        ]},
+        ]
+    },
     'index_size': {
         'options': [None, 'Indexes size', 'MB', 'indexes', 'postgres.index_size', 'line'],
         'lines': [
             ['index_size', 'size', 'absolute', 1, 1024 * 1024]
-        ]},
+        ]
+    },
     'table_count': {
         'options': [None, 'Total Tables', 'tables', 'tables', 'postgres.table_count', 'line'],
         'lines': [
             ['table_count', 'total', 'absolute']
-        ]},
+        ]
+    },
     'table_size': {
         'options': [None, 'Tables size', 'MB', 'tables', 'postgres.table_size', 'line'],
         'lines': [
             ['table_size', 'size', 'absolute', 1, 1024 * 1024]
-        ]},
+        ]
+    },
     'wal': {
         'options': [None, 'Write-Ahead Logs', 'files', 'wal', 'postgres.wal', 'line'],
         'lines': [
             ['written_wal', 'written', 'absolute'],
             ['recycled_wal', 'recycled', 'absolute'],
             ['total_wal', 'total', 'absolute']
-        ]},
+        ]
+    },
     'wal_writes': {
         'options': [None, 'Write-Ahead Logs', 'kilobytes/s', 'wal_writes', 'postgres.wal_writes', 'line'],
         'lines': [
             ['wal_writes', 'writes', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'archive_wal': {
         'options': [None, 'Archive Write-Ahead Logs', 'files/s', 'archive wal', 'postgres.archive_wal', 'line'],
         'lines': [
             ['file_count', 'total', 'incremental'],
             ['ready_count', 'ready', 'incremental'],
             ['done_count', 'done', 'incremental']
-        ]},
+        ]
+    },
     'checkpointer': {
         'options': [None, 'Checkpoints', 'writes', 'checkpointer', 'postgres.checkpointer', 'line'],
         'lines': [
             ['checkpoint_scheduled', 'scheduled', 'incremental'],
             ['checkpoint_requested', 'requested', 'incremental']
-        ]},
+        ]
+    },
     'stat_bgwriter_alloc': {
         'options': [None, 'Buffers allocated', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_alloc', 'line'],
         'lines': [
             ['buffers_alloc', 'alloc', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'stat_bgwriter_checkpoint': {
-        'options': [None, 'Buffers written during checkpoints', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_checkpoint', 'line'],
+        'options': [None, 'Buffers written during checkpoints', 'kilobytes/s', 'bgwriter',
+                    'postgres.stat_bgwriter_checkpoint', 'line'],
         'lines': [
             ['buffers_checkpoint', 'checkpoint', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'stat_bgwriter_backend': {
-        'options': [None, 'Buffers written directly by a backend', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_backend', 'line'],
+        'options': [None, 'Buffers written directly by a backend', 'kilobytes/s', 'bgwriter',
+                    'postgres.stat_bgwriter_backend', 'line'],
         'lines': [
             ['buffers_backend', 'backend', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'stat_bgwriter_backend_fsync': {
         'options': [None, 'Fsync by backend', 'times', 'bgwriter', 'postgres.stat_bgwriter_backend_fsync', 'line'],
         'lines': [
             ['buffers_backend_fsync', 'backend fsync', 'incremental']
-        ]},
+        ]
+    },
     'stat_bgwriter_bgwriter': {
-        'options': [None, 'Buffers written by the background writer', 'kilobytes/s', 'bgwriter', 'postgres.bgwriter_bgwriter', 'line'],
+        'options': [None, 'Buffers written by the background writer', 'kilobytes/s', 'bgwriter',
+                    'postgres.bgwriter_bgwriter', 'line'],
         'lines': [
             ['buffers_clean', 'clean', 'incremental', 1, 1024]
-        ]},
+        ]
+    },
     'stat_bgwriter_maxwritten': {
-        'options': [None, 'Too many buffers written', 'times', 'bgwriter', 'postgres.stat_bgwriter_maxwritten', 'line'],
+        'options': [None, 'Too many buffers written', 'times', 'bgwriter', 'postgres.stat_bgwriter_maxwritten',
+                    'line'],
         'lines': [
             ['maxwritten_clean', 'maxwritten', 'incremental']
-        ]},
+        ]
+    },
     'autovacuum': {
         'options': [None, 'Autovacuum workers', 'workers', 'autovacuum', 'postgres.autovacuum', 'line'],
         'lines': [
@@ -390,7 +463,8 @@ CHARTS = {
             ['vacuum_analyze', 'vacuum analyze', 'absolute'],
             ['vacuum_freeze', 'vacuum freeze', 'absolute'],
             ['brin_summarize', 'brin summarize', 'absolute']
-        ]},
+        ]
+    },
     'standby_delta': {
         'options': [None, 'Standby delta', 'kilobytes', 'replication delta', 'postgres.standby_delta', 'line'],
         'lines': [
@@ -398,13 +472,15 @@ CHARTS = {
             ['write_delta', 'write delta', 'absolute', 1, 1024],
             ['flush_delta', 'flush delta', 'absolute', 1, 1024],
             ['replay_delta', 'replay delta', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'replication_slot': {
         'options': [None, 'Replication slot files', 'files', 'replication slot', 'postgres.replication_slot', 'line'],
         'lines': [
             ['replslot_wal_keep', 'wal keeped', 'absolute'],
             ['replslot_files', 'pg_replslot files', 'absolute']
-        ]}
+        ]
+    }
 }
 
 
@@ -464,7 +540,7 @@ class Service(SimpleService):
             cursor.close()
 
             if self.database_poll and isinstance(self.database_poll, str):
-                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()]\
+                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()] \
                                  or self.databases
 
             self.locks_zeroed = populate_lock_types(self.databases)
