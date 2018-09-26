@@ -160,6 +160,20 @@ then
     dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d "000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
 fi
 
+
+# -----------------------------------------------------------------------------
+
+progress "create user config directories"
+
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
+do
+    if [ ! -d "etc/netdata/${x}" ]
+        then
+        run mkdir -p "etc/netdata/${x}" || exit 1
+    fi
+done
+
+
 # -----------------------------------------------------------------------------
 progress "fix permissions"
 

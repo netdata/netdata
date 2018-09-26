@@ -732,7 +732,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "stats.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
 do
     if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]
         then
