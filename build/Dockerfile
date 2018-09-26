@@ -5,4 +5,8 @@ RUN apt-get update && apt-get install -y \
     autogen \
     libmnl-dev \
     uuid-dev \
- && rm -rf /var/lib/apt/lists/*
+    rpm \
+    rubygems \
+    ruby-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && gem install fpm
