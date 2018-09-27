@@ -26,28 +26,32 @@ CHARTS = {
         'options': [None, 'nginx Active Connections', 'connections', 'active connections',
                     'nginx.connections', 'line'],
         'lines': [
-            ["active"]
-        ]},
+            ['active']
+        ]
+    },
     'requests': {
         'options': [None, 'nginx Requests', 'requests/s', 'requests', 'nginx.requests', 'line'],
         'lines': [
-            ["requests", None, 'incremental']
-        ]},
+            ['requests', None, 'incremental']
+        ]
+    },
     'connection_status': {
         'options': [None, 'nginx Active Connections by Status', 'connections', 'status',
                     'nginx.connection_status', 'line'],
         'lines': [
-            ["reading"],
-            ["writing"],
-            ["waiting", "idle"]
-        ]},
+            ['reading'],
+            ['writing'],
+            ['waiting', 'idle']
+        ]
+    },
     'connect_rate': {
         'options': [None, 'nginx Connections Rate', 'connections/s', 'connections rate',
                     'nginx.connect_rate', 'line'],
         'lines': [
-            ["accepts", "accepted", "incremental"],
-            ["handled", None, "incremental"]
-        ]}
+            ['accepts', 'accepted', 'incremental'],
+            ['handled', None, 'incremental']
+        ]
+    }
 }
 
 
