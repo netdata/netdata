@@ -17,7 +17,7 @@ ORDER = ['mdstat_health']
 CHARTS = {
     'mdstat_health': {
         'options': [None, 'Faulty Devices In MD', 'failed disks', 'health', 'md.health', 'line'],
-        'lines': list()
+        'lines': []
     }
 }
 
@@ -33,12 +33,13 @@ RE_STATUS = re.compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
 
 
 def md_charts(name):
-    order = ['{0}_disks'.format(name),
-             '{0}_operation'.format(name),
-             '{0}_mismatch_cnt'.format(name),
-             '{0}_finish'.format(name),
-             '{0}_speed'.format(name)
-             ]
+    order = [
+        '{0}_disks'.format(name),
+        '{0}_operation'.format(name),
+        '{0}_mismatch_cnt'.format(name),
+        '{0}_finish'.format(name),
+        '{0}_speed'.format(name)
+    ]
 
     charts = dict()
     charts[order[0]] = {
@@ -85,7 +86,7 @@ def md_charts(name):
 
 class MD:
     def __init__(self, raw_data):
-        self.name = raw_data["array"]
+        self.name = raw_data['array']
         self.d = raw_data
 
     def data(self):

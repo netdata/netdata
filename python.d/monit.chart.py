@@ -12,17 +12,26 @@ priority = 60000
 retries = 60
 
 # see enum State_Type from monit.h (https://bitbucket.org/tildeslash/monit/src/master/src/monit.h)
-MONIT_SERVICE_NAMES = [ 'Filesystem', 'Directory', 'File', 'Process', 'Host', 'System', 'Fifo', 'Program', 'Net' ]
-DEFAULT_SERVICES_IDS = [ 0, 1, 2, 3, 4, 6, 7, 8 ]
+MONIT_SERVICE_NAMES = ['Filesystem', 'Directory', 'File', 'Process', 'Host', 'System', 'Fifo', 'Program', 'Net']
+DEFAULT_SERVICES_IDS = [0, 1, 2, 3, 4, 6, 7, 8]
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = [ 'filesystem', 'directory', 'file', 'process', 'process_uptime', 'process_threads', 'process_children', 'host', 'host_latency', 'system', 'fifo', 'program', 'net' ]
+ORDER = [
+    'filesystem',
+    'directory',
+    'file',
+    'process',
+    'process_uptime',
+    'process_threads',
+    'process_children',
+    'host',
+    'host_latency',
+    'system',
+    'fifo',
+    'program',
+    'net'
+]
 CHARTS = {
-    # id: {
-    #     'options': [name, title, units, family, context, charttype],
-    #     'lines': [
-    #         [unique_dimension_name, name, algorithm, multiplier, divisor]
-    #     ]}
     'filesystem': {
         'options': ['filesystems', 'Filesystems', 'filesystems', 'filesystem', 'monit.filesystems', 'line'],
         'lines': []
@@ -48,15 +57,18 @@ CHARTS = {
         'lines': []
     },
     'process_uptime': {
-        'options': ['processes uptime', 'Processes uptime', 'seconds', 'applications', 'monit.process_uptime', 'line', 'hidden'],
+        'options': ['processes uptime', 'Processes uptime', 'seconds', 'applications',
+                    'monit.process_uptime', 'line', 'hidden'],
         'lines': []
     },
     'process_threads': {
-        'options': ['processes threads', 'Processes threads', 'threads', 'applications', 'monit.process_threads', 'line'],
+        'options': ['processes threads', 'Processes threads', 'threads', 'applications',
+                    'monit.process_threads', 'line'],
         'lines': []
     },
     'process_children': {
-        'options': ['processes childrens', 'Child processes', 'childrens', 'applications', 'monit.process_childrens', 'line'],
+        'options': ['processes childrens', 'Child processes', 'childrens', 'applications',
+                    'monit.process_childrens', 'line'],
         'lines': []
     },
     'host': {
@@ -68,10 +80,12 @@ CHARTS = {
         'lines': []
     },
     'net': {
-        'options': ['interfaces', 'Network interfaces and addresses', 'interfaces', 'network', 'monit.networks', 'line'],
+        'options': ['interfaces', 'Network interfaces and addresses', 'interfaces', 'network',
+                    'monit.networks', 'line'],
         'lines': []
     },
 }
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -112,18 +126,19 @@ class Service(UrlService):
                 continue
 
             xpath_query = "./service[@type='{0}']".format(service_id)
-            self.debug("Searching for {0} as {1}".format(service_category, xpath_query))
+            self.debug('Searching for {0} as {1}'.format(service_category, xpath_query))
             for service_node in xml.findall(xpath_query):
 
                 service_name = service_node.find('name').text
                 service_status = service_node.find('status').text
                 service_monitoring = service_node.find('monitor').text
-                self.debug('=> found {0} with type={1}, status={2}, monitoring={3}'.format(service_name, service_id, service_status, service_monitoring))
+                self.debug('=> found {0} with type={1}, status={2}, monitoring={3}'.format(service_name,
+                           service_id, service_status, service_monitoring))
 
                 dimension_key = service_category + '_' + service_name
                 if dimension_key not in self.charts[service_category]:
                     self.charts[service_category].add_dimension([dimension_key, service_name, 'absolute'])
-                data[dimension_key] = 1 if service_status == "0" and service_monitoring == "1" else 0
+                data[dimension_key] = 1 if service_status == '0' and service_monitoring == '1' else 0
 
                 if service_category == 'process':
                     for subnode in ('uptime', 'threads', 'children'):
@@ -144,7 +159,8 @@ class Service(UrlService):
                         continue
                     dimension_key = 'host_latency_{0}'.format(service_name)
                     if dimension_key not in self.charts['host_latency']:
-                        self.charts['host_latency'].add_dimension([dimension_key, service_name, 'absolute', 1000, 1000000])
+                        self.charts['host_latency'].add_dimension([dimension_key, service_name,
+                                                                   'absolute', 1000, 1000000])
                     data[dimension_key] = float(subnode_value.text) * 1000000
 
         return data or None
