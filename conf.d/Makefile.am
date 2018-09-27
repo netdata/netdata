@@ -34,6 +34,7 @@ dist_pythonconfig_DATA = \
     python.d/ceph.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \
+    python.d/cpuidle.conf \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
     python.d/dnsdist.conf \
