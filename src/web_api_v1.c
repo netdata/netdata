@@ -827,7 +827,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
-    // FIXME
+    // TODO
     // The browser may send multiple cookies with our id
 
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");

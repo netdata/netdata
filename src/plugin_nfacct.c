@@ -21,7 +21,7 @@ static inline size_t mnl_buffer_size() {
 #define DO_NFSTAT 1
 
 #define RRD_TYPE_NET_STAT_NETFILTER "netfilter"
-#define RRD_TYPE_NET_STAT_CONNTRACK "netlink" // FIXME: should be "conntrack" when merged with the /proc plugin
+#define RRD_TYPE_NET_STAT_CONNTRACK "netlink"
 
 #include <linux/netfilter/nfnetlink_conntrack.h>
 
@@ -592,7 +592,7 @@ static void nfacct_cleanup() {
     nfacct_root.buf = NULL;
     nfacct_root.buf_size = 0;
 
-    // FIXME: cleanup the metrics linked list
+    // TODO: cleanup the metrics linked list
 }
 
 static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
