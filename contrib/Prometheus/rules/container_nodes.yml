@@ -3,7 +3,7 @@ groups:
 
   rules:
   - alert: node_high_cpu_usage_70
-    expr: avg(rate(netdata_cpu_cpu_percentage_average{dimension="idle"}[1m])) by (job) > 70
+    expr: avg(rate(netdata_cpu_cpu_percentage_average{dimension="idle"}[1m])) by (job) < 30
     for: 1m
     annotations:
       description: '{{ $labels.job }} on ''{{ $labels.job }}'' CPU usage is at {{ humanize $value}}%.'
