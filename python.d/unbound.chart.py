@@ -67,7 +67,7 @@ EXTENDED_CHARTS = {
 # This is used as a templates for the per-thread charts.
 PER_THREAD_CHARTS = {
     '_queries': {
-        'options': [None, '{longname} Queries Processed', 'queries', 'Queries Processed', 
+        'options': [None, '{longname} Queries Processed', 'queries', 'Queries Processed',
                     'unbound.threads.queries', 'line'],
         'lines': [
             ['{shortname}_ratelimit', 'ratelimited', 'absolute', 1, 1],
