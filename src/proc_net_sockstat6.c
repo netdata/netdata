@@ -126,7 +126,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat6"
-                    , 3599
+                    , NETDATA_CHART_PRIO_IPV6_TCP
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -158,7 +158,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat6"
-                    , 3600
+                    , NETDATA_CHART_PRIO_IPV6_UDP
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -190,7 +190,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat6"
-                    , 3601
+                    , NETDATA_CHART_PRIO_IPV6_UDPLITE
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -222,7 +222,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "sockets"
                     , "proc"
                     , "net/sockstat6"
-                    , 3700
+                    , NETDATA_CHART_PRIO_IPV6_RAW
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -254,7 +254,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "fragments"
                     , "proc"
                     , "net/sockstat6"
-                    , 3010
+                    , NETDATA_CHART_PRIO_IPV6_FRAGMENTS
                     , update_every
                     , RRDSET_TYPE_LINE
             );

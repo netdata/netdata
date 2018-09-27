@@ -37,7 +37,6 @@ extern int get_numa_node_count(void);
 
 // metrics that need to be shared among data collectors
 extern unsigned long long tcpext_TCPSynRetrans;
-extern unsigned long long tcpext_TCPReqQFullDrop;
 
 // netdev renames
 extern void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name);
