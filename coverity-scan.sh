@@ -42,7 +42,7 @@ version="$(grep "^#define PACKAGE_VERSION" config.h | cut -d '"' -f 2)"
 echo >&2 "Working on netdata version: ${version}"
 
 echo >&2 "Cleaning up old builds..."
-make clean || exit 1
+make clean || echo "Nothing to clean"
 
 [ -d "cov-int" ] && rm -rf "cov-int"
 
