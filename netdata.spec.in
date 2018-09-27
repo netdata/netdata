@@ -181,17 +181,18 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(-,root,root)
 
 %dir %{_sysconfdir}/%{name}
+%dir %{_libdir}/%{name}
 
-%config(noreplace) %{_sysconfdir}/%{name}/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
-#%%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/statsd.d/*.conf
-%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
+%config %{_libdir}/%{name}/*.conf
+%config %{_libdir}/%{name}/charts.d/*.conf
+%config %{_libdir}/%{name}/health.d/*.conf
+%config %{_libdir}/%{name}/node.d/*.conf
+%config %{_libdir}/%{name}/python.d/*.conf
+%config %{_libdir}/%{name}/statsd.d/*.conf
+%config %{_sysconfdir}/logrotate.d/%{name}
 
 # To be eventually moved to %%_defaultdocdir
-%{_sysconfdir}/%{name}/node.d/*.md
+%{_libdir}/%{name}/node.d/*.md
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
@@ -215,9 +216,16 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %dir %{_datadir}/%{name}
 %dir %{_sysconfdir}/%{name}/health.d
+%dir %{_libdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
+%dir %{_libdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_libdir}/%{name}/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
+%dir %{_libdir}/%{name}/node.d
+%dir %{_sysconfdir}/%{name}/statsd.d
+%dir %{_libdir}/%{name}/statsd.d
+
 
 %if %{with systemd}
 %{_unitdir}/netdata.service

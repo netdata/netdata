@@ -10,16 +10,17 @@
 #    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ || __APPLE__*/
 
-char *netdata_configured_hostname    = NULL;
-char *netdata_configured_config_dir  = NULL;
-char *netdata_configured_log_dir     = NULL;
-char *netdata_configured_plugins_dir = NULL;
-char *netdata_configured_web_dir     = NULL;
-char *netdata_configured_cache_dir   = NULL;
-char *netdata_configured_varlib_dir  = NULL;
-char *netdata_configured_home_dir    = NULL;
-char *netdata_configured_host_prefix = NULL;
-char *netdata_configured_timezone    = NULL;
+char *netdata_configured_hostname         = NULL;
+char *netdata_configured_user_config_dir  = CONFIG_DIR;
+char *netdata_configured_stock_config_dir = LIBCONFIG_DIR;
+char *netdata_configured_log_dir          = LOG_DIR;
+char *netdata_configured_plugins_dir      = NULL;
+char *netdata_configured_web_dir          = WEB_DIR;
+char *netdata_configured_cache_dir        = CACHE_DIR;
+char *netdata_configured_varlib_dir       = VARLIB_DIR;
+char *netdata_configured_home_dir         = CACHE_DIR;
+char *netdata_configured_host_prefix      = NULL;
+char *netdata_configured_timezone         = NULL;
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;
@@ -1430,4 +1431,192 @@ failed:
     error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
     netdata_configured_host_prefix = "";
     return -1;
+}
+
+char *strdupz_path_subpath(const char *path, const char *subpath) {
+    if(unlikely(!path || !*path)) path = ".";
+    if(unlikely(!subpath)) subpath = "";
+
+    // skip trailing slashes in path
+    size_t len = strlen(path);
+    while(len > 0 && path[len - 1] == '/') len--;
+
+    // skip leading slashes in subpath
+    while(subpath && subpath[0] == '/') subpath++;
+
+    // if the last character in path is / and (there is a subpath or path is now empty)
+    // keep the trailing slash in path and remove the additional slash
+    char *slash = "/";
+    if(path[len] == '/' && (*subpath || len == 0)) {
+        slash = "";
+        len++;
+    }
+    else if(!*subpath) {
+        // there is no subpath
+        // no need for trailing slash
+        slash = "";
+    }
+
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "%.*s%s%s", (int)len, path, slash, (subpath)?subpath:"");
+    return strdupz(buffer);
+}
+
+int path_is_dir(const char *path, const char *subpath) {
+    char *s = strdupz_path_subpath(path, subpath);
+
+    size_t max_links = 100;
+
+    int is_dir = 0;
+    struct stat statbuf;
+    while(max_links-- && stat(s, &statbuf) == 0) {
+        if((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+            is_dir = 1;
+            break;
+        }
+        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+            char buffer[FILENAME_MAX + 1];
+            ssize_t l = readlink(s, buffer, FILENAME_MAX);
+            if(l > 0) {
+                buffer[l] = '\0';
+                freez(s);
+                s = strdupz(buffer);
+                continue;
+            }
+            else {
+                is_dir = 0;
+                break;
+            }
+        }
+        else {
+            is_dir = 0;
+            break;
+        }
+    }
+
+    freez(s);
+    return is_dir;
+}
+
+int path_is_file(const char *path, const char *subpath) {
+    char *s = strdupz_path_subpath(path, subpath);
+
+    size_t max_links = 100;
+
+    int is_file = 0;
+    struct stat statbuf;
+    while(max_links-- && stat(s, &statbuf) == 0) {
+        if((statbuf.st_mode & S_IFMT) == S_IFREG) {
+            is_file = 1;
+            break;
+        }
+        else if((statbuf.st_mode & S_IFMT) == S_IFLNK) {
+            char buffer[FILENAME_MAX + 1];
+            ssize_t l = readlink(s, buffer, FILENAME_MAX);
+            if(l > 0) {
+                buffer[l] = '\0';
+                freez(s);
+                s = strdupz(buffer);
+                continue;
+            }
+            else {
+                is_file = 0;
+                break;
+            }
+        }
+        else {
+            is_file = 0;
+            break;
+        }
+    }
+
+    freez(s);
+    return is_file;
+}
+
+void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data) {
+    char *udir = strdupz_path_subpath(user_path, subpath);
+    char *sdir = strdupz_path_subpath(stock_path, subpath);
+
+    debug(D_HEALTH, "Configuration traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
+
+    DIR *dir = opendir(udir);
+    if (!dir) {
+        error("Configuration cannot open user-config directory '%s'.", udir);
+    }
+    else {
+        struct dirent *de = NULL;
+        while((de = readdir(dir))) {
+            if(de->d_type == DT_DIR
+               && (   (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                      || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+               )) {
+                debug(D_HEALTH, "Configuration ignoring user-config directory '%s/%s'", udir, de->d_name);
+                continue;
+            }
+
+            if(path_is_dir(udir, de->d_name)) {
+                recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data);
+                continue;
+            }
+
+            size_t len = strlen(de->d_name);
+            if(path_is_file(udir, de->d_name) &&
+               len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                char *filename = strdupz_path_subpath(udir, de->d_name);
+                callback(filename, data);
+                freez(filename);
+            }
+
+            else
+                debug(D_HEALTH, "Health ignoring user config file '%s/%s'", udir, de->d_name);
+        }
+
+        closedir(dir);
+    }
+
+    debug(D_HEALTH, "Health configuration traversing stock config directory '%s', user config directory '%s'", sdir, udir);
+
+    dir = opendir(sdir);
+    if (!dir) {
+        error("Health configuration cannot open stock config directory '%s'.", sdir);
+    }
+    else {
+        struct dirent *de = NULL;
+        while((de = readdir(dir))) {
+            if(de->d_type == DT_DIR
+               && (      (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                         || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+               )) {
+                debug(D_HEALTH, "Health ignoring stock config directory '%s/%s'", sdir, de->d_name);
+                continue;
+            }
+
+            if(path_is_dir(sdir, de->d_name)) {
+                // we recurse in stock subdirectory, only when there is no corresponding
+                // user subdirectory - to avoid reading the files twice
+
+                if(!path_is_dir(udir, de->d_name))
+                    recursive_config_double_dir_load(udir, sdir, de->d_name, callback, data);
+
+                continue;
+            }
+
+            size_t len = strlen(de->d_name);
+            if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
+               len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+                char *filename = strdupz_path_subpath(sdir, de->d_name);
+                callback(filename, data);
+                freez(filename);
+            }
+
+            else
+                debug(D_HEALTH, "Health ignoring stock config file '%s/%s'", sdir, de->d_name);
+        }
+
+        closedir(dir);
+    }
+
+    freez(udir);
+    freez(sdir);
 }

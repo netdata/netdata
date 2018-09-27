@@ -73,27 +73,6 @@ run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
 
 # -----------------------------------------------------------------------------
-# move etc to protect the destination when unpacked
-
-if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
-    then
-    if [ -d "${NETDATA_INSTALL_PATH}/etc.new" ]
-        then
-        run rm -rf "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
-    fi
-
-    run mv "${NETDATA_INSTALL_PATH}/etc" \
-        "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
-
-    if [ -f "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf" ]
-        then
-        # delete the generated netdata.conf, so that the static installer will generate a new one
-        run rm "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf"
-    fi
-fi
-
-
-# -----------------------------------------------------------------------------
 # remove the links to allow untaring the archive
 
 run rm "${NETDATA_INSTALL_PATH}/sbin" \

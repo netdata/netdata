@@ -1031,7 +1031,7 @@ void *statsd_collector_thread(void *ptr) {
 
 #define STATSD_CONF_LINE_MAX 8192
 
-static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t line, const char *path, const char *filename) {
+static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t line, const char *filename) {
     if(!type || !*type) type = "last";
 
     if(!strcmp(type, "events")) return STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS;
@@ -1044,7 +1044,7 @@ static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t
     else if(!strcmp(type, "stddev")) return STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
     else if(!strcmp(type, "percentile")) return STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
 
-    error("STATSD: invalid type '%s' at line %zu of file '%s/%s'. Using 'last'.", type, line, path, filename);
+    error("STATSD: invalid type '%s' at line %zu of file '%s'. Using 'last'.", type, line, filename);
     return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
 }
 
@@ -1110,19 +1110,14 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     return dim;
 }
 
-static int statsd_readfile(const char *path, const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
-    debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
+static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
+    debug(D_STATSD, "STATSD configuration reading file '%s'", filename);
 
     char *buffer = mallocz(STATSD_CONF_LINE_MAX + 1);
 
-    if(filename[0] == '/')
-        strncpyz(buffer, filename, STATSD_CONF_LINE_MAX);
-    else
-        snprintfz(buffer, STATSD_CONF_LINE_MAX, "%s/%s", path, filename);
-
-    FILE *fp = fopen(buffer, "r");
+    FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("STATSD: cannot open file '%s'.", buffer);
+        error("STATSD: cannot open file '%s'.", filename);
         freez(buffer);
         return -1;
     }
@@ -1135,18 +1130,31 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
 
         s = trim(buffer);
         if (!s || *s == '#') {
-            debug(D_STATSD, "STATSD: ignoring line %zu of file '%s/%s', it is empty.", line, path, filename);
+            debug(D_STATSD, "STATSD: ignoring line %zu of file '%s', it is empty.", line, filename);
             continue;
         }
 
-        debug(D_STATSD, "STATSD: processing line %zu of file '%s/%s': %s", line, path, filename, buffer);
+        debug(D_STATSD, "STATSD: processing line %zu of file '%s': %s", line, filename, buffer);
 
         if(*s == 'i' && strncmp(s, "include", 7) == 0) {
             s = trim(&s[7]);
-            if(s && *s)
-                statsd_readfile(path, s, app, chart, dict);
+            if(s && *s) {
+                char *tmp;
+                if(*s == '/')
+                    tmp = strdupz(s);
+                else {
+                    // the file to be included is relative to current file
+                    // find the directory name from the file we already read
+                    char *filename2 = strdupz(filename); // copy filename, since dirname() will change it
+                    char *dir = dirname(filename2);      // find the directory part of the filename
+                    tmp = strdupz_path_subpath(dir, s);  // compose the new filename to read;
+                    freez(filename2);                    // free the filename we copied
+                }
+                statsd_readfile(tmp, app, chart, dict);
+                freez(tmp);
+            }
             else
-                error("STATSD: ignoring line %zu of file '%s/%s', include filename is empty", line, path, s);
+                error("STATSD: ignoring line %zu of file '%s', include filename is empty", line, filename);
 
             continue;
         }
@@ -1208,20 +1216,20 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
                 }
             }
             else
-                error("STATSD: ignoring line %zu ('%s') of file '%s/%s', [app] is not defined.", line, s, path, filename);
+                error("STATSD: ignoring line %zu ('%s') of file '%s', [app] is not defined.", line, s, filename);
 
             continue;
         }
 
         if(!app) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s/%s', it is outside all sections.", line, s, path, filename);
+            error("STATSD: ignoring line %zu ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
-            error("STATSD: ignoring line %zu ('%s') of file '%s/%s', there is no = in it.", line, s, path, filename);
+            error("STATSD: ignoring line %zu ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -1231,11 +1239,11 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
         value = trim(value);
 
         if(!name || *name == '#') {
-            error("STATSD: ignoring line %zu of file '%s/%s', name is empty.", line, path, filename);
+            error("STATSD: ignoring line %zu of file '%s', name is empty.", line, filename);
             continue;
         }
         if(!value) {
-            debug(D_CONFIG, "STATSD: ignoring line %zu of file '%s/%s', value is empty.", line, path, filename);
+            debug(D_CONFIG, "STATSD: ignoring line %zu of file '%s', value is empty.", line, filename);
             continue;
         }
 
@@ -1275,7 +1283,7 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
                     app->rrd_history_entries = 5;
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [app] section.", line, name, path, filename);
+                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [app] section.", line, name, filename);
                 continue;
             }
         }
@@ -1360,14 +1368,14 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
                         , (multipler && *multipler)?str2l(multipler):1
                         , (divisor && *divisor)?str2l(divisor):1
                         , flags
-                        , string2valuetype(type, line, path, filename)
+                        , string2valuetype(type, line, filename)
                 );
 
                 if(pattern)
                     dim->metric_pattern = simple_pattern_create(dim->metric, NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
-                error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
+                error("STATSD: ignoring line %zu ('%s') of file '%s'. Unknown keyword for the [%s] section.", line, name, filename, chart->id);
                 continue;
             }
         }
@@ -1378,49 +1386,13 @@ static int statsd_readfile(const char *path, const char *filename, STATSD_APP *a
     return 0;
 }
 
-static void statsd_readdir(const char *path) {
-    size_t pathlen = strlen(path);
+static int statsd_file_callback(const char *filename, void *data) {
+    (void)data;
+    return statsd_readfile(filename, NULL, NULL, NULL);
+}
 
-    debug(D_STATSD, "STATSD configuration reading directory '%s'", path);
-
-    DIR *dir = opendir(path);
-    if (!dir) {
-        error("STATSD configuration cannot open directory '%s'.", path);
-        return;
-    }
-
-    struct dirent *de = NULL;
-    while ((de = readdir(dir))) {
-        size_t len = strlen(de->d_name);
-
-        if(de->d_type == DT_DIR
-           && (
-                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           )) {
-            debug(D_STATSD, "STATSD: ignoring directory '%s'", de->d_name);
-            continue;
-        }
-
-        else if(de->d_type == DT_DIR) {
-            char *s = mallocz(pathlen + strlen(de->d_name) + 2);
-            strcpy(s, path);
-            strcat(s, "/");
-            strcat(s, de->d_name);
-            statsd_readdir(s);
-            freez(s);
-            continue;
-        }
-
-        else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
-                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-            statsd_readfile(path, de->d_name, NULL, NULL, NULL);
-        }
-
-        else debug(D_STATSD, "STATSD: ignoring file '%s'", de->d_name);
-    }
-
-    closedir(dir);
+static inline void statsd_readdir(const char *user_path, const char *stock_path, const char *subpath) {
+    recursive_config_double_dir_load(user_path, stock_path, subpath, statsd_file_callback, NULL);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -2243,11 +2215,7 @@ void *statsd_main(void *ptr) {
 #endif
 
     // read custom application definitions
-    {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/statsd.d", netdata_configured_config_dir);
-        statsd_readdir(filename);
-    }
+    statsd_readdir(netdata_configured_user_config_dir, netdata_configured_stock_config_dir, "statsd.d");
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd setup

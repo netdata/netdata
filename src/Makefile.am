@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 	-DVARLIB_DIR="\"$(varlibdir)\"" \
 	-DCACHE_DIR="\"$(cachedir)\"" \
 	-DCONFIG_DIR="\"$(configdir)\"" \
+	-DLIBCONFIG_DIR="\"$(libconfigdir)\"" \
 	-DLOG_DIR="\"$(logdir)\"" \
 	-DPLUGINS_DIR="\"$(pluginsdir)\"" \
 	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \

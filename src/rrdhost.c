@@ -240,7 +240,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         health_alarm_log_open(host);
 
         rrdhost_wrlock(host);
-        health_readdir(host, health_config_dir());
+        health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
     }
 

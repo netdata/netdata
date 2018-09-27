@@ -65,6 +65,7 @@ declare -A configs_signatures=(
   ['111ead4b350593dd69b6f7ac0307b49b']='python.d/httpcheck.conf'
   ['12a4c7803ae79506a14ea784fea60dce']='health.d/net.conf'
   ['12d27b9f4d1696c2d49a77ed71d68e6f']='python.d/w1sensor.conf'
+  ['12e57bea1127933a4fe49ce2e9674f4d']='statsd.d/example.conf'
   ['13141998a5d71308d9c119834c27bfd3']='python.d.conf'
   ['13ccf65fd879795f0fcea89ade27c2d0']='health.d/swap.conf'
   ['13e861a3d2f3075de883994ab54df658']='health.d/megacli.conf'

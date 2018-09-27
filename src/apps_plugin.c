@@ -100,8 +100,9 @@ static int
         include_exited_childs = 1;
 
 
-// will be changed to getenv(NETDATA_CONFIG_DIR) if it exists
-static char *config_dir = CONFIG_DIR;
+// will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
 
 // ----------------------------------------------------------------------------
 // internal flags
@@ -631,11 +632,11 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 }
 
 // read the apps_groups.conf file
-static int read_apps_groups_conf(const char *file)
+static int read_apps_groups_conf(const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, file);
+    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", path, file);
 
     debug_log("process groups file: '%s'", filename);
 
@@ -3569,10 +3570,18 @@ static void parse_args(int argc, char **argv)
 
     if(freq > 0) update_every = freq;
 
-    if(read_apps_groups_conf("groups")) {
-        error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", config_dir);
-        exit(1);
+    if(read_apps_groups_conf(user_config_dir, "groups")) {
+        error("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+
+        if(read_apps_groups_conf(stock_config_dir, "groups")) {
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
+            exit(1);
+        }
+        else
+            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
+    else
+        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
@@ -3658,12 +3667,19 @@ int main(int argc, char **argv) {
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
 
-    config_dir = getenv("NETDATA_CONFIG_DIR");
-    if(config_dir == NULL) {
+    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(user_config_dir == NULL) {
         // info("NETDATA_CONFIG_DIR is not passed from netdata");
-        config_dir = CONFIG_DIR;
+        user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
+    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+
+    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(stock_config_dir == NULL) {
+        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        stock_config_dir = LIBCONFIG_DIR;
+    }
+    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {

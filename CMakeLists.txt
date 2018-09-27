@@ -250,7 +250,7 @@ set(CGROUP_NETWORK_SOURCE_FILES
 
 include_directories(AFTER .)
 
-add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
+add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
 
 add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES})
 target_link_libraries (netdata m z uuid mnl netfilter_acct ${CMAKE_THREAD_LIBS_INIT})
