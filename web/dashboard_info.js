@@ -47,6 +47,17 @@ netdataDashboard.menu = {
         info: 'Performance metrics for network interfaces.'
     },
 
+    'ip': {
+        title: 'Networking Stack',
+        icon: '<i class="fas fa-cloud"></i>',
+        info: function (os) {
+            if(os === "linux")
+                return 'Metrics for the networking stack of the system. These metrics are collected from <code>/proc/net/netstat</code>, apply to both IPv4 and IPv6 traffic and are related to operation of the kernel networking stack.';
+            else
+                return 'Metrics for the networking stack of the system.';
+        }
+    },
+
     'ipv4': {
         title: 'IPv4 Networking',
         icon: '<i class="fas fa-cloud"></i>',
@@ -501,7 +512,7 @@ netdataDashboard.submenu = {
         info: 'Non-Uniform Memory Access (NUMA) is a hierarchical memory design the memory access time is dependent on locality. Under NUMA, a processor can access its own local memory faster than non-local memory (memory local to another processor or memory shared between processors). The individual metrics are described in the <a href="https://www.kernel.org/doc/Documentation/numastat.txt" target="_blank">Linux kernel documentation</a>.'
     },
 
-    'ipv4.ecn': {
+    'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> is a TCP extension that allows end-to-end notification of network congestion without dropping packets. ECN is an optional feature that may be used between two ECN-enabled endpoints when the underlying network infrastructure also supports it.'
     },
 
@@ -687,6 +698,10 @@ netdataDashboard.context = {
         }
     },
 
+    'system.ip': {
+        info: 'Total IP traffic in the system.'
+    },
+
     'system.ipv4': {
         info: 'Total IPv4 Traffic.'
     },
@@ -796,15 +811,46 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // IPv4
+    // IP
 
-    'ipv4.tcpmemorypressures': {
+    'ip.inerrors': {
+        info: 'Errors encountered during the reception of IP packets. ' +
+            '<code>noroutes</code> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
+            '<code>truncated</code> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
+            '<code>checksum</code> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+    },
+
+    'ip.tcpmemorypressures': {
         info: 'Number of times a socket was put in <b>memory pressure</b> due to a non fatal memory allocation failure (the kernel attempts to work around this situation by reducing the send buffers, etc).'
     },
 
-    'ipv4.tcpconnaborts': {
+    'ip.tcpconnaborts': {
         info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
     },
+
+    'ip.tcp_syn_queue': {
+        info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
+            'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
+            'is not configured to fall back to SYN cookies*. Overflows are usually caused by SYN flood DoS attacks ' +
+            '(i.e. someone sends lots of SYN packets and never completes the handshakes). ' +
+            '<b>drops</b> (or <code>TcpExtTCPReqQFullDrop</code>) is the number of connections dropped because the ' +
+            'SYN queue was full and SYN cookies were disabled. ' +
+            '<b>cookies</b> (or <code>TcpExtTCPReqQFullDoCookies</code>) is the number of SYN cookies sent because the ' +
+            'SYN queue was full.'
+    },
+
+    'ip.tcp_accept_queue': {
+        info: 'The <b>accept queue</b> of the kernel holds the fully established TCP connections, waiting to be handled ' +
+            'by the listening application. <b>overflows</b> (or <code>ListenOverflows</code>) is the number of ' +
+            'established connections that could not be handled because the receive queue of the listening application ' +
+            'was full. <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming ' +
+            'connections that could not be handled, including SYN floods, overflows, out of memory, security issues, ' +
+            'no route to destination, reception of related ICMP messages, socket is broadcast or multicast.'
+    },
+
+
+    // ------------------------------------------------------------------------
+    // IPv4
 
     'ipv4.tcpsock': {
         info: 'The number of established TCP connections (known as <code>CurrEstab</code>). This is a snapshot of the established connections at the time of measurement (i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
@@ -826,11 +872,6 @@ netdataDashboard.context = {
             + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
             + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
-    },
-
-    'ipv4.tcplistenissues': {
-        info: '<b>overflows</b> (or <code>ListenOverflows</code>) is the number of incoming connections that could not be handled because the receive queue of the application was full (for both IPv4 and IPv6).'
-            + ' <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming connections that could not be handled, including SYN floods, overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
     },
 
     // ------------------------------------------------------------------------

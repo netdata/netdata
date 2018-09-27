@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common.h"
+
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
 
@@ -31,7 +33,10 @@ extern struct config
 
 #define CONFIG_BOOLEAN_NO   0
 #define CONFIG_BOOLEAN_YES  1
+
+#ifndef CONFIG_BOOLEAN_AUTO
 #define CONFIG_BOOLEAN_AUTO 2
+#endif
 
 extern int appconfig_load(struct config *root, char *filename, int overwrite_used);
 

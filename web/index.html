@@ -1773,6 +1773,29 @@
                     + ' data-common-units="system.net.mainhead"'
                     + ' role="application"></div>';
             }
+            else if(typeof charts['system.ip'] !== 'undefined') {
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ip"'
+                    + ' data-dimensions="received"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="IP Inbound"'
+                    + ' data-width="11%"'
+                    + ' data-before="0"'
+                    + ' data-after="-' + duration.toString() + '"'
+                    + ' data-points="' + duration.toString() + '"'
+                    + ' data-common-units="system.ip.mainhead"'
+                    + ' role="application"></div>';
+
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ip"'
+                    + ' data-dimensions="sent"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="IP Outbound"'
+                    + ' data-width="11%"'
+                    + ' data-before="0"'
+                    + ' data-after="-' + duration.toString() + '"'
+                    + ' data-points="' + duration.toString() + '"'
+                    + ' data-common-units="system.ip.mainhead"'
+                    + ' role="application"></div>';
+            }
             else if(typeof charts['system.ipv4'] !== 'undefined') {
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv4"'
                     + ' data-dimensions="received"'
@@ -4434,7 +4457,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverStatic + 'dashboard_info.js?v20180922-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20180926-3',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
