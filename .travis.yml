@@ -46,7 +46,11 @@ jobs:
       env: INSTALL_COVERITY="true"
       if: type = cron
     - stage: "build"
-      name: "ubuntu 14.04 (not containerized)"
+      name: "OSX"
+      install: brew install fakeroot ossp-uuid
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+      os: osx
+    - name: "ubuntu 14.04 (not containerized)"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
     - name: "ubuntu 18.04"
@@ -58,10 +62,6 @@ jobs:
 # TODO: cannot run installer without bash
 #    - name: "alpine"
 #      script: ./.travis/containerized_build.sh alpine
-    - name: "OSX"
-      install: brew install fakeroot ossp-uuid
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-      os: osx
     - stage: "release"
       name: "Docker"
       script: docker/build.sh
