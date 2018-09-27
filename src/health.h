@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "common.h"
+
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H 1
 
@@ -415,8 +417,9 @@ extern void health_alarm_log(
         uint32_t flags
 );
 
-extern void health_readdir(RRDHOST *host, const char *path);
-extern char *health_config_dir(void);
+extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
+extern char *health_user_config_dir(void);
+extern char *health_stock_config_dir(void);
 extern void health_reload_host(RRDHOST *host);
 extern void health_alarm_log_free(RRDHOST *host);
 

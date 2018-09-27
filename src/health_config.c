@@ -178,7 +178,7 @@ static inline int health_parse_duration(char *string, int *result) {
 }
 
 static inline int health_parse_delay(
-        size_t line, const char *path, const char *file, char *string,
+        size_t line, const char *filename, char *string,
         int *delay_up_duration,
         int *delay_down_duration,
         int *delay_max_duration,
@@ -204,36 +204,36 @@ static inline int health_parse_delay(
 
         if(!strcasecmp(key, "up")) {
             if (!health_parse_duration(value, delay_up_duration)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
             else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
             if (!health_parse_duration(value, delay_down_duration)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
             else given_down = 1;
         }
         else if(!strcasecmp(key, "multiplier")) {
             *delay_multiplier = strtof(value, NULL);
             if(isnan(*delay_multiplier) || isinf(*delay_multiplier) || islessequal(*delay_multiplier, 0)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
             else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
             if (!health_parse_duration(value, delay_max_duration)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid value '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
             else given_max = 1;
         }
         else {
-            error("Health configuration at line %zu of file '%s/%s': unknown keyword '%s'",
-                    line, path, file, key);
+            error("Health configuration at line %zu of file '%s': unknown keyword '%s'",
+                    line, filename, key);
         }
     }
 
@@ -287,11 +287,11 @@ static inline uint32_t health_parse_options(const char *s) {
 }
 
 static inline int health_parse_db_lookup(
-        size_t line, const char *path, const char *file, char *string,
+        size_t line, const char *filename, char *string,
         int *group_method, int *after, int *before, int *every,
         uint32_t *options, char **dimensions
 ) {
-    debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s/%s: %s", line, path, file, string);
+    debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
     if(*dimensions) freez(*dimensions);
     *dimensions = NULL;
@@ -307,14 +307,14 @@ static inline int health_parse_db_lookup(
     while(*s && !isspace(*s)) s++;
     while(*s && isspace(*s)) *s++ = '\0';
     if(!*s) {
-        error("Health configuration invalid chart calculation at line %zu of file '%s/%s': expected group method followed by the 'after' time, but got '%s'",
-                line, path, file, key);
+        error("Health configuration invalid chart calculation at line %zu of file '%s': expected group method followed by the 'after' time, but got '%s'",
+                line, filename, key);
         return 0;
     }
 
     if((*group_method = web_client_api_request_v1_data_group(key, -1)) == -1) {
-        error("Health configuration at line %zu of file '%s/%s': invalid group method '%s'",
-                line, path, file, key);
+        error("Health configuration at line %zu of file '%s': invalid group method '%s'",
+                line, filename, key);
         return 0;
     }
 
@@ -324,8 +324,8 @@ static inline int health_parse_db_lookup(
     while(*s && isspace(*s)) *s++ = '\0';
 
     if(!health_parse_duration(key, after)) {
-        error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' after group method",
-                line, path, file, key);
+        error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
+                line, filename, key);
         return 0;
     }
 
@@ -345,8 +345,8 @@ static inline int health_parse_db_lookup(
             while(*s && isspace(*s)) *s++ = '\0';
 
             if (!health_parse_duration(value, before)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
         }
         else if(!strcasecmp(key, HEALTH_EVERY_KEY)) {
@@ -355,8 +355,8 @@ static inline int health_parse_db_lookup(
             while(*s && isspace(*s)) *s++ = '\0';
 
             if (!health_parse_duration(value, every)) {
-                error("Health configuration at line %zu of file '%s/%s': invalid duration '%s' for '%s' keyword",
-                        line, path, file, value, key);
+                error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
+                        line, filename, value, key);
             }
         }
         else if(!strcasecmp(key, "absolute") || !strcasecmp(key, "abs") || !strcasecmp(key, "absolute_sum")) {
@@ -386,17 +386,17 @@ static inline int health_parse_db_lookup(
             break;
         }
         else {
-            error("Health configuration at line %zu of file '%s/%s': unknown keyword '%s'",
-                    line, path, file, key);
+            error("Health configuration at line %zu of file '%s': unknown keyword '%s'",
+                    line, filename, key);
         }
     }
 
     return 1;
 }
 
-static inline char *health_source_file(size_t line, const char *path, const char *filename) {
+static inline char *health_source_file(size_t line, const char *file) {
     char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%zu@%s/%s", line, path, filename);
+    snprintfz(buffer, FILENAME_MAX, "%zu@%s", line, file);
     return strdupz(buffer);
 }
 
@@ -407,8 +407,10 @@ static inline void strip_quotes(char *s) {
     }
 }
 
-int health_readfile(RRDHOST *host, const char *path, const char *filename) {
-    debug(D_HEALTH, "Health configuration reading file '%s/%s'", path, filename);
+static int health_readfile(const char *filename, void *data) {
+    RRDHOST *host = (RRDHOST *)data;
+
+    debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
     static uint32_t
             hash_alarm = 0,
@@ -455,10 +457,9 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
     }
 
-    snprintfz(buffer, HEALTH_CONF_MAX_LINE, "%s/%s", path, filename);
-    FILE *fp = fopen(buffer, "r");
+    FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("Health configuration cannot read file '%s'.", buffer);
+        error("Health configuration cannot read file '%s'.", filename);
         return 0;
     }
 
@@ -481,7 +482,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             if(append < HEALTH_CONF_MAX_LINE)
                 continue;
             else {
-                error("Health configuration has too long muli-line at line %zu of file '%s/%s'.", line, path, filename);
+                error("Health configuration has too long muli-line at line %zu of file '%s'.", line, filename);
             }
         }
         append = 0;
@@ -489,7 +490,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         char *key = s;
         while(*s && *s != ':') s++;
         if(!*s) {
-            error("Health configuration has invalid line %zu of file '%s/%s'. It does not contain a ':'. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s'. It does not contain a ':'. Ignoring it.", line, filename);
             continue;
         }
         *s = '\0';
@@ -500,12 +501,12 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         value = trim_all(value);
 
         if(!key) {
-            error("Health configuration has invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s'. Keyword is empty. Ignoring it.", line, filename);
             continue;
         }
 
         if(!value) {
-            error("Health configuration has invalid line %zu of file '%s/%s'. value is empty. Ignoring it.", line, path, filename);
+            error("Health configuration has invalid line %zu of file '%s'. value is empty. Ignoring it.", line, filename);
             continue;
         }
 
@@ -526,7 +527,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             rc->next_event_id = 1;
             rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
-            rc->source = health_source_file(line, path, filename);
+            rc->source = health_source_file(line, filename);
             rc->green = NAN;
             rc->red = NAN;
             rc->value = NAN;
@@ -552,7 +553,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
-            rt->source = health_source_file(line, path, filename);
+            rt->source = health_source_file(line, filename);
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
@@ -568,10 +569,10 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 
             if(!simple_pattern_matches(os_pattern, host->os)) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s/%s: host O/S does not match '%s'", host->hostname, rc->name, line, path, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rc->name, line, filename, os_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s/%s: host O/S does not match '%s'", host->hostname, rt->name, line, path, filename, os_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: host O/S does not match '%s'", host->hostname, rt->name, line, filename, os_match);
 
                 ignore_this = 1;
             }
@@ -584,10 +585,10 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 
             if(!simple_pattern_matches(host_pattern, host->hostname)) {
                 if(rc)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s/%s: hostname does not match '%s'", host->hostname, rc->name, line, path, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rc->name, line, filename, host_match);
 
                 if(rt)
-                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s/%s: hostname does not match '%s'", host->hostname, rt->name, line, path, filename, host_match);
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s: hostname does not match '%s'", host->hostname, rt->name, line, filename, host_match);
 
                 ignore_this = 1;
             }
@@ -598,8 +599,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rc->chart) {
                     if(strcmp(rc->chart, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rc->name, key, rc->chart, value, value);
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->chart, value, value);
 
                     freez(rc->chart);
                 }
@@ -607,29 +608,29 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_db_lookup(line, path, filename, value, &rc->group, &rc->after, &rc->before,
+                health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
                         &rc->update_every,
                         &rc->options, &rc->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!health_parse_duration(value, &rc->update_every))
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
-                            line, path, filename, rc->name, key, value);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
+                            line, filename, rc->name, key, value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
                 rc->green = str2ld(value, &e);
                 if(e && *e) {
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, path, filename, rc->name, key, e);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                            line, filename, rc->name, key, e);
                 }
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
                 rc->red = str2ld(value, &e);
                 if(e && *e) {
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, path, filename, rc->name, key, e);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
+                            line, filename, rc->name, key, e);
                 }
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
@@ -637,8 +638,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rc->calculation = expression_parse(value, &failed_at, &error);
                 if(!rc->calculation) {
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
@@ -646,8 +647,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rc->warning = expression_parse(value, &failed_at, &error);
                 if(!rc->warning) {
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
@@ -655,15 +656,15 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rc->critical = expression_parse(value, &failed_at, &error);
                 if(!rc->critical) {
-                    error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rc->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rc->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rc->exec) {
                     if(strcmp(rc->exec, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rc->name, key, rc->exec, value, value);
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->exec, value, value);
 
                     freez(rc->exec);
                 }
@@ -672,8 +673,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
                     if(strcmp(rc->recipient, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rc->name, key, rc->recipient, value, value);
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->recipient, value, value);
 
                     freez(rc->recipient);
                 }
@@ -682,8 +683,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
                     if(strcmp(rc->units, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rc->name, key, rc->units, value, value);
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->units, value, value);
 
                     freez(rc->units);
                 }
@@ -693,8 +694,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rc->info) {
                     if(strcmp(rc->info, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rc->name, key, rc->info, value, value);
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rc->name, key, rc->info, value, value);
 
                     freez(rc->info);
                 }
@@ -702,22 +703,22 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 strip_quotes(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
-                health_parse_delay(line, path, filename, value, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
+                health_parse_delay(line, filename, value, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
             }
             else {
-                error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has unknown key '%s'.",
-                        line, path, filename, rc->name, key);
+                error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
+                        line, filename, rc->name, key);
             }
         }
         else if(rt) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rt->context) {
                     if(strcmp(rt->context, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rt->name, key, rt->context, value, value);
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rt->name, key, rt->context, value, value);
 
                     freez(rt->context);
                 }
@@ -732,28 +733,28 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 rt->family_pattern = simple_pattern_create(rt->family_match, NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_db_lookup(line, path, filename, value, &rt->group, &rt->after, &rt->before,
+                health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
                         &rt->update_every, &rt->options, &rt->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!health_parse_duration(value, &rt->update_every))
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
-                            line, path, filename, rt->name, key, value);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
+                            line, filename, rt->name, key, value);
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
                 rt->green = str2ld(value, &e);
                 if(e && *e) {
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, path, filename, rt->name, key, e);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                            line, filename, rt->name, key, e);
                 }
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
                 rt->red = str2ld(value, &e);
                 if(e && *e) {
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, path, filename, rt->name, key, e);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                            line, filename, rt->name, key, e);
                 }
             }
             else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
@@ -761,8 +762,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rt->calculation = expression_parse(value, &failed_at, &error);
                 if(!rt->calculation) {
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
@@ -770,8 +771,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rt->warning = expression_parse(value, &failed_at, &error);
                 if(!rt->warning) {
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
@@ -779,15 +780,15 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 int error = 0;
                 rt->critical = expression_parse(value, &failed_at, &error);
                 if(!rt->critical) {
-                    error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, path, filename, rt->name, key, value, expression_strerror(error), failed_at);
+                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
                 }
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rt->exec) {
                     if(strcmp(rt->exec, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rt->name, key, rt->exec, value, value);
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rt->name, key, rt->exec, value, value);
 
                     freez(rt->exec);
                 }
@@ -796,8 +797,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
                     if(strcmp(rt->recipient, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rt->name, key, rt->recipient, value, value);
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rt->name, key, rt->recipient, value, value);
 
                     freez(rt->recipient);
                 }
@@ -806,8 +807,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
                     if(strcmp(rt->units, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rt->name, key, rt->units, value, value);
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rt->name, key, rt->units, value, value);
 
                     freez(rt->units);
                 }
@@ -817,8 +818,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rt->info) {
                     if(strcmp(rt->info, value) != 0)
-                        error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, path, filename, rt->name, key, rt->info, value, value);
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                                line, filename, rt->name, key, rt->info, value, value);
 
                     freez(rt->info);
                 }
@@ -826,19 +827,19 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 strip_quotes(rt->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
-                health_parse_delay(line, path, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
+                health_parse_delay(line, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rt->options |= health_parse_options(value);
             }
             else {
-                error("Health configuration at line %zu of file '%s/%s' for template '%s' has unknown key '%s'.",
-                        line, path, filename, rt->name, key);
+                error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
+                        line, filename, rt->name, key);
             }
         }
         else {
-            error("Health configuration at line %zu of file '%s/%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",
-                    line, path, filename, key);
+            error("Health configuration at line %zu of file '%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",
+                    line, filename, key);
         }
     }
 
@@ -852,51 +853,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
     return 1;
 }
 
-void health_readdir(RRDHOST *host, const char *path) {
-    if(!host->health_enabled) return;
-
-    size_t pathlen = strlen(path);
-
-    debug(D_HEALTH, "Health configuration reading directory '%s'", path);
-
-    DIR *dir = opendir(path);
-    if (!dir) {
-        error("Health configuration cannot open directory '%s'.", path);
-        return;
-    }
-
-    struct dirent *de = NULL;
-    while ((de = readdir(dir))) {
-        size_t len = strlen(de->d_name);
-
-        if(de->d_type == DT_DIR
-           && (
-                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           )) {
-            debug(D_HEALTH, "Ignoring directory '%s'", de->d_name);
-            continue;
-        }
-
-        else if(de->d_type == DT_DIR) {
-            char *s = mallocz(pathlen + strlen(de->d_name) + 2);
-            strcpy(s, path);
-            strcat(s, "/");
-            strcat(s, de->d_name);
-            health_readdir(host, s);
-            freez(s);
-            continue;
-        }
-
-        else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
-                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-            health_readfile(host, path, de->d_name);
-        }
-
-        else debug(D_HEALTH, "Ignoring file '%s'", de->d_name);
-    }
-
-    closedir(dir);
+void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
+    if(unlikely(!host->health_enabled)) return;
+    recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host);
 }
-
-

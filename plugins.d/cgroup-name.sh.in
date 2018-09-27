@@ -51,9 +51,10 @@ debug() {
 
 # -----------------------------------------------------------------------------
 
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
-CONFIG="${NETDATA_CONFIG_DIR}/cgroups-names.conf"
 CGROUP="${1}"
 NAME=
 
@@ -64,16 +65,21 @@ if [ -z "${CGROUP}" ]
     fatal "called without a cgroup name. Nothing to do."
 fi
 
-if [ -f "${CONFIG}" ]
+for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_CONFIG_DIR}/cgroups-names.conf"
+do
+    if [ -f "${CONFIG}" ]
     then
-    NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
-    if [ -z "${NAME}" ]
-        then
-        info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
+        NAME="$(grep "^${CGROUP} " "${CONFIG}" | sed "s/[[:space:]]\+/ /g" | cut -d ' ' -f 2)"
+        if [ -z "${NAME}" ]
+            then
+            info "cannot find cgroup '${CGROUP}' in '${CONFIG}'."
+        else
+            break
+        fi
+    #else
+    #   info "configuration file '${CONFIG}' is not available."
     fi
-#else
-#   info "configuration file '${CONFIG}' is not available."
-fi
+done
 
 function docker_get_name_classic {
     local id="${1}"

@@ -492,6 +492,7 @@ progress "Cleanup compilation directory"
 
 [ -f src/netdata ] && run make clean
 
+
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
@@ -543,97 +544,81 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 fi
 
 # -----------------------------------------------------------------------------
-progress "Backup existing netdata configuration before installing it"
-
-if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+deleted_stock_configs=0
+if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then
-    declare -A configs_signatures=()
-    if [ -f "configs.signatures" ]
-        then
-        source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
-    fi
-fi
 
-config_signature_matches() {
-    local md5="${1}" file="${2}"
+    progress "Backup existing netdata configuration before installing it"
 
     if [ "${BASH_VERSINFO[0]}" -ge "4" ]
-        then
-        [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
-        return 1
-    fi
-
-    if [ -f "configs.signatures" ]
-        then
-        grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
-        return $?
-    fi
-
-    return 1
-}
-
-# backup user configurations
-installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -name '*.conf' -type f)
-do
-    if [ -f "${x}" ]
-        then
-        # make a backup of the configuration file
-        cp -p "${x}" "${x}.old"
-
-        if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+    then
+        declare -A configs_signatures=()
+        if [ -f "configs.signatures" ]
             then
-            # we don't have md5sum - keep it
-            echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-            run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
-        else
-            # find it relative filename
-            f="${x/*\/etc\/netdata\//}"
+            source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+        fi
+    fi
 
-            # find its checksum
-            md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+    config_signature_matches() {
+        local md5="${1}" file="${2}"
 
-            # copy the original
-            if [ -f "conf.d/${f}" ]
-                then
-                cp "conf.d/${f}" "${x}.orig"
-            fi
-
-            if config_signature_matches "${md5}" "${f}"
-                then
-                # it is a stock version - don't keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
-            else
-                # edited by user - keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
-            fi
+        if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+            then
+            [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
+            return 1
         fi
 
-    elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        rm -f "${x}.installer_backup.${installer_backup_suffix}"
-    fi
-done
+        if [ -f "configs.signatures" ]
+            then
+            grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
+            return $?
+        fi
 
+        return 1
+    }
+
+    # clean up stock config files from the user configuration directory
+    for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f)
+    do
+        if [ -f "${x}" ]
+            then
+            # find it relative filename
+            f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
+
+            # find the stock filename
+            t="${f/.conf.installer_backup.*/.conf}"
+            t="${t/.conf.old/.conf}"
+            t="${t/.conf.orig/.conf}"
+
+            if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+                then
+                # we don't have md5sum - keep it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+            else
+                # find its checksum
+                md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
+
+                if config_signature_matches "${md5}" "${t}"
+                    then
+                    # it is a stock version - remove it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
+                    run rm -f "${x}"
+                    deleted_stock_configs=$(( deleted_stock_configs + 1 ))
+                else
+                    # edited by user - keep it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
+                fi
+            fi
+        fi
+    done
+
+    touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
 run make install || exit 1
-
-
-# -----------------------------------------------------------------------------
-progress "Restore user edited netdata configuration files"
-
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
-do
-    if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        run cp -a "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
-            run rm -f "${x}.installer_backup.${installer_backup_suffix}"
-    fi
-done
 
 
 # -----------------------------------------------------------------------------
@@ -709,28 +694,30 @@ NETDATA_LIB_DIR="$( config_option "global" "lib directory" "${NETDATA_PREFIX}/va
 NETDATA_CACHE_DIR="$( config_option "global" "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "global" "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
-NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_USER_CONFIG_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_STOCK_CONFIG_DIR="$( config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 cat <<OPTIONSEOF
 
     Permissions
-    - netdata user     : ${NETDATA_USER}
-    - netdata group    : ${NETDATA_GROUP}
-    - web files user   : ${NETDATA_WEB_USER}
-    - web files group  : ${NETDATA_WEB_GROUP}
-    - root user        : ${ROOT_USER}
+    - netdata user             : ${NETDATA_USER}
+    - netdata group            : ${NETDATA_GROUP}
+    - web files user           : ${NETDATA_WEB_USER}
+    - web files group          : ${NETDATA_WEB_GROUP}
+    - root user                : ${ROOT_USER}
 
     Directories
-    - netdata conf dir : ${NETDATA_CONF_DIR}
-    - netdata log dir  : ${NETDATA_LOG_DIR}
-    - netdata run dir  : ${NETDATA_RUN_DIR}
-    - netdata lib dir  : ${NETDATA_LIB_DIR}
-    - netdata web dir  : ${NETDATA_WEB_DIR}
-    - netdata cache dir: ${NETDATA_CACHE_DIR}
+    - netdata user config dir  : ${NETDATA_USER_CONFIG_DIR}
+    - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
+    - netdata log dir          : ${NETDATA_LOG_DIR}
+    - netdata run dir          : ${NETDATA_RUN_DIR}
+    - netdata lib dir          : ${NETDATA_LIB_DIR}
+    - netdata web dir          : ${NETDATA_WEB_DIR}
+    - netdata cache dir        : ${NETDATA_CACHE_DIR}
 
     Other
-    - netdata port     : ${NETDATA_PORT}
+    - netdata port             : ${NETDATA_PORT}
 
 OPTIONSEOF
 
@@ -745,17 +732,35 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
 do
-    if [ ! -d "${NETDATA_CONF_DIR}/${x}" ]
+    if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]
         then
-        echo >&2 "Creating directory '${NETDATA_CONF_DIR}/${x}'"
-        run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
+        echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
+        run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
     fi
 done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
-run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0755 {} \;
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
+run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
+
+# --- stock conf dir ----
+
+[ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
+
+helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+[ ${deleted_stock_configs} -eq 0 ] && helplink=""
+for link in "orig" "${helplink}"
+do
+    if [ ! -z "${link}" ]
+    then
+        [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
+        run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
+    fi
+done
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
 
 # --- web dir ----
 

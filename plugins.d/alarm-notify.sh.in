@@ -159,9 +159,10 @@ custom_sender() {
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-[ -z "${NETDATA_CONFIG_DIR}"   ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-[ -z "${NETDATA_CACHE_DIR}"    ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
-[ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+[ -z "${NETDATA_CACHE_DIR}"        ] && NETDATA_CACHE_DIR="@cachedir_POST@"
+[ -z "${NETDATA_REGISTRY_URL}"     ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
 
 # -----------------------------------------------------------------------------
 # parse command line parameters
@@ -362,14 +363,20 @@ DEFAULT_RECIPIENT_IRC=
 IRC_NETWORK=
 declare -A role_recipients_irc=()
 
-# load the user configuration
-# this will overwrite the variables above
-if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
-    then
-    source "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf"
-else
-    error "Cannot find file ${NETDATA_CONFIG_DIR}/health_alarm_notify.conf. Using internal defaults."
-fi
+# load the stock and user configuration files
+# these will overwrite the variables above
+
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        debug "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
