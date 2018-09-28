@@ -21,91 +21,104 @@ retries = 60
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
-NODE_STATS = ['fd_used',
-              'mem_used',
-              'sockets_used',
-              'proc_used',
-              'disk_free',
-              'run_queue'
-              ]
-OVERVIEW_STATS = ['object_totals.channels',
-                  'object_totals.consumers',
-                  'object_totals.connections',
-                  'object_totals.queues',
-                  'object_totals.exchanges',
-                  'queue_totals.messages_ready',
-                  'queue_totals.messages_unacknowledged',
-                  'message_stats.ack',
-                  'message_stats.redeliver',
-                  'message_stats.deliver',
-                  'message_stats.publish'
-                  ]
-ORDER = ['queued_messages', 'message_rates', 'global_counts',
-         'file_descriptors', 'socket_descriptors', 'erlang_processes', 'erlang_run_queue', 'memory', 'disk_space']
+NODE_STATS = [
+    'fd_used',
+    'mem_used',
+    'sockets_used',
+    'proc_used',
+    'disk_free',
+    'run_queue'
+]
+
+OVERVIEW_STATS = [
+    'object_totals.channels',
+    'object_totals.consumers',
+    'object_totals.connections',
+    'object_totals.queues',
+    'object_totals.exchanges',
+    'queue_totals.messages_ready',
+    'queue_totals.messages_unacknowledged',
+    'message_stats.ack',
+    'message_stats.redeliver',
+    'message_stats.deliver',
+    'message_stats.publish'
+]
+
+ORDER = [
+    'queued_messages',
+    'message_rates',
+    'global_counts',
+    'file_descriptors',
+    'socket_descriptors',
+    'erlang_processes',
+    'erlang_run_queue',
+    'memory',
+    'disk_space'
+]
 
 CHARTS = {
     'file_descriptors': {
-        'options': [None, 'File Descriptors', 'descriptors', 'overview',
-                    'rabbitmq.file_descriptors', 'line'],
+        'options': [None, 'File Descriptors', 'descriptors', 'overview', 'rabbitmq.file_descriptors', 'line'],
         'lines': [
             ['fd_used', 'used', 'absolute']
-        ]},
+        ]
+    },
     'memory': {
-        'options': [None, 'Memory', 'MB', 'overview',
-                    'rabbitmq.memory', 'line'],
+        'options': [None, 'Memory', 'MB', 'overview', 'rabbitmq.memory', 'line'],
         'lines': [
             ['mem_used', 'used', 'absolute', 1, 1024 << 10]
-        ]},
+        ]
+    },
     'disk_space': {
-        'options': [None, 'Disk Space', 'GB', 'overview',
-                    'rabbitmq.disk_space', 'line'],
+        'options': [None, 'Disk Space', 'GB', 'overview', 'rabbitmq.disk_space', 'line'],
         'lines': [
             ['disk_free', 'free', 'absolute', 1, 1024 ** 3]
-        ]},
+        ]
+    },
     'socket_descriptors': {
-        'options': [None, 'Socket Descriptors', 'descriptors', 'overview',
-                    'rabbitmq.sockets', 'line'],
+        'options': [None, 'Socket Descriptors', 'descriptors', 'overview', 'rabbitmq.sockets', 'line'],
         'lines': [
             ['sockets_used', 'used', 'absolute']
-        ]},
+        ]
+    },
     'erlang_processes': {
-        'options': [None, 'Erlang Processes', 'processes', 'overview',
-                    'rabbitmq.processes', 'line'],
+        'options': [None, 'Erlang Processes', 'processes', 'overview', 'rabbitmq.processes', 'line'],
         'lines': [
             ['proc_used', 'used', 'absolute']
-        ]},
+        ]
+    },
     'erlang_run_queue': {
-        'options': [None, 'Erlang Run Queue', 'processes', 'overview',
-                    'rabbitmq.erlang_run_queue', 'line'],
+        'options': [None, 'Erlang Run Queue', 'processes', 'overview', 'rabbitmq.erlang_run_queue', 'line'],
         'lines': [
-            ['run_queue',' length', 'absolute']
-        ]},
+            ['run_queue', 'length', 'absolute']
+        ]
+    },
     'global_counts': {
-        'options': [None, 'Global Counts', 'counts', 'overview',
-                    'rabbitmq.global_counts', 'line'],
+        'options': [None, 'Global Counts', 'counts', 'overview', 'rabbitmq.global_counts', 'line'],
         'lines': [
             ['object_totals_channels', 'channels', 'absolute'],
             ['object_totals_consumers', 'consumers', 'absolute'],
             ['object_totals_connections', 'connections', 'absolute'],
             ['object_totals_queues', 'queues', 'absolute'],
             ['object_totals_exchanges', 'exchanges', 'absolute']
-        ]},
+        ]
+    },
     'queued_messages': {
-        'options': [None, 'Queued Messages', 'messages', 'overview',
-                    'rabbitmq.queued_messages', 'stacked'],
+        'options': [None, 'Queued Messages', 'messages', 'overview', 'rabbitmq.queued_messages', 'stacked'],
         'lines': [
             ['queue_totals_messages_ready', 'ready', 'absolute'],
             ['queue_totals_messages_unacknowledged', 'unacknowledged', 'absolute']
-        ]},
+        ]
+    },
     'message_rates': {
-        'options': [None, 'Message Rates', 'messages/s', 'overview',
-                    'rabbitmq.message_rates', 'stacked'],
+        'options': [None, 'Message Rates', 'messages/s', 'overview', 'rabbitmq.message_rates', 'stacked'],
         'lines': [
             ['message_stats_ack', 'ack', 'incremental'],
             ['message_stats_redeliver', 'redeliver', 'incremental'],
             ['message_stats_deliver', 'deliver', 'incremental'],
             ['message_stats_publish', 'publish', 'incremental']
-        ]}
+        ]
+    }
 }
 
 

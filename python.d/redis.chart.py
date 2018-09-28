@@ -44,29 +44,32 @@ CHARTS = {
         'lines': [
             ['total_commands_processed', 'commands', 'incremental'],
             ['instantaneous_ops_per_sec', 'operations', 'absolute']
-        ]},
+        ]
+    },
     'hit_rate': {
         'options': [None, 'Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
         'lines': [
             ['hit_rate', 'rate', 'absolute']
-        ]},
+        ]
+    },
     'memory': {
         'options': [None, 'Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
         'lines': [
             ['used_memory', 'total', 'absolute', 1, 1024],
             ['used_memory_lua', 'lua', 'absolute', 1, 1024]
-        ]},
+        ]
+    },
     'net': {
         'options': [None, 'Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
         'lines': [
             ['total_net_input_bytes', 'in', 'incremental', 8, 1024],
             ['total_net_output_bytes', 'out', 'incremental', -8, 1024]
-        ]},
+        ]
+    },
     'keys_redis': {
         'options': [None, 'Keys per Database', 'keys', 'keys', 'redis.keys', 'line'],
-        'lines': [
-            # lines are created dynamically in `check()` method
-        ]},
+        'lines': []
+    },
     'keys_pika': {
         'options': [None, 'Keys', 'keys', 'keys', 'redis.keys', 'line'],
         'lines': [
@@ -75,52 +78,61 @@ CHARTS = {
             ['list_keys', 'list', 'absolute'],
             ['zset_keys', 'zset', 'absolute'],
             ['set_keys', 'set', 'absolute']
-        ]},
+        ]
+    },
     'eviction': {
         'options': [None, 'Evicted Keys', 'keys', 'keys', 'redis.eviction', 'line'],
         'lines': [
             ['evicted_keys', 'evicted', 'absolute']
-        ]},
+        ]
+    },
     'connections': {
         'options': [None, 'Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
         'lines': [
             ['total_connections_received', 'received', 'incremental', 1],
             ['rejected_connections', 'rejected', 'incremental', -1]
-        ]},
+        ]
+    },
     'clients': {
         'options': [None, 'Clients', 'clients', 'connections', 'redis.clients', 'line'],
         'lines': [
             ['connected_clients', 'connected', 'absolute', 1],
             ['blocked_clients', 'blocked', 'absolute', -1]
-        ]},
+        ]
+    },
     'slaves': {
         'options': [None, 'Slaves', 'slaves', 'replication', 'redis.slaves', 'line'],
         'lines': [
             ['connected_slaves', 'connected', 'absolute']
-        ]},
+        ]
+    },
     'persistence': {
         'options': [None, 'Persistence Changes Since Last Save', 'changes', 'persistence',
                     'redis.rdb_changes', 'line'],
         'lines': [
             ['rdb_changes_since_last_save', 'changes', 'absolute']
-        ]},
+        ]
+    },
     'bgsave_now': {
         'options': [None, 'Duration of the RDB Save Operation', 'seconds', 'persistence',
                     'redis.bgsave_now', 'absolute'],
         'lines': [
             ['rdb_bgsave_in_progress', 'rdb save', 'absolute']
-        ]},
+        ]
+    },
     'bgsave_health': {
         'options': [None, 'Status of the Last RDB Save Operation', 'status', 'persistence',
                     'redis.bgsave_health', 'line'],
         'lines': [
             ['rdb_last_bgsave_status', 'rdb save', 'absolute']
-        ]},
+        ]
+    },
     'uptime': {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'redis.uptime', 'line'],
         'lines': [
             ['uptime_in_seconds', 'uptime', 'absolute']
-        ]}
+        ]
+    }
 }
 
 
@@ -153,7 +165,7 @@ class Service(SocketService):
         if not resp:
             return False
         if resp.strip() != '+OK':
-            self.error("invalid password")
+            self.error('invalid password')
             return False
         return True
 
@@ -169,7 +181,7 @@ class Service(SocketService):
         parsed = RE.findall(resp)
 
         if not parsed:
-            self.error("response is invalid/empty")
+            self.error('response is invalid/empty')
             return None
 
         return dict((k.replace(' ', '_'), v) for k, v in parsed)
@@ -215,12 +227,12 @@ class Service(SocketService):
         if not data:
             return False
 
-        self.order = PIKA_ORDER if data.get("pika_version") else REDIS_ORDER
+        self.order = PIKA_ORDER if data.get('pika_version') else REDIS_ORDER
 
         for n in self.order:
             self.definitions.update(copy_chart(n))
 
-        if data.get("redis_version"):
+        if data.get('redis_version'):
             for k in data:
                 if k.startswith('db'):
                     self.definitions['keys_redis']['lines'].append([k, None, 'absolute'])
@@ -242,8 +254,8 @@ class Service(SocketService):
         supposed = int(supposed)
 
         if length - offset >= supposed:
-            self.debug("received full response from redis")
+            self.debug('received full response from redis')
             return True
 
-        self.debug("waiting more data from redis")
+        self.debug('waiting more data from redis')
         return False

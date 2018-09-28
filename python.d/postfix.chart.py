@@ -15,22 +15,24 @@ ORDER = ['qemails', 'qsize']
 
 CHARTS = {
     'qemails': {
-        'options': [None, "Postfix Queue Emails", "emails", 'queue', 'postfix.qemails', 'line'],
+        'options': [None, 'Postfix Queue Emails', 'emails', 'queue', 'postfix.qemails', 'line'],
         'lines': [
             ['emails', None, 'absolute']
-        ]},
+        ]
+    },
     'qsize': {
-        'options': [None, "Postfix Queue Emails Size", "emails size in KB", 'queue', 'postfix.qsize', 'area'],
+        'options': [None, 'Postfix Queue Emails Size', 'emails size in KB', 'queue', 'postfix.qsize', 'area'],
         'lines': [
-            ["size", None, 'absolute']
-        ]}
+            ['size', None, 'absolute']
+        ]
+    }
 }
 
 
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(self, configuration=configuration, name=name)
-        self.command = "postqueue -p"
+        self.command = 'postqueue -p'
         self.order = ORDER
         self.definitions = CHARTS
 
