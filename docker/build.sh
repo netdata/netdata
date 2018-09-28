@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0+
-# author  : paulfantom
+# Author  : Pawel Krupa (paulfantom)
 # Cross-arch docker build helper script
 
 set -e
