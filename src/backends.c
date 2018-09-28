@@ -804,7 +804,7 @@ void *backends_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
+        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b));
         //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
 
         // prepare for the next iteration

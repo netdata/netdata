@@ -250,8 +250,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                         family = "utilization";
                         priority = 1000;
 
-                        // FIXME: check for /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
-                        // FIXME: check for /sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state
+                        // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
+                        // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state
 
                         char filename[FILENAME_MAX + 1];
                         struct stat stbuf;

@@ -1292,7 +1292,9 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
                     debug(D_POLLFD, "POLLFD: LISTENER: reading data from UDP slot %zu (fd %d)", i, fd);
 
-                    // FIXME: access_list is not applied to UDP
+                    // TODO: access_list is not applied to UDP
+                    // but checking the access list on every UDP packet will destroy
+                    // performance, especially for statsd.
 
                     pf->events = 0;
                     pi->rcv_callback(pi, &pf->events);

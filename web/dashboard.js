@@ -563,7 +563,7 @@ var NETDATA = window.NETDATA || {};
             focus:              false,
             visibility:         false,
             chart_data_url:     false,
-            chart_errors:       true, // FIXME: remember to set it to false before merging
+            chart_errors:       false, // remember to set it to false before merging
             chart_timing:       false,
             chart_calls:        false,
             libraries:          false,
@@ -1784,7 +1784,7 @@ var NETDATA = window.NETDATA || {};
     // ----------------------------------------------------------------------------------------------------------------
     // dimensions selection
 
-    // FIXME
+    // TODO
     // move color assignment to dimensions, here
 
     var dimensionStatus = function(parent, label, name_div, value_div, color) {
@@ -8967,7 +8967,8 @@ var NETDATA = window.NETDATA || {};
 
             /*
             // cleanup old notifications with the same alarm_id as this one
-            // FIXME: it does not seem to work on any web browser!
+            // it does not seem to work on any web browser - so notifications cannot be removed
+
             var len = NETDATA.alarms.notifications_shown.length;
             while(len--) {
                 var n = NETDATA.alarms.notifications_shown[len];
