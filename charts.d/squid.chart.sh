@@ -31,7 +31,7 @@ squid_autodetect() {
 		do
 			x=$(squid_get_stats_internal "$host" "$port" "$url" | grep client_http.requests)
 			if [ ! -z "$x" ]
-				then
+			then
 				squid_host="$host"
 				squid_port="$port"
 				squid_url="$url"
@@ -51,7 +51,7 @@ squid_check() {
 	require_cmd egrep || return 1
 
 	if [ -z "$squid_host" ] || [ -z "$squid_port" ] || [ -z "$squid_url" ]
-		then
+	then
 		squid_autodetect || return 1
 	fi
 
@@ -113,8 +113,9 @@ squid_update() {
 	# prepare the script and always grep at the end the lines that are usefull, so that
 	# even if something goes wrong, no other code can be executed
 
+	# shellcheck disable=SC1117
 	eval "$(squid_get_stats |\
-		 sed -e "s/ \\+/ /g" -e "s/\\./_/g" -e "s/^\\([a-z0-9_]\\+\\) *= *\\([0-9]\\+\\)$/local squid_\\1=\\2/g" |\
+		 sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/^\([a-z0-9_]\+\) *= *\([0-9]\+\)$/local squid_\1=\2/g" |\
 		grep -E "^local squid_(client_http|server_all)_[a-z0-9_]+=[0-9]+$")"
 
 	# write the result of the work.
