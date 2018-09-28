@@ -1560,7 +1560,7 @@
 
         // enrich the data structure returned by netdata
         // to reflect our menu system and content
-        // FIXME: this is a shame - we should fix charts naming (issue #807)
+        // TODO: this is a shame - we should fix charts naming (issue #807)
         function enrichChartData(chart) {
             var parts = chart.type.split('_');
             var tmp = parts[0];
@@ -4457,7 +4457,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverStatic + 'dashboard_info.js?v20180926-3',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20180928-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });

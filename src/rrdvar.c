@@ -110,7 +110,7 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
 }
 
 void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock) {
-    // FIXME: this is not bullet proof - avl should support some means to destroy it
+    // This is not bullet proof - avl should support some means to destroy it
     // with a callback for each item already in the index
 
     RRDVAR *rv, *last = NULL;

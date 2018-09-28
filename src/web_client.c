@@ -908,7 +908,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 *ue = ' ';
                 
                 // copy the URL - we are going to overwrite parts of it
-                // FIXME -- we should avoid it
+                // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 
                 w->header_parse_tries = 0;

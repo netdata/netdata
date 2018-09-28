@@ -217,8 +217,8 @@ int switch_namespace(const char *prefix, pid_t pid) {
     // 2 passes - found it at nsenter source code
     // this is related CLONE_NEWUSER functionality
 
-    // FIXME: this code cannot switch user namespace
-    // Fortunately, we don't need it.
+    // This code cannot switch user namespace (it can all the other namespaces)
+    // Fortunately, we don't need to switch user namespaces.
 
     int pass, errors = 0;
     for(pass = 0; pass < 2 ;pass++) {

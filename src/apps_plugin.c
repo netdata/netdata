@@ -1023,7 +1023,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->gid                  = proc_info->ki_groups[0];
     p->status_vmsize        = proc_info->ki_size / 1024; // in kB
     p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in kB
-    // FIXME: what about shared and swap memory on FreeBSD?
+    // TODO: what about shared and swap memory on FreeBSD?
     return 1;
 #else
     (void)ptr;
@@ -1578,13 +1578,13 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
         else if(strcmp(t, "[timerfd]") == 0) type = FILETYPE_TIMERFD;
         else if(strcmp(t, "[signalfd]") == 0) type = FILETYPE_SIGNALFD;
         else {
-            debug_log("FIXME: unknown anonymous inode: %s", name);
+            debug_log("UNKNOWN anonymous inode: %s", name);
             type = FILETYPE_OTHER;
         }
     }
     else if(likely(strcmp(name, "inotify") == 0)) type = FILETYPE_INOTIFY;
     else {
-        debug_log("FIXME: cannot understand linkname: %s", name);
+        debug_log("UNKNOWN linkname: %s", name);
         type = FILETYPE_OTHER;
     }
 
@@ -3049,7 +3049,7 @@ static void normalize_utilization(struct target *root) {
     // if(gtime_fix_ratio  < 0.0) gtime_fix_ratio  = 0.0;
     // if(cgtime_fix_ratio < 0.0) cgtime_fix_ratio = 0.0;
 
-    // FIXME
+    // TODO
     // we use cpu time to normalize page faults
     // the problem is that to find the proper max values
     // for page faults we have to parse /proc/vmstat
