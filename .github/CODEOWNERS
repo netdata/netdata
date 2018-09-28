@@ -15,8 +15,8 @@ docker/ @paulfantom
 
 # build system and packaging
 build/ @paulfantom
-packaging @paulfantom
-contrib @paulfantom
+packaging/ @paulfantom
+contrib/ @paulfantom
 
 # CI and automation
 .travis/ @paulfantom
