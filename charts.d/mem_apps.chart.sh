@@ -1,4 +1,4 @@
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC2154,SC1072,SC1073,SC2009,SC2162,SC2006,SC2002,SC2086,SC1117
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 

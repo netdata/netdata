@@ -8,5 +8,5 @@
 # Script to test alarm notifications for netdata
 
 dir="$(dirname "${0}")"
-${dir}/alarm-notify.sh test "${1}"
+"${dir}/alarm-notify.sh" test "${1}"
 exit $?

@@ -37,8 +37,12 @@ phpfpm_slow_requests=0
 phpfpm_get() {
 	local opts="${1}" url="${2}"
 
+	# shellcheck disable=SC2207,2086
 	phpfpm_response=($(run curl -Ss ${opts} "${url}"))
-	[ $? -ne 0 -o "${#phpfpm_response[@]}" -eq 0 ] && return 1
+	# shellcheck disable=SC2181
+	if [ $? -ne 0 ] || [ "${#phpfpm_response[@]}" -eq 0 ]; then
+		return 1
+	fi
 
 	if [[ "${phpfpm_response[0]}" != "pool:" \
 		|| "${phpfpm_response[2]}" != "process" \
@@ -105,9 +109,11 @@ phpfpm_check() {
 	for m in "${!phpfpm_urls[@]}"
 	do
 		phpfpm_get "${phpfpm_curl_opts[$m]}" "${phpfpm_urls[$m]}"
+		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]; then
-			error "cannot find status on URL '${phpfpm_url[$m]}'. Please set phpfpm_urls[$m]='http://localhost/status' in $confd/phpfpm.conf"
-			unset phpfpm_urls[$m]
+			# shellcheck disable=SC2154
+			error "cannot find status on URL '${phpfpm_urls[$m]}'. Please set phpfpm_urls[$m]='http://localhost/status' in $confd/phpfpm.conf"
+			unset "phpfpm_urls[$m]"
 			continue
 		fi
 	done
@@ -163,6 +169,7 @@ phpfpm_update() {
 	for m in "${!phpfpm_urls[@]}"
 	do
 		phpfpm_get "${phpfpm_curl_opts[$m]}" "${phpfpm_urls[$m]}"
+		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]; then
 			continue
 		fi
@@ -189,7 +196,3 @@ EOF
 
 	return 0
 }
-
-phpfpm_check
-phpfpm_create
-phpfpm_update
