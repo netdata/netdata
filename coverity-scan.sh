@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2235
 
 # To run this script you need to provide API token. This can be done either by:
 #  - Putting token in ".coverity-token" file
@@ -15,6 +16,7 @@ if [ -z "${token}" ]; then
 	exit 1
 fi
 
+# shellcheck disable=SC2230
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 ([ -z "${covbuild}" ] && [ -f .coverity-build ]) && covbuild="$(<.coverity-build)"
 if [ -z "${covbuild}" ]; then
@@ -26,6 +28,7 @@ if [ -z "${covbuild}" ]; then
 		tar -x -C /tmp/coverity/ -f /tmp/coverity_tool.tar.gz
 		sudo mv /tmp/coverity/cov-analysis-linux64-2017.07 /opt/coverity
 		export PATH=${PATH}:/opt/coverity/bin/
+		# shellcheck disable=SC2230
 		covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 	else
 		echo "Save command the full filename of cov-build in .coverity-build"

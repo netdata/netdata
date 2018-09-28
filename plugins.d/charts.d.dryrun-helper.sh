@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0+
 
+# shellcheck disable=SC2181
+
 # will stop the script for any error
 set -e
 
@@ -11,8 +13,8 @@ conf="$3"
 
 can_diff=1
 
-tmp1="`mktemp`"
-tmp2="`mktemp`"
+tmp1="$(mktemp)"
+tmp2="$(mktemp)"
 
 myset() {
     set | grep -v "^_=" | grep -v "^PIPESTATUS=" | grep -v "^BASH_LINENO="
@@ -37,6 +39,7 @@ myset >"$tmp1"
 # include the plugin and its config
 if [ -f "$conf" ]
 then
+    # shellcheck source=/dev/null
     . "$conf"
     if [ $? -ne 0 ]
     then
@@ -46,6 +49,7 @@ then
     fi
 fi
 
+# shellcheck source=/dev/null
 . "$chart"
 if [ $? -ne 0 ]
 then

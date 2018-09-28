@@ -1,8 +1,9 @@
 #!/bin/bash
+# shellcheck disable=SC2230
 
 if [ ! -f .gitignore ]
 then
-  echo "Run as ./travis/$(basename $0) from top level directory of git repository"
+  echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
   exit 1
 fi
 
@@ -19,6 +20,6 @@ fakeroot ./packaging/git-build
 python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
 # make self-extractor
 ./makeself/build-x86_64-static.sh
-for i in *.tar.gz; do sha512sum -b $i > $i.sha; done
-for i in *.gz.run; do sha512sum -b $i > $i.sha; done
+for i in *.tar.gz; do sha512sum -b "$i" > "$i.sha"; done
+for i in *.gz.run; do sha512sum -b "$i" > "$i.sha"; done
 ./.travis/deploy-if-have-key

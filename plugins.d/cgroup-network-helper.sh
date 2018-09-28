@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1117
 
 # cgroup-network-helper.sh
 # detect container and virtual machine interfaces
@@ -23,6 +24,7 @@
 # -----------------------------------------------------------------------------
 
 # the system path is cleared by cgroup-network
+# shellcheck source=/dev/null
 [ -f /etc/profile ] && source /etc/profile
 
 export LC_ALL=C
@@ -66,7 +68,7 @@ debug() {
 # -----------------------------------------------------------------------------
 # check for BASH v4+ (required for associative arrays)
 
-[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
+[ $(( BASH_VERSINFO[0] )) -lt 4 ] && \
     fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
 
 # -----------------------------------------------------------------------------
@@ -86,7 +88,7 @@ do
     shift
 done
 
-if [ -z "${pid}" -a -z "${cgroup}" ]
+if [ -z "${pid}" ] && [ -z "${cgroup}" ]
 then
     fatal "Either --pid or --cgroup is required"
 fi
@@ -115,7 +117,7 @@ proc_pid_fdinfo_iff() {
 
     debug "Searching for tun/tap interfaces for pid ${p}..."
     set_source "fdinfo"
-    grep ^iff:.* "${NETDATA_HOST_PREFIX}/proc/${p}/fdinfo"/* 2>/dev/null | cut -f 2
+    grep "^iff:.*" "${NETDATA_HOST_PREFIX}/proc/${p}/fdinfo"/* 2>/dev/null | cut -f 2
 }
 
 find_tun_tap_interfaces_for_cgroup() {
@@ -128,7 +130,7 @@ find_tun_tap_interfaces_for_cgroup() {
         local p
         for p in $(< "${c}/emulator/cgroup.procs" )
         do
-            proc_pid_fdinfo_iff ${p}
+            proc_pid_fdinfo_iff "${p}"
         done
     fi
 }
@@ -154,11 +156,14 @@ virsh_find_all_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
 
     # the virsh command
-    local virsh="$(which virsh 2>/dev/null || command -v virsh 2>/dev/null)"
+    local virsh
+    # shellcheck disable=SC2230
+    virsh="$(which virsh 2>/dev/null || command -v virsh 2>/dev/null)"
 
     if [ ! -z "${virsh}" ]
     then
-        local d="$(virsh_cgroup_to_domain_name "${c}")"
+        local d
+        d="$(virsh_cgroup_to_domain_name "${c}")"
 
         if [ ! -z "${d}" ]
         then
@@ -167,7 +172,7 @@ virsh_find_all_interfaces_for_cgroup() {
             # match only 'network' interfaces from virsh output
 
             set_source "virsh"
-            "${virsh}" -r domiflist ${d} |\
+            "${virsh}" -r domiflist "${d}" |\
                 sed -n \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"
@@ -188,7 +193,7 @@ find_all_interfaces_of_pid_or_cgroup() {
     then
         # we have been called with a pid
 
-        proc_pid_fdinfo_iff ${p}
+        proc_pid_fdinfo_iff "${p}"
 
     elif [ ! -z "${c}" ]
     then
@@ -219,6 +224,7 @@ declare -A devs=()
 # store all interfaces found in the associative array
 # this will also give the unique devices, as seen by the host
 last_src=
+# shellcheck disable=SC2162
 while read host_device guest_device
 do
     [ -z "${host_device}" ] && continue
@@ -231,8 +237,9 @@ do
     # when we run in debug, show the source
     debug "Found host device '${host_device}', guest device '${guest_device}', detected via '${last_src}'"
 
-    [ -z "${devs[${host_device}]}" -o "${devs[${host_device}]}" = "${host_device}" ] && \
+    if [ -z "${devs[${host_device}]}" ] || [ "${devs[${host_device}]}" = "${host_device}" ]; then
         devs[${host_device}]="${guest_device}"
+    fi
 
 done < <( find_all_interfaces_of_pid_or_cgroup "${pid}" "${cgroup}" )
 
