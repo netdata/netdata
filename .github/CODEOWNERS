@@ -6,14 +6,22 @@
 *.h @ktsaou
 
 # python files
-*.py @l2isbad
-plugins.d/python.d.plugin @l2isbad
-conf.d/python.d/ @l2isbad
+*.py @l2isbad @Ferroin
+plugins.d/python.d.plugin @l2isbad @Ferroin
+conf.d/python.d/ @l2isbad @Ferroin
 
 # docker builds
 docker/ @paulfantom
+
+# build system and packaging
+build/ @paulfantom
+packaging/ @paulfantom
+contrib/ @paulfantom
 
 # CI and automation
 .travis/ @paulfantom
 .travis.yml @paulfantom
 .lgtm.yml @paulfantom
+
+# Docs
+*.md @ktsaou @cakrit
