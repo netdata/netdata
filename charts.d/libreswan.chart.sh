@@ -1,4 +1,4 @@
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC1117
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -61,7 +61,8 @@ libreswan_get() {
 	libreswan_connected_tunnels=()
 
 	# convert the ipsec command output to a shell script
-	# and source it to get the values
+        # and source it to get the values
+        # shellcheck disable=SC1090
 	source <(
 		{
 			libreswan_ipsec whack --status;
@@ -86,6 +87,7 @@ libreswan_check() {
 	require_cmd ipsec || return 1
 
 	# make sure it is libreswan
+	# shellcheck disable=SC2143
 	if [ -z "$(ipsec --version | grep -i libreswan)" ]
 	then
 	    error "ipsec command is not Libreswan. Disabling Libreswan plugin."
@@ -141,7 +143,7 @@ libreswan_update_one() {
 
 	[ -z "${id}" ] && libreswan_create_one "${name}"
 
-	uptime=$(( ${libreswan_now} - ${libreswan_established_add_time[${n}]} ))
+	uptime=$(( libreswan_now - libreswan_established_add_time[${n}] ))
 	[ ${uptime} -lt 0 ] && uptime=0
 
 		# write the result of the work.

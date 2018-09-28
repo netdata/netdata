@@ -83,6 +83,7 @@ REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 [ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${0}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
+# shellcheck disable=SC2230
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
 ME="$0"
@@ -172,6 +173,7 @@ For the plugins, you will at least need:
 USAGE
 }
 
+# shellcheck disable=SC2230
 md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
 get_git_config_signatures() {
     local x s file md5
