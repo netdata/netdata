@@ -196,7 +196,3 @@ EOF
 
 	return 0
 }
-
-phpfpm_check
-phpfpm_create
-phpfpm_update "$@"

@@ -47,6 +47,7 @@ tomcat_check() {
 	fi
 	if [ -z "${tomcat_user}" ]; then
 		# check backwards compatibility
+		# shellcheck disable=SC2154
 		if [ -z "${tomcatUser}" ]; then
     	  	error "tomcat user is unset or set to the empty string"
 			return 1
@@ -56,6 +57,7 @@ tomcat_check() {
 	fi
 	if [ -z "${tomcat_password}" ]; then
 		# check backwards compatibility
+		# shellcheck disable=SC2154
 		if [ -z "${tomcatPassword}" ]; then
 	    	error "tomcat password is unset or set to the empty string"
 			return 1
@@ -66,6 +68,7 @@ tomcat_check() {
 
 	# check if we can get to tomcat's status page
 	tomcat_get
+	# shellcheck disable=2181
 	if [ $? -ne 0 ]
 		then
 		error "cannot get to status page on URL '${tomcat_url}'. Please make sure tomcat url, username and password are correct."
@@ -117,7 +120,6 @@ EOF
 
 # _update is called continuously, to collect the values
 tomcat_update() {
-	local reqs net
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).
 

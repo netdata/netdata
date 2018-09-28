@@ -1,4 +1,4 @@
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC2154
 # no need for shebang - this file is loaded from charts.d.plugin
 # SPDX-License-Identifier: GPL-3.0+
 
@@ -10,13 +10,12 @@
 squid_host=
 squid_port=
 squid_url=
-squid_timeout=2
 squid_update_every=2
 squid_priority=60000
 
 squid_get_stats_internal() {
 	local host="$1" port="$2" url="$3"
-	run squidclient -h $host -p $port $url
+	run squidclient -h "$host" -p "$port" "$url"
 }
 
 squid_get_stats() {
@@ -51,14 +50,16 @@ squid_check() {
 	require_cmd sed || return 1
 	require_cmd egrep || return 1
 
-	if [ -z "$squid_host" -o -z "$squid_port" -o -z "$squid_url" ]
+	if [ -z "$squid_host" ] || [ -z "$squid_port" ] || [ -z "$squid_url" ]
 		then
 		squid_autodetect || return 1
 	fi
 
 	# check once if the url works
-	local x="$(squid_get_stats | grep client_http.requests)"
-	if [ ! $? -eq 0 -o -z "$x" ]
+	local x
+	x="$(squid_get_stats | grep client_http.requests)"
+	# shellcheck disable=SC2181
+	if [ ! $? -eq 0 ] || [ -z "$x" ]
 	then
 		error "cannot fetch URL '$squid_url' by connecting to $squid_host:$squid_port. Please set squid_url='url' and squid_host='host' and squid_port='port' in $confd/squid.conf"
 		return 1
@@ -113,8 +114,8 @@ squid_update() {
 	# even if something goes wrong, no other code can be executed
 
 	eval "$(squid_get_stats |\
-		 sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/^\([a-z0-9_]\+\) *= *\([0-9]\+\)$/local squid_\1=\2/g" |\
-		egrep "^local squid_(client_http|server_all)_[a-z0-9_]+=[0-9]+$")"
+		 sed -e "s/ \\+/ /g" -e "s/\\./_/g" -e "s/^\\([a-z0-9_]\\+\\) *= *\\([0-9]\\+\\)$/local squid_\\1=\\2/g" |\
+		grep -E "^local squid_(client_http|server_all)_[a-z0-9_]+=[0-9]+$")"
 
 	# write the result of the work.
 	cat <<VALUESEOF
