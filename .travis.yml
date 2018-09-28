@@ -42,7 +42,8 @@ jobs:
 #    - name: "Node.js"
 #      script: tests/run_nodejs.sh
     - name: "coverity"
-      script: ./coverity-scan.sh
+      install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+      script: ./coverity-scan.sh || echo "Coverity failed :("
       env: INSTALL_COVERITY="true"
       if: type = cron
     - stage: "build"
