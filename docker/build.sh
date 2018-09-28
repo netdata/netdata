@@ -13,6 +13,7 @@ else
     VERSION="latest"
 fi
 
+declare -A ARCH_MAP
 ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
