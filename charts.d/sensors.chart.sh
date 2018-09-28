@@ -59,7 +59,7 @@ sensors_check_files() {
 	# we only need sensors that report a non-zero value
 	# also remove not needed sensors
 
-	local f='' v='' excluded=''
+	local f v excluded
 	for f in "$@"
 	do
 		[ ! -f "$f" ] && continue
@@ -80,7 +80,7 @@ sensors_check_temp_type() {
 	# valid temp types are 1 to 6
 	# disabled sensors have the value 0
 
-	local f='' t='' v=''
+	local f t v
 	for f in "$@"
 	do
 		# shellcheck disable=SC2001
@@ -98,7 +98,7 @@ sensors_check_temp_type() {
 
 # _create is called once, to create the charts
 sensors_create() {
-	local path='' dir='' name='' x='' file='' lfile='' labelname='' device='' subsystem='' id='' type='' mode='' files='' multiplier='' divisor=''
+	local path dir name x file lfile labelname device subsystem id type mode files multiplier divisor
 
 	# we create a script with the source of the
 	# sensors_update() function
