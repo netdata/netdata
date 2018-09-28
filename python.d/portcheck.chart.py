@@ -37,7 +37,8 @@ CHARTS = {
             [PORT_SUCCESS, 'success', 'absolute'],
             [PORT_TIMEOUT, 'timeout', 'absolute'],
             [PORT_FAILED, 'no connection', 'absolute']
-        ]}
+        ]
+    }
 }
 
 
@@ -57,13 +58,13 @@ class Service(SimpleService):
         :return: boolean
         """
         if self.host is None or self.port is None:
-            self.error("Host or port missing")
+            self.error('Host or port missing')
             return False
         if not isinstance(self.port, int):
             self.error('"port" is not an integer. Specify a numerical value, not service name.')
             return False
 
-        self.debug("Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s".format(
+        self.debug('Enabled portcheck: {host}:{port}, update every {update}s, timeout: {timeout}s'.format(
             host=self.host, port=self.port, update=self.update_every, timeout=self.timeout
         ))
         # We will accept any (valid-ish) configuration, even if initial connection fails (a service might be down from
