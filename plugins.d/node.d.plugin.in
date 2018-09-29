@@ -21,7 +21,8 @@
 // get NETDATA environment variables
 
 var NETDATA_PLUGINS_DIR = process.env.NETDATA_PLUGINS_DIR || __dirname;
-var NETDATA_CONFIG_DIR = process.env.NETDATA_CONFIG_DIR || __dirname + '/../../../../etc/netdata';
+var NETDATA_USER_CONFIG_DIR = process.env.NETDATA_USER_CONFIG_DIR || '@configdir_POST@';
+var NETDATA_STOCK_CONFIG_DIR = process.env.NETDATA_STOCK_CONFIG_DIR || '@libconfigdir_POST@';
 var NETDATA_UPDATE_EVERY = process.env.NETDATA_UPDATE_EVERY || 1;
 var NODE_D_DIR = NETDATA_PLUGINS_DIR + '/../node.d';
 
@@ -45,20 +46,42 @@ var netdata = require('netdata');
 // --------------------------------------------------------------------------------------------------------------------
 // configuration
 
-function pluginConfig(filename) {
-    var f = path.basename(filename);
+function netdata_read_json_config_file(module_filename) {
+    var f = path.basename(module_filename);
 
-    // node.d.plugin configuration
+    var ufilename, sfilename;
+
     var m = f.match('.plugin' + '$');
-    if(m !== null)
-        return netdata.options.paths.config + '/' + f.substring(0, m.index) + '.conf';
+    if(m !== null) {
+        ufilename = netdata.options.paths.config + '/' + f.substring(0, m.index) + '.conf';
+        sfilename = netdata.options.paths.stock_config + '/' + f.substring(0, m.index) + '.conf';
+    }
 
-    // node.d modules configuration
     m = f.match('.node.js' + '$');
-    if(m !== null)
-        return netdata.options.paths.config + '/node.d/' + f.substring(0, m.index) + '.conf';
+    if(m !== null) {
+        ufilename = netdata.options.paths.config + '/node.d/' + f.substring(0, m.index) + '.conf';
+        sfilename = netdata.options.paths.stock_config + '/node.d/' + f.substring(0, m.index) + '.conf';
+    }
 
-    return netdata.options.paths.config + '/node.d/' + f + '.conf';
+    try {
+        netdata.debug('loading module\'s ' + module_filename + ' user-config ' + ufilename);
+        return JSON.parse(fs.readFileSync(ufilename, 'utf8'));
+    }
+    catch(e) {
+        netdata.error('Cannot read user-configuration file ' + ufilename + ': ' + e.message + '.');
+        dumpError(e);
+    }
+
+    try {
+        netdata.debug('loading module\'s ' + module_filename + ' stock-config ' + sfilename);
+        return JSON.parse(fs.readFileSync(sfilename, 'utf8'));
+    }
+    catch(e) {
+        netdata.error('Cannot read stock-configuration file ' + sfilename + ': ' + e.message + ', using internal defaults.');
+        dumpError(e);
+    }
+
+    return {};
 }
 
 // internal defaults
@@ -69,35 +92,31 @@ extend(true, netdata.options, {
 
     paths: {
         plugins: NETDATA_PLUGINS_DIR,
-        config: NETDATA_CONFIG_DIR,
-        modules: [],
+        config: NETDATA_USER_CONFIG_DIR,
+        stock_config: NETDATA_STOCK_CONFIG_DIR,
+        modules: []
     },
 
     modules_enable_autodetect: true,
     modules_enable_all: true,
-    modules: {},
+    modules: {}
 });
-netdata.options.config_filename = pluginConfig(__filename);
 
 // load configuration file
-try {
-    netdata.options_loaded = JSON.parse(fs.readFileSync(netdata.options.config_filename, 'utf8'));
-    extend(true, netdata.options, netdata.options_loaded);
+netdata.options_loaded = netdata_read_json_config_file(__filename);
+extend(true, netdata.options, netdata.options_loaded);
 
-    if(!netdata.options.paths.plugins)
-        netdata.options.paths.plugins = NETDATA_PLUGINS_DIR;
+if(!netdata.options.paths.plugins)
+    netdata.options.paths.plugins = NETDATA_PLUGINS_DIR;
 
-    if(!netdata.options.paths.config)
-        netdata.options.paths.config = NETDATA_CONFIG_DIR;
+if(!netdata.options.paths.config)
+    netdata.options.paths.config = NETDATA_USER_CONFIG_DIR;
 
-    // console.error('merged netdata object:');
-    // console.error(util.inspect(netdata, {depth: 10}));
-}
-catch(e) {
-    netdata.error('Cannot read configuration file ' + netdata.options.config_filename + ': ' + e.message + ', using internal defaults.');
-    netdata.options_loaded = undefined;
-    dumpError(e);
-}
+if(!netdata.options.paths.stock_config)
+    netdata.options.paths.stock_config = NETDATA_STOCK_CONFIG_DIR;
+
+// console.error('merged netdata object:');
+// console.error(util.inspect(netdata, {depth: 10}));
 
 
 // apply module paths to node.js process
@@ -206,9 +225,6 @@ function findModules() {
                 netdata.options.modules[n].filename = NODE_D_DIR + '/' + files[len];
                 netdata.options.modules[n].loaded = false;
 
-                if(typeof(netdata.options.modules[n].config_filename) !== 'string')
-                    netdata.options.modules[n].config_filename = pluginConfig(files[len]);
-
                 // load the module
                 try {
                     netdata.debug('loading module ' + netdata.options.modules[n].filename);
@@ -228,16 +244,9 @@ function findModules() {
                     enable_autodetect: netdata.options.modules_enable_autodetect,
                     update_every: netdata.options.update_every
                 };
-                try {
-                    netdata.debug('loading module\'s ' + netdata.options.modules[n].name + ' config ' + netdata.options.modules[n].config_filename);
-                    var c2 = JSON.parse(fs.readFileSync(netdata.options.modules[n].config_filename, 'utf8'));
-                    extend(true, c, c2);
-                    netdata.debug('loaded module\'s ' + netdata.options.modules[n].name + ' config ' + netdata.options.modules[n].config_filename);
-                }
-                catch(e) {
-                    netdata.error('Cannot load module\'s ' + netdata.options.modules[n].name + ' config from ' + netdata.options.modules[n].config_filename + ' exception: ' + e + ', using internal defaults.');
-                    dumpError(e);
-                }
+
+                var c2 = netdata_read_json_config_file(files[len]);
+                extend(true, c, c2);
 
                 // call module auto-detection / configuration
                 try {

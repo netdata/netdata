@@ -404,7 +404,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdset_next(d->st_bytes);
             if(unlikely(d->name_updated)) rrdset_set_name(d->st_bytes, d->name);
 
-            // FIXME
+            // TODO
             // update the family
         }
 
@@ -457,7 +457,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 rrdset_set_name(d->st_packets, name);
             }
 
-            // FIXME
+            // TODO
             // update the family
         }
 
@@ -510,7 +510,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 rrdset_set_name(d->st_dropped, name);
             }
 
-            // FIXME
+            // TODO
             // update the family
         }
 
@@ -563,7 +563,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 rrdset_set_name(d->st_tokens, name);
             }
 
-            // FIXME
+            // TODO
             // update the family
         }
 
@@ -618,7 +618,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 rrdset_set_name(d->st_ctokens, name);
             }
 
-            // FIXME
+            // TODO
             // update the family
         }
 

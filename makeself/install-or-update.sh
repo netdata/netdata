@@ -24,62 +24,49 @@ do
     shift
 done
 
+deleted_stock_configs=0
+if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]
+then
 
-# -----------------------------------------------------------------------------
-progress "Checking new configuration files"
+    # -----------------------------------------------------------------------------
+    progress "Deleting stock configuration files from user configuration directory"
 
-declare -A configs_signatures=()
-. system/configs.signatures
+    declare -A configs_signatures=()
+    source "system/configs.signatures"
 
-if [ ! -d etc/netdata ]
-    then
-    run mkdir -p etc/netdata
-fi
-
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-for x in $(find etc.new -type f)
-do
-    # find it relative filename
-    f="${x/etc.new\/netdata\//}"
-    t="${x/etc.new\//etc\/}"
-    d=$(dirname "${t}")
-
-    #echo >&2 "x: ${x}"
-    #echo >&2 "t: ${t}"
-    #echo >&2 "d: ${d}"
-
-    if [ ! -d "${d}" ]
+    if [ ! -d etc/netdata ]
         then
-        run mkdir -p "${d}"
+        run mkdir -p etc/netdata
     fi
 
-    if [ ! -f "${t}" ]
-        then
-        run cp "${x}" "${t}"
-        continue
-    fi
+    md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+    for x in $(find etc -type f)
+    do
+        # find it relative filename
+        f="${x/etc\/netdata\//}"
 
-    if [ ! -z "${md5sum}" ]
-        then
-        # find the checksum of the existing file
-        md5="$(cat "${t}" | ${md5sum} | cut -d ' ' -f 1)"
-        #echo >&2 "md5: ${md5}"
+        # find the stock filename
+        t="${f/.conf.old/.conf}"
+        t="${t/.conf.orig/.conf}"
 
-        # check if it matches
-        if [ "${configs_signatures[${md5}]}" = "${f}" ]
+        if [ ! -z "${md5sum}" ]
             then
-            run cp "${x}" "${t}"
+            # find the checksum of the existing file
+            md5="$( ${md5sum} <"${x}" | cut -d ' ' -f 1)"
+            #echo >&2 "md5: ${md5}"
+
+            # check if it matches
+            if [ "${configs_signatures[${md5}]}" = "${t}" ]
+                then
+                # it matches the default
+                run rm -f "${x}"
+                deleted_stock_configs=$(( deleted_stock_configs + 1 ))
+            fi
         fi
-    fi
-    
-    if ! [[ "${x}" =~ .*\.orig ]]
-        then
-        run mv "${x}" "${t}.orig"
-    fi
-done
+    done
 
-run rm -rf etc.new
-
+    touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
@@ -165,6 +152,26 @@ dir_should_be_link . usr/libexec/netdata   netdata-plugins
 dir_should_be_link . var/lib/netdata       netdata-dbs
 dir_should_be_link . var/cache/netdata     netdata-metrics
 dir_should_be_link . var/log/netdata       netdata-logs
+
+dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
+
+if [ ${deleted_stock_configs} -gt 0 ]
+then
+    dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d "000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+fi
+
+
+# -----------------------------------------------------------------------------
+
+progress "create user config directories"
+
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
+do
+    if [ ! -d "etc/netdata/${x}" ]
+        then
+        run mkdir -p "etc/netdata/${x}" || exit 1
+    fi
+done
 
 
 # -----------------------------------------------------------------------------

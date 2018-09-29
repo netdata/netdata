@@ -13,13 +13,22 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 priority = 60000
 retries = 60
 
-ORDER = ['session_connections', 'client_requests',
-         'all_time_hit_rate', 'current_poll_hit_rate', 'cached_objects_expired', 'cached_objects_nuked',
-         'threads_total', 'threads_statistics', 'threads_queue_len',
-         'backend_connections', 'backend_requests',
-         'esi_statistics',
-         'memory_usage',
-         'uptime']
+ORDER = [
+    'session_connections',
+    'client_requests',
+    'all_time_hit_rate',
+    'current_poll_hit_rate',
+    'cached_objects_expired',
+    'cached_objects_nuked',
+    'threads_total',
+    'threads_statistics',
+    'threads_queue_len',
+    'backend_connections',
+    'backend_requests',
+    'esi_statistics',
+    'memory_usage',
+    'uptime'
+]
 
 CHARTS = {
     'session_connections': {

@@ -21,155 +21,185 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['fbin', 'fbout', 'fscur', 'fqcur',
-         'fhrsp_1xx', 'fhrsp_2xx', 'fhrsp_3xx', 'fhrsp_4xx', 'fhrsp_5xx', 'fhrsp_other', 'fhrsp_total',
-         'bbin', 'bbout', 'bscur', 'bqcur',
-         'bhrsp_1xx', 'bhrsp_2xx', 'bhrsp_3xx', 'bhrsp_4xx', 'bhrsp_5xx', 'bhrsp_other', 'bhrsp_total',
-         'bqtime', 'bttime', 'brtime', 'bctime',
-         'health_sup', 'health_sdown', 'health_bdown', 'health_idle']
+ORDER = [
+    'fbin',
+    'fbout',
+    'fscur',
+    'fqcur',
+    'fhrsp_1xx',
+    'fhrsp_2xx',
+    'fhrsp_3xx',
+    'fhrsp_4xx',
+    'fhrsp_5xx',
+    'fhrsp_other',
+    'fhrsp_total',
+    'bbin',
+    'bbout',
+    'bscur',
+    'bqcur',
+    'bhrsp_1xx',
+    'bhrsp_2xx',
+    'bhrsp_3xx',
+    'bhrsp_4xx',
+    'bhrsp_5xx',
+    'bhrsp_other',
+    'bhrsp_total',
+    'bqtime',
+    'bttime',
+    'brtime',
+    'bctime',
+    'health_sup',
+    'health_sdown',
+    'health_bdown',
+    'health_idle'
+]
 
 CHARTS = {
     'fbin': {
-        'options': [None, "Kilobytes In", "KB/s", 'frontend', 'haproxy_f.bin', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Kilobytes In', 'KB/s', 'frontend', 'haproxy_f.bin', 'line'],
+        'lines': []
+    },
     'fbout': {
-        'options': [None, "Kilobytes Out", "KB/s", 'frontend', 'haproxy_f.bout', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Kilobytes Out', 'KB/s', 'frontend', 'haproxy_f.bout', 'line'],
+        'lines': []
+    },
     'fscur': {
-        'options': [None, "Sessions Active", "sessions", 'frontend', 'haproxy_f.scur', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Sessions Active', 'sessions', 'frontend', 'haproxy_f.scur', 'line'],
+        'lines': []
+    },
     'fqcur': {
-        'options': [None, "Session In Queue", "sessions", 'frontend', 'haproxy_f.qcur', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Session In Queue', 'sessions', 'frontend', 'haproxy_f.qcur', 'line'],
+        'lines': []
+    },
     'fhrsp_1xx': {
-        'options': [None, "HTTP responses with 1xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_1xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 1xx code', 'responses/s', 'frontend', 'haproxy_f.hrsp_1xx', 'line'],
+        'lines': []
+    },
     'fhrsp_2xx': {
-        'options': [None, "HTTP responses with 2xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_2xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 2xx code', 'responses/s', 'frontend', 'haproxy_f.hrsp_2xx', 'line'],
+        'lines': []
+    },
     'fhrsp_3xx': {
-        'options': [None, "HTTP responses with 3xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_3xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 3xx code', 'responses/s', 'frontend', 'haproxy_f.hrsp_3xx', 'line'],
+        'lines': []
+    },
     'fhrsp_4xx': {
-        'options': [None, "HTTP responses with 4xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_4xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 4xx code', 'responses/s', 'frontend', 'haproxy_f.hrsp_4xx', 'line'],
+        'lines': []
+    },
     'fhrsp_5xx': {
-        'options': [None, "HTTP responses with 5xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_5xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 5xx code', 'responses/s', 'frontend', 'haproxy_f.hrsp_5xx', 'line'],
+        'lines': []
+    },
     'fhrsp_other': {
-        'options': [None, "HTTP responses with other codes (protocol error)", "responses/s", 'frontend', 'haproxy_f.hrsp_other', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with other codes (protocol error)', 'responses/s', 'frontend',
+                    'haproxy_f.hrsp_other', 'line'],
+        'lines': []
+    },
     'fhrsp_total': {
-        'options': [None, "HTTP responses", "responses", 'frontend', 'haproxy_f.hrsp_total', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses', 'responses', 'frontend', 'haproxy_f.hrsp_total', 'line'],
+        'lines': []
+    },
     'bbin': {
-        'options': [None, "Kilobytes In", "KB/s", 'backend', 'haproxy_b.bin', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Kilobytes In', 'KB/s', 'backend', 'haproxy_b.bin', 'line'],
+        'lines': []
+    },
     'bbout': {
-        'options': [None, "Kilobytes Out", "KB/s", 'backend', 'haproxy_b.bout', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Kilobytes Out', 'KB/s', 'backend', 'haproxy_b.bout', 'line'],
+        'lines': []
+    },
     'bscur': {
-        'options': [None, "Sessions Active", "sessions", 'backend', 'haproxy_b.scur', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Sessions Active', 'sessions', 'backend', 'haproxy_b.scur', 'line'],
+        'lines': []
+    },
     'bqcur': {
-        'options': [None, "Sessions In Queue", "sessions", 'backend', 'haproxy_b.qcur', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Sessions In Queue', 'sessions', 'backend', 'haproxy_b.qcur', 'line'],
+        'lines': []
+    },
     'bhrsp_1xx': {
-        'options': [None, "HTTP responses with 1xx code", "responses/s", 'backend', 'haproxy_b.hrsp_1xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 1xx code', 'responses/s', 'backend', 'haproxy_b.hrsp_1xx', 'line'],
+        'lines': []
+    },
     'bhrsp_2xx': {
-        'options': [None, "HTTP responses with 2xx code", "responses/s", 'backend', 'haproxy_b.hrsp_2xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 2xx code', 'responses/s', 'backend', 'haproxy_b.hrsp_2xx', 'line'],
+        'lines': []
+    },
     'bhrsp_3xx': {
-        'options': [None, "HTTP responses with 3xx code", "responses/s", 'backend', 'haproxy_b.hrsp_3xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 3xx code', 'responses/s', 'backend', 'haproxy_b.hrsp_3xx', 'line'],
+        'lines': []
+    },
     'bhrsp_4xx': {
-        'options': [None, "HTTP responses with 4xx code", "responses/s", 'backend', 'haproxy_b.hrsp_4xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 4xx code', 'responses/s', 'backend', 'haproxy_b.hrsp_4xx', 'line'],
+        'lines': []
+    },
     'bhrsp_5xx': {
-        'options': [None, "HTTP responses with 5xx code", "responses/s", 'backend', 'haproxy_b.hrsp_5xx', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses with 5xx code', 'responses/s', 'backend', 'haproxy_b.hrsp_5xx', 'line'],
+        'lines': []
+    },
     'bhrsp_other': {
-        'options': [None, "HTTP responses with other codes (protocol error)", "responses/s", 'backend',
+        'options': [None, 'HTTP responses with other codes (protocol error)', 'responses/s', 'backend',
                     'haproxy_b.hrsp_other', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'bhrsp_total': {
-        'options': [None, "HTTP responses (total)", "responses/s", 'backend', 'haproxy_b.hrsp_total', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'HTTP responses (total)', 'responses/s', 'backend', 'haproxy_b.hrsp_total', 'line'],
+        'lines': []
+    },
     'bqtime': {
-        'options': [None, "The average queue time over the 1024 last requests", "ms", 'backend', 'haproxy_b.qtime', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'The average queue time over the 1024 last requests', 'ms', 'backend',
+                    'haproxy_b.qtime', 'line'],
+        'lines': []
+    },
     'bctime': {
-        'options': [None, "The average connect time over the 1024 last requests", "ms", 'backend',
+        'options': [None, 'The average connect time over the 1024 last requests', 'ms', 'backend',
                     'haproxy_b.ctime', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'brtime': {
-        'options': [None, "The average response time over the 1024 last requests", "ms", 'backend',
+        'options': [None, 'The average response time over the 1024 last requests', 'ms', 'backend',
                     'haproxy_b.rtime', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'bttime': {
-        'options': [None, "The average total session time over the 1024 last requests", "ms", 'backend',
+        'options': [None, 'The average total session time over the 1024 last requests', 'ms', 'backend',
                     'haproxy_b.ttime', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'health_sdown': {
-        'options': [None, "Backend Servers In DOWN State", "failed servers", 'health',
+        'options': [None, 'Backend Servers In DOWN State', 'failed servers', 'health',
                     'haproxy_hs.down', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'health_sup': {
-        'options': [None, "Backend Servers In UP State", "health servers", 'health',
+        'options': [None, 'Backend Servers In UP State', 'health servers', 'health',
                     'haproxy_hs.up', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'health_bdown': {
-        'options': [None, "Is Backend Alive? 1 = DOWN", "failed backend", 'health', 'haproxy_hb.down', 'line'],
-        'lines': [
-        ]},
+        'options': [None, 'Is Backend Alive? 1 = DOWN', 'failed backend', 'health', 'haproxy_hb.down', 'line'],
+        'lines': []
+    },
     'health_idle': {
-        'options': [None, "The Ratio Of Polling Time Vs Total Time", "percent", 'health', 'haproxy.idle', 'line'],
+        'options': [None, 'The Ratio Of Polling Time Vs Total Time', 'percent', 'health', 'haproxy.idle', 'line'],
         'lines': [
             ['idle', None, 'absolute']
-        ]}
+        ]
+    }
 }
 
 
-METRICS = {'bin': {'algorithm': 'incremental', 'divisor': 1024},
-           'bout': {'algorithm': 'incremental', 'divisor': 1024},
-           'scur': {'algorithm': 'absolute', 'divisor': 1},
-           'qcur': {'algorithm': 'absolute', 'divisor': 1},
-           'hrsp_1xx': {'algorithm': 'incremental', 'divisor': 1},
-           'hrsp_2xx': {'algorithm': 'incremental', 'divisor': 1},
-           'hrsp_3xx': {'algorithm': 'incremental', 'divisor': 1},
-           'hrsp_4xx': {'algorithm': 'incremental', 'divisor': 1},
-           'hrsp_5xx': {'algorithm': 'incremental', 'divisor': 1},
-           'hrsp_other': {'algorithm': 'incremental', 'divisor': 1},
-           }
+METRICS = {
+    'bin': {'algorithm': 'incremental', 'divisor': 1024},
+    'bout': {'algorithm': 'incremental', 'divisor': 1024},
+    'scur': {'algorithm': 'absolute', 'divisor': 1},
+    'qcur': {'algorithm': 'absolute', 'divisor': 1},
+    'hrsp_1xx': {'algorithm': 'incremental', 'divisor': 1},
+    'hrsp_2xx': {'algorithm': 'incremental', 'divisor': 1},
+    'hrsp_3xx': {'algorithm': 'incremental', 'divisor': 1},
+    'hrsp_4xx': {'algorithm': 'incremental', 'divisor': 1},
+    'hrsp_5xx': {'algorithm': 'incremental', 'divisor': 1},
+    'hrsp_other': {'algorithm': 'incremental', 'divisor': 1}
+}
 
 
 BACKEND_METRICS = {

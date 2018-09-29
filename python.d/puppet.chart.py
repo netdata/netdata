@@ -2,14 +2,14 @@
 # Description: puppet netdata python.d module
 # Author: Andrey Galkin <andrey@futoin.org> (andvgal)
 # SPDX-License-Identifier: GPL-3.0+
-#---
+#
 # This module should work both with OpenSource and PE versions
 # of PuppetServer and PuppetDB.
 #
 # NOTE: PuppetDB may be configured to require proper TLS
 #       client certificate for security reasons. Use tls_key_file
 #       and tls_cert_file options then.
-#---
+#
 
 from bases.FrameworkServices.UrlService import UrlService
 from json import loads
@@ -30,10 +30,10 @@ ORDER = [
 ]
 CHARTS = {
     'jvm_heap': {
-        'options': [None, "JVM Heap", "MB", "resources", "puppet.jvm", "area"],
+        'options': [None, 'JVM Heap', 'MB', 'resources', 'puppet.jvm', 'area'],
         'lines': [
-            ["jvm_heap_committed", 'committed', "absolute", 1, MB],
-            ["jvm_heap_used", 'used', "absolute", 1, MB],
+            ['jvm_heap_committed', 'committed', 'absolute', 1, MB],
+            ['jvm_heap_used', 'used', 'absolute', 1, MB],
         ],
         'variables': [
             ['jvm_heap_max'],
@@ -41,10 +41,10 @@ CHARTS = {
         ],
     },
     'jvm_nonheap': {
-        'options': [None, "JVM Non-Heap", "MB", "resources", "puppet.jvm", "area"],
+        'options': [None, 'JVM Non-Heap', 'MB', 'resources', 'puppet.jvm', 'area'],
         'lines': [
-            ["jvm_nonheap_committed", 'committed', "absolute", 1, MB],
-            ["jvm_nonheap_used", 'used', "absolute", 1, MB],
+            ['jvm_nonheap_committed', 'committed', 'absolute', 1, MB],
+            ['jvm_nonheap_used', 'used', 'absolute', 1, MB],
         ],
         'variables': [
             ['jvm_nonheap_max'],
@@ -52,22 +52,23 @@ CHARTS = {
         ],
     },
     'cpu': {
-        'options': [None, "CPU usage", "percentage", "resources", "puppet.cpu", "stacked"],
+        'options': [None, 'CPU usage', 'percentage', 'resources', 'puppet.cpu', 'stacked'],
         'lines': [
-            ["cpu_time", 'execution', "absolute", 1, CPU_SCALE],
-            ["gc_time", 'GC', "absolute", 1, CPU_SCALE],
+            ['cpu_time', 'execution', 'absolute', 1, CPU_SCALE],
+            ['gc_time', 'GC', 'absolute', 1, CPU_SCALE],
         ]
     },
     'fd_open': {
-        'options': [None, "File Descriptors", "descriptors", "resources", "puppet.fdopen", "line"],
+        'options': [None, 'File Descriptors', 'descriptors', 'resources', 'puppet.fdopen', 'line'],
         'lines': [
-            ["fd_used", 'used', "absolute"],
+            ['fd_used', 'used', 'absolute'],
         ],
         'variables': [
             ['fd_max'],
         ],
     },
 }
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -77,7 +78,6 @@ class Service(UrlService):
         self.definitions = CHARTS
 
     def _get_data(self):
-        #---
         # NOTE: there are several ways to retrieve data
         # 1. Only PE versions:
         #    https://puppet.com/docs/pe/2018.1/api_status/status_api_metrics_endpoints.html
@@ -87,7 +87,6 @@ class Service(UrlService):
         #    https://puppet.com/docs/pe/2018.1/api_status/status_api_json_endpoints.html
         #
         # For sake of simplicity and efficiency the status one is used..
-        #---
 
         raw_data = self._get_raw_data(self.url + '/status/v1/services?level=debug')
 
@@ -118,6 +117,5 @@ class Service(UrlService):
             data['gc_time'] = int(jvm_metrics['gc-cpu-usage'] * CPU_SCALE)
         except KeyError:
             pass
-
 
         return data or None

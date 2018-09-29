@@ -18,10 +18,22 @@ update_every = 10
 priority = 60000
 retries = 60
 
-ORDER = ['general_usage', 'general_objects', 'general_bytes', 'general_operations',
-         'general_latency', 'pool_usage', 'pool_objects', 'pool_read_bytes',
-         'pool_write_bytes', 'pool_read_operations', 'pool_write_operations', 'osd_usage',
-         'osd_apply_latency', 'osd_commit_latency']
+ORDER = [
+    'general_usage',
+    'general_objects',
+    'general_bytes',
+    'general_operations',
+    'general_latency',
+    'pool_usage',
+    'pool_objects',
+    'pool_read_bytes',
+    'pool_write_bytes',
+    'pool_read_operations',
+    'pool_write_operations',
+    'osd_usage',
+    'osd_apply_latency',
+    'osd_commit_latency'
+]
 
 CHARTS = {
     'general_usage': {
@@ -164,11 +176,11 @@ class Service(SimpleService):
                                                                  pool['name'],
                                                                  'absolute', 1, 1024])
             self.definitions['pool_read_operations']['lines'].append(['read_operations_{0}'.format(pool['name']),
-                                                                pool['name'],
-                                                                'absolute'])
+                                                                     pool['name'],
+                                                                     'absolute'])
             self.definitions['pool_write_operations']['lines'].append(['write_operations_{0}'.format(pool['name']),
-                                                                 pool['name'],
-                                                                 'absolute'])
+                                                                      pool['name'],
+                                                                      'absolute'])
 
         # OSD lines
         for osd in sorted(self._get_osd_df()['nodes']):
@@ -230,16 +242,17 @@ class Service(SimpleService):
             apply_latency += perf['perf_stats']['apply_latency_ms']
             commit_latency += perf['perf_stats']['commit_latency_ms']
 
-        return {'general_usage': int(status['kb_used']),
-                'general_available': int(status['kb_avail']),
-                'general_objects': int(status['num_objects']),
-                'general_read_bytes': read_bytes_sec,
-                'general_write_bytes': write_bytes_sec,
-                'general_read_operations': read_op_per_sec,
-                'general_write_operations': write_op_per_sec,
-                'general_apply_latency': apply_latency,
-                'general_commit_latency': commit_latency
-                }
+        return {
+            'general_usage': int(status['kb_used']),
+            'general_available': int(status['kb_avail']),
+            'general_objects': int(status['num_objects']),
+            'general_read_bytes': read_bytes_sec,
+            'general_write_bytes': write_bytes_sec,
+            'general_read_operations': read_op_per_sec,
+            'general_write_operations': write_op_per_sec,
+            'general_apply_latency': apply_latency,
+            'general_commit_latency': commit_latency
+        }
 
     @staticmethod
     def _get_pool_usage(pool):
@@ -263,11 +276,12 @@ class Service(SimpleService):
         Get read/write kb and operations in a pool
         :return: A pool dict with both read/write bytes and operations.
         """
-        return {'read_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_bytes_sec', 0)),
-                'write_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_bytes_sec', 0)),
-                'read_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_op_per_sec', 0)),
-                'write_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_op_per_sec', 0))
-                }
+        return {
+            'read_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_bytes_sec', 0)),
+            'write_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_bytes_sec', 0)),
+            'read_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_op_per_sec', 0)),
+            'write_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_op_per_sec', 0))
+        }
 
     @staticmethod
     def _get_osd_usage(osd):
@@ -283,8 +297,10 @@ class Service(SimpleService):
         Get ceph osd apply and commit latency
         :return: A osd dict with osd name's key with both apply and commit latency values
         """
-        return {'apply_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['apply_latency_ms'],
-                'commit_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['commit_latency_ms']}
+        return {
+            'apply_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['apply_latency_ms'],
+            'commit_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['commit_latency_ms']
+        }
 
     def _get_df(self):
         """

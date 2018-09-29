@@ -27,20 +27,21 @@ nginx_reading=0
 nginx_writing=0
 nginx_waiting=0
 nginx_get() {
+	# shellcheck disable=SC2207
 	nginx_response=($(run curl -Ss ${nginx_curl_opts} "${nginx_url}"))
-	[ $? -ne 0 -o "${#nginx_response[@]}" -eq 0 ] && return 1
+	# shellcheck disable=SC2181
+	if [ $? -ne 0 ] || [ "${#nginx_response[@]}" -eq 0 ]; then return 1; fi
 
-	if [ "${nginx_response[0]}" != "Active" \
-		 -o "${nginx_response[1]}" != "connections:" \
-		 -o "${nginx_response[3]}" != "server" \
-		 -o "${nginx_response[4]}" != "accepts" \
-		 -o "${nginx_response[5]}" != "handled" \
-		 -o "${nginx_response[6]}" != "requests" \
-		 -o "${nginx_response[10]}" != "Reading:" \
-		 -o "${nginx_response[12]}" != "Writing:" \
-		 -o "${nginx_response[14]}" != "Waiting:" \
-	   ]
-		then
+	if [ "${nginx_response[0]}" != "Active" ] ||\
+	   [ "${nginx_response[1]}" != "connections:" ] ||\
+	   [ "${nginx_response[3]}" != "server" ] ||\
+	   [ "${nginx_response[4]}" != "accepts" ] ||\
+	   [ "${nginx_response[5]}" != "handled" ] ||\
+	   [ "${nginx_response[6]}" != "requests" ] ||\
+	   [ "${nginx_response[10]}" != "Reading:" ] ||\
+	   [ "${nginx_response[12]}" != "Writing:" ] ||\
+	   [ "${nginx_response[14]}" != "Waiting:" ]
+	then
 		error "Invalid response from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
@@ -53,15 +54,14 @@ nginx_get() {
 	nginx_writing="${nginx_response[13]}"
 	nginx_waiting="${nginx_response[15]}"
 
-	if [ -z "${nginx_active_connections}" \
-		-o -z "${nginx_accepts}" \
-		-o -z "${nginx_handled}" \
-		-o -z "${nginx_requests}" \
-		-o -z "${nginx_reading}" \
-		-o -z "${nginx_writing}" \
-		-o -z "${nginx_waiting}" \
-		]
-		then
+	if [ -z "${nginx_active_connections}" ] ||\
+	   [ -z "${nginx_accepts}" ] ||\
+	   [ -z "${nginx_handled}" ] ||\
+	   [ -z "${nginx_requests}" ] ||\
+	   [ -z "${nginx_reading}" ] ||\
+	   [ -z "${nginx_writing}" ] ||\
+	   [ -z "${nginx_waiting}" ]
+	then
 		error "empty values got from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
@@ -73,8 +73,10 @@ nginx_get() {
 nginx_check() {
 
 	nginx_get
+	# shellcheck disable=2181
 	if [ $? -ne 0 ]
-		then
+	then
+		# shellcheck disable=SC2154
 		error "cannot find stub_status on URL '${nginx_url}'. Please set nginx_url='http://nginx.server/stub_status' in $confd/nginx.conf"
 		return 1
 	fi

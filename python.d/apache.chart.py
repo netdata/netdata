@@ -26,63 +26,65 @@ CHARTS = {
         'options': [None, 'apache Lifetime Avg. Response Size', 'bytes/request',
                     'statistics', 'apache.bytesperreq', 'area'],
         'lines': [
-            ["size_req"]
+            ['size_req']
         ]},
     'workers': {
         'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
-            ["idle"],
-            ["busy"],
+            ['idle'],
+            ['busy'],
         ]},
     'reqpersec': {
         'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics',
                     'apache.reqpersec', 'area'],
         'lines': [
-            ["requests_sec"]
+            ['requests_sec']
         ]},
     'bytespersec': {
         'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobits/s', 'statistics',
                     'apache.bytesperreq', 'area'],
         'lines': [
-            ["size_sec", None, 'absolute', 8, 1000]
+            ['size_sec', None, 'absolute', 8, 1000]
         ]},
     'requests': {
         'options': [None, 'apache Requests', 'requests/s', 'requests', 'apache.requests', 'line'],
         'lines': [
-            ["requests", None, 'incremental']
+            ['requests', None, 'incremental']
         ]},
     'net': {
         'options': [None, 'apache Bandwidth', 'kilobits/s', 'bandwidth', 'apache.net', 'area'],
         'lines': [
-            ["sent", None, 'incremental', 8, 1]
+            ['sent', None, 'incremental', 8, 1]
         ]},
     'connections': {
         'options': [None, 'apache Connections', 'connections', 'connections', 'apache.connections', 'line'],
         'lines': [
-            ["connections"]
+            ['connections']
         ]},
     'conns_async': {
         'options': [None, 'apache Async Connections', 'connections', 'connections', 'apache.conns_async', 'stacked'],
         'lines': [
-            ["keepalive"],
-            ["closing"],
-            ["writing"]
+            ['keepalive'],
+            ['closing'],
+            ['writing']
         ]}
 }
 
-ASSIGNMENT = {"BytesPerReq": 'size_req',
-              "IdleWorkers": 'idle',
-              "IdleServers": 'idle_servers',
-              "BusyWorkers": 'busy',
-              "BusyServers": 'busy_servers',
-              "ReqPerSec": 'requests_sec',
-              "BytesPerSec": 'size_sec',
-              "Total Accesses": 'requests',
-              "Total kBytes": 'sent',
-              "ConnsTotal": 'connections',
-              "ConnsAsyncKeepAlive": 'keepalive',
-              "ConnsAsyncClosing": 'closing',
-              "ConnsAsyncWriting": 'writing'}
+ASSIGNMENT = {
+    'BytesPerReq': 'size_req',
+    'IdleWorkers': 'idle',
+    'IdleServers': 'idle_servers',
+    'BusyWorkers': 'busy',
+    'BusyServers': 'busy_servers',
+    'ReqPerSec': 'requests_sec',
+    'BytesPerSec': 'size_sec',
+    'Total Accesses': 'requests',
+    'Total kBytes': 'sent',
+    'ConnsTotal': 'connections',
+    'ConnsAsyncKeepAlive': 'keepalive',
+    'ConnsAsyncClosing': 'closing',
+    'ConnsAsyncWriting': 'writing'
+}
 
 
 class Service(UrlService):
@@ -103,8 +105,8 @@ class Service(UrlService):
             for chart in self.definitions:
                 if chart == 'workers':
                     lines = self.definitions[chart]['lines']
-                    lines[0] = ["idle_servers", 'idle']
-                    lines[1] = ["busy_servers", 'busy']
+                    lines[0] = ['idle_servers', 'idle']
+                    lines[1] = ['busy_servers', 'busy']
                 opts = self.definitions[chart]['options']
                 opts[1] = opts[1].replace('apache', 'lighttpd')
                 opts[4] = opts[4].replace('apache', 'lighttpd')
@@ -121,7 +123,7 @@ class Service(UrlService):
         data = dict()
 
         for row in raw_data.split('\n'):
-            tmp = row.split(":")
+            tmp = row.split(':')
             if tmp[0] in ASSIGNMENT:
                 try:
                     data[ASSIGNMENT[tmp[0]]] = int(float(tmp[1]))

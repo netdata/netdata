@@ -130,7 +130,8 @@ update_every="${1-1}"
 
 # the netdata configuration directory
 # passed by netdata as an environment variable
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 # -----------------------------------------------------------------------------
 # configuration options
@@ -153,23 +154,33 @@ ping_every="$((update_every * 1000 / 5))"
 fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 
 # -----------------------------------------------------------------------------
-# load the configuration file
+# load the configuration files
 
-if [ ! -f "${NETDATA_CONFIG_DIR}/${plugin}.conf" ]
-then
-	fatal "configuration file '${NETDATA_CONFIG_DIR}/${plugin}.conf' not found - nothing to do."
-fi
-
-source "${NETDATA_CONFIG_DIR}/${plugin}.conf"
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        info "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
 
 if [ -z "${hosts}" ]
 then
-	fatal "no hosts configured in '${NETDATA_CONFIG_DIR}/${plugin}.conf' - nothing to do."
+	fatal "no hosts configured - nothing to do."
 fi
 
-if [ -z "${fping}" -o ! -x "${fping}" ]
+if [ -z "${fping}" ]
 then
-	fatal "command '${fping}' is not found or is not executable - cannot proceed."
+	fatal "fping command is not found. Please set its full path in '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
+fi
+
+if [ ! -x "${fping}" ]
+then
+	fatal "fping command '${fping}' is not executable - cannot proceed."
 fi
 
 if [ ${ping_every} -lt 20 ]
@@ -186,4 +197,4 @@ info "starting fping: ${fping} ${options[*]}"
 exec "${fping}" "${options[@]}"
 
 # if we cannot execute fping, stop
-fatal "command '${fping} ${options[@]}' failed to be executed."
+fatal "command '${fping} ${options[*]}' failed to be executed (returned code $?)."

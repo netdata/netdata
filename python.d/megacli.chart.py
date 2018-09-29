@@ -23,8 +23,7 @@ def adapter_charts(ads):
 
     charts = {
         'adapter_degraded': {
-            'options': [
-                    None, 'Adapter State', 'is degraded', 'adapter', 'megacli.adapter_degraded', 'line'],
+            'options': [None, 'Adapter State', 'is degraded', 'adapter', 'megacli.adapter_degraded', 'line'],
             'lines': dims(ads)
             },
     }
@@ -43,15 +42,14 @@ def pd_charts(pds):
 
     charts = {
         'pd_media_error': {
-            'options': [
-                None, 'Physical Drives Media Errors', 'errors/s', 'pd', 'megacli.pd_media_error', 'line'
-            ],
-            'lines': dims("media_error", pds)},
+            'options': [None, 'Physical Drives Media Errors', 'errors/s', 'pd', 'megacli.pd_media_error', 'line'],
+            'lines': dims('media_error', pds)
+        },
         'pd_predictive_failure': {
-            'options': [
-                None, 'Physical Drives Predictive Failures', 'failures/s', 'pd', 'megacli.pd_predictive_failure', 'line'
-            ],
-            'lines': dims("predictive_failure", pds)}
+            'options': [None, 'Physical Drives Predictive Failures', 'failures/s', 'pd',
+                        'megacli.pd_predictive_failure', 'line'],
+            'lines': dims('predictive_failure', pds)
+        }
     }
 
     return order, charts
@@ -66,8 +64,8 @@ def battery_charts(bats):
         charts.update(
             {
                 'bbu_{0}_relative_charge'.format(b.id): {
-                    'options': [
-                        None, 'Relative State of Charge', '%', 'battery', 'megacli.bbu_relative_charge', 'line'],
+                    'options': [None, 'Relative State of Charge', '%', 'battery',
+                                'megacli.bbu_relative_charge', 'line'],
                     'lines': [
                         ['bbu_{0}_relative_charge'.format(b.id), 'adapter {0}'.format(b.id)],
                     ]
@@ -80,8 +78,7 @@ def battery_charts(bats):
         charts.update(
             {
                 'bbu_{0}_cycle_count'.format(b.id): {
-                    'options': [
-                        None, 'Cycle Count', 'cycle count', 'battery', 'megacli.bbu_cycle_count', 'line'],
+                    'options': [None, 'Cycle Count', 'cycle count', 'battery', 'megacli.bbu_cycle_count', 'line'],
                     'lines': [
                         ['bbu_{0}_cycle_count'.format(b.id), 'adapter {0}'.format(b.id)],
                     ]
@@ -106,13 +103,13 @@ RE_BATTERY = re.compile(
 
 
 def find_adapters(d):
-    keys = ("Adapter #", "State")
+    keys = ('Adapter #', 'State')
     d = ' '.join(v.strip() for v in d if v.startswith(keys))
     return [Adapter(*v) for v in RE_ADAPTER.findall(d)]
 
 
 def find_pds(d):
-    keys = ("Slot Number",  "Media Error Count", "Predictive Failure Count")
+    keys = ('Slot Number',  'Media Error Count', 'Predictive Failure Count')
     d = ' '.join(v.strip() for v in d if v.startswith(keys))
     return [PD(*v) for v in RE_VD.findall(d)]
 
@@ -131,7 +128,7 @@ class Adapter:
     def data(self):
         return {
             'adapter_{0}_degraded'.format(self.id): self.state,
-            }
+        }
 
 
 class PD:

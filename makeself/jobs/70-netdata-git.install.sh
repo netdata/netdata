@@ -13,13 +13,6 @@ else
 #    export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness"
 fi
 
-if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
-    then
-    # make sure we don't have an old etc path, so that the installer
-    # will install all files without examining changes
-    run mv "${NETDATA_INSTALL_PATH}/etc" "${NETDATA_INSTALL_PATH}/etc.new"
-fi
-
 run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-wait \
     --dont-start-it \

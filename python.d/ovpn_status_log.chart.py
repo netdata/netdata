@@ -17,14 +17,18 @@ CHARTS = {
         'options': [None, 'OpenVPN Active Users', 'active users', 'users', 'openvpn_status.users', 'line'],
         'lines': [
             ['users', None, 'absolute'],
-        ]},
+        ]
+    },
     'traffic': {
         'options': [None, 'OpenVPN Traffic', 'KB/s', 'traffic', 'openvpn_status.traffic', 'area'],
         'lines': [
             ['bytes_in', 'in', 'incremental', 1, 1 << 10], ['bytes_out', 'out', 'incremental', 1, -1 << 10]
-        ]},
-
+        ]
+    }
 }
+
+TLS_REGEX = r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)')
+STATIC_KEY_REGEX = r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)')
 
 
 class Service(SimpleService):
@@ -33,8 +37,10 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.log_path = self.configuration.get('log_path')
-        self.regex = dict(tls=r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)'),
-                          static_key=r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)'))
+        self.regex = {
+            'tls': TLS_REGEX,
+            'static_key': STATIC_KEY_REGEX
+        }
 
     def check(self):
         if not (self.log_path and isinstance(self.log_path, str)):
@@ -58,7 +64,7 @@ class Service(SimpleService):
                 break
         if found:
             return True
-        self.error("Failed to parse ovpenvpn log file")
+        self.error('Failed to parse ovpenvpn log file')
         return False
 
     def _get_raw_data(self):
@@ -109,7 +115,9 @@ class Service(SimpleService):
         data = dict(users=0, bytes_in=0, bytes_out=0)
         for row in raw_data:
             columns = row.split(',') if ',' in row else row.split()
-            if 'UNDEF' in columns: continue # see https://openvpn.net/archive/openvpn-users/2004-08/msg00116.html
+            if 'UNDEF' in columns:
+                # see https://openvpn.net/archive/openvpn-users/2004-08/msg00116.html
+                continue
 
             match = self.regex['tls'].search(' '.join(columns))
             if match:

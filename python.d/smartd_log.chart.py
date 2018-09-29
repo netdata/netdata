@@ -116,7 +116,7 @@ def chart_template(chart_name):
         chart_name: {
             'options': [None, title, units, family, 'smartd_log.' + chart_name, 'line'],
             'lines': []
-            }
+        }
     }
 
 

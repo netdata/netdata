@@ -460,12 +460,13 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get system paths
 
-    netdata_configured_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",    CONFIG_DIR);
-    netdata_configured_log_dir     = config_get(CONFIG_SECTION_GLOBAL, "log directory",       LOG_DIR);
-    netdata_configured_web_dir     = config_get(CONFIG_SECTION_GLOBAL, "web files directory", WEB_DIR);
-    netdata_configured_cache_dir   = config_get(CONFIG_SECTION_GLOBAL, "cache directory",     CACHE_DIR);
-    netdata_configured_varlib_dir  = config_get(CONFIG_SECTION_GLOBAL, "lib directory",       VARLIB_DIR);
-    netdata_configured_home_dir    = config_get(CONFIG_SECTION_GLOBAL, "home directory",      CACHE_DIR);
+    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",       netdata_configured_user_config_dir);
+    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_GLOBAL, "stock config directory", netdata_configured_stock_config_dir);
+    netdata_configured_log_dir          = config_get(CONFIG_SECTION_GLOBAL, "log directory",          netdata_configured_log_dir);
+    netdata_configured_web_dir          = config_get(CONFIG_SECTION_GLOBAL, "web files directory",    netdata_configured_web_dir);
+    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
+    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
+    netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
 
     {
         char plugins_dirs[(FILENAME_MAX * 2) + 1];
@@ -596,15 +597,17 @@ void set_global_environment() {
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
-    setenv("NETDATA_HOSTNAME"   , netdata_configured_hostname, 1);
-    setenv("NETDATA_CONFIG_DIR" , verify_required_directory(netdata_configured_config_dir),  1);
-    setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_plugins_dir), 1);
-    setenv("NETDATA_WEB_DIR"    , verify_required_directory(netdata_configured_web_dir),     1);
-    setenv("NETDATA_CACHE_DIR"  , verify_required_directory(netdata_configured_cache_dir),   1);
-    setenv("NETDATA_LIB_DIR"    , verify_required_directory(netdata_configured_varlib_dir),  1);
-    setenv("NETDATA_LOG_DIR"    , verify_required_directory(netdata_configured_log_dir),     1);
-    setenv("HOME"               , verify_required_directory(netdata_configured_home_dir),    1);
-    setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
+    setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
+    setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
+    setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
+    setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
+    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_plugins_dir),      1);
+    setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
+    setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
+    setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
+    setenv("NETDATA_LOG_DIR"          , verify_required_directory(netdata_configured_log_dir),          1);
+    setenv("HOME"                     , verify_required_directory(netdata_configured_home_dir),         1);
+    setenv("NETDATA_HOST_PREFIX"      , netdata_configured_host_prefix, 1);
 
     get_system_timezone();
 
@@ -624,6 +627,33 @@ void set_global_environment() {
 
     // switch to standard locale for plugins
     setenv("LC_ALL", "C", 1);
+}
+
+static int load_netdata_conf(char *filename, char overwrite_used) {
+    if(filename)
+        return config_load(filename, overwrite_used);
+
+    filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
+
+    int ret = config_load(filename, overwrite_used);
+    if(!ret) {
+        freez(filename);
+        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
+        ret = config_load(filename, overwrite_used);
+    }
+    freez(filename);
+
+    return ret;
+}
+
+static void load_stream_conf() {
+    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
+    if(!appconfig_load(&stream_config, filename, 0)) {
+        freez(filename);
+        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
+        appconfig_load(&stream_config, filename, 0);
+    }
+    freez(filename);
 }
 
 int main(int argc, char **argv) {
@@ -686,7 +716,7 @@ int main(int argc, char **argv) {
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
             switch(opt) {
                 case 'c':
-                    if(config_load(optarg, 1) != 1) {
+                    if(load_netdata_conf(optarg, 1) != 1) {
                         error("Cannot load configuration file %s.", optarg);
                         return 1;
                     }
@@ -731,9 +761,6 @@ int main(int argc, char **argv) {
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
                             if(unit_test_str2ld()) return 1;
-                            //default_rrd_update_every = 1;
-                            //default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-                            //if(!config_loaded) config_load(NULL, 0);
                             get_netdata_configured_variables();
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
@@ -841,7 +868,7 @@ int main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                config_load(NULL, 0);
+                                load_netdata_conf(NULL, 0);
                             }
 
                             backwards_compatible_config();
@@ -879,7 +906,7 @@ int main(int argc, char **argv) {
 #endif
 
     if(!config_loaded)
-        config_load(NULL, 0);
+        load_netdata_conf(NULL, 0);
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -902,8 +929,8 @@ int main(int argc, char **argv) {
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
         // files using relative filenames
-        if(chdir(netdata_configured_config_dir) == -1)
-            fatal("Cannot cd to '%s'", netdata_configured_config_dir);
+        if(chdir(netdata_configured_user_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
     }
 
     char *user = NULL;
@@ -938,11 +965,7 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // load stream.conf
-        {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s/stream.conf", netdata_configured_config_dir);
-            appconfig_load(&stream_config, filename, 0);
-        }
+        load_stream_conf();
 
 
         // --------------------------------------------------------------------

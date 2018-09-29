@@ -21,7 +21,7 @@ static inline size_t mnl_buffer_size() {
 #define DO_NFSTAT 1
 
 #define RRD_TYPE_NET_STAT_NETFILTER "netfilter"
-#define RRD_TYPE_NET_STAT_CONNTRACK "netlink" // FIXME: should be "conntrack" when merged with the /proc plugin
+#define RRD_TYPE_NET_STAT_CONNTRACK "netlink"
 
 #include <linux/netfilter/nfnetlink_conntrack.h>
 
@@ -306,7 +306,7 @@ static void nfstat_send_metrics() {
                     , "connections/s"
                     , "nfacct"
                     , NULL
-                    , 3001
+                    , NETDATA_CHART_PRIO_NETFILTER + 1
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -342,7 +342,7 @@ static void nfstat_send_metrics() {
                     , "changes/s"
                     , "nfacct"
                     , NULL
-                    , 3002
+                    , NETDATA_CHART_PRIO_NETFILTER + 2
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -379,7 +379,7 @@ static void nfstat_send_metrics() {
                     , "searches/s"
                     , "nfacct"
                     , NULL
-                    , 3010
+                    , NETDATA_CHART_PRIO_NETFILTER + 10
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -416,7 +416,7 @@ static void nfstat_send_metrics() {
                     , "events/s"
                     , "nfacct"
                     , NULL
-                    , 3005
+                    , NETDATA_CHART_PRIO_NETFILTER + 5
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -455,7 +455,7 @@ static void nfstat_send_metrics() {
                     , "expectations/s"
                     , "nfacct"
                     , NULL
-                    , 3003
+                    , NETDATA_CHART_PRIO_NETFILTER + 3
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -592,7 +592,7 @@ static void nfacct_cleanup() {
     nfacct_root.buf = NULL;
     nfacct_root.buf_size = 0;
 
-    // FIXME: cleanup the metrics linked list
+    // TODO: cleanup the metrics linked list
 }
 
 static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
@@ -675,7 +675,7 @@ static void nfacct_send_metrics() {
                 , "packets/s"
                 , "nfacct"
                 , NULL
-                , 3206
+                , NETDATA_CHART_PRIO_NETFILTER + 206
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -718,7 +718,7 @@ static void nfacct_send_metrics() {
                 , "kilobytes/s"
                 , "nfacct"
                 , NULL
-                , 3207
+                , NETDATA_CHART_PRIO_NETFILTER + 207
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );

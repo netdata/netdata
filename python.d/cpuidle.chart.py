@@ -3,13 +3,13 @@
 # Author: Steven Noonan (tycho)
 # SPDX-License-Identifier: GPL-3.0+
 
+import ctypes
 import glob
 import os
 import platform
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-import ctypes
 syscall = ctypes.CDLL('libc.so.6').syscall
 
 # default module values (can be overridden per job in `config`)
@@ -108,7 +108,7 @@ class Service(SimpleService):
 
     def check(self):
         if self.__gettid() is None:
-            self.error("Cannot get thread ID. Stats would be completely broken.")
+            self.error('Cannot get thread ID. Stats would be completely broken.')
             return False
 
         for path in sorted(glob.glob(self.sys_dir + '/cpu*/cpuidle/state*/name')):
@@ -141,9 +141,8 @@ class Service(SimpleService):
         # Sort order by kernel-specified CPU index
         self.order.sort(key=lambda x: int(x.split('_')[0][3:]))
 
-        if len(self.definitions) == 0:
+        if not self.definitions:
             self.error("couldn't find cstate stats")
             return False
 
         return True
-

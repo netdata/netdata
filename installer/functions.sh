@@ -10,8 +10,8 @@
 # checking the availability of commands
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {
@@ -312,6 +312,7 @@ portable_add_user() {
 
     echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
+    # shellcheck disable=SC2230
     local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
     # Linux
@@ -444,6 +445,7 @@ issystemd() {
     [ ! -d /lib/systemd/system ] && return 1
 
     # if there is no systemctl command, it is not systemd
+    # shellcheck disable=SC2230
     systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
     [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 

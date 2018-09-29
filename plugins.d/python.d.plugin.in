@@ -21,10 +21,20 @@ GC_RUN = True
 GC_COLLECT_EVERY = 300
 
 PY_VERSION = version_info[:2]
-PLUGIN_CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', os.path.dirname(__file__) + '/../../../../etc/netdata') + '/'
-CHARTS_PY_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR', os.path.dirname(__file__)) + '/../python.d') + '/'
-CHARTS_PY_CONFIG_DIR = PLUGIN_CONFIG_DIR + 'python.d/'
-PYTHON_MODULES_DIR = CHARTS_PY_DIR + 'python_modules'
+
+USER_CONFIG_DIR = os.getenv('NETDATA_USER_CONFIG_DIR', '@configdir_POST@')
+STOCK_CONFIG_DIR = os.getenv('NETDATA_STOCK_CONFIG_DIR', '@libconfigdir_POST@')
+
+PLUGINS_USER_CONFIG_DIR = os.path.join(USER_CONFIG_DIR, 'python.d')
+PLUGINS_STOCK_CONFIG_DIR = os.path.join(STOCK_CONFIG_DIR, 'python.d')
+
+
+PLUGINS_DIR = os.path.abspath(os.getenv(
+    'NETDATA_PLUGINS_DIR',
+    os.path.dirname(__file__)) + '/../python.d')
+
+
+PYTHON_MODULES_DIR = os.path.join(PLUGINS_DIR, 'python_modules')
 
 sys.path.append(PYTHON_MODULES_DIR)
 
@@ -53,7 +63,7 @@ def module_ok(m):
     return m.endswith(MODULE_EXTENSION) and m[:-len(MODULE_EXTENSION)] not in OBSOLETE_MODULES
 
 
-ALL_MODULES = [m for m in sorted(os.listdir(CHARTS_PY_DIR)) if module_ok(m)]
+ALL_MODULES = [m for m in sorted(os.listdir(PLUGINS_DIR)) if module_ok(m)]
 
 
 def parse_cmd():
@@ -69,10 +79,9 @@ def multi_job_check(config):
 
 
 class RawModule:
-    def __init__(self, name, path, conf_path, explicitly_enabled=True):
+    def __init__(self, name, path, explicitly_enabled=True):
         self.name = name
         self.path = path
-        self.conf_path = conf_path
         self.explicitly_enabled = explicitly_enabled
 
 
@@ -202,9 +211,20 @@ class Plugin(object):
         self.modules = OrderedDict()
         self.sleep_time = 1
         self.runs_counter = 0
-        self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
+
+        user_config = os.path.join(USER_CONFIG_DIR, 'python.d.conf')
+        stock_config = os.path.join(STOCK_CONFIG_DIR, 'python.d.conf')
+
+        Logger.debug("loading '{0}'".format(user_config))
+        self.config, error = self.loader.load_config_from_file(user_config)
+
         if error:
-            Logger.error('"python.d.conf" configuration file not found. Using defaults.')
+            Logger.error("cannot load '{0}': {1}. Will try stock version.".format(user_config, error))
+            Logger.debug("loading '{0}'".format(stock_config))
+            self.config, error = self.loader.load_config_from_file(stock_config)
+        if error:
+            Logger.error("cannot load '{0}': {1}".format(stock_config, error))
+
         self.do_gc = self.config.get("gc_run", GC_RUN)
         self.gc_interval = self.config.get("gc_interval", GC_COLLECT_EVERY)
 
@@ -233,8 +253,7 @@ class Plugin(object):
     def enabled_modules(self):
         for mod in MODULES_TO_RUN:
             mod_name = mod[:-len(MODULE_EXTENSION)]
-            mod_path = CHARTS_PY_DIR + mod
-            conf_path = ''.join([CHARTS_PY_CONFIG_DIR, mod_name, '.conf'])
+            mod_path = os.path.join(PLUGINS_DIR, mod)
             if any(
                 [
                     self.config.get('default_run', True) and self.config.get(mod_name, True),
@@ -244,7 +263,6 @@ class Plugin(object):
                 yield RawModule(
                     name=mod_name,
                     path=mod_path,
-                    conf_path=conf_path,
                     explicitly_enabled=self.config.get(mod_name),
                 )
 
@@ -261,12 +279,18 @@ class Plugin(object):
                 continue
 
             # Load module config from file ------------------------------------------------------
-            loaded_config, error = self.loader.load_config_from_file(mod.conf_path)
-            log = Logger.error if error else Logger.debug
-            log("module load config: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
-                                                                           module_name=mod.name))
+            user_config = os.path.join(PLUGINS_USER_CONFIG_DIR, mod.name + '.conf')
+            stock_config = os.path.join(PLUGINS_STOCK_CONFIG_DIR, mod.name + '.conf')
+
+            Logger.debug("loading '{0}'".format(user_config))
+            loaded_config, error = self.loader.load_config_from_file(user_config)
             if error:
-                Logger.error('load config error : {0}'.format(error))
+                Logger.error("cannot load '{0}' : {1}. Will try stock version.".format(user_config, error))
+                Logger.debug("loading '{0}'".format(stock_config))
+                loaded_config, error = self.loader.load_config_from_file(stock_config)
+
+            if error:
+                Logger.error("cannot load '{0}': {1}".format(stock_config, error))
 
             # Skip disabled modules
             if getattr(loaded_module, 'disabled_by_default', False) and not mod.explicitly_enabled:

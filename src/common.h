@@ -42,6 +42,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <sys/ioctl.h>
+#include <libgen.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -145,7 +146,8 @@
 // - for each FAMILY  +100
 // - for each CHART   +10
 
-#define NETDATA_CHART_PRIO_SYSTEM_IPV4             501
+#define NETDATA_CHART_PRIO_SYSTEM_IP               501
+#define NETDATA_CHART_PRIO_SYSTEM_IPV6             502
 
 // Memory Section - 1xxx
 #define NETDATA_CHART_PRIO_MEM_SYSTEM              1000
@@ -160,44 +162,59 @@
 #define NETDATA_CHART_PRIO_MEM_HW                  1500
 
 
+// IP
+
+#define NETDATA_CHART_PRIO_IP                      4000
+#define NETDATA_CHART_PRIO_IP_ERRORS               4100
+#define NETDATA_CHART_PRIO_IP_TCP                  4200
+#define NETDATA_CHART_PRIO_IP_TCP_MEM              4290
+#define NETDATA_CHART_PRIO_IP_BCAST                4500
+#define NETDATA_CHART_PRIO_IP_MCAST                4600
+#define NETDATA_CHART_PRIO_IP_ECN                  4700
+
+
 // IPv4
 
-#define NETDATA_CHART_PRIO_IPV4                    3000
-#define NETDATA_CHART_PRIO_IPV4_SOCKETS            3000
-#define NETDATA_CHART_PRIO_IPV4_PACKETS            3050
-#define NETDATA_CHART_PRIO_IPV4_ERRORS             3100
-
-#define NETDATA_CHART_PRIO_IPV4_ICMP               3150
-
-#define NETDATA_CHART_PRIO_IPV4_TCP                3200
-#define NETDATA_CHART_PRIO_IPV4_TCP_MEM            3290
-
-#define NETDATA_CHART_PRIO_IPV4_UDP                3300
-#define NETDATA_CHART_PRIO_IPV4_UDP_MEM            3390
-
-#define NETDATA_CHART_PRIO_IPV4_UDPLITE            3400
-
-#define NETDATA_CHART_PRIO_IPV4_RAW                3450
-
-#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS          3460
-#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM      3470
-
-#define NETDATA_CHART_PRIO_IPV4_BCAST              3500
-#define NETDATA_CHART_PRIO_IPV4_MCAST              3600
-#define NETDATA_CHART_PRIO_IPV4_ECN                3700
+#define NETDATA_CHART_PRIO_IPV4                    5100
+#define NETDATA_CHART_PRIO_IPV4_SOCKETS            5100
+#define NETDATA_CHART_PRIO_IPV4_PACKETS            5130
+#define NETDATA_CHART_PRIO_IPV4_ERRORS             5150
+#define NETDATA_CHART_PRIO_IPV4_ICMP               5170
+#define NETDATA_CHART_PRIO_IPV4_TCP                5200
+#define NETDATA_CHART_PRIO_IPV4_TCP_MEM            5290
+#define NETDATA_CHART_PRIO_IPV4_UDP                5300
+#define NETDATA_CHART_PRIO_IPV4_UDP_MEM            5390
+#define NETDATA_CHART_PRIO_IPV4_UDPLITE            5400
+#define NETDATA_CHART_PRIO_IPV4_RAW                5450
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS          5460
+#define NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM      5470
 
 // IPv6
 
-#define NETDATA_CHART_PRIO_IPV6                    3500
+#define NETDATA_CHART_PRIO_IPV6                    6200
+#define NETDATA_CHART_PRIO_IPV6_PACKETS            6200
+#define NETDATA_CHART_PRIO_IPV6_ERRORS             6300
+#define NETDATA_CHART_PRIO_IPV6_FRAGMENTS          6400
+#define NETDATA_CHART_PRIO_IPV6_TCP                6500
+#define NETDATA_CHART_PRIO_IPV6_UDP                6600
+#define NETDATA_CHART_PRIO_IPV6_UDP_ERRORS         6610
+#define NETDATA_CHART_PRIO_IPV6_UDPLITE            6700
+#define NETDATA_CHART_PRIO_IPV6_UDPLITE_ERRORS     6710
+#define NETDATA_CHART_PRIO_IPV6_RAW                6800
+#define NETDATA_CHART_PRIO_IPV6_BCAST              6840
+#define NETDATA_CHART_PRIO_IPV6_MCAST              6850
+#define NETDATA_CHART_PRIO_IPV6_ICMP               6900
+
 
 // SCTP
 
-#define NETDATA_CHART_PRIO_SCTP                    3600
+#define NETDATA_CHART_PRIO_SCTP                    7000
+
 
 // Netfilter
 
-#define NETDATA_CHART_PRIO_NETFILTER               3700
-#define NETDATA_CHART_PRIO_SYNPROXY                3750
+#define NETDATA_CHART_PRIO_NETFILTER               8700
+#define NETDATA_CHART_PRIO_SYNPROXY                8750
 
 
 // ----------------------------------------------------------------------------
@@ -333,7 +350,8 @@ typedef enum rrdcalc_status {
 #include "web_api_v1.h"
 
 extern char *netdata_configured_hostname;
-extern char *netdata_configured_config_dir;
+extern char *netdata_configured_user_config_dir;
+extern char *netdata_configured_stock_config_dir;
 extern char *netdata_configured_log_dir;
 extern char *netdata_configured_plugins_dir_base;
 extern char *netdata_configured_plugins_dir;
@@ -409,6 +427,12 @@ extern volatile sig_atomic_t netdata_exit;
 extern const char *os_type;
 
 extern const char *program_version;
+
+extern char *strdupz_path_subpath(const char *path, const char *subpath);
+extern int path_is_dir(const char *path, const char *subpath);
+extern int path_is_file(const char *path, const char *subpath);
+extern void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath
+                                             , int (*callback)(const char *filename, void *data), void *data);
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD

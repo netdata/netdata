@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-#define RRD_TYPE_NET_SNMP           "ipv4"
+#define RRD_TYPE_NET_SNMP "ipv4"
 
 static struct proc_net_snmp {
     // kernel_uint_t ip_Forwarding;
@@ -726,7 +726,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , NETDATA_CHART_PRIO_IPV4_TCP + 10
+                            , NETDATA_CHART_PRIO_IPV4_TCP + 4
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -825,8 +825,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 static RRDDIM *rd_EstabResets = NULL,
                               *rd_OutRsts = NULL,
                               *rd_AttemptFails = NULL,
-                              *rd_TCPSynRetrans = NULL,
-                              *rd_TCPReqQFullDrop = NULL;
+                              *rd_TCPSynRetrans = NULL;
 
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost(
@@ -845,11 +844,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd_EstabResets     = rrddim_add(st, "EstabResets",     NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_OutRsts         = rrddim_add(st, "OutRsts",         NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_AttemptFails    = rrddim_add(st, "AttemptFails",    NULL,           1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_TCPSynRetrans   = rrddim_add(st, "TCPSynRetrans",   "SysRetrans",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_TCPReqQFullDrop = rrddim_add(st, "TCPReqQFullDrop", "ReqQFullDrop", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_EstabResets     = rrddim_add(st, "EstabResets",          NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_OutRsts         = rrddim_add(st, "OutRsts",              NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_AttemptFails    = rrddim_add(st, "AttemptFails",         NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPSynRetrans   = rrddim_add(st, "TCPSynRetrans",        "SynRetrans",        1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -857,7 +855,6 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_OutRsts,         (collected_number)snmp_root.tcp_OutRsts);
                 rrddim_set_by_pointer(st, rd_AttemptFails,    (collected_number)snmp_root.tcp_AttemptFails);
                 rrddim_set_by_pointer(st, rd_TCPSynRetrans,   tcpext_TCPSynRetrans);
-                rrddim_set_by_pointer(st, rd_TCPReqQFullDrop, tcpext_TCPReqQFullDrop);
                 rrdset_done(st);
             }
         }

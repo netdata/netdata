@@ -33,7 +33,8 @@ CHARTS = {
             ['redirects', 'redirect', 'incremental'],
             ['bad_requests', 'bad', 'incremental'],
             ['other_requests', 'other', 'incremental']
-        ]},
+        ]
+    },
     'response_codes': {
         'options': [None, 'Responses by codes', 'requests/s', 'responses', 'traefik.response_codes', 'stacked'],
         'lines': [
@@ -43,37 +44,45 @@ CHARTS = {
             ['4xx', None, 'incremental'],
             ['1xx', None, 'incremental'],
             ['other', None, 'incremental']
-        ]},
+        ]
+    },
     'detailed_response_codes': {
-        'options': [None, 'Detailed response codes', 'requests/s', 'responses', 'traefik.detailed_response_codes', 'stacked'],
-        'lines': [
-        ]},
+        'options': [None, 'Detailed response codes', 'requests/s', 'responses', 'traefik.detailed_response_codes',
+                    'stacked'],
+        'lines': []
+    },
     'requests': {
         'options': [None, 'Requests', 'requests/s', 'requests', 'traefik.requests', 'line'],
         'lines': [
             ['total_count', 'requests', 'incremental']
-        ]},
+        ]
+    },
     'total_response_time': {
         'options': [None, 'Total response time', 'seconds', 'timings', 'traefik.total_response_time', 'line'],
         'lines': [
             ['total_response_time_sec', 'response', 'absolute', 1, 10000]
-        ]},
+        ]
+    },
     'average_response_time': {
         'options': [None, 'Average response time', 'milliseconds', 'timings', 'traefik.average_response_time', 'line'],
         'lines': [
             ['average_response_time_sec', 'response', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'average_response_time_per_iteration': {
-        'options': [None, 'Average response time per iteration', 'milliseconds', 'timings', 'traefik.average_response_time_per_iteration', 'line'],
+        'options': [None, 'Average response time per iteration', 'milliseconds', 'timings',
+                    'traefik.average_response_time_per_iteration', 'line'],
         'lines': [
             ['average_response_time_per_iteration_sec', 'response', 'incremental', 1, 10000]
-        ]},
+        ]
+    },
     'uptime': {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
         'lines': [
             ['uptime_sec', 'uptime', 'absolute']
-        ]}
+        ]
     }
+}
 
 HEALTH_STATS = [
     'uptime_sec',
@@ -82,6 +91,7 @@ HEALTH_STATS = [
     'total_count',
     'total_status_code_count'
 ]
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -117,9 +127,11 @@ class Service(UrlService):
         self.data['average_response_time_sec'] *= 1000000
         self.data['total_response_time_sec'] *= 10000
         if data['total_count'] != self.last_total_count:
-            self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] - self.last_total_response_time) * 1000000 / (data['total_count'] - self.last_total_count)
+            self.data['average_response_time_per_iteration_sec'] = \
+                (data['total_response_time_sec'] - self.last_total_response_time) * \
+                1000000 / (data['total_count'] - self.last_total_count)
         else:
-            self.data['average_response_time_per_iteration_sec']  = 0
+            self.data['average_response_time_per_iteration_sec'] = 0
         self.last_total_response_time = data['total_response_time_sec']
         self.last_total_count = data['total_count']
 
@@ -165,6 +177,7 @@ class Service(UrlService):
                 if code not in self.data:
                     self.charts['detailed_response_codes'].add_dimension([code, code, 'incremental'])
                 self.data[code] = value
+
 
 def fetch_data_(raw_data, metrics):
     data = dict()

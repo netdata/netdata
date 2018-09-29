@@ -4,18 +4,22 @@
 # SPDX-License-Identifier: GPL-3.0+
 
 from random import choice
-from threading import Thread
 from socket import getaddrinfo, gaierror
+from threading import Thread
 
 try:
     from time import monotonic as time
 except ImportError:
     from time import time
+
 try:
-    import dns.message, dns.query, dns.name
+    import dns.message
+    import dns.query
+    import dns.name
     DNS_PYTHON = True
 except ImportError:
     DNS_PYTHON = False
+
 try:
     from queue import Queue
 except ImportError:
@@ -118,8 +122,12 @@ def check_ns(ns):
 def create_charts(aggregate, server_list):
     if aggregate:
         order = ['dns_group']
-        definitions = {'dns_group': {'options': [None, 'DNS Response Time', 'ms', 'name servers',
-                                                 'dns_query_time.response_time', 'line'], 'lines': []}}
+        definitions = {
+            'dns_group': {
+                'options': [None, 'DNS Response Time', 'ms', 'name servers', 'dns_query_time.response_time', 'line'],
+                'lines': []
+            }
+        }
         for ns in server_list:
             definitions['dns_group']['lines'].append(['_'.join(['ns', ns.replace('.', '_')]), ns, 'absolute'])
 
@@ -128,8 +136,10 @@ def create_charts(aggregate, server_list):
         order = [''.join(['dns_', ns.replace('.', '_')]) for ns in server_list]
         definitions = dict()
         for ns in server_list:
-            definitions[''.join(['dns_', ns.replace('.', '_')])] = {'options': [None, 'DNS Response Time', 'ms', ns,
-                                                                                'dns_query_time.response_time', 'area'],
-                                                                    'lines': [['_'.join(['ns', ns.replace('.', '_')]),
-                                                                               ns, 'absolute']]}
+            definitions[''.join(['dns_', ns.replace('.', '_')])] = {
+                'options': [None, 'DNS Response Time', 'ms', ns, 'dns_query_time.response_time', 'area'],
+                'lines': [
+                    ['_'.join(['ns', ns.replace('.', '_')]), ns, 'absolute']
+                ]
+            }
         return order, definitions

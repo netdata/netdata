@@ -26,7 +26,8 @@ mysql_get() {
 	IFS=$'\t'$'\n'
 	#arr=($(run "${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
 	#arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^ ]+\s[0-9]" ))
-	arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+" ))
+	# shellcheck disable=SC2207
+	arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | grep -E "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+" ))
 	IFS="${oIFS}"
 
 	[ "${#arr[@]}" -lt 3 ] && return 1
@@ -56,6 +57,7 @@ mysql_check() {
 		shift
 	fi
 
+        # shellcheck disable=SC2230
 	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql 2>/dev/null || command -v mysql 2>/dev/null)"
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
@@ -81,16 +83,18 @@ mysql_check() {
 		[ -z "${mysql_cmds[$m]}" ] && mysql_cmds[$m]="$mysql_cmd"
 		if [ -z "${mysql_cmds[$m]}" ]
 			then
-			error "cannot get mysql command for '$m'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
+			# shellcheck disable=SC2154
+			error "cannot get mysql command for '${m}'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
 		fi
 
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
+		# shellcheck disable=SC2181
 		if [ ! $? -eq 0 ]
 		then
 			error "cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
-			unset mysql_cmds[$m]
-			unset mysql_opts[$m]
-			unset mysql_ids[$m]
+			unset "mysql_cmds[$m]"
+			unset "mysql_opts[$m]"
+			unset "mysql_ids[$m]"
 			continue
 		fi
 
@@ -99,7 +103,7 @@ mysql_check() {
 
 	if [ ${#mysql_opts[@]} -eq 0 ]
 		then
-		if [ ${unconfigured} -eq 1 -a ${tryroot} -eq 0 ]
+		if [ ${unconfigured} -eq 1 ] && [ ${tryroot} -eq 0 ]
 			then
 			mysql_check tryroot "${@}"
 			return $?
@@ -320,12 +324,13 @@ mysql_update() {
 		x="${mysql_ids[$m]}"
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
 
+		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]
 			then
-			unset mysql_ids[$m]
-			unset mysql_opts[$m]
-			unset mysql_cmds[$m]
-			error "failed to get values for '$m', disabling it."
+			unset "mysql_ids[$m]"
+			unset "mysql_opts[$m]"
+			unset "mysql_cmds[$m]"
+			error "failed to get values for '${m}', disabling it."
 			continue
 		fi
 

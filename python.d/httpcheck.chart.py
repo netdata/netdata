@@ -36,12 +36,14 @@ CHARTS = {
         'options': [None, 'HTTP response time', 'ms', 'response', 'httpcheck.responsetime', 'line'],
         'lines': [
             [HTTP_RESPONSE_TIME, 'time', 'absolute', 100, 1000]
-        ]},
+        ]
+    },
     'response_length': {
         'options': [None, 'HTTP response body length', 'characters', 'response', 'httpcheck.responselength', 'line'],
         'lines': [
             [HTTP_RESPONSE_LENGTH, 'length', 'absolute']
-        ]},
+        ]
+    },
     'status': {
         'options': [None, 'HTTP status', 'boolean', 'status', 'httpcheck.status', 'line'],
         'lines': [
@@ -50,7 +52,8 @@ CHARTS = {
             [HTTP_BAD_STATUS, 'bad status', 'absolute'],
             [HTTP_TIMEOUT, 'timeout', 'absolute'],
             [HTTP_NO_CONNECTION, 'no connection', 'absolute']
-        ]}
+        ]
+    }
 }
 
 
@@ -88,15 +91,15 @@ class Service(UrlService):
             self.process_response(content, data, status)
 
         except urllib3.exceptions.NewConnectionError as error:
-            self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
+            self.debug('Connection failed: {url}. Error: {error}'.format(url=url, error=error))
             data[HTTP_NO_CONNECTION] = 1
 
         except (urllib3.exceptions.TimeoutError, urllib3.exceptions.PoolError) as error:
-            self.debug("Connection timed out: {url}. Error: {error}".format(url=url, error=error))
+            self.debug('Connection timed out: {url}. Error: {error}'.format(url=url, error=error))
             data[HTTP_TIMEOUT] = 1
 
         except urllib3.exceptions.HTTPError as error:
-            self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
+            self.debug('Connection failed: {url}. Error: {error}'.format(url=url, error=error))
             data[HTTP_NO_CONNECTION] = 1
 
         except (TypeError, AttributeError) as error:
@@ -110,7 +113,7 @@ class Service(UrlService):
         self.debug('Content: \n\n{content}\n'.format(content=content))
         if status in self.status_codes_accepted:
             if self.regex and self.regex.search(content) is None:
-                self.debug("No match for regex '{regex}' found".format(regex=self.regex.pattern))
+                self.debug('No match for regex "{regex}" found'.format(regex=self.regex.pattern))
                 data[HTTP_BAD_CONTENT] = 1
             else:
                 data[HTTP_SUCCESS] = 1
