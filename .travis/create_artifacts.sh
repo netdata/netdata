@@ -22,4 +22,5 @@ python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); 
 ./makeself/build-x86_64-static.sh
 for i in *.tar.gz; do sha512sum -b "$i" > "$i.sha"; done
 for i in *.gz.run; do sha512sum -b "$i" > "$i.sha"; done
+sha256sum -b ./*.tar.gz ./*.gz.run > "sha256sums.txt"
 ./.travis/deploy-if-have-key
