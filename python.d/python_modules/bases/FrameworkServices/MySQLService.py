@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from sys import exc_info
 

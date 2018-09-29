@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 COMMON_CFLAGS=-I ../../src/ -I ../../
 PROFILE_CFLAGS=-O1 -ggdb -Wall -Wextra 

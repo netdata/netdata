@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
 #define NETDATA_ADAPTIVE_RESORTABLE_LIST_H 1

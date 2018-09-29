@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_UNIT_TEST_H
 #define NETDATA_UNIT_TEST_H 1

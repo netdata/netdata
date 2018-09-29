@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_WEB_SERVER_H
 #define NETDATA_WEB_SERVER_H 1
