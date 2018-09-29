@@ -1442,7 +1442,7 @@ char *strdupz_path_subpath(const char *path, const char *subpath) {
     while(len > 0 && path[len - 1] == '/') len--;
 
     // skip leading slashes in subpath
-    while(subpath && subpath[0] == '/') subpath++;
+    while(subpath[0] == '/') subpath++;
 
     // if the last character in path is / and (there is a subpath or path is now empty)
     // keep the trailing slash in path and remove the additional slash
@@ -1458,7 +1458,7 @@ char *strdupz_path_subpath(const char *path, const char *subpath) {
     }
 
     char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%.*s%s%s", (int)len, path, slash, (subpath)?subpath:"");
+    snprintfz(buffer, FILENAME_MAX, "%.*s%s%s", (int)len, path, slash, subpath);
     return strdupz(buffer);
 }
 
