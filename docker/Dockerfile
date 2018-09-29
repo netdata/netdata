@@ -40,7 +40,7 @@ RUN chmod +x netdata-installer.sh && \
 RUN mkdir -p /app/usr/sbin/ \
              /app/usr/share \
              /app/usr/libexec \
-             /app/usr/lib/netdata \
+             /app/usr/lib \
              /app/var/cache \
              /app/var/lib \
              /app/etc && \
