@@ -40,11 +40,13 @@ RUN chmod +x netdata-installer.sh && \
 RUN mkdir -p /app/usr/sbin/ \
              /app/usr/share \
              /app/usr/libexec \
+             /app/usr/lib \
              /app/var/cache \
              /app/var/lib \
              /app/etc && \
     mv /usr/share/netdata   /app/usr/share/ && \
     mv /usr/libexec/netdata /app/usr/libexec/ && \
+    mv /usr/lib/netdata     /app/usr/lib/ && \
     mv /var/cache/netdata   /app/var/cache/ && \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
