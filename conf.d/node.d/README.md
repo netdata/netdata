@@ -1,3 +1,5 @@
+# node.d plugin
+
 `node.d.plugin` modules accept configuration in JSON format.
 
 Unfortunately, JSON files do not accept comments. So, the best way to describe them is to have markdown text files with instructions.

@@ -1,3 +1,5 @@
+# Fronius Symo Plugin
+
 [Fronius Symo 8.2](https://www.fronius.com/en/photovoltaics/products/all-products/inverters/fronius-symo/fronius-symo-8-2-3-m)
 
 The plugin has been tested with a single inverter, namely Fronius Symo 8.2-3-M:
