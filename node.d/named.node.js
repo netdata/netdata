@@ -1,5 +1,5 @@
 'use strict';
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 // collect statistics from bind (named) v9.10+
 //

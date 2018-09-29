@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: rethinkdb netdata python.d module
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 try:
     import rethinkdb as rdb

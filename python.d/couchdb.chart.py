@@ -2,7 +2,7 @@
 # Description: couchdb netdata python.d module
 # Author: wohali <wohali@apache.org>
 # Thanks to l2isbad for good examples :)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from collections import namedtuple, defaultdict
 from json import loads

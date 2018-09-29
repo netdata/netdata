@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: cpuidle netdata python.d module
 # Author: Steven Noonan (tycho)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import ctypes
 import glob

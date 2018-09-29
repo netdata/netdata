@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: litespeed netdata python.d module
 # Author: Ilya Maschenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import glob
 import re

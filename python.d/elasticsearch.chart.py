@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: elastic search node stats netdata python.d module
 # Author: l2isbad
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
 import threading

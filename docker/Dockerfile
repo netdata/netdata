@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 # author  : paulfantom
 
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
