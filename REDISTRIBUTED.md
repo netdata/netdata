@@ -1,4 +1,4 @@
-# netdata REDESTRIBUTED
+# netdata REDISTRIBUTED
 
 Copyright 2016-2017, Costa Tsaousis.
 Copyright 2017-2018, Netdata Inc.
