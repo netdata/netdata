@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
 
 umask 022

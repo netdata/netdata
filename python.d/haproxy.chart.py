@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: haproxy netdata python.d module
 # Author: l2isbad, ktarasz
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from collections import defaultdict
 from re import compile as re_compile

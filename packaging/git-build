@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # When run from the top-level repository, performs a complete clean
 # and maintainer-mode rebuild of the FireHOL package.

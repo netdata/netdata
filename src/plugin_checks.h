@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_PLUGIN_CHECKS_H
 #define NETDATA_PLUGIN_CHECKS_H 1

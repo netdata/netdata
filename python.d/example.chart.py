@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: example netdata python.d module
 # Author: Put your name here (your github login)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from random import SystemRandom
 

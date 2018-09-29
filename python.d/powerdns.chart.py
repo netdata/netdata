@@ -2,7 +2,7 @@
 # Description: powerdns netdata python.d module
 # Author: Ilya Mashchenko (l2isbad)
 # Author: Luke Whitworth
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from json import loads
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: puppet netdata python.d module
 # Author: Andrey Galkin <andrey@futoin.org> (andvgal)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This module should work both with OpenSource and PE versions
 # of PuppetServer and PuppetDB.
