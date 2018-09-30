@@ -2,7 +2,7 @@
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 # Author: Wei He (Wing924)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
 

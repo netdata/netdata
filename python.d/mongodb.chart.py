@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: mongodb netdata python.d module
 # Author: l2isbad
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from copy import deepcopy
 from datetime import datetime

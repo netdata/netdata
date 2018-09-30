@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: monit netdata python.d module
 # Author: Evgeniy K. (n0guest)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
 from bases.FrameworkServices.UrlService import UrlService

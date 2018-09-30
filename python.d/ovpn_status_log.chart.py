@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: openvpn status log netdata python.d module
 # Author: l2isbad
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from re import compile as r_compile
 

@@ -1,5 +1,5 @@
 FROM alpine:latest
 
-RUN apk add gcc make autoconf automake pkgconfig zlib-dev libuuid git
+RUN apk add bash gcc make autoconf automake pkgconfig zlib-dev libuuid git libmnl-dev util-linux-dev build-base
 
 COPY . /code

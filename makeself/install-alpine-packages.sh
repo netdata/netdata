@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # this script should be running in alpine linux
 # install the required packages

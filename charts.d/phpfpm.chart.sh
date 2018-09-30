@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # netdata
 # real-time performance and health monitoring, done right!

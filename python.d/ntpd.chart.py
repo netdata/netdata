@@ -2,7 +2,7 @@
 # Description: ntpd netdata python.d module
 # Author: Sven Mäder (rda0)
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import struct
 import re

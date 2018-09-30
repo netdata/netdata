@@ -2,7 +2,7 @@
 # Description: cpufreq netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 # Author: Steven Noonan (tycho)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import glob
 import os

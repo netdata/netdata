@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: freeradius netdata python.d module
 # Author: l2isbad
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from re import findall
 from subprocess import Popen, PIPE
