@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "common.h"
+
 #ifndef NETDATA_INLINED_H
 #define NETDATA_INLINED_H 1
 
@@ -245,12 +247,17 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
 }
 
 static inline int read_file(const char *filename, char *buffer, size_t size) {
+    if(unlikely(!size)) return 3;
+
     int fd = open(filename, O_RDONLY, 0666);
-    if(unlikely(fd == -1))
+    if(unlikely(fd == -1)) {
+        buffer[0] = '\0';
         return 1;
+    }
 
     ssize_t r = read(fd, buffer, size);
     if(unlikely(r == -1)) {
+        buffer[0] = '\0';
         close(fd);
         return 2;
     }

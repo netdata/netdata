@@ -1529,8 +1529,8 @@ int main (int argc, char **argv) {
     int i, freq = 0;
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
-            int n = atoi(argv[i]);
-            if(n > 0 && freq < 86400) {
+            int n = str2i(argv[i]);
+            if(n > 0 && n < 86400) {
                 freq = n;
                 continue;
             }

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "common.h"
+
 #ifndef NETDATA_DICTIONARY_H
 #define NETDATA_DICTIONARY_H 1
 
@@ -37,7 +39,7 @@ typedef struct dictionary {
 
 extern DICTIONARY *dictionary_create(uint8_t flags);
 extern void dictionary_destroy(DICTIONARY *dict);
-extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
+extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len) NEVERNULL;
 extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
