@@ -85,6 +85,7 @@ jobs:
             repo: netdata/netdata
             tags: true
     - name: "Docker images"
+      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
       script: docker/build.sh
       env: REPOSITORY="netdata/netdata"
       if: type = cron OR tag =~ ^v
