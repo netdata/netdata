@@ -210,7 +210,9 @@ def parse_stats(field, named_stats):
                 if '[' in line:
                     continue
                 v, k = line.strip().split(' ', 1)
-                data[k] = int(v)
+                if k not in data:
+                    data[k] = 0
+                data[k] += int(v)
                 continue
             break
         break
