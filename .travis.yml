@@ -12,11 +12,9 @@ stages:
   - test
   - build
   - name: release
-    if: branch = master AND type = cron
-# TODO allow creating release on commit message
-#        type = master AND \    
-#        type != pull_request AND \
-#        ( type = cron OR commit_message =~ /[(major|minor|patch)]/ )
+    if: branch = master AND type != pull_request
+  - name: package
+    if: branch = master AND type != pull_request
 
 jobs:
   include:
@@ -46,6 +44,7 @@ jobs:
       script: ./coverity-scan.sh || echo "Coverity failed :("
       env: INSTALL_COVERITY="true"
       if: type = cron
+
     - stage: "build"
       name: "OSX"
       install: brew install fakeroot ossp-uuid
@@ -62,12 +61,13 @@ jobs:
       script: ./.travis/containerized_build.sh centos6
     - name: "alpine"
       script: ./.travis/containerized_build.sh alpine
+
     - stage: "release"
-      name: "Docker"
-      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
-      script: docker/build.sh
-      env: REPOSITORY="netdata/netdata"
-    - name: "GitHub"
+      name: "Create release"
+      script: .travis/releaser.sh
+
+    - stage: "package"
+      name: "Archive and self-extractor"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: .travis/create_artifacts.sh
       deploy:
@@ -78,11 +78,16 @@ jobs:
           skip_cleanup: true
           file_glob: true
           file:
-            - "netdata*.tar.*"
+            - "netdata*.tar.gz*"
             - "netdata*.gz.run*"
+            - "sha256sums.txt"
           on:
             repo: netdata/netdata
             tags: true
+    - name: "Docker images"
+      script: docker/build.sh
+      env: REPOSITORY="netdata/netdata"
+      if: type = cron OR tag =~ ^v
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci

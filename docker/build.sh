@@ -8,9 +8,8 @@ set -e
 
 REPOSITORY="${REPOSITORY:-netdata}"
 
-if [ ${VERSION+x} ]; then
-    VERSION="${VERSION}"
-else
+VERSION=$(git tag --points-at)
+if [ "${VERSION}" == "" ]; then
     VERSION="latest"
 fi
 
