@@ -2755,6 +2755,30 @@ For detailed configuration information please read [`w1sensor.conf`](https://git
 
 ---
 
+# logparser
+
+By this module you can parse all kind of log files into multi dimension and multi charts
+
+An example for 3 dimensions and 2 charts
+
+```yaml
+chart1_name:
+    log_path: /path/logs/log.file
+    dimensions:
+      dimension_name1: .*GET.*
+      dimension_name2: .*POST.*
+      dimension_name3: .*PATCH.*
+chart2_name:
+    log_path: /path/logs/log2.file
+    dimensions:
+      dimension_name1: [0-9]+
+      dimension_name2: [A-Z]+
+      dimension_name3: [a-z]+
+
+```
+
+---
+
 # web_log
 
 Tails the apache/nginx/lighttpd/gunicorn log files to collect real-time web-server statistics.
