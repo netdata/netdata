@@ -64,6 +64,7 @@ jobs:
       script: ./.travis/containerized_build.sh alpine
     - stage: "release"
       name: "Docker"
+      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
       script: docker/build.sh
       env: REPOSITORY="netdata/netdata"
     - name: "GitHub"
