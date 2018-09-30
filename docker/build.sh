@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Author  : Pawel Krupa (paulfantom)
 # Cross-arch docker build helper script
+# Needs docker in version >18.02 due to usage of manifests
 
 set -e
 
