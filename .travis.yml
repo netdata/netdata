@@ -60,9 +60,8 @@ jobs:
       script: ./.travis/containerized_build.sh centos7
     - name: "CentOS 6"
       script: ./.travis/containerized_build.sh centos6
-# TODO: cannot run installer without bash
-#    - name: "alpine"
-#      script: ./.travis/containerized_build.sh alpine
+    - name: "alpine"
+      script: ./.travis/containerized_build.sh alpine
     - stage: "release"
       name: "Docker"
       script: docker/build.sh
