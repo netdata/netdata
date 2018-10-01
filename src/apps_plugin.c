@@ -3571,7 +3571,7 @@ static void parse_args(int argc, char **argv)
     if(freq > 0) update_every = freq;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
-        error("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);

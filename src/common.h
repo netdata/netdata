@@ -431,8 +431,14 @@ extern const char *program_version;
 extern char *strdupz_path_subpath(const char *path, const char *subpath);
 extern int path_is_dir(const char *path, const char *subpath);
 extern int path_is_file(const char *path, const char *subpath);
-extern void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath
-                                             , int (*callback)(const char *filename, void *data), void *data);
+extern void recursive_config_double_dir_load(
+          const char *user_path
+        , const char *stock_path
+        , const char *subpath
+        , int (*callback)(const char *filename, void *data)
+        , void *data
+        , size_t depth
+        );
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD

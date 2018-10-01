@@ -1392,7 +1392,7 @@ static int statsd_file_callback(const char *filename, void *data) {
 }
 
 static inline void statsd_readdir(const char *user_path, const char *stock_path, const char *subpath) {
-    recursive_config_double_dir_load(user_path, stock_path, subpath, statsd_file_callback, NULL);
+    recursive_config_double_dir_load(user_path, stock_path, subpath, statsd_file_callback, NULL, 0);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
