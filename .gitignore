@@ -75,6 +75,7 @@ system/netdata.service
 system/netdata.plist
 system/netdata-freebsd
 
+conf.d/edit-config
 plugins.d/alarm-notify.sh
 plugins.d/cgroup-name.sh
 plugins.d/charts.d.plugin

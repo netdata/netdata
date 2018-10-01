@@ -745,6 +745,7 @@ done
 run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
 run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
 run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
+run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
 
 # --- stock conf dir ----
 
