@@ -1535,7 +1535,7 @@ int path_is_file(const char *path, const char *subpath) {
 }
 
 void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data, size_t depth) {
-    if(depth > 10) {
+    if(depth > 3) {
         error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
         return;
     }
@@ -1552,7 +1552,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if( (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+            if( !de->d_name[0] ||
+                (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                 (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                ) {
                 debug(D_HEALTH, "CONFIG ignoring user-config directory '%s/%s'", udir, de->d_name);
@@ -1588,7 +1589,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if( (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+            if( !de->d_name[0] ||
+                (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
                 (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
                ) {
                 debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
