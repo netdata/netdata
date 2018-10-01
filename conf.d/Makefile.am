@@ -3,6 +3,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
+CLEANFILES = \
+    edit-config \
+	$(NULL)
+
+include $(top_srcdir)/build/subst.inc
+
+SUFFIXES = .in
+
+dist_config_SCRIPTS = \
+    edit-config \
+    $(NULL)
+
+dist_noinst_DATA = \
+    edit-config.in \
+	$(NULL)
 
 dist_libconfig_DATA = \
     apps_groups.conf \
@@ -17,6 +32,10 @@ dist_libconfig_DATA = \
 
 nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
+    $(NULL)
+
+usernodeconfigdir=$(configdir)/node.d
+dist_usernodeconfig_DATA = \
     node.d/README.md \
     node.d/fronius.conf.md \
     node.d/named.conf.md \
