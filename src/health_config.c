@@ -855,5 +855,5 @@ static int health_readfile(const char *filename, void *data) {
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
     if(unlikely(!host->health_enabled)) return;
-    recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host);
+    recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
 }
