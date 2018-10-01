@@ -24,4 +24,4 @@ contrib/ @paulfantom
 .lgtm.yml @paulfantom
 
 # Docs
-*.md @ktsaou @cakrit
+#*.md @ktsaou @cakrit
