@@ -1552,10 +1552,9 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR
-               && (      (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                      || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-               )) {
+            if( (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+               ) {
                 debug(D_HEALTH, "CONFIG ignoring user-config directory '%s/%s'", udir, de->d_name);
                 continue;
             }
@@ -1574,7 +1573,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
             }
 
             else
-                debug(D_HEALTH, "CONFIG ignoring user config file '%s/%s'", udir, de->d_name);
+                debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s'", udir, de->d_name);
         }
 
         closedir(dir);
@@ -1589,10 +1588,9 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     else {
         struct dirent *de = NULL;
         while((de = readdir(dir))) {
-            if(de->d_type == DT_DIR
-               && (     (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                     || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-               )) {
+            if( (de->d_name[0] == '.' && de->d_name[1] == '\0') ||
+                (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+               ) {
                 debug(D_HEALTH, "CONFIG ignoring stock config directory '%s/%s'", sdir, de->d_name);
                 continue;
             }
