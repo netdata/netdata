@@ -447,7 +447,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("CONFIG: cannot open file '%s'", filename);
+        // info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
         return 0;
     }
 
