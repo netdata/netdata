@@ -630,28 +630,45 @@ void set_global_environment() {
 }
 
 static int load_netdata_conf(char *filename, char overwrite_used) {
-    if(filename)
-        return config_load(filename, overwrite_used);
+    errno = 0;
 
-    filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
+    int ret = 0;
 
-    int ret = config_load(filename, overwrite_used);
-    if(!ret) {
-        freez(filename);
-        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
+    if(filename && *filename) {
         ret = config_load(filename, overwrite_used);
+        if(!ret)
+            error("CONFIG: cannot load config file '%s'.", filename);
     }
-    freez(filename);
+    else {
+        filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
+
+        ret = config_load(filename, overwrite_used);
+        if(!ret) {
+            info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
+            freez(filename);
+
+            filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
+            ret = config_load(filename, overwrite_used);
+            if(!ret)
+                info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+        }
+
+        freez(filename);
+    }
 
     return ret;
 }
 
 static void load_stream_conf() {
+    errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0)) {
+        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
+
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        appconfig_load(&stream_config, filename, 0);
+        if(!appconfig_load(&stream_config, filename, 0))
+            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
 }
