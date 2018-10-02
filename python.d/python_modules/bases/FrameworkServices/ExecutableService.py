@@ -36,7 +36,7 @@ class ExecutableService(SimpleService):
             except TypeError:
                 continue
 
-        return data or None
+        return data
 
     def check(self):
         """
