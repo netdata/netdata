@@ -15,7 +15,10 @@ then
 USAGE:
   ${0} FILENAME
 
-  Find the stock config file named FILENAME and edit it.
+  Copy and edit the stock config file named: FILENAME
+  if FILENAME is already copied, it will be edited as-is.
+
+  The EDITOR shell variable is used to define the editor to be used.
 
   Stock config files at: '${NETDATA_STOCK_CONFIG_DIR}'
   User  config files at: '${NETDATA_USER_CONFIG_DIR}'
@@ -83,7 +86,6 @@ fi
 # already exists
 if [ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ]
 then
-	echo >&2 "Editing existing file '${NETDATA_USER_CONFIG_DIR}/${file}' ... "
 	edit "${NETDATA_USER_CONFIG_DIR}/${file}"
 fi
 
