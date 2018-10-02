@@ -57,23 +57,23 @@ class Service(ExecutableService):
         seats = list()
         data = self._get_raw_data()
 
-        for item in data:
-            fields = item.split()
-            if len(fields) == 3:
-                users['remote'].append(fields[2])
-                ret['sessions_remote'] += 1
-            elif len(fields) == 4:
-                users['graphical'].append(fields[2])
-                ret['sessions_graphical'] += 1
-                seats.append(fields[3])
-            elif len(fields) == 5:
-                users['console'].append(fields[2])
-                ret['sessions_console'] += 1
-                seats.append(fields[3])
-
-        ret['users_graphical'] = len(set(users['graphical']))
-        ret['users_console'] = len(set(users['console']))
-        ret['users_remote'] = len(set(users['remote']))
-        ret['seats'] = len(set(seats))
+        if data:
+            for item in data:
+                fields = item.split()
+                if len(fields) == 3:
+                    users['remote'].append(fields[2])
+                    ret['sessions_remote'] += 1
+                elif len(fields) == 4:
+                    users['graphical'].append(fields[2])
+                    ret['sessions_graphical'] += 1
+                    seats.append(fields[3])
+                elif len(fields) == 5:
+                    users['console'].append(fields[2])
+                    ret['sessions_console'] += 1
+                    seats.append(fields[3])
+            ret['users_graphical'] = len(set(users['graphical']))
+            ret['users_console'] = len(set(users['console']))
+            ret['users_remote'] = len(set(users['remote']))
+            ret['seats'] = len(set(seats))
 
         return ret
