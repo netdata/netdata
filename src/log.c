@@ -161,13 +161,15 @@ void open_all_log_files() {
 // ----------------------------------------------------------------------------
 // error log throttling
 
-time_t error_log_throttle_period_backup = 0;
 time_t error_log_throttle_period = 1200;
 unsigned long error_log_errors_per_period = 200;
+unsigned long error_log_errors_per_period_backup = 0;
 
 int error_log_limit(int reset) {
     static time_t start = 0;
     static unsigned long counter = 0, prevented = 0;
+
+    // fprintf(stderr, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
 
     // do not throttle if the period is 0
     if(error_log_throttle_period == 0)
@@ -188,7 +190,7 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resetting logging for process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION reset for process '%s' (prevented %lu logs in the last %ld seconds).\n"
                     , date
                     , program_name
                     , program_name
@@ -209,7 +211,7 @@ int error_log_limit(int reset) {
         if(prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
                     , date
                     , program_name
                     , program_name
@@ -231,7 +233,7 @@ int error_log_limit(int reset) {
         if(!prevented) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH);
-            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
+            fprintf(stderr, "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
                     , date
                     , program_name
                     , counter
