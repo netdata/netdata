@@ -127,8 +127,8 @@ def get_sensor_definition(sensor):
 
 def get_sensor_class(name):
     '''Get the class for a particular sensor type.'''
-    module = import_module(format('.{0}', NAME_MAP[item]['module']), 'yoctopuce')
-    return getattr(module, NAME_MAP[item]['class'])
+    module = import_module(format('.{0}', NAME_MAP[name]['module']), 'yoctopuce')
+    return getattr(module, NAME_MAP[name]['class'])
 
 
 class Service(SimpleService):
@@ -193,7 +193,7 @@ class Service(SimpleService):
             self.sensors.extend(sensors)
             charts[item] = get_chart(item, sensors[0]['unit'])
             for entry in sensors:
-                chart[item]['lines'].append(get_line(entry['name'], entry['precision']))
+                charts[item]['lines'].append(get_line(entry['name'], entry['precision']))
         return (charts, order)
 
     def __find_sensors(self):
@@ -225,7 +225,7 @@ class Service(SimpleService):
             self.sensors.extend(sensors)
             charts[item] = get_chart(item, sensors[0]['unit'])
             for entry in sensors:
-                chart[item]['lines'].append(get_line(entry['name'], entry['precision']))
+                charts[item]['lines'].append(get_line(entry['name'], entry['precision']))
         return (charts, order)
 
     def check(self):
@@ -234,8 +234,8 @@ class Service(SimpleService):
             return False
 
         try:
-            yapi.RegisterHub(self.hub)
-            yapi.UpdateDeviceList()
+            yocto_api.RegisterHub(self.hub)
+            yocto_api.UpdateDeviceList()
         except yocto_api.YAPI_Exception:
             self.error('Unable to enumerate devices.')
             return False
