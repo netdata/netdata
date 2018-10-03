@@ -122,7 +122,7 @@ class Service(SimpleService):
         self.supply = self.configuration.get('supply', None)
         if self.supply is not None:
             self.syspath = '/sys/class/power_supply/{0}'.format(self.supply)
-        self.types = self.configuration.get('charts', 'energy charge capacity voltage').split()
+        self.types = self.configuration.get('charts', 'capacity').split()
 
     def check(self):
         if platform.system() != 'Linux':
