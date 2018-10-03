@@ -87,6 +87,7 @@ Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbt
  - new web server, a lot faster and more secure
  - updated all javascript libraries to their latest versions (fixed compatibility issues - now netdata chart can now be embedded on **Atlassian Confluence** pages and remain fully interactive!)
  - new plugins:
+   - **nvidia-smi** (monitor NVIDIA GPU load, memory, power, temp etc)
    - **BTRFS** (visualize BTRFS allocation with alarms)
    - **bcache** (monitor hybrid setups HDD + SSD)
    - **ceph**
@@ -197,6 +198,9 @@ This is a list of what it currently monitors:
 
 - **CPU**<br/>
   usage, interrupts, softirqs, frequency, total and per core, CPU states
+
+- **GPU - NVIDIA**<br/>
+  for NVIDIA devices, per device stats on GPU utilization, memory allocation / utilization, fan speed, power usage, temperature, clock speed, PCI bandwidth
 
 - **Memory**<br/>
   RAM, swap and kernel memory usage, KSM (Kernel Samepage Merging), NUMA

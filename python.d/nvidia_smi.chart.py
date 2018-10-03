@@ -7,7 +7,7 @@ import subprocess
 import threading
 import xml.etree.ElementTree as et
 import time
-from base import SimpleService
+from bases.FrameworkServices.SimpleService import SimpleService
 from bases.collection import find_binary
 
 CHART_TEMPLATES = {
@@ -74,6 +74,7 @@ class Poller(threading.Thread):
         self.lock = threading.RLock()
         self.last_time = 0
         self.last_data = ''
+        self.daemon = True
 
     def _read(self):
         lines = []
@@ -110,7 +111,8 @@ class Service(SimpleService):
         self.fake_name = "gpu"
         self.nvidia_smi = find_binary('nvidia-smi')
         self.assignment = {}
-        self.poller = Poller([self.nvidia_smi, '-x', '-q', '-l', '1'], lambda x: '</nvidia_smi_log>' in x)
+        self.poll_seconds = self.configuration.get('poll_seconds', 1)
+        self.poller = Poller([self.nvidia_smi, '-x', '-q', '-l', '{}'.format(self.poll_seconds)], lambda x: '</nvidia_smi_log>' in x)
 
     def _invoke_nvidia_smi(self):
         if self.poller.ident is None:
@@ -163,30 +165,7 @@ class Service(SimpleService):
 
         return data
 
-    def check(self):
-        if not self.nvidia_smi:
-            self.error("Could not find 'nvidia-smi' binary. Do you have the proprietary NVIDIA driver and tools installed?")
-            return False
-
-        smi = self._invoke_nvidia_smi()
-        if smi is None:
-            self.error("Failed to invoke 'nvidia-smi'. Do you have the proprietary NVIDIA driver and tools installed?")
-            return False
-
-        gpuidx = 0
-        for gpu in smi.findall('gpu'):
-            gpuid = gpu.get('id')
-            name = gpuid.replace(':', '_')
-            name = name.replace('.', '_')
-            self.assignment[gpuid] = {
-                'gpuid': 'gpu%d' % (gpuidx,),
-            }
-            gpuidx += 1
-
-        if len(self.assignment) == 0:
-            self.error("Could not find any NVIDIA GPUs in nvidia-smi XML output")
-            return False
-
+    def create_chart(self):
         data = self._get_data()
 
         order = []
@@ -244,7 +223,33 @@ class Service(SimpleService):
                         priority_offset = 0
                     self.definitions[chartname] = chartdef
                     order.append((priority_offset, gpuid, chartname))
+        return order
 
+    def check(self):
+        if not self.nvidia_smi:
+            self.error("Could not find 'nvidia-smi' binary. Do you have the proprietary NVIDIA driver and tools installed?")
+            return False
+
+        smi = self._invoke_nvidia_smi()
+        if smi is None:
+            self.error("Failed to invoke 'nvidia-smi'. Do you have the proprietary NVIDIA driver and tools installed?")
+            return False
+
+        gpuidx = 0
+        for gpu in smi.findall('gpu'):
+            gpuid = gpu.get('id')
+            name = gpuid.replace(':', '_')
+            name = name.replace('.', '_')
+            self.assignment[gpuid] = {
+                'gpuid': 'gpu%d' % (gpuidx,),
+            }
+            gpuidx += 1
+
+        if len(self.assignment) == 0:
+            self.error("Could not find any NVIDIA GPUs in nvidia-smi XML output")
+            return False
+
+        order = self.create_chart()
 
         self._get_data()
 
