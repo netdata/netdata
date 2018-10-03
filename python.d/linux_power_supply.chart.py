@@ -137,7 +137,10 @@ class Service(SimpleService):
         if not os.access(self.syspath, os.R_OK):
             self.error('Unable to access {0}'.format(self.syspath))
             return False
-        chartset = set(GET_CHART.keys()).intersection(set(self.types))
+        return self.create_charts()
+
+    def create_charts(self):
+        chartset = set(GET_CHART).intersection(set(self.types))
         if not chartset:
             self.error('No valid attributes requested for monitoring.')
             return False
@@ -152,7 +155,7 @@ class Service(SimpleService):
             self.error('No charts can be created.')
             return False
         self.definitions.update(charts)
-        self.order.extend(sorted(charts.keys()))
+        self.order.extend(sorted(charts))
         self.attrlist.extend(attrlist)
         return True
 
