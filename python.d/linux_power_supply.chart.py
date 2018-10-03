@@ -31,6 +31,7 @@ def _get_capacity_chart(syspath):
     else:
         return None, None
 
+
 def _get_generic_chart(syspath, name, unit, maxname, minname):
     # Used to generate charts for energy, charge, and voltage.
     options = [None, name.title(), unit, 'power_supply', 'power_supply.{0}'.format(name), 'line']
@@ -64,19 +65,23 @@ def _get_generic_chart(syspath, name, unit, maxname, minname):
         attrlist.append(attr_min_design)
     return {name: {'options': options, 'lines': lines}}, attrlist
 
+
 def _get_charge_chart(syspath):
     # Charge is measured in microamphours.  We track up to five
     # attributes.
     return _get_generic_chart(syspath, 'charge', 'µAh', 'full', 'empty')
+
 
 def _get_energy_chart(syspath):
     # Energy is measured in microwatthours.  We track up to five
     # attributes.
     return _get_generic_chart(syspath, 'energy', 'µWh', 'full', 'empty')
 
+
 def _get_voltage_chart(syspath):
     # Voltage is measured in microvolts. We track up to five attributes.
     return _get_generic_chart(syspath, 'voltage', 'µV', 'min', 'max')
+
 
 # This is a list of functions for generating charts.  Used below to save
 # a bit of code (and to make it a bit easier to add new charts).
@@ -87,6 +92,7 @@ GET_CHART = {
     'voltage': _get_voltage_chart
 }
 
+
 # This opens the specified file and returns the value in it or None if
 # the file doesn't exist.
 def _get_sysfs_value(filepath):
@@ -95,6 +101,7 @@ def _get_sysfs_value(filepath):
             return int(datasource.read())
     except (OSError, IOError):
         return None
+
 
 # Certain attributes (*_empty and *_empty_design) are implicitly zero
 # if not provided by the driver.  This function is used to fetch those
