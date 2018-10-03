@@ -25,8 +25,7 @@ def charts(jails):
 
     ch = {
         ORDER[0]: {
-                'options':
-                    [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
+                'options': [None, 'Jails Ban Rate', 'bans/s', 'bans', 'jail.bans', 'line'],
                 'lines': []
         },
         ORDER[1]: {

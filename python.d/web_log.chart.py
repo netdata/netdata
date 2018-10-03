@@ -502,7 +502,7 @@ class Web:
                 self.order.append('detailed_response_codes%s' % code)
                 self.definitions['detailed_response_codes%s' % code] = {
                     'options': [None, 'Detailed Response Codes %s' % code[1:], 'requests/s', 'responses',
-                               'web_log.detailed_response_codes%s' % code, 'stacked'],
+                                'web_log.detailed_response_codes%s' % code, 'stacked'],
                     'lines': []
                 }
 

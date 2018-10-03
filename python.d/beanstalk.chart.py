@@ -110,11 +110,12 @@ CHARTS = {
 
 
 def tube_chart_template(name):
-    order = ['{0}_jobs_rate'.format(name),
-             '{0}_jobs'.format(name),
-             '{0}_connections'.format(name),
-             '{0}_commands'.format(name),
-             '{0}_pause'.format(name)
+    order = [
+        '{0}_jobs_rate'.format(name),
+        '{0}_jobs'.format(name),
+        '{0}_connections'.format(name),
+        '{0}_commands'.format(name),
+        '{0}_pause'.format(name)
     ]
     family = 'tube {0}'.format(name)
 
