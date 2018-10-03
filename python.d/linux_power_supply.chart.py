@@ -103,16 +103,6 @@ def get_sysfs_value(filepath):
         return None
 
 
-# Certain attributes (*_empty and *_empty_design) are implicitly zero
-# if not provided by the driver.  This function is used to fetch those
-# attributes.
-def get_sysfs_value_or_zero(filepath):
-    result = get_sysfs_value(filepath)
-    if result is None:
-        return 0
-    return result
-
-
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -164,7 +154,7 @@ class Service(SimpleService):
         for attr in self.attrlist:
             attrpath = os.path.join(self.syspath, attr)
             if attr.endswith(('_min', '_min_design', '_empty', '_empty_design')):
-                data[attr] = get_sysfs_value_or_zero(attrpath)
+                data[attr] = get_sysfs_value(attrpath) or 0
             else:
                 data[attr] = get_sysfs_value(attrpath)
         return data
