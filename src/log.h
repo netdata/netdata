@@ -59,8 +59,8 @@ extern int access_log_syslog;
 extern int error_log_syslog;
 extern int output_log_syslog;
 
-extern time_t error_log_throttle_period, error_log_throttle_period_backup;
-extern unsigned long error_log_errors_per_period;
+extern time_t error_log_throttle_period;
+extern unsigned long error_log_errors_per_period, error_log_errors_per_period_backup;
 extern int error_log_limit(int reset);
 
 extern void open_all_log_files();
@@ -68,8 +68,11 @@ extern void reopen_all_log_files();
 
 static inline void debug_dummy(void) {}
 
-#define error_log_limit_reset() do { error_log_throttle_period = error_log_throttle_period_backup; error_log_limit(1); } while(0)
-#define error_log_limit_unlimited() do { error_log_throttle_period = 0; } while(0)
+#define error_log_limit_reset() do { error_log_errors_per_period = error_log_errors_per_period_backup; error_log_limit(1); } while(0)
+#define error_log_limit_unlimited() do { \
+        error_log_limit_reset(); \
+        error_log_errors_per_period = ((error_log_errors_per_period_backup * 10) < 10000) ? 10000 : (error_log_errors_per_period_backup * 10); \
+    } while(0)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
