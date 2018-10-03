@@ -20,19 +20,19 @@ ORDER = []
 CHARTS = {}
 
 
-def _get_capacity_chart(syspath):
+def get_capacity_chart(syspath):
     # Capacity is measured in percent.  We track one value.
     options = [None, 'Capacity', '%', 'power_supply', 'power_supply.capacity', 'line']
     lines = list()
     attr_now = 'capacity'
-    if _get_sysfs_value(os.path.join(syspath, attr_now)) is not None:
+    if get_sysfs_value(os.path.join(syspath, attr_now)) is not None:
         lines.append([attr_now, attr_now, 'absolute', 1, 1])
         return {'capacity': {'options': options, 'lines': lines}}, [attr_now]
     else:
         return None, None
 
 
-def _get_generic_chart(syspath, name, unit, maxname, minname):
+def get_generic_chart(syspath, name, unit, maxname, minname):
     # Used to generate charts for energy, charge, and voltage.
     options = [None, name.title(), unit, 'power_supply', 'power_supply.{0}'.format(name), 'line']
     lines = list()
@@ -42,60 +42,60 @@ def _get_generic_chart(syspath, name, unit, maxname, minname):
     attr_now = '{0}_now'.format(name)
     attr_min = '{0}_{1}'.format(name, minname)
     attr_min_design = '{0}_{1}_design'.format(name, minname)
-    if _get_sysfs_value(os.path.join(syspath, attr_now)) is not None:
+    if get_sysfs_value(os.path.join(syspath, attr_now)) is not None:
         lines.append([attr_now, attr_now, 'absolute', 1, PRECISION])
         attrlist.append(attr_now)
     else:
         return None, None
-    if _get_sysfs_value(os.path.join(syspath, attr_max)) is not None:
+    if get_sysfs_value(os.path.join(syspath, attr_max)) is not None:
         lines.insert(0, [attr_max, attr_max, 'absolute', 1, PRECISION])
         lines.append([attr_min, attr_min, 'absolute', 1, PRECISION])
         attrlist.append(attr_max)
         attrlist.append(attr_min)
-    elif _get_sysfs_value(os.path.join(syspath, attr_min)) is not None:
+    elif get_sysfs_value(os.path.join(syspath, attr_min)) is not None:
         lines.append([attr_min, attr_min, 'absolute', 1, PRECISION])
         attrlist.append(attr_min)
-    if _get_sysfs_value(os.path.join(syspath, attr_max_design)) is not None:
+    if get_sysfs_value(os.path.join(syspath, attr_max_design)) is not None:
         lines.insert(0, [attr_max_design, attr_max_design, 'absolute', 1, PRECISION])
         lines.append([attr_min_design, attr_min_design, 'absolute', 1, PRECISION])
         attrlist.append(attr_max_design)
         attrlist.append(attr_min_design)
-    elif _get_sysfs_value(os.path.join(syspath, attr_min_design)) is not None:
+    elif get_sysfs_value(os.path.join(syspath, attr_min_design)) is not None:
         lines.append([attr_min_design, attr_min_design, 'absolute', 1, PRECISION])
         attrlist.append(attr_min_design)
     return {name: {'options': options, 'lines': lines}}, attrlist
 
 
-def _get_charge_chart(syspath):
+def get_charge_chart(syspath):
     # Charge is measured in microamphours.  We track up to five
     # attributes.
-    return _get_generic_chart(syspath, 'charge', 'µAh', 'full', 'empty')
+    return get_generic_chart(syspath, 'charge', 'µAh', 'full', 'empty')
 
 
-def _get_energy_chart(syspath):
+def get_energy_chart(syspath):
     # Energy is measured in microwatthours.  We track up to five
     # attributes.
-    return _get_generic_chart(syspath, 'energy', 'µWh', 'full', 'empty')
+    return get_generic_chart(syspath, 'energy', 'µWh', 'full', 'empty')
 
 
-def _get_voltage_chart(syspath):
+def get_voltage_chart(syspath):
     # Voltage is measured in microvolts. We track up to five attributes.
-    return _get_generic_chart(syspath, 'voltage', 'µV', 'min', 'max')
+    return get_generic_chart(syspath, 'voltage', 'µV', 'min', 'max')
 
 
 # This is a list of functions for generating charts.  Used below to save
 # a bit of code (and to make it a bit easier to add new charts).
 GET_CHART = {
-    'capacity': _get_capacity_chart,
-    'charge': _get_charge_chart,
-    'energy': _get_energy_chart,
-    'voltage': _get_voltage_chart
+    'capacity': get_capacity_chart,
+    'charge': get_charge_chart,
+    'energy': get_energy_chart,
+    'voltage': get_voltage_chart
 }
 
 
 # This opens the specified file and returns the value in it or None if
 # the file doesn't exist.
-def _get_sysfs_value(filepath):
+def get_sysfs_value(filepath):
     try:
         with open(filepath, 'r') as datasource:
             return int(datasource.read())
@@ -106,8 +106,8 @@ def _get_sysfs_value(filepath):
 # Certain attributes (*_empty and *_empty_design) are implicitly zero
 # if not provided by the driver.  This function is used to fetch those
 # attributes.
-def _get_sysfs_value_or_zero(filepath):
-    result = _get_sysfs_value(filepath)
+def get_sysfs_value_or_zero(filepath):
+    result = get_sysfs_value(filepath)
     if result is None:
         return 0
     return result
@@ -161,7 +161,7 @@ class Service(SimpleService):
         for attr in self.attrlist:
             attrpath = os.path.join(self.syspath, attr)
             if attr.endswith(('_min', '_min_design', '_empty', '_empty_design')):
-                data[attr] = _get_sysfs_value_or_zero(attrpath)
+                data[attr] = get_sysfs_value_or_zero(attrpath)
             else:
-                data[attr] = _get_sysfs_value(attrpath)
+                data[attr] = get_sysfs_value(attrpath)
         return data
