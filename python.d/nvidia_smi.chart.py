@@ -12,53 +12,63 @@ from bases.collection import find_binary
 
 CHART_TEMPLATES = {
     'pci_bandwidth': {
-        'options': [None, 'PCI express bandwidth utilization', 'KB/s', 'nvidia_smi', 'nvidia_smi', 'area'],
-        '_metrics': { 'pci': [ 'rx_util', 'tx_util' ] },
+        'options': [None, 'PCI express bandwidth utilization', 'KB/s',
+                    'nvidia_smi', 'nvidia_smi', 'area'],
+        '_metrics': {'pci': ['rx_util', 'tx_util']},
         'lines': []
     },
     'fan_speed': {
-        'options': [None, 'Fan speed', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { None: [ 'fan_speed' ] },
+        'options': [None, 'Fan speed', 'percentage', 'nvidia_smi',
+                    'nvidia_smi', 'line'],
+        '_metrics': {None: ['fan_speed']},
         'lines': []
     },
     'gpu_utilization': {
-        'options': [None, 'Compute utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'utilization': [ 'gpu_util' ] },
+        'options': [None, 'Compute utilization', 'percentage', 'nvidia_smi',
+                    'nvidia_smi', 'line'],
+        '_metrics': {'utilization': ['gpu_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'membw_utilization': {
-        'options': [None, 'Memory bandwidth utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'utilization': [ 'memory_util' ] },
+        'options': [None, 'Memory bandwidth utilization', 'percentage',
+                    'nvidia_smi', 'nvidia_smi', 'line'],
+        '_metrics': {'utilization': ['memory_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'encoder_utilization': {
-        'options': [None, 'Encoder/decoder utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'utilization': [ 'encoder_util', 'decoder_util' ] },
+        'options': [None, 'Encoder/decoder utilization', 'percentage',
+                    'nvidia_smi', 'nvidia_smi', 'line'],
+        '_metrics': {'utilization': ['encoder_util', 'decoder_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'mem_allocated': {
-        'options': [None, 'Memory utilization', 'MB', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'fb_memory_usage': [ 'used' ] },
+        'options': [None, 'Memory utilization', 'MB', 'nvidia_smi',
+                    'nvidia_smi', 'line'],
+        '_metrics': {'fb_memory_usage': ['used']},
         'lines': []
     },
     'temperature': {
-        'options': [None, 'Temperature', 'Celsius', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'temperature': [ 'gpu_temp' ] },
+        'options': [None, 'Temperature', 'Celsius', 'nvidia_smi', 'nvidia_smi',
+                    'line'],
+        '_metrics': {'temperature': ['gpu_temp']},
         '_transform': lambda metricname: metricname.split('_')[1],
         'lines': []
     },
     'clocks': {
-        'options': [None, 'Clock frequencies', 'MHz', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'clocks': [ 'graphics_clock', 'sm_clock', 'mem_clock', 'video_clock' ] },
+        'options': [None, 'Clock frequencies', 'MHz', 'nvidia_smi',
+                    'nvidia_smi', 'line'],
+        '_metrics': {'clocks': ['graphics_clock', 'sm_clock', 'mem_clock',
+                     'video_clock']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'power': {
-        'options': [None, 'Power utilization', 'Watts', 'nvidia_smi', 'nvidia_smi', 'line'],
-        '_metrics': { 'power_readings': [ 'power_draw' ] },
+        'options': [None, 'Power utilization', 'Watts', 'nvidia_smi',
+                    'nvidia_smi', 'line'],
+        '_metrics': {'power_readings': ['power_draw']},
         '_transform': lambda metricname: metricname.split('_')[0],
         '_divisor': 10,
         'lines': []
@@ -91,7 +101,8 @@ class Poller(threading.Thread):
     def run(self):
         self.lock.acquire()
         try:
-            self.process = subprocess.Popen(self.command, stdout=subprocess.PIPE)
+            self.process = subprocess.Popen(
+                self.command, stdout=subprocess.PIPE)
         except (OSError, FileNotFoundError):
             return
 
@@ -112,11 +123,13 @@ class Service(SimpleService):
         self.nvidia_smi = find_binary('nvidia-smi')
         self.assignment = {}
         self.poll_seconds = self.configuration.get('poll_seconds', 1)
-        self.poller = Poller([self.nvidia_smi, '-x', '-q', '-l', '{}'.format(self.poll_seconds)], lambda x: '</nvidia_smi_log>' in x)
+        args = [self.nvidia_smi, '-x', '-q', '-l', str(self.poll_seconds)]
+        self.poller = Poller(args, lambda x: '</nvidia_smi_log>' in x)
 
     def _invoke_nvidia_smi(self):
         if self.poller.ident is None:
-            proc = subprocess.Popen([self.nvidia_smi, '-x', '-q'], stdout=subprocess.PIPE)
+            proc = subprocess.Popen(
+                [self.nvidia_smi, '-x', '-q'], stdout=subprocess.PIPE)
             stdout, _ = proc.communicate()
         else:
             # TODO: Warn if self.poller.last_time is old.
@@ -175,7 +188,10 @@ class Service(SimpleService):
                 assignment = self.assignment[name]
                 gpuid = assignment['gpuid']
 
-                num_metrics = sum([len(metricnames) for rootname, metricnames in template['_metrics'].items()])
+                metricitems = template['_metrics'].items()
+                num_metrics = sum(
+                    [len(metricnames) for rootname, metricnames in metricitems]
+                )
                 should_be_instanced = num_metrics > 1
 
                 if should_be_instanced:
@@ -200,7 +216,8 @@ class Service(SimpleService):
                         if rootname == 'pci' and metric == 'tx_util':
                             direction = -1
 
-                        transform = template.get('_transform', lambda metricname: metricname)
+                        transform = template.get(
+                            '_transform', lambda metricname: metricname)
 
                         if should_be_instanced:
                             nickname = transform(metric)
@@ -208,7 +225,10 @@ class Service(SimpleService):
                             nickname = gpuid + '_' + transform(metric)
 
                         divisor = template.get('_divisor', 1)
-                        chartdef['lines'].append([metricname, nickname, 'absolute', direction, divisor])
+                        chartdef['lines'].append(
+                            [metricname, nickname, 'absolute',
+                             direction, divisor]
+                        )
 
                 metrics_available = False
                 for rootname, metrics in chartdef['_metrics'].items():
@@ -227,12 +247,18 @@ class Service(SimpleService):
 
     def check(self):
         if not self.nvidia_smi:
-            self.error("Could not find 'nvidia-smi' binary. Do you have the proprietary NVIDIA driver and tools installed?")
+            self.error(
+                "Could not find 'nvidia-smi' binary. Do you have the "
+                "proprietary NVIDIA driver and tools installed?"
+            )
             return False
 
         smi = self._invoke_nvidia_smi()
         if smi is None:
-            self.error("Failed to invoke 'nvidia-smi'. Do you have the proprietary NVIDIA driver and tools installed?")
+            self.error(
+                "Failed to invoke 'nvidia-smi'. Do you have the "
+                "proprietary NVIDIA driver and tools installed?"
+            )
             return False
 
         gpuidx = 0
@@ -245,7 +271,8 @@ class Service(SimpleService):
             gpuidx += 1
 
         if len(self.assignment) == 0:
-            self.error("Could not find any NVIDIA GPUs in nvidia-smi XML output")
+            self.error(
+                "Could not find any NVIDIA GPUs in nvidia-smi XML output")
             return False
 
         order = self.create_chart()
