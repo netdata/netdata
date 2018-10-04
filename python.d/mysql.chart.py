@@ -127,7 +127,12 @@ GLOBAL_STATS = [
     'wsrep_replicated_bytes',
     'wsrep_local_bf_aborts',
     'wsrep_local_cert_failures',
-    'wsrep_flow_control_paused_ns'
+    'wsrep_flow_control_paused_ns',
+    'Com_delete',
+    'Com_insert',
+    'Com_select',
+    'Com_update',
+    'Com_replace'
 ]
 
 
@@ -155,6 +160,7 @@ VARIABLES = [
 ORDER = [
     'net',
     'queries',
+    'queries_type',
     'handlers',
     'table_locks',
     'join_issues',
@@ -212,6 +218,17 @@ CHARTS = {
             ['Queries', 'queries', 'incremental'],
             ['Questions', 'questions', 'incremental'],
             ['Slow_queries', 'slow_queries', 'incremental']
+        ]
+    },
+    'queries_type': {
+        'options': [None, 'mysql Query type', 'queries/s', 'query_types', 'mysql.queries_type', 'stacked'],
+        'lines': [
+            ['Com_select', 'select', 'incremental'],
+            ['Com_delete', 'delete', 'incremental'],
+            ['Com_update', 'update', 'incremental'],
+            ['Com_insert', 'insert', 'incremental'],
+            ['Qcache_hits', 'cache_hits', 'incremental'],
+            ['Com_replace', 'replace', 'incremental']
         ]
     },
     'handlers': {
