@@ -434,6 +434,12 @@ netdataDashboard.menu = {
         title: 'Logind',
         icon: '<i class="fas fa-user"></i>',
         info: undefined
+    },
+
+    'linux_power_supply': {
+        title: 'Power Supply',
+        icon: '<i class="fas fa-battery-half"></i>',
+        info: 'Statistics for the various system power supplies.'
     }
 };
 
