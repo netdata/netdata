@@ -251,7 +251,6 @@ class Service(SimpleService):
         gpuidx = 0
         for gpu in smi.findall('gpu'):
             gpuid = gpu.get('id')
-            name = gpuid.replace(':', '_').replace('.', '_')
             self.assignment[gpuid] = {
                 'gpuid': 'gpu%d' % (gpuidx,),
             }
