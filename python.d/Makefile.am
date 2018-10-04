@@ -37,6 +37,7 @@ dist_python_DATA = \
     icecast.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
+    linux_power_supply.chart.py \
     litespeed.chart.py \
     logind.chart.py \
     mdstat.chart.py \
