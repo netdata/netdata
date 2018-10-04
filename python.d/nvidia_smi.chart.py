@@ -12,62 +12,53 @@ from bases.collection import find_binary
 
 CHART_TEMPLATES = {
     'pci_bandwidth': {
-        'options': [None, 'PCI express bandwidth utilization', 'KB/s',
-                    'nvidia_smi', 'nvidia_smi', 'area'],
+        'options': [None, 'PCI express bandwidth utilization', 'KB/s', 'nvidia_smi', 'nvidia_smi', 'area'],
         '_metrics': {'pci': ['rx_util', 'tx_util']},
         'lines': []
     },
     'fan_speed': {
-        'options': [None, 'Fan speed', 'percentage', 'nvidia_smi',
-                    'nvidia_smi', 'line'],
+        'options': [None, 'Fan speed', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {None: ['fan_speed']},
         'lines': []
     },
     'gpu_utilization': {
-        'options': [None, 'Compute utilization', 'percentage', 'nvidia_smi',
-                    'nvidia_smi', 'line'],
+        'options': [None, 'Compute utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'utilization': ['gpu_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'membw_utilization': {
-        'options': [None, 'Memory bandwidth utilization', 'percentage',
-                    'nvidia_smi', 'nvidia_smi', 'line'],
+        'options': [None, 'Memory bandwidth utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'utilization': ['memory_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'encoder_utilization': {
-        'options': [None, 'Encoder/decoder utilization', 'percentage',
-                    'nvidia_smi', 'nvidia_smi', 'line'],
+        'options': [None, 'Encoder/decoder utilization', 'percentage', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'utilization': ['encoder_util', 'decoder_util']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'mem_allocated': {
-        'options': [None, 'Memory utilization', 'MB', 'nvidia_smi',
-                    'nvidia_smi', 'line'],
+        'options': [None, 'Memory utilization', 'MB', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'fb_memory_usage': ['used']},
         'lines': []
     },
     'temperature': {
-        'options': [None, 'Temperature', 'Celsius', 'nvidia_smi', 'nvidia_smi',
-                    'line'],
+        'options': [None, 'Temperature', 'Celsius', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'temperature': ['gpu_temp']},
         '_transform': lambda metricname: metricname.split('_')[1],
         'lines': []
     },
     'clocks': {
-        'options': [None, 'Clock frequencies', 'MHz', 'nvidia_smi',
-                    'nvidia_smi', 'line'],
+        'options': [None, 'Clock frequencies', 'MHz', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'clocks': ['graphics_clock', 'sm_clock', 'mem_clock',
                      'video_clock']},
         '_transform': lambda metricname: metricname.split('_')[0],
         'lines': []
     },
     'power': {
-        'options': [None, 'Power utilization', 'Watts', 'nvidia_smi',
-                    'nvidia_smi', 'line'],
+        'options': [None, 'Power utilization', 'Watts', 'nvidia_smi', 'nvidia_smi', 'line'],
         '_metrics': {'power_readings': ['power_draw']},
         '_transform': lambda metricname: metricname.split('_')[0],
         '_divisor': 10,
@@ -248,17 +239,13 @@ class Service(SimpleService):
     def check(self):
         if not self.nvidia_smi:
             self.error(
-                "Could not find 'nvidia-smi' binary. Do you have the "
-                "proprietary NVIDIA driver and tools installed?"
-            )
+                "Could not find 'nvidia-smi' binary. Do you have the proprietary NVIDIA driver and tools installed?")
             return False
 
         smi = self._invoke_nvidia_smi()
         if smi is None:
             self.error(
-                "Failed to invoke 'nvidia-smi'. Do you have the "
-                "proprietary NVIDIA driver and tools installed?"
-            )
+                "Failed to invoke 'nvidia-smi'. Do you have the proprietary NVIDIA driver and tools installed?")
             return False
 
         gpuidx = 0
@@ -271,8 +258,7 @@ class Service(SimpleService):
             gpuidx += 1
 
         if len(self.assignment) == 0:
-            self.error(
-                "Could not find any NVIDIA GPUs in nvidia-smi XML output")
+            self.error("Could not find any NVIDIA GPUs in nvidia-smi XML output")
             return False
 
         order = self.create_chart()
