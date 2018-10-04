@@ -105,7 +105,7 @@ class Poller(threading.Thread):
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        SimpleService.__init__(self, configuration=configuration, name=name)
+        super().__init__(configuration=configuration, name=name)
         self.order = []
         self.definitions = {}
         self.fake_name = "gpu"
@@ -238,8 +238,7 @@ class Service(SimpleService):
         gpuidx = 0
         for gpu in smi.findall('gpu'):
             gpuid = gpu.get('id')
-            name = gpuid.replace(':', '_')
-            name = name.replace('.', '_')
+            name = gpuid.replace(':', '_').replace('.', '_')
             self.assignment[gpuid] = {
                 'gpuid': 'gpu%d' % (gpuidx,),
             }
