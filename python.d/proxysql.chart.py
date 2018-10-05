@@ -236,7 +236,7 @@ class Service(MySQLService):
                                 if (name + '_status') not in self.charts['pool_status']:
                                     self.add_backend_dimensions(name)
 
-                        to_netdata["{1}_{2}".format(name, key)] = backend[key]
+                        to_netdata["{0}_{1}".format(name, key)] = backend[key]
 
                     if key == 'bytes_data_recv':
                         to_netdata['bytes_data_recv'] += int(backend[key])
@@ -257,7 +257,7 @@ class Service(MySQLService):
                     to_netdata[name + '_count'] = cmd['count']
                     to_netdata[name + '_duration'] = cmd['duration']
                     for histogram in cmd['histogram']:
-                        dimId = 'commands_histogram_{1}_{2}'.format(name, histogram)
+                        dimId = 'commands_histogram_{0}_{1}'.format(name, histogram)
                         to_netdata[dimId] = cmd['histogram'][histogram]
 
         return to_netdata or None
@@ -281,7 +281,7 @@ class Service(MySQLService):
         chart = self.charts.add_chart(self.histogram_chart(cmd))
 
         for histogram in HISTOGRAM_ORDER:
-            dimId = 'commands_histogram_{1}_{2}'.format(cmd['name'], histogram)
+            dimId = 'commands_histogram_{0}_{1}'.format(cmd['name'], histogram)
             chart.add_dimension([dimId, histogram, 'incremental'])
 
     @staticmethod
@@ -289,7 +289,7 @@ class Service(MySQLService):
         return [
             'commands_historgram_' + cmd['name'],
             None,
-            'ProxySQL {1} Command Histogram'.format(cmd['name'].title()),
+            'ProxySQL {0} Command Histogram'.format(cmd['name'].title()),
             'commands',
             'commands_histogram',
             'proxysql.commands_histogram_' + cmd['name'],
@@ -340,7 +340,7 @@ class Service(MySQLService):
         hostgroup = backend['hostgroup'].replace(' ', '_').lower()
         host = backend['srv_host'].replace('.', '_')
 
-        return "{1}_{2}_{3}".format(hostgroup, host, backend['srv_port'])
+        return "{0}_{1}_{2}".format(hostgroup, host, backend['srv_port'])
 
     @staticmethod
     def convert_status(status):
