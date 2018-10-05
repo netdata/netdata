@@ -75,6 +75,9 @@
 var NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
+
+    NETDATA.url_pipe = '%7C';
+
     // ------------------------------------------------------------------------
     // compatibility fixes
 
@@ -4686,12 +4689,12 @@ var NETDATA = window.NETDATA || {};
                 ret = this.library.options(this);
 
             if(this.append_options !== null)
-                ret += '|' + this.append_options.toString();
+                ret += NETDATA.url_pipe + this.append_options.toString();
 
-            ret += '|jsonwrap';
+            ret += NETDATA.url_pipe + 'jsonwrap';
 
             if(NETDATA.options.current.eliminate_zero_dimensions === true)
-                ret += '|nonzero';
+                ret += NETDATA.url_pipe + 'nonzero';
 
             return ret;
         };
@@ -8468,7 +8471,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { return 'ms|flip' + (this.isLogScale(state)?'|abs':'').toString(); },
+            options: function(state) { return 'ms' + NETDATA.url_pipe + 'flip' + (this.isLogScale(state)?(NETDATA.url_pipe + 'abs'):'').toString(); },
             legend: function(state) {
                 return (this.isSparkline(state) === false && NETDATA.dataAttributeBoolean(state.element, 'legend', true) === true) ? 'right-side' : null;
             },
@@ -8513,7 +8516,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
-            options: function(state) { void(state); return 'flip|abs'; },
+            options: function(state) { void(state); return 'flip' + NETDATA.url_pipe + 'abs'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
@@ -8533,7 +8536,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'ssvcomma'; },
-            options: function(state) { void(state); return 'null2zero|flip|abs'; },
+            options: function(state) { void(state); return 'null2zero%' + NETDATA.url_pipe + 'flip' + NETDATA.url_pipe + 'abs'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
@@ -8553,7 +8556,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { void(state); return 'objectrows|ms'; },
+            options: function(state) { void(state); return 'objectrows' + NETDATA.url_pipe + 'ms'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 50; },
@@ -8633,7 +8636,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { void(state); return 'objectrows|ms'; },
+            options: function(state) { void(state); return 'objectrows' + NETDATA.url_pipe + 'ms'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
