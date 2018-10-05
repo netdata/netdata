@@ -224,7 +224,7 @@ class Service(MySQLService):
                                 if (name + '_status') not in self.charts['pool_status']:
                                     self._add_backend_dimensions(name)
 
-                        to_netdata[name + "_" + key] = backend[key]
+                        to_netdata["{1}_{2}".format(name, key)] = backend[key]
 
                     if key == 'bytes_data_recv':
                         to_netdata['bytes_data_recv'] += int(backend[key])
@@ -235,17 +235,17 @@ class Service(MySQLService):
         if 'commands_status' in raw_data:
             for record in raw_data['commands_status'][0]:
                 cmd = self._generate_command_stats(record)
+                name = cmd['name']
 
                 if len(self.charts) > 0:
-                    if (cmd['name'] + '_count') not in self.charts['commands_count']:
-                        self._add_command_dimensions(cmd['name'])
+                    if (name + '_count') not in self.charts['commands_count']:
+                        self._add_command_dimensions(name)
                         self._add_histogram_chart(cmd)
 
-                    to_netdata[cmd['name'] + '_count'] = cmd['count']
-                    to_netdata[cmd['name'] + '_duration'] = cmd['duration']
+                    to_netdata[name + '_count'] = cmd['count']
+                    to_netdata[name + '_duration'] = cmd['duration']
                     for histogram in cmd['histogram']:
-                        dimId = 'commands_histogram_' + \
-                            cmd['name'] + '_' + histogram
+                        dimId = 'commands_histogram_{1}_{2}'.format(name, histogram)
                         to_netdata[dimId] = cmd['histogram'][histogram]
 
         return to_netdata or None
@@ -280,7 +280,7 @@ class Service(MySQLService):
         chart = self.charts.add_chart(self._histogram_chart(cmd))
 
         for histogram in HISTOGRAM_ORDER:
-            dimId = 'commands_histogram_' + cmd['name'] + '_' + histogram
+            dimId = 'commands_histogram_{1}_{2}'.format(cmd['name'], histogram)
             chart.add_dimension(
                 [dimId, histogram, 'incremental'])
 
@@ -289,7 +289,7 @@ class Service(MySQLService):
         return [
             'commands_historgram_' + cmd['name'],
             None,
-            'ProxySQL ' + cmd['name'].title() + ' Command Histogram',
+            'ProxySQL {1} Command Histogram'.format(cmd['name'].title()),
             'commands',
             'commands_histogram',
             'proxysql.commands_histogram_' + cmd['name'],
@@ -340,7 +340,7 @@ class Service(MySQLService):
         hostgroup = backend['hostgroup'].replace(' ', '_').lower()
         host = backend['srv_host'].replace('.', '_')
 
-        return "%s_%s_%s" % (hostgroup, host, backend['srv_port'])
+        return "{1}_{2}_{3}".format(hostgroup, host, backend['srv_port'])
 
     @staticmethod
     def _convert_status(status):
