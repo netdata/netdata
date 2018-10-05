@@ -157,19 +157,19 @@ CHARTS = {
             ['client_connections_non_idle', 'non_idle', 'absolute']
         ]},
     'pool_connection_used': {
-        'options': [None, 'ProxySQL used connections', 'connections', 'pool_connections', 'proxysql.pool_used_connections', 'line'],
+        'options': [None, 'ProxySQL Used Connections', 'connections', 'pool_connections', 'proxysql.pool_used_connections', 'line'],
         'lines': [
         ]},
     'pool_connection_free': {
-        'options': [None, 'ProxySQL free connections', 'connections', 'pool_connections', 'proxysql.pool_free_connections', 'line'],
+        'options': [None, 'ProxySQL Free Connections', 'connections', 'pool_connections', 'proxysql.pool_free_connections', 'line'],
         'lines': [
         ]},
     'pool_connection_ok': {
-        'options': [None, 'ProxySQL established connections', 'connections', 'pool_connections', 'proxysql.pool_ok_connections', 'line'],
+        'options': [None, 'ProxySQL Established Connections', 'connections', 'pool_connections', 'proxysql.pool_ok_connections', 'line'],
         'lines': [
         ]},
     'pool_connection_error': {
-        'options': [None, 'ProxySQL error connections', 'connections', 'pool_connections', 'proxysql.pool_error_connections', 'line'],
+        'options': [None, 'ProxySQL Error Connections', 'connections', 'pool_connections', 'proxysql.pool_error_connections', 'line'],
         'lines': [
         ]},
     'commands_count': {
@@ -289,7 +289,7 @@ class Service(MySQLService):
         return [
             'commands_historgram_' + cmd['name'],
             None,
-            cmd['name'] + ' Command Histogram',
+            'ProxySQL ' + cmd['name'].title() + ' Command Histogram',
             'commands',
             'commands_histogram',
             'proxysql.commands_histogram_' + cmd['name'],
