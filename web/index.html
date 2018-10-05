@@ -596,8 +596,10 @@
         function verifyURL(s) {
             if(typeof(s) === 'string' && (s.startsWith('http://') || s.startsWith('https://')))
                 return s
+                    .replace(/'/g, '%22')
                     .replace(/"/g, '%27')
-                    .replace(/'/g, '%22');
+                    .replace(/)/g, '%28')
+                    .replace(/(/g, '%29');
 
             console.log('invalid URL detected:');
             console.log(s);
