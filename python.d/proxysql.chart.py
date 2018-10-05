@@ -16,45 +16,48 @@ def query(table, *params):
 
 
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_global
-QUERY_GLOBAL = query("stats_mysql_global",
-                     "Variable_Name",
-                     "Variable_Value",
-                     )
+QUERY_GLOBAL = query(
+    "stats_mysql_global",
+    "Variable_Name",
+    "Variable_Value"
+)
 
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_connection_pool
-QUERY_CONNECTION_POOL = query("stats_mysql_connection_pool",
-                              "hostgroup",
-                              "srv_host",
-                              "srv_port",
-                              "status",
-                              "ConnUsed",
-                              "ConnFree",
-                              "ConnOK",
-                              "ConnERR",
-                              "Queries",
-                              "Bytes_data_sent",
-                              "Bytes_data_recv",
-                              "Latency_us",
-                              )
+QUERY_CONNECTION_POOL = query(
+    "stats_mysql_connection_pool",
+    "hostgroup",
+    "srv_host",
+    "srv_port",
+    "status",
+    "ConnUsed",
+    "ConnFree",
+    "ConnOK",
+    "ConnERR",
+    "Queries",
+    "Bytes_data_sent",
+    "Bytes_data_recv",
+    "Latency_us"
+)
 
 # https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_commands_counters
-QUERY_COMMANDS = query("stats_mysql_commands_counters",
-                       "Command",
-                       "Total_Time_us",
-                       "Total_cnt",
-                       "cnt_100us",
-                       "cnt_500us",
-                       "cnt_1ms",
-                       "cnt_5ms",
-                       "cnt_10ms",
-                       "cnt_50ms",
-                       "cnt_100ms",
-                       "cnt_500ms",
-                       "cnt_1s",
-                       "cnt_5s",
-                       "cnt_10s",
-                       "cnt_INFs",
-                       )
+QUERY_COMMANDS = query(
+    "stats_mysql_commands_counters",
+    "Command",
+    "Total_Time_us",
+    "Total_cnt",
+    "cnt_100us",
+    "cnt_500us",
+    "cnt_1ms",
+    "cnt_5ms",
+    "cnt_10ms",
+    "cnt_50ms",
+    "cnt_100ms",
+    "cnt_500ms",
+    "cnt_1s",
+    "cnt_5s",
+    "cnt_10s",
+    "cnt_INFs"
+)
 
 GLOBAL_STATS = [
     'client_connections_aborted',
@@ -63,7 +66,8 @@ GLOBAL_STATS = [
     'client_connections_non_idle',
     'proxysql_uptime',
     'questions',
-    'slow_queries']
+    'slow_queries'
+]
 
 CONNECTION_POOL_STATS = [
     'status',
@@ -74,7 +78,8 @@ CONNECTION_POOL_STATS = [
     'queries',
     'bytes_data_sent',
     'bytes_data_recv',
-    'latency_us']
+    'latency_us'
+]
 
 ORDER = [
     'connections',
@@ -90,7 +95,8 @@ ORDER = [
     'pool_connection_used',
     'pool_connection_free',
     'pool_connection_ok',
-    'pool_connection_error']
+    'pool_connection_error'
+]
 
 HISTOGRAM_ORDER = [
     '100us',
@@ -104,7 +110,7 @@ HISTOGRAM_ORDER = [
     '1s',
     '5s',
     '10s',
-    'inf',
+    'inf'
 ]
 
 STATUS = {
@@ -117,37 +123,40 @@ STATUS = {
 CHARTS = {
     'pool_status': {
         'options': [None, 'ProxySQL Backend Status', 'status', 'status', 'proxysql.pool_status', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'pool_net': {
         'options': [None, 'ProxySQL Backend Bandwidth', 'kilobits/s', 'bandwidth', 'proxysql.pool_net', 'area'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'pool_overall_net': {
         'options': [None, 'ProxySQL Backend Overall Bandwidth', 'kilobits/s', 'overall_bandwidth', 'proxysql.pool_overall_net', 'area'],
         'lines': [
             ['bytes_data_recv', 'in', 'incremental', 8, 1024],
             ['bytes_data_sent', 'out', 'incremental', -8, 1024]
-        ]},
+        ]
+    },
     'questions': {
         'options': [None, 'ProxySQL Frontend Questions', 'questions/s', 'questions', 'proxysql.questions', 'line'],
         'lines': [
             ['questions', 'questions', 'incremental'],
             ['slow_queries', 'slow_queries', 'incremental']
-        ]},
+        ]
+    },
     'pool_queries': {
         'options': [None, 'ProxySQL Backend Queries', 'queries/s', 'queries', 'proxysql.queries', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'active_transactions': {
         'options': [None, 'ProxySQL Frontend Active Transactions', 'transactions/s', 'active_transactions', 'proxysql.active_transactions', 'line'],
         'lines': [
             ['active_transactions', 'active_transactions', 'absolute']
-        ]},
+        ]
+    },
     'pool_latency': {
         'options': [None, 'ProxySQL Backend Latency', 'ms', 'latency', 'proxysql.latency', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'connections': {
         'options': [None, 'ProxySQL Frontend Connections', 'connections/s', 'connections', 'proxysql.connections', 'line'],
         'lines': [
@@ -155,31 +164,32 @@ CHARTS = {
             ['client_connections_created', 'created', 'incremental'],
             ['client_connections_aborted', 'aborted', 'incremental'],
             ['client_connections_non_idle', 'non_idle', 'absolute']
-        ]},
+        ]
+    },
     'pool_connection_used': {
         'options': [None, 'ProxySQL Used Connections', 'connections', 'pool_connections', 'proxysql.pool_used_connections', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'pool_connection_free': {
         'options': [None, 'ProxySQL Free Connections', 'connections', 'pool_connections', 'proxysql.pool_free_connections', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'pool_connection_ok': {
         'options': [None, 'ProxySQL Established Connections', 'connections', 'pool_connections', 'proxysql.pool_ok_connections', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'pool_connection_error': {
         'options': [None, 'ProxySQL Error Connections', 'connections', 'pool_connections', 'proxysql.pool_error_connections', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'commands_count': {
         'options': [None, 'ProxySQL Commands', 'commands', 'commands', 'proxysql.commands_count', 'line'],
-        'lines': [
-        ]},
+        'lines': []
+    },
     'commands_duration': {
         'options': [None, 'ProxySQL Commands Duration', 'ms', 'commands', 'proxysql.commands_duration', 'line'],
-        'lines': [
-        ]}
+        'lines': []
+    }
 }
 
 
@@ -188,9 +198,11 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.queries = dict(global_status=QUERY_GLOBAL,
-                            connection_pool_status=QUERY_CONNECTION_POOL,
-                            commands_status=QUERY_COMMANDS)
+        self.queries = dict(
+            global_status=QUERY_GLOBAL,
+            connection_pool_status=QUERY_CONNECTION_POOL,
+            commands_status=QUERY_COMMANDS
+        )
 
     def _get_data(self):
         raw_data = self._get_raw_data(description=True)
@@ -251,38 +263,26 @@ class Service(MySQLService):
         return to_netdata or None
 
     def add_backend_dimensions(self, name):
-        self.charts['pool_status'].add_dimension(
-            [name + '_status', name, 'absolute'])
-        self.charts['pool_net'].add_dimension(
-            [name + '_bytes_data_recv', 'from_' + name, 'incremental', 8, 1024])
-        self.charts['pool_net'].add_dimension(
-            [name + '_bytes_data_sent', 'to_' + name, 'incremental', -8, 1024])
-        self.charts['pool_queries'].add_dimension(
-            [name + '_queries', name, 'incremental'])
-        self.charts['pool_latency'].add_dimension(
-            [name + '_latency_us', name, 'absolute', 1, 1000])
-        self.charts['pool_connection_used'].add_dimension(
-            [name + '_connused', name, 'absolute'])
-        self.charts['pool_connection_free'].add_dimension(
-            [name + '_connfree', name, 'absolute'])
-        self.charts['pool_connection_ok'].add_dimension(
-            [name + '_connok', name, 'incremental'])
-        self.charts['pool_connection_error'].add_dimension(
-            [name + '_connerr', name, 'incremental'])
+        self.charts['pool_status'].add_dimension([name + '_status', name, 'absolute'])
+        self.charts['pool_net'].add_dimension([name + '_bytes_data_recv', 'from_' + name, 'incremental', 8, 1024])
+        self.charts['pool_net'].add_dimension([name + '_bytes_data_sent', 'to_' + name, 'incremental', -8, 1024])
+        self.charts['pool_queries'].add_dimension([name + '_queries', name, 'incremental'])
+        self.charts['pool_latency'].add_dimension([name + '_latency_us', name, 'absolute', 1, 1000])
+        self.charts['pool_connection_used'].add_dimension([name + '_connused', name, 'absolute'])
+        self.charts['pool_connection_free'].add_dimension([name + '_connfree', name, 'absolute'])
+        self.charts['pool_connection_ok'].add_dimension([name + '_connok', name, 'incremental'])
+        self.charts['pool_connection_error'].add_dimension([name + '_connerr', name, 'incremental'])
 
     def add_command_dimensions(self, cmd):
-        self.charts['commands_count'].add_dimension(
-            [cmd + '_count', cmd, 'incremental'])
-        self.charts['commands_duration'].add_dimension(
-            [cmd + '_duration', cmd, 'incremental', 1, 1000])
+        self.charts['commands_count'].add_dimension([cmd + '_count', cmd, 'incremental'])
+        self.charts['commands_duration'].add_dimension([cmd + '_duration', cmd, 'incremental', 1, 1000])
 
     def add_histogram_chart(self, cmd):
         chart = self.charts.add_chart(self.histogram_chart(cmd))
 
         for histogram in HISTOGRAM_ORDER:
             dimId = 'commands_histogram_{1}_{2}'.format(cmd['name'], histogram)
-            chart.add_dimension(
-                [dimId, histogram, 'incremental'])
+            chart.add_dimension([dimId, histogram, 'incremental'])
 
     @staticmethod
     def histogram_chart(cmd):
@@ -293,7 +293,7 @@ class Service(MySQLService):
             'commands',
             'commands_histogram',
             'proxysql.commands_histogram_' + cmd['name'],
-            'stacked',
+            'stacked'
         ]
 
     @staticmethod
@@ -331,8 +331,8 @@ class Service(MySQLService):
                 '1s': data[11],
                 '5s': data[12],
                 '10s': data[13],
-                'inf': data[14],
-            },
+                'inf': data[14]
+            }
         }
 
     @staticmethod
