@@ -212,17 +212,17 @@ class Service(MySQLService):
             to_netdata['bytes_data_sent'] = 0
 
             for record in raw_data['connection_pool_status'][0]:
-                backend = self._generate_backend(record)
-                name = self._generate_backend_name(backend)
+                backend = self.generate_backend(record)
+                name = self.generate_backend_name(backend)
 
                 for key in backend:
                     if key in CONNECTION_POOL_STATS:
                         if key == 'status':
-                            backend[key] = self._convert_status(backend[key])
+                            backend[key] = self.convert_status(backend[key])
 
                             if len(self.charts) > 0:
                                 if (name + '_status') not in self.charts['pool_status']:
-                                    self._add_backend_dimensions(name)
+                                    self.add_backend_dimensions(name)
 
                         to_netdata["{1}_{2}".format(name, key)] = backend[key]
 
@@ -234,13 +234,13 @@ class Service(MySQLService):
 
         if 'commands_status' in raw_data:
             for record in raw_data['commands_status'][0]:
-                cmd = self._generate_command_stats(record)
+                cmd = self.generate_command_stats(record)
                 name = cmd['name']
 
                 if len(self.charts) > 0:
                     if (name + '_count') not in self.charts['commands_count']:
-                        self._add_command_dimensions(name)
-                        self._add_histogram_chart(cmd)
+                        self.add_command_dimensions(name)
+                        self.add_histogram_chart(cmd)
 
                     to_netdata[name + '_count'] = cmd['count']
                     to_netdata[name + '_duration'] = cmd['duration']
@@ -250,7 +250,7 @@ class Service(MySQLService):
 
         return to_netdata or None
 
-    def _add_backend_dimensions(self, name):
+    def add_backend_dimensions(self, name):
         self.charts['pool_status'].add_dimension(
             [name + '_status', name, 'absolute'])
         self.charts['pool_net'].add_dimension(
@@ -270,14 +270,14 @@ class Service(MySQLService):
         self.charts['pool_connection_error'].add_dimension(
             [name + '_connerr', name, 'incremental'])
 
-    def _add_command_dimensions(self, cmd):
+    def add_command_dimensions(self, cmd):
         self.charts['commands_count'].add_dimension(
             [cmd + '_count', cmd, 'incremental'])
         self.charts['commands_duration'].add_dimension(
             [cmd + '_duration', cmd, 'incremental', 1, 1000])
 
-    def _add_histogram_chart(self, cmd):
-        chart = self.charts.add_chart(self._histogram_chart(cmd))
+    def add_histogram_chart(self, cmd):
+        chart = self.charts.add_chart(self.histogram_chart(cmd))
 
         for histogram in HISTOGRAM_ORDER:
             dimId = 'commands_histogram_{1}_{2}'.format(cmd['name'], histogram)
@@ -285,7 +285,7 @@ class Service(MySQLService):
                 [dimId, histogram, 'incremental'])
 
     @staticmethod
-    def _histogram_chart(cmd):
+    def histogram_chart(cmd):
         return [
             'commands_historgram_' + cmd['name'],
             None,
@@ -297,7 +297,7 @@ class Service(MySQLService):
         ]
 
     @staticmethod
-    def _generate_backend(data):
+    def generate_backend(data):
         return {
             'hostgroup': data[0],
             'srv_host': data[1],
@@ -314,7 +314,7 @@ class Service(MySQLService):
         }
 
     @staticmethod
-    def _generate_command_stats(data):
+    def generate_command_stats(data):
         return {
             'name': data[0].lower(),
             'duration': data[1],
@@ -336,14 +336,14 @@ class Service(MySQLService):
         }
 
     @staticmethod
-    def _generate_backend_name(backend):
+    def generate_backend_name(backend):
         hostgroup = backend['hostgroup'].replace(' ', '_').lower()
         host = backend['srv_host'].replace('.', '_')
 
         return "{1}_{2}_{3}".format(hostgroup, host, backend['srv_port'])
 
     @staticmethod
-    def _convert_status(status):
+    def convert_status(status):
         if status in STATUS:
             return STATUS[status]
         return -1
