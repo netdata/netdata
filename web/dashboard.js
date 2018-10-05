@@ -75,6 +75,14 @@
 var NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
+
+    NETDATA.encodeURIComponent = function(s) {
+        if(typeof(s) === 'string')
+            return encodeURIComponent(s);
+
+        return s;
+    };
+
     // ------------------------------------------------------------------------
     // compatibility fixes
 
@@ -2927,7 +2935,7 @@ var NETDATA = window.NETDATA || {};
                 that.force_update_every *= 1000;
 
             // the dimensions requested by the user
-            that.dimensions = NETDATA.dataAttribute(that.element, 'dimensions', null);
+            that.dimensions = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'dimensions', null));
 
             that.title = NETDATA.dataAttribute(that.element, 'title', null);    // the title of the chart
             that.units = NETDATA.dataAttribute(that.element, 'units', null);    // the units of the chart dimensions
@@ -2935,8 +2943,11 @@ var NETDATA = window.NETDATA || {};
             that.units_current = that.units;
             that.units_common = NETDATA.dataAttribute(that.element, 'common-units', null);
 
-            that.append_options = NETDATA.dataAttribute(that.element, 'append-options', null); // additional options to pass to netdata
-            that.override_options = NETDATA.dataAttribute(that.element, 'override-options', null);  // override options to pass to netdata
+            // additional options to pass to netdata
+            that.append_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'append-options', null));
+
+            // override options to pass to netdata
+            that.override_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'override-options', null));
 
             that.debug = NETDATA.dataAttributeBoolean(that.element, 'debug', false);
 
@@ -4686,12 +4697,12 @@ var NETDATA = window.NETDATA || {};
                 ret = this.library.options(this);
 
             if(this.append_options !== null)
-                ret += '|' + this.append_options.toString();
+                ret += '%7C' + this.append_options.toString();
 
-            ret += '|jsonwrap';
+            ret += '%7C' + 'jsonwrap';
 
             if(NETDATA.options.current.eliminate_zero_dimensions === true)
-                ret += '|nonzero';
+                ret += '%7C' + 'nonzero';
 
             return ret;
         };
@@ -8468,7 +8479,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { return 'ms|flip' + (this.isLogScale(state)?'|abs':'').toString(); },
+            options: function(state) { return 'ms' + '%7C' + 'flip' + (this.isLogScale(state)?('%7C' + 'abs'):'').toString(); },
             legend: function(state) {
                 return (this.isSparkline(state) === false && NETDATA.dataAttributeBoolean(state.element, 'legend', true) === true) ? 'right-side' : null;
             },
@@ -8513,7 +8524,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
-            options: function(state) { void(state); return 'flip|abs'; },
+            options: function(state) { void(state); return 'flip' + '%7C' + 'abs'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
@@ -8533,7 +8544,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'ssvcomma'; },
-            options: function(state) { void(state); return 'null2zero|flip|abs'; },
+            options: function(state) { void(state); return 'null2zero' + '%7C' + 'flip' + '%7C' + 'abs'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
@@ -8553,7 +8564,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { void(state); return 'objectrows|ms'; },
+            options: function(state) { void(state); return 'objectrows' + '%7C' + 'ms'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 50; },
@@ -8633,7 +8644,7 @@ var NETDATA = window.NETDATA || {};
             enabled: true,
             xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
-            options: function(state) { void(state); return 'objectrows|ms'; },
+            options: function(state) { void(state); return 'objectrows' + '%7C' + 'ms'; },
             legend: function(state) { void(state); return null; },
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
