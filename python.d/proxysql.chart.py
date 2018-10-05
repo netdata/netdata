@@ -130,7 +130,8 @@ CHARTS = {
         'lines': []
     },
     'pool_overall_net': {
-        'options': [None, 'ProxySQL Backend Overall Bandwidth', 'kilobits/s', 'overall_bandwidth', 'proxysql.pool_overall_net', 'area'],
+        'options': [None, 'ProxySQL Backend Overall Bandwidth', 'kilobits/s', 'overall_bandwidth',
+                    'proxysql.pool_overall_net', 'area'],
         'lines': [
             ['bytes_data_recv', 'in', 'incremental', 8, 1024],
             ['bytes_data_sent', 'out', 'incremental', -8, 1024]
@@ -148,7 +149,8 @@ CHARTS = {
         'lines': []
     },
     'active_transactions': {
-        'options': [None, 'ProxySQL Frontend Active Transactions', 'transactions/s', 'active_transactions', 'proxysql.active_transactions', 'line'],
+        'options': [None, 'ProxySQL Frontend Active Transactions', 'transactions/s', 'active_transactions',
+                    'proxysql.active_transactions', 'line'],
         'lines': [
             ['active_transactions', 'active_transactions', 'absolute']
         ]
@@ -158,7 +160,8 @@ CHARTS = {
         'lines': []
     },
     'connections': {
-        'options': [None, 'ProxySQL Frontend Connections', 'connections/s', 'connections', 'proxysql.connections', 'line'],
+        'options': [None, 'ProxySQL Frontend Connections', 'connections/s', 'connections', 'proxysql.connections',
+                    'line'],
         'lines': [
             ['client_connections_connected', 'connected', 'absolute'],
             ['client_connections_created', 'created', 'incremental'],
@@ -167,19 +170,23 @@ CHARTS = {
         ]
     },
     'pool_connection_used': {
-        'options': [None, 'ProxySQL Used Connections', 'connections', 'pool_connections', 'proxysql.pool_used_connections', 'line'],
+        'options': [None, 'ProxySQL Used Connections', 'connections', 'pool_connections',
+                    'proxysql.pool_used_connections', 'line'],
         'lines': []
     },
     'pool_connection_free': {
-        'options': [None, 'ProxySQL Free Connections', 'connections', 'pool_connections', 'proxysql.pool_free_connections', 'line'],
+        'options': [None, 'ProxySQL Free Connections', 'connections', 'pool_connections',
+                    'proxysql.pool_free_connections', 'line'],
         'lines': []
     },
     'pool_connection_ok': {
-        'options': [None, 'ProxySQL Established Connections', 'connections', 'pool_connections', 'proxysql.pool_ok_connections', 'line'],
+        'options': [None, 'ProxySQL Established Connections', 'connections', 'pool_connections',
+                    'proxysql.pool_ok_connections', 'line'],
         'lines': []
     },
     'pool_connection_error': {
-        'options': [None, 'ProxySQL Error Connections', 'connections', 'pool_connections', 'proxysql.pool_error_connections', 'line'],
+        'options': [None, 'ProxySQL Error Connections', 'connections', 'pool_connections',
+                    'proxysql.pool_error_connections', 'line'],
         'lines': []
     },
     'commands_count': {
