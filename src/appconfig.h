@@ -1,5 +1,80 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/*
+ * This section manages ini config files, like netdata.conf and stream.conf
+ *
+ * It is organized like this:
+ *
+ * struct config (i.e. netdata.conf or stream.conf)
+ *   .sections    = a linked list of struct section
+ *   .mutex       = a mutex to protect the above linked list due to multi-threading
+ *   .index       = an AVL tree of struct section
+ *
+ * struct section (i.e. [global] or [health] of netdata.conf)
+ *   .value       = a linked list of struct config_option
+ *   .mutex       = a mutex to protect the above linked list due to multi-threading
+ *   .value_index = an AVL tree of struct config_option
+ *
+ * struct config_option (ie. a name-value pair for each ini file option)
+ *
+ * The following operations on name-value options are supported:
+ *    SET           to set the value of an option
+ *    SET DEFAULT   to set the value and the default value of an option
+ *    GET           to get the value of an option
+ *    EXISTS        to check if an option exists
+ *    MOVE          to move an option from a section to another section, and/or rename it
+ *
+ *    GET and SET operations are provided for the following data types:
+ *                  STRING
+ *                  NUMBER (long long)
+ *                  FLOAT (long double)
+ *                  BOOLEAN (false, true)
+ *                  BOOLEAN ONDEMAND (false, true, auto)
+ *
+ *   GET and SET operations create struct config_option, if it is not already present.
+ *   This allows netdata to run even without netdata.conf and stream.conf. The internal
+ *   defaults are used to create the structure that should exist in the ini file and the config
+ *   file can be downloaded from the server.
+ *
+ *   Also 2 operations are supported for the whole config file:
+ *
+ *     LOAD         To load the ini file from disk
+ *     GENERATE     To generate the ini file (this is used to download the ini file from the server)
+ *
+ * For each option (name-value pair), the system maintains 4 flags:
+ *   LOADED   to indicate that the value has been loaded from the file
+ *   USED     to indicate that netdata used the value
+ *   CHANGED  to indicate that the value has been changed from the loaded value or the internal default value
+ *   CHECKED  is used internally for optimization (to avoid an strcmp() every time GET is called).
+ *
+ * TODO:
+ * 1. The linked lists and the mutexes can be removed and the AVL trees can become DICTIONARY.
+ *    This part of the code was written before we add traversal to AVL.
+ *
+ * 2. High level data types could be supported, to simplify the rest of the code:
+ *       MULTIPLE CHOICE  to let the user select one of the supported keywords
+ *                        this would allow users see in comments the available options
+ *
+ *       SIMPLE PATTERN   to let the user define netdata SIMPLE PATTERNS
+ *
+ * 3. Sorting of options should be supported.
+ *    Today, when the ini file is downloaded from the server, the options are shown in the order
+ *    they appear in the linked list (the order they were added, listing changed options first).
+ *    If we remove the linked list, the order they appear in the AVL tree will be used (which is
+ *    random due to simple_hash()).
+ *    Ideally, we support sorting of options when generating the ini file.
+ *
+ * 4. There is no free() operation. So, memory is freed on netdata exit.
+ *
+ * 5. Avoid memory fragmentation
+ *    Since entries are created from multiple threads and a lot of allocations are required
+ *    for each config_option, fragmentation can be a problem for IoT.
+ *
+ * 6. Although this way of managing options is quite flexible and dynamic, it wastes memory
+ *    for the names of the options. Since most of the option names are static, we could provide
+ *    a method to allocate only the dynamic option names.
+ */
+
 #include "common.h"
 
 #ifndef NETDATA_CONFIG_H

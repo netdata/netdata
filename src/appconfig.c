@@ -9,11 +9,11 @@
 
 #define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
 #define CONFIG_VALUE_USED    0x02 // has been accessed from the program
-#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value
+#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
 struct config_option {
-    avl avl;                // the index - this has to be first!
+    avl avl;                // the index entry of this entry - this has to be first!
 
     uint8_t flags;
     uint32_t hash;          // a simple hash to speed up searching
@@ -26,7 +26,7 @@ struct config_option {
 };
 
 struct section {
-    avl avl;
+    avl avl;                // the index entry of this section - this has to be first!
 
     uint32_t hash;          // a simple hash to speed up searching
                             // we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -48,8 +48,11 @@ struct config netdata_config = {
         .sections = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
-            { NULL, appconfig_section_compare },
-            AVL_LOCK_INITIALIZER
+            .avl_tree = {
+                .root = NULL,
+                .compar = appconfig_section_compare
+            },
+            .rwlock = AVL_LOCK_INITIALIZER
         }
 };
 
@@ -57,8 +60,11 @@ struct config stream_config = {
         .sections = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
-                { NULL, appconfig_section_compare },
-                AVL_LOCK_INITIALIZER
+                .avl_tree = {
+                    .root = NULL,
+                    .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
         }
 };
 
