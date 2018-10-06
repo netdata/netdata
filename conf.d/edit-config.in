@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-[ -f /etc/profile ] && source /etc/profile
+[ -f /etc/profile ] && . /etc/profile
 
 file="${1}"
 
