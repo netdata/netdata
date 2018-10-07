@@ -174,27 +174,30 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     if(unlikely(rrdset_index_add_name(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
 
+    rrdset_flag_clear(st, RRDSET_FLAG_BACKEND_SEND);
+    rrdset_flag_clear(st, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
     return 1;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
-    RRDHOST *host = st->rrdhost;
-
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
-        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        if(unlikely(host->rrdpush_send_enabled))
-            rrdset_push_chart_definition(st);
+        rrdset_push_chart_definition_now(st);
     }
 }
 
 inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         // the chart will be pushed upstream automatically
         // due to data collection
@@ -480,7 +483,7 @@ RRDSET *rrdset_create_custom(
     RRDSET *st = rrdset_find_on_create(host, fullid);
     if(st) {
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         return st;
     }
 
@@ -490,7 +493,7 @@ RRDSET *rrdset_create_custom(
     if(st) {
         rrdhost_unlock(host);
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         return st;
     }
 
@@ -652,7 +655,11 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_BACKEND_SEND);
+    rrdset_flag_clear(st, RRDSET_FLAG_BACKEND_IGNORE);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {

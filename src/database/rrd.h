@@ -240,19 +240,21 @@ struct rrddim {
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED          = 1 << 0, // enables or disables a chart
-    RRDSET_FLAG_DETAIL           = 1 << 1, // if set, the data set should be considered as a detail of another
+    RRDSET_FLAG_ENABLED           = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL            = 1 << 1, // if set, the data set should be considered as a detail of another
                                          // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG            = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE         = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_BACKEND_SEND     = 1 << 4, // if set, this chart should be sent to backends
-    RRDSET_FLAG_BACKEND_IGNORE   = 1 << 5, // if set, this chart should not be sent to backends
-    RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
-    RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9, // if set, the chart should be checked to determine if the dimensions as homogeneous
-    RRDSET_FLAG_HIDDEN           = 1 << 10, // if set, do not show this chart on the dashboard, but use it for backends
-    RRDSET_FLAG_SYNC_CLOCK       = 1 << 11, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_DEBUG             = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE          = 1 << 3, // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_BACKEND_SEND      = 1 << 4, // if set, this chart should be sent to backends
+    RRDSET_FLAG_BACKEND_IGNORE    = 1 << 5, // if set, this chart should not be sent to backends
+    RRDSET_FLAG_UPSTREAM_SEND     = 1 << 6, // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE   = 1 << 7, // if set, this chart should not be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_EXPOSED  = 1 << 8, // if set, we have sent this chart definition to netdata master (streaming)
+    RRDSET_FLAG_STORE_FIRST       = 1 << 9, // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS     = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMEGENEOUS_CHECK = 1 << 11, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HIDDEN            = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
+    RRDSET_FLAG_SYNC_CLOCK        = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -302,7 +304,7 @@ struct rrdset {
     long current_entry;                             // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
 
-    uint32_t flags;                                 // configuration flags
+    RRDSET_FLAGS flags;                             // configuration flags
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
@@ -501,7 +503,7 @@ struct rrdhost {
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host
 
-    uint32_t flags;                                 // flags about this RRDHOST
+    RRDHOST_FLAGS flags;                            // flags about this RRDHOST
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
@@ -530,6 +532,8 @@ struct rrdhost {
 
     volatile unsigned int rrdpush_sender_error_shown:1; // 1 when we have logged a communication error
     volatile unsigned int rrdpush_sender_join:1;    // 1 when we have to join the sending thread
+
+    SIMPLE_PATTERN *rrdpush_send_charts_matching;   // pattern to match the charts to be sent
 
     // metrics may be collected asynchronously
     // these synchronize all the threads willing the write to our sending buffer
@@ -646,6 +650,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , unsigned int rrdpush_enabled
         , char *rrdpush_destination
         , char *rrdpush_api_key
+        , char *rrdpush_send_charts_matching
 );
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
