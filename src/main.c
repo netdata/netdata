@@ -229,7 +229,7 @@ void cancel_main_threads() {
 struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
-    { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
+    { 'd', "Fork and run in the background.",             NULL,          "run in the foreground"},
     { 'h', "Display this help message.",                  NULL,          NULL},
     { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
     { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
@@ -676,7 +676,7 @@ static void load_stream_conf() {
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
-    int dont_fork = 0;
+    int fork = 0;
     size_t default_stacksize;
 
     // set the name for logging
@@ -690,11 +690,6 @@ int main(int argc, char **argv) {
             if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
                 strncpyz(pidfile, argv[i+1], FILENAME_MAX);
                 fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
-                remove_option(i, &argc, argv);
-            }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
-                dont_fork = 1;
-                fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
                 remove_option(i, &argc, argv);
             }
             else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
@@ -742,8 +737,8 @@ int main(int argc, char **argv) {
                         config_loaded = 1;
                     }
                     break;
-                case 'D':
-                    dont_fork = 1;
+                case 'd':
+                    fork = 1;
                     break;
                 case 'h':
                     return help(0);
@@ -1056,7 +1051,7 @@ int main(int argc, char **argv) {
         info("resources control: allowed file descriptors: soft = %zu, max = %zu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
 
     // fork, switch user, create pid file, set process priority
-    if(become_daemon(dont_fork, user) == -1)
+    if(become_daemon(fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());

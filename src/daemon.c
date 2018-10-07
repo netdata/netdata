@@ -379,9 +379,9 @@ static void sched_setscheduler_set(void) {
 }
 #endif // !HAVE_SCHED_SETSCHEDULER
 
-int become_daemon(int dont_fork, const char *user)
+int become_daemon(int do_fork, const char *user)
 {
-    if(!dont_fork) {
+    if(do_fork) {
         int i = fork();
         if(i == -1) {
             perror("cannot fork");

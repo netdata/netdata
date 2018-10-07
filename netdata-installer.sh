@@ -87,7 +87,7 @@ REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
 ME="$0"
-DONOTSTART=0
+DONOTSTART=1
 DONOTWAIT=0
 AUTOUPDATE=0
 NETDATA_PREFIX=
