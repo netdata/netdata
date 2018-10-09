@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: RetroShare netdata python.d module
 # Authors: sehraf
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
 
@@ -21,19 +21,22 @@ CHARTS = {
         'lines': [
             ['bandwidth_up_kb',   'Upload'],
             ['bandwidth_down_kb', 'Download']
-        ]},
+        ]
+    },
     'peers': {
         'options': [None, 'RetroShare Peers', 'peers', 'RetroShare', 'retroshare.peers', 'line'],
         'lines': [
             ['peers_all',       'All friends'],
             ['peers_connected', 'Connected friends']
-        ]},
+        ]
+    },
     'dht': {
         'options': [None, 'Retroshare DHT', 'peers', 'RetroShare', 'retroshare.dht', 'line'],
         'lines': [
             ['dht_size_all', 'DHT nodes estimated'],
             ['dht_size_rs',  'RS nodes estimated']
-        ]}
+        ]
+    }
 }
 
 

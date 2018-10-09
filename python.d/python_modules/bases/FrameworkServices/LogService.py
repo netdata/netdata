@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Pawel Krupa (paulfantom)
-# SPDX-License-Identifier: GPL-3.0+
+# Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from glob import glob
 import os

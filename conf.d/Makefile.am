@@ -1,10 +1,25 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
+CLEANFILES = \
+    edit-config \
+	$(NULL)
 
-dist_config_DATA = \
+include $(top_srcdir)/build/subst.inc
+
+SUFFIXES = .in
+
+dist_config_SCRIPTS = \
+    edit-config \
+    $(NULL)
+
+dist_noinst_DATA = \
+    edit-config.in \
+	$(NULL)
+
+dist_libconfig_DATA = \
     apps_groups.conf \
     charts.d.conf \
     fping.conf \
@@ -15,8 +30,12 @@ dist_config_DATA = \
     stream.conf \
     $(NULL)
 
-nodeconfigdir=$(configdir)/node.d
+nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
+    $(NULL)
+
+usernodeconfigdir=$(configdir)/node.d
+dist_usernodeconfig_DATA = \
     node.d/README.md \
     node.d/fronius.conf.md \
     node.d/named.conf.md \
@@ -25,7 +44,7 @@ dist_nodeconfig_DATA = \
     node.d/stiebeleltron.conf.md \
     $(NULL)
 
-pythonconfigdir=$(configdir)/python.d
+pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/beanstalk.conf \
@@ -34,6 +53,7 @@ dist_pythonconfig_DATA = \
     python.d/ceph.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \
+    python.d/cpuidle.conf \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
     python.d/dnsdist.conf \
@@ -51,6 +71,7 @@ dist_pythonconfig_DATA = \
     python.d/icecast.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
+    python.d/linux_power_supply.conf \
     python.d/litespeed.conf \
     python.d/logind.conf \
     python.d/mdstat.conf \
@@ -88,8 +109,7 @@ dist_pythonconfig_DATA = \
     python.d/web_log.conf \
     $(NULL)
 
-healthconfigdir=$(configdir)/health.d
-
+healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     health.d/apache.conf \
     health.d/apcupsd.conf \
@@ -115,6 +135,7 @@ dist_healthconfig_DATA = \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
     health.d/lighttpd.conf \
+    health.d/linux_power_supply.conf \
     health.d/load.conf \
     health.d/mdstat.conf \
     health.d/megacli.conf \
@@ -148,7 +169,7 @@ dist_healthconfig_DATA = \
     health.d/zfs.conf \
     $(NULL)
 
-chartsconfigdir=$(configdir)/charts.d
+chartsconfigdir=$(libconfigdir)/charts.d
 dist_chartsconfig_DATA = \
     charts.d/apache.conf \
     charts.d/apcupsd.conf \
@@ -172,7 +193,7 @@ dist_chartsconfig_DATA = \
     charts.d/squid.conf \
     $(NULL)
 
-statsdconfigdir=$(configdir)/statsd.d
+statsdconfigdir=$(libconfigdir)/statsd.d
 dist_statsdconfig_DATA = \
     statsd.d/example.conf \
     $(NULL)

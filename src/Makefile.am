@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 	-DVARLIB_DIR="\"$(varlibdir)\"" \
 	-DCACHE_DIR="\"$(cachedir)\"" \
 	-DCONFIG_DIR="\"$(configdir)\"" \
+	-DLIBCONFIG_DIR="\"$(libconfigdir)\"" \
 	-DLOG_DIR="\"$(logdir)\"" \
 	-DPLUGINS_DIR="\"$(pluginsdir)\"" \
 	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \

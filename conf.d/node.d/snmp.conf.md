@@ -10,7 +10,7 @@ This collector supports:
 - each SNMP device may have a different update frequency
 - each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
 
-The source code of the plugin is [here](https://github.com/firehol/netdata/blob/master/node.d/snmp.node.js).
+The source code of the plugin is [here](https://github.com/netdata/netdata/blob/master/node.d/snmp.node.js).
 
 ## Configuration
 
@@ -177,7 +177,7 @@ If it works, restart netdata to activate the snmp collector and refresh the dash
 
 ## Data collection speed
 
-Keep in mind that many SNMP switches are routers are very slow. They may not be able to report values per second. If you run `node.d.plugin` in `debug` mode, it will report the time it took for the SNMP device to respond. My switch, for example, needs 7-8 seconds to respond for the traffic on 24 ports (48 OIDs, in/out).
+Keep in mind that many SNMP switches and routers are very slow. They may not be able to report values per second. If you run `node.d.plugin` in `debug` mode, it will report the time it took for the SNMP device to respond. My switch, for example, needs 7-8 seconds to respond for the traffic on 24 ports (48 OIDs, in/out).
 
 Also, if you use many SNMP clients on the same SNMP device at the same time, values may be skipped. This is a problem of the SNMP device, not this collector.
 

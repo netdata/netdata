@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: rethinkdb netdata python.d module
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 try:
     import rethinkdb as rdb
@@ -34,21 +34,21 @@ def cluster_charts():
                         'line'],
             'lines': [
                 ['cluster_clients_active', 'active'],
-                ]
-            },
+            ]
+        },
         'cluster_queries': {
             'options': [None, 'Queries', 'queries/s', 'cluster', 'rethinkdb.cluster_queries', 'line'],
             'lines': [
                 ['cluster_queries_per_sec', 'queries'],
-                ]
-            },
+            ]
+        },
         'cluster_documents': {
             'options': [None, 'Documents', 'documents/s', 'cluster', 'rethinkdb.cluster_documents', 'line'],
             'lines': [
                 ['cluster_read_docs_per_sec', 'reads'],
                 ['cluster_written_docs_per_sec', 'writes'],
-                ]
-            },
+            ]
+        },
     }
 
 
@@ -126,7 +126,7 @@ class Server:
             'queries_total': qe['queries_total'],
             'read_docs_total': qe['read_docs_total'],
             'written_docs_total': qe['written_docs_total'],
-            }
+        }
 
         return dict(('{0}_{1}'.format(self.name, k), d[k]) for k in d)
 

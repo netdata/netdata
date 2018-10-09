@@ -41,6 +41,6 @@
 
   netdata re-distributes a lot of open source software components.
   Check its full license at:
-  https://github.com/firehol/netdata/blob/master/LICENSE.md
+  https://github.com/netdata/netdata/blob/master/LICENSE.md
 
 

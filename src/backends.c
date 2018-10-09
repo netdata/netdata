@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
 
@@ -186,11 +186,13 @@ static inline int format_dimension_collected_graphite_plaintext(
 
     buffer_sprintf(
             b
-            , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %llu\n"
+            , "%s.%s.%s.%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n"
             , prefix
             , hostname
             , chart_name
             , dimension_name
+            , (host->tags)?";":""
+            , (host->tags)?host->tags:""
             , rd->last_collected_value
             , (unsigned long long)rd->last_collected_time.tv_sec
     );
@@ -223,11 +225,13 @@ static inline int format_dimension_stored_graphite_plaintext(
 
         buffer_sprintf(
                 b
-                , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n"
+                , "%s.%s.%s.%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
                 , prefix
                 , hostname
                 , chart_name
                 , dimension_name
+                , (host->tags)?";":""
+                , (host->tags)?host->tags:""
                 , value
                 , (unsigned long long) last_t
         );
@@ -800,7 +804,7 @@ void *backends_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
+        //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b));
         //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
 
         // prepare for the next iteration

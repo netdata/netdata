@@ -2,7 +2,7 @@
 # Description:
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
 
@@ -36,7 +36,7 @@ class ExecutableService(SimpleService):
             except TypeError:
                 continue
 
-        return data or None
+        return data
 
     def check(self):
         """

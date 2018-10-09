@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # netdata
 # real-time performance and health monitoring, done right!
@@ -103,7 +103,10 @@ apache_get() {
 	ret=$?
 	IFS="${oIFS}"
 
-	([ $ret -ne 0 ] || [ "${#apache_response[@]}" -eq 0 ]) && return 1
+	if [ $ret -ne 0 ] || [ "${#apache_response[@]}" -eq 0 ]
+	then
+		return 1
+	fi
 
 	# the last line on the apache output is "Scoreboard"
 	# we use this label to detect that the output has a new word count

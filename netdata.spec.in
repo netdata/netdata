@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 %global contentdir %{_datadir}/netdata
 
 # This is temporary and should eventually be resolved. This bypasses
@@ -85,7 +85,7 @@ Version:	@PACKAGE_RPM_VERSION@
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/firehol/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+Source0:	https://github.com/netdata/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.gz
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
@@ -181,17 +181,18 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(-,root,root)
 
 %dir %{_sysconfdir}/%{name}
+%dir %{_libdir}/%{name}
 
-%config(noreplace) %{_sysconfdir}/%{name}/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
-#%%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/statsd.d/*.conf
-%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
+%config %{_libdir}/%{name}/*.conf
+%config %{_libdir}/%{name}/charts.d/*.conf
+%config %{_libdir}/%{name}/health.d/*.conf
+%config %{_libdir}/%{name}/node.d/*.conf
+%config %{_libdir}/%{name}/python.d/*.conf
+%config %{_libdir}/%{name}/statsd.d/*.conf
+%config %{_sysconfdir}/logrotate.d/%{name}
 
 # To be eventually moved to %%_defaultdocdir
-%{_sysconfdir}/%{name}/node.d/*.md
+%{_libdir}/%{name}/node.d/*.md
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
@@ -215,9 +216,16 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %dir %{_datadir}/%{name}
 %dir %{_sysconfdir}/%{name}/health.d
+%dir %{_libdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
+%dir %{_libdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_libdir}/%{name}/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
+%dir %{_libdir}/%{name}/node.d
+%dir %{_sysconfdir}/%{name}/statsd.d
+%dir %{_libdir}/%{name}/statsd.d
+
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
@@ -233,10 +241,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %changelog
 * Tue Mar 27 2018 Costa Tsaousis <costa@tsaousis.gr> - 1.10.0-1
   Please check full changelog at github.
-  https://github.com/firehol/netdata/releases
+  https://github.com/netdata/netdata/releases
 * Sun Dec 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.9.0-1
   Please check full changelog at github.
-  https://github.com/firehol/netdata/releases
+  https://github.com/netdata/netdata/releases
 * Sun Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
   This is mainly a bugfix release.
   Please check full changelog at github.

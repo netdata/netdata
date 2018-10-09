@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Description: PHP-FPM netdata python.d module
 # Author: Pawel Krupa (paulfantom)
-# SPDX-License-Identifier: GPL-3.0+
+# Author: Ilya Mashchenko (l2isbad)
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
 import re
@@ -59,18 +60,21 @@ CHARTS = {
             ['active'],
             ['maxActive', 'max active'],
             ['idle']
-        ]},
+        ]
+    },
     'requests': {
         'options': [None, 'PHP-FPM Requests', 'requests/s', 'requests', 'phpfpm.requests', 'line'],
         'lines': [
             ['requests', None, 'incremental']
-        ]},
+        ]
+    },
     'performance': {
         'options': [None, 'PHP-FPM Performance', 'status', 'performance', 'phpfpm.performance', 'line'],
         'lines': [
             ['reached', 'max children reached'],
             ['slow', 'slow requests']
-        ]},
+        ]
+    },
     'request_duration': {
         'options': [None, 'PHP-FPM Request Duration', 'milliseconds', 'request duration', 'phpfpm.request_duration',
                     'line'],
@@ -78,21 +82,24 @@ CHARTS = {
             ['minReqDur', 'min', 'absolute', 1, 1000],
             ['maxReqDur', 'max', 'absolute', 1, 1000],
             ['avgReqDur', 'avg', 'absolute', 1, 1000]
-        ]},
+        ]
+    },
     'request_cpu': {
         'options': [None, 'PHP-FPM Request CPU', 'percent', 'request CPU', 'phpfpm.request_cpu', 'line'],
         'lines': [
             ['minReqCpu', 'min'],
             ['maxReqCpu', 'max'],
             ['avgReqCpu', 'avg']
-        ]},
+        ]
+    },
     'request_mem': {
         'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'request memory', 'phpfpm.request_mem', 'line'],
         'lines': [
             ['minReqMem', 'min', 'absolute', 1, 1024],
             ['maxReqMem', 'max', 'absolute', 1, 1024],
             ['avgReqMem', 'avg', 'absolute', 1, 1024]
-        ]}
+        ]
+    }
 }
 
 

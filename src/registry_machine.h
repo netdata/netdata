@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_REGISTRY_MACHINE_H
 #define NETDATA_REGISTRY_MACHINE_H 1

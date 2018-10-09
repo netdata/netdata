@@ -43,7 +43,7 @@ The following python.d modules are supported:
 
 # apache
 
-This module will monitor one or more apache servers depending on configuration.
+This module will monitor one or more Apache servers depending on configuration.
 
 **Requirements:**
  * apache with enabled `mod_status`
@@ -127,7 +127,7 @@ If no configuration is given, module will attempt to read log file at `/var/log/
 
 # beanstalk
 
-Module provides server and tube level statistics:
+Module provides server and tube-level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
@@ -464,12 +464,12 @@ each state.
 ---
 # dns_query_time
 
-This module provides dns query time statistics.
+This module provides DNS query time statistics.
 
 **Requirement:**
 * `python-dnspython` package
 
-It produces one aggregate chart or one chart per dns server, showing the query time.
+It produces one aggregate chart or one chart per DNS server, showing the query time.
 
 ---
 
@@ -557,12 +557,12 @@ Following charts are drawn:
 
 # dovecot
 
-This module provides statistics information from dovecot server.
+This module provides statistics information from Dovecot server.
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
 
 **Requirement:**
-Dovecot unix socket with R/W permissions for user netdata or dovecot with configured TCP/IP socket.
+Dovecot UNIX socket with R/W permissions for user netdata or Dovecot with configured TCP/IP socket.
 
 Module gives information with following charts:
 
@@ -602,7 +602,7 @@ Module gives information with following charts:
 10. **hits** - number of cache hits
  * hits
 
-11. **attempts** - authorization attemts
+11. **attempts** - authorization attempts
  * success
  * failure
 
@@ -631,7 +631,7 @@ If no configuration is given, module will attempt to connect to dovecot using un
 
 # elasticsearch
 
-Module monitor elasticsearch performance and health metrics
+This module monitors Elasticsearch performance and health metrics.
 
 It produces:
 
@@ -646,7 +646,7 @@ It produces:
  * Indexing and flushing latency
 
 3. **Memory usage and garbace collection** charts:
- * JVM heap currently in use, commited
+ * JVM heap currently in use, committed
  * Count of garbage collections
  * Time spent on garbage collections
 
@@ -805,7 +805,7 @@ and restart/reload your FREERADIUS server.
 
 The `go_expvar` module can monitor any Go application that exposes its metrics with the use of `expvar` package from the Go standard library.
 
-`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts. Please see the [wiki page](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications) for more info.
+`go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts. Please see the [wiki page](https://github.com/netdata/netdata/wiki/Monitoring-Go-Applications) for more info.
 
 For the memory statistics, it produces the following charts:
 
@@ -833,7 +833,7 @@ For the memory statistics, it produces the following charts:
 
 ### configuration
 
-Please see the [wiki page](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications#using-netdata-go_expvar-module) for detailed info about module configuration.
+Please see the [wiki page](https://github.com/netdata/netdata/wiki/Monitoring-Go-Applications#using-netdata-go_expvar-module) for detailed info about module configuration.
 
 ---
 
@@ -1039,6 +1039,74 @@ The module will not work If no configuration is given.
 
 ---
 
+# linux\_power\_supply
+
+This module monitors variosu metrics reported by power supply drivers
+on Linux.  This allows tracking and alerting on things like remaining
+battery capacity.
+
+Depending on the uderlying driver, it may provide the following charts
+and metrics:
+
+1. Capacity: The power supply capacity expressed as a percentage.
+  * capacity\_now
+
+2. Charge: The charge for the power supply, expressed as microamphours.
+  * charge\_full\_design
+  * charge\_full
+  * charge\_now
+  * charge\_empty
+  * charge\_empty\_design
+
+3. Energy: The energy for the power supply, expressed as microwatthours.
+  * energy\_full\_design
+  * energy\_full
+  * energy\_now
+  * energy\_empty
+  * energy\_empty\_design
+
+2. Voltage: The voltage for the power supply, expressed as microvolts.
+  * voltage\_max\_design
+  * voltage\_max
+  * voltage\_now
+  * voltage\_min
+  * voltage\_min\_design
+
+### configuration
+
+Sample:
+
+```yaml
+battery:
+  supply: 'BAT0'
+  charts: 'capacity charge energy voltage'
+```
+
+The `supply` key specifies the name of the power supply device to monitor.
+You can use `ls /sys/class/power_supply` to get a list of such devices
+on your system.
+
+The `charts` key is a space separated list of which charts to try
+to display.  It defaults to trying to display everything.
+
+### notes
+
+* Most drivers provide at least the first chart.  Battery powered ACPI
+compliant systems (like most laptops) provide all but the third, but do
+not provide all of the metrics for each chart.
+
+* Current, energy, and voltages are reported with a _very_ high precision
+by the power\_supply framework.  Usually, this is far higher than the
+actual hardware supports reporting, so expect to see changes in these
+charts jump instead of scaling smoothly.
+
+* If `max` or `full` attribute is defined by the driver, but not a
+corresponding `min or `empty` attribute, then netdata will still provide
+the corresponding `min` or `empty`, which will then always read as zero.
+This way, alerts which match on these will still work.
+
+---
+
 # litespeed
 
 Module monitor litespeed web server performance metrics.
@@ -1089,7 +1157,7 @@ If no configuration is given, module will use "/tmp/lshttpd/".
 
 # logind
 
-THis module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
+This module monitors active sessions, users, and seats tracked by systemd-logind or elogind.
 
 It provides the following charts:
 
@@ -1412,7 +1480,7 @@ If no configuration is given, module will attempt to connect to mongodb daemon o
 
 # monit
 
-Monit monitoring module. Data is grabbed from stats XML interface (exsists for a long time, but not mentioned in official documentation). Mostly this plugin shows statuses of monit targets, i.e. [statuses of specified checks](https://mmonit.com/monit/documentation/monit.html#Service-checks).
+Monit monitoring module. Data is grabbed from stats XML interface (exists for a long time, but not mentioned in official documentation). Mostly this plugin shows statuses of monit targets, i.e. [statuses of specified checks](https://mmonit.com/monit/documentation/monit.html#Service-checks).
 
 1. **Filesystems**
  * Filesystems
@@ -1997,7 +2065,7 @@ Following charts are drawn:
  * cache
 
 8. **Transactions on db** transactions/s
- * commited
+ * committed
  * rolled back
 
 9. **Tuples written to db** writes/s
@@ -2361,12 +2429,12 @@ Charts are created dynamically.
 
 ### configuration
 
-For detailed configuration information please read [`sensors.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/sensors.conf) file.
+For detailed configuration information please read [`sensors.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/sensors.conf) file.
 
 ### possible issues
 
 There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
-We are tracking such cases in issue [#827](https://github.com/firehol/netdata/issues/827).
+We are tracking such cases in issue [#827](https://github.com/netdata/netdata/issues/827).
 Please join this discussion for help.
 
 ---
@@ -2423,7 +2491,7 @@ It produces following charts:
 
 ### configuration
 
-Please see the [Monitoring Java Spring Boot Applications](https://github.com/firehol/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
+Please see the [Monitoring Java Spring Boot Applications](https://github.com/netdata/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
 
 ---
 
@@ -2751,7 +2819,7 @@ Charts are created dynamically based on the number of detected sensors.
 
 ### configuration
 
-For detailed configuration information please read [`w1sensor.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
+For detailed configuration information please read [`w1sensor.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
 
 ---
 
@@ -2796,7 +2864,7 @@ It produces following charts:
 
 9. **IP protocols** requests/s (requests per ip protocol version)
 
-10. **Curent Poll Unique Client IPs** unique ips/s (unique client IPs per data collection iteration)
+10. **Current Poll Unique Client IPs** unique ips/s (unique client IPs per data collection iteration)
 
 11. **All Time Unique Client IPs** unique ips/s (unique client IPs since the last restart of netdata)
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 var netdataDashboard = window.netdataDashboard || {};
 
@@ -31,7 +31,7 @@ netdataDashboard.menu = {
         title: 'Quality of Service',
         icon: '<i class="fas fa-globe"></i>',
         info: 'Netdata collects and visualizes <code>tc</code> class utilization using its ' +
-            '<a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. ' +
+            '<a href="https://github.com/netdata/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. ' +
             'If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, ' +
             'netdata automatically collects interface and class names. If your QoS configuration includes overheads ' +
             'calculation, the values shown here will include these overheads (the total bandwidth for the same ' +
@@ -45,6 +45,17 @@ netdataDashboard.menu = {
         title: 'Network Interfaces',
         icon: '<i class="fas fa-sitemap"></i>',
         info: 'Performance metrics for network interfaces.'
+    },
+
+    'ip': {
+        title: 'Networking Stack',
+        icon: '<i class="fas fa-cloud"></i>',
+        info: function (os) {
+            if(os === "linux")
+                return 'Metrics for the networking stack of the system. These metrics are collected from <code>/proc/net/netstat</code>, apply to both IPv4 and IPv6 traffic and are related to operation of the kernel networking stack.';
+            else
+                return 'Metrics for the networking stack of the system.';
+        }
     },
 
     'ipv4': {
@@ -152,7 +163,7 @@ netdataDashboard.menu = {
     'apps': {
         title: 'Applications',
         icon: '<i class="fas fa-heartbeat"></i>',
-        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/netdata/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
@@ -304,7 +315,7 @@ netdataDashboard.menu = {
     'web_log': {
         title: undefined,
         icon: '<i class="fas fa-file-alt"></i>',
-        info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
+        info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/netdata/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'named': {
@@ -423,6 +434,12 @@ netdataDashboard.menu = {
         title: 'Logind',
         icon: '<i class="fas fa-user"></i>',
         info: undefined
+    },
+
+    'linux_power_supply': {
+        title: 'Power Supply',
+        icon: '<i class="fas fa-battery-half"></i>',
+        info: 'Statistics for the various system power supplies.'
     }
 };
 
@@ -477,7 +494,7 @@ netdataDashboard.submenu = {
     },
 
     'web_log.urls': {
-        info: 'Number of requests for each <code>URL pattern</code> defined in <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>. This chart counts all requests matching the URL patterns defined, independently of the web server response codes (i.e. both successful and unsuccessful).'
+        info: 'Number of requests for each <code>URL pattern</code> defined in <a href="https://github.com/netdata/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>. This chart counts all requests matching the URL patterns defined, independently of the web server response codes (i.e. both successful and unsuccessful).'
     },
 
     'web_log.clients': {
@@ -501,7 +518,7 @@ netdataDashboard.submenu = {
         info: 'Non-Uniform Memory Access (NUMA) is a hierarchical memory design the memory access time is dependent on locality. Under NUMA, a processor can access its own local memory faster than non-local memory (memory local to another processor or memory shared between processors). The individual metrics are described in the <a href="https://www.kernel.org/doc/Documentation/numastat.txt" target="_blank">Linux kernel documentation</a>.'
     },
 
-    'ipv4.ecn': {
+    'ip.ecn': {
         info: '<a href="https://en.wikipedia.org/wiki/Explicit_Congestion_Notification" target="_blank">Explicit Congestion Notification (ECN)</a> is a TCP extension that allows end-to-end notification of network congestion without dropping packets. ECN is an optional feature that may be used between two ECN-enabled endpoints when the underlying network infrastructure also supports it.'
     },
 
@@ -687,6 +704,10 @@ netdataDashboard.context = {
         }
     },
 
+    'system.ip': {
+        info: 'Total IP traffic in the system.'
+    },
+
     'system.ipv4': {
         info: 'Total IPv4 Traffic.'
     },
@@ -796,15 +817,46 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // IPv4
+    // IP
 
-    'ipv4.tcpmemorypressures': {
+    'ip.inerrors': {
+        info: 'Errors encountered during the reception of IP packets. ' +
+            '<code>noroutes</code> (<code>InNoRoutes</code>) counts packets that were dropped because there was no route to send them. ' +
+            '<code>truncated</code> (<code>InTruncatedPkts</code>) counts packets which is being discarded because the datagram frame didn\'t carry enough data. ' +
+            '<code>checksum</code> (<code>InCsumErrors</code>) counts packets that were dropped because they had wrong checksum. '
+    },
+
+    'ip.tcpmemorypressures': {
         info: 'Number of times a socket was put in <b>memory pressure</b> due to a non fatal memory allocation failure (the kernel attempts to work around this situation by reducing the send buffers, etc).'
     },
 
-    'ipv4.tcpconnaborts': {
+    'ip.tcpconnaborts': {
         info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
     },
+
+    'ip.tcp_syn_queue': {
+        info: 'The <b>SYN queue</b> of the kernel tracks TCP handshakes until connections get fully established. ' +
+            'It overflows when too many incoming TCP connection requests hang in the half-open state and the server ' +
+            'is not configured to fall back to SYN cookies*. Overflows are usually caused by SYN flood DoS attacks ' +
+            '(i.e. someone sends lots of SYN packets and never completes the handshakes). ' +
+            '<b>drops</b> (or <code>TcpExtTCPReqQFullDrop</code>) is the number of connections dropped because the ' +
+            'SYN queue was full and SYN cookies were disabled. ' +
+            '<b>cookies</b> (or <code>TcpExtTCPReqQFullDoCookies</code>) is the number of SYN cookies sent because the ' +
+            'SYN queue was full.'
+    },
+
+    'ip.tcp_accept_queue': {
+        info: 'The <b>accept queue</b> of the kernel holds the fully established TCP connections, waiting to be handled ' +
+            'by the listening application. <b>overflows</b> (or <code>ListenOverflows</code>) is the number of ' +
+            'established connections that could not be handled because the receive queue of the listening application ' +
+            'was full. <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming ' +
+            'connections that could not be handled, including SYN floods, overflows, out of memory, security issues, ' +
+            'no route to destination, reception of related ICMP messages, socket is broadcast or multicast.'
+    },
+
+
+    // ------------------------------------------------------------------------
+    // IPv4
 
     'ipv4.tcpsock': {
         info: 'The number of established TCP connections (known as <code>CurrEstab</code>). This is a snapshot of the established connections at the time of measurement (i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
@@ -828,11 +880,6 @@ netdataDashboard.context = {
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
     },
 
-    'ipv4.tcplistenissues': {
-        info: '<b>overflows</b> (or <code>ListenOverflows</code>) is the number of incoming connections that could not be handled because the receive queue of the application was full (for both IPv4 and IPv6).'
-            + ' <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming connections that could not be handled, including SYN floods, overflows, out of memory, security issues, no route to destination, reception of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
-    },
-
     // ------------------------------------------------------------------------
     // APPS
 
@@ -845,7 +892,7 @@ netdataDashboard.context = {
     },
 
     'apps.vmem': {
-        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
     },
 
     'apps.preads': {
@@ -868,7 +915,7 @@ netdataDashboard.context = {
     },
 
     'users.vmem': {
-        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
     },
 
     'users.preads': {
@@ -891,7 +938,7 @@ netdataDashboard.context = {
     },
 
     'groups.vmem': {
-        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/firehol/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
     },
 
     'groups.preads': {
@@ -1643,7 +1690,7 @@ netdataDashboard.context = {
             '<code>4xx</code> are bad requests, ' +
             '<code>5xx</code> are internal server errors, ' +
             '<code>other</code> are non-standard responses, ' +
-            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/netdata/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.response_time': {
@@ -1680,7 +1727,7 @@ netdataDashboard.context = {
     },
 
     'web_log.clients_all': {
-        info: 'Unique client IPs accessing the web server since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the web server. On very busy web servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
+        info: 'Unique client IPs accessing the web server since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the web server. On very busy web servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/netdata/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     // ------------------------------------------------------------------------
@@ -1778,7 +1825,7 @@ netdataDashboard.context = {
             'Squid also defines <code>000</code> mostly for UDP requests, and ' +
             '<code>6xx</code> for broken upstream servers sending wrong headers. ' +
             'Finally, <code>other</code> are non-standard responses, and ' +
-            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+            '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/netdata/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.squid_duration': {
@@ -1811,7 +1858,7 @@ netdataDashboard.context = {
     },
 
     'web_log.squid_clients_all': {
-        info: 'Unique client IPs accessing squid since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the server. On very busy squid servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
+        info: 'Unique client IPs accessing squid since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the server. On very busy squid servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/netdata/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'web_log.squid_transport_methods': {

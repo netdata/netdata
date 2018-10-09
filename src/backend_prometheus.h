@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_BACKEND_PROMETHEUS_H
 #define NETDATA_BACKEND_PROMETHEUS_H 1

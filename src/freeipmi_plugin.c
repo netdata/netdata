@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  *  netdata freeipmi.plugin
  *  Copyright (C) 2017 Costa Tsaousis
@@ -1529,8 +1529,8 @@ int main (int argc, char **argv) {
     int i, freq = 0;
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
-            int n = atoi(argv[i]);
-            if(n > 0 && freq < 86400) {
+            int n = str2i(argv[i]);
+            if(n > 0 && n < 86400) {
                 freq = n;
                 continue;
             }
@@ -1602,7 +1602,7 @@ int main (int argc, char **argv) {
                     " options ipmi_si kipmid_max_busy_us=10\n"
                     "\n"
                     " For more information:\n"
-                    " https://github.com/firehol/netdata/wiki/monitoring-IPMI\n"
+                    " https://github.com/netdata/netdata/wiki/monitoring-IPMI\n"
                     "\n"
                     , VERSION
                     , netdata_update_every

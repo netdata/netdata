@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Ilya Mashchenko (l2isbad)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 from bases.collection import safe_print
 
@@ -307,6 +307,12 @@ class Dimension:
             return self.id == other
         return self.id == other.id
 
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(repr(self))
+
     def create(self):
         return DIMENSION_CREATE.format(**self.params)
 
@@ -362,6 +368,9 @@ class ChartVariable:
         if isinstance(other, ChartVariable):
             return self.id == other.id
         return False
+
+    def __ne__(self, other):
+        return not self == other
 
     def __hash__(self):
         return hash(repr(self))

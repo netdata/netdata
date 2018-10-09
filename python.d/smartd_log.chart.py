@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: smart netdata python.d module
 # Author: l2isbad, vorph1
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
 import re
@@ -116,7 +116,7 @@ def chart_template(chart_name):
         chart_name: {
             'options': [None, title, units, family, 'smartd_log.' + chart_name, 'line'],
             'lines': []
-            }
+        }
     }
 
 
@@ -184,6 +184,12 @@ class Disk:
         if isinstance(other, Disk):
             return self.name == other.name
         return self.name == other
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(repr(self))
 
     @handle_os_error
     def is_active(self):

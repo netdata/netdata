@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 /*
  * netdata apps.plugin
@@ -93,14 +93,16 @@ static int
         enable_file_charts = 0,
 #else
         enable_file_charts = 1,
+        max_fds_cache_seconds = 60,
 #endif
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
 
 
-// will be changed to getenv(NETDATA_CONFIG_DIR) if it exists
-static char *config_dir = CONFIG_DIR;
+// will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
 
 // ----------------------------------------------------------------------------
 // internal flags
@@ -119,6 +121,9 @@ static size_t
         global_iterations_counter = 1,
         calls_counter = 0,
         file_counter = 0,
+        filenames_allocated_counter = 0,
+        inodes_changed_counter = 0,
+        links_changed_counter = 0,
         targets_assignment_counter = 0;
 
 
@@ -247,6 +252,18 @@ size_t
 // structure to store data for each process running
 // see: man proc for the description of the fields
 
+struct pid_fd {
+    int fd;
+
+#ifndef __FreeBSD__
+    ino_t inode;
+    char *filename;
+    uint32_t link_hash;
+    size_t cache_iterations_counter;
+    size_t cache_iterations_reset;
+#endif
+};
+
 struct pid_stat {
     int32_t pid;
     char comm[MAX_COMPARE_NAME + 1];
@@ -341,8 +358,8 @@ struct pid_stat {
     kernel_uint_t io_storage_bytes_written;
     // kernel_uint_t io_cancelled_write_bytes;
 
-    int *fds;                       // array of fds it uses
-    int fds_size;                   // the size of the fds array
+    struct pid_fd *fds;             // array of fds it uses
+    size_t fds_size;                   // the size of the fds array
 
     int children_count;             // number of processes directly referencing this
     unsigned char keep:1;           // 1 when we need to keep this process in memory even after it exited
@@ -615,11 +632,11 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 }
 
 // read the apps_groups.conf file
-static int read_apps_groups_conf(const char *file)
+static int read_apps_groups_conf(const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, file);
+    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", path, file);
 
     debug_log("process groups file: '%s'", filename);
 
@@ -684,14 +701,16 @@ static int read_apps_groups_conf(const char *file)
 
 // ----------------------------------------------------------------------------
 // struct pid_stat management
+static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size);
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
     if(unlikely(all_pids[pid]))
         return all_pids[pid];
 
     struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
-    p->fds = callocz(sizeof(int), MAX_SPARE_FDS);
+    p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
     p->fds_size = MAX_SPARE_FDS;
+    init_pid_fds(p, 0, p->fds_size);
 
     if(likely(root_of_pids))
         root_of_pids->prev = p;
@@ -723,7 +742,17 @@ static inline void del_pid_entry(pid_t pid) {
     if(p->next) p->next->prev = p->prev;
     if(p->prev) p->prev->next = p->next;
 
+    // free the filename
+#ifndef __FreeBSD__
+    {
+        size_t i;
+        for(i = 0; i < p->fds_size; i++)
+            if(p->fds[i].filename)
+                freez(p->fds[i].filename);
+    }
+#endif
     freez(p->fds);
+
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
@@ -867,9 +896,11 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 #endif
 
     cmdline[bytes] = '\0';
-    for(i = 0; i < bytes ; i++)
+    for(i = 0; i < bytes ; i++) {
         if(unlikely(!cmdline[i])) cmdline[i] = ' ';
+    }
 
+    if(p->cmdline) freez(p->cmdline);
     p->cmdline = strdupz(cmdline);
 
     debug_log("Read file '%s' contents: %s", p->cmdline_filename, p->cmdline);
@@ -878,6 +909,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
 cleanup:
     // copy the command to the command line
+    if(p->cmdline) freez(p->cmdline);
     p->cmdline = strdupz(p->comm);
     return 0;
 }
@@ -991,7 +1023,7 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     p->gid                  = proc_info->ki_groups[0];
     p->status_vmsize        = proc_info->ki_size / 1024; // in kB
     p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in kB
-    // FIXME: what about shared and swap memory on FreeBSD?
+    // TODO: what about shared and swap memory on FreeBSD?
     return 1;
 #else
     (void)ptr;
@@ -1517,9 +1549,9 @@ static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t h
     return c;
 }
 
-static inline int file_descriptor_find_or_add(const char *name)
-{
-    uint32_t hash = simple_hash(name);
+static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
+    if(unlikely(!hash))
+        hash = simple_hash(name);
 
     debug_log("adding or finding name '%s' with hash %u", name, hash);
 
@@ -1546,43 +1578,65 @@ static inline int file_descriptor_find_or_add(const char *name)
         else if(strcmp(t, "[timerfd]") == 0) type = FILETYPE_TIMERFD;
         else if(strcmp(t, "[signalfd]") == 0) type = FILETYPE_SIGNALFD;
         else {
-            debug_log("FIXME: unknown anonymous inode: %s", name);
+            debug_log("UNKNOWN anonymous inode: %s", name);
             type = FILETYPE_OTHER;
         }
     }
     else if(likely(strcmp(name, "inotify") == 0)) type = FILETYPE_INOTIFY;
     else {
-        debug_log("FIXME: cannot understand linkname: %s", name);
+        debug_log("UNKNOWN linkname: %s", name);
         type = FILETYPE_OTHER;
     }
 
     return file_descriptor_set_on_empty_slot(name, hash, type);
 }
 
+static inline void clear_pid_fd(struct pid_fd *pfd) {
+    pfd->fd = 0;
+
+    #ifndef __FreeBSD__
+    pfd->link_hash = 0;
+    pfd->inode = 0;
+    pfd->cache_iterations_counter = 0;
+    pfd->cache_iterations_reset = 0;
+#endif
+}
+
 static inline void make_all_pid_fds_negative(struct pid_stat *p) {
-    int *fd = p->fds, *end = &p->fds[p->fds_size];
-    while(fd < end) {
-        *fd = -(*fd);
-        fd++;
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
+    while(pfd < pfdend) {
+        pfd->fd = -(pfd->fd);
+        pfd++;
     }
 }
 
 static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
-    int *fd = p->fds, *fdend = &p->fds[p->fds_size];
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
 
-    while(fd < fdend) {
-        if(unlikely(*fd < 0)) {
-            file_descriptor_not_used(-(*fd));
-            *fd++ = 0;
+    while(pfd < pfdend) {
+        int fd = pfd->fd;
+
+        if(unlikely(fd < 0)) {
+            file_descriptor_not_used(-(fd));
+            clear_pid_fd(pfd);
         }
-        else
-            fd++;
+
+        pfd++;
     }
 }
 
-static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
-    int *fd = &p->fds[first], *end = &p->fds[first + size];
-    while(fd < end) *fd++ = 0;
+static inline void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
+    struct pid_fd *pfd = &p->fds[first], *pfdend = &p->fds[first + size];
+    size_t i = first;
+
+    while(pfd < pfdend) {
+#ifndef __FreeBSD__
+        pfd->filename = NULL;
+#endif
+        clear_pid_fd(pfd);
+        pfd++;
+        i++;
+    }
 }
 
 static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
@@ -1639,14 +1693,14 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
             debug_log("extending fd memory slots for %s from %d to %d", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
 
-            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
+            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(struct pid_fd));
 
             // and initialize it
-            zero_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
+            init_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
             p->fds_size = fdid + MAX_SPARE_FDS;
         }
 
-        if (unlikely(p->fds[fdid] == 0)) {
+        if (unlikely(p->fds[fdid].fd == 0)) {
             // we don't know this fd, get it
 
             switch (fds->kf_type) {
@@ -1702,15 +1756,14 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
             // if another process already has this, we will get
             // the same id
-            p->fds[fdid] = file_descriptor_find_or_add(fdsname);
+            p->fds[fdid].fd = file_descriptor_find_or_add(fdsname, 0);
         }
 
             // else make it positive again, we need it
-            // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir dirent structure
+            // of course, the actual file may have changed
 
         else
-            p->fds[fdid] = -p->fds[fdid];
+            p->fds[fdid].fd = -p->fds[fdid].fd;
 
         bfdsbuf += fds->kf_structsize;
     }
@@ -1725,7 +1778,6 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     if(unlikely(!fds)) return 0;
 
     struct dirent *de;
-    char fdname[FILENAME_MAX + 1];
     char linkname[FILENAME_MAX + 1];
 
     // we make all pid fds negative, so that
@@ -1744,7 +1796,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
         if(unlikely(fdid < 0)) continue;
 
         // check if the fds array is small
-        if(unlikely(fdid >= p->fds_size)) {
+        if(unlikely((size_t)fdid >= p->fds_size)) {
             // it is small, extend it
 
             debug_log("extending fd memory slots for %s from %d to %d"
@@ -1753,41 +1805,94 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
                     , fdid + MAX_SPARE_FDS
             );
 
-            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
+            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(struct pid_fd));
 
             // and initialize it
-            zero_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
-            p->fds_size = fdid + MAX_SPARE_FDS;
+            init_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
+            p->fds_size = (size_t)fdid + MAX_SPARE_FDS;
         }
 
-        if(unlikely(p->fds[fdid] == 0)) {
-            // we don't know this fd, get it
+        if(unlikely(p->fds[fdid].fd < 0 && de->d_ino != p->fds[fdid].inode)) {
+            // inodes do not match, clear the previous entry
+            inodes_changed_counter++;
+            file_descriptor_not_used(-p->fds[fdid].fd);
+            clear_pid_fd(&p->fds[fdid]);
+        }
 
-            sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
-            ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
-            if(unlikely(l == -1)) {
-                if(debug_enabled || (p->target && p->target->debug_enabled))
-                    error("Cannot read link %s", fdname);
+        if(p->fds[fdid].fd < 0 && p->fds[fdid].cache_iterations_counter > 0) {
+            p->fds[fdid].fd = -p->fds[fdid].fd;
+            p->fds[fdid].cache_iterations_counter--;
+            continue;
+        }
 
-                continue;
+        if(unlikely(!p->fds[fdid].filename)) {
+            filenames_allocated_counter++;
+            char fdname[FILENAME_MAX + 1];
+            snprintfz(fdname, FILENAME_MAX, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
+            p->fds[fdid].filename = strdupz(fdname);
+        }
+
+        file_counter++;
+        ssize_t l = readlink(p->fds[fdid].filename, linkname, FILENAME_MAX);
+        if(unlikely(l == -1)) {
+            // cannot read the link
+
+            if(debug_enabled || (p->target && p->target->debug_enabled))
+                error("Cannot read link %s", p->fds[fdid].filename);
+
+            if(unlikely(p->fds[fdid].fd < 0)) {
+                file_descriptor_not_used(-p->fds[fdid].fd);
+                clear_pid_fd(&p->fds[fdid]);
             }
-            else
-                linkname[l] = '\0';
 
-            file_counter++;
+            continue;
+        }
+        else
+            linkname[l] = '\0';
+
+        uint32_t link_hash = simple_hash(linkname);
+
+        if(unlikely(p->fds[fdid].fd < 0 && p->fds[fdid].link_hash != link_hash)) {
+            // the link changed
+            links_changed_counter++;
+            file_descriptor_not_used(-p->fds[fdid].fd);
+            clear_pid_fd(&p->fds[fdid]);
+        }
+
+        if(unlikely(p->fds[fdid].fd == 0)) {
+            // we don't know this fd, get it
 
             // if another process already has this, we will get
             // the same id
-            p->fds[fdid] = file_descriptor_find_or_add(linkname);
+            p->fds[fdid].fd = file_descriptor_find_or_add(linkname, link_hash);
+            p->fds[fdid].inode = de->d_ino;
+            p->fds[fdid].link_hash = link_hash;
+        }
+        else {
+            // else make it positive again, we need it
+            p->fds[fdid].fd = -p->fds[fdid].fd;
         }
 
-            // else make it positive again, we need it
-            // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir dirent structure
-            // UPDATE: no we cannot use inodes - under /proc inodes don't change when the link is changed
+        // caching control
+        // without this we read all the files on every iteration
+        if(max_fds_cache_seconds > 0) {
+            size_t spread = ((size_t)max_fds_cache_seconds > 10) ? 10 : (size_t)max_fds_cache_seconds;
 
-        else
-            p->fds[fdid] = -p->fds[fdid];
+            // cache it for a few iterations
+            size_t max = ((size_t) max_fds_cache_seconds + (fdid % spread)) / (size_t) update_every;
+            p->fds[fdid].cache_iterations_reset++;
+
+            if(unlikely(p->fds[fdid].cache_iterations_reset % spread == (size_t) fdid % spread))
+                p->fds[fdid].cache_iterations_reset++;
+
+            if(unlikely((fdid <= 2 && p->fds[fdid].cache_iterations_reset > 5) ||
+                        p->fds[fdid].cache_iterations_reset > max)) {
+                // for stdin, stdout, stderr (fdid <= 2) we have checked a few times, or if it goes above the max, goto max
+                p->fds[fdid].cache_iterations_reset = max;
+            }
+
+            p->fds[fdid].cache_iterations_counter = p->fds[fdid].cache_iterations_reset;
+        }
     }
 
     closedir(fds);
@@ -2306,7 +2411,7 @@ static int collect_data_for_all_processes(void) {
 // check: update_apps_groups_statistics()
 
 static void cleanup_exited_pids(void) {
-    int c;
+    size_t c;
     struct pid_stat *p = NULL;
 
     for(p = root_of_pids; p ;) {
@@ -2315,9 +2420,9 @@ static void cleanup_exited_pids(void) {
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
 
             for(c = 0; c < p->fds_size; c++)
-                if(p->fds[c] > 0) {
-                    file_descriptor_not_used(p->fds[c]);
-                    p->fds[c] = 0;
+                if(p->fds[c].fd > 0) {
+                    file_descriptor_not_used(p->fds[c].fd);
+                    clear_pid_fd(&p->fds[c]);
                 }
 
             pid_t r = p->pid;
@@ -2572,9 +2677,10 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     reallocate_target_fds(u);
     reallocate_target_fds(g);
 
-    int c, size = p->fds_size, *fds = p->fds;
+    size_t c, size = p->fds_size;
+    struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
-        int fd = fds[c];
+        int fd = fds[c].fd;
 
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
@@ -2753,6 +2859,9 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "CHART netdata.apps_sizes '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_sizes line 140001 %1$d\n"
                 "DIMENSION calls '' incremental 1 1\n"
                 "DIMENSION files '' incremental 1 1\n"
+                "DIMENSION filenames '' incremental 1 1\n"
+                "DIMENSION inode_changes '' incremental 1 1\n"
+                "DIMENSION link_changes '' incremental 1 1\n"
                 "DIMENSION pids '' absolute 1 1\n"
                 "DIMENSION fds '' absolute 1 1\n"
                 "DIMENSION targets '' absolute 1 1\n"
@@ -2795,6 +2904,9 @@ void send_resource_usage_to_netdata(usec_t dt) {
         "BEGIN netdata.apps_sizes %llu\n"
         "SET calls = %zu\n"
         "SET files = %zu\n"
+        "SET filenames = %zu\n"
+        "SET inode_changes = %zu\n"
+        "SET link_changes = %zu\n"
         "SET pids = %zu\n"
         "SET fds = %d\n"
         "SET targets = %zu\n"
@@ -2806,6 +2918,9 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , dt
         , calls_counter
         , file_counter
+        , filenames_allocated_counter
+        , inodes_changed_counter
+        , links_changed_counter
         , all_pids_count
         , all_files_len
         , apps_groups_targets_count
@@ -2934,7 +3049,7 @@ static void normalize_utilization(struct target *root) {
     // if(gtime_fix_ratio  < 0.0) gtime_fix_ratio  = 0.0;
     // if(cgtime_fix_ratio < 0.0) cgtime_fix_ratio = 0.0;
 
-    // FIXME
+    // TODO
     // we use cpu time to normalize page faults
     // the problem is that to find the proper max values
     // for page faults we have to parse /proc/vmstat
@@ -3348,6 +3463,19 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
+#ifndef __FreeBSD__
+        if(strcmp("fds-cache-secs", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'fds-cache-secs' requires a number as argument.\n");
+                exit(1);
+            }
+            i++;
+            max_fds_cache_seconds = str2i(argv[i]);
+            if(max_fds_cache_seconds < 0) max_fds_cache_seconds = 0;
+            continue;
+        }
+#endif
+
         if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;
@@ -3417,9 +3545,21 @@ static void parse_args(int argc, char **argv)
                     " without-files     enable / disable reporting files, sockets, pipes\n"
                     "                   (default is enabled)\n"
                     "\n"
+#ifndef __FreeBSD__
+                    " fds-cache-secs N  cache the files of processed for N seconds\n"
+                    "                   caching is adaptive per file (when a file\n"
+                    "                   is found, it starts at 0 and while the file\n"
+                    "                   remains open, it is incremented up to the\n"
+                    "                   max given)\n"
+                    "                   (default is %d seconds)\n"
+                    "\n"
+#endif
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
+#ifndef __FreeBSD__
+                    , max_fds_cache_seconds
+#endif
             );
             exit(1);
         }
@@ -3430,10 +3570,18 @@ static void parse_args(int argc, char **argv)
 
     if(freq > 0) update_every = freq;
 
-    if(read_apps_groups_conf("groups")) {
-        error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", config_dir);
-        exit(1);
+    if(read_apps_groups_conf(user_config_dir, "groups")) {
+        info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+
+        if(read_apps_groups_conf(stock_config_dir, "groups")) {
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. Failing.", stock_config_dir);
+            exit(1);
+        }
+        else
+            info("Loaded config file '%s/apps_groups.conf'", stock_config_dir);
     }
+    else
+        info("Loaded config file '%s/apps_groups.conf'", user_config_dir);
 }
 
 static int am_i_running_as_root() {
@@ -3519,12 +3667,19 @@ int main(int argc, char **argv) {
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix() == -1) exit(1);
 
-    config_dir = getenv("NETDATA_CONFIG_DIR");
-    if(config_dir == NULL) {
+    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(user_config_dir == NULL) {
         // info("NETDATA_CONFIG_DIR is not passed from netdata");
-        config_dir = CONFIG_DIR;
+        user_config_dir = CONFIG_DIR;
     }
-    // else info("Found NETDATA_CONFIG_DIR='%s'", config_dir);
+    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
+
+    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(stock_config_dir == NULL) {
+        // info("NETDATA_CONFIG_DIR is not passed from netdata");
+        stock_config_dir = LIBCONFIG_DIR;
+    }
+    // else info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {

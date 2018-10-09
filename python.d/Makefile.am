@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
     $(NULL)
@@ -37,6 +37,7 @@ dist_python_DATA = \
     icecast.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
+    linux_power_supply.chart.py \
     litespeed.chart.py \
     logind.chart.py \
     mdstat.chart.py \
@@ -77,7 +78,6 @@ dist_python_DATA = \
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
     python_modules/__init__.py \
-    python_modules/base.py \
     $(NULL)
 
 basesdir=$(pythonmodulesdir)/bases

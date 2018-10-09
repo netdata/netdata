@@ -1,5 +1,5 @@
 'use strict';
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 // This program will connect to one or more SMA Sunny Webboxes
 // to get the Solar Power Generated (current, today, total).

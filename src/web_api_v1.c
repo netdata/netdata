@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
 
@@ -335,12 +335,26 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_backend_options, prometheus_output_options);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
+                    host
+                    , w->response.data
+                    , prometheus_server
+                    , prometheus_prefix
+                    , prometheus_backend_options
+                    , prometheus_output_options
+                    );
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_backend_options, prometheus_backend_options);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
+                    host
+                    , w->response.data
+                    , prometheus_server
+                    , prometheus_prefix
+                    , prometheus_backend_options
+                    , prometheus_output_options
+                    );
             return 200;
 
         default:
@@ -813,7 +827,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
-    // FIXME
+    // TODO
     // The browser may send multiple cookies with our id
 
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_PROC_SELF_MOUNTINFO_H
 #define NETDATA_PROC_SELF_MOUNTINFO_H 1

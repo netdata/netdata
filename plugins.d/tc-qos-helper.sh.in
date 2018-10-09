@@ -3,7 +3,7 @@
 # netdata
 # real-time performance and health monitoring, done right!
 # (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This script is a helper to allow netdata collect tc data.
 # tc output parsing has been implemented in C, inside netdata
@@ -100,17 +100,17 @@ if [ ! -d "${fireqos_run_dir}" ]
             warning "Although FireQoS is installed on this system as '${fireqos}', I cannot find/read its installation configuration at '${fireqos_exec_dir}/install.config'."
         fi
     else
-        warning "FireQoS is not installed on this system. Use FireQoS to apply traffic QoS and expose the class names to netdata. Check https://github.com/firehol/netdata/wiki/You-should-install-QoS-on-all-your-servers"
+        warning "FireQoS is not installed on this system. Use FireQoS to apply traffic QoS and expose the class names to netdata. Check https://github.com/netdata/netdata/wiki/You-should-install-QoS-on-all-your-servers"
     fi
 fi
 
 # -----------------------------------------------------------------------------
 
 [ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 plugins_dir="${NETDATA_PLUGINS_DIR}"
-config_dir="${NETDATA_CONFIG_DIR}"
 tc="$(which tc 2>/dev/null || command -v tc 2>/dev/null)"
 
 
@@ -139,10 +139,17 @@ update_every=$((t))
 # -----------------------------------------------------------------------------
 # allow the user to override our defaults
 
-if [ -f "${config_dir}/tc-qos-helper.conf" ]
-    then
-    source "${config_dir}/tc-qos-helper.conf"
-fi
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        info "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
 
 case "${tc_show}" in
     qdisc|class)

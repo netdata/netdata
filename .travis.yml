@@ -13,13 +13,15 @@ stages:
   - build
   - name: release
     if: branch = master AND type != pull_request
+  - name: package
+    if: branch = master AND type != pull_request
 
 jobs:
   include:
     - stage: "lint"
       name: "python"
       install: skip
-      script: docker run --rm -v $(pwd):/code eeacms/pylint || echo "OK"
+      script: docker run -ti --rm -v $(pwd):/apps alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 python.d/ plugins.d/python.d.plugin || echo "OK"
     - name: "javascript"
       install: skip
       script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/web/*.js /code/plugins.d/node.d.plugin/*.js /code/node.d/*.js /code/node.d/node_modules/netdata.js
@@ -28,7 +30,7 @@ jobs:
       script: docker run --rm -v $(pwd)/web:/code eeacms/csslint sh -c "csslint /code/*.css" || echo "OK"
     - name: "bash"
       install: skip
-      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /project/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi' || echo "OK"
+      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /project/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi'
     - stage: "test"
       name: "C"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
@@ -37,8 +39,18 @@ jobs:
 #      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
 #    - name: "Node.js"
 #      script: tests/run_nodejs.sh
+    - name: "coverity"
+      install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+      script: ./coverity-scan.sh || echo "Coverity failed :("
+      env: INSTALL_COVERITY="true"
+      if: type = cron
+
     - stage: "build"
-      name: "ubuntu 14.04 (not containerized)"
+      name: "OSX"
+      install: brew install fakeroot ossp-uuid
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+      os: osx
+    - name: "ubuntu 14.04 (not containerized)"
       install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
     - name: "ubuntu 18.04"
@@ -47,21 +59,17 @@ jobs:
       script: ./.travis/containerized_build.sh centos7
     - name: "CentOS 6"
       script: ./.travis/containerized_build.sh centos6
-# TODO: cannot run installer without bash
-#    - name: "alpine"
-#      script: ./.travis/containerized_build.sh alpine
-    - name: "OSX"
-      install: brew install fakeroot ossp-uuid
-      script: 
-        - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-      os: osx
+    - name: "alpine"
+      script: ./.travis/containerized_build.sh alpine
+
     - stage: "release"
-      name: "Docker"
-      script: docker/build.sh
-      env: REPOSITORY="firehol/netdata"
-    - name: "GitHub"
+      name: "Create release"
+      script: .travis/releaser.sh
+
+    - stage: "package"
+      name: "Archive and self-extractor"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: ./.travis/create_artifacts.sh
+      script: .travis/create_artifacts.sh
       deploy:
         - provider: releases
           draft: true
@@ -70,11 +78,17 @@ jobs:
           skip_cleanup: true
           file_glob: true
           file:
-            - "netdata*.tar.*"
+            - "netdata*.tar.gz*"
             - "netdata*.gz.run*"
+            - "sha256sums.txt"
           on:
-            repo: firehol/netdata
+            repo: netdata/netdata
             tags: true
+    - name: "Docker images"
+      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
+      script: docker/build.sh
+      env: REPOSITORY="netdata/netdata"
+      if: type = cron OR tag =~ ^v
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci

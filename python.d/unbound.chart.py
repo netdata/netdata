@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: unbound netdata python.d module
 # Author: Austin S. Hemmelgarn (Ferroin)
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
 import sys
@@ -67,7 +67,8 @@ EXTENDED_CHARTS = {
 # This is used as a templates for the per-thread charts.
 PER_THREAD_CHARTS = {
     '_queries': {
-        'options': [None, '{longname} Queries Processed', 'queries', 'Queries Processed', 'unbound.threads.queries', 'line'],
+        'options': [None, '{longname} Queries Processed', 'queries', 'Queries Processed',
+                    'unbound.threads.queries', 'line'],
         'lines': [
             ['{shortname}_ratelimit', 'ratelimited', 'absolute', 1, 1],
             ['{shortname}_cachemiss', 'cache_miss', 'absolute', 1, 1],
@@ -78,7 +79,8 @@ PER_THREAD_CHARTS = {
         ]
     },
     '_recursion': {
-        'options': [None, '{longname} Recursion Timings', 'seconds', 'Recursive Timings', 'unbound.threads.recursion', 'line'],
+        'options': [None, '{longname} Recursion Timings', 'seconds', 'Recursive Timings',
+                    'unbound.threads.recursion', 'line'],
         'lines': [
             ['{shortname}_recursive_avg', 'average', 'absolute', 1, PRECISION],
             ['{shortname}_recursive_med', 'median', 'absolute', 1, PRECISION]

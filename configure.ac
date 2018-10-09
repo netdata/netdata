@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 AC_PREREQ(2.60)
 
@@ -35,7 +35,7 @@ AC_SUBST([PACKAGE_RPM_RELEASE])
 
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_SRCDIR([src/main.c])
 AM_INIT_AUTOMAKE([tar-pax])
 AC_CANONICAL_HOST
@@ -498,6 +498,7 @@ AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
 AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
 AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
 AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
+AC_SUBST([libconfigdir], ["\$(libdir)/netdata/conf.d"])
 AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
 AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
 AC_SUBST([webdir])
