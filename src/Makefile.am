@@ -23,10 +23,6 @@ dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS =
 
-if ENABLE_PLUGIN_APPS
-plugins_PROGRAMS += apps.plugin
-endif
-
 if ENABLE_PLUGIN_CGROUP_NETWORK
 plugins_PROGRAMS += cgroup-network
 endif
@@ -208,42 +204,6 @@ netdata_SOURCES += \
 netdata_LDADD += $(top_builddir)/src/plugins/linux-cgroups.plugin/libplugin-linux-cgroups.a
 endif
 endif
-
-apps_plugin_SOURCES = \
-	apps_plugin.c \
-	avl.c \
-	avl.h \
-	clocks.c \
-	clocks.h \
-	common.c \
-	common.h \
-	inlined.h \
-	locks.c \
-	locks.h \
-	log.c log.h \
-	procfile.c \
-	procfile.h \
-	threads.c \
-	threads.h \
-	web_buffer.c \
-	web_buffer.h \
-	$(NULL)
-
-if FREEBSD
-apps_plugin_SOURCES += \
-	plugin_freebsd.h \
-	$(NULL)
-else
-apps_plugin_SOURCES += \
-	adaptive_resortable_list.c \
-	adaptive_resortable_list.h \
-	$(NULL)
-endif
-
-apps_plugin_LDADD = \
-	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_LIBCAP_LIBS) \
-	$(NULL)
 
 cgroup_network_SOURCES = \
     cgroup-network.c \

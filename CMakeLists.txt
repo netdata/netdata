@@ -323,7 +323,7 @@ set(NETDATA_COMMON_FILES
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c
         src/appconfig.h
-        src/apps_plugin.c
+        src/plugins/apps.plugin/apps_plugin.c
         src/avl.c
         src/avl.h
         src/adaptive_resortable_list.c

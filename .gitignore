@@ -30,9 +30,16 @@ netdata.spec
 
 # netdata binaries
 netdata
+!netdata/
+
 apps.plugin
+!apps.plugin/
+
 freeipmi.plugin
+!freeipmi.plugin/
+
 cgroup-network
+!cgroup-network/
 
 # netdata makeself archives
 *.tar.*
