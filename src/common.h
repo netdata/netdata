@@ -322,7 +322,6 @@ typedef enum rrdcalc_status {
 #include "plugin_macos.h"
 #define NETDATA_OS_TYPE "macos"
 #else
-#include "src/plugins/linux-diskspace.plugin/plugin_diskspace.h"
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 

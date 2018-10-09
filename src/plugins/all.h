@@ -1,6 +1,4 @@
-//
-// Created by costa on 09/10/18.
-//
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../common.h"
 

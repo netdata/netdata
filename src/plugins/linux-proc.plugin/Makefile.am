@@ -36,7 +36,7 @@ libplugin_linux_proc_a_SOURCES = \
 	proc_self_mountinfo.c \
 	proc_self_mountinfo.h \
 	zfs_common.c \
-    zfs_common.h \
+	zfs_common.h \
 	proc_spl_kstat_zfs.c \
 	proc_stat.c \
 	proc_sys_kernel_random_entropy_avail.c \
