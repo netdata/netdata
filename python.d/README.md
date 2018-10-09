@@ -2137,6 +2137,8 @@ tcpipv4:
   port     : '6032'
 ```
 
+If no configuration is given, module will fail to run.
+
 ---
 
 # puppet
