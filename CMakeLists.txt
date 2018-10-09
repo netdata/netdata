@@ -347,7 +347,7 @@ set(APPS_PLUGIN_SOURCE_FILES
         )
 
 set(FREEIPMI_PLUGIN_SOURCE_FILES
-        src/freeipmi_plugin.c
+        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
         src/common.c
         src/common.h
         src/clocks.c

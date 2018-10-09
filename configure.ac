@@ -547,6 +547,7 @@ AC_CONFIG_FILES([
     python.d/Makefile
     node.d/Makefile
     plugins.d/Makefile
+    src/plugins/linux-freeipmi.plugin/Makefile
     src/plugins/linux-cgroups.plugin/Makefile
     src/plugins/Makefile
     src/Makefile

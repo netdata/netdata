@@ -15,7 +15,7 @@
  *  UCRL-CODE-222073
  */
 
-#include "common.h"
+#include "src/common.h"
 
 #include <stdio.h>
 #include <stdlib.h>

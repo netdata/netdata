@@ -27,10 +27,6 @@ if ENABLE_PLUGIN_APPS
 plugins_PROGRAMS += apps.plugin
 endif
 
-if ENABLE_PLUGIN_FREEIPMI
-plugins_PROGRAMS += freeipmi.plugin
-endif
-
 if ENABLE_PLUGIN_CGROUP_NETWORK
 plugins_PROGRAMS += cgroup-network
 endif
@@ -247,26 +243,6 @@ endif
 apps_plugin_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
-	$(NULL)
-
-freeipmi_plugin_SOURCES = \
-	freeipmi_plugin.c \
-	clocks.c \
-	clocks.h \
-	common.c \
-	common.h \
-	inlined.h \
-	locks.c \
-	locks.h \
-	log.c log.h \
-	procfile.c \
-	procfile.h \
-	threads.c \
-	threads.h \
-	$(NULL)
-
-freeipmi_plugin_LDADD = \
-	$(OPTIONAL_IPMIMONITORING_LIBS) \
 	$(NULL)
 
 cgroup_network_SOURCES = \

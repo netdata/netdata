@@ -4,5 +4,6 @@ MAINTAINERCLEANFILES = Makefile.in
 
 SUBDIRS = \
     linux-cgroups.plugin \
+    linux-freeipmi.plugin \
    	$(NULL)
 
