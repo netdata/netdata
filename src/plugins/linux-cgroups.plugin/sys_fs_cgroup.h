@@ -2,6 +2,8 @@
 // Created by costa on 09/10/18.
 //
 
+#include "../../common.h"
+
 #ifndef NETDATA_SYS_FS_CGROUP_H
 #define NETDATA_SYS_FS_CGROUP_H 1
 
@@ -19,6 +21,8 @@
     },
 
 extern void *cgroups_main(void *ptr);
+
+#include "../linux-proc.plugin/plugin_proc.h"
 
 #else // TARGET_OS != OS_LINUX
 

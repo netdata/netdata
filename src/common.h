@@ -310,7 +310,6 @@ typedef enum rrdcalc_status {
 #include "procfile.h"
 #include "appconfig.h"
 #include "dictionary.h"
-#include "proc_self_mountinfo.h"
 #include "plugin_checks.h"
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
@@ -323,8 +322,7 @@ typedef enum rrdcalc_status {
 #include "plugin_macos.h"
 #define NETDATA_OS_TYPE "macos"
 #else
-#include "plugin_proc.h"
-#include "plugin_proc_diskspace.h"
+#include "src/plugins/linux-diskspace.plugin/plugin_diskspace.h"
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
@@ -345,7 +343,6 @@ typedef enum rrdcalc_status {
 #include "daemon.h"
 #include "main.h"
 #include "unit_test.h"
-#include "ipc.h"
 #include "backends.h"
 #include "backend_prometheus.h"
 #include "inlined.h"

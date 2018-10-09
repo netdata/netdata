@@ -6,5 +6,7 @@ SUBDIRS = \
     apps.plugin \
     linux-cgroups.plugin \
     linux-freeipmi.plugin \
+    linux-proc.plugin \
+    linux-diskspace.plugin \
    	$(NULL)
 

@@ -145,10 +145,10 @@ set(NETDATA_FREEBSD_FILES
         src/freebsd_getmntinfo.c
         src/freebsd_getifaddrs.c
         src/freebsd_devstat.c
-        src/zfs_common.c
-        src/zfs_common.h
         src/freebsd_kstat_zfs.c
         src/freebsd_ipfw.c
+        src/plugins/linux-proc.plugin/zfs_common.c
+        src/plugins/linux-proc.plugin/zfs_common.h
         )
 
 set(NETDATA_MACOS_FILES
@@ -160,41 +160,42 @@ set(NETDATA_MACOS_FILES
         )
 
 set(NETDATA_LINUX_FILES
-        src/ipc.c
-        src/ipc.h
-        src/plugin_proc.c
-        src/plugin_proc.h
-        src/plugin_proc_diskspace.c
-        src/plugin_proc_diskspace.h
-        src/proc_diskstats.c
-        src/proc_interrupts.c
-        src/proc_softirqs.c
-        src/proc_loadavg.c
-        src/proc_meminfo.c
-        src/proc_net_dev.c
-        src/proc_net_ip_vs_stats.c
-        src/proc_net_netstat.c
-        src/proc_net_rpc_nfs.c
-        src/proc_net_rpc_nfsd.c
-        src/proc_net_snmp.c
-        src/proc_net_snmp6.c
-        src/proc_net_sctp_snmp.c
-        src/proc_net_sockstat.c
-        src/proc_net_sockstat6.c
-        src/proc_net_softnet_stat.c
-        src/proc_net_stat_conntrack.c
-        src/proc_net_stat_synproxy.c
-        src/zfs_common.c
-        src/zfs_common.h
-        src/proc_spl_kstat_zfs.c
-        src/proc_stat.c
-        src/proc_sys_kernel_random_entropy_avail.c
-        src/proc_vmstat.c
-        src/proc_uptime.c
-        src/sys_kernel_mm_ksm.c
-        src/sys_fs_btrfs.c
-        src/threads.c
-        src/threads.h
+        src/plugins/linux-diskspace.plugin/plugin_diskspace.c
+        src/plugins/linux-diskspace.plugin/plugin_diskspace.h
+        src/plugins/linux-proc.plugin/ipc.c
+        src/plugins/linux-proc.plugin/plugin_proc.c
+        src/plugins/linux-proc.plugin/plugin_proc.h
+        src/plugins/linux-proc.plugin/proc_diskstats.c
+        src/plugins/linux-proc.plugin/proc_interrupts.c
+        src/plugins/linux-proc.plugin/proc_softirqs.c
+        src/plugins/linux-proc.plugin/proc_loadavg.c
+        src/plugins/linux-proc.plugin/proc_meminfo.c
+        src/plugins/linux-proc.plugin/proc_net_dev.c
+        src/plugins/linux-proc.plugin/proc_net_ip_vs_stats.c
+        src/plugins/linux-proc.plugin/proc_net_netstat.c
+        src/plugins/linux-proc.plugin/proc_net_rpc_nfs.c
+        src/plugins/linux-proc.plugin/proc_net_rpc_nfsd.c
+        src/plugins/linux-proc.plugin/proc_net_snmp.c
+        src/plugins/linux-proc.plugin/proc_net_snmp6.c
+        src/plugins/linux-proc.plugin/proc_net_sctp_snmp.c
+        src/plugins/linux-proc.plugin/proc_net_sockstat.c
+        src/plugins/linux-proc.plugin/proc_net_sockstat6.c
+        src/plugins/linux-proc.plugin/proc_net_softnet_stat.c
+        src/plugins/linux-proc.plugin/proc_net_stat_conntrack.c
+        src/plugins/linux-proc.plugin/proc_net_stat_synproxy.c
+        src/plugins/linux-proc.plugin/proc_self_mountinfo.c
+        src/plugins/linux-proc.plugin/proc_self_mountinfo.h
+        src/plugins/linux-proc.plugin/proc_spl_kstat_zfs.c
+        src/plugins/linux-proc.plugin/proc_stat.c
+        src/plugins/linux-proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        src/plugins/linux-proc.plugin/proc_vmstat.c
+        src/plugins/linux-proc.plugin/proc_uptime.c
+        src/plugins/linux-proc.plugin/sys_devices_system_edac_mc.c
+        src/plugins/linux-proc.plugin/sys_devices_system_node.c
+        src/plugins/linux-proc.plugin/sys_kernel_mm_ksm.c
+        src/plugins/linux-proc.plugin/sys_fs_btrfs.c
+        src/plugins/linux-proc.plugin/zfs_common.c
+        src/plugins/linux-proc.plugin/zfs_common.h
         src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
         src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
         )
@@ -256,8 +257,6 @@ set(NETDATA_COMMON_FILES
         src/plugins_d.h
         src/popen.c
         src/popen.h
-        src/proc_self_mountinfo.c
-        src/proc_self_mountinfo.h
         src/procfile.c
         src/procfile.h
         src/registry.c
@@ -300,8 +299,8 @@ set(NETDATA_COMMON_FILES
         src/statsd.h
         src/storage_number.c
         src/storage_number.h
-        src/sys_devices_system_edac_mc.c
-        src/sys_devices_system_node.c
+        src/threads.c
+        src/threads.h
         src/unit_test.c
         src/unit_test.h
         src/url.c

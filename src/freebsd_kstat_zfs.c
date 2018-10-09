@@ -2,7 +2,7 @@
 
 #include "common.h"
 
-#include "zfs_common.h"
+#include "src/plugins/linux-proc.plugin/zfs_common.h"
 
 extern struct arcstats arcstats;
 

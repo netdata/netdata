@@ -550,6 +550,8 @@ AC_CONFIG_FILES([
     src/plugins/apps.plugin/Makefile
     src/plugins/linux-freeipmi.plugin/Makefile
     src/plugins/linux-cgroups.plugin/Makefile
+    src/plugins/linux-proc.plugin/Makefile
+    src/plugins/linux-diskspace.plugin/Makefile
     src/plugins/Makefile
     src/Makefile
     system/Makefile
