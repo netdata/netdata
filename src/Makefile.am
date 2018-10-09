@@ -4,15 +4,7 @@
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
-AM_CPPFLAGS = \
-	-DVARLIB_DIR="\"$(varlibdir)\"" \
-	-DCACHE_DIR="\"$(cachedir)\"" \
-	-DCONFIG_DIR="\"$(configdir)\"" \
-	-DLIBCONFIG_DIR="\"$(libconfigdir)\"" \
-	-DLOG_DIR="\"$(logdir)\"" \
-	-DPLUGINS_DIR="\"$(pluginsdir)\"" \
-	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \
-	-DWEB_DIR="\"$(webdir)\"" \
+SUBDIRS = \
 	$(NULL)
 
 AM_CFLAGS = \
@@ -44,6 +36,7 @@ plugins_PROGRAMS += cgroup-network
 endif
 
 netdata_SOURCES = \
+    plugins/all.h \
 	adaptive_resortable_list.c \
 	adaptive_resortable_list.h \
 	appconfig.c \
@@ -146,6 +139,9 @@ netdata_SOURCES = \
 	web_server.h \
 	$(NULL)
 
+netdata_LDADD = \
+	$(NULL)
+
 if FREEBSD
 netdata_SOURCES += \
 	plugin_freebsd.c \
@@ -210,18 +206,12 @@ netdata_SOURCES += \
 	sys_kernel_mm_ksm.c \
 	sys_devices_system_edac_mc.c \
 	sys_devices_system_node.c \
-	sys_fs_cgroup.c \
 	sys_fs_btrfs.c \
 	$(NULL)
-endif
-endif
 
-netdata_LDADD = \
-	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
-	$(OPTIONAL_ZLIB_LIBS) \
-	$(OPTIONAL_UUID_LIBS) \
-	$(NULL)
+netdata_LDADD += $(top_builddir)/src/plugins/linux-cgroups.plugin/libplugin-linux-cgroups.a
+endif
+endif
 
 apps_plugin_SOURCES = \
 	apps_plugin.c \
@@ -303,4 +293,11 @@ cgroup_network_SOURCES = \
 cgroup_network_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
+	$(NULL)
+
+netdata_LDADD += \
+	$(OPTIONAL_MATH_LIBS) \
+	$(OPTIONAL_NFACCT_LIBS) \
+	$(OPTIONAL_ZLIB_LIBS) \
+	$(OPTIONAL_UUID_LIBS) \
 	$(NULL)

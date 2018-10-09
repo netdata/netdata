@@ -3,12 +3,140 @@
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.0.2)
 project(netdata C)
 
-find_package (Threads)
+find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wformat-signedness -Werror=format-security -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 -fstack-protector-all")
+# default is "Debug"
+#set(CMAKE_BUILD_TYPE "Release")
+
+# set this to see the compilation commands
+#set(CMAKE_VERBOSE_MAKEFILE 1)
+
+
+# -----------------------------------------------------------------------------
+# Set compilation options according to build type
+
+IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+    message(STATUS "building for: debugging")
+
+    ## unfortunately these produce errors
+    #include(CheckCXXCompilerFlag)
+    #CHECK_CXX_COMPILER_FLAG("-Wformat-signedness" CXX_FORMAT_SIGNEDNESS)
+    #CHECK_CXX_COMPILER_FLAG("-Werror=format-security" CXX_FORMAT_SECURITY)
+    #CHECK_CXX_COMPILER_FLAG("-fstack-protector-all" CXX_STACK_PROTECTOR)
+    set(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
+    set(CXX_FORMAT_SECURITY "-Werror=format-security")
+    set(CXX_STACK_PROTECTOR "-fstack-protector-all")
+
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR}")
+ELSE()
+    message(STATUS "building for: release")
+    cmake_policy(SET CMP0069 "NEW")
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT error)
+    IF(${ipo_supported})
+        message(STATUS "link time optimization: supported")
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    ELSE()
+        message(STATUS "link time optimization: not supported")
+    ENDIF()
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# O/S Detection
+
+# these are defined in common.h too
+SET(LINUX   False)
+SET(FREEBSD False)
+SET(MACOS   False)
+
+# Detect the operating system
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    SET(TARGET_OS_NAME "macos")
+    SET(TARGET_OS 3)
+    SET(MACOS True)
+ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+    SET(TARGET_OS_NAME "freebsd")
+    SET(TARGET_OS 2)
+    SET(FREEBSD True)
+ELSE()
+    SET(TARGET_OS_NAME "linux")
+    SET(TARGET_OS 1)
+    SET(LINUX True)
+ENDIF()
+
+# show the operating system on the console
+message(STATUS "operating system: ${TARGET_OS_NAME} (TARGET_OS=${TARGET_OS})")
+
+
+# -----------------------------------------------------------------------------
+# Detect libuuid
+
+pkg_check_modules(UUID REQUIRED uuid)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${UUID_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${UUID_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${UUID_INCLUDE_DIRS})
+
+# -----------------------------------------------------------------------------
+# Detect libz
+
+pkg_check_modules(ZLIB REQUIRED zlib)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
+
+
+# -----------------------------------------------------------------------------
+# Detect libcap
+
+IF(LINUX)
+    pkg_check_modules(CAP QUIET libcap)
+    # later we use:
+    # ${CAP_LIBRARIES}
+    # ${CAP_CFLAGS_OTHER}
+    # ${CAP_INCLUDE_DIRS}
+ENDIF(LINUX)
+
+
+# -----------------------------------------------------------------------------
+# Detect libipmimonitoring
+
+IF(LINUX)
+    pkg_check_modules(IPMI libipmimonitoring)
+    # later we use:
+    # ${IPMI_LIBRARIES}
+    # ${IPMI_CFLAGS_OTHER}
+    # ${IPMI_INCLUDE_DIRS}
+ENDIF(LINUX)
+
+
+# -----------------------------------------------------------------------------
+# Detect libmnl
+IF(LINUX)
+    pkg_check_modules(MNL libmnl)
+    # later we use:
+    # ${MNL_LIBRARIES}
+    # ${MNL_CFLAGS_OTHER}
+    # ${MNL_INCLUDE_DIRS}
+ENDIF(LINUX)
+
+# -----------------------------------------------------------------------------
+# Detect libmnl
+
+IF(LINUX)
+    pkg_check_modules(NFACCT libnetfilter_acct)
+    # later we use:
+    # ${NFACCT_LIBRARIES}
+    # ${NFACCT_CFLAGS_OTHER}
+    # ${NFACCT_INCLUDE_DIRS}
+ENDIF(LINUX)
+
+# -----------------------------------------------------------------------------
+# netdata files
 
 set(NETDATA_FREEBSD_FILES
         src/plugin_freebsd.c
@@ -64,9 +192,24 @@ set(NETDATA_LINUX_FILES
         src/proc_vmstat.c
         src/proc_uptime.c
         src/sys_kernel_mm_ksm.c
-        src/sys_fs_cgroup.c
         src/sys_fs_btrfs.c
-        src/threads.c src/threads.h)
+        src/threads.c
+        src/threads.h
+        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
+        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
+        )
+
+IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
+    message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
+    set(NETDATA_NFACCT_FILES
+            src/plugin_nfacct.c
+            src/plugin_nfacct.h
+            )
+ELSE()
+    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
+    set(NETDATA_NFACCT_FILES
+            )
+ENDIF()
 
 set(NETDATA_COMMON_FILES
         src/adaptive_resortable_list.c
@@ -107,8 +250,6 @@ set(NETDATA_COMMON_FILES
         src/plugin_checks.h
         src/plugin_idlejitter.c
         src/plugin_idlejitter.h
-        src/plugin_nfacct.c
-        src/plugin_nfacct.h
         src/plugin_tc.c
         src/plugin_tc.h
         src/plugins_d.c
@@ -176,6 +317,7 @@ set(NETDATA_COMMON_FILES
         src/web_server.c
         src/web_server.h
         config.h
+        src/plugins/all.h
         )
 
 set(APPS_PLUGIN_SOURCE_FILES
@@ -250,22 +392,84 @@ set(CGROUP_NETWORK_SOURCE_FILES
 
 include_directories(AFTER .)
 
-add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
+add_definitions(
+        -DHAVE_CONFIG_H
+        -DTARGET_OS=${TARGET_OS}
+        -DCACHE_DIR="/var/cache/netdata"
+        -DCONFIG_DIR="/etc/netdata"
+        -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
+        -DLOG_DIR="/var/log/netdata"
+        -DPLUGINS_DIR="/usr/libexec/netdata"
+        -DWEB_DIR="/usr/share/netdata"
+        -DVARLIB_DIR="/var/lib/netdata"
+)
 
-add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES})
-target_link_libraries (netdata m z uuid mnl netfilter_acct ${CMAKE_THREAD_LIBS_INIT})
+# -----------------------------------------------------------------------------
+# netdata
 
-add_executable(netdata_freebsd ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
-target_link_libraries (netdata_freebsd m z uuid ${CMAKE_THREAD_LIBS_INIT})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(netdata_macos ${NETDATA_COMMON_FILES} ${NETDATA_MACOS_FILES})
-target_link_libraries (netdata_macos m z uuid ${CMAKE_THREAD_LIBS_INIT})
+IF(LINUX)
+    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES} ${NETDATA_NFACCT_FILES})
+    target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES} ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
+    SET(build_plugin_apps True)
 
-add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/inlined.h)
-target_link_libraries (apps.plugin m cap ${CMAKE_THREAD_LIBS_INIT})
+ELSEIF(FREEBSD)
+    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
+    target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
+    SET(build_plugin_apps True)
 
-add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
-target_link_libraries (freeipmi.plugin ipmimonitoring ${CMAKE_THREAD_LIBS_INIT})
+ELSEIF(MACOS)
+    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_MACOS_FILES})
+    target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
+    SET(build_plugin_apps False)
 
-add_executable(cgroup-network ${CGROUP_NETWORK_SOURCE_FILES})
-target_link_libraries (cgroup-network m ${CMAKE_THREAD_LIBS_INIT})
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# apps.plugin
+
+IF(build_plugin_apps)
+    message(STATUS "apps.plugin: enabled")
+    add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/inlined.h)
+    target_link_libraries (apps.plugin m ${CAP_LIBRARIES} ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
+    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "apps.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# freeipmi.plugin
+
+IF(LINUX AND IPMI_LIBRARIES)
+    message(STATUS "freeipmi.plugin: enabled")
+    add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
+    target_link_libraries (freeipmi.plugin ${IPMI_LIBRARIES} ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
+    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "freeipmi.plugin: disabled (depends on libipmimonitoring)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# cgroup-network
+
+IF(LINUX)
+    message(STATUS "cgroup-network: enabled")
+    add_executable(cgroup-network ${CGROUP_NETWORK_SOURCE_FILES})
+    target_link_libraries (cgroup-network ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "cgroup-network: disabled (requires Linux)")
+ENDIF()

@@ -2,6 +2,7 @@
 .libs
 
 *.o
+*.a
 config.h.in
 Makefile.in
 *~

@@ -54,6 +54,7 @@ SUBDIRS = \
 	node.d \
 	plugins.d \
 	python.d \
+	src/plugins \
 	src \
 	system \
 	web \

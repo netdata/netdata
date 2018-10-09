@@ -6,6 +6,10 @@
 #include <config.h>
 #endif
 
+#define OS_LINUX   1
+#define OS_FREEBSD 2
+#define OS_MACOS   3
+
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs
 

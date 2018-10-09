@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-
-extern void *cgroups_main(void *ptr);
+#include "plugins/all.h"
 
 void netdata_cleanup_and_exit(int ret) {
     // enabling this, is wrong
@@ -62,7 +61,7 @@ struct netdata_static_thread static_threads[] = {
     // linux internal plugins
     {"PLUGIN[proc]",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
     {"PLUGIN[diskspace]",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
-    {"PLUGIN[cgroup]",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
     {"PLUGIN[tc]",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
 

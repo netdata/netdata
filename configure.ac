@@ -41,6 +41,7 @@ AM_INIT_AUTOMAKE([tar-pax])
 AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_INSTALL
+AC_PROG_RANLIB
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -170,14 +171,17 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
+    build_target_id=2
     CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
 darwin*)
     build_target=macos
+    build_target_id=3
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
     ;;
 *)
     build_target=linux
+    build_target_id=1
     ;;
 esac
 
@@ -486,17 +490,41 @@ AC_MSG_RESULT([${enable_lto}])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
-AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
-AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
-AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
-AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
-AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
-AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
-AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
-AC_SUBST([libconfigdir], ["\$(libdir)/netdata/conf.d"])
-AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
-AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
+varlibdir="${localstatedir}/lib/netdata"
+registrydir="${localstatedir}/lib/netdata/registry"
+cachedir="${localstatedir}/cache/netdata"
+chartsdir="${libexecdir}/netdata/charts.d"
+nodedir="${libexecdir}/netdata/node.d"
+pythondir="${libexecdir}/netdata/python.d"
+configdir="${sysconfdir}/netdata"
+libconfigdir="${libdir}/netdata/conf.d"
+logdir="${localstatedir}/log/netdata"
+pluginsdir="${libexecdir}/netdata/plugins.d"
+
+AC_SUBST([build_target])
+AC_SUBST([varlibdir])
+AC_SUBST([registrydir])
+AC_SUBST([cachedir])
+AC_SUBST([chartsdir])
+AC_SUBST([nodedir])
+AC_SUBST([pythondir])
+AC_SUBST([configdir])
+AC_SUBST([libconfigdir])
+AC_SUBST([logdir])
+AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+
+CPPFLAGS="\
+    -DTARGET_OS=${build_target_id} \
+	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
+	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
+	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
+	-DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
+	-DLOG_DIR=\"\\\"${logdir}\\\"\" \
+	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
+	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
+	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
+"
 
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
@@ -519,6 +547,8 @@ AC_CONFIG_FILES([
     python.d/Makefile
     node.d/Makefile
     plugins.d/Makefile
+    src/plugins/linux-cgroups.plugin/Makefile
+    src/plugins/Makefile
     src/Makefile
     system/Makefile
     web/Makefile
