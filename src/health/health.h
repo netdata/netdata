@@ -3,7 +3,7 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H 1
 
-#include "../../common.h"
+#include "src/common.h"
 
 #define NETDATA_PLUGIN_HOOK_HEALTH \
     { \

@@ -26,6 +26,7 @@
 #include "web_api_v1.h"
 #include "signals.h"
 
+#include "health/health.h"
 #include "plugins/all.h"
 
 extern char *netdata_configured_hostname;

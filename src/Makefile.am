@@ -4,6 +4,9 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 SUBDIRS = \
+    libnetdata \
+    health \
+    plugins \
 	$(NULL)
 
 AM_CFLAGS = \
@@ -86,11 +89,11 @@ FREEBSD_PLUGIN_FILES = \
     $(NULL)
 
 HEALTH_PLUGIN_FILES = \
-	plugins/health.plugin/health.c \
-	plugins/health.plugin/health.h \
-	plugins/health.plugin/health_config.c \
-	plugins/health.plugin/health_json.c \
-	plugins/health.plugin/health_log.c \
+	health/health.c \
+	health/health.h \
+	health/health_config.c \
+	health/health_json.c \
+	health/health_log.c \
     $(NULL)
 
 IDLEJITTER_PLUGIN_FILES = \

@@ -202,11 +202,11 @@ set(FREEBSD_PLUGIN_FILES
         )
 
 set(HEALTH_PLUGIN_FILES
-        src/plugins/health.plugin/health.c
-        src/plugins/health.plugin/health.h
-        src/plugins/health.plugin/health_config.c
-        src/plugins/health.plugin/health_json.c
-        src/plugins/health.plugin/health_log.c
+        src/health/health.c
+        src/health/health.h
+        src/health/health_config.c
+        src/health/health_json.c
+        src/health/health_log.c
         )
 
 set(IDLEJITTER_PLUGIN_FILES

@@ -5,7 +5,6 @@ MAINTAINERCLEANFILES = Makefile.in
 SUBDIRS = \
     apps.plugin \
     checks.plugin \
-    health.plugin \
     idlejitter.plugin \
     plugins.d.plugin \
     statsd.plugin \

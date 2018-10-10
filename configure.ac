@@ -546,11 +546,11 @@ AC_CONFIG_FILES([
     python.d/Makefile
     node.d/Makefile
     plugins.d/Makefile
+    src/health/Makefile
     src/libnetdata/Makefile
     src/plugins/apps.plugin/Makefile
     src/plugins/checks.plugin/Makefile
     src/plugins/freebsd.plugin/Makefile
-    src/plugins/health.plugin/Makefile
     src/plugins/idlejitter.plugin/Makefile
     src/plugins/linux-cgroups.plugin/Makefile
     src/plugins/linux-diskspace.plugin/Makefile
