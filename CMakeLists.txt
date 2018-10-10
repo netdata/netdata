@@ -393,7 +393,7 @@ add_definitions(
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
 IF(LINUX)
-    add_executable(netdata ${NETDATA_FILES}
+    add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
             ${NFACCT_PLUGIN_FILES}
@@ -424,7 +424,7 @@ IF(LINUX)
 ELSEIF(FREEBSD)
     set(APPS_PLUGIN_FILES ${APPS_PLUGIN_FILES} plugins/freebsd.plugin/plugin_freebsd.h)
 
-    add_executable(netdata ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
+    add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
@@ -433,7 +433,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_FREEIPMI False)
 
 ELSEIF(MACOS)
-    add_executable(netdata ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
+    add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
@@ -449,7 +449,7 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_APPS)
     message(STATUS "apps.plugin: enabled")
-    add_executable(apps.plugin ${APPS_PLUGIN_FILES})
+    add_executable(apps.plugin config.h ${APPS_PLUGIN_FILES})
     target_link_libraries (apps.plugin ${NETDATA_COMMON_LIBRARIES} ${CAP_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
@@ -463,7 +463,7 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_FREEIPMI)
     message(STATUS "freeipmi.plugin: enabled")
-    add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_FILES})
+    add_executable(freeipmi.plugin config.h ${FREEIPMI_PLUGIN_FILES})
     target_link_libraries (freeipmi.plugin ${NETDATA_COMMON_LIBRARIES} ${IPMI_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
@@ -477,7 +477,7 @@ ENDIF()
 
 IF(ENABLE_PLUGIN_CGROUP_NETWORK)
     message(STATUS "cgroup-network: enabled")
-    add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
+    add_executable(cgroup-network config.h ${CGROUP_NETWORK_FILES})
     target_link_libraries (cgroup-network ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
