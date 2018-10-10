@@ -18,6 +18,7 @@
 #include "macos.plugin/plugin_macos.h"
 #include "plugins.d.plugin/plugins_d.h"
 #include "statsd.plugin/statsd.h"
+#include "health.plugin/health.h"
 
 
 // ----------------------------------------------------------------------------

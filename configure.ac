@@ -550,6 +550,7 @@ AC_CONFIG_FILES([
     src/plugins/apps.plugin/Makefile
     src/plugins/checks.plugin/Makefile
     src/plugins/freebsd.plugin/Makefile
+    src/plugins/health.plugin/Makefile
     src/plugins/idlejitter.plugin/Makefile
     src/plugins/linux-cgroups.plugin/Makefile
     src/plugins/linux-diskspace.plugin/Makefile

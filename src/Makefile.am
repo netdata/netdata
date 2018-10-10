@@ -47,11 +47,6 @@ netdata_SOURCES = \
 	eval.h \
 	global_statistics.c \
 	global_statistics.h \
-	health.c \
-	health.h \
-	health_config.c \
-	health_json.c \
-	health_log.c \
 	inlined.h \
 	locks.c \
 	locks.h \
@@ -81,16 +76,21 @@ netdata_SOURCES = \
 	rrd2json.c \
 	rrd2json.h \
 	rrdcalc.c \
+	rrdcalc.h \
 	rrdcalctemplate.c \
+	rrdcalctemplate.h \
 	rrddim.c \
 	rrddimvar.c \
+	rrddimvar.h \
 	rrdfamily.c \
 	rrdhost.c \
 	rrdpush.c \
 	rrdpush.h \
 	rrdset.c \
 	rrdsetvar.c \
+	rrdsetvar.h \
 	rrdvar.c \
+	rrdvar.h \
 	signals.c \
 	signals.h \
 	simple_pattern.c \
@@ -124,6 +124,7 @@ netdata_LDADD = \
     $(top_builddir)/src/plugins/idlejitter.plugin/libplugin-idlejitter.a \
     $(top_builddir)/src/plugins/plugins.d.plugin/libplugin-plugins.d.a \
     $(top_builddir)/src/plugins/statsd.plugin/libplugin-statsd.a \
+    $(top_builddir)/src/plugins/health.plugin/libplugin-health.a \
 	$(NULL)
 
 if FREEBSD

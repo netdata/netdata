@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "common.h"
+
 #ifndef NETDATA_RRD_H
 #define NETDATA_RRD_H 1
 
@@ -20,8 +22,6 @@ extern int gap_when_lost_iterations_above;
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
-
-typedef struct rrdhost RRDHOST;
 
 // ----------------------------------------------------------------------------
 // chart types
@@ -204,7 +204,6 @@ struct rrddim {
 
     storage_number values[];                        // the array of values - THIS HAS TO BE THE LAST MEMBER
 };
-typedef struct rrddim RRDDIM;
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -357,7 +356,6 @@ struct rrdset {
     RRDDIM *dimensions;                             // the actual data for every dimension
 
 };
-typedef struct rrdset RRDSET;
 
 #define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
 #define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
@@ -404,6 +402,65 @@ typedef enum rrdhost_flags {
 #else
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
+
+// ----------------------------------------------------------------------------
+// Health data
+
+typedef struct alarm_entry {
+    uint32_t unique_id;
+    uint32_t alarm_id;
+    uint32_t alarm_event_id;
+
+    time_t when;
+    time_t duration;
+    time_t non_clear_duration;
+
+    char *name;
+    uint32_t hash_name;
+
+    char *chart;
+    uint32_t hash_chart;
+
+    char *family;
+
+    char *exec;
+    char *recipient;
+    time_t exec_run_timestamp;
+    int exec_code;
+
+    char *source;
+    char *units;
+    char *info;
+
+    calculated_number old_value;
+    calculated_number new_value;
+
+    char *old_value_string;
+    char *new_value_string;
+
+    RRDCALC_STATUS old_status;
+    RRDCALC_STATUS new_status;
+
+    uint32_t flags;
+
+    int delay;
+    time_t delay_up_to_timestamp;
+
+    uint32_t updated_by_id;
+    uint32_t updates_id;
+
+    struct alarm_entry *next;
+} ALARM_ENTRY;
+
+
+typedef struct alarm_log {
+    uint32_t next_log_id;
+    uint32_t next_alarm_id;
+    unsigned int count;
+    unsigned int max;
+    ALARM_ENTRY *alarms;
+    netdata_rwlock_t alarm_log_rwlock;
+} ALARM_LOG;
 
 
 // ----------------------------------------------------------------------------

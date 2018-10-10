@@ -233,20 +233,31 @@ typedef enum rrdcalc_status {
 
 #if defined(__FreeBSD__)
 #include <pthread_np.h>
-#include "plugin_freebsd.h"
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
-#include "plugin_macos.h"
 #define NETDATA_OS_TYPE "macos"
 #else
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
-#include "eval.h"
-#include "health.h"
+// forward typedefs
+typedef struct rrdhost RRDHOST;
+typedef struct rrddim RRDDIM;
+typedef struct rrdset RRDSET;
+typedef struct rrdvar RRDVAR;
+typedef struct rrdsetvar RRDSETVAR;
+typedef struct rrddimvar RRDDIMVAR;
+typedef struct rrdcalc RRDCALC;
+typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 
+#include "eval.h"
 #include "statistical.h"
 #include "socket.h"
+#include "rrdvar.h"
+#include "rrdsetvar.h"
+#include "rrddimvar.h"
+#include "rrdcalc.h"
+#include "rrdcalctemplate.h"
 #include "rrd.h"
 #include "rrd2json.h"
 #include "web_client.h"

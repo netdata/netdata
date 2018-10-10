@@ -5,6 +5,18 @@
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 
+#define NETDATA_PLUGIN_HOOK_PLUGINSD \
+    { \
+        .name = "PLUGINSD", \
+        .config_section = NULL, \
+        .config_name = NULL, \
+        .enabled = 1, \
+        .thread = NULL, \
+        .init_routine = NULL, \
+        .start_routine = pluginsd_main \
+    },
+
+
 #define PLUGINSD_FILE_SUFFIX ".plugin"
 #define PLUGINSD_FILE_SUFFIX_LEN strlen(PLUGINSD_FILE_SUFFIX)
 #define PLUGINSD_CMD_MAX (FILENAME_MAX*2)

@@ -240,11 +240,11 @@ set(NETDATA_COMMON_FILES
         src/eval.h
         src/global_statistics.c
         src/global_statistics.h
-        src/health.c
-        src/health.h
-        src/health_config.c
-        src/health_json.c
-        src/health_log.c
+        src/plugins/health.plugin/health.c
+        src/plugins/health.plugin/health.h
+        src/plugins/health.plugin/health_config.c
+        src/plugins/health.plugin/health_json.c
+        src/plugins/health.plugin/health_log.c
         src/inlined.h
         src/locks.c
         src/locks.h
@@ -320,7 +320,7 @@ set(NETDATA_COMMON_FILES
         src/web_server.h
         src/plugins/all.h
         config.h
-        )
+        src/rrdvar.h src/rrdsetvar.h src/rrddimvar.h src/rrdcalc.h src/rrdcalctemplate.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

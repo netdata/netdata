@@ -55,12 +55,13 @@ struct netdata_static_thread static_threads[] = {
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
-    {"HEALTH",               NULL,                    NULL,         1, NULL, NULL, health_main},
-    {"PLUGINSD",             NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
     {"WEB_SERVER[multi]",    NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"WEB_SERVER[single]",   NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+
+    NETDATA_PLUGIN_HOOK_PLUGINSD
+    NETDATA_PLUGIN_HOOK_HEALTH
 
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };

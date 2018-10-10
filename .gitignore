@@ -85,7 +85,7 @@ system/netdata-freebsd
 
 conf.d/edit-config
 plugins.d/alarm-notify.sh
-plugins.d/cgroup-name.sh
+src/plugins/linux-cgroups.plugin/cgroup-name.sh
 plugins.d/charts.d.plugin
 plugins.d/fping.plugin
 plugins.d/node.d.plugin
