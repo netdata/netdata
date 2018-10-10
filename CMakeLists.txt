@@ -217,40 +217,57 @@ ELSE()
             )
 ENDIF()
 
-set(NETDATA_COMMON_FILES
+set(LIBNETDATA_FILES
         src/libnetdata/adaptive_resortable_list.c
         src/libnetdata/adaptive_resortable_list.h
         src/libnetdata/appconfig.c
         src/libnetdata/appconfig.h
         src/libnetdata/avl.c
         src/libnetdata/avl.h
-        src/backend_prometheus.c
-        src/backend_prometheus.h
-        src/backends.c
-        src/backends.h
         src/libnetdata/clocks.c
         src/libnetdata/clocks.h
         src/libnetdata/common.c
-        src/common.h
-        src/daemon.c
-        src/daemon.h
         src/libnetdata/dictionary.c
         src/libnetdata/dictionary.h
         src/libnetdata/eval.c
         src/libnetdata/eval.h
-        src/global_statistics.c
-        src/global_statistics.h
         src/libnetdata/inlined.h
         src/libnetdata/locks.c
         src/libnetdata/locks.h
         src/libnetdata/log.c
         src/libnetdata/log.h
-        src/main.c
-        src/main.h
         src/libnetdata/popen.c
         src/libnetdata/popen.h
         src/libnetdata/procfile.c
         src/libnetdata/procfile.h
+        src/libnetdata/simple_pattern.c
+        src/libnetdata/simple_pattern.h
+        src/libnetdata/socket.c
+        src/libnetdata/socket.h
+        src/libnetdata/statistical.c
+        src/libnetdata/statistical.h
+        src/libnetdata/storage_number.c
+        src/libnetdata/storage_number.h
+        src/libnetdata/threads.c
+        src/libnetdata/threads.h
+        src/libnetdata/web_buffer.c
+        src/libnetdata/web_buffer.h
+        )
+
+set(NETDATA_COMMON_FILES
+        config.h
+        src/backend_prometheus.c
+        src/backend_prometheus.h
+        src/backends.c
+        src/backends.h
+        src/common.c
+        src/common.h
+        src/daemon.c
+        src/daemon.h
+        src/global_statistics.c
+        src/global_statistics.h
+        src/main.c
+        src/main.h
         src/registry.c
         src/registry.h
         src/registry_db.c
@@ -286,12 +303,6 @@ set(NETDATA_COMMON_FILES
         src/rrdvar.h
         src/signals.c
         src/signals.h
-        src/libnetdata/simple_pattern.c
-        src/libnetdata/simple_pattern.h
-        src/libnetdata/socket.c
-        src/libnetdata/socket.h
-        src/libnetdata/statistical.c
-        src/libnetdata/statistical.h
         src/plugins/checks.plugin/plugin_checks.c
         src/plugins/checks.plugin/plugin_checks.h
         src/plugins/health.plugin/health.c
@@ -305,18 +316,12 @@ set(NETDATA_COMMON_FILES
         src/plugins/plugins.d.plugin/plugins_d.h
         src/plugins/statsd.plugin/statsd.c
         src/plugins/statsd.plugin/statsd.h
-        src/libnetdata/storage_number.c
-        src/libnetdata/storage_number.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
         src/unit_test.c
         src/unit_test.h
         src/url.c
         src/url.h
         src/web_api_v1.c
         src/web_api_v1.h
-        src/libnetdata/web_buffer.c
-        src/libnetdata/web_buffer.h
         src/web_buffer_svg.c
         src/web_buffer_svg.h
         src/web_client.c
@@ -324,77 +329,25 @@ set(NETDATA_COMMON_FILES
         src/web_server.c
         src/web_server.h
         src/plugins/all.h
-        config.h
-        src/common.c)
+        ${LIBNETDATA_FILES}
+        )
 
 set(APPS_PLUGIN_SOURCE_FILES
-        src/libnetdata/appconfig.c
-        src/libnetdata/appconfig.h
-        src/plugins/apps.plugin/apps_plugin.c
-        src/libnetdata/avl.c
-        src/libnetdata/avl.h
-        src/libnetdata/adaptive_resortable_list.c
-        src/libnetdata/adaptive_resortable_list.h
-        src/libnetdata/common.c
-        src/common.h
-        src/libnetdata/clocks.c
-        src/libnetdata/clocks.h
-        src/libnetdata/inlined.h
-        src/libnetdata/locks.c
-        src/libnetdata/locks.h
-        src/libnetdata/log.c
-        src/libnetdata/log.h
-        src/libnetdata/procfile.c
-        src/libnetdata/procfile.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
-        src/libnetdata/web_buffer.c
-        src/libnetdata/web_buffer.h
         config.h
+        src/plugins/apps.plugin/apps_plugin.c
+        ${LIBNETDATA_FILES}
         )
 
 set(FREEIPMI_PLUGIN_SOURCE_FILES
-        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
-        src/libnetdata/common.c
-        src/common.h
-        src/libnetdata/clocks.c
-        src/libnetdata/clocks.h
-        src/libnetdata/inlined.h
-        src/libnetdata/locks.c
-        src/libnetdata/locks.h
-        src/libnetdata/log.c
-        src/libnetdata/log.h
-        src/libnetdata/procfile.c
-        src/libnetdata/procfile.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
         config.h
+        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
+        ${LIBNETDATA_FILES}
         )
 
 set(CGROUP_NETWORK_SOURCE_FILES
-        src/plugins/linux-cgroups.plugin/cgroup-network.c
-        src/libnetdata/common.c
-        src/common.h
-        src/libnetdata/clocks.c
-        src/libnetdata/clocks.h
-        src/libnetdata/inlined.h
-        src/libnetdata/locks.c
-        src/libnetdata/locks.h
-        src/libnetdata/log.c
-        src/libnetdata/log.h
-        src/libnetdata/popen.c
-        src/libnetdata/popen.h
-        src/libnetdata/procfile.c
-        src/libnetdata/procfile.h
-        src/signals.c
-        src/signals.h
-        src/libnetdata/storage_number.c
-        src/libnetdata/storage_number.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
-        src/libnetdata/web_buffer.c
-        src/libnetdata/web_buffer.h
         config.h
+        src/plugins/linux-cgroups.plugin/cgroup-network.c
+        ${LIBNETDATA_FILES}
         )
 
 include_directories(AFTER .)
