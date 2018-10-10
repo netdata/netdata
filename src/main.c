@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
-#include "plugins/all.h"
 
 void netdata_cleanup_and_exit(int ret) {
     // enabling this, is wrong
