@@ -37,7 +37,7 @@ AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_SRCDIR([src/main.c])
-AM_INIT_AUTOMAKE([tar-pax])
+AM_INIT_AUTOMAKE([tar-pax silent-rules subdir-objects])
 AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_INSTALL
