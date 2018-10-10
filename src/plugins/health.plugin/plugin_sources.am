@@ -5,7 +5,7 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-health_dir = $(top_srcdir)/src/plugins/health.plugin
+health_dir = $(abs_top_srcdir)/src/plugins/health.plugin
 
 health_SOURCES = \
 	$(health_dir)/health.c \

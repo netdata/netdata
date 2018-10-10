@@ -5,7 +5,7 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-tc_dir = $(top_srcdir)/src/plugins/linux-tc.plugin
+tc_dir = $(abs_top_srcdir)/src/plugins/linux-tc.plugin
 
 tc_SOURCES = \
 	$(tc_dir)/plugin_tc.c \

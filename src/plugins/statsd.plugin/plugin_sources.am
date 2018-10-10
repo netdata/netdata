@@ -5,7 +5,7 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-statsd_dir = $(top_srcdir)/src/plugins/statsd.plugin
+statsd_dir = $(abs_top_srcdir)/src/plugins/statsd.plugin
 
 statsd_SOURCES = \
 	$(statsd_dir)/statsd.c \

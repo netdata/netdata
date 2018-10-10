@@ -5,7 +5,7 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-macos_dir = $(top_srcdir)/src/plugins/macos.plugin
+macos_dir = $(abs_top_srcdir)/src/plugins/macos.plugin
 
 macos_SOURCES = \
 	$(macos_dir)/plugin_macos.c \

@@ -5,8 +5,8 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-freebsd_dir = $(top_srcdir)/src/plugins/freebsd.plugin
-linux_proc_dir = $(top_srcdir)/src/plugins/linux-proc.plugin
+freebsd_dir = $(abs_top_srcdir)/src/plugins/freebsd.plugin
+linux_proc_dir = $(abs_top_srcdir)/src/plugins/linux-proc.plugin
 
 freebsd_SOURCES = \
 	$(freebsd_dir)/plugin_freebsd.c \

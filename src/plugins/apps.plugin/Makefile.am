@@ -10,8 +10,8 @@ AM_CFLAGS = \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)
 
-apps_dir = $(top_srcdir)/src/plugins/apps.plugin
-freebsd_dir = $(top_srcdir)/src/plugins/freebsd.plugin
+apps_dir = $(abs_top_srcdir)/src/plugins/apps.plugin
+freebsd_dir = $(abs_top_srcdir)/src/plugins/freebsd.plugin
 
 if ENABLE_PLUGIN_APPS
 plugins_PROGRAMS = apps.plugin

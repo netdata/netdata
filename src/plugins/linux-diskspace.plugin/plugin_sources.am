@@ -5,7 +5,7 @@
 # We don't build static libraries
 # because LTO does not always work with them (eg alpine)
 
-diskspace_dir = $(top_srcdir)/src/plugins/linux-diskspace.plugin
+diskspace_dir = $(abs_top_srcdir)/src/plugins/linux-diskspace.plugin
 
 diskspace_SOURCES = \
     $(diskspace_dir)/plugin_diskspace.h \
