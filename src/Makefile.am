@@ -256,10 +256,6 @@ if FREEBSD
     NETDATA_FILES += \
         $(FREEBSD_PLUGIN_FILES) \
         $(NULL)
-
-    APPS_PLUGIN_FILES += \
-        plugins/freebsd.plugin/plugin_freebsd.h \
-    	$(NULL)
 endif
 
 if MACOS

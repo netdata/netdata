@@ -424,8 +424,6 @@ IF(LINUX)
     ENDIF()
 
 ELSEIF(FREEBSD)
-    set(APPS_PLUGIN_FILES ${APPS_PLUGIN_FILES} plugins/freebsd.plugin/plugin_freebsd.h)
-
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
