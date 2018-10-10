@@ -29,26 +29,10 @@ plugins_PROGRAMS += cgroup-network
 
 cgroup_network_SOURCES = \
     cgroup-network.c \
-	../../clocks.c \
-	../../clocks.h \
-	../../common.c \
-	../../common.h \
-	../../inlined.h \
-	../../locks.c \
-	../../locks.h \
-	../../log.c \
-	../../log.h \
-	../../procfile.c \
-	../../procfile.h \
-	../../popen.c \
-	../../popen.h \
-	../../signals.c \
-	../../signals.h \
-	../../threads.c \
-	../../threads.h \
 	$(NULL)
 
 cgroup_network_LDADD = \
+	../../libnetdata/libnetdata.a \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)

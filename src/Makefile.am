@@ -25,39 +25,17 @@ plugins_PROGRAMS =
 
 netdata_SOURCES = \
     plugins/all.h \
-	adaptive_resortable_list.c \
-	adaptive_resortable_list.h \
-	appconfig.c \
-	appconfig.h \
-	avl.c \
-	avl.h \
 	backend_prometheus.c \
 	backend_prometheus.h \
 	backends.c \
 	backends.h \
-	clocks.c \
-	clocks.h \
-	common.c \
 	common.h \
 	daemon.c \
 	daemon.h \
-	dictionary.c \
-	dictionary.h \
-	eval.c \
-	eval.h \
 	global_statistics.c \
 	global_statistics.h \
-	inlined.h \
-	locks.c \
-	locks.h \
-	log.c \
-	log.h \
 	main.c \
 	main.h \
-	popen.c \
-	popen.h \
-	procfile.c \
-	procfile.h \
 	registry.c \
 	registry.h \
 	registry_db.c \
@@ -93,24 +71,12 @@ netdata_SOURCES = \
 	rrdvar.h \
 	signals.c \
 	signals.h \
-	simple_pattern.c \
-	simple_pattern.h \
-	socket.c \
-	socket.h \
-	statistical.c \
-	statistical.h \
-	storage_number.c \
-	storage_number.h \
-	threads.c \
-	threads.h \
 	unit_test.c \
 	unit_test.h \
 	url.c \
 	url.h \
 	web_api_v1.c \
 	web_api_v1.h \
-	web_buffer.c \
-	web_buffer.h \
 	web_buffer_svg.c \
 	web_buffer_svg.h \
 	web_client.c \
@@ -134,6 +100,7 @@ netdata_LDADD += \
     $(NULL)
 
 else
+
 if MACOS
 
 netdata_LDADD += \
@@ -151,9 +118,11 @@ netdata_LDADD += \
     $(NULL)
 
 endif
+
 endif
 
 netdata_LDADD += \
+    $(top_builddir)/src/libnetdata/libnetdata.a \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \

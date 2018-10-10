@@ -13,26 +13,11 @@ if ENABLE_PLUGIN_FREEIPMI
 plugins_PROGRAMS = freeipmi.plugin
 endif
 
-# FIXME: we should not reference parent files like this
-# we need to build a libnetdata.a and reference that
-
 freeipmi_plugin_SOURCES = \
 	freeipmi_plugin.c \
-	../../clocks.c \
-	../../clocks.h \
-	../../common.c \
-	../../common.h \
-	../../inlined.h \
-	../../locks.c \
-	../../locks.h \
-	../../log.c \
-	../../log.h \
-	../../procfile.c \
-	../../procfile.h \
-	../../threads.c \
-	../../threads.h \
 	$(NULL)
 
 freeipmi_plugin_LDADD = \
+	../../libnetdata/libnetdata.a \
 	$(OPTIONAL_IPMIMONITORING_LIBS) \
 	$(NULL)

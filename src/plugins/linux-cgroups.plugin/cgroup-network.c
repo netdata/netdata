@@ -23,9 +23,10 @@ char *environment[] = {
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
-void health_reload(void) {};
-void rrdhost_save_all(void) {};
 
+void signals_block(void) {};
+void signals_unblock(void) {};
+void signals_reset(void) {};
 
 // ----------------------------------------------------------------------------
 
