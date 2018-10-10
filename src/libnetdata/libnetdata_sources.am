@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# the list of files in libnetdata
+# this file is included from Makefile.am
+# of tools requiring libnetdata
+
+# We don't build static libraries
+# because LTO does not always work with them (eg alpine)
+
+libnetdata_SOURCES = \
+    $(top_srcdir)/src/libnetdata/adaptive_resortable_list.c \
+    $(top_srcdir)/src/libnetdata/adaptive_resortable_list.h \
+    $(top_srcdir)/src/libnetdata/appconfig.c \
+    $(top_srcdir)/src/libnetdata/appconfig.h \
+    $(top_srcdir)/src/libnetdata/avl.c \
+    $(top_srcdir)/src/libnetdata/avl.h \
+    $(top_srcdir)/src/libnetdata/clocks.c \
+    $(top_srcdir)/src/libnetdata/clocks.h \
+    $(top_srcdir)/src/libnetdata/common.c \
+    $(top_srcdir)/src/libnetdata/dictionary.c \
+    $(top_srcdir)/src/libnetdata/dictionary.h \
+    $(top_srcdir)/src/libnetdata/eval.c \
+    $(top_srcdir)/src/libnetdata/eval.h \
+    $(top_srcdir)/src/libnetdata/inlined.h \
+    $(top_srcdir)/src/libnetdata/libnetdata.h \
+    $(top_srcdir)/src/libnetdata/locks.c \
+    $(top_srcdir)/src/libnetdata/locks.h \
+    $(top_srcdir)/src/libnetdata/log.c \
+    $(top_srcdir)/src/libnetdata/log.h \
+    $(top_srcdir)/src/libnetdata/popen.c \
+    $(top_srcdir)/src/libnetdata/popen.h \
+    $(top_srcdir)/src/libnetdata/procfile.c \
+    $(top_srcdir)/src/libnetdata/procfile.h \
+    $(top_srcdir)/src/libnetdata/simple_pattern.c \
+    $(top_srcdir)/src/libnetdata/simple_pattern.h \
+    $(top_srcdir)/src/libnetdata/socket.c \
+    $(top_srcdir)/src/libnetdata/socket.h \
+    $(top_srcdir)/src/libnetdata/statistical.c \
+    $(top_srcdir)/src/libnetdata/statistical.h \
+    $(top_srcdir)/src/libnetdata/storage_number.c \
+    $(top_srcdir)/src/libnetdata/storage_number.h \
+    $(top_srcdir)/src/libnetdata/threads.c \
+    $(top_srcdir)/src/libnetdata/threads.h \
+    $(top_srcdir)/src/libnetdata/web_buffer.c \
+    $(top_srcdir)/src/libnetdata/web_buffer.h \
+    $(NULL)
+

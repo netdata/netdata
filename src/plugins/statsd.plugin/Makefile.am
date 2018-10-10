@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = Makefile.in
 
 AM_CFLAGS = \
@@ -8,9 +9,6 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(NULL)
 
-noinst_LIBRARIES=libplugin-statsd.a
-
-libplugin_statsd_a_SOURCES = \
-	statsd.c \
-	statsd.h \
+dist_noinst_DATA = \
+	plugin_sources.am \
 	$(NULL)

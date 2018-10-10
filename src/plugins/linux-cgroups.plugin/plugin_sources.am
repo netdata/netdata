@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# the list of files for this plugin
+
+# We don't build static libraries
+# because LTO does not always work with them (eg alpine)
+
+cgroups_dir = $(top_srcdir)/src/plugins/linux-cgroups.plugin
+
+cgroups_SOURCES = \
+    $(cgroups_dir)/sys_fs_cgroup.c \
+    $(cgroups_dir)/sys_fs_cgroup.h \
+    $(NULL)

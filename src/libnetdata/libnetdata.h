@@ -312,5 +312,6 @@ extern void recursive_config_double_dir_load(
 
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
+extern char *netdata_configured_host_prefix;
 
 #endif // NETDATA_LIB_H

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = Makefile.in
 
 AM_CFLAGS = \
@@ -9,22 +10,27 @@ AM_CFLAGS = \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)
 
-if ENABLE_PLUGIN_FREEIPMI
+apps_dir = $(top_srcdir)/src/plugins/apps.plugin
+freebsd_dir = $(top_srcdir)/src/plugins/freebsd.plugin
+
+if ENABLE_PLUGIN_APPS
 plugins_PROGRAMS = apps.plugin
 endif
 
+include ../../libnetdata/libnetdata_sources.am
+
 apps_plugin_SOURCES = \
-	apps_plugin.c \
+	$(apps_dir)/apps_plugin.c \
+	$(libnetdata_SOURCES) \
 	$(NULL)
 
 if FREEBSD
 apps_plugin_SOURCES += \
-	../../plugin_freebsd.h \
+	$(freebsd_dir)/plugin_freebsd.h \
 	$(NULL)
 endif
 
 apps_plugin_LDADD = \
-	../../libnetdata/libnetdata.a \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)

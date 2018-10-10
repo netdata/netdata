@@ -325,7 +325,7 @@ set(NETDATA_COMMON_FILES
         src/web_server.h
         src/plugins/all.h
         config.h
-        )
+        src/common.c)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/libnetdata/appconfig.c

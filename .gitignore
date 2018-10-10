@@ -1,5 +1,6 @@
 .deps
 .libs
+.dirstamp
 
 *.o
 *.a

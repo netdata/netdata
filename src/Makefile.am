@@ -1,7 +1,6 @@
-#
-# Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
+
+AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 SUBDIRS = \
@@ -12,8 +11,6 @@ AM_CFLAGS = \
 	$(OPTIONAL_NFACCT_CLFAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(OPTIONAL_UUID_CFLAGS) \
-	$(OPTIONAL_LIBCAP_CFLAGS) \
-	$(OPTIONAL_IPMIMONITORING_CFLAGS)\
 	$(NULL)
 
 sbin_PROGRAMS = netdata
@@ -23,12 +20,27 @@ dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS =
 
+include libnetdata/libnetdata_sources.am
+include plugins/checks.plugin/plugin_sources.am
+include plugins/freebsd.plugin/plugin_sources.am
+include plugins/health.plugin/plugin_sources.am
+include plugins/idlejitter.plugin/plugin_sources.am
+include plugins/linux-cgroups.plugin/plugin_sources.am
+include plugins/linux-diskspace.plugin/plugin_sources.am
+include plugins/linux-nfacct.plugin/plugin_sources.am
+include plugins/linux-proc.plugin/plugin_sources.am
+include plugins/linux-tc.plugin/plugin_sources.am
+include plugins/macos.plugin/plugin_sources.am
+include plugins/plugins.d.plugin/plugin_sources.am
+include plugins/statsd.plugin/plugin_sources.am
+
 netdata_SOURCES = \
     plugins/all.h \
 	backend_prometheus.c \
 	backend_prometheus.h \
 	backends.c \
 	backends.h \
+	common.c \
 	common.h \
 	daemon.c \
 	daemon.h \
@@ -83,46 +95,40 @@ netdata_SOURCES = \
 	web_client.h \
 	web_server.c \
 	web_server.h \
+	$(libnetdata_SOURCES) \
+	$(checks_SOURCES) \
+	$(health_SOURCES) \
+	$(idlejitter_SOURCES) \
+	$(pluginsd_SOURCES) \
+	$(statsd_SOURCES) \
 	$(NULL)
 
 netdata_LDADD = \
-    $(top_builddir)/src/plugins/checks.plugin/libplugin-checks.a \
-    $(top_builddir)/src/plugins/idlejitter.plugin/libplugin-idlejitter.a \
-    $(top_builddir)/src/plugins/plugins.d.plugin/libplugin-plugins.d.a \
-    $(top_builddir)/src/plugins/statsd.plugin/libplugin-statsd.a \
-    $(top_builddir)/src/plugins/health.plugin/libplugin-health.a \
 	$(NULL)
 
 if FREEBSD
-
-netdata_LDADD += \
-    $(top_builddir)/src/plugins/freebsd.plugin/libplugin-freebsd.a \
-    $(NULL)
-
-else
+    netdata_SOURCES += \
+        $(freebsd_SOURCES) \
+        $(NULL)
+endif
 
 if MACOS
-
-netdata_LDADD += \
-    $(top_builddir)/src/plugins/macos.plugin/libplugin-macos.a \
-    $(NULL)
-
-else
-
-netdata_LDADD += \
-    $(top_builddir)/src/plugins/linux-cgroups.plugin/libplugin-linux-cgroups.a \
-    $(top_builddir)/src/plugins/linux-diskspace.plugin/libplugin-linux-diskspace.a \
-    $(top_builddir)/src/plugins/linux-nfacct.plugin/libplugin-linux-nfacct.a \
-    $(top_builddir)/src/plugins/linux-proc.plugin/libplugin-linux-proc.a \
-    $(top_builddir)/src/plugins/linux-tc.plugin/libplugin-linux-tc.a \
-    $(NULL)
-
+    netdata_SOURCES += \
+        $(macos_SOURCES) \
+        $(NULL)
 endif
 
+if LINUX
+    netdata_SOURCES += \
+        $(cgroups_SOURCES) \
+        $(diskspace_SOURCES) \
+        $(nfacct_SOURCES) \
+        $(proc_SOURCES) \
+        $(tc_SOURCES) \
+        $(NULL)
 endif
 
 netdata_LDADD += \
-    $(top_builddir)/src/libnetdata/libnetdata.a \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \

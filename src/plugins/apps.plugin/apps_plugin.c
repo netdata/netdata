@@ -6,7 +6,32 @@
  * Released under GPL v3+
  */
 
-#include "src/common.h"
+#include "../../libnetdata/libnetdata.h"
+
+// ----------------------------------------------------------------------------
+
+// callback required by fatal()
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
+
+// callbacks required by popen()
+void signals_block(void) {};
+void signals_unblock(void) {};
+void signals_reset(void) {};
+
+// callback required by eval()
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+    return 0;
+};
+
+// required by get_system_cpus()
+char *netdata_configured_host_prefix = "";
+
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -98,7 +123,6 @@ static int
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
-
 
 // will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
 static char *user_config_dir = CONFIG_DIR;
@@ -460,13 +484,6 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-
-// ----------------------------------------------------------------------------
-// callback required by fatal()
-
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
 
 // ----------------------------------------------------------------------------
 // apps_groups.conf
@@ -2805,8 +2822,6 @@ static void calculate_netdata_statistics(void) {
 
 // ----------------------------------------------------------------------------
 // update chart dimensions
-
-int print_calculated_number(char *str, calculated_number value) { (void)str; (void)value; return 0; }
 
 static inline void send_BEGIN(const char *type, const char *id, usec_t usec) {
     fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
