@@ -11,6 +11,8 @@ AM_CFLAGS = \
 	$(OPTIONAL_NFACCT_CLFAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(OPTIONAL_UUID_CFLAGS) \
+	$(OPTIONAL_LIBCAP_LIBS) \
+	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS = netdata
@@ -20,19 +22,165 @@ dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS =
 
-include libnetdata/libnetdata_sources.am
-include plugins/checks.plugin/plugin_sources.am
-include plugins/freebsd.plugin/plugin_sources.am
-include plugins/health.plugin/plugin_sources.am
-include plugins/idlejitter.plugin/plugin_sources.am
-include plugins/linux-cgroups.plugin/plugin_sources.am
-include plugins/linux-diskspace.plugin/plugin_sources.am
-include plugins/linux-nfacct.plugin/plugin_sources.am
-include plugins/linux-proc.plugin/plugin_sources.am
-include plugins/linux-tc.plugin/plugin_sources.am
-include plugins/macos.plugin/plugin_sources.am
-include plugins/plugins.d.plugin/plugin_sources.am
-include plugins/statsd.plugin/plugin_sources.am
+LIBNETDATA_FILES = \
+    libnetdata/adaptive_resortable_list.c \
+    libnetdata/adaptive_resortable_list.h \
+    libnetdata/appconfig.c \
+    libnetdata/appconfig.h \
+    libnetdata/avl.c \
+    libnetdata/avl.h \
+    libnetdata/clocks.c \
+    libnetdata/clocks.h \
+    libnetdata/common.c \
+    libnetdata/dictionary.c \
+    libnetdata/dictionary.h \
+    libnetdata/eval.c \
+    libnetdata/eval.h \
+    libnetdata/inlined.h \
+    libnetdata/libnetdata.h \
+    libnetdata/locks.c \
+    libnetdata/locks.h \
+    libnetdata/log.c \
+    libnetdata/log.h \
+    libnetdata/popen.c \
+    libnetdata/popen.h \
+    libnetdata/procfile.c \
+    libnetdata/procfile.h \
+    libnetdata/simple_pattern.c \
+    libnetdata/simple_pattern.h \
+    libnetdata/socket.c \
+    libnetdata/socket.h \
+    libnetdata/statistical.c \
+    libnetdata/statistical.h \
+    libnetdata/storage_number.c \
+    libnetdata/storage_number.h \
+    libnetdata/threads.c \
+    libnetdata/threads.h \
+    libnetdata/web_buffer.c \
+    libnetdata/web_buffer.h \
+    $(NULL)
+
+APPS_PLUGIN_FILES = \
+	plugins/apps.plugin/apps_plugin.c \
+	$(LIBNETDATA_FILES) \
+    $(NULL)
+
+CHECKS_PLUGIN_FILES = \
+    plugins/checks.plugin/plugin_checks.c \
+    plugins/checks.plugin/plugin_checks.h \
+    $(NULL)
+
+FREEBSD_PLUGIN_FILES = \
+	plugins/freebsd.plugin/plugin_freebsd.c \
+	plugins/freebsd.plugin/plugin_freebsd.h \
+	plugins/freebsd.plugin/freebsd_sysctl.c \
+	plugins/freebsd.plugin/freebsd_getmntinfo.c \
+	plugins/freebsd.plugin/freebsd_getifaddrs.c \
+	plugins/freebsd.plugin/freebsd_devstat.c \
+	plugins/freebsd.plugin/freebsd_kstat_zfs.c \
+	plugins/freebsd.plugin/freebsd_ipfw.c \
+	plugins/linux-proc.plugin/zfs_common.c \
+	plugins/linux-proc.plugin/zfs_common.h \
+    $(NULL)
+
+HEALTH_PLUGIN_FILES = \
+	plugins/health.plugin/health.c \
+	plugins/health.plugin/health.h \
+	plugins/health.plugin/health_config.c \
+	plugins/health.plugin/health_json.c \
+	plugins/health.plugin/health_log.c \
+    $(NULL)
+
+IDLEJITTER_PLUGIN_FILES = \
+	plugins/idlejitter.plugin/plugin_idlejitter.c \
+	plugins/idlejitter.plugin/plugin_idlejitter.h \
+    $(NULL)
+
+CGROUPS_PLUGIN_FILES = \
+    plugins/linux-cgroups.plugin/sys_fs_cgroup.c \
+    plugins/linux-cgroups.plugin/sys_fs_cgroup.h \
+    $(NULL)
+
+CGROUP_NETWORK_FILES = \
+    plugins/linux-cgroups.plugin/cgroup-network.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+DISKSPACE_PLUGIN_FILES = \
+    plugins/linux-diskspace.plugin/plugin_diskspace.h \
+    plugins/linux-diskspace.plugin/plugin_diskspace.c \
+    $(NULL)
+
+FREEIPMI_PLUGIN_FILES = \
+    plugins/linux-freeipmi.plugin/freeipmi_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+NFACCT_PLUGIN_FILES = \
+	plugins/linux-nfacct.plugin/plugin_nfacct.c \
+	plugins/linux-nfacct.plugin/plugin_nfacct.h \
+    $(NULL)
+
+PROC_PLUGIN_FILES = \
+	plugins/linux-proc.plugin/ipc.c \
+	plugins/linux-proc.plugin/ipc.h \
+	plugins/linux-proc.plugin/plugin_proc.c \
+	plugins/linux-proc.plugin/plugin_proc.h \
+	plugins/linux-proc.plugin/proc_diskstats.c \
+	plugins/linux-proc.plugin/proc_interrupts.c \
+	plugins/linux-proc.plugin/proc_softirqs.c \
+	plugins/linux-proc.plugin/proc_loadavg.c \
+	plugins/linux-proc.plugin/proc_meminfo.c \
+	plugins/linux-proc.plugin/proc_net_dev.c \
+	plugins/linux-proc.plugin/proc_net_ip_vs_stats.c \
+	plugins/linux-proc.plugin/proc_net_netstat.c \
+	plugins/linux-proc.plugin/proc_net_rpc_nfs.c \
+	plugins/linux-proc.plugin/proc_net_rpc_nfsd.c \
+	plugins/linux-proc.plugin/proc_net_snmp.c \
+	plugins/linux-proc.plugin/proc_net_snmp6.c \
+	plugins/linux-proc.plugin/proc_net_sctp_snmp.c \
+	plugins/linux-proc.plugin/proc_net_sockstat.c \
+	plugins/linux-proc.plugin/proc_net_sockstat6.c \
+	plugins/linux-proc.plugin/proc_net_softnet_stat.c \
+	plugins/linux-proc.plugin/proc_net_stat_conntrack.c \
+	plugins/linux-proc.plugin/proc_net_stat_synproxy.c \
+	plugins/linux-proc.plugin/proc_self_mountinfo.c \
+	plugins/linux-proc.plugin/proc_self_mountinfo.h \
+	plugins/linux-proc.plugin/zfs_common.c \
+	plugins/linux-proc.plugin/zfs_common.h \
+	plugins/linux-proc.plugin/proc_spl_kstat_zfs.c \
+	plugins/linux-proc.plugin/proc_stat.c \
+	plugins/linux-proc.plugin/proc_sys_kernel_random_entropy_avail.c \
+	plugins/linux-proc.plugin/proc_vmstat.c \
+	plugins/linux-proc.plugin/proc_uptime.c \
+	plugins/linux-proc.plugin/sys_kernel_mm_ksm.c \
+	plugins/linux-proc.plugin/sys_devices_system_edac_mc.c \
+	plugins/linux-proc.plugin/sys_devices_system_node.c \
+	plugins/linux-proc.plugin/sys_fs_btrfs.c \
+    $(NULL)
+
+TC_PLUGIN_FILES = \
+	plugins/linux-tc.plugin/plugin_tc.c \
+	plugins/linux-tc.plugin/plugin_tc.h \
+    $(NULL)
+
+MACOS_PLUGIN_FILES = \
+	plugins/macos.plugin/plugin_macos.c \
+	plugins/macos.plugin/plugin_macos.h \
+	plugins/macos.plugin/macos_sysctl.c \
+	plugins/macos.plugin/macos_mach_smi.c \
+	plugins/macos.plugin/macos_fw.c \
+    $(NULL)
+
+PLUGINSD_PLUGIN_FILES = \
+	plugins/plugins.d.plugin/plugins_d.c \
+	plugins/plugins.d.plugin/plugins_d.h \
+    $(NULL)
+
+STATSD_PLUGIN_FILES = \
+	plugins/statsd.plugin/statsd.c \
+	plugins/statsd.plugin/statsd.h \
+    $(NULL)
 
 netdata_SOURCES = \
     plugins/all.h \
@@ -95,12 +243,12 @@ netdata_SOURCES = \
 	web_client.h \
 	web_server.c \
 	web_server.h \
-	$(libnetdata_SOURCES) \
-	$(checks_SOURCES) \
-	$(health_SOURCES) \
-	$(idlejitter_SOURCES) \
-	$(pluginsd_SOURCES) \
-	$(statsd_SOURCES) \
+	$(LIBNETDATA_FILES) \
+	$(CHECKS_PLUGIN_FILES) \
+	$(HEALTH_PLUGIN_FILES) \
+	$(IDLEJITTER_PLUGIN_FILES) \
+	$(PLUGINSD_PLUGIN_FILES) \
+	$(STATSD_PLUGIN_FILES) \
 	$(NULL)
 
 netdata_LDADD = \
@@ -108,24 +256,29 @@ netdata_LDADD = \
 
 if FREEBSD
     netdata_SOURCES += \
-        $(freebsd_SOURCES) \
+        $(FREEBSD_PLUGIN_FILES) \
         $(NULL)
+
+    APPS_PLUGIN_FILES += \
+        plugins/freebsd.plugin/plugin_freebsd.h \
+    	$(NULL)
 endif
 
 if MACOS
     netdata_SOURCES += \
-        $(macos_SOURCES) \
+        $(MACOS_PLUGIN_FILES) \
         $(NULL)
 endif
 
 if LINUX
     netdata_SOURCES += \
-        $(cgroups_SOURCES) \
-        $(diskspace_SOURCES) \
-        $(nfacct_SOURCES) \
-        $(proc_SOURCES) \
-        $(tc_SOURCES) \
+        $(CGROUPS_PLUGIN_FILES) \
+        $(DISKSPACE_PLUGIN_FILES) \
+        $(NFACCT_PLUGIN_FILES) \
+        $(PROC_PLUGIN_FILES) \
+        $(TC_PLUGIN_FILES) \
         $(NULL)
+
 endif
 
 netdata_LDADD += \
@@ -134,3 +287,34 @@ netdata_LDADD += \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
 	$(NULL)
+
+if ENABLE_PLUGIN_APPS
+    plugins_PROGRAMS += apps.plugin
+    apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
+    apps_plugin_LDADD = \
+        $(OPTIONAL_MATH_LIBS) \
+        $(OPTIONAL_LIBCAP_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_CGROUP_NETWORK
+    plugins_PROGRAMS += cgroup-network
+    cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
+    cgroup_network_LDADD = \
+        $(OPTIONAL_MATH_LIBS) \
+        $(OPTIONAL_ZLIB_LIBS) \
+        $(OPTIONAL_UUID_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_FREEIPMI
+    plugins_PROGRAMS += freeipmi.plugin
+    freeipmi_plugin_SOURCES = $(FREEIPMI_PLUGIN_FILES)
+    freeipmi_plugin_LDADD = \
+        $(OPTIONAL_MATH_LIBS) \
+        $(OPTIONAL_ZLIB_LIBS) \
+        $(OPTIONAL_UUID_LIBS) \
+        $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
