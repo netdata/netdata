@@ -16,7 +16,6 @@
 #include "rrd2json.h"
 #include "web_client.h"
 #include "web_server.h"
-#include "registry.h"
 #include "daemon.h"
 #include "main.h"
 #include "unit_test.h"
@@ -27,6 +26,7 @@
 #include "signals.h"
 
 #include "health/health.h"
+#include "registry/registry.h"
 #include "plugins/all.h"
 
 extern char *netdata_configured_hostname;

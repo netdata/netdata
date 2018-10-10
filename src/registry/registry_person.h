@@ -3,6 +3,8 @@
 #ifndef NETDATA_REGISTRY_PERSON_H
 #define NETDATA_REGISTRY_PERSON_H 1
 
+#include "registry_internals.h"
+
 // ----------------------------------------------------------------------------
 // PERSON structures
 

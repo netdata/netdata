@@ -547,6 +547,7 @@ AC_CONFIG_FILES([
     node.d/Makefile
     plugins.d/Makefile
     src/health/Makefile
+    src/registry/Makefile
     src/libnetdata/Makefile
     src/plugins/apps.plugin/Makefile
     src/plugins/checks.plugin/Makefile

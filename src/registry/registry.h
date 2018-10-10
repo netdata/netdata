@@ -49,6 +49,8 @@
 #ifndef NETDATA_REGISTRY_H
 #define NETDATA_REGISTRY_H 1
 
+#include "../common.h"
+
 #define NETDATA_REGISTRY_COOKIE_NAME "netdata_registry_id"
 
 // initialize the registry

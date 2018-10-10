@@ -181,6 +181,22 @@ PLUGINSD_PLUGIN_FILES = \
 	plugins/plugins.d.plugin/plugins_d.h \
     $(NULL)
 
+REGISTRY_PLUGIN_FILES = \
+	registry/registry.c \
+	registry/registry.h \
+	registry/registry_db.c \
+	registry/registry_init.c \
+	registry/registry_internals.c \
+	registry/registry_internals.h \
+	registry/registry_log.c \
+	registry/registry_machine.c \
+	registry/registry_machine.h \
+	registry/registry_person.c \
+	registry/registry_person.h \
+	registry/registry_url.c \
+	registry/registry_url.h \
+    $(NULL)
+
 STATSD_PLUGIN_FILES = \
 	plugins/statsd.plugin/statsd.c \
 	plugins/statsd.plugin/statsd.h \
@@ -200,19 +216,6 @@ NETDATA_FILES = \
 	global_statistics.h \
 	main.c \
 	main.h \
-	registry.c \
-	registry.h \
-	registry_db.c \
-	registry_init.c \
-	registry_internals.c \
-	registry_internals.h \
-	registry_log.c \
-	registry_machine.c \
-	registry_machine.h \
-	registry_person.c \
-	registry_person.h \
-	registry_url.c \
-	registry_url.h \
 	rrd.c \
 	rrd.h \
 	rrd2json.c \
@@ -252,6 +255,7 @@ NETDATA_FILES = \
 	$(HEALTH_PLUGIN_FILES) \
 	$(IDLEJITTER_PLUGIN_FILES) \
 	$(PLUGINSD_PLUGIN_FILES) \
+	$(REGISTRY_PLUGIN_FILES) \
 	$(STATSD_PLUGIN_FILES) \
 	$(NULL)
 

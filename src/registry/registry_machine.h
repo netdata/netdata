@@ -3,6 +3,8 @@
 #ifndef NETDATA_REGISTRY_MACHINE_H
 #define NETDATA_REGISTRY_MACHINE_H 1
 
+#include "registry_internals.h"
+
 // ----------------------------------------------------------------------------
 // MACHINE structures
 

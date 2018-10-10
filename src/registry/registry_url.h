@@ -3,6 +3,8 @@
 #ifndef NETDATA_REGISTRY_URL_H
 #define NETDATA_REGISTRY_URL_H 1
 
+#include "registry_internals.h"
+
 // ----------------------------------------------------------------------------
 // URL structures
 // Save memory by de-duplicating URLs

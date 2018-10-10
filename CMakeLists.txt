@@ -294,6 +294,22 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins/plugins.d.plugin/plugins_d.h
         )
 
+set(REGISTRY_PLUGIN_FILES
+        src/registry/registry.c
+        src/registry/registry.h
+        src/registry/registry_db.c
+        src/registry/registry_init.c
+        src/registry/registry_internals.c
+        src/registry/registry_internals.h
+        src/registry/registry_log.c
+        src/registry/registry_machine.c
+        src/registry/registry_machine.h
+        src/registry/registry_person.c
+        src/registry/registry_person.h
+        src/registry/registry_url.c
+        src/registry/registry_url.h
+        )
+
 set(STATSD_PLUGIN_FILES
         src/plugins/statsd.plugin/statsd.c
         src/plugins/statsd.plugin/statsd.h
@@ -313,19 +329,6 @@ set(NETDATA_FILES
         src/global_statistics.h
         src/main.c
         src/main.h
-        src/registry.c
-        src/registry.h
-        src/registry_db.c
-        src/registry_init.c
-        src/registry_internals.c
-        src/registry_internals.h
-        src/registry_log.c
-        src/registry_machine.c
-        src/registry_machine.h
-        src/registry_person.c
-        src/registry_person.h
-        src/registry_url.c
-        src/registry_url.h
         src/rrd.c
         src/rrd.h
         src/rrd2json.c
@@ -365,6 +368,7 @@ set(NETDATA_FILES
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
         )
 
