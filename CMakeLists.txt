@@ -138,7 +138,55 @@ ENDIF(LINUX)
 # -----------------------------------------------------------------------------
 # netdata files
 
-set(NETDATA_FREEBSD_FILES
+set(LIBNETDATA_FILES
+        src/libnetdata/adaptive_resortable_list.c
+        src/libnetdata/adaptive_resortable_list.h
+        src/libnetdata/appconfig.c
+        src/libnetdata/appconfig.h
+        src/libnetdata/avl.c
+        src/libnetdata/avl.h
+        src/libnetdata/clocks.c
+        src/libnetdata/clocks.h
+        src/libnetdata/common.c
+        src/libnetdata/dictionary.c
+        src/libnetdata/dictionary.h
+        src/libnetdata/eval.c
+        src/libnetdata/eval.h
+        src/libnetdata/inlined.h
+        src/libnetdata/libnetdata.h
+        src/libnetdata/locks.c
+        src/libnetdata/locks.h
+        src/libnetdata/log.c
+        src/libnetdata/log.h
+        src/libnetdata/popen.c
+        src/libnetdata/popen.h
+        src/libnetdata/procfile.c
+        src/libnetdata/procfile.h
+        src/libnetdata/simple_pattern.c
+        src/libnetdata/simple_pattern.h
+        src/libnetdata/socket.c
+        src/libnetdata/socket.h
+        src/libnetdata/statistical.c
+        src/libnetdata/statistical.h
+        src/libnetdata/storage_number.c
+        src/libnetdata/storage_number.h
+        src/libnetdata/threads.c
+        src/libnetdata/threads.h
+        src/libnetdata/web_buffer.c
+        src/libnetdata/web_buffer.h
+        )
+
+set(APPS_PLUGIN_FILES
+        src/plugins/apps.plugin/apps_plugin.c
+        ${LIBNETDATA_FILES}
+        )
+
+set(CHECKS_PLUGIN_FILES
+        src/plugins/checks.plugin/plugin_checks.c
+        src/plugins/checks.plugin/plugin_checks.h
+        )
+
+set(FREEBSD_PLUGIN_FILES
         src/plugins/freebsd.plugin/plugin_freebsd.c
         src/plugins/freebsd.plugin/plugin_freebsd.h
         src/plugins/freebsd.plugin/freebsd_sysctl.c
@@ -147,25 +195,49 @@ set(NETDATA_FREEBSD_FILES
         src/plugins/freebsd.plugin/freebsd_devstat.c
         src/plugins/freebsd.plugin/freebsd_kstat_zfs.c
         src/plugins/freebsd.plugin/freebsd_ipfw.c
-
-        # the following are common with Linux
         src/plugins/linux-proc.plugin/zfs_common.c
         src/plugins/linux-proc.plugin/zfs_common.h
         )
 
-set(NETDATA_MACOS_FILES
-        src/plugins/macos.plugin/plugin_macos.c
-        src/plugins/macos.plugin/plugin_macos.h
-        src/plugins/macos.plugin/macos_sysctl.c
-        src/plugins/macos.plugin/macos_mach_smi.c
-        src/plugins/macos.plugin/macos_fw.c
+set(HEALTH_PLUGIN_FILES
+        src/plugins/health.plugin/health.c
+        src/plugins/health.plugin/health.h
+        src/plugins/health.plugin/health_config.c
+        src/plugins/health.plugin/health_json.c
+        src/plugins/health.plugin/health_log.c
         )
 
-set(NETDATA_LINUX_FILES
+set(IDLEJITTER_PLUGIN_FILES
+        src/plugins/idlejitter.plugin/plugin_idlejitter.c
+        src/plugins/idlejitter.plugin/plugin_idlejitter.h
+        )
+
+set(CGROUPS_PLUGIN_FILES
         src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
         src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
-        src/plugins/linux-diskspace.plugin/plugin_diskspace.c
+        )
+
+set(CGROUP_NETWORK_FILES
+        src/plugins/linux-cgroups.plugin/cgroup-network.c
+        ${LIBNETDATA_FILES}
+        )
+
+set(DISKSPACE_PLUGIN_FILES
         src/plugins/linux-diskspace.plugin/plugin_diskspace.h
+        src/plugins/linux-diskspace.plugin/plugin_diskspace.c
+        )
+
+set(FREEIPMI_PLUGIN_FILES
+        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
+        ${LIBNETDATA_FILES}
+        )
+
+set(NFACCT_PLUGIN_FILES
+        src/plugins/linux-nfacct.plugin/plugin_nfacct.c
+        src/plugins/linux-nfacct.plugin/plugin_nfacct.h
+        )
+
+set(PROC_PLUGIN_FILES
         src/plugins/linux-proc.plugin/ipc.c
         src/plugins/linux-proc.plugin/plugin_proc.c
         src/plugins/linux-proc.plugin/plugin_proc.h
@@ -189,73 +261,44 @@ set(NETDATA_LINUX_FILES
         src/plugins/linux-proc.plugin/proc_net_stat_synproxy.c
         src/plugins/linux-proc.plugin/proc_self_mountinfo.c
         src/plugins/linux-proc.plugin/proc_self_mountinfo.h
+        src/plugins/linux-proc.plugin/zfs_common.c
+        src/plugins/linux-proc.plugin/zfs_common.h
         src/plugins/linux-proc.plugin/proc_spl_kstat_zfs.c
         src/plugins/linux-proc.plugin/proc_stat.c
         src/plugins/linux-proc.plugin/proc_sys_kernel_random_entropy_avail.c
         src/plugins/linux-proc.plugin/proc_vmstat.c
         src/plugins/linux-proc.plugin/proc_uptime.c
+        src/plugins/linux-proc.plugin/sys_kernel_mm_ksm.c
         src/plugins/linux-proc.plugin/sys_devices_system_edac_mc.c
         src/plugins/linux-proc.plugin/sys_devices_system_node.c
-        src/plugins/linux-proc.plugin/sys_kernel_mm_ksm.c
         src/plugins/linux-proc.plugin/sys_fs_btrfs.c
-        src/plugins/linux-proc.plugin/zfs_common.c
-        src/plugins/linux-proc.plugin/zfs_common.h
+        )
+
+set(TC_PLUGIN_FILES
         src/plugins/linux-tc.plugin/plugin_tc.c
         src/plugins/linux-tc.plugin/plugin_tc.h
         )
 
-IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
-    message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
-    set(NETDATA_NFACCT_FILES
-            src/plugins/linux-nfacct.plugin/plugin_nfacct.c
-            src/plugins/linux-nfacct.plugin/plugin_nfacct.h
-            )
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINTERNAL_PLUGIN_NFACCT=1")
-ELSE()
-    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
-    set(NETDATA_NFACCT_FILES
-            )
-ENDIF()
-
-set(LIBNETDATA_FILES
-        src/libnetdata/adaptive_resortable_list.c
-        src/libnetdata/adaptive_resortable_list.h
-        src/libnetdata/appconfig.c
-        src/libnetdata/appconfig.h
-        src/libnetdata/avl.c
-        src/libnetdata/avl.h
-        src/libnetdata/clocks.c
-        src/libnetdata/clocks.h
-        src/libnetdata/common.c
-        src/libnetdata/dictionary.c
-        src/libnetdata/dictionary.h
-        src/libnetdata/eval.c
-        src/libnetdata/eval.h
-        src/libnetdata/inlined.h
-        src/libnetdata/locks.c
-        src/libnetdata/locks.h
-        src/libnetdata/log.c
-        src/libnetdata/log.h
-        src/libnetdata/popen.c
-        src/libnetdata/popen.h
-        src/libnetdata/procfile.c
-        src/libnetdata/procfile.h
-        src/libnetdata/simple_pattern.c
-        src/libnetdata/simple_pattern.h
-        src/libnetdata/socket.c
-        src/libnetdata/socket.h
-        src/libnetdata/statistical.c
-        src/libnetdata/statistical.h
-        src/libnetdata/storage_number.c
-        src/libnetdata/storage_number.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
-        src/libnetdata/web_buffer.c
-        src/libnetdata/web_buffer.h
+set(MACOS_PLUGIN_FILES
+        src/plugins/macos.plugin/plugin_macos.c
+        src/plugins/macos.plugin/plugin_macos.h
+        src/plugins/macos.plugin/macos_sysctl.c
+        src/plugins/macos.plugin/macos_mach_smi.c
+        src/plugins/macos.plugin/macos_fw.c
         )
 
-set(NETDATA_COMMON_FILES
-        config.h
+set(PLUGINSD_PLUGIN_FILES
+        src/plugins/plugins.d.plugin/plugins_d.c
+        src/plugins/plugins.d.plugin/plugins_d.h
+        )
+
+set(STATSD_PLUGIN_FILES
+        src/plugins/statsd.plugin/statsd.c
+        src/plugins/statsd.plugin/statsd.h
+        )
+
+set(NETDATA_FILES
+        src/plugins/all.h
         src/backend_prometheus.c
         src/backend_prometheus.h
         src/backends.c
@@ -303,19 +346,6 @@ set(NETDATA_COMMON_FILES
         src/rrdvar.h
         src/signals.c
         src/signals.h
-        src/plugins/checks.plugin/plugin_checks.c
-        src/plugins/checks.plugin/plugin_checks.h
-        src/plugins/health.plugin/health.c
-        src/plugins/health.plugin/health.h
-        src/plugins/health.plugin/health_config.c
-        src/plugins/health.plugin/health_json.c
-        src/plugins/health.plugin/health_log.c
-        src/plugins/idlejitter.plugin/plugin_idlejitter.c
-        src/plugins/idlejitter.plugin/plugin_idlejitter.h
-        src/plugins/plugins.d.plugin/plugins_d.c
-        src/plugins/plugins.d.plugin/plugins_d.h
-        src/plugins/statsd.plugin/statsd.c
-        src/plugins/statsd.plugin/statsd.h
         src/unit_test.c
         src/unit_test.h
         src/url.c
@@ -328,27 +358,20 @@ set(NETDATA_COMMON_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/plugins/all.h
         ${LIBNETDATA_FILES}
+        ${CHECKS_PLUGIN_FILES}
+        ${HEALTH_PLUGIN_FILES}
+        ${IDLEJITTER_PLUGIN_FILES}
+        ${PLUGINSD_PLUGIN_FILES}
+        ${STATSD_PLUGIN_FILES}
         )
 
-set(APPS_PLUGIN_SOURCE_FILES
-        config.h
-        src/plugins/apps.plugin/apps_plugin.c
-        ${LIBNETDATA_FILES}
-        )
-
-set(FREEIPMI_PLUGIN_SOURCE_FILES
-        config.h
-        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
-        ${LIBNETDATA_FILES}
-        )
-
-set(CGROUP_NETWORK_SOURCE_FILES
-        config.h
-        src/plugins/linux-cgroups.plugin/cgroup-network.c
-        ${LIBNETDATA_FILES}
-        )
+IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
+    message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINTERNAL_PLUGIN_NFACCT=1")
+ELSE()
+    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
+ENDIF()
 
 include_directories(AFTER .)
 
@@ -370,25 +393,53 @@ add_definitions(
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
 
 IF(LINUX)
-    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_LINUX_FILES} ${NETDATA_NFACCT_FILES})
-    target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES} ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
-    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
-    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
-    SET(build_plugin_apps True)
+    add_executable(netdata ${NETDATA_FILES}
+            ${CGROUPS_PLUGIN_FILES}
+            ${DISKSPACE_PLUGIN_FILES}
+            ${NFACCT_PLUGIN_FILES}
+            ${PROC_PLUGIN_FILES}
+            ${TC_PLUGIN_FILES}
+            )
+    target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES}
+            ${MNL_LIBRARIES}
+            ${NFACCT_LIBRARIES}
+            )
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS}
+            ${MNL_INCLUDE_DIRS}
+            ${NFACCT_INCLUDE_DIRS}
+            )
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS}
+            ${MNL_CFLAGS_OTHER}
+            ${NFACCT_CFLAGS_OTHER}
+            )
+
+    SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
+    SET(ENABLE_PLUGIN_APPS True)
+    IF(IPMI_LIBRARIES)
+        SET(ENABLE_PLUGIN_FREEIPMI True)
+    ELSE()
+        SET(ENABLE_PLUGIN_FREEIPMI False)
+    ENDIF()
 
 ELSEIF(FREEBSD)
-    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_FREEBSD_FILES})
+    set(APPS_PLUGIN_FILES ${APPS_PLUGIN_FILES} plugins/freebsd.plugin/plugin_freebsd.h)
+
+    add_executable(netdata ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
     target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
-    SET(build_plugin_apps True)
+    SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
+    SET(ENABLE_PLUGIN_APPS True)
+    SET(ENABLE_PLUGIN_FREEIPMI False)
 
 ELSEIF(MACOS)
-    add_executable(netdata ${NETDATA_COMMON_FILES} ${NETDATA_MACOS_FILES})
+    add_executable(netdata ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
     target_link_libraries (netdata ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
-    SET(build_plugin_apps False)
+    SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
+    SET(ENABLE_PLUGIN_APPS False)
+    SET(ENABLE_PLUGIN_FREEIPMI False)
 
 ENDIF()
 
@@ -396,10 +447,10 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # apps.plugin
 
-IF(build_plugin_apps)
+IF(ENABLE_PLUGIN_APPS)
     message(STATUS "apps.plugin: enabled")
-    add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/libnetdata/inlined.h)
-    target_link_libraries (apps.plugin m ${CAP_LIBRARIES} ${NETDATA_COMMON_LIBRARIES})
+    add_executable(apps.plugin ${APPS_PLUGIN_FILES})
+    target_link_libraries (apps.plugin ${NETDATA_COMMON_LIBRARIES} ${CAP_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${CAP_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${CAP_CFLAGS_OTHER})
 ELSE()
@@ -410,10 +461,10 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # freeipmi.plugin
 
-IF(LINUX AND IPMI_LIBRARIES)
+IF(ENABLE_PLUGIN_FREEIPMI)
     message(STATUS "freeipmi.plugin: enabled")
-    add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
-    target_link_libraries (freeipmi.plugin ${IPMI_LIBRARIES} ${NETDATA_COMMON_LIBRARIES})
+    add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_FILES})
+    target_link_libraries (freeipmi.plugin ${NETDATA_COMMON_LIBRARIES} ${IPMI_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
 ELSE()
@@ -424,9 +475,9 @@ ENDIF()
 # -----------------------------------------------------------------------------
 # cgroup-network
 
-IF(LINUX)
+IF(ENABLE_PLUGIN_CGROUP_NETWORK)
     message(STATUS "cgroup-network: enabled")
-    add_executable(cgroup-network ${CGROUP_NETWORK_SOURCE_FILES})
+    add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
     target_link_libraries (cgroup-network ${NETDATA_COMMON_LIBRARIES})
     target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})

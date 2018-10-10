@@ -15,7 +15,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
 	$(NULL)
 
-sbin_PROGRAMS = netdata
+sbin_PROGRAMS =
 dist_cache_DATA = .keep
 dist_varlib_DATA = .keep
 dist_registry_DATA = .keep
@@ -123,7 +123,6 @@ NFACCT_PLUGIN_FILES = \
 
 PROC_PLUGIN_FILES = \
 	plugins/linux-proc.plugin/ipc.c \
-	plugins/linux-proc.plugin/ipc.h \
 	plugins/linux-proc.plugin/plugin_proc.c \
 	plugins/linux-proc.plugin/plugin_proc.h \
 	plugins/linux-proc.plugin/proc_diskstats.c \
@@ -182,7 +181,7 @@ STATSD_PLUGIN_FILES = \
 	plugins/statsd.plugin/statsd.h \
     $(NULL)
 
-netdata_SOURCES = \
+NETDATA_FILES = \
     plugins/all.h \
 	backend_prometheus.c \
 	backend_prometheus.h \
@@ -251,11 +250,8 @@ netdata_SOURCES = \
 	$(STATSD_PLUGIN_FILES) \
 	$(NULL)
 
-netdata_LDADD = \
-	$(NULL)
-
 if FREEBSD
-    netdata_SOURCES += \
+    NETDATA_FILES += \
         $(FREEBSD_PLUGIN_FILES) \
         $(NULL)
 
@@ -265,13 +261,13 @@ if FREEBSD
 endif
 
 if MACOS
-    netdata_SOURCES += \
+    NETDATA_FILES += \
         $(MACOS_PLUGIN_FILES) \
         $(NULL)
 endif
 
 if LINUX
-    netdata_SOURCES += \
+    NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
         $(NFACCT_PLUGIN_FILES) \
@@ -281,18 +277,25 @@ if LINUX
 
 endif
 
-netdata_LDADD += \
+NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
+	$(NULL)
+
+
+sbin_PROGRAMS += netdata
+netdata_SOURCES = $(NETDATA_FILES)
+netdata_LDADD = \
+	$(NETDATA_COMMON_LIBS) \
+	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
     apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
-        $(OPTIONAL_MATH_LIBS) \
+    	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
         $(NULL)
 endif
@@ -301,9 +304,7 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
     plugins_PROGRAMS += cgroup-network
     cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
-        $(OPTIONAL_MATH_LIBS) \
-        $(OPTIONAL_ZLIB_LIBS) \
-        $(OPTIONAL_UUID_LIBS) \
+    	$(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 
@@ -311,9 +312,7 @@ if ENABLE_PLUGIN_FREEIPMI
     plugins_PROGRAMS += freeipmi.plugin
     freeipmi_plugin_SOURCES = $(FREEIPMI_PLUGIN_FILES)
     freeipmi_plugin_LDADD = \
-        $(OPTIONAL_MATH_LIBS) \
-        $(OPTIONAL_ZLIB_LIBS) \
-        $(OPTIONAL_UUID_LIBS) \
+    	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
         $(NULL)
 endif
