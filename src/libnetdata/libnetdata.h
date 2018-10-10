@@ -204,7 +204,7 @@
 
 #define GUID_LEN 36
 
-
+#include "os.h"
 #include "storage_number.h"
 #include "web_buffer.h"
 #include "locks.h"
@@ -271,16 +271,7 @@ extern int sleep_usec(usec_t usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
-extern int processors;
-extern long get_system_cpus(void);
 extern int verify_netdata_host_prefix();
-
-extern pid_t pid_max;
-extern pid_t get_system_pid_max(void);
-
-/* Number of ticks per second */
-extern unsigned int system_hz;
-extern void get_system_HZ(void);
 
 extern int recursively_delete_dir(const char *path, const char *reason);
 

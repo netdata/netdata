@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
-
 #ifndef NETDATA_PLUGIN_PROC_H
 #define NETDATA_PLUGIN_PROC_H 1
 
-#if TARGET_OS == OS_LINUX
+#include "../../common.h"
+
+#if (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_PROC \
     { \
@@ -60,11 +60,11 @@ extern void netdev_rename_device_del(const char *host_device);
 #include "proc_self_mountinfo.h"
 #include "zfs_common.h"
 
-#else // TARGET_OS != OS_LINUX
+#else // (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_PROC
 
-#endif // TARGET_OS != OS_LINUX
+#endif // (TARGET_OS == OS_LINUX)
 
 
 #endif /* NETDATA_PLUGIN_PROC_H */

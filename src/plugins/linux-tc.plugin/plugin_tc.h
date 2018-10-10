@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
-
 #ifndef NETDATA_PLUGIN_TC_H
 #define NETDATA_PLUGIN_TC_H 1
 
-#if TARGET_OS == OS_LINUX
+#include "../../common.h"
+
+#if (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_TC \
     { \
@@ -20,11 +20,11 @@
 
 extern void *tc_main(void *ptr);
 
-#else // TARGET_OS != OS_LINUX
+#else // (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_TC
 
-#endif // TARGET_OS != OS_LINUX
+#endif // (TARGET_OS == OS_LINUX)
 
 
 #endif /* NETDATA_PLUGIN_TC_H */

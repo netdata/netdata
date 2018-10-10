@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_SIMPLE_PATTERN_H
 #define NETDATA_SIMPLE_PATTERN_H
+
+#include "libnetdata.h"
+
 
 typedef enum {
     SIMPLE_PATTERN_EXACT,

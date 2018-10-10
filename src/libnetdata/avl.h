@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef _AVL_H
 #define _AVL_H 1
+
+#include "libnetdata.h"
+
 
 /* Maximum AVL tree height. */
 #ifndef AVL_MAX_HEIGHT

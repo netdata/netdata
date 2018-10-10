@@ -1,13 +1,11 @@
-//
-// Created by costa on 09/10/18.
-//
-
-#include "../../common.h"
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_SYS_FS_CGROUP_H
 #define NETDATA_SYS_FS_CGROUP_H 1
 
-#if TARGET_OS == OS_LINUX
+#include "../../common.h"
+
+#if (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_CGROUPS \
     { \
@@ -24,10 +22,10 @@ extern void *cgroups_main(void *ptr);
 
 #include "../linux-proc.plugin/plugin_proc.h"
 
-#else // TARGET_OS != OS_LINUX
+#else // (TARGET_OS == OS_LINUX)
 
 #define NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
 
-#endif // TARGET_OS != OS_LINUX
+#endif // (TARGET_OS == OS_LINUX)
 
 #endif //NETDATA_SYS_FS_CGROUP_H

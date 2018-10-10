@@ -187,7 +187,7 @@ esac
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
-AC_MSG_RESULT([${build_target}])
+AC_MSG_RESULT([${build_target} with id ${build_target_id}])
 
 
 # -----------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_EVAL_H
 #define NETDATA_EVAL_H 1
+
+#include "libnetdata.h"
 
 #define EVAL_MAX_VARIABLE_NAME_LENGTH 300
 

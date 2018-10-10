@@ -158,6 +158,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks.h
         src/libnetdata/log.c
         src/libnetdata/log.h
+        src/libnetdata/os.c
+        src/libnetdata/os.h
         src/libnetdata/popen.c
         src/libnetdata/popen.h
         src/libnetdata/procfile.c

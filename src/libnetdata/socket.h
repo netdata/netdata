@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
+
+#include "libnetdata.h"
 
 #ifndef MAX_LISTEN_FDS
 #define MAX_LISTEN_FDS 50

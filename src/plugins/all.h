@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../common.h"
-
 #ifndef NETDATA_ALL_H
 #define NETDATA_ALL_H 1
+
+#include "../common.h"
 
 // netdata internal data collection plugins
 

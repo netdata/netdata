@@ -3,7 +3,6 @@
 #include "plugin_macos.h"
 
 #include <Availability.h>
-#include <sys/sysctl.h>
 // NEEDED BY: do_bandwidth
 #include <net/route.h>
 // NEEDED BY do_tcp...
@@ -1491,17 +1490,3 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     return 0;
 }
 
-int getsysctl_by_name(const char *name, void *ptr, size_t len)
-{
-    size_t nlen = len;
-
-    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
-        error("MACOS: sysctl(%s...) failed: %s", name, strerror(errno));
-        return 1;
-    }
-    if (unlikely(nlen != len)) {
-        error("MACOS: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
-        return 1;
-    }
-    return 0;
-}

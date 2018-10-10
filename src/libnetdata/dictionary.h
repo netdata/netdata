@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_DICTIONARY_H
 #define NETDATA_DICTIONARY_H 1
+
+#include "libnetdata.h"
 
 struct dictionary_stats {
     unsigned long long inserts;

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_INLINED_H
 #define NETDATA_INLINED_H 1
+
+#include "libnetdata.h"
 
 #ifdef KERNEL_32BIT
 typedef uint32_t kernel_uint_t;

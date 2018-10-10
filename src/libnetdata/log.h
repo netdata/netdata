@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_LOG_H
 #define NETDATA_LOG_H 1
+
+#include "libnetdata.h"
 
 #define D_WEB_BUFFER        0x0000000000000001
 #define D_WEB_CLIENT        0x0000000000000002

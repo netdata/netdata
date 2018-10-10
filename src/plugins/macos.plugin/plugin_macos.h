@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
 
 #ifndef NETDATA_PLUGIN_MACOS_H
 #define NETDATA_PLUGIN_MACOS_H 1
 
+#include "../../common.h"
 
-
-#if TARGET_OS == OS_MACOS
+#if (TARGET_OS == OS_MACOS)
 
 #define NETDATA_PLUGIN_HOOK_MACOS \
     { \
@@ -31,11 +30,11 @@ extern int do_macos_mach_smi(int update_every, usec_t dt);
 extern int do_macos_iokit(int update_every, usec_t dt);
 
 
-#else // TARGET_OS != OS_LINUX
+#else // (TARGET_OS == OS_MACOS)
 
 #define NETDATA_PLUGIN_HOOK_MACOS
 
-#endif // TARGET_OS != OS_LINUX
+#endif // (TARGET_OS == OS_MACOS)
 
 
 

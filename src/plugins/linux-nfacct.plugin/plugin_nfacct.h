@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
-
 #ifndef NETDATA_NFACCT_H
 #define NETDATA_NFACCT_H 1
+
+#include "../../common.h"
 
 #if defined(INTERNAL_PLUGIN_NFACCT)
 

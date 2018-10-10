@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
-
 #ifndef NETDATA_PLUGIN_IDLEJITTER_H
 #define NETDATA_PLUGIN_IDLEJITTER_H 1
+
+#include "../../common.h"
 
 #define NETDATA_PLUGIN_HOOK_IDLEJITTER \
     { \

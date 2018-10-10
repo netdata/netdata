@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../common.h"
-
 #ifndef NETDATA_STATSD_H
 #define NETDATA_STATSD_H 1
+
+#include "../../common.h"
 
 #define STATSD_LISTEN_PORT 8125
 #define STATSD_LISTEN_BACKLOG 4096

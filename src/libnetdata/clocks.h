@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_CLOCKS_H
 #define NETDATA_CLOCKS_H 1
+
+#include "libnetdata.h"
 
 #ifndef HAVE_STRUCT_TIMESPEC
 struct timespec {

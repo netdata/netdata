@@ -75,10 +75,10 @@
  *    a method to allocate only the dynamic option names.
  */
 
-#include "libnetdata.h"
-
 #ifndef NETDATA_CONFIG_H
 #define NETDATA_CONFIG_H 1
+
+#include "libnetdata.h"
 
 #define CONFIG_FILENAME "netdata.conf"
 

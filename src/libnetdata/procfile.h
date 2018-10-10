@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "libnetdata.h"
-
 /*
  * procfile is a library for reading kernel files from /proc
  *
@@ -28,6 +26,8 @@
 
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1
+
+#include "libnetdata.h"
 
 // ----------------------------------------------------------------------------
 // An array of words
