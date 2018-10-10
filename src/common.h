@@ -310,9 +310,9 @@ typedef enum rrdcalc_status {
 #include "procfile.h"
 #include "appconfig.h"
 #include "dictionary.h"
-#include "plugin_checks.h"
-#include "plugin_idlejitter.h"
-#include "plugin_nfacct.h"
+#include "src/plugins/checks.plugin/plugin_checks.h"
+#include "src/plugins/idlejitter.plugin/plugin_idlejitter.h"
+#include "src/plugins/linux-nfacct.plugin/plugin_nfacct.h"
 
 #if defined(__FreeBSD__)
 #include <pthread_np.h>
@@ -331,8 +331,8 @@ typedef enum rrdcalc_status {
 #include "statistical.h"
 #include "socket.h"
 #include "rrd.h"
-#include "plugin_tc.h"
-#include "plugins_d.h"
+#include "src/plugins/linux-tc.plugin/plugin_tc.h"
+#include "src/plugins/plugins.d.plugin/plugins_d.h"
 #include "statsd.h"
 #include "rrd2json.h"
 #include "web_client.h"

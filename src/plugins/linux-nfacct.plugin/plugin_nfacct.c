@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "common.h"
+#include "plugin_nfacct.h"
 
-#ifdef INTERNAL_PLUGIN_NFACCT
+#if defined(INTERNAL_PLUGIN_NFACCT)
 
 #ifdef HAVE_LIBMNL
 #include <libmnl/libmnl.h>

@@ -1,7 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "../../common.h"
+
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
+
+#if TARGET_OS == OS_FREEBSD
+
+
+#define NETDATA_PLUGIN_HOOK_FREEBSD \
+    { \
+        .name = "PLUGIN[freebsd]", \
+        .config_section = CONFIG_SECTION_PLUGINS, \
+        .config_name = "freebsd", \
+        .enabled = 1, \
+        .thread = NULL, \
+        .init_routine = NULL, \
+        .start_routine = freebsd_main \
+    },
+
 
 #include <sys/sysctl.h>
 
@@ -128,5 +145,11 @@ static inline int getsysctl_by_name(const char *name, void *ptr, size_t len)
     }
     return 0;
 }
+
+#else // TARGET_OS != OS_FREEBSD
+
+#define NETDATA_PLUGIN_HOOK_FREEBSD
+
+#endif // TARGET_OS != OS_FREEBSD
 
 #endif /* NETDATA_PLUGIN_FREEBSD_H */

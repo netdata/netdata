@@ -4,9 +4,34 @@ MAINTAINERCLEANFILES = Makefile.in
 
 SUBDIRS = \
     apps.plugin \
-    linux-cgroups.plugin \
-    linux-freeipmi.plugin \
-    linux-proc.plugin \
-    linux-diskspace.plugin \
+    checks.plugin \
+    idlejitter.plugin \
+    plugins.d.plugin \
    	$(NULL)
 
+if FREEBSD
+
+SUBDIRS += \
+    freebsd.plugin \
+   	$(NULL)
+
+else
+if MACOS
+
+SUBDIRS += \
+    macos.plugin \
+   	$(NULL)
+
+else
+
+SUBDIRS += \
+    linux-cgroups.plugin \
+    linux-diskspace.plugin \
+    linux-freeipmi.plugin \
+    linux-nfacct.plugin \
+    linux-proc.plugin \
+    linux-tc.plugin \
+   	$(NULL)
+
+endif
+endif

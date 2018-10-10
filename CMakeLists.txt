@@ -139,27 +139,31 @@ ENDIF(LINUX)
 # netdata files
 
 set(NETDATA_FREEBSD_FILES
-        src/plugin_freebsd.c
-        src/plugin_freebsd.h
-        src/freebsd_sysctl.c
-        src/freebsd_getmntinfo.c
-        src/freebsd_getifaddrs.c
-        src/freebsd_devstat.c
-        src/freebsd_kstat_zfs.c
-        src/freebsd_ipfw.c
+        src/plugins/freebsd.plugin/plugin_freebsd.c
+        src/plugins/freebsd.plugin/plugin_freebsd.h
+        src/plugins/freebsd.plugin/freebsd_sysctl.c
+        src/plugins/freebsd.plugin/freebsd_getmntinfo.c
+        src/plugins/freebsd.plugin/freebsd_getifaddrs.c
+        src/plugins/freebsd.plugin/freebsd_devstat.c
+        src/plugins/freebsd.plugin/freebsd_kstat_zfs.c
+        src/plugins/freebsd.plugin/freebsd_ipfw.c
+
+        # the following are common with Linux
         src/plugins/linux-proc.plugin/zfs_common.c
         src/plugins/linux-proc.plugin/zfs_common.h
         )
 
 set(NETDATA_MACOS_FILES
-        src/plugin_macos.c
-        src/plugin_macos.h
-        src/macos_sysctl.c
-        src/macos_mach_smi.c
-        src/macos_fw.c
+        src/plugins/macos.plugin/plugin_macos.c
+        src/plugins/macos.plugin/plugin_macos.h
+        src/plugins/macos.plugin/macos_sysctl.c
+        src/plugins/macos.plugin/macos_mach_smi.c
+        src/plugins/macos.plugin/macos_fw.c
         )
 
 set(NETDATA_LINUX_FILES
+        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
+        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
         src/plugins/linux-diskspace.plugin/plugin_diskspace.c
         src/plugins/linux-diskspace.plugin/plugin_diskspace.h
         src/plugins/linux-proc.plugin/ipc.c
@@ -196,16 +200,17 @@ set(NETDATA_LINUX_FILES
         src/plugins/linux-proc.plugin/sys_fs_btrfs.c
         src/plugins/linux-proc.plugin/zfs_common.c
         src/plugins/linux-proc.plugin/zfs_common.h
-        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
-        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
+        src/plugins/linux-tc.plugin/plugin_tc.c
+        src/plugins/linux-tc.plugin/plugin_tc.h
         )
 
 IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
     message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
     set(NETDATA_NFACCT_FILES
-            src/plugin_nfacct.c
-            src/plugin_nfacct.h
+            src/plugins/linux-nfacct.plugin/plugin_nfacct.c
+            src/plugins/linux-nfacct.plugin/plugin_nfacct.h
             )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINTERNAL_PLUGIN_NFACCT=1")
 ELSE()
     message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
     set(NETDATA_NFACCT_FILES
@@ -247,14 +252,12 @@ set(NETDATA_COMMON_FILES
         src/log.h
         src/main.c
         src/main.h
-        src/plugin_checks.c
-        src/plugin_checks.h
-        src/plugin_idlejitter.c
-        src/plugin_idlejitter.h
-        src/plugin_tc.c
-        src/plugin_tc.h
-        src/plugins_d.c
-        src/plugins_d.h
+        src/plugins/checks.plugin/plugin_checks.c
+        src/plugins/checks.plugin/plugin_checks.h
+        src/plugins/idlejitter.plugin/plugin_idlejitter.c
+        src/plugins/idlejitter.plugin/plugin_idlejitter.h
+        src/plugins/plugins.d.plugin/plugins_d.c
+        src/plugins/plugins.d.plugin/plugins_d.h
         src/popen.c
         src/popen.h
         src/procfile.c
@@ -315,8 +318,8 @@ set(NETDATA_COMMON_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        config.h
         src/plugins/all.h
+        config.h
         )
 
 set(APPS_PLUGIN_SOURCE_FILES

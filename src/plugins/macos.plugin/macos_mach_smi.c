@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "common.h"
+#include "plugin_macos.h"
 
 #include <mach/mach.h>
 

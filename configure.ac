@@ -548,10 +548,17 @@ AC_CONFIG_FILES([
     node.d/Makefile
     plugins.d/Makefile
     src/plugins/apps.plugin/Makefile
-    src/plugins/linux-freeipmi.plugin/Makefile
+    src/plugins/checks.plugin/Makefile
+    src/plugins/freebsd.plugin/Makefile
+    src/plugins/idlejitter.plugin/Makefile
     src/plugins/linux-cgroups.plugin/Makefile
-    src/plugins/linux-proc.plugin/Makefile
     src/plugins/linux-diskspace.plugin/Makefile
+    src/plugins/linux-freeipmi.plugin/Makefile
+    src/plugins/linux-nfacct.plugin/Makefile
+    src/plugins/linux-proc.plugin/Makefile
+    src/plugins/linux-tc.plugin/Makefile
+    src/plugins/macos.plugin/Makefile
+    src/plugins/plugins.d.plugin/Makefile
     src/plugins/Makefile
     src/Makefile
     system/Makefile

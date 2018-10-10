@@ -23,10 +23,6 @@ dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS =
 
-if ENABLE_PLUGIN_CGROUP_NETWORK
-plugins_PROGRAMS += cgroup-network
-endif
-
 netdata_SOURCES = \
     plugins/all.h \
 	adaptive_resortable_list.c \
@@ -63,12 +59,6 @@ netdata_SOURCES = \
 	log.h \
 	main.c \
 	main.h \
-	plugin_checks.c \
-	plugin_checks.h \
-	plugin_idlejitter.c \
-	plugin_idlejitter.h \
-	plugins_d.c \
-	plugins_d.h \
 	popen.c \
 	popen.h \
 	procfile.c \
@@ -132,45 +122,39 @@ netdata_SOURCES = \
 	$(NULL)
 
 netdata_LDADD = \
+    $(top_builddir)/src/plugins/checks.plugin/libplugin-checks.a \
+    $(top_builddir)/src/plugins/idlejitter.plugin/libplugin-idlejitter.a \
+    $(top_builddir)/src/plugins/plugins.d.plugin/libplugin-plugins.d.a \
 	$(NULL)
 
 if FREEBSD
-netdata_SOURCES += \
-	plugin_freebsd.c \
-	plugin_freebsd.h \
-	freebsd_sysctl.c \
-	freebsd_getmntinfo.c \
-	freebsd_getifaddrs.c \
-	freebsd_devstat.c \
-	zfs_common.c \
-	zfs_common.h \
-	freebsd_kstat_zfs.c \
-	freebsd_ipfw.c \
-	$(NULL)
+
+netdata_LDADD += \
+    $(top_builddir)/src/plugins/freebsd.plugin/libplugin-freebsd.a \
+    $(NULL)
+
 else
 if MACOS
-netdata_SOURCES += \
-	plugin_macos.c \
-	plugin_macos.h \
-	macos_sysctl.c \
-	macos_mach_smi.c \
-	macos_fw.c \
-	$(NULL)
+
+netdata_LDADD += \
+    $(top_builddir)/src/plugins/macos.plugin/libplugin-macos.a \
+    $(NULL)
+
 else
-netdata_SOURCES += \
-	plugin_nfacct.c \
-	plugin_nfacct.h \
-	plugin_tc.c \
-	plugin_tc.h \
-	$(NULL)
 
 netdata_LDADD += \
     $(top_builddir)/src/plugins/linux-cgroups.plugin/libplugin-linux-cgroups.a \
-    $(top_builddir)/src/plugins/linux-proc.plugin/libplugin-linux-proc.a \
     $(top_builddir)/src/plugins/linux-diskspace.plugin/libplugin-linux-diskspace.a \
+    $(top_builddir)/src/plugins/linux-nfacct.plugin/libplugin-linux-nfacct.a \
+    $(top_builddir)/src/plugins/linux-proc.plugin/libplugin-linux-proc.a \
+    $(top_builddir)/src/plugins/linux-tc.plugin/libplugin-linux-tc.a \
     $(NULL)
 
 endif
+endif
+
+if ENABLE_PLUGIN_CGROUP_NETWORK
+plugins_PROGRAMS += cgroup-network
 endif
 
 cgroup_network_SOURCES = \
