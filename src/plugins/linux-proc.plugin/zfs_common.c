@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "plugin_proc.h"
+#include "zfs_common.h"
 
 struct arcstats arcstats = { 0 };
 
