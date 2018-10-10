@@ -311,6 +311,6 @@ extern void recursive_config_double_dir_load(
 #define BITS_IN_A_KILOBIT 1000
 
 
-extern void netdata_cleanup_and_exit(int ret);
+extern void netdata_cleanup_and_exit(int ret) NORETURN;
 
 #endif // NETDATA_LIB_H
