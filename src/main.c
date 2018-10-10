@@ -50,8 +50,10 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
     NETDATA_PLUGIN_HOOK_LINUX_TC
 
-    // common plugins for all systems
     NETDATA_PLUGIN_HOOK_IDLEJITTER
+    NETDATA_PLUGIN_HOOK_STATSD
+
+        // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
     {"HEALTH",               NULL,                    NULL,         1, NULL, NULL, health_main},
     {"PLUGINSD",             NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
@@ -59,7 +61,6 @@ struct netdata_static_thread static_threads[] = {
     {"WEB_SERVER[single]",   NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
-    {"STATSD",               NULL,                    NULL,         1, NULL, NULL, statsd_main},
 
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };

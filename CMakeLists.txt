@@ -298,8 +298,8 @@ set(NETDATA_COMMON_FILES
         src/socket.h
         src/statistical.c
         src/statistical.h
-        src/statsd.c
-        src/statsd.h
+        src/plugins/statsd.plugin/statsd.c
+        src/plugins/statsd.plugin/statsd.h
         src/storage_number.c
         src/storage_number.h
         src/threads.c

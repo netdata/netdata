@@ -99,8 +99,6 @@ netdata_SOURCES = \
 	socket.h \
 	statistical.c \
 	statistical.h \
-	statsd.c \
-	statsd.h \
 	storage_number.c \
 	storage_number.h \
 	threads.c \
@@ -125,6 +123,7 @@ netdata_LDADD = \
     $(top_builddir)/src/plugins/checks.plugin/libplugin-checks.a \
     $(top_builddir)/src/plugins/idlejitter.plugin/libplugin-idlejitter.a \
     $(top_builddir)/src/plugins/plugins.d.plugin/libplugin-plugins.d.a \
+    $(top_builddir)/src/plugins/statsd.plugin/libplugin-statsd.a \
 	$(NULL)
 
 if FREEBSD

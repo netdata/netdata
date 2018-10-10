@@ -559,6 +559,7 @@ AC_CONFIG_FILES([
     src/plugins/linux-tc.plugin/Makefile
     src/plugins/macos.plugin/Makefile
     src/plugins/plugins.d.plugin/Makefile
+    src/plugins/statsd.plugin/Makefile
     src/plugins/Makefile
     src/Makefile
     system/Makefile

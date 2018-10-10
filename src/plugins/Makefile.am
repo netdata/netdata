@@ -7,6 +7,7 @@ SUBDIRS = \
     checks.plugin \
     idlejitter.plugin \
     plugins.d.plugin \
+    statsd.plugin \
    	$(NULL)
 
 if FREEBSD

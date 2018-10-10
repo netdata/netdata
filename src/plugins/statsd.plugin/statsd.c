@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "common.h"
+#include "statsd.h"
 
 #define STATSD_CHART_PREFIX "statsd"
 #define STATSD_CHART_PRIORITY 90000

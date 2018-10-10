@@ -248,7 +248,6 @@ typedef enum rrdcalc_status {
 #include "statistical.h"
 #include "socket.h"
 #include "rrd.h"
-#include "statsd.h"
 #include "rrd2json.h"
 #include "web_client.h"
 #include "web_server.h"
