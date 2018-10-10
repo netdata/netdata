@@ -5,7 +5,6 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
 	alarm-notify.sh \
-	cgroup-name.sh \
 	charts.d.plugin \
 	fping.plugin \
 	node.d.plugin \
@@ -25,8 +24,6 @@ dist_plugins_SCRIPTS = \
 	alarm-email.sh \
 	alarm-notify.sh \
 	alarm-test.sh \
-	cgroup-name.sh \
-	cgroup-network-helper.sh \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
 	fping.plugin \
@@ -38,7 +35,6 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
 	alarm-notify.sh.in \
-	cgroup-name.sh.in \
 	charts.d.plugin.in \
 	fping.plugin.in \
 	node.d.plugin.in \

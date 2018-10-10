@@ -8,6 +8,13 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(NULL)
 
+CLEANFILES = \
+	cgroup-name.sh \
+	$(NULL)
+
+include $(top_srcdir)/build/subst.inc
+SUFFIXES = .in
+
 plugins_PROGRAMS=
 
 noinst_LIBRARIES=libplugin-linux-cgroups.a
@@ -47,3 +54,12 @@ cgroup_network_LDADD = \
 	$(NULL)
 
 endif
+
+dist_plugins_SCRIPTS = \
+	cgroup-name.sh \
+	cgroup-network-helper.sh \
+	$(NULL)
+
+dist_noinst_DATA = \
+	cgroup-name.sh.in \
+	$(NULL)
