@@ -367,7 +367,7 @@ set(FREEIPMI_PLUGIN_SOURCE_FILES
         )
 
 set(CGROUP_NETWORK_SOURCE_FILES
-        src/cgroup-network.c
+        src/plugins/linux-cgroups.plugin/cgroup-network.c
         src/common.c
         src/common.h
         src/clocks.c

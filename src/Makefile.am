@@ -152,36 +152,6 @@ netdata_LDADD += \
 endif
 endif
 
-if ENABLE_PLUGIN_CGROUP_NETWORK
-plugins_PROGRAMS += cgroup-network
-endif
-
-cgroup_network_SOURCES = \
-    cgroup-network.c \
-	clocks.c \
-	clocks.h \
-    common.c \
-    common.h \
-    inlined.h \
-	locks.c \
-	locks.h \
-    log.c \
-    log.h \
-	procfile.c \
-	procfile.h \
-	popen.c \
-	popen.h \
-	signals.c \
-	signals.h \
-	threads.c \
-	threads.h \
-    $(NULL)
-
-cgroup_network_LDADD = \
-	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_LIBCAP_LIBS) \
-	$(NULL)
-
 netdata_LDADD += \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \

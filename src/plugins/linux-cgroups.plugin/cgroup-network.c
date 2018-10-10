@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "common.h"
-#include <libgen.h>
+#include "../../common.h"
 
 #ifdef HAVE_SETNS
 #ifndef _GNU_SOURCE
