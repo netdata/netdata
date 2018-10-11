@@ -37,9 +37,17 @@ AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_SRCDIR([src/main.c])
-AM_INIT_AUTOMAKE([tar-pax])
+define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
+m4_ifdef([AM_SILENT_RULES], [
+    define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
+    ])
+AM_INIT_AUTOMAKE(AUTOMATE_INIT_OPTIONS)
+m4_ifdef([AM_SILENT_RULES], [
+    AM_SILENT_RULES([yes])
+    ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
@@ -170,21 +178,24 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
+    build_target_id=2
     CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
 darwin*)
     build_target=macos
+    build_target_id=3
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
     ;;
 *)
     build_target=linux
+    build_target_id=1
     ;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
-AC_MSG_RESULT([${build_target}])
+AC_MSG_RESULT([${build_target} with id ${build_target_id}])
 
 
 # -----------------------------------------------------------------------------
@@ -486,17 +497,41 @@ AC_MSG_RESULT([${enable_lto}])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
-AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
-AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
-AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
-AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
-AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
-AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
-AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
-AC_SUBST([libconfigdir], ["\$(libdir)/netdata/conf.d"])
-AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
-AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
+varlibdir="${localstatedir}/lib/netdata"
+registrydir="${localstatedir}/lib/netdata/registry"
+cachedir="${localstatedir}/cache/netdata"
+chartsdir="${libexecdir}/netdata/charts.d"
+nodedir="${libexecdir}/netdata/node.d"
+pythondir="${libexecdir}/netdata/python.d"
+configdir="${sysconfdir}/netdata"
+libconfigdir="${libdir}/netdata/conf.d"
+logdir="${localstatedir}/log/netdata"
+pluginsdir="${libexecdir}/netdata/plugins.d"
+
+AC_SUBST([build_target])
+AC_SUBST([varlibdir])
+AC_SUBST([registrydir])
+AC_SUBST([cachedir])
+AC_SUBST([chartsdir])
+AC_SUBST([nodedir])
+AC_SUBST([pythondir])
+AC_SUBST([configdir])
+AC_SUBST([libconfigdir])
+AC_SUBST([logdir])
+AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+
+CPPFLAGS="\
+    -DTARGET_OS=${build_target_id} \
+	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
+	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
+	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
+	-DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
+	-DLOG_DIR=\"\\\"${logdir}\\\"\" \
+	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
+	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
+	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
+"
 
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
@@ -519,7 +554,33 @@ AC_CONFIG_FILES([
     python.d/Makefile
     node.d/Makefile
     plugins.d/Makefile
+    src/api/Makefile
+    src/backends/graphite/Makefile
+    src/backends/json/Makefile
+    src/backends/Makefile
+    src/backends/opentsdb/Makefile
+    src/backends/prometheus/Makefile
+    src/database/Makefile
+    src/health/Makefile
+    src/libnetdata/Makefile
     src/Makefile
+    src/plugins/apps.plugin/Makefile
+    src/plugins/checks.plugin/Makefile
+    src/plugins/freebsd.plugin/Makefile
+    src/plugins/idlejitter.plugin/Makefile
+    src/plugins/linux-cgroups.plugin/Makefile
+    src/plugins/linux-diskspace.plugin/Makefile
+    src/plugins/linux-freeipmi.plugin/Makefile
+    src/plugins/linux-nfacct.plugin/Makefile
+    src/plugins/linux-proc.plugin/Makefile
+    src/plugins/linux-tc.plugin/Makefile
+    src/plugins/macos.plugin/Makefile
+    src/plugins/Makefile
+    src/plugins/plugins.d.plugin/Makefile
+    src/plugins/statsd.plugin/Makefile
+    src/registry/Makefile
+    src/streaming/Makefile
+    src/webserver/Makefile
     system/Makefile
     web/Makefile
     diagrams/Makefile
