@@ -222,6 +222,7 @@
 #include "eval.h"
 #include "statistical.h"
 #include "adaptive_resortable_list.h"
+#include "url.h"
 
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);

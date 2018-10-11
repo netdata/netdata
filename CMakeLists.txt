@@ -176,6 +176,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/threads.h
         src/libnetdata/web_buffer.c
         src/libnetdata/web_buffer.h
+        src/libnetdata/url.c
+        src/libnetdata/url.h
         )
 
 set(APPS_PLUGIN_FILES
@@ -315,12 +317,61 @@ set(STATSD_PLUGIN_FILES
         src/plugins/statsd.plugin/statsd.h
         )
 
+set(RRD_PLUGIN_FILES
+        src/database/rrdcalc.c
+        src/database/rrdcalc.h
+        src/database/rrdcalctemplate.c
+        src/database/rrdcalctemplate.h
+        src/database/rrddim.c
+        src/database/rrddimvar.c
+        src/database/rrddimvar.h
+        src/database/rrdfamily.c
+        src/database/rrdhost.c
+        src/database/rrd.c
+        src/database/rrd.h
+        src/database/rrdset.c
+        src/database/rrdsetvar.c
+        src/database/rrdsetvar.h
+        src/database/rrdvar.c
+        src/database/rrdvar.h
+        )
+
+set(WEB_PLUGIN_FILES
+        src/webserver/web_client.c
+        src/webserver/web_client.h
+        src/webserver/web_server.c
+        src/webserver/web_server.h
+        )
+
+set(API_PLUGIN_FILES
+        src/api/rrd2json.c
+        src/api/rrd2json.h
+        src/api/web_api_v1.c
+        src/api/web_api_v1.h
+        src/api/web_buffer_svg.c
+        src/api/web_buffer_svg.h
+        )
+
+set(STREAMING_PLUGIN_FILES
+        src/streaming/rrdpush.c
+        src/streaming/rrdpush.h
+        )
+
+set(BACKENDS_PLUGIN_FILES
+        src/backends/backends.c
+        src/backends/backends.h
+        src/backends/graphite/graphite.c
+        src/backends/graphite/graphite.h
+        src/backends/json/json.c
+        src/backends/json/json.h
+        src/backends/opentsdb/opentsdb.c
+        src/backends/opentsdb/opentsdb.h
+        src/backends/prometheus/backend_prometheus.c
+        src/backends/prometheus/backend_prometheus.h
+        )
+
 set(NETDATA_FILES
         src/plugins/all.h
-        src/backend_prometheus.c
-        src/backend_prometheus.h
-        src/backends.c
-        src/backends.h
         src/common.c
         src/common.h
         src/daemon.c
@@ -329,47 +380,21 @@ set(NETDATA_FILES
         src/global_statistics.h
         src/main.c
         src/main.h
-        src/rrd.c
-        src/rrd.h
-        src/rrd2json.c
-        src/rrd2json.h
-        src/rrdcalc.c
-        src/rrdcalc.h
-        src/rrdcalctemplate.c
-        src/rrdcalctemplate.h
-        src/rrddim.c
-        src/rrddimvar.c
-        src/rrddimvar.h
-        src/rrdfamily.c
-        src/rrdhost.c
-        src/rrdpush.c
-        src/rrdpush.h
-        src/rrdset.c
-        src/rrdsetvar.c
-        src/rrdsetvar.h
-        src/rrdvar.c
-        src/rrdvar.h
         src/signals.c
         src/signals.h
         src/unit_test.c
         src/unit_test.h
-        src/url.c
-        src/url.h
-        src/web_api_v1.c
-        src/web_api_v1.h
-        src/web_buffer_svg.c
-        src/web_buffer_svg.h
-        src/web_client.c
-        src/web_client.h
-        src/web_server.c
-        src/web_server.h
         ${LIBNETDATA_FILES}
+        ${API_PLUGIN_FILES}
+        ${BACKENDS_PLUGIN_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
+        ${WEB_PLUGIN_FILES}
         )
 
 IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)

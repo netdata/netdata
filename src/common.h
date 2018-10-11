@@ -9,26 +9,41 @@
 // netdata include files
 
 #include "global_statistics.h"
-#include "web_buffer_svg.h"
-#include "url.h"
 
-#include "rrd.h"
-#include "rrd2json.h"
-#include "web_client.h"
-#include "web_server.h"
-#include "daemon.h"
-#include "main.h"
-#include "unit_test.h"
-#include "backends.h"
-#include "backend_prometheus.h"
-#include "rrdpush.h"
-#include "web_api_v1.h"
-#include "signals.h"
+// the netdata database
+#include "database/rrd.h"
 
+// the netdata webserver(s)
+#include "webserver/web_server.h"
+
+// streaming metrics between netdata servers
+#include "streaming/rrdpush.h"
+
+// health monitoring and alarm notifications
 #include "health/health.h"
+
+// the netdata registry
+// the registry is actually an API feature
 #include "registry/registry.h"
+
+// backends for archiving the metrics
+#include "src/backends/backends.h"
+
+// the netdata API
+#include "api/web_api_v1.h"
+
+// all data collection plugins
 #include "plugins/all.h"
 
+// netdata unit tests
+#include "unit_test.h"
+
+// the netdata deamon
+#include "daemon.h"
+#include "main.h"
+#include "signals.h"
+
+// global netdata daemon variables
 extern char *netdata_configured_hostname;
 extern char *netdata_configured_user_config_dir;
 extern char *netdata_configured_stock_config_dir;

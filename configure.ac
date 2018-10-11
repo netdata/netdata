@@ -546,9 +546,16 @@ AC_CONFIG_FILES([
     python.d/Makefile
     node.d/Makefile
     plugins.d/Makefile
+    src/api/Makefile
+    src/backends/graphite/Makefile
+    src/backends/json/Makefile
+    src/backends/Makefile
+    src/backends/opentsdb/Makefile
+    src/backends/prometheus/Makefile
+    src/database/Makefile
     src/health/Makefile
-    src/registry/Makefile
     src/libnetdata/Makefile
+    src/Makefile
     src/plugins/apps.plugin/Makefile
     src/plugins/checks.plugin/Makefile
     src/plugins/freebsd.plugin/Makefile
@@ -560,10 +567,12 @@ AC_CONFIG_FILES([
     src/plugins/linux-proc.plugin/Makefile
     src/plugins/linux-tc.plugin/Makefile
     src/plugins/macos.plugin/Makefile
+    src/plugins/Makefile
     src/plugins/plugins.d.plugin/Makefile
     src/plugins/statsd.plugin/Makefile
-    src/plugins/Makefile
-    src/Makefile
+    src/registry/Makefile
+    src/streaming/Makefile
+    src/webserver/Makefile
     system/Makefile
     web/Makefile
     diagrams/Makefile

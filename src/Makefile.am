@@ -4,9 +4,15 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 SUBDIRS = \
-    libnetdata \
+    api \
+    backends \
+    database \
     health \
+    libnetdata \
     plugins \
+    registry \
+    streaming \
+    webserver \
 	$(NULL)
 
 AM_CFLAGS = \
@@ -63,6 +69,8 @@ LIBNETDATA_FILES = \
     libnetdata/threads.h \
     libnetdata/web_buffer.c \
     libnetdata/web_buffer.h \
+	libnetdata/url.c \
+	libnetdata/url.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
@@ -181,6 +189,39 @@ PLUGINSD_PLUGIN_FILES = \
 	plugins/plugins.d.plugin/plugins_d.h \
     $(NULL)
 
+RRD_PLUGIN_FILES = \
+    database/rrdcalc.c \
+    database/rrdcalc.h \
+    database/rrdcalctemplate.c \
+    database/rrdcalctemplate.h \
+    database/rrddim.c \
+    database/rrddimvar.c \
+    database/rrddimvar.h \
+    database/rrdfamily.c \
+    database/rrdhost.c \
+    database/rrd.c \
+    database/rrd.h \
+    database/rrdset.c \
+    database/rrdsetvar.c \
+    database/rrdsetvar.h \
+    database/rrdvar.c \
+    database/rrdvar.h \
+    $(NULL)
+
+API_PLUGIN_FILES = \
+    api/rrd2json.c \
+    api/rrd2json.h \
+    api/web_api_v1.c \
+    api/web_api_v1.h \
+    api/web_buffer_svg.c \
+    api/web_buffer_svg.h \
+    $(NULL)
+
+STREAMING_PLUGIN_FILES = \
+    streaming/rrdpush.c \
+    streaming/rrdpush.h \
+    $(NULL)
+
 REGISTRY_PLUGIN_FILES = \
 	registry/registry.c \
 	registry/registry.h \
@@ -202,12 +243,44 @@ STATSD_PLUGIN_FILES = \
 	plugins/statsd.plugin/statsd.h \
     $(NULL)
 
+WEB_PLGUGIN_FILES = \
+    webserver/web_client.c \
+    webserver/web_client.h \
+    webserver/web_server.c \
+    webserver/web_server.h \
+    $(NULL)
+
+BACKENDS_PLUGIN_FILES = \
+    backends/backends.c \
+    backends/backends.h \
+    backends/graphite/graphite.c \
+    backends/graphite/graphite.h \
+    backends/json/json.c \
+    backends/json/json.h \
+    backends/opentsdb/opentsdb.c \
+    backends/opentsdb/opentsdb.h \
+    backends/prometheus/backend_prometheus.c \
+    backends/prometheus/backend_prometheus.h \
+    $(NULL)
+
+API_PLUGIN_FILES = \
+    api/rrd2json.c \
+    api/rrd2json.h \
+	api/web_api_v1.c \
+	api/web_api_v1.h \
+	api/web_buffer_svg.c \
+	api/web_buffer_svg.h \
+    $(NULL)
+
+WEB_PLUGIN_FILES = \
+    webserver/web_client.c \
+    webserver/web_client.h \
+    webserver/web_server.c \
+    webserver/web_server.h \
+    $(NULL)
+
 NETDATA_FILES = \
     plugins/all.h \
-	backend_prometheus.c \
-	backend_prometheus.h \
-	backends.c \
-	backends.h \
 	common.c \
 	common.h \
 	daemon.c \
@@ -216,47 +289,22 @@ NETDATA_FILES = \
 	global_statistics.h \
 	main.c \
 	main.h \
-	rrd.c \
-	rrd.h \
-	rrd2json.c \
-	rrd2json.h \
-	rrdcalc.c \
-	rrdcalc.h \
-	rrdcalctemplate.c \
-	rrdcalctemplate.h \
-	rrddim.c \
-	rrddimvar.c \
-	rrddimvar.h \
-	rrdfamily.c \
-	rrdhost.c \
-	rrdpush.c \
-	rrdpush.h \
-	rrdset.c \
-	rrdsetvar.c \
-	rrdsetvar.h \
-	rrdvar.c \
-	rrdvar.h \
 	signals.c \
 	signals.h \
 	unit_test.c \
 	unit_test.h \
-	url.c \
-	url.h \
-	web_api_v1.c \
-	web_api_v1.h \
-	web_buffer_svg.c \
-	web_buffer_svg.h \
-	web_client.c \
-	web_client.h \
-	web_server.c \
-	web_server.h \
 	$(LIBNETDATA_FILES) \
+	$(API_PLUGIN_FILES) \
+	$(BACKENDS_PLUGIN_FILES) \
 	$(CHECKS_PLUGIN_FILES) \
 	$(HEALTH_PLUGIN_FILES) \
 	$(IDLEJITTER_PLUGIN_FILES) \
 	$(PLUGINSD_PLUGIN_FILES) \
 	$(REGISTRY_PLUGIN_FILES) \
+	$(RRD_PLUGIN_FILES) \
+	$(STREAMING_PLUGIN_FILES) \
 	$(STATSD_PLUGIN_FILES) \
+	$(WEB_PLUGIN_FILES) \
 	$(NULL)
 
 if FREEBSD
