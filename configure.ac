@@ -37,9 +37,17 @@ AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_SRCDIR([src/main.c])
-AM_INIT_AUTOMAKE([tar-pax silent-rules subdir-objects])
+define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
+m4_ifdef([AM_SILENT_RULES], [
+    define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
+    ])
+AM_INIT_AUTOMAKE(AUTOMATE_INIT_OPTIONS)
+m4_ifdef([AM_SILENT_RULES], [
+    AM_SILENT_RULES([yes])
+    ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS

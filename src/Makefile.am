@@ -263,15 +263,6 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
-API_PLUGIN_FILES = \
-    api/rrd2json.c \
-    api/rrd2json.h \
-	api/web_api_v1.c \
-	api/web_api_v1.h \
-	api/web_buffer_svg.c \
-	api/web_buffer_svg.h \
-    $(NULL)
-
 WEB_PLUGIN_FILES = \
     webserver/web_client.c \
     webserver/web_client.h \

@@ -483,7 +483,6 @@ run ./configure \
     --with-zlib \
     --with-math \
     --with-user=netdata \
-    --enable-silent-rules \
     ${NETDATA_CONFIGURE_OPTIONS} \
     CFLAGS="${CFLAGS}" || exit 1
 
