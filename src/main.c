@@ -2,8 +2,6 @@
 
 #include "common.h"
 
-extern void *cgroups_main(void *ptr);
-
 void netdata_cleanup_and_exit(int ret) {
     // enabling this, is wrong
     // because the threads will be cancelled while cleaning up
@@ -41,43 +39,31 @@ void netdata_cleanup_and_exit(int ret) {
 
 struct netdata_static_thread static_threads[] = {
 
-#ifdef INTERNAL_PLUGIN_NFACCT
-    // nfacct requires root access
-    // so, we build it as an external plugin with setuid to root
-    {"PLUGIN[nfacct]",       CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
-#endif
+    NETDATA_PLUGIN_HOOK_CHECKS
+    NETDATA_PLUGIN_HOOK_FREEBSD
+    NETDATA_PLUGIN_HOOK_MACOS
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    // debugging plugin
-    {"PLUGIN[check]",        CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
-#endif
-
-#if defined(__FreeBSD__)
-    // FreeBSD internal plugins
-    {"PLUGIN[freebsd]",      CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
-#elif defined(__APPLE__)
-    // macOS internal plugins
-    {"PLUGIN[macos]",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
-#else
     // linux internal plugins
-    {"PLUGIN[proc]",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
-    {"PLUGIN[diskspace]",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
-    {"PLUGIN[cgroup]",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
-    {"PLUGIN[tc]",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
-#endif /* __FreeBSD__, __APPLE__*/
+    NETDATA_PLUGIN_HOOK_LINUX_NFACCT
+    NETDATA_PLUGIN_HOOK_LINUX_PROC
+    NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
+    NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
+    NETDATA_PLUGIN_HOOK_LINUX_TC
 
-    // common plugins for all systems
-    {"PLUGIN[idlejitter]",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-    {"BACKENDS",            NULL,                    NULL,         1, NULL, NULL, backends_main},
-    {"HEALTH",              NULL,                    NULL,         1, NULL, NULL, health_main},
-    {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
-    {"WEB_SERVER[multi]",   NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
-    {"WEB_SERVER[single]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"WEB_SERVER[static1]", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
-    {"STREAM",              NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
-    {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
+    NETDATA_PLUGIN_HOOK_IDLEJITTER
+    NETDATA_PLUGIN_HOOK_STATSD
 
-    {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
+        // common plugins for all systems
+    {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
+    {"WEB_SERVER[multi]",    NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
+    {"WEB_SERVER[single]",   NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
+    {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+
+    NETDATA_PLUGIN_HOOK_PLUGINSD
+    NETDATA_PLUGIN_HOOK_HEALTH
+
+    {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 
 void web_server_threading_selection(void) {
@@ -1053,7 +1039,7 @@ int main(int argc, char **argv) {
     if(getrlimit(RLIMIT_NOFILE, &rlimit_nofile) != 0)
         error("getrlimit(RLIMIT_NOFILE) failed");
     else
-        info("resources control: allowed file descriptors: soft = %zu, max = %zu", rlimit_nofile.rlim_cur, rlimit_nofile.rlim_max);
+        info("resources control: allowed file descriptors: soft = %zu, max = %zu", (size_t)rlimit_nofile.rlim_cur, (size_t)rlimit_nofile.rlim_max);
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
