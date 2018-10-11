@@ -394,6 +394,7 @@ set(NETDATA_FILES
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
+        ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         )
 
