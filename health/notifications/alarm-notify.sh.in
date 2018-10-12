@@ -575,44 +575,44 @@ fi
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
 for method_name in ${method_names} ; do
-    send="SEND_${method_name^^}"
-    if [ ${!send} = "NO" ] ; then
+    send_var="SEND_${method_name^^}"
+    if [ ${!send_var} = "NO" ] ; then
         continue
     fi
 
-    declare -A arr=()
+    declare -A arr_var=()
 
     for x in ${roles//,/ } ; do
         # the roles 'silent' and 'disabled' mean:
         # don't send a notification for this role
         [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
 
-        role_recipients="role_recipients_${method_name}"
-        role_recipients=${!role_recipients}
-        default_recipient="DEFAULT_RECIPIENT_${method_name^^}"
+        role_recipients_var="role_recipients_${method_name}"
+        role_recipients=${!role_recipients_var}
+        default_recipient_var="DEFAULT_RECIPIENT_${method_name^^}"
 
         a="${role_recipients[${x}]}"
-        [ -z "${a}" ] && a="${!default_recipient}"
+        [ -z "${a}" ] && a="${!default_recipient_var}"
         for r in ${a//,/ } ; do
-            [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr[${r/|*/}]="1"
+            [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr_var[${r/|*/}]="1"
         done
     done
 
     # build the list of recipients
-    to="to_${method_name}"
+    to_var="to_${method_name}"
     if [ ${method_name} = "email" ] ; then
         declare to_${method_name}
-        for x in "${!arr[@]}" ; do
-            [ ! -z "${!to}" ] && to_email="${!to}, "
-            to_email="${!to}${x}"
+        for x in "${!arr_var[@]}" ; do
+            [ ! -z "${!to_var}" ] && to_email="${!to_var}, "
+            to_email="${!to_var}${x}"
         done
     else
         declare to_${method_name}="${!arr[*]}"
     fi
-    [ -z "${!to}" ] && declare ${send}="NO"
+    [ -z "${!to_var}" ] && declare ${send}="NO"
 
     if [ ${unittest} ] ; then
-        echo "results: ${method}: ${!to}"
+        echo "results: ${method}: ${!to_var}"
     fi
 done
 
