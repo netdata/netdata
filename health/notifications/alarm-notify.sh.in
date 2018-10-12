@@ -600,25 +600,34 @@ for method_name in ${method_names} ; do
 
     # build the list of recipients
     to_var="to_${method_name}"
-    if [ ${method_name} = "email" ] ; then
-        declare to_${method_name}
-        for x in "${!arr_var[@]}" ; do
-            [ ! -z "${!to_var}" ] && to_email="${!to_var}, "
-            to_email="${!to_var}${x}"
-        done
-    else
-        declare to_${method_name}="${!arr[*]}"
-    fi
-    [ -z "${!to_var}" ] && declare ${send}="NO"
+    declare to_${method_name}="${!arr[*]}"
 
-    if [ ${unittest} ] ; then
-        echo "results: ${method}: ${!to_var}"
-    fi
+    [ -z "${!to_var}" ] && declare ${send}="NO"
 done
 
 # -----------------------------------------------------------------------------
-# exit now if we're in unit test mode
+# handle fixup of the email recipient list.
+
+fix_to_email() {
+  to_email=
+  while [ ! -z "${1}" ]
+  do
+    [ ! -z "${to_email}" ] && to_email="${to_email}, "
+    to_email="${to_email}${1}"
+    shift 1
+  done
+}
+
+# ${to_email} without quotes here
+fix_to_email ${to_email}
+
+# -----------------------------------------------------------------------------
+# handle output if we're running in unit test mode
 if [ ${unittest} ] ; then
+    for method_name in ${method_names} ; do
+        to_var="to_${method_name}"
+        echo "results: ${method}: ${!to_var}"
+    done
     exit 0
 fi
 
