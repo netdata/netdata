@@ -35,11 +35,13 @@ typedef enum {
 unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
+char *default_rrdpush_send_charts_matching = NULL;
 
 int rrdpush_init() {
     default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
+    default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
@@ -69,11 +71,33 @@ unsigned int remote_clock_resync_iterations = 60;
 #define rrdpush_buffer_lock(host) netdata_mutex_lock(&((host)->rrdpush_sender_buffer_mutex))
 #define rrdpush_buffer_unlock(host) netdata_mutex_unlock(&((host)->rrdpush_sender_buffer_mutex))
 
+static inline int should_send_chart_matching(RRDSET *st) {
+    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))) {
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
+        rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+    }
+    else if(!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE)) {
+        RRDHOST *host = st->rrdhost;
+
+        if(simple_pattern_matches(host->rrdpush_send_charts_matching, st->id) ||
+            simple_pattern_matches(host->rrdpush_send_charts_matching, st->name)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
+        }
+        else {
+            rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND);
+            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
+        }
+    }
+
+    return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
+}
+
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {
     rrdset_check_rdlock(st);
 
-    if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_EXPOSED_UPSTREAM))))
+    if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))))
         return 1;
 
     RRDDIM *rd;
@@ -93,7 +117,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     // send the chart
     buffer_sprintf(
@@ -171,8 +195,11 @@ static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
 
-void rrdset_push_chart_definition(RRDSET *st) {
+void rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
+
+    if(unlikely(!host->rrdpush_send_enabled || !should_send_chart_matching(st)))
+        return;
 
     rrdset_rdlock(st);
     rrdpush_buffer_lock(host);
@@ -182,10 +209,10 @@ void rrdset_push_chart_definition(RRDSET *st) {
 }
 
 void rrdset_done_push(RRDSET *st) {
-    RRDHOST *host = st->rrdhost;
-
-    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED)))
+    if(unlikely(!should_send_chart_matching(st)))
         return;
+
+    RRDHOST *host = st->rrdhost;
 
     rrdpush_buffer_lock(host);
 
@@ -269,7 +296,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+        rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
         st->upstream_resync_time = 0;
 
@@ -750,6 +777,7 @@ static int rrdpush_receive(int fd
     int rrdpush_enabled = default_rrdpush_enabled;
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
+    char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
     time_t alarms_delay = 60;
     RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
@@ -781,6 +809,9 @@ static int rrdpush_receive(int fd
     rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, key, "multiple connections", rrdpush_multiple_connections_strategy);
     rrdpush_multiple_connections_strategy = get_multiple_connections_strategy(&stream_config, machine_guid, "multiple connections", rrdpush_multiple_connections_strategy);
 
+    rrdpush_send_charts_matching = appconfig_get(&stream_config, key, "default proxy send charts matching", rrdpush_send_charts_matching);
+    rrdpush_send_charts_matching = appconfig_get(&stream_config, machine_guid, "proxy send charts matching", rrdpush_send_charts_matching);
+
     tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
 
@@ -803,6 +834,7 @@ static int rrdpush_receive(int fd
                 , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
                 , rrdpush_destination
                 , rrdpush_api_key
+                , rrdpush_send_charts_matching
         );
 
     if(!host) {

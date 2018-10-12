@@ -122,6 +122,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         unsigned int rrdpush_enabled,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
+                        char *rrdpush_send_charts_matching,
                         int is_localhost
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
@@ -137,6 +138,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
     host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
+    host->rrdpush_send_charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL, SIMPLE_PATTERN_EXACT);
 
     host->rrdpush_sender_pipe[0] = -1;
     host->rrdpush_sender_pipe[1] = -1;
@@ -329,6 +331,7 @@ RRDHOST *rrdhost_find_or_create(
         , unsigned int rrdpush_enabled
         , char *rrdpush_destination
         , char *rrdpush_api_key
+        , char *rrdpush_send_charts_matching
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
@@ -351,6 +354,7 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_enabled
                 , rrdpush_destination
                 , rrdpush_api_key
+                , rrdpush_send_charts_matching
                 , 0
         );
     }
@@ -463,6 +467,7 @@ void rrd_init(char *hostname) {
             , default_rrdpush_enabled
             , default_rrdpush_destination
             , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
             , 1
     );
     rrd_unlock();
@@ -576,6 +581,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->health_log_filename);
     freez(host->hostname);
     freez(host->registry_hostname);
+    simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
