@@ -190,26 +190,34 @@ custom_sender() {
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-roles="${1}"               # the roles that should be notified for this event
-host="${2}"                # the host generated this event
-unique_id="${3}"           # the unique id of this event
-alarm_id="${4}"            # the unique id of the alarm that generated this event
-event_id="${5}"            # the incremental id of the event, for this alarm id
-when="${6}"                # the timestamp this event occurred
-name="${7}"                # the name of the alarm, as given in netdata health.d entries
-chart="${8}"               # the name of the chart (type.id)
-family="${9}"              # the family of the chart
-status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${12}"              # the current value of the alarm
-old_value="${13}"          # the previous value of the alarm
-src="${14}"                # the line number and file the alarm has been configured
-duration="${15}"           # the duration in seconds of the previous alarm state
-non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-units="${17}"              # the units of the value
-info="${18}"               # a short description of the alarm
-value_string="${19}"       # friendly value (with units)
-old_value_string="${20}"   # friendly old value (with units)
+if [ ${1} = "unittest" ] ; then
+    unittest=1                 # enable unit testing mode
+    roles="${2}"               # the role that should be used for unit testing
+    cfgfile="${3}"             # the location of the config file to use for unit testing
+    status="${4}"              # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    old_status="${5}"          # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+else
+    roles="${1}"               # the roles that should be notified for this event
+    host="${2}"                # the host generated this event
+    unique_id="${3}"           # the unique id of this event
+    alarm_id="${4}"            # the unique id of the alarm that generated this event
+    event_id="${5}"            # the incremental id of the event, for this alarm id
+    when="${6}"                # the timestamp this event occurred
+    name="${7}"                # the name of the alarm, as given in netdata health.d entries
+    chart="${8}"               # the name of the chart (type.id)
+    family="${9}"              # the family of the chart
+    status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    value="${12}"              # the current value of the alarm
+    old_value="${13}"          # the previous value of the alarm
+    src="${14}"                # the line number and file the alarm has been configured
+    duration="${15}"           # the duration in seconds of the previous alarm state
+    non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
+    units="${17}"              # the units of the value
+    info="${18}"               # a short description of the alarm
+    value_string="${19}"       # friendly value (with units)
+    old_value_string="${20}"   # friendly old value (with units)
+fi
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -340,17 +348,24 @@ IRC_NETWORK=
 # load the stock and user configuration files
 # these will overwrite the variables above
 
-for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
-do
-    if [ -f "${CONFIG}" ]
-        then
-        debug "Loading config file '${CONFIG}'..."
-        source "${CONFIG}"
-        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
-    else
-        warning "Cannot find file '${CONFIG}'."
-    fi
-done
+if [ ${unittest} ] ;
+    then
+    source "${config}"
+    [ $? -ne 0 ] && error "Failed to load requested config file."
+    exit 1
+else
+    for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
+    do
+        if [ -f "${CONFIG}" ]
+            then
+            debug "Loading config file '${CONFIG}'..."
+            source "${CONFIG}"
+            [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+        else
+            warning "Cannot find file '${CONFIG}'."
+        fi
+    done
+fi
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
@@ -596,7 +611,16 @@ for method_name in ${method_names} ; do
     fi
     [ -z "${!to}" ] && declare ${send}="NO"
 
+    if [ ${unittest} ] ; then
+        echo "results: ${method}: ${!to}"
+    fi
 done
+
+# -----------------------------------------------------------------------------
+# exit now if we're in unit test mode
+if [ ${unittest} ] ; then
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # check that we have at least a method enabled
