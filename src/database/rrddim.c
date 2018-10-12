@@ -49,7 +49,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     rd->hash_name = simple_hash(rd->name);
     rrddimvar_rename_all(rd);
     rd->exposed = 0;
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
 
@@ -61,7 +61,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     rd->algorithm = algorithm;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
 
@@ -73,7 +73,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     rd->multiplier = multiplier;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
 
@@ -85,7 +85,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     rd->divisor = divisor;
     rd->exposed = 0;
     rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
 
@@ -96,7 +96,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {

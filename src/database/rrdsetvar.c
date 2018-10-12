@@ -183,7 +183,7 @@ void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, calculated_number value)
             *v = value;
 
             // mark the chart to be sent upstream
-            rrdset_flag_clear(rs->rrdset, RRDSET_FLAG_EXPOSED_UPSTREAM);
+            rrdset_flag_clear(rs->rrdset, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
     }
 }
