@@ -183,7 +183,7 @@ set(LIBNETDATA_FILES
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
-        src/plugins/apps.plugin/apps_plugin.c
+        src/plugins/plugins.d.plugin/apps.plugin/apps_plugin.c
         )
 
 set(CHECKS_PLUGIN_FILES
@@ -232,7 +232,7 @@ set(DISKSPACE_PLUGIN_FILES
         )
 
 set(FREEIPMI_PLUGIN_FILES
-        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
+        src/plugins/plugins.d.plugin/freeipmi.plugin/freeipmi_plugin.c
         )
 
 set(NFACCT_PLUGIN_FILES

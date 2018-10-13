@@ -1,17 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = Makefile.in
-
 CLEANFILES = \
-	alarm-notify.sh \
+	python.d.plugin \
 	$(NULL)
 
-alarm-notify.sh: alarm-notify.sh.in
+python.d.plugin: python.d.plugin.in
 	if sed \
 		-e 's#[@]configdir_POST@#$(configdir)#g' \
 		-e 's#[@]libconfigdir_POST@#$(libconfigdir)#g' \
-		-e 's#[@]cachedir_POST@#$(cachedir)#g' \
 		$< > $@.tmp; then \
 		mv "$@.tmp" "$@"; \
 	else \
@@ -20,11 +17,9 @@ alarm-notify.sh: alarm-notify.sh.in
 	fi
 
 dist_plugins_SCRIPTS = \
-	alarm-notify.sh \
-	alarm-email.sh \
-	alarm-test.sh \
+	python.d.plugin \
 	$(NULL)
 
 dist_noinst_DATA = \
-	alarm-notify.sh.in \
+	python.d.plugin.in \
 	$(NULL)

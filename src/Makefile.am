@@ -74,7 +74,7 @@ LIBNETDATA_FILES = \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
-	plugins/apps.plugin/apps_plugin.c \
+	plugins/plugins.d.plugin/apps.plugin/apps_plugin.c \
 	$(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -125,7 +125,7 @@ DISKSPACE_PLUGIN_FILES = \
     $(NULL)
 
 FREEIPMI_PLUGIN_FILES = \
-    plugins/linux-freeipmi.plugin/freeipmi_plugin.c \
+    plugins/plugins.d.plugin/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -360,4 +360,3 @@ if ENABLE_PLUGIN_FREEIPMI
         $(OPTIONAL_IPMIMONITORING_LIBS) \
         $(NULL)
 endif
-

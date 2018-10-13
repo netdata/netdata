@@ -52,7 +52,6 @@ SUBDIRS = \
 	diagrams \
 	makeself \
 	node.d \
-	plugins.d \
 	python.d \
 	src \
 	system \
