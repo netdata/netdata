@@ -1,4 +1,4 @@
-# Data Collection Plugins
+# Netdata Data Collection Plugins
 
 netdata supports **internal** and **external** data collection plugins:
 
@@ -14,7 +14,7 @@ netdata supports **internal** and **external** data collection plugins:
    Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
    data collection modules with the minimum of code.
 
-## Internal Plugins
+## Netdata Internal Plugins
 
 plugin|description
 :---:|:---
@@ -30,9 +30,35 @@ plugin|description
 [plugins.d.plugin](plugins.d.plugin/)|implements the **external plugins** API and serves external plugins
 [statsd.plugin](statsd.plugin/)|implements a high performance statsd server for netdata
 
-## External Plugins and Plugin Orchestrators
+## Netdata External Plugins and Plugin Orchestrators
 
 Browse the [plugins.d.plugin](plugins.d.plugin/) directory.
+
+## Internal Plugins Configuration
+
+Each plugin can be enabled or disabled via `netdata.conf`, section `[plugins]`.
+
+At this section there a list of all the plugins with a boolean setting to enable them or not. 
+
+Example:
+
+```
+[plugins]
+	# cgroups = yes
+	# diskspace = yes
+	# idlejitter = yes
+	# proc = yes
+	# tc = yes
+```
+
+The exception is statsd.plugin that has its own `[statsd]` section.
+
+Once a plugin is enabled, consult the page of each plugin for additional configuration options.
+
+## Operation of Internal Plugins
+
+Each of these plugins runs as a thread inside the netdata daemon.
+Once this thread has started, the plugin may spawn additional threads according to its design.
 
 ## Internal Plugins API
 
