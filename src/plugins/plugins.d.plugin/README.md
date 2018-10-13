@@ -8,24 +8,66 @@ from external processes, thus allowing netdata to use **external plugins**.
 This plugin allows netdata to use **external plugins** for data collection:
 
 1. external data collection plugins may be written in any computer language.
-2. external data collection plugins may use O/S capabilities or `setuid` to run with escalated privileges (compared to the netdata daemon). The communication between the external plugin and netdata is unidirectional (from the plugin to netdata), so that netdata cannot manipulate an external plugin running with escalated privileges.
+2. external data collection plugins may use O/S capabilities or `setuid` to
+   run with escalated privileges (compared to the netdata daemon).
+   The communication between the external plugin and netdata is unidirectional
+   (from the plugin to netdata), so that netdata cannot manipulate an external
+   plugin running with escalated privileges.
 
 ## Operation
 
-Each of the external plugins is expected to run forever. Netdata will start it when it starts and stop it when to exits.
+Each of the external plugins is expected to run forever.
+Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, netdata will log an error.
-If the external plugin exits or crashes without pushing metrics to netdata, netdata will not start it again.
+If the external plugin exits or crashes without pushing metrics to netdata,
+netdata will not start it again.
 
-The `stdout` of external plugins is connected to netdata to receive metrics, with the API defined below.
+The `stdout` of external plugins is connected to netdata to receive metrics,
+with the API defined below.
+
 The `stderr` of external plugins is connected to netdata `error.log`.
 
 ## Configuration
 
 This plugin is configured via `netdata.conf`, section `[plugins]`.
+At this section there a list of all the plugins found at the system it runs
+with a boolean setting to enable them or not. 
 
-For each of the external plugins it supports, another `netdata.conf` section
+Example:
+
+```
+[plugins]
+	# enable running new plugins = yes
+	# check for new plugins every = 60
+	
+	# charts.d = yes
+	# fping = yes
+	# node.d = yes
+	# python.d = yes
+```
+
+The setting `enable running new plugins` changes the default behavior for all external plugins.
+So if set to `no`, only the plugins that are explicitly set to `yes` will be run.
+
+The setting `check for new plugins every` controls the time the directory `/usr/libexec/netdata/plugins.d`
+will be rescanned for new plugins. So, new plugins can give added anytime. 
+
+For each of the external plugins enabled, another `netdata.conf` section
 is created, in the form of `[plugin:NAME]`, where `NAME` is the name of the external plugin.
+This section allows controlling the update frequency of the plugin and provide
+additional command line arguments to it.
+
+For example, for `apps.plugin` the following section is available:
+
+```
+[plugin:apps]
+	# update every = 1
+	# command options = 
+```
+
+- `update every` controls the granularity of the external plugin.
+- `command options` allows giving additional command line options to the plugin.
 
 
 ## External Plugins API
