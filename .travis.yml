@@ -21,7 +21,7 @@ jobs:
     - stage: "lint"
       name: "python"
       install: skip
-      script: docker run -ti --rm -v $(pwd):/apps alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 python.d/ plugins.d/python.d.plugin || echo "OK"
+      script: docker run -ti --rm -v $(pwd):/apps alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 python.d/ plugins.d/python.d.plugin
     - name: "javascript"
       install: skip
       script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/web/*.js /code/plugins.d/node.d.plugin/*.js /code/node.d/*.js /code/node.d/node_modules/netdata.js

@@ -1,7 +1,9 @@
 .deps
 .libs
+.dirstamp
 
 *.o
+*.a
 config.h.in
 Makefile.in
 *~
@@ -29,9 +31,16 @@ netdata.spec
 
 # netdata binaries
 netdata
+!netdata/
+
 apps.plugin
+!apps.plugin/
+
 freeipmi.plugin
+!freeipmi.plugin/
+
 cgroup-network
+!cgroup-network/
 
 # netdata makeself archives
 *.tar.*
@@ -77,7 +86,7 @@ system/netdata-freebsd
 
 conf.d/edit-config
 plugins.d/alarm-notify.sh
-plugins.d/cgroup-name.sh
+src/plugins/linux-cgroups.plugin/cgroup-name.sh
 plugins.d/charts.d.plugin
 plugins.d/fping.plugin
 plugins.d/node.d.plugin

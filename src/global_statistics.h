@@ -3,6 +3,8 @@
 #ifndef NETDATA_GLOBAL_STATISTICS_H
 #define NETDATA_GLOBAL_STATISTICS_H 1
 
+#include "common.h"
+
 // ----------------------------------------------------------------------------
 // global statistics
 

@@ -2,10 +2,11 @@
 swagger: '2.0'
 info:
   title: NetData API
-  description: 'Real time data collection and graphs...'
+  description: 'Real-time performance and health monitoring.'
   version: 1.9.11_rolling
 host: registry.my-netdata.io
 schemes:
+  - https
   - http
 basePath: /api/v1
 produces:
