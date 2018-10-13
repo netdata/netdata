@@ -30,7 +30,7 @@ netdata supports **internal** and **external** data collection plugins:
 
 ## External Plugins and Plugin Orchestrators
 
-Please browse the `plugins.d.plugin` directory.
+Browse the [plugins.d.plugin](plugins.d.plugin/) directory.
 
 ## Internal Plugins API
 
