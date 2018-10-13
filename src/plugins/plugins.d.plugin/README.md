@@ -11,8 +11,8 @@ plugin|language|description
 [charts.d.plugin](charts.d.plugin/)|`BASH`|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
 [fping.plugin](fping.plugin/)|`C`|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
 [freeipmi.plugin](freeipmi.plugin/)|`C`|collects metrics from enterprise hardware sensors, on Linux servers.
-[node.d.plugin](node.d.plugin/)|`node.js`|a **plugin orchestrator** for data collection plugins written in `node.js`.
-[python.d.plugin](python.d.plugin/)|`python`|a **plugin orchestrator** for data collection plugins written in `python` v2 or v3 (both are supported).
+[node.d.plugin](node.d.plugin/)|`node.js`|a **plugin orchestrator** for data collection modules written in `node.js`.
+[python.d.plugin](python.d.plugin/)|`python`|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
 
 
 ## Motivation
