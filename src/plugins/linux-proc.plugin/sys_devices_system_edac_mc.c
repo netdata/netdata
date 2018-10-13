@@ -142,9 +142,9 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , NULL
                     , "ECC Memory Correctable Errors"
                     , "errors"
-                    , "proc"
+                    , PLUGIN_PROC_NAME
                     , "/sys/devices/system/edac/mc"
-                    , NETDATA_CHART_PRIO_MEM_HW + 50
+                    , NETDATA_CHART_PRIO_MEM_HW_ECC_CE
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -180,9 +180,9 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , NULL
                     , "ECC Memory Uncorrectable Errors"
                     , "errors"
-                    , "proc"
+                    , PLUGIN_PROC_NAME
                     , "/sys/devices/system/edac/mc"
-                    , NETDATA_CHART_PRIO_MEM_HW + 60
+                    , NETDATA_CHART_PRIO_MEM_HW_ECC_UE
                     , update_every
                     , RRDSET_TYPE_LINE
             );

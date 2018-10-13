@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME "/proc/net/sockstat"
+
 static struct proc_net_sockstat {
     kernel_uint_t sockets_used;
 
@@ -231,8 +233,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 Sockets Used"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -266,9 +268,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 TCP Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat"
-                    , NETDATA_CHART_PRIO_IPV4_TCP + 1
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
+                    , NETDATA_CHART_PRIO_IPV4_TCP_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -304,8 +306,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 TCP Sockets Memory"
                     , "KB"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_TCP_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -336,8 +338,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 UDP Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_UDP
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -368,8 +370,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 UDP Sockets Memory"
                     , "KB"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_UDP_MEM
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -400,8 +402,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 UDPLITE Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_UDPLITE
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -432,8 +434,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 RAW Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_RAW
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -464,8 +466,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 FRAG Sockets"
                     , "fragments"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -496,8 +498,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "IPv4 FRAG Sockets Memory"
                     , "KB"
-                    , "proc"
-                    , "net/sockstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM
                     , update_every
                     , RRDSET_TYPE_AREA

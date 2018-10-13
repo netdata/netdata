@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_KSM_NAME "/sys/kernel/mm/ksm"
+
 typedef struct ksm_name_value {
     char filename[FILENAME_MAX + 1];
     unsigned long long value;
@@ -104,8 +106,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging"
                     , "MB"
-                    , "proc"
-                    , "/sys/kernel/mm/ksm"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_KSM_NAME
                     , NETDATA_CHART_PRIO_MEM_KSM
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -144,9 +146,9 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging Savings"
                     , "MB"
-                    , "proc"
-                    , "/sys/kernel/mm/ksm"
-                    , NETDATA_CHART_PRIO_MEM_KSM + 1
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_KSM_NAME
+                    , NETDATA_CHART_PRIO_MEM_KSM_SAVINGS
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -178,9 +180,9 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging Effectiveness"
                     , "percentage"
-                    , "proc"
-                    , "/sys/kernel/mm/ksm"
-                    , NETDATA_CHART_PRIO_MEM_KSM + 2
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_KSM_NAME
+                    , NETDATA_CHART_PRIO_MEM_KSM_RATIOS
                     , update_every
                     , RRDSET_TYPE_LINE
             );

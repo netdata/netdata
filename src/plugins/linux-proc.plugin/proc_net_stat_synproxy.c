@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_SYNPROXY_NAME "/proc/net/stat/synproxy"
+
 #define RRD_TYPE_NET_STAT_NETFILTER         "netfilter"
 #define RRD_TYPE_NET_STAT_SYNPROXY          "synproxy"
 
@@ -70,9 +72,9 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , NULL
                     , "SYNPROXY Entries Used"
                     , "entries"
-                    , "proc"
-                    , "net/stat/synproxy"
-                    , NETDATA_CHART_PRIO_SYNPROXY + 4
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_SYNPROXY_NAME
+                    , NETDATA_CHART_PRIO_SYNPROXY_ENTRIES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -100,9 +102,9 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , NULL
                     , "SYNPROXY SYN Packets received"
                     , "SYN/s"
-                    , "proc"
-                    , "net/stat/synproxy"
-                    , NETDATA_CHART_PRIO_SYNPROXY + 1
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_SYNPROXY_NAME
+                    , NETDATA_CHART_PRIO_SYNPROXY_SYN_RECEIVED
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -130,9 +132,9 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , NULL
                     , "SYNPROXY Connections Reopened"
                     , "connections/s"
-                    , "proc"
-                    , "net/stat/synproxy"
-                    , NETDATA_CHART_PRIO_SYNPROXY + 3
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_SYNPROXY_NAME
+                    , NETDATA_CHART_PRIO_SYNPROXY_CONN_OPEN
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -160,9 +162,9 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , NULL
                     , "SYNPROXY TCP Cookies"
                     , "cookies/s"
-                    , "proc"
-                    , "net/stat/synproxy"
-                    , NETDATA_CHART_PRIO_SYNPROXY + 2
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_SYNPROXY_NAME
+                    , NETDATA_CHART_PRIO_SYNPROXY_COOKIES
                     , update_every
                     , RRDSET_TYPE_LINE
             );

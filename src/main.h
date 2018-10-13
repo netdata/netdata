@@ -25,17 +25,17 @@ struct option_def {
 };
 
 struct netdata_static_thread {
-    char *name;
+    char *name;                         // the name of the thread as it should appear in the logs
 
-    char *config_section;
-    char *config_name;
+    char *config_section;               // the section of netdata.conf to check if this is enabled or not
+    char *config_name;                  // the name of the config option to check if it is true or false
 
-    volatile sig_atomic_t enabled;
+    volatile sig_atomic_t enabled;      // the current status of the thread
 
-    netdata_thread_t *thread;
+    netdata_thread_t *thread;           // internal use, to maintain a pointer to the created thread
 
-    void (*init_routine) (void);
-    void *(*start_routine) (void *);
+    void (*init_routine) (void);        // an initialization function to run before spawning the thread
+    void *(*start_routine) (void *);    // the threaded worker
 };
 
 extern void cancel_main_threads(void);

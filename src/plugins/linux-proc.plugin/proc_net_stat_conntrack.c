@@ -4,6 +4,7 @@
 
 #define RRD_TYPE_NET_STAT_NETFILTER     "netfilter"
 #define RRD_TYPE_NET_STAT_CONNTRACK     "conntrack"
+#define PLUGIN_PROC_MODULE_CONNTRACK_NAME "/proc/net/stat/nf_conntrack"
 
 int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static procfile *ff = NULL;
@@ -142,9 +143,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker Connections"
                     , "active connections"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -175,9 +176,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker New Connections"
                     , "connections/s"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER + 1
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_NEW
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -212,9 +213,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker Changes"
                     , "changes/s"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER + 2
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_CHANGES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -249,9 +250,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker Expectations"
                     , "expectations/s"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER + 3
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_EXPECT
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -286,9 +287,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker Searches"
                     , "searches/s"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER + 10
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_SEARCH
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -324,9 +325,9 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , NULL
                     , "Connection Tracker Errors"
                     , "events/s"
-                    , "proc"
-                    , "net/stat/nf_conntrack"
-                    , NETDATA_CHART_PRIO_NETFILTER + 5
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_CONNTRACK_NAME
+                    , NETDATA_CHART_PRIO_NETFILTER_ERRORS
                     , update_every
                     , RRDSET_TYPE_LINE
             );

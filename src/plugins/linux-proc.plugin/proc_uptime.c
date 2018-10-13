@@ -85,9 +85,9 @@ int do_proc_uptime(int update_every, usec_t dt) {
                 , NULL
                 , "System Uptime"
                 , "seconds"
-                , "proc"
-                , "uptime"
-                , 1000
+                , PLUGIN_PROC_NAME
+                , "/proc/uptime"
+                , NETDATA_CHART_PRIO_SYSTEM_UPTIME
                 , update_every
                 , RRDSET_TYPE_LINE
         );

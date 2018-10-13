@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_proc.h"
+#define PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME "/proc/net/sctp/snmp"
 
 int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
     (void)dt;
@@ -137,8 +138,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP current total number of established associations"
                     , "associations"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -171,8 +172,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP Association Transitions"
                     , "transitions/s"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP + 10
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -209,8 +210,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP Packets"
                     , "packets/s"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP + 20
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -244,8 +245,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP Packet Errors"
                     , "packets/s"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP + 30
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -280,8 +281,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP Fragmentation"
                     , "packets/s"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP + 40
                     , update_every
                     , RRDSET_TYPE_LINE);
@@ -320,8 +321,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NULL
                     , "SCTP Chunk Types"
                     , "chunks/s"
-                    , "proc"
-                    , "net/sctp/snmp"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SCTP_SNMP_NAME
                     , NETDATA_CHART_PRIO_SCTP + 50
                     , update_every
                     , RRDSET_TYPE_LINE

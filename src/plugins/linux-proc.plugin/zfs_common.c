@@ -4,7 +4,7 @@
 
 struct arcstats arcstats = { 0 };
 
-void generate_charts_arcstats(const char *plugin, int update_every) {
+void generate_charts_arcstats(const char *plugin, const char *module, int update_every) {
 
     // ARC reads
     unsigned long long aread = arcstats.hits + arcstats.misses;
@@ -48,8 +48,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS ARC Size"
                     , "MB"
                     , plugin
-                    , "zfs"
-                    , 2500
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_ARC_SIZE
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -86,8 +86,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS L2 ARC Size"
                     , "MB"
                     , plugin
-                    , "zfs"
-                    , 2500
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_L2_SIZE
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -123,8 +123,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS Reads"
                     , "reads/s"
                     , plugin
-                    , "zfs"
-                    , 2510
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_READS
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -168,8 +168,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS ARC L2 Read/Write Rate"
                     , "kilobytes/s"
                     , plugin
-                    , "zfs"
-                    , 2700
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_IO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -202,8 +202,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS ARC Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2520
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_HITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -236,8 +236,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS Demand Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2530
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_DHITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -270,8 +270,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS Prefetch Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2540
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_PHITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -304,8 +304,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS Metadata Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2550
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_MHITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -338,8 +338,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS L2 Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2560
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_L2HITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -374,8 +374,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "ZFS List Hits"
                     , "hits/s"
                     , plugin
-                    , "zfs"
-                    , 2600
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_LIST_HITS
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -396,7 +396,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
     }
 }
 
-void generate_charts_arc_summary(const char *plugin, int update_every) {
+void generate_charts_arc_summary(const char *plugin, const char *module, int update_every) {
     unsigned long long arc_accesses_total = arcstats.hits + arcstats.misses;
     unsigned long long real_hits = arcstats.mfu_hits + arcstats.mru_hits;
     unsigned long long real_misses = arc_accesses_total - real_hits;
@@ -433,8 +433,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS ARC Size Breakdown"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2520
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_ARC_SIZE_BREAKDOWN
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -472,8 +472,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS Memory Operations"
                     , "operations/s"
                     , plugin
-                    , "zfs"
-                    , 2523
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_MEMORY_OPS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -518,8 +518,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS Important Operations"
                     , "operations/s"
                     , plugin
-                    , "zfs"
-                    , 2522
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_IMPORTANT_OPS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -556,8 +556,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS Actual Cache Hits"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2519
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_ACTUAL_HITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -590,8 +590,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS Data Demand Efficiency"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2531
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_DEMAND_DATA_HITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -624,8 +624,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS Data Prefetch Efficiency"
                     , "percentage"
                     , plugin
-                    , "zfs"
-                    , 2532
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_PREFETCH_DATA_HITS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -658,8 +658,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS ARC Hash Elements"
                     , "elements"
                     , plugin
-                    , "zfs"
-                    , 2800
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_HASH_ELEMENTS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -692,8 +692,8 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "ZFS ARC Hash Chains"
                     , "chains"
                     , plugin
-                    , "zfs"
-                    , 2810
+                    , module
+                    , NETDATA_CHART_PRIO_ZFS_HASH_CHAINS
                     , update_every
                     , RRDSET_TYPE_LINE
             );

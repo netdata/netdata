@@ -197,9 +197,9 @@ int do_ipc(int update_every, usec_t dt) {
                     , NULL
                     , "IPC Semaphores"
                     , "semaphores"
-                    , "linux"
+                    , PLUGIN_PROC_NAME
                     , "ipc"
-                    , 1000
+                    , NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );
@@ -215,9 +215,9 @@ int do_ipc(int update_every, usec_t dt) {
                     , NULL
                     , "IPC Semaphore Arrays"
                     , "arrays"
-                    , "linux"
+                    , PLUGIN_PROC_NAME
                     , "ipc"
-                    , 1000
+                    , NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );

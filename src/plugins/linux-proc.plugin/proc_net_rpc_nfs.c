@@ -2,6 +2,9 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NFS_NAME "/proc/net/rpc/nfs"
+#define CONFIG_SECTION_PLUGIN_PROC_NFS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NFS_NAME
+
 struct nfs_procs {
     char name[30];
     unsigned long long value;
@@ -145,18 +148,18 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfs");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/rpc/nfs", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NFS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(!ff) return 1;
 
     ff = procfile_readall(ff);
     if(!ff) return 0; // we return 0, so that we will retry to open it next time
 
-    if(do_net == -1) do_net = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "network", 1);
-    if(do_rpc == -1) do_rpc = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "rpc", 1);
-    if(do_proc2 == -1) do_proc2 = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "NFS v2 procedures", 1);
-    if(do_proc3 == -1) do_proc3 = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "NFS v3 procedures", 1);
-    if(do_proc4 == -1) do_proc4 = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "NFS v4 procedures", 1);
+    if(do_net == -1) do_net = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "network", 1);
+    if(do_rpc == -1) do_rpc = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "rpc", 1);
+    if(do_proc2 == -1) do_proc2 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v2 procedures", 1);
+    if(do_proc3 == -1) do_proc3 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v3 procedures", 1);
+    if(do_proc4 == -1) do_proc4 = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NFS, "NFS v4 procedures", 1);
 
     // if they are enabled, reset them to 1
     // later we do them =2 to avoid doing strcmp() for all lines
@@ -288,9 +291,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Client Network"
                     , "operations/s"
-                    , "proc"
-                    , "net/rpc/nfs"
-                    , 2207
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFS_NAME
+                    , NETDATA_CHART_PRIO_NFS_NET
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -328,9 +331,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Client Remote Procedure Calls Statistics"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfs"
-                    , 2208
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFS_NAME
+                    , NETDATA_CHART_PRIO_NFS_RPC
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -361,9 +364,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v2 Client Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfs"
-                    , 2209
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFS_NAME
+                    , NETDATA_CHART_PRIO_NFS_PROC2
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -394,9 +397,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v3 Client Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfs"
-                    , 2210
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFS_NAME
+                    , NETDATA_CHART_PRIO_NFS_PROC3
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -427,9 +430,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v4 Client Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfs"
-                    , 2211
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFS_NAME
+                    , NETDATA_CHART_PRIO_NFS_PROC4
                     , update_every
                     , RRDSET_TYPE_STACKED
             );

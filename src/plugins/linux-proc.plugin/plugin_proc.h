@@ -18,6 +18,10 @@
         .start_routine = proc_main \
     },
 
+
+#define PLUGIN_PROC_CONFIG_NAME "proc"
+#define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
+
 extern void *proc_main(void *ptr);
 
 extern int do_proc_net_dev(int update_every, usec_t dt);

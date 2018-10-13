@@ -227,9 +227,9 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                               "disk.space",
                                                               title,
                                                               "GB",
-                                                              "freebsd",
+                                "freebsd.plugin",
                                                               "getmntinfo",
-                                                              2023,
+                                NETDATA_CHART_PRIO_DISKSPACE_SPACE,
                                                               update_every,
                                                               RRDSET_TYPE_STACKED
                         );
@@ -266,9 +266,9 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                                "disk.inodes",
                                                                title,
                                                                "Inodes",
-                                                               "freebsd",
+                                "freebsd.plugin",
                                                                "getmntinfo",
-                                                               2024,
+                                NETDATA_CHART_PRIO_DISKSPACE_INODES,
                                                                update_every,
                                                                RRDSET_TYPE_STACKED
                         );

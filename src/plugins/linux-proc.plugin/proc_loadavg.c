@@ -2,6 +2,9 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_LOADAVG_NAME "/proc/loadavg"
+#define CONFIG_SECTION_PLUGIN_PROC_LOADAVG "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_LOADAVG_NAME
+
 // linux calculates this once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
@@ -14,7 +17,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/loadavg");
 
-        ff = procfile_open(config_get("plugin:proc:/proc/loadavg", "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
     }
@@ -24,8 +27,8 @@ int do_proc_loadavg(int update_every, usec_t dt) {
         return 0; // we return 0, so that we will retry to open it next time
 
     if(unlikely(do_loadavg == -1)) {
-        do_loadavg          = config_get_boolean("plugin:proc:/proc/loadavg", "enable load average", 1);
-        do_all_processes    = config_get_boolean("plugin:proc:/proc/loadavg", "enable total processes", 1);
+        do_loadavg          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable load average", 1);
+        do_all_processes    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_LOADAVG, "enable total processes", 1);
     }
 
     if(unlikely(procfile_lines(ff) < 1)) {
@@ -62,9 +65,9 @@ int do_proc_loadavg(int update_every, usec_t dt) {
                         , NULL
                         , "System Load Average"
                         , "load"
-                        , "proc"
-                        , "loadavg"
-                        , 100
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_LOADAVG_NAME
+                        , NETDATA_CHART_PRIO_SYSTEM_LOAD
                         , (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -102,9 +105,9 @@ int do_proc_loadavg(int update_every, usec_t dt) {
                     , NULL
                     , "System Active Processes"
                     , "processes"
-                    , "proc"
-                    , "loadavg"
-                    , 750
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_LOADAVG_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_ACTIVE_PROCESSES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
