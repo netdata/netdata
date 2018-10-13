@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME "/proc/net/sockstat6"
+
 static struct proc_net_sockstat6 {
     kernel_uint_t tcp6_inuse;
     kernel_uint_t udp6_inuse;
@@ -124,8 +126,8 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , NULL
                     , "IPv6 TCP Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat6"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME
                     , NETDATA_CHART_PRIO_IPV6_TCP
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -156,8 +158,8 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , NULL
                     , "IPv6 UDP Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat6"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME
                     , NETDATA_CHART_PRIO_IPV6_UDP
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -188,8 +190,8 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , NULL
                     , "IPv6 UDPLITE Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat6"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME
                     , NETDATA_CHART_PRIO_IPV6_UDPLITE
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -220,8 +222,8 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , NULL
                     , "IPv6 RAW Sockets"
                     , "sockets"
-                    , "proc"
-                    , "net/sockstat6"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME
                     , NETDATA_CHART_PRIO_IPV6_RAW
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -252,8 +254,8 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , NULL
                     , "IPv6 FRAG Sockets"
                     , "fragments"
-                    , "proc"
-                    , "net/sockstat6"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_SOCKSTAT6_NAME
                     , NETDATA_CHART_PRIO_IPV6_FRAGMENTS
                     , update_every
                     , RRDSET_TYPE_LINE

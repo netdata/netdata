@@ -164,9 +164,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                  NULL,
                                                  "Memory allocated by rules",
                                                  "bytes",
-                                                 "freebsd",
+                                                 "freebsd.plugin",
                                                  "ipfw",
-                                                 3005,
+                                                 NETDATA_CHART_PRIO_IPFW_MEM,
                                                  update_every,
                                                  RRDSET_TYPE_STACKED
                 );
@@ -197,9 +197,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                          NULL,
                                                          "Packets",
                                                          "packets/s",
-                                                         "freebsd",
+                                                 "freebsd.plugin",
                                                          "ipfw",
-                                                         3001,
+                                                         NETDATA_CHART_PRIO_IPFW_PACKETS,
                                                          update_every,
                                                          RRDSET_TYPE_STACKED
                     );
@@ -214,9 +214,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                        NULL,
                                                        "Bytes",
                                                        "bytes/s",
-                                                       "freebsd",
+                                                 "freebsd.plugin",
                                                        "ipfw",
-                                                       3002,
+                                                       NETDATA_CHART_PRIO_IPFW_BYTES,
                                                        update_every,
                                                        RRDSET_TYPE_STACKED
                     );
@@ -318,9 +318,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                     NULL,
                                                     "Active rules",
                                                     "rules",
-                                                    "freebsd",
+                                                 "freebsd.plugin",
                                                     "ipfw",
-                                                    3003,
+                                                    NETDATA_CHART_PRIO_IPFW_ACTIVE,
                                                     update_every,
                                                     RRDSET_TYPE_STACKED
                 );
@@ -335,9 +335,9 @@ int do_ipfw(int update_every, usec_t dt) {
                                                      NULL,
                                                      "Expired rules",
                                                      "rules",
-                                                     "freebsd",
+                                                 "freebsd.plugin",
                                                      "ipfw",
-                                                     3004,
+                                                     NETDATA_CHART_PRIO_IPFW_EXPIRED,
                                                      update_every,
                                                      RRDSET_TYPE_STACKED
                 );

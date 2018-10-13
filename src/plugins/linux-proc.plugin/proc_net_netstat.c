@@ -3,6 +3,8 @@
 #include "plugin_proc.h"
 
 #define RRD_TYPE_NET_NETSTAT "ip"
+#define PLUGIN_PROC_MODULE_NETSTAT_NAME "/proc/net/netstat"
+#define CONFIG_SECTION_PLUGIN_PROC_NETSTAT "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETSTAT_NAME
 
 unsigned long long tcpext_TCPSynRetrans = 0;
 
@@ -116,22 +118,22 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         hash_ipext = simple_hash("IpExt");
         hash_tcpext = simple_hash("TcpExt");
 
-        do_bandwidth = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_inerrors  = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "input errors", CONFIG_BOOLEAN_AUTO);
-        do_mcast     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_bcast     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
-        do_mcast_p   = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast packets", CONFIG_BOOLEAN_AUTO);
-        do_bcast_p   = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "broadcast packets", CONFIG_BOOLEAN_AUTO);
-        do_ecn       = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "ECN packets", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_inerrors  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "input errors", CONFIG_BOOLEAN_AUTO);
+        do_mcast     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_bcast     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast_p   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "multicast packets", CONFIG_BOOLEAN_AUTO);
+        do_bcast_p   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "broadcast packets", CONFIG_BOOLEAN_AUTO);
+        do_ecn       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "ECN packets", CONFIG_BOOLEAN_AUTO);
 
-        do_tcpext_reorder    = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP reorders", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_syscookies = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_ofo        = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_reorder    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP reorders", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_syscookies = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN cookies", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_ofo        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_connaborts = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_memory     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
 
-        do_tcpext_syn_queue    = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP SYN queue", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_accept_queue = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP accept queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_syn_queue    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP SYN queue", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_accept_queue = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "TCP accept queue", CONFIG_BOOLEAN_AUTO);
 
         arl_ipext  = arl_create("netstat/ipext", NULL, 60);
         arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
@@ -230,7 +232,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/netstat");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/netstat", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETSTAT, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -274,8 +276,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Bandwidth"
                             , "kilobits/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_SYSTEM_IP
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -309,8 +311,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Input Errors"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_IP_ERRORS
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -348,8 +350,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Multicast Bandwidth"
                             , "kilobits/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_IP_MCAST
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -386,8 +388,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Broadcast Bandwidth"
                             , "kilobits/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_IP_BCAST
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -424,9 +426,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Multicast Packets"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_MCAST + 10
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_MCAST_PACKETS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -461,9 +463,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP Broadcast Packets"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_BCAST + 10
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_BCAST_PACKETS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -499,8 +501,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IP ECN Statistics"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_IP_ECN
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -551,8 +553,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Memory Pressures"
                             , "events/s"
-                            , "proc"
-                            , "net/netstat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
                             , NETDATA_CHART_PRIO_IP_TCP_MEM
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -585,9 +587,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Connection Aborts"
                             , "connections/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 10
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_CONNABORTS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -629,9 +631,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Reordered Packets by Detection Method"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 20
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_REORDERS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -670,9 +672,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Out-Of-Order Queue"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 50
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_OFO
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -711,9 +713,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP SYN Cookies"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 60
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_SYNCOOKIES
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -752,9 +754,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP SYN Queue Issues"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 15
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_SYN_QUEUE
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -790,9 +792,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Accept Queue Issues"
                             , "packets/s"
-                            , "proc"
-                            , "net/netstat"
-                            , NETDATA_CHART_PRIO_IP_TCP + 16
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NETSTAT_NAME
+                            , NETDATA_CHART_PRIO_IP_TCP_ACCEPT_QUEUE
                             , update_every
                             , RRDSET_TYPE_LINE
                     );

@@ -31,9 +31,9 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
                 , NULL
                 , "Available Entropy"
                 , "entropy"
-                , "proc"
-                , "sys/kernel/random/entropy_avail"
-                , 1000
+                , PLUGIN_PROC_NAME
+                , "/proc/sys/kernel/random/entropy_avail"
+                , NETDATA_CHART_PRIO_SYSTEM_ENTROPY
                 , update_every
                 , RRDSET_TYPE_LINE
         );

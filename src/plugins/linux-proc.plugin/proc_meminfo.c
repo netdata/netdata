@@ -2,6 +2,9 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_MEMINFO_NAME "/proc/meminfo"
+#define CONFIG_SECTION_PLUGIN_PROC_MEMINFO "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_MEMINFO_NAME
+
 int do_proc_meminfo(int update_every, usec_t dt) {
     (void)dt;
 
@@ -58,15 +61,15 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             HardwareCorrupted = 0;
 
     if(unlikely(!arl_base)) {
-        do_ram          = config_get_boolean("plugin:proc:/proc/meminfo", "system ram", 1);
-        do_swap         = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "system swap", CONFIG_BOOLEAN_AUTO);
-        do_hwcorrupt    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
-        do_committed    = config_get_boolean("plugin:proc:/proc/meminfo", "committed memory", 1);
-        do_writeback    = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
-        do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
-        do_slab         = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
-        do_hugepages    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hugepages", CONFIG_BOOLEAN_AUTO);
-        do_transparent_hugepages = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "transparent hugepages", CONFIG_BOOLEAN_AUTO);
+        do_ram          = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system ram", 1);
+        do_swap         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "system swap", CONFIG_BOOLEAN_AUTO);
+        do_hwcorrupt    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
+        do_committed    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "committed memory", 1);
+        do_writeback    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "writeback memory", 1);
+        do_kernel       = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "kernel memory", 1);
+        do_slab         = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "slab memory", 1);
+        do_hugepages    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "hugepages", CONFIG_BOOLEAN_AUTO);
+        do_transparent_hugepages = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "transparent hugepages", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("meminfo", NULL, 60);
         arl_expect(arl_base, "MemTotal", &MemTotal);
@@ -118,7 +121,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/meminfo");
-        ff = procfile_open(config_get("plugin:proc:/proc/meminfo", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_MEMINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
     }
@@ -160,9 +163,9 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , NULL
                         , "System RAM"
                         , "MB"
-                        , "proc"
-                        , "meminfo"
-                        , 200
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
+                        , NETDATA_CHART_PRIO_SYSTEM_RAM
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -195,8 +198,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , NULL
                         , "Available RAM for applications"
                         , "MB"
-                        , "proc"
-                        , "meminfo"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
                         , NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -231,9 +234,9 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "System Swap"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
-                    , 201
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_SWAP
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -268,8 +271,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Corrupted Memory, detected by ECC"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HW
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -301,8 +304,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Committed (Allocated) Memory"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -334,8 +337,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Writeback Memory"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_KERNEL
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -374,8 +377,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Memory Used by Kernel"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_KERNEL + 1
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -413,8 +416,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Reclaimable Kernel Memory"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_SLAB
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -450,8 +453,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Dedicated HugePages Memory"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HUGEPAGES + 1
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -491,8 +494,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Transparent HugePages Memory"
                     , "MB"
-                    , "proc"
-                    , "meminfo"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HUGEPAGES
                     , update_every
                     , RRDSET_TYPE_STACKED

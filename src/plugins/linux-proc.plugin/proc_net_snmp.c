@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_proc.h"
+#define PLUGIN_PROC_MODULE_NET_SNMP_NAME "/proc/net/snmp"
 
 #define RRD_TYPE_NET_SNMP "ipv4"
 
@@ -275,8 +276,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Packets"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_PACKETS
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -315,8 +316,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Fragments Sent"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_FRAGMENTS
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -354,8 +355,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Fragments Reassembly"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_FRAGMENTS + 1
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -396,8 +397,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Errors"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_ERRORS
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -463,8 +464,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , NULL
                                 , "IPv4 ICMP Packets"
                                 , "packets/s"
-                                , "proc"
-                                , "net/snmp"
+                                , PLUGIN_PROC_NAME
+                                , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                                 , NETDATA_CHART_PRIO_IPV4_ICMP
                                 , update_every
                                 , RRDSET_TYPE_LINE
@@ -496,8 +497,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , NULL
                                 , "IPv4 ICMP Errors"
                                 , "packets/s"
-                                , "proc"
-                                , "net/snmp"
+                                , PLUGIN_PROC_NAME
+                                , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                                 , NETDATA_CHART_PRIO_IPV4_ICMP + 1
                                 , update_every
                                 , RRDSET_TYPE_LINE
@@ -594,8 +595,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Messages"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_ICMP + 2
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -691,8 +692,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Connections"
                             , "active connections"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_TCP
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -724,8 +725,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Packets"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_TCP + 4
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -760,8 +761,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Errors"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_TCP + 20
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -798,8 +799,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Opens"
                             , "connections/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_TCP + 5
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -836,8 +837,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 TCP Handshake Issues"
                             , "events/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_TCP + 30
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -897,8 +898,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 UDP Packets"
                             , "packets/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_UDP
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -943,8 +944,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 UDP Errors"
                             , "events/s"
-                            , "proc"
-                            , "net/snmp"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                             , NETDATA_CHART_PRIO_IPV4_UDP + 10
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -1017,8 +1018,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , NULL
                                 , "IPv4 UDPLite Packets"
                                 , "packets/s"
-                                , "proc"
-                                , "net/snmp"
+                                , PLUGIN_PROC_NAME
+                                , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                                 , NETDATA_CHART_PRIO_IPV4_UDPLITE
                                 , update_every
                                 , RRDSET_TYPE_LINE
@@ -1052,8 +1053,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                                 , NULL
                                 , "IPv4 UDPLite Errors"
                                 , "packets/s"
-                                , "proc"
-                                , "net/snmp"
+                                , PLUGIN_PROC_NAME
+                                , PLUGIN_PROC_MODULE_NET_SNMP_NAME
                                 , NETDATA_CHART_PRIO_IPV4_UDPLITE + 10
                                 , update_every
                                 , RRDSET_TYPE_LINE);

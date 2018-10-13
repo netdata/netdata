@@ -30,9 +30,9 @@ void *cpuidlejitter_main(void *ptr) {
             , NULL
             , "CPU Idle Jitter"
             , "microseconds lost/s"
-            , "idlejitter"
+            , "idlejitter.plugin"
             , NULL
-            , 800
+            , NETDATA_CHART_PRIO_SYSTEM_IDLEJITTER
             , localhost->rrd_update_every
             , RRDSET_TYPE_AREA
     );

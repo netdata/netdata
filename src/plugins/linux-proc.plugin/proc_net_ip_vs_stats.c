@@ -2,21 +2,23 @@
 
 #include "plugin_proc.h"
 
-#define RRD_TYPE_NET_IPVS           "ipvs"
+#define RRD_TYPE_NET_IPVS "ipvs"
+#define PLUGIN_PROC_MODULE_NET_IPVS_NAME "/proc/net/ip_vs_stats"
+#define CONFIG_SECTION_PLUGIN_PROC_NET_IPVS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NET_IPVS_NAME
 
 int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     (void)dt;
     static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;
     static procfile *ff = NULL;
 
-    if(do_bandwidth == -1)  do_bandwidth    = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS bandwidth", 1);
-    if(do_sockets == -1)    do_sockets      = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS connections", 1);
-    if(do_packets == -1)    do_packets      = config_get_boolean("plugin:proc:/proc/net/ip_vs_stats", "IPVS packets", 1);
+    if(do_bandwidth == -1)  do_bandwidth    = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS bandwidth", 1);
+    if(do_sockets == -1)    do_sockets      = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS connections", 1);
+    if(do_packets == -1)    do_packets      = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "IPVS packets", 1);
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/ip_vs_stats");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/ip_vs_stats", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NET_IPVS, "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
     }
     if(!ff) return 1;
 
@@ -52,9 +54,9 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
                     , NULL
                     , "IPVS New Connections"
                     , "connections/s"
-                    , "proc"
-                    , "net/ip_vs_stats"
-                    , 3101
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_IPVS_NAME
+                    , NETDATA_CHART_PRIO_IPVS_SOCKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -80,9 +82,9 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
                     , NULL
                     , "IPVS Packets"
                     , "packets/s"
-                    , "proc"
-                    , "net/ip_vs_stats"
-                    , 3102
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_IPVS_NAME
+                    , NETDATA_CHART_PRIO_IPVS_PACKETS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -110,9 +112,9 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
                     , NULL
                     , "IPVS Bandwidth"
                     , "kilobits/s"
-                    , "proc"
-                    , "net/ip_vs_stats"
-                    , 3100
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NET_IPVS_NAME
+                    , NETDATA_CHART_PRIO_IPVS_NET
                     , update_every
                     , RRDSET_TYPE_AREA
             );

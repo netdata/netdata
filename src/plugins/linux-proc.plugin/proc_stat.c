@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_STAT_NAME "/proc/stat"
+
 struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
@@ -241,14 +243,14 @@ int do_proc_stat(int update_every, usec_t dt) {
                         type = "system";
                         context = "system.cpu";
                         family = id;
-                        priority = 100;
+                        priority = NETDATA_CHART_PRIO_SYSTEM_CPU;
                     }
                     else {
                         title = "Core utilization";
                         type = "cpu";
                         context = "cpu.cpu";
                         family = "utilization";
-                        priority = 1000;
+                        priority = NETDATA_CHART_PRIO_CPU_PER_CORE;
 
                         // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
                         // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state
@@ -292,9 +294,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , context
                             , title
                             , "percentage"
-                            , "proc"
-                            , "stat"
-                            , priority
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , priority + core
                             , update_every
                             , RRDSET_TYPE_STACKED
                     );
@@ -347,9 +349,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , NULL
                             , "CPU Interrupts"
                             , "interrupts/s"
-                            , "proc"
-                            , "stat"
-                            , 900
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , NETDATA_CHART_PRIO_SYSTEM_INTR
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -379,9 +381,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , NULL
                             , "CPU Context Switches"
                             , "context switches/s"
-                            , "proc"
-                            , "stat"
-                            , 800
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , NETDATA_CHART_PRIO_SYSTEM_CTXT
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -420,9 +422,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                     , NULL
                     , "Started Processes"
                     , "processes/s"
-                    , "proc"
-                    , "stat"
-                    , 700
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_STAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_FORKS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -452,9 +454,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                     , NULL
                     , "System Processes"
                     , "processes"
-                    , "proc"
-                    , "stat"
-                    , 600
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_STAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_PROCESSES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -486,9 +488,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.core_throttling"
                             , "Core Thermal Throttling Events"
                             , "events/s"
-                            , "proc"
-                            , "stat"
-                            , 5001
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , NETDATA_CHART_PRIO_CORE_THROTTLING
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -516,9 +518,9 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.package_throttling"
                             , "Package Thermal Throttling Events"
                             , "events/s"
-                            , "proc"
-                            , "stat"
-                            , 5002
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
+                            , NETDATA_CHART_PRIO_PACKAGE_THROTTLING
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -546,8 +548,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.scaling_cur_freq"
                             , "Per CPU Core, Current CPU Scaling Frequency"
                             , "MHz"
-                            , "proc"
-                            , "stat"
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_STAT_NAME
                             , 5003
                             , update_every
                             , RRDSET_TYPE_LINE

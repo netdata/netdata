@@ -2,6 +2,9 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_INTERRUPTS_NAME "/proc/interrupts"
+#define CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_INTERRUPTS_NAME
+
 #define MAX_INTERRUPT_NAME 50
 
 struct cpu_interrupt {
@@ -57,12 +60,12 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     struct interrupt *irrs = NULL;
 
     if(unlikely(do_per_core == -1))
-        do_per_core = config_get_boolean("plugin:proc:/proc/interrupts", "interrupts per core", 1);
+        do_per_core = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "interrupts per core", 1);
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(config_get("plugin:proc:/proc/interrupts", "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff))
         return 1;
@@ -152,9 +155,9 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 , NULL
                 , "System interrupts"
                 , "interrupts/s"
-                , "proc"
-                , "interrupts"
-                , 1000
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_INTERRUPTS_NAME
+                , NETDATA_CHART_PRIO_SYSTEM_INTERRUPTS
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -217,9 +220,9 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                         , "cpu.interrupts"
                         , title
                         , "interrupts/s"
-                        , "proc"
-                        , "interrupts"
-                        , 1100 + c
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_INTERRUPTS_NAME
+                        , NETDATA_CHART_PRIO_INTERRUPTS_PER_CORE + c
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );

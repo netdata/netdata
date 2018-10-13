@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NFSD_NAME "/proc/net/rpc/nfsd"
+
 struct nfsd_procs {
     char name[30];
     unsigned long long value;
@@ -517,9 +519,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server Read Cache"
                     , "reads/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2100
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_READCACHE
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -555,9 +557,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server File Handles"
                     , "handles/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2101
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_FILEHANDLES
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -595,9 +597,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server I/O"
                     , "kilobytes/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2102
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_IO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -628,9 +630,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , NULL
                         , "NFS Server Threads"
                         , "threads"
-                        , "proc"
-                        , "net/rpc/nfsd"
-                        , 2103
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NFSD_NAME
+                        , NETDATA_CHART_PRIO_NFSD_THREADS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -656,9 +658,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , NULL
                         , "NFS Server Threads Full Count"
                         , "ops/s"
-                        , "proc"
-                        , "net/rpc/nfsd"
-                        , 2104
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NFSD_NAME
+                        , NETDATA_CHART_PRIO_NFSD_THREADS_FULLCNT
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -693,9 +695,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , NULL
                         , "NFS Server Threads Usage Histogram"
                         , "percentage"
-                        , "proc"
-                        , "net/rpc/nfsd"
-                        , 2105
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NFSD_NAME
+                        , NETDATA_CHART_PRIO_NFSD_THREADS_HISTOGRAM
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -752,9 +754,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server Read Ahead Depth"
                     , "percentage"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2105
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_READAHEAD
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -806,9 +808,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server Network Statistics"
                     , "packets/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2107
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_NET
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -845,9 +847,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS Server Remote Procedure Calls Statistics"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2108
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_RPC
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -881,9 +883,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v2 Server Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2109
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_PROC2
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -914,9 +916,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v3 Server Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2110
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_PROC3
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -947,9 +949,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v4 Server Remote Procedure Calls"
                     , "calls/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2111
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_PROC4
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -980,9 +982,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , NULL
                     , "NFS v4 Server Operations"
                     , "operations/s"
-                    , "proc"
-                    , "net/rpc/nfsd"
-                    , 2112
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NFSD_NAME
+                    , NETDATA_CHART_PRIO_NFSD_PROC4OPS
                     , update_every
                     , RRDSET_TYPE_STACKED
             );

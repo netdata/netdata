@@ -2,6 +2,8 @@
 
 #include "plugin_diskspace.h"
 
+#define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
+
 #define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
@@ -261,9 +263,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , "disk.space"
                         , title
                         , "GB"
-                        , "diskspace"
+                        , PLUGIN_DISKSPACE_NAME
                         , NULL
-                        , 2023
+                        , NETDATA_CHART_PRIO_DISKSPACE_SPACE
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -301,9 +303,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , "disk.inodes"
                         , title
                         , "Inodes"
-                        , "diskspace"
+                        , PLUGIN_DISKSPACE_NAME
                         , NULL
-                        , 2024
+                        , NETDATA_CHART_PRIO_DISKSPACE_INODES
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -408,9 +410,9 @@ void *diskspace_main(void *ptr) {
                         , NULL
                         , "NetData Disk Space Plugin CPU usage"
                         , "milliseconds/s"
-                        , "diskspace"
+                        , PLUGIN_DISKSPACE_NAME
                         , NULL
-                        , 132020
+                        , NETDATA_CHART_PRIO_NETDATA_DISKSPACE
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -436,7 +438,7 @@ void *diskspace_main(void *ptr) {
                         , NULL
                         , "NetData Disk Space Plugin Duration"
                         , "milliseconds/run"
-                        , "diskspace"
+                        , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , 132021
                         , update_every

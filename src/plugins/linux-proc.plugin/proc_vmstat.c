@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_VMSTAT_NAME "/proc/vmstat"
+
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -104,9 +106,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Swap I/O"
                     , "kilobytes/s"
-                    , "proc"
-                    , "vmstat"
-                    , 250
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_SWAPIO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -136,9 +138,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Memory Paged from/to disk"
                     , "kilobytes/s"
-                    , "proc"
-                    , "vmstat"
-                    , 151
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_PGPGIO
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -168,8 +170,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Memory Page Faults"
                     , "page faults/s"
-                    , "proc"
-                    , "vmstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
                     , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -213,8 +215,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "NUMA events"
                     , "events/s"
-                    , "proc"
-                    , "vmstat"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
                     , NETDATA_CHART_PRIO_MEM_NUMA
                     , update_every
                     , RRDSET_TYPE_LINE
