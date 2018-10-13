@@ -16,17 +16,17 @@ netdata supports **internal** and **external** data collection plugins:
 
 ## Internal Plugins
 
-- `checks` is a debugging plugin (by default it is disabled)
-- `freebsd` collects resource usage and performance data on FreeBSD systems
-- `idlejitter` measures CPU latency and jitter on all operating systems
-- `linux-cgroups` collects resource usage of Containers, VMs and systemd, on Linux systems
-- `linux-diskspace` collects disk space usage metrics on Linux mount points
-- `linux-nfacct` collects netfilter metrics using `libmnl` and `libnetfilter_acct`
-- `linux-proc` collects resource usage and performance data on Linux systems
-- `linux-tc` collects traffic QoS metrics of Linux network interfaces
-- `macos` collects resource usage and performance data on MacOS systems
-- `plugins.d` implements the external plugins API and serves external plugins
-- `statsd` implements a high performance statsd server for netdata
+- [checks.plugin](checks.plugin/) is a debugging plugin (by default it is disabled)
+- [freebsd.plugin](freebsd.plugin/) collects resource usage and performance data on FreeBSD systems
+- [idlejitter.plugin](idlejitter.plugin/) measures CPU latency and jitter on all operating systems
+- [linux-cgroups.plugin](linux-cgroups.plugin/) collects resource usage of Containers, VMs and systemd, on Linux systems
+- [linux-diskspace.plugin](linux-diskspace.plugin/) collects disk space usage metrics on Linux mount points
+- [linux-nfacct.plugin](linux-nfacct.plugin/) collects netfilter metrics using `libmnl` and `libnetfilter_acct`
+- [linux-proc.plugin](linux-proc.plugin/) collects resource usage and performance data on Linux systems
+- [linux-tc.plugin](linux-tc.plugin/) collects traffic QoS metrics of Linux network interfaces
+- [macos.plugin](macos.plugin/) collects resource usage and performance data on MacOS systems
+- [plugins.d.plugin](plugins.d.plugin/) implements the external plugins API and serves external plugins
+- [statsd.plugin](statsd.plugin/) implements a high performance statsd server for netdata
 
 ## External Plugins and Plugin Orchestrators
 
