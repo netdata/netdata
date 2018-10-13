@@ -4,6 +4,8 @@
 
 #if defined(INTERNAL_PLUGIN_NFACCT)
 
+#define PLUGIN_NFACCT_NAME "nfacct.plugin"
+
 #ifdef HAVE_LIBMNL
 #include <libmnl/libmnl.h>
 
@@ -304,9 +306,9 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker New Connections"
                     , "connections/s"
-                    , "nfacct"
+                    , PLUGIN_NFACCT_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_NETFILTER + 1
+                    , NETDATA_CHART_PRIO_NETFILTER_NEW
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -340,9 +342,9 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Changes"
                     , "changes/s"
-                    , "nfacct"
+                    , PLUGIN_NFACCT_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_NETFILTER + 2
+                    , NETDATA_CHART_PRIO_NETFILTER_CHANGES
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -377,9 +379,9 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Searches"
                     , "searches/s"
-                    , "nfacct"
+                    , PLUGIN_NFACCT_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_NETFILTER + 10
+                    , NETDATA_CHART_PRIO_NETFILTER_SEARCH
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -414,9 +416,9 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Errors"
                     , "events/s"
-                    , "nfacct"
+                    , PLUGIN_NFACCT_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_NETFILTER + 5
+                    , NETDATA_CHART_PRIO_NETFILTER_ERRORS
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -453,9 +455,9 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Expectations"
                     , "expectations/s"
-                    , "nfacct"
+                    , PLUGIN_NFACCT_NAME
                     , NULL
-                    , NETDATA_CHART_PRIO_NETFILTER + 3
+                    , NETDATA_CHART_PRIO_NETFILTER_EXPECT
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
             );
@@ -673,9 +675,9 @@ static void nfacct_send_metrics() {
                 , NULL
                 , "Netfilter Accounting Packets"
                 , "packets/s"
-                , "nfacct"
+                , PLUGIN_NFACCT_NAME
                 , NULL
-                , NETDATA_CHART_PRIO_NETFILTER + 206
+                , NETDATA_CHART_PRIO_NETFILTER_PACKETS
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -716,9 +718,9 @@ static void nfacct_send_metrics() {
                 , NULL
                 , "Netfilter Accounting Bandwidth"
                 , "kilobytes/s"
-                , "nfacct"
+                , PLUGIN_NFACCT_NAME
                 , NULL
-                , NETDATA_CHART_PRIO_NETFILTER + 207
+                , NETDATA_CHART_PRIO_NETFILTER_BYTES
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
         );

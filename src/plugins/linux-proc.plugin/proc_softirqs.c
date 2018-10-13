@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_SOFTIRQS_NAME "/proc/softirqs"
+
 #define MAX_INTERRUPT_NAME 50
 
 struct cpu_interrupt {
@@ -134,9 +136,9 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 , NULL
                 , "System softirqs"
                 , "softirqs/s"
-                , "proc"
-                , "softirqs"
-                , 950
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_SOFTIRQS_NAME
+                , NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
@@ -212,9 +214,9 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                         , "cpu.softirqs"
                         , title
                         , "softirqs/s"
-                        , "proc"
-                        , "softirqs"
-                        , 3000 + c
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_SOFTIRQS_NAME
+                        , NETDATA_CHART_PRIO_SOFTIRQS_PER_CORE + c
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );

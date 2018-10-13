@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NET_SOFTNET_NAME "/proc/net/softnet_stat"
+
 static inline char *softnet_column_name(size_t column) {
     switch(column) {
         // https://github.com/torvalds/linux/blob/a7fd20d1c476af4563e66865213474a2f9f473a4/net/core/net-procfs.c#L161-L166
@@ -89,9 +91,9 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
                 , "system.softnet_stat"
                 , "System softnet_stat"
                 , "events/s"
-                , "proc"
-                , "net/softnet_stat"
-                , 955
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_NET_SOFTNET_NAME
+                , NETDATA_CHART_PRIO_SYSTEM_SOFTNET_STAT
                 , update_every
                 , RRDSET_TYPE_LINE
         );
@@ -125,9 +127,9 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
                         , "cpu.softnet_stat"
                         , title
                         , "events/s"
-                        , "proc"
-                        , "net/softnet_stat"
-                        , 4101 + l
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NET_SOFTNET_NAME
+                        , NETDATA_CHART_PRIO_SOFTNET_PER_CORE + l
                         , update_every
                         , RRDSET_TYPE_LINE
                 );

@@ -4159,9 +4159,12 @@ var NETDATA = window.NETDATA || {};
 
                 if (typeof this.chart.plugin === 'string' && this.chart.plugin !== '') {
                     str = this.chart.plugin;
-                    if (typeof this.chart.module === 'string' && this.chart.module !== '') {
-                        str += '/' + this.chart.module;
-                    }
+
+                    if(str.endsWith(".plugin"))
+                        str = str.substring(0, str.length - 7);
+
+                    if (typeof this.chart.module === 'string' && this.chart.module !== '')
+                        str += ':' + this.chart.module;
 
                     if (withContext && context !== '')
                         str += ', ' + context;

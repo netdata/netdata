@@ -3,6 +3,7 @@
 #include "plugin_tc.h"
 
 #define RRD_TYPE_TC "tc"
+#define PLUGIN_TC_NAME "tc.plugin"
 
 // ----------------------------------------------------------------------------
 // /sbin/tc processor
@@ -393,9 +394,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , RRD_TYPE_TC ".qos"
                     , "Class Usage"
                     , "kilobits/s"
-                    , "tc"
+                    , PLUGIN_TC_NAME
                     , NULL
-                    , 7000
+                    , NETDATA_CHART_PRIO_TC_QOS
                     , localhost->rrd_update_every
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
@@ -441,9 +442,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , RRD_TYPE_TC ".qos_packets"
                     , "Class Packets"
                     , "packets/s"
-                    , "tc"
+                    , PLUGIN_TC_NAME
                     , NULL
-                    , 7010
+                    , NETDATA_CHART_PRIO_TC_QOS_PACKETS
                     , localhost->rrd_update_every
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
@@ -494,9 +495,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , RRD_TYPE_TC ".qos_dropped"
                     , "Class Dropped Packets"
                     , "packets/s"
-                    , "tc"
+                    , PLUGIN_TC_NAME
                     , NULL
-                    , 7020
+                    , NETDATA_CHART_PRIO_TC_QOS_DROPPED
                     , localhost->rrd_update_every
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
@@ -547,9 +548,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , RRD_TYPE_TC ".qos_tokens"
                     , "Class Tokens"
                     , "tokens"
-                    , "tc"
+                    , PLUGIN_TC_NAME
                     , NULL
-                    , 7030
+                    , NETDATA_CHART_PRIO_TC_QOS_TOCKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -601,9 +602,9 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , RRD_TYPE_TC ".qos_ctokens"
                     , "Class cTokens"
                     , "ctokens"
-                    , "tc"
+                    , PLUGIN_TC_NAME
                     , NULL
-                    , 7040
+                    , NETDATA_CHART_PRIO_TC_QOS_CTOCKENS
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -1077,9 +1078,9 @@ void *tc_main(void *ptr) {
                             , NULL
                             , "NetData TC CPU usage"
                             , "milliseconds/s"
-                            , "tc"
+                            , PLUGIN_TC_NAME
                             , NULL
-                            , 135000
+                            , NETDATA_CHART_PRIO_NETDATA_TC_CPU
                             , localhost->rrd_update_every
                             , RRDSET_TYPE_STACKED
                     );
@@ -1104,9 +1105,9 @@ void *tc_main(void *ptr) {
                             , NULL
                             , "NetData TC script execution"
                             , "milliseconds/run"
-                            , "tc"
+                            , PLUGIN_TC_NAME
                             , NULL
-                            , 135001
+                            , NETDATA_CHART_PRIO_NETDATA_TC_TIME
                             , localhost->rrd_update_every
                             , RRDSET_TYPE_AREA
                     );

@@ -29,9 +29,9 @@ void *checks_main(void *ptr) {
             , NULL
             , "Caller gives microseconds"
             , "a million !"
-            , "netdata"
-            , "checks"
-            , 99999
+            , "checks.plugin"
+            , ""
+            , NETDATA_CHART_PRIO_CHECKS
             , localhost->rrd_update_every
             , RRDSET_TYPE_LINE
     );
@@ -47,9 +47,9 @@ void *checks_main(void *ptr) {
             , NULL
             , "Netdata calcs microseconds"
             , "a million !"
-            , "netdata"
-            , "checks"
-            , 99999
+            , "checks.plugin"
+            , ""
+            , NETDATA_CHART_PRIO_CHECKS
             , localhost->rrd_update_every
             , RRDSET_TYPE_LINE
     );
@@ -64,9 +64,9 @@ void *checks_main(void *ptr) {
             , NULL
             , "Clock difference"
             , "microseconds diff"
-            , "netdata"
-            , "checks"
-            , 99999
+            , "checks.plugin"
+            , ""
+            , NETDATA_CHART_PRIO_CHECKS
             , localhost->rrd_update_every
             , RRDSET_TYPE_LINE
     );

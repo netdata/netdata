@@ -9,7 +9,7 @@
 
 #define NETDATA_PLUGIN_HOOK_LINUX_CGROUPS \
     { \
-        .name = "PLUGIN[cgroup]", \
+        .name = "PLUGIN[cgroups]", \
         .config_section = CONFIG_SECTION_PLUGINS, \
         .config_name = "cgroups", \
         .enabled = 1, \

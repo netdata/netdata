@@ -2,6 +2,8 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_BTRFS_NAME "/sys/fs/btrfs"
+
 typedef struct btrfs_disk {
     char *name;
     uint32_t hash;
@@ -557,9 +559,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , "btrfs.disk"
                         , title
                         , "MB"
-                        , "proc"
-                        , "sys/fs/btrfs"
-                        , 2300
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_DISK
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -613,9 +615,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , "btrfs.data"
                         , title
                         , "MB"
-                        , "proc"
-                        , "sys/fs/btrfs"
-                        , 2301
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_DATA
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -654,9 +656,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , "btrfs.metadata"
                         , title
                         , "MB"
-                        , "proc"
-                        , "sys/fs/btrfs"
-                        , 2302
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_METADATA
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -697,9 +699,9 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , "btrfs.system"
                         , title
                         , "MB"
-                        , "proc"
-                        , "sys/fs/btrfs"
-                        , 2303
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_BTRFS_NAME
+                        , NETDATA_CHART_PRIO_BTRFS_SYSTEM
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );

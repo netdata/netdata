@@ -3,7 +3,8 @@
 #include "statsd.h"
 
 #define STATSD_CHART_PREFIX "statsd"
-#define STATSD_CHART_PRIORITY 90000
+
+#define PLUGIN_STATSD_NAME "statsd.plugin"
 
 // --------------------------------------------------------------------------------------
 
@@ -1202,7 +1203,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
                     chart->context    = strdupz(s);
                     chart->family     = strdupz("overview");
                     chart->units      = strdupz("value");
-                    chart->priority   = STATSD_CHART_PRIORITY;
+                    chart->priority   = NETDATA_CHART_PRIO_STATSD_PRIVATE;
                     chart->chart_type = RRDSET_TYPE_LINE;
 
                     chart->next = app->charts;
@@ -1451,7 +1452,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , context         // context
             , title           // title
             , units           // units
-            , "statsd"        // plugin
+            , PLUGIN_STATSD_NAME // plugin
             , "private_chart" // module
             , priority        // priority
             , update_every    // update every
@@ -1490,7 +1491,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , context       // context
                 , title         // title
                 , "value"       // units
-                , STATSD_CHART_PRIORITY
+                , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
         );
@@ -1532,7 +1533,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
                 , context       // context
                 , title         // title
                 , "events/s"    // units
-                , STATSD_CHART_PRIORITY
+                , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
         );
@@ -1574,7 +1575,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
                 , context       // context
                 , title         // title
                 , "entries"     // units
-                , STATSD_CHART_PRIORITY
+                , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_LINE
         );
@@ -1616,7 +1617,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , context       // context
                 , title         // title
                 , units         // units
-                , STATSD_CHART_PRIORITY
+                , NETDATA_CHART_PRIO_STATSD_PRIVATE
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
         );
@@ -1989,7 +1990,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->context            // context
                 , chart->title              // title
                 , chart->units              // units
-                , "statsd"                  // plugin
+                , PLUGIN_STATSD_NAME        // plugin
                 , chart->source             // module
                 , chart->priority           // priority
                 , statsd.update_every       // update every
@@ -2249,7 +2250,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Metrics in the netdata statsd database"
             , "metrics"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132010
             , statsd.update_every
@@ -2270,7 +2271,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Useful metrics in the netdata statsd database"
             , "metrics"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132010
             , statsd.update_every
@@ -2291,7 +2292,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Events processed by the netdata statsd server"
             , "events/s"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132011
             , statsd.update_every
@@ -2314,7 +2315,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Read operations made by the netdata statsd server"
             , "reads/s"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132012
             , statsd.update_every
@@ -2331,7 +2332,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Bytes read by the netdata statsd server"
             , "kilobits/s"
-            , "netdata"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132013
             , statsd.update_every
@@ -2348,7 +2349,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Network packets processed by the netdata statsd server"
             , "packets/s"
-            , "netdata"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132014
             , statsd.update_every
@@ -2365,7 +2366,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd server TCP connects and disconnects"
             , "events"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132015
             , statsd.update_every
@@ -2382,7 +2383,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd server TCP connected sockets"
             , "connected"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132016
             , statsd.update_every
@@ -2398,7 +2399,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Private metric charts created by the netdata statsd server"
             , "charts"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132020
             , statsd.update_every
@@ -2414,7 +2415,7 @@ void *statsd_main(void *ptr) {
             , "netdata.statsd_cpu"
             , "NetData statsd charting thread CPU usage"
             , "milliseconds/s"
-            , "statsd"
+            , PLUGIN_STATSD_NAME
             , "stats"
             , 132001
             , statsd.update_every
@@ -2440,7 +2441,7 @@ void *statsd_main(void *ptr) {
                 , "netdata.statsd_cpu"
                 , title
                 , "milliseconds/s"
-                , "statsd"
+                , PLUGIN_STATSD_NAME
                 , "stats"
                 , 132002 + i
                 , statsd.update_every

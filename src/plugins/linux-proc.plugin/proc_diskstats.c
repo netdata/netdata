@@ -3,13 +3,14 @@
 #include "plugin_proc.h"
 
 #define RRD_TYPE_DISK "disk"
+#define PLUGIN_PROC_MODULE_DISKSTATS_NAME "/proc/diskstats"
+#define CONFIG_SECTION_PLUGIN_PROC_DISKSTATS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_DISKSTATS_NAME
 
 #define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_VIRTUAL   3
 
-#define CONFIG_SECTION_DISKSTATS "plugin:proc:/proc/diskstats"
 #define DEFAULT_EXCLUDED_DISKS "loop* ram*"
 
 static struct disk {
@@ -257,9 +258,9 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
                     , "disk.bcache_cache_alloc"
                     , "BCache Cache Allocations"
                     , "percentage"
-                    , "proc"
-                    , "diskstats"
-                    , 2120
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                    , NETDATA_CHART_PRIO_BCACHE_CACHE_ALLOC
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -304,7 +305,7 @@ static inline int is_major_enabled(int major) {
     if(major_configs[major] == -1) {
         char buffer[CONFIG_MAX_NAME + 1];
         snprintfz(buffer, CONFIG_MAX_NAME, "performance metrics for disks with major %d", major);
-        major_configs[major] = (char)config_get_boolean(CONFIG_SECTION_DISKSTATS, buffer, 1);
+        major_configs[major] = (char)config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, buffer, 1);
     }
 
     return (int)major_configs[major];
@@ -429,7 +430,7 @@ static void get_disk_config(struct disk *d) {
         def_enable = CONFIG_BOOLEAN_NO;
 
     char var_name[4096 + 1];
-    snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", d->disk);
+    snprintfz(var_name, 4096, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS ":%s", d->disk);
 
     def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
     if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
@@ -781,59 +782,59 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!globals_initialized)) {
         globals_initialized = 1;
 
-        global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
-        global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
-        global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
-        global_enable_performance_for_partitions = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for partitions", global_enable_performance_for_partitions);
+        global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
+        global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
+        global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
+        global_enable_performance_for_partitions = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "performance metrics for partitions", global_enable_performance_for_partitions);
 
-        global_do_io      = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "bandwidth for all disks", global_do_io);
-        global_do_ops     = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "operations for all disks", global_do_ops);
-        global_do_mops    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "merged operations for all disks", global_do_mops);
-        global_do_iotime  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "i/o time for all disks", global_do_iotime);
-        global_do_qops    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "queued operations for all disks", global_do_qops);
-        global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
-        global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
-        global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "bcache for all disks", global_do_bcache);
-        global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
+        global_do_io      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bandwidth for all disks", global_do_io);
+        global_do_ops     = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "operations for all disks", global_do_ops);
+        global_do_mops    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "merged operations for all disks", global_do_mops);
+        global_do_iotime  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "i/o time for all disks", global_do_iotime);
+        global_do_qops    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "queued operations for all disks", global_do_qops);
+        global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "utilization percentage for all disks", global_do_util);
+        global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "backlog for all disks", global_do_backlog);
+        global_do_bcache  = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache for all disks", global_do_bcache);
+        global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
-        global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
+        global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
         
         char buffer[FILENAME_MAX + 1];
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s");
-        path_to_sys_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device", buffer);
+        path_to_sys_block_device = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/bcache");
-        path_to_sys_block_device_bcache = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device bcache", buffer);
+        path_to_sys_block_device_bcache = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device bcache", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/block/%s");
-        path_to_sys_devices_virtual_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get virtual block device", buffer);
+        path_to_sys_devices_virtual_block_device = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get virtual block device", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        path_to_sys_dev_block_major_minor_string = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
+        path_to_sys_dev_block_major_minor_string = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device infos", buffer);
 
         //snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-        //path_to_get_hw_sector_size = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer);
+        //path_to_get_hw_sector_size = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get h/w sector size", buffer);
 
         //snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
-        //path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer);
+        //path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get h/w sector size for partitions", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
-        path_to_device_mapper = config_get(CONFIG_SECTION_DISKSTATS, "path to device mapper", buffer);
+        path_to_device_mapper = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to device mapper", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-label", netdata_configured_host_prefix);
-        path_to_device_label = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/disk/by-label", buffer);
+        path_to_device_label = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-label", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-id", netdata_configured_host_prefix);
-        path_to_device_id = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/disk/by-id", buffer);
+        path_to_device_id = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/disk/by-id", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/vx/dsk", netdata_configured_host_prefix);
-        path_to_veritas_volume_groups = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/vx/dsk", buffer);
+        path_to_veritas_volume_groups = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/vx/dsk", buffer);
 
-        name_disks_by_id = config_get_boolean(CONFIG_SECTION_DISKSTATS, "name disks by id", name_disks_by_id);
+        name_disks_by_id = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
 
         excluded_disks = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
+                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
                 , NULL
                 , SIMPLE_PATTERN_EXACT
         );
@@ -844,7 +845,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/diskstats");
-        ff = procfile_open(config_get(CONFIG_SECTION_DISKSTATS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff)) return 0;
 
@@ -960,9 +961,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.io"
                         , "Disk I/O Bandwidth"
                         , "kilobytes/s"
-                        , "proc"
-                        , "diskstats"
-                        , 2000
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_IO
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -991,9 +992,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.ops"
                         , "Disk Completed I/O Operations"
                         , "operations/s"
-                        , "proc"
-                        , "diskstats"
-                        , 2001
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_OPS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -1024,9 +1025,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.qops"
                         , "Disk Current I/O Operations"
                         , "operations"
-                        , "proc"
-                        , "diskstats"
-                        , 2002
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_QOPS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -1055,9 +1056,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.backlog"
                         , "Disk Backlog"
                         , "backlog (ms)"
-                        , "proc"
-                        , "diskstats"
-                        , 2003
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_BACKLOG
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -1086,9 +1087,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.util"
                         , "Disk Utilization Time"
                         , "% of time working"
-                        , "proc"
-                        , "diskstats"
-                        , 2004
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_UTIL
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -1117,9 +1118,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.mops"
                         , "Disk Merged Operations"
                         , "merged operations/s"
-                        , "proc"
-                        , "diskstats"
-                        , 2021
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_MOPS
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -1150,9 +1151,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.iotime"
                         , "Disk Total I/O Time"
                         , "milliseconds/s"
-                        , "proc"
-                        , "diskstats"
-                        , 2022
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                        , NETDATA_CHART_PRIO_DISK_IOTIME
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -1186,9 +1187,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
                             , "ms per operation"
-                            , "proc"
-                            , "diskstats"
-                            , 2005
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_DISK_AWAIT
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1217,9 +1218,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
                             , "kilobytes per operation"
-                            , "proc"
-                            , "diskstats"
-                            , 2006
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_DISK_AVGSZ
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1248,9 +1249,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.svctm"
                             , "Average Service Time"
                             , "ms per operation"
-                            , "proc"
-                            , "diskstats"
-                            , 2007
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_DISK_SVCTM
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1353,9 +1354,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_hit_ratio"
                             , "BCache Cache Hit Ratio"
                             , "percentage"
-                            , "proc"
-                            , "diskstats"
-                            , 2120
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_HIT_RATIO
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1385,9 +1386,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_rates"
                             , "BCache Rates"
                             , "KB/s"
-                            , "proc"
-                            , "diskstats"
-                            , 2121
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_RATES
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1412,9 +1413,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_size"
                             , "BCache Cache Sizes"
                             , "MB"
-                            , "proc"
-                            , "diskstats"
-                            , 2122
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_SIZE
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1437,9 +1438,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_usage"
                             , "BCache Cache Usage"
                             , "percent"
-                            , "proc"
-                            , "diskstats"
-                            , 2123
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_USAGE
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
@@ -1463,9 +1464,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_cache_read_races"
                             , "BCache Cache Read Races"
                             , "operations/s"
-                            , "proc"
-                            , "diskstats"
-                            , 2126
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_CACHE_READ_RACES
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1491,9 +1492,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache"
                             , "BCache Cache I/O Operations"
                             , "operations/s"
-                            , "proc"
-                            , "diskstats"
-                            , 2124
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_OPS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1525,9 +1526,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.bcache_bypass"
                             , "BCache Cache Bypass I/O Operations"
                             , "operations/s"
-                            , "proc"
-                            , "diskstats"
-                            , 2125
+                            , PLUGIN_PROC_NAME
+                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                            , NETDATA_CHART_PRIO_BCACHE_BYPASS
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -1563,9 +1564,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     , NULL
                     , "Disk I/O"
                     , "kilobytes/s"
-                    , "proc"
-                    , "diskstats"
-                    , 150
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_DISKSTATS_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_IO
                     , update_every
                     , RRDSET_TYPE_AREA
             );

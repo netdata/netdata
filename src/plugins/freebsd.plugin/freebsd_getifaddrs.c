@@ -251,9 +251,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  NULL,
                                                  "Network Traffic",
                                                  "kilobits/s",
-                                                 "freebsd",
+                            "freebsd.plugin",
                                                  "getifaddrs",
-                                                 500,
+                            NETDATA_CHART_PRIO_SYSTEM_NET,
                                                  update_every,
                                                  RRDSET_TYPE_AREA
                                                  );
@@ -295,9 +295,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  NULL,
                                                  "Network Packets",
                                                  "packets/s",
-                                                 "freebsd",
+                            "freebsd.plugin",
                                                  "getifaddrs",
-                                                 7001,
+                            NETDATA_CHART_PRIO_SYSTEM_PACKETS,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
                                                  );
@@ -340,9 +340,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 Bandwidth",
                                                  "kilobits/s",
-                                                 "freebsd",
+                            "freebsd.plugin",
                                                  "getifaddrs",
-                                                 500,
+                            NETDATA_CHART_PRIO_SYSTEM_IPV4,
                                                  update_every,
                                                  RRDSET_TYPE_AREA
                     );
@@ -379,9 +379,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Bandwidth",
                                                  "kilobits/s",
-                                                 "freebsd",
+                            "freebsd.plugin",
                                                  "getifaddrs",
-                                                 500,
+                            NETDATA_CHART_PRIO_SYSTEM_IPV6,
                                                  update_every,
                                                  RRDSET_TYPE_AREA
                     );
@@ -449,9 +449,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                     "net.net",
                                                                     "Bandwidth",
                                                                     "kilobits/s",
-                                                                    "freebsd",
+                                "freebsd.plugin",
                                                                     "getifaddrs",
-                                                                    7000,
+                                NETDATA_CHART_PRIO_FIRST_NET_IFACE,
                                                                     update_every,
                                                                     RRDSET_TYPE_AREA
                         );
@@ -478,9 +478,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                   "net.packets",
                                                                   "Packets",
                                                                   "packets/s",
-                                                                  "freebsd",
+                                "freebsd.plugin",
                                                                   "getifaddrs",
-                                                                  7001,
+                                NETDATA_CHART_PRIO_FIRST_NET_PACKETS,
                                                                   update_every,
                                                                   RRDSET_TYPE_LINE
                         );
@@ -517,9 +517,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                  "net.errors",
                                                                  "Interface Errors",
                                                                  "errors/s",
-                                                                 "freebsd",
+                                "freebsd.plugin",
                                                                  "getifaddrs",
-                                                                 7002,
+                                NETDATA_CHART_PRIO_FIRST_NET_ERRORS,
                                                                  update_every,
                                                                  RRDSET_TYPE_LINE
                         );
@@ -551,9 +551,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                 "net.drops",
                                                                 "Interface Drops",
                                                                 "drops/s",
-                                                                "freebsd",
+                                "freebsd.plugin",
                                                                 "getifaddrs",
-                                                                7003,
+                                NETDATA_CHART_PRIO_FIRST_NET_DROPS,
                                                                 update_every,
                                                                 RRDSET_TYPE_LINE
                         );
@@ -586,9 +586,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                  "net.events",
                                                                  "Network Interface Events",
                                                                  "events/s",
-                                                                 "freebsd",
+                                "freebsd.plugin",
                                                                  "getifaddrs",
-                                                                 7006,
+                                NETDATA_CHART_PRIO_FIRST_NET_EVENTS,
                                                                  update_every,
                                                                  RRDSET_TYPE_LINE
                         );

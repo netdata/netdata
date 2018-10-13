@@ -2,6 +2,9 @@
 
 #include "plugin_proc.h"
 
+#define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
+#define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
+
 // ----------------------------------------------------------------------------
 // netdev list
 
@@ -298,7 +301,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
     d->chart_family = strdupz(buffer);
 
-    d->priority = 43000;
+    d->priority = NETDATA_CHART_PRIO_CGROUP_NET_IFACE;
     d->flipped = 1;
 }
 
@@ -407,7 +410,7 @@ static struct netdev *get_netdev(const char *name) {
     d->chart_id_net_packets    = strdupz(d->name);
 
     d->chart_family = strdupz(d->name);
-    d->priority = 7000;
+    d->priority = NETDATA_CHART_PRIO_FIRST_NET_IFACE;
 
     netdev_rename_lock(d);
 
@@ -437,25 +440,25 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
-        path_to_sys_devices_virtual_net = config_get("plugin:proc:/proc/net/dev", "path to get virtual interfaces", filename);
+        path_to_sys_devices_virtual_net = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get virtual interfaces", filename);
 
-        enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
+        enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
-        do_bandwidth    = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "errors for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_drops        = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "drops for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_fifo         = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "fifo for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
-        do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_packets      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_errors       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "errors for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_drops        = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "drops for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_fifo         = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "fifo for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_events       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
 
-        disabled_list = simple_pattern_create(config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
+        disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
     }
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
-        ff = procfile_open(config_get("plugin:proc:/proc/net/dev", "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -577,8 +580,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.net"
                         , "Bandwidth"
                         , "kilobits/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -618,8 +621,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.packets"
                         , "Packets"
                         , "packets/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 1
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -663,8 +666,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.errors"
                         , "Interface Errors"
                         , "errors/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 2
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -706,8 +709,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.drops"
                         , "Interface Drops"
                         , "drops/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 3
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -749,8 +752,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.fifo"
                         , "Interface FIFO Buffer Errors"
                         , "errors"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 4
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -792,8 +795,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.compressed"
                         , "Compressed Packets"
                         , "packets/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 5
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -835,8 +838,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.events"
                         , "Network Interface Events"
                         , "events/s"
-                        , "proc"
-                        , "net/dev"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_NETDEV_NAME
                         , d->priority + 6
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -871,9 +874,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     , NULL
                     , "Physical Network Interfaces Aggregated Bandwidth"
                     , "kilobits/s"
-                    , "proc"
-                    , "net/dev"
-                    , 500
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_NETDEV_NAME
+                    , NETDATA_CHART_PRIO_SYSTEM_NET
                     , update_every
                     , RRDSET_TYPE_AREA
             );

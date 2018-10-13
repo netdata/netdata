@@ -143,9 +143,9 @@ int do_vm_loadavg(int update_every, usec_t dt){
                         NULL,
                         "System Load Average",
                         "load",
-                        "freebsd",
+                        "freebsd.plugin",
                         "vm.loadavg",
-                        100,
+                        NETDATA_CHART_PRIO_SYSTEM_LOAD,
                         (update_every < MIN_LOADAVG_UPDATE_EVERY) ?
                         MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE
                 );
@@ -212,9 +212,9 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             NULL,
                             "System Active Processes",
                             "processes",
-                            "freebsd",
+                            "freebsd.plugin",
                             "vm.vmtotal",
-                            750,
+                            NETDATA_CHART_PRIO_SYSTEM_ACTIVE_PROCESSES,
                             update_every,
                             RRDSET_TYPE_LINE
                     );
@@ -241,9 +241,9 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             NULL,
                             "System Processes",
                             "processes",
-                            "freebsd",
+                            "freebsd.plugin",
                             "vm.vmtotal",
-                            600,
+                            NETDATA_CHART_PRIO_SYSTEM_PROCESSES,
                             update_every,
                             RRDSET_TYPE_LINE
                     );
@@ -273,7 +273,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             NULL,
                             "Committed (Allocated) Memory",
                             "MB",
-                            "freebsd",
+                            "freebsd.plugin",
                             "vm.vmtotal",
                             NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED,
                             update_every,
@@ -332,9 +332,10 @@ int do_kern_cp_time(int update_every, usec_t dt) {
                         "system.cpu",
                         "Total CPU utilization",
                         "percentage",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.cp_time",
-                        100, update_every,
+                        NETDATA_CHART_PRIO_SYSTEM_CPU,
+                        update_every,
                         RRDSET_TYPE_STACKED
                 );
 
@@ -413,9 +414,9 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                             "cpu.cpu",
                             "Core utilization",
                             "percentage",
-                            "freebsd",
+                            "freebsd.plugin",
                             "kern.cp_times",
-                            1000,
+                            NETDATA_CHART_PRIO_CPU_PER_CORE,
                             update_every,
                             RRDSET_TYPE_STACKED
                     );
@@ -497,9 +498,9 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                 "cpu.temperatute",
                 "Core temperature",
                 "Celsius",
-                "freebsd",
+                "freebsd.plugin",
                 "dev.cpu.temperature",
-                1050,
+                NETDATA_CHART_PRIO_CPU_TEMPERATURE,
                 update_every,
                 RRDSET_TYPE_LINE
         );
@@ -550,9 +551,9 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
                     NULL,
                     "Current CPU Scaling Frequency",
                     "MHz",
-                    "freebsd",
+                    "freebsd.plugin",
                     "dev.cpu.0.freq",
-                    5003,
+                    NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -614,9 +615,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                         NULL,
                         "Total Hardware Interrupts",
                         "interrupts/s",
-                        "freebsd",
+                        "freebsd.plugin",
                         "hw.intrcnt",
-                        900,
+                        NETDATA_CHART_PRIO_SYSTEM_INTR,
                         update_every,
                         RRDSET_TYPE_LINE
                 );
@@ -659,9 +660,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                             NULL,
                             "System interrupts",
                             "interrupts/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "hw.intrcnt",
-                            1000,
+                            NETDATA_CHART_PRIO_SYSTEM_INTERRUPTS,
                             update_every,
                             RRDSET_TYPE_STACKED
                     );
@@ -717,9 +718,9 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
                     NULL,
                     "Device Interrupts",
                     "interrupts/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.sys.v_intr",
-                    1000,
+                    NETDATA_CHART_PRIO_SYSTEM_DEV_INTR,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -763,9 +764,9 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
                     NULL,
                     "Software Interrupts",
                     "interrupts/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.sys.v_soft",
-                    1100,
+                    NETDATA_CHART_PRIO_SYSTEM_SOFT_INTR,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -809,9 +810,9 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
                     NULL,
                     "CPU Context Switches",
                     "context switches/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.sys.v_swtch",
-                    800,
+                    NETDATA_CHART_PRIO_SYSTEM_CTXT,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -855,9 +856,9 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
                     NULL,
                     "Started Processes",
                     "processes/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.sys.v_swtch",
-                    700,
+                    NETDATA_CHART_PRIO_SYSTEM_FORKS,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -932,9 +933,9 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                     NULL,
                     "System Swap",
                     "MB",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.swap_info",
-                    201,
+                    NETDATA_CHART_PRIO_SYSTEM_SWAP,
                     update_every,
                     RRDSET_TYPE_STACKED
             );
@@ -992,9 +993,9 @@ int do_system_ram(int update_every, usec_t dt) {
                     NULL,
                     "System RAM",
                     "MB",
-                    "freebsd",
+                    "freebsd.plugin",
                     "system.ram",
-                    200,
+                    NETDATA_CHART_PRIO_SYSTEM_RAM,
                     update_every,
                     RRDSET_TYPE_STACKED
             );
@@ -1053,9 +1054,9 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
                     NULL,
                     "Swap I/O",
                     "kilobytes/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.vm.v_swappgs",
-                    250,
+                    NETDATA_CHART_PRIO_SYSTEM_SWAPIO,
                     update_every,
                     RRDSET_TYPE_AREA
             );
@@ -1107,7 +1108,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                     NULL,
                     "Memory Page Faults",
                     "page faults/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "vm.stats.vm.v_pgfaults",
                     NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS,
                     update_every,
@@ -1189,9 +1190,9 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                         NULL,
                         "IPC Semaphores",
                         "semaphores",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.sem",
-                        1000,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1214,9 +1215,9 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                         NULL,
                         "IPC Semaphore Arrays",
                         "arrays",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.sem",
-                        1000,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1288,9 +1289,9 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                         NULL,
                         "IPC Shared Memory Segments",
                         "segments",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.shm",
-                        1000,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SEGS,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1313,9 +1314,9 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                         NULL,
                         "IPC Shared Memory Segments Size",
                         "kilobytes",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.shm",
-                        1000,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SIZE,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1393,9 +1394,9 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                         NULL,
                         "Number of IPC Message Queues",
                         "queues",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.msq",
-                        990,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1418,9 +1419,9 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                         NULL,
                         "Number of Messages in IPC Message Queues",
                         "messages",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.msq",
-                        1000,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES,
                         update_every,
                         RRDSET_TYPE_AREA
                 );
@@ -1443,9 +1444,9 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                         NULL,
                         "Size of IPC Message Queues",
                         "bytes",
-                        "freebsd",
+                        "freebsd.plugin",
                         "kern.ipc.msq",
-                        1100,
+                        NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE,
                         update_every,
                         RRDSET_TYPE_LINE
                 );
@@ -1487,9 +1488,9 @@ int do_uptime(int update_every, usec_t dt) {
                 NULL,
                 "System Uptime",
                 "seconds",
-                "freebsd",
+                "freebsd.plugin",
                 "uptime",
-                1000,
+                NETDATA_CHART_PRIO_SYSTEM_UPTIME,
                 update_every,
                 RRDSET_TYPE_LINE
         );
@@ -1615,9 +1616,9 @@ int do_net_isr(int update_every, usec_t dt) {
                     NULL,
                     "System softnet_stat",
                     "events/s",
-                    "freebsd",
+                    "freebsd.plugin",
                     "net.isr",
-                    955,
+                    NETDATA_CHART_PRIO_SYSTEM_SOFTNET_STAT,
                     update_every,
                     RRDSET_TYPE_LINE
             );
@@ -1668,9 +1669,9 @@ int do_net_isr(int update_every, usec_t dt) {
                         NULL,
                         "Per CPU netisr statistics",
                         "events/s",
-                        "freebsd",
+                        "freebsd.plugin",
                         "net.isr",
-                        1101 + i,
+                        NETDATA_CHART_PRIO_SOFTNET_PER_CORE + i,
                         update_every,
                         RRDSET_TYPE_LINE
                 );
@@ -1730,7 +1731,7 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
                     NULL,
                     "IPv4 TCP Connections",
                     "active connections",
-                    "freebsd",
+                    "freebsd.plugin",
                     "net.inet.tcp.states",
                     2500,
                     update_every,
@@ -1814,7 +1815,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 TCP Packets",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             2600,
                             update_every,
@@ -1846,7 +1847,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 TCP Errors",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             2700,
                             update_every,
@@ -1888,7 +1889,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 TCP Handshake Issues",
                             "events/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             2900,
                             update_every,
@@ -1929,7 +1930,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "TCP Connection Aborts",
                             "connections/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             3010,
                             update_every,
@@ -1969,7 +1970,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "TCP Out-Of-Order Queue",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             3050,
                             update_every,
@@ -2001,7 +2002,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "TCP SYN Cookies",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             3100,
                             update_every,
@@ -2038,7 +2039,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "TCP Listen Socket Issues",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             3015,
                             update_every,
@@ -2072,7 +2073,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 ECN Statistics",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.tcp.stats",
                             8700,
                             update_every,
@@ -2146,7 +2147,7 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 UDP Packets",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.udp.stats",
                             2601,
                             update_every,
@@ -2179,7 +2180,7 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 UDP Errors",
                             "events/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.udp.stats",
                             2701,
                             update_every,
@@ -2265,7 +2266,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Packets"
                             , "packets/s"
-                            , "freebsd"
+                              "freebsd.plugin",
                             , "net.inet.icmp.stats"
                             , 2602
                             , update_every
@@ -2298,7 +2299,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Errors"
                             , "packets/s"
-                            , "freebsd"
+                              "freebsd.plugin",
                             , "net.inet.icmp.stats"
                             , 2603
                             , update_every
@@ -2334,7 +2335,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Messages"
                             , "packets/s"
-                            , "freebsd"
+                              "freebsd.plugin",
                             , "net.inet.icmp.stats"
                             , 2604
                             , update_every
@@ -2412,7 +2413,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 Packets",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.ip.stats",
                             3000,
                             update_every,
@@ -2448,7 +2449,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 Fragments Sent",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.ip.stats",
                             3010,
                             update_every,
@@ -2484,7 +2485,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 Fragments Reassembly",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.ip.stats",
                             3011,
                             update_every,
@@ -2522,7 +2523,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv4 Errors",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet.ip.stats",
                             3002,
                             update_every,
@@ -2613,7 +2614,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 Packets",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.ip6.stats",
                             3000,
                             update_every,
@@ -2653,7 +2654,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                              NULL,
                              "IPv6 Fragments Sent",
                              "packets/s",
-                             "freebsd",
+                            "freebsd.plugin",
                              "net.inet6.ip6.stats",
                              3010,
                              update_every,
@@ -2693,7 +2694,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 Fragments Reassembly",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.ip6.stats",
                             3011,
                             update_every,
@@ -2744,7 +2745,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 Errors",
                             "packets/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.ip6.stats",
                             3002,
                             update_every,
@@ -2858,7 +2859,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 ICMP Messages",
                             "messages/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10000,
                             update_every,
@@ -2893,7 +2894,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 ICMP Redirects",
                             "redirects/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10050,
                             update_every,
@@ -2940,7 +2941,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 ICMP Errors",
                             "errors/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10100,
                             update_every,
@@ -2995,7 +2996,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 ICMP Echo",
                             "messages/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10200,
                             update_every,
@@ -3038,7 +3039,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 Router Messages",
                             "messages/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10400,
                             update_every,
@@ -3081,7 +3082,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 Neighbor Messages",
                             "messages/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10500,
                             update_every,
@@ -3131,7 +3132,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                             NULL,
                             "IPv6 ICMP Types",
                             "messages/s",
-                            "freebsd",
+                            "freebsd.plugin",
                             "net.inet6.icmp6.stats",
                             10700,
                             update_every,
