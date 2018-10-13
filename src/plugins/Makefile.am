@@ -15,3 +15,8 @@ SUBDIRS = \
     plugins.d.plugin \
     statsd.plugin \
    	$(NULL)
+
+
+dist_noinst_DATA = \
+	README.md \
+	$(NULL)
