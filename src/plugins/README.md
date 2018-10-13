@@ -32,7 +32,7 @@ netdata supports **internal** and **external** data collection plugins:
 
 Please browse the `plugins.d.plugin` directory.
 
-## API
+## Internal Plugins API
 
 The internal data collection API consists of the following calls:
 
