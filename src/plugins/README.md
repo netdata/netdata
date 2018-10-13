@@ -11,8 +11,8 @@ netdata supports **internal** and **external** data collection plugins:
 
 - **plugin orchestrators** are external plugins that do not collect any data by themeselves.
    Instead they support data collection **modules** written in the language of the orchestrator.
-   Usually the orchestrator supports provides a higher level abstraction, making ideal for writing new
-   data collection modules with the minimum possible of code.
+   Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
+   data collection modules with the minimum of code.
 
 ## Internal Plugins
 
