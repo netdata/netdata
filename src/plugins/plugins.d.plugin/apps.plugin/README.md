@@ -8,7 +8,7 @@ This plugin provides charts for 3 sections of the default dashboard:
 
 ## Per application charts
 
-This plugin walks through the entire `/proc` filesystem and aggregates statistics for applications of interest, defined in `/etc/netdata/apps_groups.conf` (the default is [here](https://github.com/netdata/netdata/blob/master/conf.d/apps_groups.conf)) (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
+This plugin walks through the entire `/proc` filesystem and aggregates statistics for applications of interest, defined in `/etc/netdata/apps_groups.conf` (the default is [here](apps_groups.conf)) (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 
 The plugin internally builds a process tree (much like `ps fax` does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported).
 
@@ -55,7 +55,7 @@ Uncomment the line `update every` and set it to a higher number. If you just set
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](https://github.com/netdata/netdata/blob/master/conf.d/apps_groups.conf)).
+The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](apps_groups.conf)).
 To edit it on your system run `/etc/netdata/edit-config apps_groups.conf`.
 
 The configuration file works accepts multiple lines, each having this format:
