@@ -6,11 +6,11 @@ SUBDIRS = \
     checks.plugin \
     freebsd.plugin \
     idlejitter.plugin \
-    linux-cgroups.plugin \
-    linux-diskspace.plugin \
-    linux-nfacct.plugin \
-    linux-proc.plugin \
-    linux-tc.plugin \
+    cgroups.plugin \
+    diskspace.plugin \
+    nfacct.plugin \
+    proc.plugin \
+    tc.plugin \
     macos.plugin \
     plugins.d \
     statsd.plugin \

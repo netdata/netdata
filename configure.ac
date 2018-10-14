@@ -562,11 +562,11 @@ AC_CONFIG_FILES([
     plugins/checks.plugin/Makefile
     plugins/freebsd.plugin/Makefile
     plugins/idlejitter.plugin/Makefile
-    plugins/linux-cgroups.plugin/Makefile
-    plugins/linux-diskspace.plugin/Makefile
-    plugins/linux-nfacct.plugin/Makefile
-    plugins/linux-proc.plugin/Makefile
-    plugins/linux-tc.plugin/Makefile
+    plugins/cgroups.plugin/Makefile
+    plugins/diskspace.plugin/Makefile
+    plugins/nfacct.plugin/Makefile
+    plugins/proc.plugin/Makefile
+    plugins/tc.plugin/Makefile
     plugins/macos.plugin/Makefile
     plugins/Makefile
     plugins/plugins.d/Makefile

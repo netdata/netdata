@@ -21,7 +21,7 @@
 
 extern void *diskspace_main(void *ptr);
 
-#include "../linux-proc.plugin/plugin_proc.h"
+#include "../proc.plugin/plugin_proc.h"
 
 #else // (TARGET_OS == OS_LINUX)
 
