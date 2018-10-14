@@ -6,3 +6,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 dist_libconfig_DATA = \
     stream.conf \
     $(NULL)
+
+dist_noinst_DATA = \
+	README.md \
+	$(NULL)

@@ -139,45 +139,45 @@ ENDIF(LINUX)
 # netdata files
 
 set(LIBNETDATA_FILES
-        libnetdata/adaptive_resortable_list.c
-        libnetdata/adaptive_resortable_list.h
-        libnetdata/appconfig.c
-        libnetdata/appconfig.h
-        libnetdata/avl.c
-        libnetdata/avl.h
-        libnetdata/clocks.c
-        libnetdata/clocks.h
-        libnetdata/dictionary.c
-        libnetdata/dictionary.h
-        libnetdata/eval.c
-        libnetdata/eval.h
+        libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
+        libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
+        libnetdata/config/appconfig.c
+        libnetdata/config/appconfig.h
+        libnetdata/avl/avl.c
+        libnetdata/avl/avl.h
+        libnetdata/buffer/buffer.c
+        libnetdata/buffer/buffer.h
+        libnetdata/clocks/clocks.c
+        libnetdata/clocks/clocks.h
+        libnetdata/dictionary/dictionary.c
+        libnetdata/dictionary/dictionary.h
+        libnetdata/eval/eval.c
+        libnetdata/eval/eval.h
         libnetdata/inlined.h
         libnetdata/libnetdata.c
         libnetdata/libnetdata.h
-        libnetdata/locks.c
-        libnetdata/locks.h
-        libnetdata/log.c
-        libnetdata/log.h
+        libnetdata/locks/locks.c
+        libnetdata/locks/locks.h
+        libnetdata/log/log.c
+        libnetdata/log/log.h
         libnetdata/os.c
         libnetdata/os.h
-        libnetdata/popen.c
-        libnetdata/popen.h
-        libnetdata/procfile.c
-        libnetdata/procfile.h
-        libnetdata/simple_pattern.c
-        libnetdata/simple_pattern.h
-        libnetdata/socket.c
-        libnetdata/socket.h
-        libnetdata/statistical.c
-        libnetdata/statistical.h
-        libnetdata/storage_number.c
-        libnetdata/storage_number.h
-        libnetdata/threads.c
-        libnetdata/threads.h
-        libnetdata/web_buffer.c
-        libnetdata/web_buffer.h
-        libnetdata/url.c
-        libnetdata/url.h
+        libnetdata/popen/popen.c
+        libnetdata/popen/popen.h
+        libnetdata/procfile/procfile.c
+        libnetdata/procfile/procfile.h
+        libnetdata/simple_pattern/simple_pattern.c
+        libnetdata/simple_pattern/simple_pattern.h
+        libnetdata/socket/socket.c
+        libnetdata/socket/socket.h
+        libnetdata/statistical/statistical.c
+        libnetdata/statistical/statistical.h
+        libnetdata/storage_number/storage_number.c
+        libnetdata/storage_number/storage_number.h
+        libnetdata/threads/threads.c
+        libnetdata/threads/threads.h
+        libnetdata/url/url.c
+        libnetdata/url/url.h
         )
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})

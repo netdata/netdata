@@ -559,6 +559,23 @@ AC_CONFIG_FILES([
     database/Makefile
     health/Makefile
     libnetdata/Makefile
+    libnetdata/adaptive_resortable_list/Makefile
+    libnetdata/avl/Makefile
+    libnetdata/buffer/Makefile
+    libnetdata/clocks/Makefile
+    libnetdata/config/Makefile
+    libnetdata/dictionary/Makefile
+    libnetdata/eval/Makefile
+    libnetdata/locks/Makefile
+    libnetdata/log/Makefile
+    libnetdata/popen/Makefile
+    libnetdata/procfile/Makefile
+    libnetdata/simple_pattern/Makefile
+    libnetdata/socket/Makefile
+    libnetdata/statistical/Makefile
+    libnetdata/storage_number/Makefile
+    libnetdata/threads/Makefile
+    libnetdata/url/Makefile
     plugins/checks.plugin/Makefile
     plugins/freebsd.plugin/Makefile
     plugins/idlejitter.plugin/Makefile

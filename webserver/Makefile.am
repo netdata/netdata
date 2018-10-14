@@ -2,3 +2,7 @@
 
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
+
+dist_noinst_DATA = \
+	README.md \
+	$(NULL)

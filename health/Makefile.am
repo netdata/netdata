@@ -23,6 +23,7 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
 	alarm-notify.sh.in \
+	README.md \
 	$(NULL)
 
 healthconfigdir=$(libconfigdir)/health.d
