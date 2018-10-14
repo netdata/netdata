@@ -34,13 +34,13 @@ When it exits:
 
 The library will call the `processor()` function, given to
 `arl_create()`, for each expected keyword found.
-The default `processor()` expects `dst` to be an unsigned long long *.
+The default `processor()` expects `dst` to be an `unsigned long long *`.
 
-Each `name` keyword may have a different `processor()`.
+Each `name` keyword may have a different `processor()` (by calling `arl_expect_custom()`).
 
-Thus, ARL maintains a list of expectations (`name` keywords expected).
+ARL maintains a list of expectations (`name` keywords expected).
 When all expectations are satisfied (even in the middle of an iteration),
-the call to `arl_check()` will return 1, so signal the caller to stop the loop,
+the call to `arl_check()` will return 1, to signal the caller to stop the loop,
 saving valuable CPU resources. 
 
 ## Limitations
