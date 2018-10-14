@@ -17,7 +17,7 @@ It does the following:
    From the same output it collects the SSIDs each AP supports by looking for lines `ssid NAME`.
 
    Example:
-   ```sh
+```sh
 # iw dev
 phy#0
         Interface wlan0
@@ -27,7 +27,7 @@ phy#0
                 ssid TSAOUSIS
                 type AP
                 channel 7 (2442 MHz), width: 20 MHz, center1: 2442 MHz
-   ```
+```
 
 
 2. For each interface found, it runs `iw INTERFACE station dump`.
@@ -44,7 +44,7 @@ phy#0
 
    Example:
 
-   ```sh
+```sh
 # iw wlan0 station dump
 Station 40:b8:37:5a:ed:5e (on wlan0)
         inactive time:  910 ms
@@ -65,7 +65,7 @@ Station 40:b8:37:5a:ed:5e (on wlan0)
         WMM/WME:        yes
         MFP:            no
         TDLS peer:      no
-   ```
+```
 
 3. For each interface found, it creates 6 charts:
 
