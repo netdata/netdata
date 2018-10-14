@@ -7,14 +7,17 @@ netdata supports **internal** and **external** data collection plugins:
 - **external** plugins may be written in any computer language and are spawn as independent long-running processes by the netdata daemon.
    They communicate with the netdata daemon via `pipes` (`stdout` communication). The list of netdata external plugins at [plugins.d](plugins.d/).
 
-> To minimize the number of processes spawn for data collection, netdata also supports **plugin orchestrators**.
+To minimize the number of processes spawn for data collection, netdata also supports **plugin orchestrators**.
 
 - **plugin orchestrators** are external plugins that do not collect any data by themeselves.
    Instead they support data collection **modules** written in the language of the orchestrator.
    Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
-   data collection modules with the minimum of code. Currently netdata provides plugin orchestrators
-   [BASH](plugins.d/charts.d.plugin) v4+, [node.js](plugins.d/node.d.plugin) and
-   [python](plugins.d/python.d.plugin) v2+ (including v3).
+   data collection modules with the minimum of code.
+   
+   Currently netdata provides plugin orchestrators
+   BASH v4+ [charts.d.plugin](plugins.d/charts.d.plugin),
+   node.js [node.d.plugin](plugins.d/node.d.plugin) and
+   python v2+ (including v3) [python.d.plugin](plugins.d/python.d.plugin).
 
 ## Netdata Internal Plugins
 
@@ -99,8 +102,8 @@ collect_data() {
         rd = rrddim_add(st, "id", "name", multiplier, divider, algorithm);
     }
     else {
-        // this chart is already create it
-        // let netdata know we start the next iteration on it
+        // this chart is already created
+        // let netdata know we start a new iteration on it
         rrdset_next(st);
     }
     
