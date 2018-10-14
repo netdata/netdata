@@ -200,8 +200,8 @@ set(FREEBSD_PLUGIN_FILES
         plugins/freebsd.plugin/freebsd_devstat.c
         plugins/freebsd.plugin/freebsd_kstat_zfs.c
         plugins/freebsd.plugin/freebsd_ipfw.c
-        plugins/linux-proc.plugin/zfs_common.c
-        plugins/linux-proc.plugin/zfs_common.h
+        plugins/proc.plugin/zfs_common.c
+        plugins/proc.plugin/zfs_common.h
         )
 
 set(HEALTH_PLUGIN_FILES
@@ -218,17 +218,17 @@ set(IDLEJITTER_PLUGIN_FILES
         )
 
 set(CGROUPS_PLUGIN_FILES
-        plugins/linux-cgroups.plugin/sys_fs_cgroup.c
-        plugins/linux-cgroups.plugin/sys_fs_cgroup.h
+        plugins/cgroups.plugin/sys_fs_cgroup.c
+        plugins/cgroups.plugin/sys_fs_cgroup.h
         )
 
 set(CGROUP_NETWORK_FILES
-        plugins/linux-cgroups.plugin/cgroup-network.c
+        plugins/cgroups.plugin/cgroup-network.c
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        plugins/linux-diskspace.plugin/plugin_diskspace.h
-        plugins/linux-diskspace.plugin/plugin_diskspace.c
+        plugins/diskspace.plugin/plugin_diskspace.h
+        plugins/diskspace.plugin/plugin_diskspace.c
         )
 
 set(FREEIPMI_PLUGIN_FILES
@@ -236,50 +236,50 @@ set(FREEIPMI_PLUGIN_FILES
         )
 
 set(NFACCT_PLUGIN_FILES
-        plugins/linux-nfacct.plugin/plugin_nfacct.c
-        plugins/linux-nfacct.plugin/plugin_nfacct.h
+        plugins/nfacct.plugin/plugin_nfacct.c
+        plugins/nfacct.plugin/plugin_nfacct.h
         )
 
 set(PROC_PLUGIN_FILES
-        plugins/linux-proc.plugin/ipc.c
-        plugins/linux-proc.plugin/plugin_proc.c
-        plugins/linux-proc.plugin/plugin_proc.h
-        plugins/linux-proc.plugin/proc_diskstats.c
-        plugins/linux-proc.plugin/proc_interrupts.c
-        plugins/linux-proc.plugin/proc_softirqs.c
-        plugins/linux-proc.plugin/proc_loadavg.c
-        plugins/linux-proc.plugin/proc_meminfo.c
-        plugins/linux-proc.plugin/proc_net_dev.c
-        plugins/linux-proc.plugin/proc_net_ip_vs_stats.c
-        plugins/linux-proc.plugin/proc_net_netstat.c
-        plugins/linux-proc.plugin/proc_net_rpc_nfs.c
-        plugins/linux-proc.plugin/proc_net_rpc_nfsd.c
-        plugins/linux-proc.plugin/proc_net_snmp.c
-        plugins/linux-proc.plugin/proc_net_snmp6.c
-        plugins/linux-proc.plugin/proc_net_sctp_snmp.c
-        plugins/linux-proc.plugin/proc_net_sockstat.c
-        plugins/linux-proc.plugin/proc_net_sockstat6.c
-        plugins/linux-proc.plugin/proc_net_softnet_stat.c
-        plugins/linux-proc.plugin/proc_net_stat_conntrack.c
-        plugins/linux-proc.plugin/proc_net_stat_synproxy.c
-        plugins/linux-proc.plugin/proc_self_mountinfo.c
-        plugins/linux-proc.plugin/proc_self_mountinfo.h
-        plugins/linux-proc.plugin/zfs_common.c
-        plugins/linux-proc.plugin/zfs_common.h
-        plugins/linux-proc.plugin/proc_spl_kstat_zfs.c
-        plugins/linux-proc.plugin/proc_stat.c
-        plugins/linux-proc.plugin/proc_sys_kernel_random_entropy_avail.c
-        plugins/linux-proc.plugin/proc_vmstat.c
-        plugins/linux-proc.plugin/proc_uptime.c
-        plugins/linux-proc.plugin/sys_kernel_mm_ksm.c
-        plugins/linux-proc.plugin/sys_devices_system_edac_mc.c
-        plugins/linux-proc.plugin/sys_devices_system_node.c
-        plugins/linux-proc.plugin/sys_fs_btrfs.c
+        plugins/proc.plugin/ipc.c
+        plugins/proc.plugin/plugin_proc.c
+        plugins/proc.plugin/plugin_proc.h
+        plugins/proc.plugin/proc_diskstats.c
+        plugins/proc.plugin/proc_interrupts.c
+        plugins/proc.plugin/proc_softirqs.c
+        plugins/proc.plugin/proc_loadavg.c
+        plugins/proc.plugin/proc_meminfo.c
+        plugins/proc.plugin/proc_net_dev.c
+        plugins/proc.plugin/proc_net_ip_vs_stats.c
+        plugins/proc.plugin/proc_net_netstat.c
+        plugins/proc.plugin/proc_net_rpc_nfs.c
+        plugins/proc.plugin/proc_net_rpc_nfsd.c
+        plugins/proc.plugin/proc_net_snmp.c
+        plugins/proc.plugin/proc_net_snmp6.c
+        plugins/proc.plugin/proc_net_sctp_snmp.c
+        plugins/proc.plugin/proc_net_sockstat.c
+        plugins/proc.plugin/proc_net_sockstat6.c
+        plugins/proc.plugin/proc_net_softnet_stat.c
+        plugins/proc.plugin/proc_net_stat_conntrack.c
+        plugins/proc.plugin/proc_net_stat_synproxy.c
+        plugins/proc.plugin/proc_self_mountinfo.c
+        plugins/proc.plugin/proc_self_mountinfo.h
+        plugins/proc.plugin/zfs_common.c
+        plugins/proc.plugin/zfs_common.h
+        plugins/proc.plugin/proc_spl_kstat_zfs.c
+        plugins/proc.plugin/proc_stat.c
+        plugins/proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        plugins/proc.plugin/proc_vmstat.c
+        plugins/proc.plugin/proc_uptime.c
+        plugins/proc.plugin/sys_kernel_mm_ksm.c
+        plugins/proc.plugin/sys_devices_system_edac_mc.c
+        plugins/proc.plugin/sys_devices_system_node.c
+        plugins/proc.plugin/sys_fs_btrfs.c
         )
 
 set(TC_PLUGIN_FILES
-        plugins/linux-tc.plugin/plugin_tc.c
-        plugins/linux-tc.plugin/plugin_tc.h
+        plugins/tc.plugin/plugin_tc.c
+        plugins/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
