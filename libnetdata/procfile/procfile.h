@@ -1,29 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/*
- * procfile is a library for reading kernel files from /proc
- *
- * The idea is this:
- *
- *  - every file is opened once with procfile_open().
- *
- *  - to read updated contents, we rewind it (lseek() to 0) and read again
- *    with procfile_readall().
- *
- *  - for every file, we use a buffer that is adjusted to fit its entire
- *    contents in memory, allowing us to read it with a single read() call.
- *    (this provides atomicity / consistency on the data read from the kernel)
- *
- *  - once the data are read, we update two arrays of pointers:
- *     - a words array, pointing to each word in the data read
- *     - a lines array, pointing to the first word for each line
- *
- *    This is highly optimized. Both arrays are automatically adjusted to
- *    fit all contents and are updated in a single pass on the data:
- *     - a raspberry Pi can process 5.000+ files / sec.
- *     - a J1900 celeron processor can process 23.000+ files / sec.
-*/
-
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1
 

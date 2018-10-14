@@ -5,42 +5,6 @@
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
 #define NETDATA_ADAPTIVE_RESORTABLE_LIST_H 1
 
-/*
- * ADAPTIVE RE-SORTABLE LIST
- * This structure allows netdata to read a file of NAME VALUE lines
- * in the fastest possible way.
- *
- * It maintains a linked list of all NAME (keywords), sorted in the
- * same order as found in the source data file.
- * The linked list is kept sorted at all times - the source file
- * may change at any time, the list will adapt.
- *
- * The caller:
- *
- * 1. calls arl_create() to create a list
- *
- * 2. calls arl_expect() to register the expected keyword
- *
- * Then:
- *
- * 3. calls arl_begin() to initiate a data collection iteration.
- *    This is to be called just ONCE every time the source is re-scanned.
- *
- * 4. calls arl_check() for each line read from the file.
- *
- * Finally:
- *
- * 5. calls arl_free() to destroy this and free all memory.
- *
- * The program will call the processor() function, given to
- * arl_create(), for each expected keyword found.
- * The default processor() expects dst to be an unsigned long long *.
- *
- * LIMITATIONS
- * DO NOT USE THIS IF THE A NAME/KEYWORD MAY APPEAR MORE THAN
- * ONCE IN THE SOURCE DATA SET.
- */
-
 #define ARL_ENTRY_FLAG_FOUND    0x01    // the entry has been found in the source data
 #define ARL_ENTRY_FLAG_EXPECTED 0x02    // the entry is expected by the program
 #define ARL_ENTRY_FLAG_DYNAMIC  0x04    // the entry was dynamically allocated, from source data
