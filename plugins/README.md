@@ -18,19 +18,19 @@ netdata supports **internal** and **external** data collection plugins:
 
 ## Netdata Internal Plugins
 
-plugin|description
-:---:|:---
-[checks.plugin](checks.plugin/)|a debugging plugin (by default it is disabled)
-[freebsd.plugin](freebsd.plugin/)|collects resource usage and performance data on FreeBSD systems
-[idlejitter.plugin](idlejitter.plugin/)|measures CPU latency and jitter on all operating systems
-[linux-cgroups.plugin](linux-cgroups.plugin/)|collects resource usage of Containers, VMs and systemd, on Linux systems
-[linux-diskspace.plugin](linux-diskspace.plugin/)|collects disk space usage metrics on Linux mount points
-[linux-nfacct.plugin](linux-nfacct.plugin/)|collects netfilter metrics using `libmnl` and `libnetfilter_acct`
-[linux-proc.plugin](linux-proc.plugin/)|collects resource usage and performance data on Linux systems
-[linux-tc.plugin](linux-tc.plugin/)|collects traffic QoS metrics of Linux network interfaces
-[macos.plugin](macos.plugin/)|collects resource usage and performance data on MacOS systems
-[plugins.d](plugins.d/)|implements the **external plugins** API and serves external plugins
-[statsd.plugin](statsd.plugin/)|implements a high performance statsd server for netdata
+plugin|O/S|description
+:---:|:---:|:---
+[checks.plugin](checks.plugin/)|all|a debugging plugin (by default it is disabled)
+[freebsd.plugin](freebsd.plugin/)|freebsd|collects resource usage and performance data on FreeBSD systems
+[idlejitter.plugin](idlejitter.plugin/)|all|measures CPU latency and jitter on all operating systems
+[linux-cgroups.plugin](linux-cgroups.plugin/)|linux|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
+[linux-diskspace.plugin](linux-diskspace.plugin/)|linux|collects disk space usage metrics on Linux mount points
+[linux-nfacct.plugin](linux-nfacct.plugin/)|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
+[linux-proc.plugin](linux-proc.plugin/)|linux|collects resource usage and performance data on Linux systems
+[linux-tc.plugin](linux-tc.plugin/)|linux|collects traffic QoS metrics (`tc`) of Linux network interfaces
+[macos.plugin](macos.plugin/)|macos|collects resource usage and performance data on MacOS systems
+[plugins.d](plugins.d/)|all|implements the **external plugins** API and serves external plugins
+[statsd.plugin](statsd.plugin/)|all|implements a high performance **statsd** server for netdata
 
 ## Netdata External Plugins and Plugin Orchestrators
 
