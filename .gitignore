@@ -83,8 +83,8 @@ system/netdata.logrotate
 system/netdata.service
 system/netdata.plist
 system/netdata-freebsd
+system/edit-config
 
-conf.d/edit-config
 src/health/alarm-notify.sh
 src/plugins/linux-cgroups.plugin/cgroup-name.sh
 src/plugins/linux-tc.plugin/tc-qos-helper.sh

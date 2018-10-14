@@ -147,12 +147,12 @@ set(LIBNETDATA_FILES
         src/libnetdata/avl.h
         src/libnetdata/clocks.c
         src/libnetdata/clocks.h
-        src/libnetdata/common.c
         src/libnetdata/dictionary.c
         src/libnetdata/dictionary.h
         src/libnetdata/eval.c
         src/libnetdata/eval.h
         src/libnetdata/inlined.h
+        src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/locks.c
         src/libnetdata/locks.h
@@ -369,20 +369,24 @@ set(BACKENDS_PLUGIN_FILES
         src/backends/prometheus/backend_prometheus.h
         )
 
+set(DAEMON_FILES
+        src/daemon/common.c
+        src/daemon/common.h
+        src/daemon/daemon.c
+        src/daemon/daemon.h
+        src/daemon/global_statistics.c
+        src/daemon/global_statistics.h
+        src/daemon/main.c
+        src/daemon/main.h
+        src/daemon/signals.c
+        src/daemon/signals.h
+        src/daemon/unit_test.c
+        src/daemon/unit_test.h
+        )
+
 set(NETDATA_FILES
         src/plugins/all.h
-        src/common.c
-        src/common.h
-        src/daemon.c
-        src/daemon.h
-        src/global_statistics.c
-        src/global_statistics.h
-        src/main.c
-        src/main.h
-        src/signals.c
-        src/signals.h
-        src/unit_test.c
-        src/unit_test.h
+        ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
         ${CHECKS_PLUGIN_FILES}

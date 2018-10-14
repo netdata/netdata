@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../common.h"
+#include "src/daemon/common.h"
 #include "registry_internals.h"
 
 struct registry registry;

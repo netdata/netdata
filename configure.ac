@@ -36,7 +36,7 @@ AC_SUBST([PACKAGE_RPM_RELEASE])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
-AC_CONFIG_SRCDIR([src/main.c])
+AC_CONFIG_SRCDIR([src/daemon/main.c])
 define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [
     define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
@@ -555,6 +555,7 @@ AC_CONFIG_FILES([
     src/backends/Makefile
     src/backends/opentsdb/Makefile
     src/backends/prometheus/Makefile
+    src/daemon/Makefile
     src/database/Makefile
     src/health/Makefile
     src/libnetdata/Makefile

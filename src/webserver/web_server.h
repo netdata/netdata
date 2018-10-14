@@ -3,7 +3,7 @@
 #ifndef NETDATA_WEB_SERVER_H
 #define NETDATA_WEB_SERVER_H 1
 
-#include "../common.h"
+#include "src/daemon/common.h"
 #include "web_client.h"
 
 #ifndef API_LISTEN_PORT

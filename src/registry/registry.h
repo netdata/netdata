@@ -49,7 +49,7 @@
 #ifndef NETDATA_REGISTRY_H
 #define NETDATA_REGISTRY_H 1
 
-#include "../common.h"
+#include "src/daemon/common.h"
 
 #define NETDATA_REGISTRY_COOKIE_NAME "netdata_registry_id"
 

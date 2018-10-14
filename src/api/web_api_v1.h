@@ -3,7 +3,7 @@
 #ifndef NETDATA_WEB_API_V1_H
 #define NETDATA_WEB_API_V1_H 1
 
-#include "../common.h"
+#include "src/daemon/common.h"
 #include "web_buffer_svg.h"
 #include "rrd2json.h"
 

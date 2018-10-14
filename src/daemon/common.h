@@ -3,7 +3,7 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
-#include "libnetdata/libnetdata.h"
+#include "src/libnetdata/libnetdata.h"
 
 // ----------------------------------------------------------------------------
 // netdata include files
@@ -11,29 +11,29 @@
 #include "global_statistics.h"
 
 // the netdata database
-#include "database/rrd.h"
+#include "src/database/rrd.h"
 
 // the netdata webserver(s)
-#include "webserver/web_server.h"
+#include "src/webserver/web_server.h"
 
 // streaming metrics between netdata servers
-#include "streaming/rrdpush.h"
+#include "src/streaming/rrdpush.h"
 
 // health monitoring and alarm notifications
-#include "health/health.h"
+#include "src/health/health.h"
 
 // the netdata registry
 // the registry is actually an API feature
-#include "registry/registry.h"
+#include "src/registry/registry.h"
 
 // backends for archiving the metrics
 #include "src/backends/backends.h"
 
 // the netdata API
-#include "api/web_api_v1.h"
+#include "src/api/web_api_v1.h"
 
 // all data collection plugins
-#include "plugins/all.h"
+#include "src/plugins/all.h"
 
 // netdata unit tests
 #include "unit_test.h"

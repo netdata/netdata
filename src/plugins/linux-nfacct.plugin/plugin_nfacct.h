@@ -3,7 +3,7 @@
 #ifndef NETDATA_NFACCT_H
 #define NETDATA_NFACCT_H 1
 
-#include "../../common.h"
+#include "src/daemon/common.h"
 
 #if defined(INTERNAL_PLUGIN_NFACCT)
 

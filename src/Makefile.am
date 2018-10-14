@@ -40,12 +40,12 @@ LIBNETDATA_FILES = \
     libnetdata/avl.h \
     libnetdata/clocks.c \
     libnetdata/clocks.h \
-    libnetdata/common.c \
     libnetdata/dictionary.c \
     libnetdata/dictionary.h \
     libnetdata/eval.c \
     libnetdata/eval.h \
     libnetdata/inlined.h \
+    libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/locks.c \
     libnetdata/locks.h \
@@ -270,20 +270,24 @@ WEB_PLUGIN_FILES = \
     webserver/web_server.h \
     $(NULL)
 
+DAEMON_FILES = \
+	daemon/common.c \
+	daemon/common.h \
+	daemon/daemon.c \
+	daemon/daemon.h \
+	daemon/global_statistics.c \
+	daemon/global_statistics.h \
+	daemon/main.c \
+	daemon/main.h \
+	daemon/signals.c \
+	daemon/signals.h \
+	daemon/unit_test.c \
+	daemon/unit_test.h \
+    $(NULL)
+
 NETDATA_FILES = \
     plugins/all.h \
-	common.c \
-	common.h \
-	daemon.c \
-	daemon.h \
-	global_statistics.c \
-	global_statistics.h \
-	main.c \
-	main.h \
-	signals.c \
-	signals.h \
-	unit_test.c \
-	unit_test.h \
+    $(DAEMON_FILES) \
 	$(LIBNETDATA_FILES) \
 	$(API_PLUGIN_FILES) \
 	$(BACKENDS_PLUGIN_FILES) \

@@ -14,7 +14,7 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
-#include "../common.h"
+#include "src/daemon/common.h"
 
 #include "rrdvar.h"
 #include "rrdsetvar.h"

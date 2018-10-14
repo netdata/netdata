@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../common.h"
+#include "web_buffer_svg.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
 #define VERDANA_KERNING 0.2

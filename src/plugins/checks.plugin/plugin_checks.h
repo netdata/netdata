@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_CHECKS_H
 #define NETDATA_PLUGIN_CHECKS_H 1
 
-#include "../../common.h"
+#include "src/daemon/common.h"
 
 #ifdef NETDATA_INTERNAL_CHECKS
 

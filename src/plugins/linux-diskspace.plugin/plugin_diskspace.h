@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_PROC_DISKSPACE_H
 #define NETDATA_PLUGIN_PROC_DISKSPACE_H
 
-#include "../../common.h"
+#include "src/daemon/common.h"
 
 
 #if (TARGET_OS == OS_LINUX)

@@ -191,6 +191,6 @@ extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
 extern int mysendfile(struct web_client *w, char *filename);
 
-#include "../common.h"
+#include "src/daemon/common.h"
 
 #endif

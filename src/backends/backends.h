@@ -3,7 +3,7 @@
 #ifndef NETDATA_BACKENDS_H
 #define NETDATA_BACKENDS_H 1
 
-#include "../common.h"
+#include "src/daemon/common.h"
 
 typedef enum backend_options {
     BACKEND_OPTION_NONE              = 0,

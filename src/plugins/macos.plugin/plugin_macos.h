@@ -4,7 +4,7 @@
 #ifndef NETDATA_PLUGIN_MACOS_H
 #define NETDATA_PLUGIN_MACOS_H 1
 
-#include "../../common.h"
+#include "src/daemon/common.h"
 
 #if (TARGET_OS == OS_MACOS)
 
