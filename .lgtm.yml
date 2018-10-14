@@ -8,15 +8,15 @@
 # https://lgtm.com/help/lgtm/lgtm.yml-configuration-file
 path_classifiers:
   library:
-    - python.d/python_modules/third_party/
-    - python.d/python_modules/urllib3/
-    - python.d/python_modules/pyyaml2/
-    - python.d/python_modules/pyyaml3/
-    - node.d/node_modules/lib/
-    - node.d/node_modules/asn1-ber.js
-    - node.d/node_modules/extend.js
-    - node.d/node_modules/net-snmp.js
-    - node.d/node_modules/pixl-xml.js
+    - plugins/plugins.d/python.d.plugin/python_modules/third_party/
+    - plugins/plugins.d/python.d.plugin/python_modules/urllib3/
+    - plugins/plugins.d/python.d.plugin/python_modules/pyyaml2/
+    - plugins/plugins.d/python.d.plugin/python_modules/pyyaml3/
+    - plugins/plugins.d/node.d.plugin/node_modules/lib/
+    - plugins/plugins.d/node.d.plugin/node_modules/asn1-ber.js
+    - plugins/plugins.d/node.d.plugin/node_modules/extend.js
+    - plugins/plugins.d/node.d.plugin/node_modules/net-snmp.js
+    - plugins/plugins.d/node.d.plugin/node_modules/pixl-xml.js
     - web/lib/
     - web/css/
   test:
