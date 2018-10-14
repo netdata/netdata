@@ -14,6 +14,17 @@ In some older systems, the package named `node` is not node.js. It is a terminal
 
 `node.d.plugin` can work even without any configuration. Its default configuration file is [/etc/netdata/node.d.conf](https://github.com/netdata/netdata/blob/master/conf.d/node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
 
+## configuring `node.d.plugin` modules
+
+`node.d.plugin` modules accept configuration in JSON format.
+
+Unfortunately, JSON files do not accept comments. So, the best way to describe them is to have markdown text files with instructions.
+
+JSON has a very strict formatting. If you get errors from netdata at `/var/log/netdata/error.log` that a certain configuration file cannot be loaded, we suggest to verify it at [http://jsonlint.com/](http://jsonlint.com/).
+
+The files in this directory, provide usable examples for configuring each `node.d.plugin` module.
+
+
 ## debugging modules written for node.d.plugin
 
 To test `node.d.plugin` collectors, which are placed in `/usr/libexec/netdata/node.d`, you can run `node.d.plugin` by hand, with something like this:

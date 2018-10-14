@@ -18,3 +18,7 @@ dist_noinst_DATA = \
 	fping.plugin.in \
 	README.md \
 	$(NULL)
+
+dist_libconfig_DATA = \
+    fping.conf \
+    $(NULL)

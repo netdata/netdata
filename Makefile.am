@@ -47,7 +47,6 @@ EXTRA_DIST = \
 	$(NULL)
 
 SUBDIRS = \
-	conf.d \
 	diagrams \
 	makeself \
 	src \

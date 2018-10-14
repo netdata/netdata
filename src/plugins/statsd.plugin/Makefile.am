@@ -6,3 +6,8 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 dist_noinst_DATA = \
 	README.md \
 	$(NULL)
+
+statsdconfigdir=$(libconfigdir)/statsd.d
+dist_statsdconfig_DATA = \
+    example.conf \
+    $(NULL)

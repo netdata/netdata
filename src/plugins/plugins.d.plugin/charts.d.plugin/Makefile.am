@@ -9,6 +9,10 @@ CLEANFILES = \
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
+dist_libconfig_DATA = \
+    charts.d.conf \
+    $(NULL)
+
 dist_plugins_SCRIPTS = \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \

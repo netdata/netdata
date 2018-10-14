@@ -8,6 +8,10 @@ CLEANFILES = \
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
+dist_libconfig_DATA = \
+    python.d.conf \
+    $(NULL)
+
 dist_plugins_SCRIPTS = \
 	python.d.plugin \
 	$(NULL)

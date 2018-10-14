@@ -548,7 +548,6 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
-    conf.d/Makefile
     netdata.spec
     src/api/Makefile
     src/backends/graphite/Makefile
