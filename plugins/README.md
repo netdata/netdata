@@ -18,19 +18,19 @@ netdata supports **internal** and **external** data collection plugins:
 
 ## Netdata Internal Plugins
 
-plugin|O/S|description
-:---:|:---:|:---
-[checks.plugin](checks.plugin/)|all|a debugging plugin (by default it is disabled)
-[freebsd.plugin](freebsd.plugin/)|freebsd|collects resource usage and performance data on FreeBSD systems
-[idlejitter.plugin](idlejitter.plugin/)|all|measures CPU latency and jitter on all operating systems
-[cgroups.plugin](cgroups.plugin/)|linux|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
-[diskspace.plugin](diskspace.plugin/)|linux|collects disk space usage metrics on Linux mount points
-[nfacct.plugin](nfacct.plugin/)|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
-[proc.plugin](proc.plugin/)|linux|collects resource usage and performance data on Linux systems
-[tc.plugin](tc.plugin/)|linux|collects traffic QoS metrics (`tc`) of Linux network interfaces
-[macos.plugin](macos.plugin/)|macos|collects resource usage and performance data on MacOS systems
-[plugins.d](plugins.d/)|all|implements the **external plugins** API and serves external plugins
-[statsd.plugin](statsd.plugin/)|all|implements a high performance **statsd** server for netdata
+plugin|language|O/S|description
+:---:|:---:|:---:|:---
+[cgroups.plugin](cgroups.plugin/)|`C`|linux|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
+[checks.plugin](checks.plugin/)|`C`|all|a debugging plugin (by default it is disabled)
+[diskspace.plugin](diskspace.plugin/)|`C`|linux|collects disk space usage metrics on Linux mount points
+[freebsd.plugin](freebsd.plugin/)|`C`|freebsd|collects resource usage and performance data on FreeBSD systems
+[idlejitter.plugin](idlejitter.plugin/)|`C`|all|measures CPU latency and jitter on all operating systems
+[macos.plugin](macos.plugin/)|`C`|macos|collects resource usage and performance data on MacOS systems
+[nfacct.plugin](nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
+[plugins.d](plugins.d/)|`C`|all|implements the **external plugins** API and serves external plugins
+[proc.plugin](proc.plugin/)|`C`|linux|collects resource usage and performance data on Linux systems
+[statsd.plugin](statsd.plugin/)|`C`|all|implements a high performance **statsd** server for netdata
+[tc.plugin](tc.plugin/)|`C`|linux|collects traffic QoS metrics (`tc`) of Linux network interfaces
 
 ## Netdata External Plugins and Plugin Orchestrators
 
