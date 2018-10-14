@@ -47,12 +47,9 @@ EXTRA_DIST = \
 	$(NULL)
 
 SUBDIRS = \
-	charts.d \
 	conf.d \
 	diagrams \
 	makeself \
-	node.d \
-	python.d \
 	src \
 	system \
 	web \

@@ -30,84 +30,6 @@ dist_libconfig_DATA = \
     stream.conf \
     $(NULL)
 
-nodeconfigdir=$(libconfigdir)/node.d
-dist_nodeconfig_DATA = \
-    $(NULL)
-
-usernodeconfigdir=$(configdir)/node.d
-dist_usernodeconfig_DATA = \
-    node.d/README.md \
-    node.d/fronius.conf.md \
-    node.d/named.conf.md \
-    node.d/sma_webbox.conf.md \
-    node.d/snmp.conf.md \
-    node.d/stiebeleltron.conf.md \
-    $(NULL)
-
-pythonconfigdir=$(libconfigdir)/python.d
-dist_pythonconfig_DATA = \
-    python.d/apache.conf \
-    python.d/beanstalk.conf \
-    python.d/bind_rndc.conf \
-    python.d/boinc.conf \
-    python.d/ceph.conf \
-    python.d/chrony.conf \
-    python.d/couchdb.conf \
-    python.d/cpuidle.conf \
-    python.d/cpufreq.conf \
-    python.d/dns_query_time.conf \
-    python.d/dnsdist.conf \
-    python.d/dockerd.conf \
-    python.d/dovecot.conf \
-    python.d/elasticsearch.conf \
-    python.d/example.conf \
-    python.d/exim.conf \
-    python.d/fail2ban.conf \
-    python.d/freeradius.conf \
-    python.d/go_expvar.conf \
-    python.d/haproxy.conf \
-    python.d/hddtemp.conf \
-    python.d/httpcheck.conf \
-    python.d/icecast.conf \
-    python.d/ipfs.conf \
-    python.d/isc_dhcpd.conf \
-    python.d/linux_power_supply.conf \
-    python.d/litespeed.conf \
-    python.d/logind.conf \
-    python.d/mdstat.conf \
-    python.d/megacli.conf \
-    python.d/memcached.conf \
-    python.d/mongodb.conf \
-    python.d/monit.conf \
-    python.d/mysql.conf \
-    python.d/nginx.conf \
-    python.d/nginx_plus.conf \
-    python.d/nsd.conf \
-    python.d/ntpd.conf \
-    python.d/ovpn_status_log.conf \
-    python.d/phpfpm.conf \
-    python.d/portcheck.conf \
-    python.d/postfix.conf \
-    python.d/postgres.conf \
-    python.d/powerdns.conf \
-    python.d/puppet.conf \
-    python.d/rabbitmq.conf \
-    python.d/redis.conf \
-    python.d/rethinkdbs.conf \
-    python.d/retroshare.conf \
-    python.d/samba.conf \
-    python.d/sensors.conf \
-    python.d/springboot.conf \
-    python.d/spigotmc.conf \
-    python.d/squid.conf \
-    python.d/smartd_log.conf \
-    python.d/tomcat.conf \
-    python.d/traefik.conf \
-    python.d/unbound.conf \
-    python.d/varnish.conf \
-    python.d/w1sensor.conf \
-    python.d/web_log.conf \
-    $(NULL)
 
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
@@ -167,30 +89,6 @@ dist_healthconfig_DATA = \
     health.d/varnish.conf \
     health.d/web_log.conf \
     health.d/zfs.conf \
-    $(NULL)
-
-chartsconfigdir=$(libconfigdir)/charts.d
-dist_chartsconfig_DATA = \
-    charts.d/apache.conf \
-    charts.d/apcupsd.conf \
-    charts.d/cpufreq.conf \
-    charts.d/exim.conf \
-    charts.d/libreswan.conf \
-    charts.d/load_average.conf \
-    charts.d/mysql.conf \
-    charts.d/nut.conf \
-    charts.d/phpfpm.conf \
-    charts.d/sensors.conf \
-    charts.d/tomcat.conf \
-    charts.d/ap.conf \
-    charts.d/cpu_apps.conf \
-    charts.d/example.conf \
-    charts.d/hddtemp.conf \
-    charts.d/mem_apps.conf \
-    charts.d/nginx.conf \
-    charts.d/opensips.conf \
-    charts.d/postfix.conf \
-    charts.d/squid.conf \
     $(NULL)
 
 statsdconfigdir=$(libconfigdir)/statsd.d

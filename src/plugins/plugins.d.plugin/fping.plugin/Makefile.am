@@ -24,4 +24,5 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
 	fping.plugin.in \
+	README.md \
 	$(NULL)

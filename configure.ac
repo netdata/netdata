@@ -548,11 +548,8 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
-    charts.d/Makefile
     conf.d/Makefile
     netdata.spec
-    python.d/Makefile
-    node.d/Makefile
     src/api/Makefile
     src/backends/graphite/Makefile
     src/backends/json/Makefile

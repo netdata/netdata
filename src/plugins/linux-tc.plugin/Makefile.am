@@ -11,6 +11,7 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
 	tc-qos-helper.sh.in \
+	README.md \
 	$(NULL)
 
 tc-qos-helper.sh: tc-qos-helper.sh.in
