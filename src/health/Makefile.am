@@ -1,23 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 AUTOMAKE_OPTIONS = subdir-objects
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
 	alarm-notify.sh \
 	$(NULL)
 
-alarm-notify.sh: alarm-notify.sh.in
-	if sed \
-		-e 's#[@]configdir_POST@#$(configdir)#g' \
-		-e 's#[@]libconfigdir_POST@#$(libconfigdir)#g' \
-		-e 's#[@]cachedir_POST@#$(cachedir)#g' \
-		$< > $@.tmp; then \
-		mv "$@.tmp" "$@"; \
-	else \
-		rm -f "$@.tmp"; \
-		false; \
-	fi
+include $(top_srcdir)/build/subst.inc
+SUFFIXES = .in
 
 dist_plugins_SCRIPTS = \
 	alarm-notify.sh \

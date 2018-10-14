@@ -1,22 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 AUTOMAKE_OPTIONS = subdir-objects
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
 	fping.plugin \
 	$(NULL)
 
-fping.plugin: fping.plugin.in
-	if sed \
-		-e 's#[@]configdir_POST@#$(configdir)#g' \
-		-e 's#[@]libconfigdir_POST@#$(libconfigdir)#g' \
-		$< > $@.tmp; then \
-		mv "$@.tmp" "$@"; \
-	else \
-		rm -f "$@.tmp"; \
-		false; \
-	fi
+include $(top_srcdir)/build/subst.inc
+SUFFIXES = .in
 
 dist_plugins_SCRIPTS = \
 	fping.plugin \
