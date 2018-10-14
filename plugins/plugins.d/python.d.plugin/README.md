@@ -67,7 +67,7 @@ CHART = {
         ]}
 ```
 
-All names are better explained in the [External Plugins](https://github.com/netdata/netdata/wiki/External-Plugins) section.
+All names are better explained in the [External Plugins](../) section.
 Parameters like `priority` and `update_every` are handled by `python.d.plugin`.
 
 ### `Service` class

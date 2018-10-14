@@ -87,7 +87,7 @@ The plugin supports a few options. To see them, run:
  options ipmi_si kipmid_max_busy_us=10
 
  For more information:
- https://github.com/netdata/netdata/wiki/monitoring-IPMI
+ https://github.com/ktsaou/netdata/tree/master/plugins/plugins.d/freeipmi.plugin
 
 ```
 
