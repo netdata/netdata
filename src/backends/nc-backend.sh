@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+# This is a simple backend database proxy, written in BASH, using the nc command.
+# Run the script without any parameters for help.
 
 MODE="${1}"
 MY_PORT="${2}"
