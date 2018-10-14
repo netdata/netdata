@@ -1,6 +1,8 @@
 .deps
 .libs
 .dirstamp
+.project
+.pydevproject
 
 *.o
 *.a
@@ -62,8 +64,8 @@ netdata-coverity-analysis.tgz
 .settings/
 README
 TODO.md
-conf.d/netdata.conf
-src/TODO.txt
+netdata.conf
+TODO.txt
 
 web/chart-info/
 web/control.html
@@ -85,13 +87,13 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 
-src/health/alarm-notify.sh
-src/plugins/linux-cgroups.plugin/cgroup-name.sh
-src/plugins/linux-tc.plugin/tc-qos-helper.sh
-src/plugins/plugins.d.plugin/charts.d.plugin/charts.d.plugin
-src/plugins/plugins.d.plugin/node.d.plugin/node.d.plugin
-src/plugins/plugins.d.plugin/python.d.plugin/python.d.plugin
-src/plugins/plugins.d.plugin/fping.plugin/fping.plugin
+health/alarm-notify.sh
+plugins/linux-cgroups.plugin/cgroup-name.sh
+plugins/linux-tc.plugin/tc-qos-helper.sh
+plugins/plugins.d.plugin/charts.d.plugin/charts.d.plugin
+plugins/plugins.d.plugin/node.d.plugin/node.d.plugin
+plugins/plugins.d.plugin/python.d.plugin/python.d.plugin
+plugins/plugins.d.plugin/fping.plugin/fping.plugin
 
 # installer generated files
 netdata-uninstaller.sh
@@ -117,7 +119,9 @@ diagrams/*.atxt
 diagrams/plantuml.jar
 
 # cppcheck
-src/cppcheck-build/
+cppcheck-build/
+
+venv/
 
 # debugging / profiling
 makeself/debug/

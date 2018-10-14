@@ -36,7 +36,7 @@ AC_SUBST([PACKAGE_RPM_RELEASE])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
-AC_CONFIG_SRCDIR([src/daemon/main.c])
+AC_CONFIG_SRCDIR([daemon/main.c])
 define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [
     define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
@@ -549,38 +549,37 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    src/api/Makefile
-    src/backends/graphite/Makefile
-    src/backends/json/Makefile
-    src/backends/Makefile
-    src/backends/opentsdb/Makefile
-    src/backends/prometheus/Makefile
-    src/daemon/Makefile
-    src/database/Makefile
-    src/health/Makefile
-    src/libnetdata/Makefile
-    src/Makefile
-    src/plugins/checks.plugin/Makefile
-    src/plugins/freebsd.plugin/Makefile
-    src/plugins/idlejitter.plugin/Makefile
-    src/plugins/linux-cgroups.plugin/Makefile
-    src/plugins/linux-diskspace.plugin/Makefile
-    src/plugins/linux-nfacct.plugin/Makefile
-    src/plugins/linux-proc.plugin/Makefile
-    src/plugins/linux-tc.plugin/Makefile
-    src/plugins/macos.plugin/Makefile
-    src/plugins/Makefile
-    src/plugins/plugins.d.plugin/Makefile
-    src/plugins/plugins.d.plugin/apps.plugin/Makefile
-    src/plugins/plugins.d.plugin/charts.d.plugin/Makefile
-    src/plugins/plugins.d.plugin/fping.plugin/Makefile
-    src/plugins/plugins.d.plugin/freeipmi.plugin/Makefile
-    src/plugins/plugins.d.plugin/node.d.plugin/Makefile
-    src/plugins/plugins.d.plugin/python.d.plugin/Makefile
-    src/plugins/statsd.plugin/Makefile
-    src/registry/Makefile
-    src/streaming/Makefile
-    src/webserver/Makefile
+    api/Makefile
+    backends/graphite/Makefile
+    backends/json/Makefile
+    backends/Makefile
+    backends/opentsdb/Makefile
+    backends/prometheus/Makefile
+    daemon/Makefile
+    database/Makefile
+    health/Makefile
+    libnetdata/Makefile
+    plugins/checks.plugin/Makefile
+    plugins/freebsd.plugin/Makefile
+    plugins/idlejitter.plugin/Makefile
+    plugins/linux-cgroups.plugin/Makefile
+    plugins/linux-diskspace.plugin/Makefile
+    plugins/linux-nfacct.plugin/Makefile
+    plugins/linux-proc.plugin/Makefile
+    plugins/linux-tc.plugin/Makefile
+    plugins/macos.plugin/Makefile
+    plugins/Makefile
+    plugins/plugins.d.plugin/Makefile
+    plugins/plugins.d.plugin/apps.plugin/Makefile
+    plugins/plugins.d.plugin/charts.d.plugin/Makefile
+    plugins/plugins.d.plugin/fping.plugin/Makefile
+    plugins/plugins.d.plugin/freeipmi.plugin/Makefile
+    plugins/plugins.d.plugin/node.d.plugin/Makefile
+    plugins/plugins.d.plugin/python.d.plugin/Makefile
+    plugins/statsd.plugin/Makefile
+    registry/Makefile
+    streaming/Makefile
+    webserver/Makefile
     system/Makefile
     web/Makefile
     diagrams/Makefile
