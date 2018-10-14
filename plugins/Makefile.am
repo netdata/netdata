@@ -12,7 +12,7 @@ SUBDIRS = \
     linux-proc.plugin \
     linux-tc.plugin \
     macos.plugin \
-    plugins.d.plugin \
+    plugins.d \
     statsd.plugin \
    	$(NULL)
 

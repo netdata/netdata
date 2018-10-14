@@ -149,7 +149,7 @@ LIBNETDATA_FILES = \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
-	plugins/plugins.d.plugin/apps.plugin/apps_plugin.c \
+	plugins/plugins.d/apps.plugin/apps_plugin.c \
 	$(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -200,7 +200,7 @@ DISKSPACE_PLUGIN_FILES = \
     $(NULL)
 
 FREEIPMI_PLUGIN_FILES = \
-    plugins/plugins.d.plugin/freeipmi.plugin/freeipmi_plugin.c \
+    plugins/plugins.d/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -260,8 +260,8 @@ MACOS_PLUGIN_FILES = \
     $(NULL)
 
 PLUGINSD_PLUGIN_FILES = \
-	plugins/plugins.d.plugin/plugins_d.c \
-	plugins/plugins.d.plugin/plugins_d.h \
+	plugins/plugins.d/plugins_d.c \
+	plugins/plugins.d/plugins_d.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \

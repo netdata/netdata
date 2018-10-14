@@ -5,7 +5,7 @@ netdata supports **internal** and **external** data collection plugins:
 - **internal** plugins are written in `C` and run as threads inside the netdata daemon.
 
 - **external** plugins may be written in any computer language and are spawn as independent long-running processes by the netdata daemon.
-   They communicate with the netdata daemon via `pipes` (`stdout` communication). The list of netdata external plugins at [plugins.d.plugin](plugins.d.plugin/).
+   They communicate with the netdata daemon via `pipes` (`stdout` communication). The list of netdata external plugins at [plugins.d](plugins.d/).
 
 > To minimize the number of processes spawn for data collection, netdata also supports **plugin orchestrators**.
 
@@ -13,8 +13,8 @@ netdata supports **internal** and **external** data collection plugins:
    Instead they support data collection **modules** written in the language of the orchestrator.
    Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
    data collection modules with the minimum of code. Currently netdata provides plugin orchestrators
-   [BASH](plugins.d.plugin/charts.d.plugin) v4+, [node.js](plugins.d.plugin/node.d.plugin) and
-   [python](plugins.d.plugin/python.d.plugin) v2+ (including v3).
+   [BASH](plugins.d/charts.d.plugin) v4+, [node.js](plugins.d/node.d.plugin) and
+   [python](plugins.d/python.d.plugin) v2+ (including v3).
 
 ## Netdata Internal Plugins
 
@@ -29,12 +29,12 @@ plugin|description
 [linux-proc.plugin](linux-proc.plugin/)|collects resource usage and performance data on Linux systems
 [linux-tc.plugin](linux-tc.plugin/)|collects traffic QoS metrics of Linux network interfaces
 [macos.plugin](macos.plugin/)|collects resource usage and performance data on MacOS systems
-[plugins.d.plugin](plugins.d.plugin/)|implements the **external plugins** API and serves external plugins
+[plugins.d](plugins.d/)|implements the **external plugins** API and serves external plugins
 [statsd.plugin](statsd.plugin/)|implements a high performance statsd server for netdata
 
 ## Netdata External Plugins and Plugin Orchestrators
 
-Browse the [plugins.d.plugin](plugins.d.plugin/) directory.
+Browse the [plugins.d](plugins.d/) directory.
 
 ## Internal Plugins Configuration
 

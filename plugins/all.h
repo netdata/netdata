@@ -16,7 +16,7 @@
 #include "linux-proc.plugin/plugin_proc.h"
 #include "linux-tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
-#include "plugins.d.plugin/plugins_d.h"
+#include "plugins.d/plugins_d.h"
 #include "statsd.plugin/statsd.h"
 
 

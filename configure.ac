@@ -569,13 +569,13 @@ AC_CONFIG_FILES([
     plugins/linux-tc.plugin/Makefile
     plugins/macos.plugin/Makefile
     plugins/Makefile
-    plugins/plugins.d.plugin/Makefile
-    plugins/plugins.d.plugin/apps.plugin/Makefile
-    plugins/plugins.d.plugin/charts.d.plugin/Makefile
-    plugins/plugins.d.plugin/fping.plugin/Makefile
-    plugins/plugins.d.plugin/freeipmi.plugin/Makefile
-    plugins/plugins.d.plugin/node.d.plugin/Makefile
-    plugins/plugins.d.plugin/python.d.plugin/Makefile
+    plugins/plugins.d/Makefile
+    plugins/plugins.d/apps.plugin/Makefile
+    plugins/plugins.d/charts.d.plugin/Makefile
+    plugins/plugins.d/fping.plugin/Makefile
+    plugins/plugins.d/freeipmi.plugin/Makefile
+    plugins/plugins.d/node.d.plugin/Makefile
+    plugins/plugins.d/python.d.plugin/Makefile
     plugins/statsd.plugin/Makefile
     registry/Makefile
     streaming/Makefile

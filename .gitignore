@@ -90,10 +90,10 @@ system/edit-config
 health/alarm-notify.sh
 plugins/linux-cgroups.plugin/cgroup-name.sh
 plugins/linux-tc.plugin/tc-qos-helper.sh
-plugins/plugins.d.plugin/charts.d.plugin/charts.d.plugin
-plugins/plugins.d.plugin/node.d.plugin/node.d.plugin
-plugins/plugins.d.plugin/python.d.plugin/python.d.plugin
-plugins/plugins.d.plugin/fping.plugin/fping.plugin
+plugins/plugins.d/charts.d.plugin/charts.d.plugin
+plugins/plugins.d/node.d.plugin/node.d.plugin
+plugins/plugins.d/python.d.plugin/python.d.plugin
+plugins/plugins.d/fping.plugin/fping.plugin
 
 # installer generated files
 netdata-uninstaller.sh
