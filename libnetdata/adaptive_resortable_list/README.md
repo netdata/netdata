@@ -1,19 +1,21 @@
 
 # Adaptive Re-sortable List (ARL)
 
-This structure allows netdata to read a file of `name - value` pairs
+This library allows netdata to read a series of `name - value` pairs
 in the **fastest possible way**.
 
 ARLs are used all over netdata, as they are the most
-CPU utilization efficient way to parse `/proc` files. They are used to
-parse both vertical and horizontal `name - value` pairs.
+CPU utilization efficient way to process `/proc` files. They are used to
+process both vertical (csv like) and horizontal (one pair per line) `name - value` pairs.
 
 ## How ARL works
 
 It maintains a linked list of all `NAME` (keywords), sorted in the
-same order as found in the source data file. The linked list is kept
-sorted at all times - the source file may change at any time, the
+order found in the data source. The linked list is kept
+sorted at all times - the data source may change at any time, the
 linked list will adapt at the next iteration.
+
+### Initialization
 
 During initialization (just once), the caller:
 
@@ -21,28 +23,66 @@ During initialization (just once), the caller:
 
 - calls `arl_expect()` multiple times to register the expected keywords
 
-Then, for each iteration through the data source:
+The library will call the `processor()` function (given to
+`arl_create()`), for each expected keyword found.
+The default `processor()` expects `dst` to be an `unsigned long long *`.
+
+Each `name` keyword may have a different `processor()` (by calling
+`arl_expect_custom()` instead of `arl_expect()`).
+
+### Data collection iterations
+
+For each iteration through the data source, the caller:
 
 - calls `arl_begin()` to initiate a data collection iteration.
-   This is to be called just ONCE every time the source is re-scanned.
+   This is to be called just ONCE every time the source is re-evaluated.
 
 - calls `arl_check()` for each entry read from the file.
 
-When it exits:
+### Cleanup
+
+When the caller exits:
 
 - calls `arl_free()` to destroy this and free all memory.
 
-The library will call the `processor()` function, given to
-`arl_create()`, for each expected keyword found.
-The default `processor()` expects `dst` to be an `unsigned long long *`.
+### Performance
 
-Each `name` keyword may have a different `processor()` (by calling `arl_expect_custom()`).
+ARL maintains a list of `name` keywords found in the data source (even the ones
+that are not useful for data collection).
 
-ARL maintains a list of expectations (`name` keywords expected).
+If the data source maintains the same order on the `name-value` pairs, for each
+each call to `arl_check()` only an `strcmp()` is executed to verify the
+expected order has not changed, a counter is incremented and a pointer is changed.
+So, if the data source has 100 `name-value` pairs, and their order remains constant
+over time, 100 successful `strcmp()` are executed.
+
+In the unlikely event that an iteration sees the data source with a different order,
+for each out-of-order keyword, a full search of the remaining keywords is made. But
+this search uses 32bit hashes, not string comparisons, so it should also be fast. 
+
 When all expectations are satisfied (even in the middle of an iteration),
 the call to `arl_check()` will return 1, to signal the caller to stop the loop,
-saving valuable CPU resources. 
+saving valuable CPU resources for the rest of the data source. 
+
+In the following test we used alternative methods to process, **300k times**,
+a data source like `/proc/meminfo`, already tokenized, in memory,
+to extract the same number of expected metrics:
+
+test|code|string comparison|number parsing|duration
+:---:|:---:|:---:|:---:|:---:|
+1|if-else-if-else-if|`strcmp()`|`strtoull()`|1396639 usecs
+2|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`strtoull()`| 262911 usecs
+3|if-else-if-else-if|statement expression `simple_hash()` and `strcmp()`|`strtoull()`|255728 usecs
+4|if-continue|inline `simple_hash()` and `strcmp()`|`strtoull()`|255024 usecs
+5|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`str2ull()`|180654 usecs
+6|ARL|ARL|`strtoull()`|121800 usecs
+7|ARL|ARL|`str2ull()`|62702 usecs
+
+So, compared to unoptimized code (test No 1: 1400ms), before ARL netdata was using test
+No **5** with hashing and a custom `str2ull()` to achieve 180ms.
+The current ARL implementation is test No **7** that needs only 63ms.
 
 ## Limitations
-Do not use this if the a name/keyword may appear more than once in the
-source data set.
+
+Do not use ARL if the a name/keyword may appear more than once in the
+source data. 
