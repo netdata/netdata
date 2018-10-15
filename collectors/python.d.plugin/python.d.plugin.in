@@ -38,9 +38,9 @@ PYTHON_MODULES_DIR = os.path.join(PLUGINS_DIR, 'python_modules')
 
 sys.path.append(PYTHON_MODULES_DIR)
 
-from bases.loaders import ModuleAndConfigLoader
-from bases.loggers import PythonDLogger
-from bases.collection import setdefault_values, run_and_exit
+from bases.loaders import ModuleAndConfigLoader  # noqa: E402
+from bases.loggers import PythonDLogger  # noqa: E402
+from bases.collection import setdefault_values, run_and_exit  # noqa: E402
 
 try:
     from collections import OrderedDict
