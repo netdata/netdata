@@ -2266,7 +2266,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ICMP Packets"
                             , "packets/s"
-                              "freebsd.plugin",
+                            , "freebsd.plugin"
                             , "net.inet.icmp.stats"
                             , 2602
                             , update_every

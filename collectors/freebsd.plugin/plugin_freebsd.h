@@ -3,7 +3,7 @@
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
-#include "../../daemon/common.h"
+#include "daemon/common.h"
 
 #if (TARGET_OS == OS_FREEBSD)
 
