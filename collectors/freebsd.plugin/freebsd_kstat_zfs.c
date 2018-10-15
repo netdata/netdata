@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_freebsd.h"
-#include "../linux-proc.plugin/zfs_common.h"
+#include "collectors/proc.plugin/zfs_common.h"
 
 extern struct arcstats arcstats;
 
