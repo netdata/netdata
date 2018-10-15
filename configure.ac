@@ -36,7 +36,7 @@ AC_SUBST([PACKAGE_RPM_RELEASE])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([build/m4])
-AC_CONFIG_SRCDIR([src/main.c])
+AC_CONFIG_SRCDIR([daemon/main.c])
 define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [
     define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
@@ -548,45 +548,65 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
-    charts.d/Makefile
-    conf.d/Makefile
     netdata.spec
-    python.d/Makefile
-    node.d/Makefile
-    plugins.d/Makefile
-    src/api/Makefile
-    src/backends/graphite/Makefile
-    src/backends/json/Makefile
-    src/backends/Makefile
-    src/backends/opentsdb/Makefile
-    src/backends/prometheus/Makefile
-    src/database/Makefile
-    src/health/Makefile
-    src/libnetdata/Makefile
-    src/Makefile
-    src/plugins/apps.plugin/Makefile
-    src/plugins/checks.plugin/Makefile
-    src/plugins/freebsd.plugin/Makefile
-    src/plugins/idlejitter.plugin/Makefile
-    src/plugins/linux-cgroups.plugin/Makefile
-    src/plugins/linux-diskspace.plugin/Makefile
-    src/plugins/linux-freeipmi.plugin/Makefile
-    src/plugins/linux-nfacct.plugin/Makefile
-    src/plugins/linux-proc.plugin/Makefile
-    src/plugins/linux-tc.plugin/Makefile
-    src/plugins/macos.plugin/Makefile
-    src/plugins/Makefile
-    src/plugins/plugins.d.plugin/Makefile
-    src/plugins/statsd.plugin/Makefile
-    src/registry/Makefile
-    src/streaming/Makefile
-    src/webserver/Makefile
-    system/Makefile
-    web/Makefile
-    diagrams/Makefile
-    makeself/Makefile
+    backends/graphite/Makefile
+    backends/json/Makefile
+    backends/Makefile
+    backends/opentsdb/Makefile
+    backends/prometheus/Makefile
+    collectors/Makefile
+    collectors/apps.plugin/Makefile
+    collectors/cgroups.plugin/Makefile
+    collectors/charts.d.plugin/Makefile
+    collectors/checks.plugin/Makefile
+    collectors/diskspace.plugin/Makefile
+    collectors/fping.plugin/Makefile
+    collectors/freebsd.plugin/Makefile
+    collectors/freeipmi.plugin/Makefile
+    collectors/idlejitter.plugin/Makefile
+    collectors/macos.plugin/Makefile
+    collectors/nfacct.plugin/Makefile
+    collectors/node.d.plugin/Makefile
+    collectors/plugins.d/Makefile
+    collectors/proc.plugin/Makefile
+    collectors/python.d.plugin/Makefile
+    collectors/statsd.plugin/Makefile
+    collectors/tc.plugin/Makefile
     contrib/Makefile
+    daemon/Makefile
+    database/Makefile
+    diagrams/Makefile
+    health/Makefile
+    libnetdata/Makefile
+    libnetdata/adaptive_resortable_list/Makefile
+    libnetdata/avl/Makefile
+    libnetdata/buffer/Makefile
+    libnetdata/clocks/Makefile
+    libnetdata/config/Makefile
+    libnetdata/dictionary/Makefile
+    libnetdata/eval/Makefile
+    libnetdata/locks/Makefile
+    libnetdata/log/Makefile
+    libnetdata/popen/Makefile
+    libnetdata/procfile/Makefile
+    libnetdata/simple_pattern/Makefile
+    libnetdata/socket/Makefile
+    libnetdata/statistical/Makefile
+    libnetdata/storage_number/Makefile
+    libnetdata/threads/Makefile
+    libnetdata/url/Makefile
+    makeself/Makefile
+    registry/Makefile
+    streaming/Makefile
+    system/Makefile
     tests/Makefile
+    web/Makefile
+    web/api/Makefile
+    web/gui/Makefile
+    web/server/Makefile
+    web/server/single/Makefile
+    web/server/multi/Makefile
+    web/server/static/Makefile
 ])
 AC_OUTPUT
 

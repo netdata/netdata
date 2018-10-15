@@ -1,15 +1,15 @@
 ---
 exclude_paths:
-  - python.d/python_modules/pyyaml2/**
-  - python.d/python_modules/pyyaml3/**
-  - python.d/python_modules/urllib3/**
-  - python.d/python_modules/lm_sensors.py
+  - collectors/python.d.plugin/python_modules/pyyaml2/**
+  - collectors/python.d.plugin/python_modules/pyyaml3/**
+  - collectors/python.d.plugin/python_modules/urllib3/**
+  - collectors/python.d.plugin/python_modules/lm_sensors.py
   - web/css/**
   - web/lib/**
   - web/old/**
-  - node.d/node_modules/lib/**
-  - node.d/node_modules/asn1-ber.js
-  - node.d/node_modules/net-snmp.js
-  - node.d/node_modules/pixl-xml.js
-  - node.d/node_modules/extend.js
+  - collectors/node.d.plugin/node_modules/lib/**
+  - collectors/node.d.plugin/node_modules/asn1-ber.js
+  - collectors/node.d.plugin/node_modules/net-snmp.js
+  - collectors/node.d.plugin/node_modules/pixl-xml.js
+  - collectors/node.d.plugin/node_modules/extend.js
   - tests/**

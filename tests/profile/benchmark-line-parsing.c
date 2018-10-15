@@ -383,9 +383,15 @@ struct base {
 };
 
 static inline void callback(void *data1, void *data2) {
-  char *string = data1;
-  unsigned long long *value = data2;
-  *value = fast_strtoull(string);
+    char *string = data1;
+    unsigned long long *value = data2;
+    *value = fast_strtoull(string);
+}
+
+static inline void callback_system_strtoull(void *data1, void *data2) {
+    char *string = data1;
+    unsigned long long *value = data2;
+    *value = strtoull(string, NULL, 10);
 }
 
 
@@ -415,7 +421,7 @@ static inline struct base *entry(struct base *base, const char *name, void *data
 static inline int check(struct base *base, const char *s) {
   uint32_t hash = simple_hash2(s);
 
-  if(likely(hash == base->last->hash && !strcmp(s, base->last->name))) {
+  if(likely(!strcmp(s, base->last->name))) {
     base->last->found = 1;
     base->found++;
     if(base->last->func) base->last->func(base->last->data1, base->last->data2);
@@ -514,17 +520,17 @@ void test6() {
   static struct base *base = NULL;
 
   if(unlikely(!base)) {
-    base = entry(base, "cache", NUMBER1, &values6[0], callback);
-    base = entry(base, "rss", NUMBER2, &values6[1], callback);
-    base = entry(base, "rss_huge", NUMBER3, &values6[2], callback);
-    base = entry(base, "mapped_file", NUMBER4, &values6[3], callback);
-    base = entry(base, "writeback", NUMBER5, &values6[4], callback);
-    base = entry(base, "dirty", NUMBER6, &values6[5], callback);
-    base = entry(base, "swap", NUMBER7, &values6[6], callback);
-    base = entry(base, "pgpgin", NUMBER8, &values6[7], callback);
-    base = entry(base, "pgpgout", NUMBER9, &values6[8], callback);
-    base = entry(base, "pgfault", NUMBER10, &values6[9], callback);
-    base = entry(base, "pgmajfault", NUMBER11, &values6[10], callback);
+    base = entry(base, "cache", NUMBER1, &values6[0], callback_system_strtoull);
+    base = entry(base, "rss", NUMBER2, &values6[1], callback_system_strtoull);
+    base = entry(base, "rss_huge", NUMBER3, &values6[2], callback_system_strtoull);
+    base = entry(base, "mapped_file", NUMBER4, &values6[3], callback_system_strtoull);
+    base = entry(base, "writeback", NUMBER5, &values6[4], callback_system_strtoull);
+    base = entry(base, "dirty", NUMBER6, &values6[5], callback_system_strtoull);
+    base = entry(base, "swap", NUMBER7, &values6[6], callback_system_strtoull);
+    base = entry(base, "pgpgin", NUMBER8, &values6[7], callback_system_strtoull);
+    base = entry(base, "pgpgout", NUMBER9, &values6[8], callback_system_strtoull);
+    base = entry(base, "pgfault", NUMBER10, &values6[9], callback_system_strtoull);
+    base = entry(base, "pgmajfault", NUMBER11, &values6[10], callback_system_strtoull);
   }
 
   begin(base);
@@ -534,6 +540,33 @@ void test6() {
     if(check(base, strings[i]))
       break;
   }
+}
+
+void test7() {
+
+    static struct base *base = NULL;
+
+    if(unlikely(!base)) {
+        base = entry(base, "cache", NUMBER1, &values6[0], callback);
+        base = entry(base, "rss", NUMBER2, &values6[1], callback);
+        base = entry(base, "rss_huge", NUMBER3, &values6[2], callback);
+        base = entry(base, "mapped_file", NUMBER4, &values6[3], callback);
+        base = entry(base, "writeback", NUMBER5, &values6[4], callback);
+        base = entry(base, "dirty", NUMBER6, &values6[5], callback);
+        base = entry(base, "swap", NUMBER7, &values6[6], callback);
+        base = entry(base, "pgpgin", NUMBER8, &values6[7], callback);
+        base = entry(base, "pgpgout", NUMBER9, &values6[8], callback);
+        base = entry(base, "pgfault", NUMBER10, &values6[9], callback);
+        base = entry(base, "pgmajfault", NUMBER11, &values6[10], callback);
+    }
+
+    begin(base);
+
+    int i;
+    for(i = 0; strings[i] ; i++) {
+        if(check(base, strings[i]))
+            break;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -615,8 +648,13 @@ void main(void)
     (void)strcmp("1", "2");
     (void)strtoull("123", NULL, 0);
 
-  unsigned long i, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0;
-  unsigned long max = 200000;
+  unsigned long i, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0, c7;
+  unsigned long max = 1000000;
+
+  // let the processor get up to speed
+  begin_clock();
+  for(i = 0; i <= max ;i++) test1();
+  c1 = end_clock();
 
   begin_clock();
   for(i = 0; i <= max ;i++) test1();
@@ -638,26 +676,32 @@ void main(void)
   for(i = 0; i <= max ;i++) test5();
   c5 = end_clock();
 
-  begin_clock();
-  for(i = 0; i <= max ;i++) test6();
-  c6 = end_clock();
+    begin_clock();
+    for(i = 0; i <= max ;i++) test6();
+    c6 = end_clock();
 
-  for(i = 0; i < 11 ; i++)
+    begin_clock();
+    for(i = 0; i <= max ;i++) test7();
+    c7 = end_clock();
+
+    for(i = 0; i < 11 ; i++)
     printf("value %lu: %llu %llu %llu %llu %llu %llu\n", i, values1[i], values2[i], values3[i], values4[i], values5[i], values6[i]);
   
   printf("\n\nRESULTS\n");
-  printf("test1() in %lu usecs: simple system strcmp().\n"
-         "test2() in %lu usecs: inline simple_hash() with system strtoull().\n"
+  printf("test1() in %lu usecs: if-else-if-else-if, simple strcmp() with system strtoull().\n"
+         "test2() in %lu usecs: inline simple_hash() if-else-if-else-if, with system strtoull().\n"
          "test3() in %lu usecs: statement expression simple_hash(), system strtoull().\n"
-         "test4() in %lu usecs: inline simple_hash(), if-continue checks.\n"
-         "test5() in %lu usecs: inline simple_hash(), if-else-if-else-if (netdata default).\n"
-         "test6() in %lu usecs: adaptive re-sortable array (wow!)\n"
+         "test4() in %lu usecs: inline simple_hash(), if-continue checks, system strtoull().\n"
+         "test5() in %lu usecs: inline simple_hash(), if-else-if-else-if, custom strtoull() (netdata default prior to ARL).\n"
+         "test6() in %lu usecs: adaptive re-sortable list, system strtoull() (wow!)\n"
+         "test7() in %lu usecs: adaptive re-sortable list, custom strtoull() (wow!)\n"
          , c1
          , c2
          , c3
          , c4
          , c5
          , c6
+         , c7
          );
 
 }
