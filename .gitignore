@@ -67,12 +67,12 @@ TODO.md
 netdata.conf
 TODO.txt
 
-webserver/gui/chart-info/
-webserver/gui/control.html
-webserver/gui/datasource.css
-webserver/gui/gadget.xml
-webserver/gui/index_new.html
-webserver/gui/version.txt
+web/gui/chart-info/
+web/gui/control.html
+web/gui/datasource.css
+web/gui/gadget.xml
+web/gui/index_new.html
+web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/

@@ -336,19 +336,19 @@ set(RRD_PLUGIN_FILES
         )
 
 set(WEB_PLUGIN_FILES
-        webserver/web_client.c
-        webserver/web_client.h
-        webserver/web_server.c
-        webserver/web_server.h
+        web/server/web_client.c
+        web/server/web_client.h
+        web/server/web_server.c
+        web/server/web_server.h
         )
 
 set(API_PLUGIN_FILES
-        webserver/api/rrd2json.c
-        webserver/api/rrd2json.h
-        webserver/api/web_api_v1.c
-        webserver/api/web_api_v1.h
-        webserver/api/web_buffer_svg.c
-        webserver/api/web_buffer_svg.h
+        web/api/rrd2json.c
+        web/api/rrd2json.h
+        web/api/web_api_v1.c
+        web/api/web_api_v1.h
+        web/api/web_buffer_svg.c
+        web/api/web_buffer_svg.h
         )
 
 set(STREAMING_PLUGIN_FILES

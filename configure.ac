@@ -554,8 +554,28 @@ AC_CONFIG_FILES([
     backends/Makefile
     backends/opentsdb/Makefile
     backends/prometheus/Makefile
+    collectors/Makefile
+    collectors/apps.plugin/Makefile
+    collectors/cgroups.plugin/Makefile
+    collectors/charts.d.plugin/Makefile
+    collectors/checks.plugin/Makefile
+    collectors/diskspace.plugin/Makefile
+    collectors/fping.plugin/Makefile
+    collectors/freebsd.plugin/Makefile
+    collectors/freeipmi.plugin/Makefile
+    collectors/idlejitter.plugin/Makefile
+    collectors/macos.plugin/Makefile
+    collectors/nfacct.plugin/Makefile
+    collectors/node.d.plugin/Makefile
+    collectors/plugins.d/Makefile
+    collectors/proc.plugin/Makefile
+    collectors/python.d.plugin/Makefile
+    collectors/statsd.plugin/Makefile
+    collectors/tc.plugin/Makefile
+    contrib/Makefile
     daemon/Makefile
     database/Makefile
+    diagrams/Makefile
     health/Makefile
     libnetdata/Makefile
     libnetdata/adaptive_resortable_list/Makefile
@@ -575,34 +595,15 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
-    collectors/Makefile
-    collectors/apps.plugin/Makefile
-    collectors/cgroups.plugin/Makefile
-    collectors/charts.d.plugin/Makefile
-    collectors/checks.plugin/Makefile
-    collectors/diskspace.plugin/Makefile
-    collectors/fping.plugin/Makefile
-    collectors/freebsd.plugin/Makefile
-    collectors/freeipmi.plugin/Makefile
-    collectors/idlejitter.plugin/Makefile
-    collectors/macos.plugin/Makefile
-    collectors/nfacct.plugin/Makefile
-    collectors/node.d.plugin/Makefile
-    collectors/plugins.d/Makefile
-    collectors/proc.plugin/Makefile
-    collectors/python.d.plugin/Makefile
-    collectors/statsd.plugin/Makefile
-    collectors/tc.plugin/Makefile
+    makeself/Makefile
     registry/Makefile
     streaming/Makefile
-    webserver/Makefile
-    webserver/gui/Makefile
-    webserver/api/Makefile
     system/Makefile
-    diagrams/Makefile
-    makeself/Makefile
-    contrib/Makefile
     tests/Makefile
+    web/Makefile
+    web/api/Makefile
+    web/gui/Makefile
+    web/server/Makefile
 ])
 AC_OUTPUT
 

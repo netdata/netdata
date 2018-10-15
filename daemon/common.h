@@ -11,29 +11,29 @@
 #include "global_statistics.h"
 
 // the netdata database
-#include "../database/rrd.h"
+#include "database/rrd.h"
 
 // the netdata webserver(s)
-#include "../webserver/web_server.h"
+#include "web/server/web_server.h"
 
 // streaming metrics between netdata servers
-#include "../streaming/rrdpush.h"
+#include "streaming/rrdpush.h"
 
 // health monitoring and alarm notifications
-#include "../health/health.h"
+#include "health/health.h"
 
 // the netdata registry
 // the registry is actually an API feature
-#include "../registry/registry.h"
+#include "registry/registry.h"
 
 // backends for archiving the metrics
-#include "../backends/backends.h"
+#include "backends/backends.h"
 
 // the netdata API
-#include "../webserver/api/web_api_v1.h"
+#include "web/api/web_api_v1.h"
 
 // all data collection plugins
-#include "../collectors/all.h"
+#include "collectors/all.h"
 
 // netdata unit tests
 #include "unit_test.h"

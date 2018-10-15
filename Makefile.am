@@ -75,14 +75,14 @@ dist_noinst_SCRIPTS= \
 # Compile netdata binaries
 
 SUBDIRS += \
-    collectors \
     backends \
+    collectors \
     database \
     health \
     libnetdata \
     registry \
     streaming \
-    webserver \
+    web \
 	$(NULL)
 
 
@@ -280,12 +280,12 @@ RRD_PLUGIN_FILES = \
     $(NULL)
 
 API_PLUGIN_FILES = \
-    webserver/api/rrd2json.c \
-    webserver/api/rrd2json.h \
-    webserver/api/web_api_v1.c \
-    webserver/api/web_api_v1.h \
-    webserver/api/web_buffer_svg.c \
-    webserver/api/web_buffer_svg.h \
+    web/api/rrd2json.c \
+    web/api/rrd2json.h \
+    web/api/web_api_v1.c \
+    web/api/web_api_v1.h \
+    web/api/web_buffer_svg.c \
+    web/api/web_buffer_svg.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
@@ -314,11 +314,11 @@ STATSD_PLUGIN_FILES = \
 	collectors/statsd.plugin/statsd.h \
     $(NULL)
 
-WEB_PLGUGIN_FILES = \
-    webserver/web_client.c \
-    webserver/web_client.h \
-    webserver/web_server.c \
-    webserver/web_server.h \
+WEB_PLUGIN_FILES = \
+    web/server/web_client.c \
+    web/server/web_client.h \
+    web/server/web_server.c \
+    web/server/web_server.h \
     $(NULL)
 
 BACKENDS_PLUGIN_FILES = \
@@ -332,13 +332,6 @@ BACKENDS_PLUGIN_FILES = \
     backends/opentsdb/opentsdb.h \
     backends/prometheus/backend_prometheus.c \
     backends/prometheus/backend_prometheus.h \
-    $(NULL)
-
-WEB_PLUGIN_FILES = \
-    webserver/web_client.c \
-    webserver/web_client.h \
-    webserver/web_server.c \
-    webserver/web_server.h \
     $(NULL)
 
 DAEMON_FILES = \

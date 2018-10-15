@@ -3,7 +3,7 @@
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 #ifdef NETDATA_WITH_ZLIB
 extern int web_enable_gzip,
@@ -191,6 +191,6 @@ extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
 extern int mysendfile(struct web_client *w, char *filename);
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 
 #endif

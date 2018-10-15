@@ -173,9 +173,6 @@ For the plugins, you will at least need:
 USAGE
 }
 
-# shellcheck disable=SC2230
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-
 while [ ! -z "${1}" ]
 do
     if [ "$1" = "--install" ]
@@ -502,6 +499,10 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 fi
 
 # -----------------------------------------------------------------------------
+
+# shellcheck disable=SC2230
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+
 deleted_stock_configs=0
 if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then

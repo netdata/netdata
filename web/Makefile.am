@@ -6,6 +6,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 SUBDIRS = \
     api \
     gui \
+    server \
     $(NULL)
 
 dist_noinst_DATA = \

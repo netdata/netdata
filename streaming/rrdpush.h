@@ -3,8 +3,8 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "webserver/web_client.h"
-#include "../daemon/common.h"
+#include "web/server/web_client.h"
+#include "daemon/common.h"
 
 extern unsigned int default_rrdpush_enabled;
 extern char *default_rrdpush_destination;

@@ -4,6 +4,10 @@
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
+dist_noinst_DATA = \
+	README.md \
+	$(NULL)
+
 dist_web_DATA = \
 	demo.html \
 	demo2.html \
