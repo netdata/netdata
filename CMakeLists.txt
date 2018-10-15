@@ -139,250 +139,254 @@ ENDIF(LINUX)
 # netdata files
 
 set(LIBNETDATA_FILES
-        src/libnetdata/adaptive_resortable_list.c
-        src/libnetdata/adaptive_resortable_list.h
-        src/libnetdata/appconfig.c
-        src/libnetdata/appconfig.h
-        src/libnetdata/avl.c
-        src/libnetdata/avl.h
-        src/libnetdata/clocks.c
-        src/libnetdata/clocks.h
-        src/libnetdata/common.c
-        src/libnetdata/dictionary.c
-        src/libnetdata/dictionary.h
-        src/libnetdata/eval.c
-        src/libnetdata/eval.h
-        src/libnetdata/inlined.h
-        src/libnetdata/libnetdata.h
-        src/libnetdata/locks.c
-        src/libnetdata/locks.h
-        src/libnetdata/log.c
-        src/libnetdata/log.h
-        src/libnetdata/os.c
-        src/libnetdata/os.h
-        src/libnetdata/popen.c
-        src/libnetdata/popen.h
-        src/libnetdata/procfile.c
-        src/libnetdata/procfile.h
-        src/libnetdata/simple_pattern.c
-        src/libnetdata/simple_pattern.h
-        src/libnetdata/socket.c
-        src/libnetdata/socket.h
-        src/libnetdata/statistical.c
-        src/libnetdata/statistical.h
-        src/libnetdata/storage_number.c
-        src/libnetdata/storage_number.h
-        src/libnetdata/threads.c
-        src/libnetdata/threads.h
-        src/libnetdata/web_buffer.c
-        src/libnetdata/web_buffer.h
-        src/libnetdata/url.c
-        src/libnetdata/url.h
+        libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
+        libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
+        libnetdata/config/appconfig.c
+        libnetdata/config/appconfig.h
+        libnetdata/avl/avl.c
+        libnetdata/avl/avl.h
+        libnetdata/buffer/buffer.c
+        libnetdata/buffer/buffer.h
+        libnetdata/clocks/clocks.c
+        libnetdata/clocks/clocks.h
+        libnetdata/dictionary/dictionary.c
+        libnetdata/dictionary/dictionary.h
+        libnetdata/eval/eval.c
+        libnetdata/eval/eval.h
+        libnetdata/inlined.h
+        libnetdata/libnetdata.c
+        libnetdata/libnetdata.h
+        libnetdata/locks/locks.c
+        libnetdata/locks/locks.h
+        libnetdata/log/log.c
+        libnetdata/log/log.h
+        libnetdata/os.c
+        libnetdata/os.h
+        libnetdata/popen/popen.c
+        libnetdata/popen/popen.h
+        libnetdata/procfile/procfile.c
+        libnetdata/procfile/procfile.h
+        libnetdata/simple_pattern/simple_pattern.c
+        libnetdata/simple_pattern/simple_pattern.h
+        libnetdata/socket/socket.c
+        libnetdata/socket/socket.h
+        libnetdata/statistical/statistical.c
+        libnetdata/statistical/statistical.h
+        libnetdata/storage_number/storage_number.c
+        libnetdata/storage_number/storage_number.h
+        libnetdata/threads/threads.c
+        libnetdata/threads/threads.h
+        libnetdata/url/url.c
+        libnetdata/url/url.h
         )
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
-        src/plugins/apps.plugin/apps_plugin.c
+        collectors/apps.plugin/apps_plugin.c
         )
 
 set(CHECKS_PLUGIN_FILES
-        src/plugins/checks.plugin/plugin_checks.c
-        src/plugins/checks.plugin/plugin_checks.h
+        collectors/checks.plugin/plugin_checks.c
+        collectors/checks.plugin/plugin_checks.h
         )
 
 set(FREEBSD_PLUGIN_FILES
-        src/plugins/freebsd.plugin/plugin_freebsd.c
-        src/plugins/freebsd.plugin/plugin_freebsd.h
-        src/plugins/freebsd.plugin/freebsd_sysctl.c
-        src/plugins/freebsd.plugin/freebsd_getmntinfo.c
-        src/plugins/freebsd.plugin/freebsd_getifaddrs.c
-        src/plugins/freebsd.plugin/freebsd_devstat.c
-        src/plugins/freebsd.plugin/freebsd_kstat_zfs.c
-        src/plugins/freebsd.plugin/freebsd_ipfw.c
-        src/plugins/linux-proc.plugin/zfs_common.c
-        src/plugins/linux-proc.plugin/zfs_common.h
+        collectors/freebsd.plugin/plugin_freebsd.c
+        collectors/freebsd.plugin/plugin_freebsd.h
+        collectors/freebsd.plugin/freebsd_sysctl.c
+        collectors/freebsd.plugin/freebsd_getmntinfo.c
+        collectors/freebsd.plugin/freebsd_getifaddrs.c
+        collectors/freebsd.plugin/freebsd_devstat.c
+        collectors/freebsd.plugin/freebsd_kstat_zfs.c
+        collectors/freebsd.plugin/freebsd_ipfw.c
+        collectors/proc.plugin/zfs_common.c
+        collectors/proc.plugin/zfs_common.h
         )
 
 set(HEALTH_PLUGIN_FILES
-        src/health/health.c
-        src/health/health.h
-        src/health/health_config.c
-        src/health/health_json.c
-        src/health/health_log.c
+        health/health.c
+        health/health.h
+        health/health_config.c
+        health/health_json.c
+        health/health_log.c
         )
 
 set(IDLEJITTER_PLUGIN_FILES
-        src/plugins/idlejitter.plugin/plugin_idlejitter.c
-        src/plugins/idlejitter.plugin/plugin_idlejitter.h
+        collectors/idlejitter.plugin/plugin_idlejitter.c
+        collectors/idlejitter.plugin/plugin_idlejitter.h
         )
 
 set(CGROUPS_PLUGIN_FILES
-        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.c
-        src/plugins/linux-cgroups.plugin/sys_fs_cgroup.h
+        collectors/cgroups.plugin/sys_fs_cgroup.c
+        collectors/cgroups.plugin/sys_fs_cgroup.h
         )
 
 set(CGROUP_NETWORK_FILES
-        src/plugins/linux-cgroups.plugin/cgroup-network.c
+        collectors/cgroups.plugin/cgroup-network.c
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        src/plugins/linux-diskspace.plugin/plugin_diskspace.h
-        src/plugins/linux-diskspace.plugin/plugin_diskspace.c
+        collectors/diskspace.plugin/plugin_diskspace.h
+        collectors/diskspace.plugin/plugin_diskspace.c
         )
 
 set(FREEIPMI_PLUGIN_FILES
-        src/plugins/linux-freeipmi.plugin/freeipmi_plugin.c
+        collectors/freeipmi.plugin/freeipmi_plugin.c
         )
 
 set(NFACCT_PLUGIN_FILES
-        src/plugins/linux-nfacct.plugin/plugin_nfacct.c
-        src/plugins/linux-nfacct.plugin/plugin_nfacct.h
+        collectors/nfacct.plugin/plugin_nfacct.c
+        collectors/nfacct.plugin/plugin_nfacct.h
         )
 
 set(PROC_PLUGIN_FILES
-        src/plugins/linux-proc.plugin/ipc.c
-        src/plugins/linux-proc.plugin/plugin_proc.c
-        src/plugins/linux-proc.plugin/plugin_proc.h
-        src/plugins/linux-proc.plugin/proc_diskstats.c
-        src/plugins/linux-proc.plugin/proc_interrupts.c
-        src/plugins/linux-proc.plugin/proc_softirqs.c
-        src/plugins/linux-proc.plugin/proc_loadavg.c
-        src/plugins/linux-proc.plugin/proc_meminfo.c
-        src/plugins/linux-proc.plugin/proc_net_dev.c
-        src/plugins/linux-proc.plugin/proc_net_ip_vs_stats.c
-        src/plugins/linux-proc.plugin/proc_net_netstat.c
-        src/plugins/linux-proc.plugin/proc_net_rpc_nfs.c
-        src/plugins/linux-proc.plugin/proc_net_rpc_nfsd.c
-        src/plugins/linux-proc.plugin/proc_net_snmp.c
-        src/plugins/linux-proc.plugin/proc_net_snmp6.c
-        src/plugins/linux-proc.plugin/proc_net_sctp_snmp.c
-        src/plugins/linux-proc.plugin/proc_net_sockstat.c
-        src/plugins/linux-proc.plugin/proc_net_sockstat6.c
-        src/plugins/linux-proc.plugin/proc_net_softnet_stat.c
-        src/plugins/linux-proc.plugin/proc_net_stat_conntrack.c
-        src/plugins/linux-proc.plugin/proc_net_stat_synproxy.c
-        src/plugins/linux-proc.plugin/proc_self_mountinfo.c
-        src/plugins/linux-proc.plugin/proc_self_mountinfo.h
-        src/plugins/linux-proc.plugin/zfs_common.c
-        src/plugins/linux-proc.plugin/zfs_common.h
-        src/plugins/linux-proc.plugin/proc_spl_kstat_zfs.c
-        src/plugins/linux-proc.plugin/proc_stat.c
-        src/plugins/linux-proc.plugin/proc_sys_kernel_random_entropy_avail.c
-        src/plugins/linux-proc.plugin/proc_vmstat.c
-        src/plugins/linux-proc.plugin/proc_uptime.c
-        src/plugins/linux-proc.plugin/sys_kernel_mm_ksm.c
-        src/plugins/linux-proc.plugin/sys_devices_system_edac_mc.c
-        src/plugins/linux-proc.plugin/sys_devices_system_node.c
-        src/plugins/linux-proc.plugin/sys_fs_btrfs.c
+        collectors/proc.plugin/ipc.c
+        collectors/proc.plugin/plugin_proc.c
+        collectors/proc.plugin/plugin_proc.h
+        collectors/proc.plugin/proc_diskstats.c
+        collectors/proc.plugin/proc_interrupts.c
+        collectors/proc.plugin/proc_softirqs.c
+        collectors/proc.plugin/proc_loadavg.c
+        collectors/proc.plugin/proc_meminfo.c
+        collectors/proc.plugin/proc_net_dev.c
+        collectors/proc.plugin/proc_net_ip_vs_stats.c
+        collectors/proc.plugin/proc_net_netstat.c
+        collectors/proc.plugin/proc_net_rpc_nfs.c
+        collectors/proc.plugin/proc_net_rpc_nfsd.c
+        collectors/proc.plugin/proc_net_snmp.c
+        collectors/proc.plugin/proc_net_snmp6.c
+        collectors/proc.plugin/proc_net_sctp_snmp.c
+        collectors/proc.plugin/proc_net_sockstat.c
+        collectors/proc.plugin/proc_net_sockstat6.c
+        collectors/proc.plugin/proc_net_softnet_stat.c
+        collectors/proc.plugin/proc_net_stat_conntrack.c
+        collectors/proc.plugin/proc_net_stat_synproxy.c
+        collectors/proc.plugin/proc_self_mountinfo.c
+        collectors/proc.plugin/proc_self_mountinfo.h
+        collectors/proc.plugin/zfs_common.c
+        collectors/proc.plugin/zfs_common.h
+        collectors/proc.plugin/proc_spl_kstat_zfs.c
+        collectors/proc.plugin/proc_stat.c
+        collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        collectors/proc.plugin/proc_vmstat.c
+        collectors/proc.plugin/proc_uptime.c
+        collectors/proc.plugin/sys_kernel_mm_ksm.c
+        collectors/proc.plugin/sys_devices_system_edac_mc.c
+        collectors/proc.plugin/sys_devices_system_node.c
+        collectors/proc.plugin/sys_fs_btrfs.c
         )
 
 set(TC_PLUGIN_FILES
-        src/plugins/linux-tc.plugin/plugin_tc.c
-        src/plugins/linux-tc.plugin/plugin_tc.h
+        collectors/tc.plugin/plugin_tc.c
+        collectors/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
-        src/plugins/macos.plugin/plugin_macos.c
-        src/plugins/macos.plugin/plugin_macos.h
-        src/plugins/macos.plugin/macos_sysctl.c
-        src/plugins/macos.plugin/macos_mach_smi.c
-        src/plugins/macos.plugin/macos_fw.c
+        collectors/macos.plugin/plugin_macos.c
+        collectors/macos.plugin/plugin_macos.h
+        collectors/macos.plugin/macos_sysctl.c
+        collectors/macos.plugin/macos_mach_smi.c
+        collectors/macos.plugin/macos_fw.c
         )
 
 set(PLUGINSD_PLUGIN_FILES
-        src/plugins/plugins.d.plugin/plugins_d.c
-        src/plugins/plugins.d.plugin/plugins_d.h
+        collectors/plugins.d/plugins_d.c
+        collectors/plugins.d/plugins_d.h
         )
 
 set(REGISTRY_PLUGIN_FILES
-        src/registry/registry.c
-        src/registry/registry.h
-        src/registry/registry_db.c
-        src/registry/registry_init.c
-        src/registry/registry_internals.c
-        src/registry/registry_internals.h
-        src/registry/registry_log.c
-        src/registry/registry_machine.c
-        src/registry/registry_machine.h
-        src/registry/registry_person.c
-        src/registry/registry_person.h
-        src/registry/registry_url.c
-        src/registry/registry_url.h
+        registry/registry.c
+        registry/registry.h
+        registry/registry_db.c
+        registry/registry_init.c
+        registry/registry_internals.c
+        registry/registry_internals.h
+        registry/registry_log.c
+        registry/registry_machine.c
+        registry/registry_machine.h
+        registry/registry_person.c
+        registry/registry_person.h
+        registry/registry_url.c
+        registry/registry_url.h
         )
 
 set(STATSD_PLUGIN_FILES
-        src/plugins/statsd.plugin/statsd.c
-        src/plugins/statsd.plugin/statsd.h
+        collectors/statsd.plugin/statsd.c
+        collectors/statsd.plugin/statsd.h
         )
 
 set(RRD_PLUGIN_FILES
-        src/database/rrdcalc.c
-        src/database/rrdcalc.h
-        src/database/rrdcalctemplate.c
-        src/database/rrdcalctemplate.h
-        src/database/rrddim.c
-        src/database/rrddimvar.c
-        src/database/rrddimvar.h
-        src/database/rrdfamily.c
-        src/database/rrdhost.c
-        src/database/rrd.c
-        src/database/rrd.h
-        src/database/rrdset.c
-        src/database/rrdsetvar.c
-        src/database/rrdsetvar.h
-        src/database/rrdvar.c
-        src/database/rrdvar.h
+        database/rrdcalc.c
+        database/rrdcalc.h
+        database/rrdcalctemplate.c
+        database/rrdcalctemplate.h
+        database/rrddim.c
+        database/rrddimvar.c
+        database/rrddimvar.h
+        database/rrdfamily.c
+        database/rrdhost.c
+        database/rrd.c
+        database/rrd.h
+        database/rrdset.c
+        database/rrdsetvar.c
+        database/rrdsetvar.h
+        database/rrdvar.c
+        database/rrdvar.h
         )
 
 set(WEB_PLUGIN_FILES
-        src/webserver/web_client.c
-        src/webserver/web_client.h
-        src/webserver/web_server.c
-        src/webserver/web_server.h
-        )
+        web/server/web_client.c
+        web/server/web_client.h
+        web/server/web_server.c
+        web/server/web_server.h
+        web/server/single/single-threaded.c web/server/single/single-threaded.h web/server/multi/multi-threaded.c web/server/multi/multi-threaded.h web/server/static/static-threaded.c web/server/static/static-threaded.h web/server/web_client_cache.c web/server/web_client_cache.h)
 
 set(API_PLUGIN_FILES
-        src/api/rrd2json.c
-        src/api/rrd2json.h
-        src/api/web_api_v1.c
-        src/api/web_api_v1.h
-        src/api/web_buffer_svg.c
-        src/api/web_buffer_svg.h
+        web/api/rrd2json.c
+        web/api/rrd2json.h
+        web/api/web_api_v1.c
+        web/api/web_api_v1.h
+        web/api/web_buffer_svg.c
+        web/api/web_buffer_svg.h
         )
 
 set(STREAMING_PLUGIN_FILES
-        src/streaming/rrdpush.c
-        src/streaming/rrdpush.h
+        streaming/rrdpush.c
+        streaming/rrdpush.h
         )
 
 set(BACKENDS_PLUGIN_FILES
-        src/backends/backends.c
-        src/backends/backends.h
-        src/backends/graphite/graphite.c
-        src/backends/graphite/graphite.h
-        src/backends/json/json.c
-        src/backends/json/json.h
-        src/backends/opentsdb/opentsdb.c
-        src/backends/opentsdb/opentsdb.h
-        src/backends/prometheus/backend_prometheus.c
-        src/backends/prometheus/backend_prometheus.h
+        backends/backends.c
+        backends/backends.h
+        backends/graphite/graphite.c
+        backends/graphite/graphite.h
+        backends/json/json.c
+        backends/json/json.h
+        backends/opentsdb/opentsdb.c
+        backends/opentsdb/opentsdb.h
+        backends/prometheus/backend_prometheus.c
+        backends/prometheus/backend_prometheus.h
+        )
+
+set(DAEMON_FILES
+        daemon/common.c
+        daemon/common.h
+        daemon/daemon.c
+        daemon/daemon.h
+        daemon/global_statistics.c
+        daemon/global_statistics.h
+        daemon/main.c
+        daemon/main.h
+        daemon/signals.c
+        daemon/signals.h
+        daemon/unit_test.c
+        daemon/unit_test.h
         )
 
 set(NETDATA_FILES
-        src/plugins/all.h
-        src/common.c
-        src/common.h
-        src/daemon.c
-        src/daemon.h
-        src/global_statistics.c
-        src/global_statistics.h
-        src/main.c
-        src/main.h
-        src/signals.c
-        src/signals.h
-        src/unit_test.c
-        src/unit_test.h
+        collectors/all.h
+        ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
         ${CHECKS_PLUGIN_FILES}

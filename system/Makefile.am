@@ -4,6 +4,7 @@
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
+    edit-config \
 	netdata-openrc \
 	netdata.logrotate \
 	netdata.service \
@@ -14,10 +15,14 @@ CLEANFILES = \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
-
 SUFFIXES = .in
 
+dist_config_SCRIPTS = \
+    edit-config \
+    $(NULL)
+
 nodist_noinst_DATA = \
+    edit-config.in \
 	netdata-openrc \
 	netdata.logrotate \
 	netdata.service \

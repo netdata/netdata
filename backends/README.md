@@ -1,0 +1,137 @@
+
+netdata supports backends for archiving the metrics, or providing long term dashboards, using grafana or other tools, like this:
+
+![image](https://cloud.githubusercontent.com/assets/2662304/20649711/29f182ba-b4ce-11e6-97c8-ab2c0ab59833.png)
+
+Since netdata collects thousands of metrics per server per second, which would easily congest any backend server when several netdata servers are sending data to it, netdata allows sending metrics at a lower frequency. So, although netdata collects metrics every second, it can send to the backend servers averages or sums every X seconds (though, it can send them per second if you need it to).
+
+## features
+
+1. Supported backends
+
+   1. **graphite** (`plaintext interface`, used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**, **ElasticSearch** via logstash tcp input and the graphite codec, etc)
+
+      metrics are sent to the backend server as `prefix.hostname.chart.dimension`. `prefix` is configured below, `hostname` is the hostname of the machine (can also be configured).
+
+   2. **opentsdb** (`telnet interface`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
+
+      metrics are sent to opentsdb as `prefix.chart.dimension` with tag `host=hostname`.
+
+   3. **json** document DBs
+
+      metrics are sent to a document db, `JSON` formatted.
+
+   4. **prometheus** is described at [prometheus page](prometheus/) since it pulls data from netdata.
+
+2. Only one backend may be active at a time.
+
+3. All metrics are transferred to the backend - netdata does not implement any metric filtering.
+
+4. Three modes of operation (for all backends):
+
+   1. `as collected`: the latest collected value is sent to the backend. This means that if netdata is configured to send data to the backend every 10 seconds, only 1 out of 10 values will appear at the backend server. The values are sent exactly as collected, before any multipliers or dividers applied and before any interpolation. This mode emulates other data collectors, such as `collectd`.
+
+   2. `average`: the average of the interpolated values shown on the netdata graphs is sent to the backend. So, if netdata is configured to send data to the backend server every 10 seconds, the average of the 10 values shown on the netdata charts will be used. **If you can't decide which mode to use, use `average`.**
+
+   3. `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to the backend. So, if netdata is configured to send data to the backend every 10 seconds, the sum of the 10 values shown on the netdata charts will be used.
+
+5. This code is smart enough, not to slow down netdata, independently of the speed of the backend server.
+
+## configuration
+
+In `/etc/netdata/netdata.conf` you should have something like this (if not download the latest version of `netdata.conf` from your netdata):
+
+```
+[backend]
+	enabled = yes | no
+	type = graphite | opentsdb | json
+        host tags = list of TAG=VALUE
+	destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used
+	data source = average | sum | as collected
+	prefix = netdata
+	hostname = my-name
+	update every = 10
+	buffer on failures = 10
+	timeout ms = 20000
+        send charts matching = *
+        send hosts matching = localhost *
+        send names instead of ids = yes
+```
+
+- `enabled = yes | no`, enables or disables sending data to a backend
+
+- `type = graphite | opentsdb | json`, selects the backend type
+
+- `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the **first available** to send the metrics.
+
+   The format of each item in this list, is: `[PROTOCOL:]IP[:PORT]`.
+
+   `PROTOCOL` can be `udp` or `tcp`. `tcp` is the default and only supported by the current backends.
+
+   `IP` can be `XX.XX.XX.XX` (IPv4), or `[XX:XX...XX:XX]` (IPv6). For IPv6 you can to enclose the IP in `[]` to separate it from the port.
+
+   `PORT` can be a number of a service name. If omitted, the default port for the backend will be used (graphite = 2003, opentsdb = 4242).
+
+   Example IPv4:
+
+```
+   destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+```
+
+   Example IPv6 and IPv4 together:
+   
+```
+   destination = [ffff:...:0001]:2003 10.11.12.1:2003
+```
+
+   When multiple servers are defined, netdata will try the next one when the first one fails. This allows you to load-balance different servers: give your backend servers in different order on each netdata.
+
+   netdata also ships [`nc-backend.sh`](https://github.com/netdata/netdata/blob/master/contrib/nc-backend.sh), a script that can be used as a fallback backend to save the metrics to disk and push them to the time-series database when it becomes available again. It can also be used to monitor / trace / debug the metrics netdata generates.
+
+- `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of data that will be sent to the backend.
+
+- `hostname = my-name`, is the hostname to be used for sending data to the backend server. By default this is `[global].hostname`.
+
+- `prefix = netdata`, is the prefix to add to all metrics.
+
+- `update every = 10`, is the number of seconds between sending data to the backend. netdata will add some randomness to this number, to prevent stressing the backend server when many netdata servers send data to the same backend. This randomness does not affect the quality of the data, only the time they are sent.
+
+- `buffer on failures = 10`, is the number of iterations (each iteration is `[backend].update every` seconds) to buffer data, when the backend is not available. If the backend fails to receive the data after that many failures, data loss on the backend is expected (netdata will also log it).
+
+- `timeout ms = 20000`, is the timeout in milliseconds to wait for the backend server to process the data. By default this is `2 * update_every * 1000`.
+
+- `send hosts matching = localhost *` includes one or more space separated patterns, using ` * ` as wildcard (any number of times within each pattern). The patterns are checked against the hostname (the localhost is always checked as `localhost`), allowing us to filter which hosts will be sent to the backend when this netdata is a central netdata aggregating multiple hosts. A pattern starting with ` ! ` gives a negative match. So to match all hosts named `*db*` except hosts containing `*slave*`, use `!*slave* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
+
+- `send charts matching = *` includes one or more space separated patterns, using ` * ` as wildcard (any number of times within each pattern). The patterns are checked against both chart id and chart name. A pattern starting with ` ! ` gives a negative match. So to match all charts named `apps.*` except charts ending in `*reads`, use `!*reads apps.*` (so, the order is important: the first pattern matching the chart id or the chart name will be used - positive or negative).
+
+- `send names instead of ids = yes | no` controls the metric names netdata should send to backend. netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+
+- `host tags = list of TAG=VALUE` defines tags that should be appended on all metrics for the given host. These are currently only sent to opentsdb and prometheus. Please use the appropriate format for each time-series db. For example opentsdb likes them like `TAG1=VALUE1 TAG2=VALUE2`, but prometheus like `tag1="value1",tag2="value2"`. Host tags are mirrored with database replication (streaming of metrics between netdata servers).
+
+## monitoring operation
+
+netdata provides 5 charts:
+
+1. **Buffered metrics**, the number of metrics netdata added to the buffer for dispatching them to the backend server.
+2. **Buffered data size**, the amount of data (in KB) netdata added the buffer.
+3. ~~**Backend latency**, the time the backend server needed to process the data netdata sent. If there was a re-connection involved, this includes the connection time.~~ (this chart has been removed, because it only measures the time netdata needs to give the data to the O/S - since the backend servers do not ack the reception, netdata does not have any means to measure this properly)
+4. **Backend operations**, the number of operations performed by netdata.
+5. **Backend thread CPU usage**, the CPU resources consumed by the netdata thread, that is responsible for sending the metrics to the backend server.
+
+![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
+
+## alarms
+
+The latest version of the alarms configuration for monitoring the backend is here: https://github.com/netdata/netdata/blob/master/conf.d/health.d/backend.conf
+
+netdata adds 4 alarms:
+
+1. `backend_last_buffering`, number of seconds since the last successful buffering of backend data
+2. `backend_metrics_sent`, percentage of metrics sent to the backend server
+3. `backend_metrics_lost`, number of metrics lost due to repeating failures to contact the backend server
+4. ~~`backend_slow`, the percentage of time between iterations needed by the backend time to process the data sent by netdata~~ (this was misleading and has been removed).
+
+![image](https://cloud.githubusercontent.com/assets/2662304/20463779/a46ed1c2-af43-11e6-91a5-07ca4533cac3.png)
+
+## InfluxDB setup as netdata backend (example)
+You can find blog post with example: how to use InfluxDB with netdata [here](https://blog.hda.me/2017/01/09/using-netdata-with-influxdb-backend.html)  
