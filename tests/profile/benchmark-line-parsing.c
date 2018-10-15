@@ -649,7 +649,7 @@ void main(void)
     (void)strtoull("123", NULL, 0);
 
   unsigned long i, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0, c7;
-  unsigned long max = 300000;
+  unsigned long max = 1000000;
 
   // let the processor get up to speed
   begin_clock();

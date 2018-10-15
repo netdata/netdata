@@ -64,23 +64,24 @@ When all expectations are satisfied (even in the middle of an iteration),
 the call to `arl_check()` will return 1, to signal the caller to stop the loop,
 saving valuable CPU resources for the rest of the data source. 
 
-In the following test we used alternative methods to process, **300k times**,
+In the following test we used alternative methods to process, **1M times**,
 a data source like `/proc/meminfo`, already tokenized, in memory,
 to extract the same number of expected metrics:
 
 test|code|string comparison|number parsing|duration
 :---:|:---:|:---:|:---:|:---:|
-1|if-else-if-else-if|`strcmp()`|`strtoull()`|1396639 usecs
-2|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`strtoull()`| 262911 usecs
-3|if-else-if-else-if|statement expression `simple_hash()` and `strcmp()`|`strtoull()`|255728 usecs
-4|if-continue|inline `simple_hash()` and `strcmp()`|`strtoull()`|255024 usecs
-5|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`str2ull()`|180654 usecs
-6|ARL|ARL|`strtoull()`|121800 usecs
-7|ARL|ARL|`str2ull()`|62702 usecs
+1|if-else-if-else-if|`strcmp()`|`strtoull()`|4698657 usecs
+2|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`strtoull()`| 872005 usecs
+3|if-else-if-else-if|statement expression `simple_hash()` and `strcmp()`|`strtoull()`|861626 usecs
+4|if-continue|inline `simple_hash()` and `strcmp()`|`strtoull()`|871887 usecs
+5|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`str2ull()`|606541 usecs
+6|ARL|ARL|`strtoull()`|424149 usecs
+7|ARL|ARL|`str2ull()`|199324 usecs
 
-So, compared to unoptimized code (test No 1: 1400ms), before ARL netdata was using test
-No **5** with hashing and a custom `str2ull()` to achieve 180ms.
-The current ARL implementation is test No **7** that needs only 63ms.
+So, compared to unoptimized code (test No 1: 4.7sec), before ARL netdata was using test
+No **5** with hashing and a custom `str2ull()` to achieve 607ms.
+The current ARL implementation is test No **7** that needs only 199ms
+(23 times faster vs unoptimized code, 3 times faster vs optimized code).
 
 ## Limitations
 
