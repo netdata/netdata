@@ -6,7 +6,6 @@ netdata supports **internal** and **external** data collection plugins:
 
 - **external** plugins may be written in any computer language and are spawn as independent long-running processes by the netdata daemon.
    They communicate with the netdata daemon via `pipes` (`stdout` communication).
-   The list of netdata external plugins can be found at the [plugins.d](plugins.d/) directory.
 
 To minimize the number of processes spawn for data collection, netdata also supports **plugin orchestrators**.
 
@@ -16,9 +15,9 @@ To minimize the number of processes spawn for data collection, netdata also supp
    data collection modules with the minimum of code.
    
    Currently netdata provides plugin orchestrators
-   BASH v4+ [charts.d.plugin](plugins.d/charts.d.plugin),
-   node.js [node.d.plugin](plugins.d/node.d.plugin) and
-   python v2+ (including v3) [python.d.plugin](plugins.d/python.d.plugin).
+   BASH v4+ [charts.d.plugin](charts.d.plugin),
+   node.js [node.d.plugin](node.d.plugin) and
+   python v2+ (including v3) [python.d.plugin](python.d.plugin).
 
 ## Netdata Plugins
 
