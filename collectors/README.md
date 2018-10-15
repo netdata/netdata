@@ -25,7 +25,7 @@ plugin|lang|O/S|runs as|modular|description
 :---:|:---:|:---:|:---:|:---:|:---
 [apps.plugin](apps.plugin/)|`C`|linux, freebsd|external|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.
 [cgroups.plugin](cgroups.plugin/)|`C`|linux|internal|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
-[charts.d.plugin](charts.d.plugin/)|`BASH`|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
+[charts.d.plugin](charts.d.plugin/)|`BASH` v4+|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
 [checks.plugin](checks.plugin/)|`C`|any|internal|-|a debugging plugin (by default it is disabled)
 [diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points
 [fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
@@ -37,7 +37,7 @@ plugin|lang|O/S|runs as|modular|description
 [node.d.plugin](node.d.plugin/)|`node.js`|any|external|yes|a **plugin orchestrator** for data collection modules written in `node.js`.
 [plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins
 [proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems
-[python.d.plugin](python.d.plugin/)|`python`|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
+[python.d.plugin](python.d.plugin/)|`python` v2+|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
 [statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for netdata
 [tc.plugin](tc.plugin/)|`C`|linux|internal|-|collects traffic QoS metrics (`tc`) of Linux network interfaces
 
