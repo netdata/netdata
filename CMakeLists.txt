@@ -343,12 +343,12 @@ set(WEB_PLUGIN_FILES
         )
 
 set(API_PLUGIN_FILES
-        api/rrd2json.c
-        api/rrd2json.h
-        api/web_api_v1.c
-        api/web_api_v1.h
-        api/web_buffer_svg.c
-        api/web_buffer_svg.h
+        webserver/api/rrd2json.c
+        webserver/api/rrd2json.h
+        webserver/api/web_api_v1.c
+        webserver/api/web_api_v1.h
+        webserver/api/web_buffer_svg.c
+        webserver/api/web_buffer_svg.h
         )
 
 set(STREAMING_PLUGIN_FILES

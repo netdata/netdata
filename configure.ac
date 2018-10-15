@@ -549,7 +549,6 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    api/Makefile
     backends/graphite/Makefile
     backends/json/Makefile
     backends/Makefile
@@ -597,8 +596,9 @@ AC_CONFIG_FILES([
     registry/Makefile
     streaming/Makefile
     webserver/Makefile
+    webserver/gui/Makefile
+    webserver/api/Makefile
     system/Makefile
-    web/Makefile
     diagrams/Makefile
     makeself/Makefile
     contrib/Makefile

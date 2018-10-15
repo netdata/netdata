@@ -48,7 +48,6 @@ SUBDIRS = \
 	diagrams \
 	makeself \
 	system \
-	web \
 	contrib \
 	tests \
 	$(NULL)
@@ -76,7 +75,6 @@ dist_noinst_SCRIPTS= \
 # Compile netdata binaries
 
 SUBDIRS += \
-    api \
     collectors \
     backends \
     database \
@@ -282,12 +280,12 @@ RRD_PLUGIN_FILES = \
     $(NULL)
 
 API_PLUGIN_FILES = \
-    api/rrd2json.c \
-    api/rrd2json.h \
-    api/web_api_v1.c \
-    api/web_api_v1.h \
-    api/web_buffer_svg.c \
-    api/web_buffer_svg.h \
+    webserver/api/rrd2json.c \
+    webserver/api/rrd2json.h \
+    webserver/api/web_api_v1.c \
+    webserver/api/web_api_v1.h \
+    webserver/api/web_buffer_svg.c \
+    webserver/api/web_buffer_svg.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \

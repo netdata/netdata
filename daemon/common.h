@@ -30,7 +30,7 @@
 #include "../backends/backends.h"
 
 // the netdata API
-#include "../api/web_api_v1.h"
+#include "../webserver/api/web_api_v1.h"
 
 // all data collection plugins
 #include "../collectors/all.h"

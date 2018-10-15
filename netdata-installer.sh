@@ -175,46 +175,6 @@ USAGE
 
 # shellcheck disable=SC2230
 md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-get_git_config_signatures() {
-    local x s file md5
-
-    [ ! -d "conf.d" ] && echo >&2 "Wrong directory." && return 1
-    [ -z "${md5sum}" -o ! -x "${md5sum}" ] && echo >&2 "No md5sum command." && return 1
-
-    echo >configs.signatures.tmp
-
-    for x in $(find conf.d -name \*.conf)
-    do
-            x="${x/conf.d\//}"
-            echo "${x}"
-            for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
-            do
-                    git checkout ${c} "conf.d/${x}" || continue
-                    s="$(cat "conf.d/${x}" | ${md5sum} | cut -d ' ' -f 1)"
-                    echo >>configs.signatures.tmp "${s}:${x}"
-                    echo "    ${s}"
-            done
-            git checkout HEAD "conf.d/${x}" || break
-    done
-
-    cat configs.signatures.tmp |\
-        grep -v "^$" |\
-        sort -u |\
-        {
-            echo "declare -A configs_signatures=("
-            IFS=":"
-            while read md5 file
-            do
-                echo "  ['${md5}']='${file}'"
-            done
-            echo ")"
-        } >configs.signatures
-
-    rm configs.signatures.tmp
-
-    return 0
-}
-
 
 while [ ! -z "${1}" ]
 do
@@ -269,10 +229,6 @@ do
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
         usage
-        exit 1
-    elif [ "$1" = "get_git_config_signatures" ]
-        then
-        get_git_config_signatures && exit 0
         exit 1
     else
         echo >&2
@@ -962,7 +918,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Check version.txt"
 
-if [ ! -s web/version.txt ]
+if [ ! -s webserver/gui/version.txt ]
     then
     cat <<VERMSG
 
