@@ -319,6 +319,14 @@ WEB_PLUGIN_FILES = \
     web/server/web_client.h \
     web/server/web_server.c \
     web/server/web_server.h \
+    web/server/web_client_cache.c \
+    web/server/web_client_cache.h \
+    web/server/single/single-threaded.c \
+    web/server/single/single-threaded.h \
+    web/server/multi/multi-threaded.c \
+    web/server/multi/multi-threaded.h \
+    web/server/static/static-threaded.c \
+    web/server/static/static-threaded.h \
     $(NULL)
 
 BACKENDS_PLUGIN_FILES = \

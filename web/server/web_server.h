@@ -33,9 +33,6 @@ extern WEB_SERVER_MODE web_server_mode;
 extern WEB_SERVER_MODE web_server_mode_id(const char *mode);
 extern const char *web_server_mode_name(WEB_SERVER_MODE id);
 
-extern void *socket_listen_main_multi_threaded(void *ptr);
-extern void *socket_listen_main_single_threaded(void *ptr);
-extern void *socket_listen_main_static_threaded(void *ptr);
 extern int api_listen_sockets_setup(void);
 
 #define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST 60
@@ -43,5 +40,19 @@ extern int api_listen_sockets_setup(void);
 extern int web_client_timeout;
 extern int web_client_first_request_timeout;
 extern long web_client_streaming_rate_t;
+
+#ifdef WEB_SERVER_INTERNALS
+extern LISTEN_SOCKETS api_sockets;
+extern void web_client_update_acl_matches(struct web_client *w);
+extern void web_server_log_connection(struct web_client *w, const char *msg);
+extern void web_client_initialize_connection(struct web_client *w);
+extern struct web_client *web_client_create_on_listenfd(int listener);
+
+#include "web_client_cache.h"
+#endif // WEB_SERVER_INTERNALS
+
+#include "single/single-threaded.h"
+#include "multi/multi-threaded.h"
+#include "static/static-threaded.h"
 
 #endif /* NETDATA_WEB_SERVER_H */

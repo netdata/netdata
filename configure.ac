@@ -604,6 +604,9 @@ AC_CONFIG_FILES([
     web/api/Makefile
     web/gui/Makefile
     web/server/Makefile
+    web/server/single/Makefile
+    web/server/multi/Makefile
+    web/server/static/Makefile
 ])
 AC_OUTPUT
 
