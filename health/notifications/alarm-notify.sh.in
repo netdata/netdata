@@ -599,7 +599,7 @@ for method_name in ${method_names} ; do
 
     # build the list of recipients
     to_var="to_${method_name}"
-    declare to_${method_name}="${!arr[*]}"
+    declare to_${method_name}="${!arr_var[*]}"
 
     [ -z "${!to_var}" ] && declare ${send_var}="NO"
 done
