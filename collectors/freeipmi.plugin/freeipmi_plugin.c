@@ -15,7 +15,7 @@
  *  UCRL-CODE-222073
  */
 
-#include "../../../libnetdata/libnetdata.h"
+#include "../../libnetdata/libnetdata.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1624,7 +1624,7 @@ int main (int argc, char **argv) {
                     " options ipmi_si kipmid_max_busy_us=10\n"
                     "\n"
                     " For more information:\n"
-                    " https://github.com/ktsaou/netdata/tree/master/plugins/plugins.d/freeipmi.plugin\n"
+                    " https://github.com/ktsaou/netdata/tree/master/plugins/freeipmi.plugin\n"
                     "\n"
                     , VERSION
                     , netdata_update_every

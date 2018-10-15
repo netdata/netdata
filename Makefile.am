@@ -147,7 +147,7 @@ LIBNETDATA_FILES = \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
-	collectors/plugins.d/apps.plugin/apps_plugin.c \
+	collectors/apps.plugin/apps_plugin.c \
 	$(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -198,7 +198,7 @@ DISKSPACE_PLUGIN_FILES = \
     $(NULL)
 
 FREEIPMI_PLUGIN_FILES = \
-    collectors/plugins.d/freeipmi.plugin/freeipmi_plugin.c \
+    collectors/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 

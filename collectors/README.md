@@ -1,4 +1,4 @@
-# Netdata Data Collection Plugins
+# Data Collection Plugins
 
 netdata supports **internal** and **external** data collection plugins:
 
@@ -20,46 +20,39 @@ To minimize the number of processes spawn for data collection, netdata also supp
    node.js [node.d.plugin](plugins.d/node.d.plugin) and
    python v2+ (including v3) [python.d.plugin](plugins.d/python.d.plugin).
 
-## Netdata Internal Plugins
+## Netdata Plugins
 
-plugin|language|O/S|description
-:---:|:---:|:---:|:---
-[cgroups.plugin](cgroups.plugin/)|`C`|linux|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
-[checks.plugin](checks.plugin/)|`C`|all|a debugging plugin (by default it is disabled)
-[diskspace.plugin](diskspace.plugin/)|`C`|linux|collects disk space usage metrics on Linux mount points
-[freebsd.plugin](freebsd.plugin/)|`C`|freebsd|collects resource usage and performance data on FreeBSD systems
-[idlejitter.plugin](idlejitter.plugin/)|`C`|all|measures CPU latency and jitter on all operating systems
-[macos.plugin](macos.plugin/)|`C`|macos|collects resource usage and performance data on MacOS systems
-[nfacct.plugin](nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
-[plugins.d](plugins.d/)|`C`|all|implements the **external plugins** API and serves external plugins
-[proc.plugin](proc.plugin/)|`C`|linux|collects resource usage and performance data on Linux systems
-[statsd.plugin](statsd.plugin/)|`C`|all|implements a high performance **statsd** server for netdata
-[tc.plugin](tc.plugin/)|`C`|linux|collects traffic QoS metrics (`tc`) of Linux network interfaces
+plugin|lang|O/S|runs as|modular|description
+:---:|:---:|:---:|:---:|:---:|:---
+[apps.plugin](apps.plugin/)|`C`|linux, freebsd|independent process|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.
+[cgroups.plugin](cgroups.plugin/)|`C`|linux|daemon thread|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
+[charts.d.plugin](charts.d.plugin/)|`BASH`|any|independent process|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
+[checks.plugin](checks.plugin/)|`C`|any|daemon thread|-|a debugging plugin (by default it is disabled)
+[diskspace.plugin](diskspace.plugin/)|`C`|linux|daemon thread|-|collects disk space usage metrics on Linux mount points
+[fping.plugin](fping.plugin/)|`C`|any|independent process|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
+[freebsd.plugin](freebsd.plugin/)|`C`|freebsd|daemon thread|yes|collects resource usage and performance data on FreeBSD systems
+[freeipmi.plugin](freeipmi.plugin/)|`C`|linux|independent process|-|collects metrics from enterprise hardware sensors, on Linux servers.
+[idlejitter.plugin](idlejitter.plugin/)|`C`|any|daemon thread|-|measures CPU latency and jitter on all operating systems
+[macos.plugin](macos.plugin/)|`C`|macos|daemon thread|yes|collects resource usage and performance data on MacOS systems
+[nfacct.plugin](nfacct.plugin/)|`C`|linux|daemon thread|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
+[node.d.plugin](node.d.plugin/)|`node.js`|any|independent process|yes|a **plugin orchestrator** for data collection modules written in `node.js`.
+[plugins.d](plugins.d/)|`C`|any|daemon thread|-|implements the **external plugins** API and serves external plugins
+[proc.plugin](proc.plugin/)|`C`|linux|daemon thread|yes|collects resource usage and performance data on Linux systems
+[python.d.plugin](python.d.plugin/)|`python`|any|independent process|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
+[statsd.plugin](statsd.plugin/)|`C`|any|daemon thread|-|implements a high performance **statsd** server for netdata
+[tc.plugin](tc.plugin/)|`C`|linux|daemon thread|-|collects traffic QoS metrics (`tc`) of Linux network interfaces
 
-## Netdata External Plugins and Plugin Orchestrators
-
-Browse the [plugins.d](plugins.d/) directory.
-
-## Internal Plugins Configuration
+## Enabling and Disabling plugins
 
 Each plugin can be enabled or disabled via `netdata.conf`, section `[plugins]`.
 
-At this section there a list of all the plugins with a boolean setting to enable them or not. 
+At this section there a list of all the plugins with a boolean setting to enable them or disable them. 
 
-Example:
-
-```
-[plugins]
-	# cgroups = yes
-	# diskspace = yes
-	# idlejitter = yes
-	# proc = yes
-	# tc = yes
-```
-
-The exception is statsd.plugin that has its own `[statsd]` section.
+The exception is `statsd.plugin` that has its own `[statsd]` section.
 
 Once a plugin is enabled, consult the page of each plugin for additional configuration options.
+
+All **external plugins** (independent processes) are managed by [plugins.d](plugins.d/), which provides additional management options.
 
 ## Operation of Internal Plugins
 

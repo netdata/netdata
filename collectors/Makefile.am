@@ -3,17 +3,23 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-    checks.plugin \
-    freebsd.plugin \
-    idlejitter.plugin \
-    cgroups.plugin \
-    diskspace.plugin \
-    nfacct.plugin \
-    proc.plugin \
-    tc.plugin \
-    macos.plugin \
     plugins.d \
+    apps.plugin \
+    cgroups.plugin \
+    charts.d.plugin \
+    checks.plugin \
+    diskspace.plugin \
+    fping.plugin \
+    freebsd.plugin \
+    freeipmi.plugin \
+    idlejitter.plugin \
+    macos.plugin \
+    nfacct.plugin \
+    node.d.plugin \
+    proc.plugin \
+    python.d.plugin \
     statsd.plugin \
+    tc.plugin \
    	$(NULL)
 
 

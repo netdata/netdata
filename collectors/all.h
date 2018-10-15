@@ -16,8 +16,9 @@
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
-#include "plugins.d/plugins_d.h"
 #include "statsd.plugin/statsd.h"
+
+#include "plugins.d/plugins_d.h"
 
 
 // ----------------------------------------------------------------------------

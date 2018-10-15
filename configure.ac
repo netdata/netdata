@@ -576,24 +576,24 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
-    collectors/checks.plugin/Makefile
-    collectors/freebsd.plugin/Makefile
-    collectors/idlejitter.plugin/Makefile
-    collectors/cgroups.plugin/Makefile
-    collectors/diskspace.plugin/Makefile
-    collectors/nfacct.plugin/Makefile
-    collectors/proc.plugin/Makefile
-    collectors/tc.plugin/Makefile
-    collectors/macos.plugin/Makefile
     collectors/Makefile
+    collectors/apps.plugin/Makefile
+    collectors/cgroups.plugin/Makefile
+    collectors/charts.d.plugin/Makefile
+    collectors/checks.plugin/Makefile
+    collectors/diskspace.plugin/Makefile
+    collectors/fping.plugin/Makefile
+    collectors/freebsd.plugin/Makefile
+    collectors/freeipmi.plugin/Makefile
+    collectors/idlejitter.plugin/Makefile
+    collectors/macos.plugin/Makefile
+    collectors/nfacct.plugin/Makefile
+    collectors/node.d.plugin/Makefile
     collectors/plugins.d/Makefile
-    collectors/plugins.d/apps.plugin/Makefile
-    collectors/plugins.d/charts.d.plugin/Makefile
-    collectors/plugins.d/fping.plugin/Makefile
-    collectors/plugins.d/freeipmi.plugin/Makefile
-    collectors/plugins.d/node.d.plugin/Makefile
-    collectors/plugins.d/python.d.plugin/Makefile
+    collectors/proc.plugin/Makefile
+    collectors/python.d.plugin/Makefile
     collectors/statsd.plugin/Makefile
+    collectors/tc.plugin/Makefile
     registry/Makefile
     streaming/Makefile
     webserver/Makefile

@@ -7,12 +7,12 @@ from external processes, thus allowing netdata to use **external plugins**.
 
 plugin|language|O/S|description
 :---:|:---:|:---:|:---
-[apps.plugin](apps.plugin/)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.
-[charts.d.plugin](charts.d.plugin/)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
-[fping.plugin](fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
-[freeipmi.plugin](freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.
-[node.d.plugin](node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.
-[python.d.plugin](python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
+[apps.plugin](../apps.plugin/)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.
+[charts.d.plugin](../charts.d.plugin/)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
+[fping.plugin](../fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
+[freeipmi.plugin](../freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.
+[node.d.plugin](../node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.
+[python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
 
 
 ## Motivation

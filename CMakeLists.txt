@@ -183,25 +183,25 @@ set(LIBNETDATA_FILES
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
-        plugins/plugins.d/apps.plugin/apps_plugin.c
+        collectors/apps.plugin/apps_plugin.c
         )
 
 set(CHECKS_PLUGIN_FILES
-        plugins/checks.plugin/plugin_checks.c
-        plugins/checks.plugin/plugin_checks.h
+        collectors/checks.plugin/plugin_checks.c
+        collectors/checks.plugin/plugin_checks.h
         )
 
 set(FREEBSD_PLUGIN_FILES
-        plugins/freebsd.plugin/plugin_freebsd.c
-        plugins/freebsd.plugin/plugin_freebsd.h
-        plugins/freebsd.plugin/freebsd_sysctl.c
-        plugins/freebsd.plugin/freebsd_getmntinfo.c
-        plugins/freebsd.plugin/freebsd_getifaddrs.c
-        plugins/freebsd.plugin/freebsd_devstat.c
-        plugins/freebsd.plugin/freebsd_kstat_zfs.c
-        plugins/freebsd.plugin/freebsd_ipfw.c
-        plugins/proc.plugin/zfs_common.c
-        plugins/proc.plugin/zfs_common.h
+        collectors/freebsd.plugin/plugin_freebsd.c
+        collectors/freebsd.plugin/plugin_freebsd.h
+        collectors/freebsd.plugin/freebsd_sysctl.c
+        collectors/freebsd.plugin/freebsd_getmntinfo.c
+        collectors/freebsd.plugin/freebsd_getifaddrs.c
+        collectors/freebsd.plugin/freebsd_devstat.c
+        collectors/freebsd.plugin/freebsd_kstat_zfs.c
+        collectors/freebsd.plugin/freebsd_ipfw.c
+        collectors/proc.plugin/zfs_common.c
+        collectors/proc.plugin/zfs_common.h
         )
 
 set(HEALTH_PLUGIN_FILES
@@ -213,86 +213,86 @@ set(HEALTH_PLUGIN_FILES
         )
 
 set(IDLEJITTER_PLUGIN_FILES
-        plugins/idlejitter.plugin/plugin_idlejitter.c
-        plugins/idlejitter.plugin/plugin_idlejitter.h
+        collectors/idlejitter.plugin/plugin_idlejitter.c
+        collectors/idlejitter.plugin/plugin_idlejitter.h
         )
 
 set(CGROUPS_PLUGIN_FILES
-        plugins/cgroups.plugin/sys_fs_cgroup.c
-        plugins/cgroups.plugin/sys_fs_cgroup.h
+        collectors/cgroups.plugin/sys_fs_cgroup.c
+        collectors/cgroups.plugin/sys_fs_cgroup.h
         )
 
 set(CGROUP_NETWORK_FILES
-        plugins/cgroups.plugin/cgroup-network.c
+        collectors/cgroups.plugin/cgroup-network.c
         )
 
 set(DISKSPACE_PLUGIN_FILES
-        plugins/diskspace.plugin/plugin_diskspace.h
-        plugins/diskspace.plugin/plugin_diskspace.c
+        collectors/diskspace.plugin/plugin_diskspace.h
+        collectors/diskspace.plugin/plugin_diskspace.c
         )
 
 set(FREEIPMI_PLUGIN_FILES
-        plugins/plugins.d/freeipmi.plugin/freeipmi_plugin.c
+        collectors/freeipmi.plugin/freeipmi_plugin.c
         )
 
 set(NFACCT_PLUGIN_FILES
-        plugins/nfacct.plugin/plugin_nfacct.c
-        plugins/nfacct.plugin/plugin_nfacct.h
+        collectors/nfacct.plugin/plugin_nfacct.c
+        collectors/nfacct.plugin/plugin_nfacct.h
         )
 
 set(PROC_PLUGIN_FILES
-        plugins/proc.plugin/ipc.c
-        plugins/proc.plugin/plugin_proc.c
-        plugins/proc.plugin/plugin_proc.h
-        plugins/proc.plugin/proc_diskstats.c
-        plugins/proc.plugin/proc_interrupts.c
-        plugins/proc.plugin/proc_softirqs.c
-        plugins/proc.plugin/proc_loadavg.c
-        plugins/proc.plugin/proc_meminfo.c
-        plugins/proc.plugin/proc_net_dev.c
-        plugins/proc.plugin/proc_net_ip_vs_stats.c
-        plugins/proc.plugin/proc_net_netstat.c
-        plugins/proc.plugin/proc_net_rpc_nfs.c
-        plugins/proc.plugin/proc_net_rpc_nfsd.c
-        plugins/proc.plugin/proc_net_snmp.c
-        plugins/proc.plugin/proc_net_snmp6.c
-        plugins/proc.plugin/proc_net_sctp_snmp.c
-        plugins/proc.plugin/proc_net_sockstat.c
-        plugins/proc.plugin/proc_net_sockstat6.c
-        plugins/proc.plugin/proc_net_softnet_stat.c
-        plugins/proc.plugin/proc_net_stat_conntrack.c
-        plugins/proc.plugin/proc_net_stat_synproxy.c
-        plugins/proc.plugin/proc_self_mountinfo.c
-        plugins/proc.plugin/proc_self_mountinfo.h
-        plugins/proc.plugin/zfs_common.c
-        plugins/proc.plugin/zfs_common.h
-        plugins/proc.plugin/proc_spl_kstat_zfs.c
-        plugins/proc.plugin/proc_stat.c
-        plugins/proc.plugin/proc_sys_kernel_random_entropy_avail.c
-        plugins/proc.plugin/proc_vmstat.c
-        plugins/proc.plugin/proc_uptime.c
-        plugins/proc.plugin/sys_kernel_mm_ksm.c
-        plugins/proc.plugin/sys_devices_system_edac_mc.c
-        plugins/proc.plugin/sys_devices_system_node.c
-        plugins/proc.plugin/sys_fs_btrfs.c
+        collectors/proc.plugin/ipc.c
+        collectors/proc.plugin/plugin_proc.c
+        collectors/proc.plugin/plugin_proc.h
+        collectors/proc.plugin/proc_diskstats.c
+        collectors/proc.plugin/proc_interrupts.c
+        collectors/proc.plugin/proc_softirqs.c
+        collectors/proc.plugin/proc_loadavg.c
+        collectors/proc.plugin/proc_meminfo.c
+        collectors/proc.plugin/proc_net_dev.c
+        collectors/proc.plugin/proc_net_ip_vs_stats.c
+        collectors/proc.plugin/proc_net_netstat.c
+        collectors/proc.plugin/proc_net_rpc_nfs.c
+        collectors/proc.plugin/proc_net_rpc_nfsd.c
+        collectors/proc.plugin/proc_net_snmp.c
+        collectors/proc.plugin/proc_net_snmp6.c
+        collectors/proc.plugin/proc_net_sctp_snmp.c
+        collectors/proc.plugin/proc_net_sockstat.c
+        collectors/proc.plugin/proc_net_sockstat6.c
+        collectors/proc.plugin/proc_net_softnet_stat.c
+        collectors/proc.plugin/proc_net_stat_conntrack.c
+        collectors/proc.plugin/proc_net_stat_synproxy.c
+        collectors/proc.plugin/proc_self_mountinfo.c
+        collectors/proc.plugin/proc_self_mountinfo.h
+        collectors/proc.plugin/zfs_common.c
+        collectors/proc.plugin/zfs_common.h
+        collectors/proc.plugin/proc_spl_kstat_zfs.c
+        collectors/proc.plugin/proc_stat.c
+        collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        collectors/proc.plugin/proc_vmstat.c
+        collectors/proc.plugin/proc_uptime.c
+        collectors/proc.plugin/sys_kernel_mm_ksm.c
+        collectors/proc.plugin/sys_devices_system_edac_mc.c
+        collectors/proc.plugin/sys_devices_system_node.c
+        collectors/proc.plugin/sys_fs_btrfs.c
         )
 
 set(TC_PLUGIN_FILES
-        plugins/tc.plugin/plugin_tc.c
-        plugins/tc.plugin/plugin_tc.h
+        collectors/tc.plugin/plugin_tc.c
+        collectors/tc.plugin/plugin_tc.h
         )
 
 set(MACOS_PLUGIN_FILES
-        plugins/macos.plugin/plugin_macos.c
-        plugins/macos.plugin/plugin_macos.h
-        plugins/macos.plugin/macos_sysctl.c
-        plugins/macos.plugin/macos_mach_smi.c
-        plugins/macos.plugin/macos_fw.c
+        collectors/macos.plugin/plugin_macos.c
+        collectors/macos.plugin/plugin_macos.h
+        collectors/macos.plugin/macos_sysctl.c
+        collectors/macos.plugin/macos_mach_smi.c
+        collectors/macos.plugin/macos_fw.c
         )
 
 set(PLUGINSD_PLUGIN_FILES
-        plugins/plugins.d/plugins_d.c
-        plugins/plugins.d/plugins_d.h
+        collectors/plugins.d/plugins_d.c
+        collectors/plugins.d/plugins_d.h
         )
 
 set(REGISTRY_PLUGIN_FILES
@@ -312,8 +312,8 @@ set(REGISTRY_PLUGIN_FILES
         )
 
 set(STATSD_PLUGIN_FILES
-        plugins/statsd.plugin/statsd.c
-        plugins/statsd.plugin/statsd.h
+        collectors/statsd.plugin/statsd.c
+        collectors/statsd.plugin/statsd.h
         )
 
 set(RRD_PLUGIN_FILES
@@ -385,7 +385,7 @@ set(DAEMON_FILES
         )
 
 set(NETDATA_FILES
-        plugins/all.h
+        collectors/all.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
