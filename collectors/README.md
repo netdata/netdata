@@ -54,12 +54,12 @@ Once a plugin is enabled, consult the page of each plugin for additional configu
 
 All **external plugins** are managed by [plugins.d](plugins.d/), which provides additional management options.
 
-## Operation of Internal Plugins
+### Internal Plugins
 
-Each of these plugins runs as a thread inside the netdata daemon.
+Each of the internal plugins runs as a thread inside the netdata daemon.
 Once this thread has started, the plugin may spawn additional threads according to its design.
 
-## Internal Plugins API
+#### Internal Plugins API
 
 The internal data collection API consists of the following calls:
 
@@ -111,3 +111,9 @@ collect_data() {
 
 Of course netdata has a lot of libraries to help you also in collecting the metrics.
 The best way to find your way through this, is to examine what other similar plugins do.
+
+
+### External Plugins
+
+**External plugins** use the API and are managed by [plugins.d](plugins.d/).
+
