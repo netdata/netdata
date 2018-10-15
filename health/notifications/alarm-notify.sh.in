@@ -350,9 +350,8 @@ IRC_NETWORK=
 
 if [ ${unittest} ] ;
     then
-    source "${config}"
-    [ $? -ne 0 ] && error "Failed to load requested config file."
-    exit 1
+    source "${cfgfile}"
+    [ $? -ne 0 ] && error "Failed to load requested config file." && exit 1
 else
     for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
     do
@@ -602,7 +601,7 @@ for method_name in ${method_names} ; do
     to_var="to_${method_name}"
     declare to_${method_name}="${!arr[*]}"
 
-    [ -z "${!to_var}" ] && declare ${send}="NO"
+    [ -z "${!to_var}" ] && declare ${send_var}="NO"
 done
 
 # -----------------------------------------------------------------------------
@@ -626,7 +625,7 @@ fix_to_email ${to_email}
 if [ ${unittest} ] ; then
     for method_name in ${method_names} ; do
         to_var="to_${method_name}"
-        echo "results: ${method}: ${!to_var}"
+        echo "results: ${method_name}: ${!to_var}"
     done
     exit 0
 fi
