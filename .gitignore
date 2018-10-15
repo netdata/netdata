@@ -88,12 +88,12 @@ system/netdata-freebsd
 system/edit-config
 
 health/alarm-notify.sh
-plugins/cgroups.plugin/cgroup-name.sh
-plugins/tc.plugin/tc-qos-helper.sh
-plugins/plugins.d/charts.d.plugin/charts.d.plugin
-plugins/plugins.d/node.d.plugin/node.d.plugin
-plugins/plugins.d/python.d.plugin/python.d.plugin
-plugins/plugins.d/fping.plugin/fping.plugin
+collectors/cgroups.plugin/cgroup-name.sh
+collectors/tc.plugin/tc-qos-helper.sh
+collectors/plugins.d/charts.d.plugin/charts.d.plugin
+collectors/plugins.d/node.d.plugin/node.d.plugin
+collectors/plugins.d/python.d.plugin/python.d.plugin
+collectors/plugins.d/fping.plugin/fping.plugin
 
 # installer generated files
 netdata-uninstaller.sh

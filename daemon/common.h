@@ -33,7 +33,7 @@
 #include "../api/web_api_v1.h"
 
 // all data collection plugins
-#include "../plugins/all.h"
+#include "../collectors/all.h"
 
 // netdata unit tests
 #include "unit_test.h"

@@ -576,24 +576,24 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
-    plugins/checks.plugin/Makefile
-    plugins/freebsd.plugin/Makefile
-    plugins/idlejitter.plugin/Makefile
-    plugins/cgroups.plugin/Makefile
-    plugins/diskspace.plugin/Makefile
-    plugins/nfacct.plugin/Makefile
-    plugins/proc.plugin/Makefile
-    plugins/tc.plugin/Makefile
-    plugins/macos.plugin/Makefile
-    plugins/Makefile
-    plugins/plugins.d/Makefile
-    plugins/plugins.d/apps.plugin/Makefile
-    plugins/plugins.d/charts.d.plugin/Makefile
-    plugins/plugins.d/fping.plugin/Makefile
-    plugins/plugins.d/freeipmi.plugin/Makefile
-    plugins/plugins.d/node.d.plugin/Makefile
-    plugins/plugins.d/python.d.plugin/Makefile
-    plugins/statsd.plugin/Makefile
+    collectors/checks.plugin/Makefile
+    collectors/freebsd.plugin/Makefile
+    collectors/idlejitter.plugin/Makefile
+    collectors/cgroups.plugin/Makefile
+    collectors/diskspace.plugin/Makefile
+    collectors/nfacct.plugin/Makefile
+    collectors/proc.plugin/Makefile
+    collectors/tc.plugin/Makefile
+    collectors/macos.plugin/Makefile
+    collectors/Makefile
+    collectors/plugins.d/Makefile
+    collectors/plugins.d/apps.plugin/Makefile
+    collectors/plugins.d/charts.d.plugin/Makefile
+    collectors/plugins.d/fping.plugin/Makefile
+    collectors/plugins.d/freeipmi.plugin/Makefile
+    collectors/plugins.d/node.d.plugin/Makefile
+    collectors/plugins.d/python.d.plugin/Makefile
+    collectors/statsd.plugin/Makefile
     registry/Makefile
     streaming/Makefile
     webserver/Makefile
