@@ -21,7 +21,7 @@ jobs:
     - stage: "lint"
       name: "python"
       install: skip
-      script: docker run -ti --rm -v $(pwd):/code alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 /code/
+      script: docker run -ti --rm -v $(pwd):/code alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 /code/collectors/python.d.plugin/python.d.plugin.in /code/
     - name: "css"
       install: skip
       script: docker run --rm -v $(pwd):/code eeacms/csslint sh -c "csslint /code/web/gui/*.css" || echo "OK"
