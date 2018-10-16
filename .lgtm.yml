@@ -17,7 +17,7 @@ path_classifiers:
     - collectors/node.d.plugin/node_modules/extend.js
     - collectors/node.d.plugin/node_modules/net-snmp.js
     - collectors/node.d.plugin/node_modules/pixl-xml.js
-    - web/lib/
-    - web/css/
+    - web/gui/lib/
+    - web/gui/css/
   test:
     - tests/
