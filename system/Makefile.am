@@ -22,7 +22,6 @@ dist_config_SCRIPTS = \
     $(NULL)
 
 nodist_noinst_DATA = \
-    edit-config.in \
 	netdata-openrc \
 	netdata.logrotate \
 	netdata.service \
@@ -33,6 +32,7 @@ nodist_noinst_DATA = \
 	$(NULL)
 
 dist_noinst_DATA = \
+	edit-config.in \
 	netdata-openrc.in \
 	netdata.logrotate.in \
 	netdata.service.in \
