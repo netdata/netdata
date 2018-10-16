@@ -21,14 +21,20 @@ dist_noinst_DATA = \
     README.md \
     $(NULL)
 
-pythonconfigdir=$(libconfigdir)/python.d
-dist_pythonconfig_DATA = \
-    $(NULL)
-
 dist_python_SCRIPTS = \
     $(NULL)
 
 dist_python_DATA = \
+    $(NULL)
+
+userpythonconfigdir=$(configdir)/python.d
+dist_userpythonconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+
+pythonconfigdir=$(libconfigdir)/python.d
+dist_pythonconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 include apache/Makefile.inc

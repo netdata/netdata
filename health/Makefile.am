@@ -26,8 +26,14 @@ dist_noinst_DATA = \
 	README.md \
 	$(NULL)
 
+userhealthconfigdir=$(configdir)/health.d
+dist_userhealthconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     health.d/apache.conf \
     health.d/apcupsd.conf \
     health.d/backend.conf \
