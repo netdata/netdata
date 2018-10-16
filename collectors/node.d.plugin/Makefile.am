@@ -21,8 +21,14 @@ dist_noinst_DATA = \
 	README.md \
 	$(NULL)
 
+usernodeconfigdir=$(configdir)/node.d
+dist_usernodeconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+
 nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 dist_node_DATA = \
