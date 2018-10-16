@@ -512,14 +512,14 @@ AC_SUBST([webdir])
 
 CPPFLAGS="\
     -DTARGET_OS=${build_target_id} \
-	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
-	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
-	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
-	-DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
-	-DLOG_DIR=\"\\\"${logdir}\\\"\" \
-	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
-	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
-	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
+    -DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
+    -DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
+    -DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
+    -DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
+    -DLOG_DIR=\"\\\"${logdir}\\\"\" \
+    -DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
+    -DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
+    -DWEB_DIR=\"\\\"${webdir}\\\"\" \
 "
 
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
@@ -537,7 +537,6 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
-    netdata.spec
     backends/graphite/Makefile
     backends/json/Makefile
     backends/Makefile

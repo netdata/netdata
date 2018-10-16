@@ -56,7 +56,6 @@ dist_noinst_DATA= \
 	configs.signatures \
 	contrib \
 	netdata.cppcheck \
-	netdata.spec \
 	package.json \
 	docs \
 	packaging/version \
