@@ -77,6 +77,7 @@ dist_noinst_SCRIPTS= \
 SUBDIRS += \
     backends \
     collectors \
+    daemon \
     database \
     health \
     libnetdata \
