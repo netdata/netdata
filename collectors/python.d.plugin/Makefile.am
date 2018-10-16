@@ -2,8 +2,8 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
-	python.d.plugin \
-	$(NULL)
+    python.d.plugin \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
@@ -13,13 +13,74 @@ dist_libconfig_DATA = \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
-	python.d.plugin \
-	$(NULL)
+    python.d.plugin \
+    $(NULL)
 
 dist_noinst_DATA = \
-	python.d.plugin.in \
-	README.md \
-	$(NULL)
+    python.d.plugin.in \
+    README.md \
+    apache/README.md \
+    beanstalk/README.md \
+    bind_rndc/README.md \
+    boinc/README.md \
+    ceph/README.md \
+    chrony/README.md \
+    couchdb/README.md \
+    cpufreq/README.md \
+    cpuidle/README.md \
+    dnsdist/README.md \
+    dns_query_time/README.md \
+    dockerd/README.md \
+    dovecot/README.md \
+    elasticsearch/README.md \
+    example/README.md \
+    exim/README.md \
+    fail2ban/README.md \
+    freeradius/README.md \
+    go_expvar/README.md \
+    haproxy/README.md \
+    hddtemp/README.md \
+    httpcheck/README.md \
+    icecast/README.md \
+    ipfs/README.md \
+    isc_dhcpd/README.md \
+    linux_power_supply/README.md \
+    litespeed/README.md \
+    logind/README.md \
+    mdstat/README.md \
+    megacli/README.md \
+    memcached/README.md \
+    mongodb/README.md \
+    monit/README.md \
+    mysql/README.md \
+    nginx/README.md \
+    nginx_plus/README.md \
+    nsd/README.md \
+    ntpd/README.md \
+    ovpn_status_log/README.md \
+    phpfpm/README.md \
+    portcheck/README.md \
+    postfix/README.md \
+    postgres/README.md \
+    powerdns/README.md \
+    puppet/README.md \
+    rabbitmq/README.md \
+    redis/README.md \
+    rethinkdbs/README.md \
+    retroshare/README.md \
+    samba/README.md \
+    sensors/README.md \
+    smartd_log/README.md \
+    spigotmc/README.md \
+    springboot/README.md \
+    squid/README.md \
+    tomcat/README.md \
+    traefik/README.md \
+    unbound/README.md \
+    varnish/README.md \
+    w1sensor/README.md \
+    web_log/README.md \
+    $(NULL)
 
 pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \

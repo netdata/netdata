@@ -24,8 +24,9 @@ EXTRA_DIST = \
 	.eslintrc \
 	.lgtm.yml \
 	.travis \
-	build/build.sh
-	build/Dockerfile
+	.github/CODEOWNERS \
+	build/build.sh \
+	build/Dockerfile \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
 	build/m4/ax_check_enable_debug.m4 \
@@ -40,6 +41,7 @@ EXTRA_DIST = \
 	build/m4/ax_c__generic.m4 \
 	README.md \
 	CONTRIBUTORS.md \
+	CODE_OF_CONDUCT.md \
 	LICENSE \
 	REDISTRIBUTED.md \
 	$(NULL)

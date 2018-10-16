@@ -25,7 +25,6 @@ src/.deps/*
 stamp-h1
 tests/profile/*
 .travis.yml
-web/images/README.md
 END
 )
 
