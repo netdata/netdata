@@ -1,27 +1,25 @@
-# Global code owner
+# Global (default) code owner
 * @ktsaou
 
-# C code
-*.c @ktsaou
-*.h @ktsaou
-
-# python files
-*.py @l2isbad @Ferroin
-plugins.d/python.d.plugin @l2isbad @Ferroin
-conf.d/python.d/ @l2isbad @Ferroin
-
-# docker builds
-docker/ @paulfantom
-
-# build system and packaging
-build/ @paulfantom
-packaging/ @paulfantom
-contrib/ @paulfantom
-
-# CI and automation
+# Ownership by directory structure
 .travis/ @paulfantom
+# backends/
+build/ @paulfantom
+collectors/python.d.plugin/ @l2isbad @Ferroin
+contrib/ @paulfantom
+daemon/ @ktsaou
+database/ @ktsaou
+docker/ @paulfantom
+# health/ 
+# installer/
+# libnetdata/ 
+# makeself/ 
+packaging/ @paulfantom
+# registry/
+# streaming/
+# system/ 
+# tests/
+# web/ 
+
 .travis.yml @paulfantom
 .lgtm.yml @paulfantom
-
-# Docs
-#*.md @ktsaou @cakrit
