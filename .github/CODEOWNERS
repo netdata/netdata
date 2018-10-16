@@ -23,3 +23,6 @@ packaging/ @paulfantom
 
 .travis.yml @paulfantom
 .lgtm.yml @paulfantom
+
+# Ownership by filetype (overwrites ownership by directory)
+*.am @paulfantom @ktsaou
