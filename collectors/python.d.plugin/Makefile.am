@@ -101,6 +101,7 @@ include uwsgi/Makefile.inc
 include varnish/Makefile.inc
 include w1sensor/Makefile.inc
 include web_log/Makefile.inc
+include yoctopuce/Makefile.inc
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
