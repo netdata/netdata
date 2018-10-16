@@ -183,7 +183,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_sysconfdir}/%{name}
 %dir %{_libdir}/%{name}
 
-%config %{_sysconfigdir}/%{name}/*.conf
 %config %{_libdir}/%{name}/conf.d/*.conf
 %config %{_libdir}/%{name}/conf.d/charts.d/*.conf
 %config %{_libdir}/%{name}/conf.d/health.d/*.conf
@@ -197,7 +196,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
-%attr(750,root,netdata) %{_sysconfigdir}/%{name}/edit-config
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %if %{with netns}
