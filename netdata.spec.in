@@ -191,10 +191,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 #%config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
-# To be eventually moved to %%_defaultdocdir
-#%{_libdir}/%{name}/conf.d/node.d/*.md
+%{_libdir}/%{name}
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+%{_sysconfdir}/%{name}/edit-config
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
