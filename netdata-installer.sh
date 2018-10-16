@@ -570,9 +570,8 @@ then
             fi
         fi
     done
-
-    touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 fi
+touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 
 # -----------------------------------------------------------------------------
 progress "Install netdata"
