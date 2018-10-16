@@ -30,8 +30,14 @@ dist_charts_SCRIPTS = \
 dist_charts_DATA = \
     $(NULL)
 
+userchartsconfigdir=$(configdir)/charts.d
+dist_userchartsconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+
 chartsconfigdir=$(libconfigdir)/charts.d
 dist_chartsconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 include ap/Makefile.inc
