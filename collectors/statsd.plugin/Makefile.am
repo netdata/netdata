@@ -9,5 +9,12 @@ dist_noinst_DATA = \
 
 statsdconfigdir=$(libconfigdir)/statsd.d
 dist_statsdconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     example.conf \
     $(NULL)
+
+userstatsdconfigdir=$(configdir)/statsd.d
+dist_userstatsdconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+

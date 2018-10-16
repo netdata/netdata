@@ -186,13 +186,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 %config %{_libdir}/%{name}/conf.d/*.conf
 %config %{_libdir}/%{name}/conf.d/charts.d/*.conf
 %config %{_libdir}/%{name}/conf.d/health.d/*.conf
-%config %{_libdir}/%{name}/conf.d/node.d/*.conf
+#%config %{_libdir}/%{name}/conf.d/node.d/*.conf
 %config %{_libdir}/%{name}/conf.d/python.d/*.conf
 %config %{_libdir}/%{name}/conf.d/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 # To be eventually moved to %%_defaultdocdir
-%{_libdir}/%{name}/node.d/*.md
+#%{_libdir}/%{name}/conf.d/node.d/*.md
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
@@ -216,15 +216,15 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %dir %{_datadir}/%{name}
 %dir %{_sysconfdir}/%{name}/health.d
-%dir %{_libdir}/%{name}/health.d
+%dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_sysconfdir}/%{name}/python.d
-%dir %{_libdir}/%{name}/python.d
+%dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
-%dir %{_libdir}/%{name}/charts.d
+%dir %{_libdir}/%{name}/conf.d/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
-%dir %{_libdir}/%{name}/node.d
+%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_sysconfdir}/%{name}/statsd.d
-%dir %{_libdir}/%{name}/statsd.d
+%dir %{_libdir}/%{name}/conf.d/statsd.d
 
 
 %if %{with systemd}
