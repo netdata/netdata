@@ -1,6 +1,8 @@
 .deps
 .libs
 .dirstamp
+.project
+.pydevproject
 
 *.o
 *.a
@@ -62,15 +64,15 @@ netdata-coverity-analysis.tgz
 .settings/
 README
 TODO.md
-conf.d/netdata.conf
-src/TODO.txt
+netdata.conf
+TODO.txt
 
-web/chart-info/
-web/control.html
-web/datasource.css
-web/gadget.xml
-web/index_new.html
-web/version.txt
+web/gui/chart-info/
+web/gui/control.html
+web/gui/datasource.css
+web/gui/gadget.xml
+web/gui/index_new.html
+web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/
@@ -83,15 +85,15 @@ system/netdata.logrotate
 system/netdata.service
 system/netdata.plist
 system/netdata-freebsd
+system/edit-config
 
-conf.d/edit-config
-plugins.d/alarm-notify.sh
-src/plugins/linux-cgroups.plugin/cgroup-name.sh
-plugins.d/charts.d.plugin
-plugins.d/fping.plugin
-plugins.d/node.d.plugin
-plugins.d/python.d.plugin
-plugins.d/tc-qos-helper.sh
+health/alarm-notify.sh
+collectors/cgroups.plugin/cgroup-name.sh
+collectors/tc.plugin/tc-qos-helper.sh
+collectors/charts.d.plugin/charts.d.plugin
+collectors/node.d.plugin/node.d.plugin
+collectors/python.d.plugin/python.d.plugin
+collectors/fping.plugin/fping.plugin
 
 # installer generated files
 netdata-uninstaller.sh
@@ -117,7 +119,9 @@ diagrams/*.atxt
 diagrams/plantuml.jar
 
 # cppcheck
-src/cppcheck-build/
+cppcheck-build/
+
+venv/
 
 # debugging / profiling
 makeself/debug/
