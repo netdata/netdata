@@ -20,6 +20,7 @@ dist_noinst_DATA = \
 	debian/changelog \
 	debian/netdata.postrm \
 	rhel/build-netdata-rpm.sh \
+	rhel/netdata.spec \
 	$(NULL)
 
 dist_noinst_SCRIPTS = \

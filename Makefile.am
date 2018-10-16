@@ -59,7 +59,6 @@ dist_noinst_DATA= \
 	configs.signatures \
 	docker \
 	netdata.cppcheck \
-	netdata.spec \
 	package.json \
 	$(NULL)
 

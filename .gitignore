@@ -4,6 +4,8 @@
 .project
 .pydevproject
 
+*.rpm
+
 *.o
 *.a
 config.h.in
