@@ -2,8 +2,8 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
-	python.d.plugin \
-	$(NULL)
+    python.d.plugin \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
@@ -13,145 +13,85 @@ dist_libconfig_DATA = \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
-	python.d.plugin \
-	$(NULL)
+    python.d.plugin \
+    $(NULL)
 
 dist_noinst_DATA = \
-	python.d.plugin.in \
-	README.md \
-	$(NULL)
+    python.d.plugin.in \
+    README.md \
+    $(NULL)
 
 pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \
-    apache/apache.conf \
-    beanstalk/beanstalk.conf \
-    bind_rndc/bind_rndc.conf \
-    boinc/boinc.conf \
-    ceph/ceph.conf \
-    chrony/chrony.conf \
-    couchdb/couchdb.conf \
-    cpuidle/cpuidle.conf \
-    cpufreq/cpufreq.conf \
-    dns_query_time/dns_query_time.conf \
-    dnsdist/dnsdist.conf \
-    dockerd/dockerd.conf \
-    dovecot/dovecot.conf \
-    elasticsearch/elasticsearch.conf \
-    example/example.conf \
-    exim/exim.conf \
-    fail2ban/fail2ban.conf \
-    freeradius/freeradius.conf \
-    go_expvar/go_expvar.conf \
-    haproxy/haproxy.conf \
-    hddtemp/hddtemp.conf \
-    httpcheck/httpcheck.conf \
-    icecast/icecast.conf \
-    ipfs/ipfs.conf \
-    isc_dhcpd/isc_dhcpd.conf \
-    linux_power_supply/linux_power_supply.conf \
-    litespeed/litespeed.conf \
-    logind/logind.conf \
-    mdstat/mdstat.conf \
-    megacli/megacli.conf \
-    memcached/memcached.conf \
-    mongodb/mongodb.conf \
-    monit/monit.conf \
-    mysql/mysql.conf \
-    nginx/nginx.conf \
-    nginx_plus/nginx_plus.conf \
-    nsd/nsd.conf \
-    ntpd/ntpd.conf \
-    ovpn_status_log/ovpn_status_log.conf \
-    phpfpm/phpfpm.conf \
-    portcheck/portcheck.conf \
-    postfix/postfix.conf \
-    postgres/postgres.conf \
-    powerdns/powerdns.conf \
-    puppet/puppet.conf \
-    rabbitmq/rabbitmq.conf \
-    redis/redis.conf \
-    rethinkdbs/rethinkdbs.conf \
-    retroshare/retroshare.conf \
-    samba/samba.conf \
-    sensors/sensors.conf \
-    springboot/springboot.conf \
-    spigotmc/spigotmc.conf \
-    squid/squid.conf \
-    smartd_log/smartd_log.conf \
-    tomcat/tomcat.conf \
-    traefik/traefik.conf \
-    unbound/unbound.conf \
-    varnish/varnish.conf \
-    w1sensor/w1sensor.conf \
-    web_log/web_log.conf \
     $(NULL)
 
 dist_python_SCRIPTS = \
     $(NULL)
 
 dist_python_DATA = \
-    apache/apache.chart.py \
-    beanstalk/beanstalk.chart.py \
-    bind_rndc/bind_rndc.chart.py \
-    boinc/boinc.chart.py \
-    ceph/ceph.chart.py \
-    chrony/chrony.chart.py \
-    couchdb/couchdb.chart.py \
-    cpufreq/cpufreq.chart.py \
-    cpuidle/cpuidle.chart.py \
-    dns_query_time/dns_query_time.chart.py \
-    dnsdist/dnsdist.chart.py \
-    dockerd/dockerd.chart.py \
-    dovecot/dovecot.chart.py \
-    elasticsearch/elasticsearch.chart.py \
-    example/example.chart.py \
-    exim/exim.chart.py \
-    fail2ban/fail2ban.chart.py \
-    freeradius/freeradius.chart.py \
-    go_expvar/go_expvar.chart.py \
-    haproxy/haproxy.chart.py \
-    hddtemp/hddtemp.chart.py \
-    httpcheck/httpcheck.chart.py \
-    icecast/icecast.chart.py \
-    ipfs/ipfs.chart.py \
-    isc_dhcpd/isc_dhcpd.chart.py \
-    linux_power_supply/linux_power_supply.chart.py \
-    litespeed/litespeed.chart.py \
-    logind/logind.chart.py \
-    mdstat/mdstat.chart.py \
-    megacli/megacli.chart.py \
-    memcached/memcached.chart.py \
-    mongodb/mongodb.chart.py \
-    monit/monit.chart.py \
-    mysql/mysql.chart.py \
-    nginx/nginx.chart.py \
-    nginx_plus/nginx_plus.chart.py \
-    nsd/nsd.chart.py \
-    ntpd/ntpd.chart.py \
-    ovpn_status_log/ovpn_status_log.chart.py \
-    phpfpm/phpfpm.chart.py \
-    portcheck/portcheck.chart.py \
-    postfix/postfix.chart.py \
-    postgres/postgres.chart.py \
-    powerdns/powerdns.chart.py \
-    puppet/puppet.chart.py \
-    rabbitmq/rabbitmq.chart.py \
-    redis/redis.chart.py \
-    rethinkdbs/rethinkdbs.chart.py \
-    retroshare/retroshare.chart.py \
-    samba/samba.chart.py \
-    sensors/sensors.chart.py \
-    spigotmc/spigotmc.chart.py \
-    springboot/springboot.chart.py \
-    squid/squid.chart.py \
-    smartd_log/smartd_log.chart.py \
-    tomcat/tomcat.chart.py \
-    traefik/traefik.chart.py \
-    unbound/unbound.chart.py \
-    varnish/varnish.chart.py \
-    w1sensor/w1sensor.chart.py \
-    web_log/web_log.chart.py \
     $(NULL)
+
+include apache/Makefile.inc
+include beanstalk/Makefile.inc
+include bind_rndc/Makefile.inc
+include boinc/Makefile.inc
+include ceph/Makefile.inc
+include chrony/Makefile.inc
+include couchdb/Makefile.inc
+include cpufreq/Makefile.inc
+include cpuidle/Makefile.inc
+include dnsdist/Makefile.inc
+include dns_query_time/Makefile.inc
+include dockerd/Makefile.inc
+include dovecot/Makefile.inc
+include elasticsearch/Makefile.inc
+include example/Makefile.inc
+include exim/Makefile.inc
+include fail2ban/Makefile.inc
+include freeradius/Makefile.inc
+include go_expvar/Makefile.inc
+include haproxy/Makefile.inc
+include hddtemp/Makefile.inc
+include httpcheck/Makefile.inc
+include icecast/Makefile.inc
+include ipfs/Makefile.inc
+include isc_dhcpd/Makefile.inc
+include linux_power_supply/Makefile.inc
+include litespeed/Makefile.inc
+include logind/Makefile.inc
+include mdstat/Makefile.inc
+include megacli/Makefile.inc
+include memcached/Makefile.inc
+include mongodb/Makefile.inc
+include monit/Makefile.inc
+include mysql/Makefile.inc
+include nginx/Makefile.inc
+include nginx_plus/Makefile.inc
+include nsd/Makefile.inc
+include ntpd/Makefile.inc
+include ovpn_status_log/Makefile.inc
+include phpfpm/Makefile.inc
+include portcheck/Makefile.inc
+include postfix/Makefile.inc
+include postgres/Makefile.inc
+include powerdns/Makefile.inc
+include puppet/Makefile.inc
+include rabbitmq/Makefile.inc
+include redis/Makefile.inc
+include rethinkdbs/Makefile.inc
+include retroshare/Makefile.inc
+include samba/Makefile.inc
+include sensors/Makefile.inc
+include smartd_log/Makefile.inc
+include spigotmc/Makefile.inc
+include springboot/Makefile.inc
+include squid/Makefile.inc
+include tomcat/Makefile.inc
+include traefik/Makefile.inc
+include unbound/Makefile.inc
+include varnish/Makefile.inc
+include w1sensor/Makefile.inc
+include web_log/Makefile.inc
 
 pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
