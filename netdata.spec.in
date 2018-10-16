@@ -184,11 +184,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}
 
 %config %{_sysconfdir}/%{name}/*.conf
-%config %{_sysconfdir}/%{name}/charts.d/*.conf
-%config %{_sysconfdir}/%{name}/health.d/*.conf
-%config %{_sysconfdir}/%{name}/node.d/*.conf
-%config %{_sysconfdir}/%{name}/python.d/*.conf
-%config %{_sysconfdir}/%{name}/statsd.d/*.conf
+#%config %{_sysconfdir}/%{name}/charts.d/*.conf
+#%config %{_sysconfdir}/%{name}/health.d/*.conf
+#%config %{_sysconfdir}/%{name}/node.d/*.conf
+#%config %{_sysconfdir}/%{name}/python.d/*.conf
+#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 # To be eventually moved to %%_defaultdocdir
