@@ -405,7 +405,7 @@ NETDATA_COMMON_LIBS = \
 
 
 sbin_PROGRAMS += netdata
-netdata_SOURCES = ../config.h $(NETDATA_FILES)
+netdata_SOURCES = config.h $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \
@@ -413,7 +413,7 @@ netdata_LDADD = \
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
-    apps_plugin_SOURCES = ../config.h $(APPS_PLUGIN_FILES)
+    apps_plugin_SOURCES = config.h $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
@@ -422,7 +422,7 @@ endif
 
 if ENABLE_PLUGIN_CGROUP_NETWORK
     plugins_PROGRAMS += cgroup-network
-    cgroup_network_SOURCES = ../config.h $(CGROUP_NETWORK_FILES)
+    cgroup_network_SOURCES = config.h $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(NULL)
@@ -430,7 +430,7 @@ endif
 
 if ENABLE_PLUGIN_FREEIPMI
     plugins_PROGRAMS += freeipmi.plugin
-    freeipmi_plugin_SOURCES = ../config.h $(FREEIPMI_PLUGIN_FILES)
+    freeipmi_plugin_SOURCES = config.h $(FREEIPMI_PLUGIN_FILES)
     freeipmi_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
