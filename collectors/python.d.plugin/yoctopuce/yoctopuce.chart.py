@@ -25,6 +25,10 @@ except ImportError:
 # usually take longer than 1s to stabilize on a value.
 update_every = 5
 
+# This plugin should only run if explicitly enabled, as it's not likely
+# to be used by most people and has an expensive check call.
+disabled_by_default = True
+
 # This is the global order, a subset for the actual list of charts we
 # can provide is created at runtime.
 ORDER = ['light', 'temperature', 'humidity', 'pressure', 'current', 'voltage', 'voc', 'co2']
