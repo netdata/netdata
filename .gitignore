@@ -31,7 +31,6 @@ libtool
 ltmain.sh
 missing
 stamp-h1
-netdata.spec
 
 # netdata binaries
 netdata
