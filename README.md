@@ -72,11 +72,11 @@ Netdata now has its own github organization `netdata`, so all github URLs are no
 
 ---
 
-<img src="https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png">
+![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)
 
 `Jun 16, 2018` - **netdata in CNCF**
 
-Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://deploy-preview-842--landscape.netlify.com/grouping=no&sort=stars).
+Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
 
 Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.
 
