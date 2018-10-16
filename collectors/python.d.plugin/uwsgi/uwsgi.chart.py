@@ -19,49 +19,49 @@ CHARTS = {
     'requests': {
         'options': [None, 'Requests', 'requests/s', 'requests', 'uwsgi.requests', 'stacked'],
         'lines': [
-            ['requests_%s', 'worker %s', 'incremental']
+            ['requests', 'requests', 'incremental']
         ]
     },
     'tx': {
         'options': [None, 'Transmitted data', 'KB/s', 'requests', 'uwsgi.tx', 'stacked'],
         'lines': [
-            ['tx_%s', 'worker %s', 'incremental']
+            ['tx', 'tx', 'incremental']
         ]
     },
     'avg_rt': {
         'options': [None, 'Average request time', 'ms', 'requests', 'uwsgi.avg_rt', 'line'],
         'lines': [
-            ['avg_rt_%s', 'worker %s', 'absolute']
+            ['avg_rt', 'avg_rt', 'absolute']
         ]
     },
     'memory_rss': {
         'options': [None, 'RSS (Resident Set Size)', 'MB', 'memory', 'uwsgi.memory_rss', 'stacked'],
         'lines': [
-            ['memory_rss_%s', 'worker %s', 'absolute', 1, 1024 * 1024]
+            ['memory_rss', 'memory_rss', 'absolute', 1, 1024 * 1024]
         ]
     },
     'memory_vsz': {
         'options': [None, 'VSZ (Virtual Memory Size)', 'MB', 'memory', 'uwsgi.memory_vsz', 'stacked'],
         'lines': [
-            ['memory_vsz_%s', 'worker %s', 'absolute', 1, 1024 * 1024]
+            ['memory_vsz', 'memory_vsz', 'absolute', 1, 1024 * 1024]
         ]
     },
     'exceptions': {
         'options': [None, 'Exceptions', 'exceptions', 'exceptions', 'uwsgi.exceptions', 'line'],
         'lines': [
-            ['exceptions_%s', 'worker %s', 'incremental']
+            ['exceptions', 'exceptions', 'incremental']
         ]
     },
     'harakiri': {
         'options': [None, 'Harakiris', 'harakiris', 'harakiris', 'uwsgi.harakiris', 'line'],
         'lines': [
-            ['harakiri_count_%s', 'worker %s', 'incremental']
+            ['harakiri_count', 'harakiris', 'incremental']
         ]
     },
     'respawn': {
         'options': [None, 'Respawns', 'respawns', 'respawns', 'uwsgi.respawns', 'line'],
         'lines': [
-            ['respawn_count_%s', 'worker %s', 'incremental']
+            ['respawn_count', 'respawns', 'incremental']
         ]
     },
 }
@@ -76,6 +76,7 @@ class Service(SocketService):
         self.definitions = deepcopy(CHARTS)
 
         self.last_result = {}
+        self.workers = []
 
     def read_data(self):
         """
@@ -96,25 +97,29 @@ class Service(SocketService):
         Parse configuration, check if redis is available, and dynamically create chart lines data
         :return: boolean
         """
-        if not SocketService.check(self):
-            return False
+        self._parse_config()
 
-        stats = self.read_data()
-        if not stats:
-            return False
-
-        # Generate chart dimensions
-        for chart in CHARTS:
+        # Clear dynamic dimensions, these are added during `_get_data()` to allow adding workers at run-time
+        for chart in ('requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz'):
             self.definitions[chart]['lines'] = []
 
-            for worker in stats['workers']:
-                for line in CHARTS[chart]['lines']:
-                    # dimension name and id
-                    dimension_name = line[0] % worker['id']
-                    dimension_id = line[1] % worker['id']
-                    self.definitions[chart]['lines'].append([dimension_name, dimension_id] + line[2:])
+        stats = self.read_data()
+        return bool(stats)
 
-        return True
+    def add_worker_dimensions(self, key):
+        """
+        Helper to add dimensions for a worker.
+        :param key: (int or str) worker identifier
+        :return:
+        """
+        for chart in ('requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz'):
+
+            for line in CHARTS[chart]['lines']:
+                dimension_id = '%s_%s' % (line[0], key)
+                dimension_name = str(key)
+
+                dimension = [dimension_id, dimension_name] + line[2:]
+                self.charts[chart].add_dimension(dimension)
 
     @staticmethod
     def _check_raw_data(data):
@@ -131,22 +136,34 @@ class Service(SocketService):
         if not stats:
             return None
 
-        result = {}
+        result = {
+            'exceptions': 0,
+            'harakiri_count': 0,
+            'respawn_count': 0,
+        }
 
         for worker in stats['workers']:
-            result['requests_%s' % worker['id']] = worker['requests']
-            result['tx_%s' % worker['id']] = worker['tx']
-            result['avg_rt_%s' % worker['id']] = worker['avg_rt']
+            key = worker['pid']
+
+            # Add dimensions for new workers
+            if key not in self.workers:
+                self.add_worker_dimensions(key)
+                self.workers.append(key)
+
+            result['requests_%s' % key] = worker['requests']
+            result['tx_%s' % key] = worker['tx']
+            result['avg_rt_%s' % key] = worker['avg_rt']
 
             # avg_rt is not reset by uwsgi, so reset here
-            if self.last_result.get('requests_%s' % worker['id']) == worker['requests']:
-                result['avg_rt_%s' % worker['id']] = 0
+            if self.last_result.get('requests_%s' % key) == worker['requests']:
+                result['avg_rt_%s' % key] = 0
 
-            result['memory_rss_%s' % worker['id']] = worker['rss']
-            result['memory_vsz_%s' % worker['id']] = worker['vsz']
-            result['exceptions_%s' % worker['id']] = worker['exceptions']
-            result['harakiri_count_%s' % worker['id']] = worker['harakiri_count']
-            result['respawn_count_%s' % worker['id']] = worker['respawn_count']
+            result['memory_rss_%s' % key] = worker['rss']
+            result['memory_vsz_%s' % key] = worker['vsz']
+
+            result['exceptions'] += worker['exceptions']
+            result['harakiri_count'] += worker['harakiri_count']
+            result['respawn_count'] += worker['respawn_count']
 
         self.last_result = result
         return result
