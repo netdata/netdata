@@ -12,59 +12,67 @@ from bases.FrameworkServices.SocketService import SocketService
 priority = 60000
 retries = 60
 
-ORDER = ['requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz', 'exceptions', 'harakiri', 'respawn', ]
+ORDER = ['requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz', 'exceptions', 'harakiri', 'respawn']
 
 # NOTE: lines are created dynamically in `check()` method
 CHARTS = {
     'requests': {
         'options': [None, 'Requests', 'requests/s', 'requests', 'uwsgi.requests', 'stacked'],
         'lines': [
-            ['requests.%s', 'worker %s', 'incremental']
-        ]},
+            ['requests_%s', 'worker %s', 'incremental']
+        ]
+    },
     'tx': {
         'options': [None, 'Transmitted data', 'KB/s', 'requests', 'uwsgi.tx', 'stacked'],
         'lines': [
-            ['tx.%s', 'worker %s', 'incremental']
-        ]},
+            ['tx_%s', 'worker %s', 'incremental']
+        ]
+    },
     'avg_rt': {
         'options': [None, 'Average request time', 'ms', 'requests', 'uwsgi.avg_rt', 'line'],
         'lines': [
-            ['avg_rt.%s', 'worker %s', 'absolute']
-        ]},
+            ['avg_rt_%s', 'worker %s', 'absolute']
+        ]
+    },
     'memory_rss': {
         'options': [None, 'RSS (Resident Set Size)', 'MB', 'memory', 'uwsgi.memory_rss', 'stacked'],
         'lines': [
-            ['memory_rss.%s', 'worker %s', 'absolute', 1, 1024 * 1024]
-        ]},
+            ['memory_rss_%s', 'worker %s', 'absolute', 1, 1024 * 1024]
+        ]
+    },
     'memory_vsz': {
         'options': [None, 'VSZ (Virtual Memory Size)', 'MB', 'memory', 'uwsgi.memory_vsz', 'stacked'],
         'lines': [
-            ['memory_vsz.%s', 'worker %s', 'absolute', 1, 1024 * 1024]
-        ]},
+            ['memory_vsz_%s', 'worker %s', 'absolute', 1, 1024 * 1024]
+        ]
+    },
     'exceptions': {
         'options': [None, 'Exceptions', 'exceptions', 'exceptions', 'uwsgi.exceptions', 'line'],
         'lines': [
-            ['exceptions.%s', 'worker %s', 'incremental']
-        ]},
+            ['exceptions_%s', 'worker %s', 'incremental']
+        ]
+    },
     'harakiri': {
         'options': [None, 'Harakiris', 'harakiris', 'harakiris', 'uwsgi.harakiris', 'line'],
         'lines': [
-            ['harakiri_count.%s', 'worker %s', 'incremental']
-        ]},
+            ['harakiri_count_%s', 'worker %s', 'incremental']
+        ]
+    },
     'respawn': {
         'options': [None, 'Respawns', 'respawns', 'respawns', 'uwsgi.respawns', 'line'],
         'lines': [
-            ['respawn_count.%s', 'worker %s', 'incremental']
-        ]},
+            ['respawn_count_%s', 'worker %s', 'incremental']
+        ]
+    },
 }
 
 
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
-        SocketService.__init__(self, configuration=configuration, name=name)
+        super(Service, self).__init__(configuration=configuration, name=name)
         self.url = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 1717)
-        self.order = deepcopy(ORDER)
+        self.order = ORDER
         self.definitions = deepcopy(CHARTS)
 
         self.last_result = {}
@@ -77,7 +85,11 @@ class Service(SocketService):
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
-        return json.loads(raw_data)
+        try:
+            return json.loads(raw_data)
+        except ValueError as err:
+            self.error(err)
+            return None
 
     def check(self):
         """
@@ -104,8 +116,10 @@ class Service(SocketService):
 
         return True
 
-    def _check_raw_data(self, data):
-        # Keep reading until disconnected
+    @staticmethod
+    def _check_raw_data(data):
+        # The server will close the connection when it's done sending
+        # data, so just keep looping until that happens.
         return False
 
     def _get_data(self):
@@ -120,19 +134,19 @@ class Service(SocketService):
         result = {}
 
         for worker in stats['workers']:
-            result['requests.%s' % worker['id']] = worker['requests']
-            result['tx.%s' % worker['id']] = worker['tx']
-            result['avg_rt.%s' % worker['id']] = worker['avg_rt']
+            result['requests_%s' % worker['id']] = worker['requests']
+            result['tx_%s' % worker['id']] = worker['tx']
+            result['avg_rt_%s' % worker['id']] = worker['avg_rt']
 
             # avg_rt is not reset by uwsgi, so reset here
-            if self.last_result.get('requests.%s' % worker['id']) == worker['requests']:
-                result['avg_rt.%s' % worker['id']] = 0
+            if self.last_result.get('requests_%s' % worker['id']) == worker['requests']:
+                result['avg_rt_%s' % worker['id']] = 0
 
-            result['memory_rss.%s' % worker['id']] = worker['rss']
-            result['memory_vsz.%s' % worker['id']] = worker['vsz']
-            result['exceptions.%s' % worker['id']] = worker['exceptions']
-            result['harakiri_count.%s' % worker['id']] = worker['harakiri_count']
-            result['respawn_count.%s' % worker['id']] = worker['respawn_count']
+            result['memory_rss_%s' % worker['id']] = worker['rss']
+            result['memory_vsz_%s' % worker['id']] = worker['vsz']
+            result['exceptions_%s' % worker['id']] = worker['exceptions']
+            result['harakiri_count_%s' % worker['id']] = worker['harakiri_count']
+            result['respawn_count_%s' % worker['id']] = worker['respawn_count']
 
         self.last_result = result
         return result
