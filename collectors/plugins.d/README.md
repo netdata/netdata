@@ -47,7 +47,7 @@ Netdata will start it when it starts and stop it when it exits.
 If the external plugin exits or crashes, netdata will log an error.
 If the external plugin exits or crashes without pushing metrics to netdata, netdata will not start it again.
 - Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
-- Plugins may also be disabled by netdata if they are writing things that netdata does not understand.
+- Plugins may also be disabled by netdata if they output things that netdata does not understand.
 
 The `stdout` of external plugins is connected to netdata to receive metrics,
 with the API defined below.
@@ -58,10 +58,9 @@ Plugins can create any number of charts with any number of dimensions each. Each
 
 ## Configuration
 
-Netdata will supply the environment variable `NETDATA_CONFIG_DIR` having the directory where configuration files are stored. It is up to the plugin to read the configuration it needs. `plugins.d` itself is configured via `netdata.conf`, section `[plugins]`. 
+Netdata will supply the environment variables `NETDATA_USER_CONFIG_DIR` (for user supplied) and `NETDATA_STOCK_CONFIG_DIR` (for netdata supplied) configuration files to identify the directory where configuration files are stored. It is up to the plugin to read the configuration it needs. 
 
-At this section there a list of all the plugins found at the system it runs
-with a boolean setting to enable them or not. 
+The `netdata.conf` section [plugins] section contains a list of all the plugins found at the system where netdata runs, with a boolean setting to enable them or not. 
 
 Example:
 
@@ -376,9 +375,6 @@ follow these guidelines), will be disabled by netdata.
 
 netdata will collect any **signed** value in the 64bit range:
 `-9.223.372.036.854.775.808` to `+9.223.372.036.854.775.807`
-
-Internally, all calculations are made using 128 bit double precision and are
-stored in 30 bits as floating point.
 
 If a value is not collected, leave it empty, like this:
 
