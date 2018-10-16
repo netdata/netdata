@@ -3,8 +3,8 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
-	charts.d.plugin \
-	$(NULL)
+    charts.d.plugin \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
@@ -14,14 +14,15 @@ dist_libconfig_DATA = \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
-	charts.d.dryrun-helper.sh \
-	charts.d.plugin \
-	loopsleepms.sh.inc \
-	$(NULL)
+    charts.d.dryrun-helper.sh \
+    charts.d.plugin \
+    loopsleepms.sh.inc \
+    $(NULL)
 
 dist_noinst_DATA = \
-	charts.d.plugin.in \
-	ap/README.md \
+    charts.d.plugin.in \
+    README.md \
+    ap/README.md \
     apache/README.md \
     apcupsd/README.md \
     cpu_apps/README.md \
@@ -41,33 +42,33 @@ dist_noinst_DATA = \
     sensors/README.md \
     squid/README.md \
     tomcat/README.md \
-	$(NULL)
+    $(NULL)
 
 dist_charts_SCRIPTS = \
-	$(NULL)
+    $(NULL)
 
 dist_charts_DATA = \
-	ap/ap.chart.sh \
-	apcupsd/apcupsd.chart.sh \
-	apache/apache.chart.sh \
-	cpu_apps/cpu_apps.chart.sh \
-	cpufreq/cpufreq.chart.sh \
-	example/example.chart.sh \
-	exim/exim.chart.sh \
-	hddtemp/hddtemp.chart.sh \
-	libreswan/libreswan.chart.sh \
-	load_average/load_average.chart.sh \
-	mem_apps/mem_apps.chart.sh \
-	mysql/mysql.chart.sh \
-	nginx/nginx.chart.sh \
-	nut/nut.chart.sh \
-	opensips/opensips.chart.sh \
-	phpfpm/phpfpm.chart.sh \
-	postfix/postfix.chart.sh \
-	sensors/sensors.chart.sh \
-	squid/squid.chart.sh \
-	tomcat/tomcat.chart.sh \
-	$(NULL)
+    ap/ap.chart.sh \
+    apcupsd/apcupsd.chart.sh \
+    apache/apache.chart.sh \
+    cpu_apps/cpu_apps.chart.sh \
+    cpufreq/cpufreq.chart.sh \
+    example/example.chart.sh \
+    exim/exim.chart.sh \
+    hddtemp/hddtemp.chart.sh \
+    libreswan/libreswan.chart.sh \
+    load_average/load_average.chart.sh \
+    mem_apps/mem_apps.chart.sh \
+    mysql/mysql.chart.sh \
+    nginx/nginx.chart.sh \
+    nut/nut.chart.sh \
+    opensips/opensips.chart.sh \
+    phpfpm/phpfpm.chart.sh \
+    postfix/postfix.chart.sh \
+    sensors/sensors.chart.sh \
+    squid/squid.chart.sh \
+    tomcat/tomcat.chart.sh \
+    $(NULL)
 
 chartsconfigdir=$(libconfigdir)/charts.d
 dist_chartsconfig_DATA = \
