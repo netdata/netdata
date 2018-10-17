@@ -45,6 +45,7 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 // API sockets
 
 LISTEN_SOCKETS api_sockets = {
+        .config          = &netdata_config,
         .config_section  = CONFIG_SECTION_WEB,
         .default_bind_to = "*",
         .default_port    = API_LISTEN_PORT,

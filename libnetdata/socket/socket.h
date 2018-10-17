@@ -10,6 +10,7 @@
 #endif
 
 typedef struct listen_sockets {
+    struct config *config;              // the config file to use
     const char *config_section;         // the netdata configuration section to read settings from
     const char *default_bind_to;        // the default bind to configuration string
     uint16_t default_port;              // the default port to use

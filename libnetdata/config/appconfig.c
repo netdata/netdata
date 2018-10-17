@@ -42,31 +42,6 @@ struct section {
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
-static int appconfig_section_compare(void *a, void *b);
-
-struct config netdata_config = {
-        .sections = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-            .avl_tree = {
-                .root = NULL,
-                .compar = appconfig_section_compare
-            },
-            .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
-
-struct config stream_config = {
-        .sections = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                    .root = NULL,
-                    .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
 
 // ----------------------------------------------------------------------------
 // locking
@@ -112,7 +87,7 @@ static struct config_option *appconfig_option_index_find(struct section *co, con
 // ----------------------------------------------------------------------------
 // config sections index
 
-static int appconfig_section_compare(void *a, void *b) {
+int appconfig_section_compare(void *a, void *b) {
     if(((struct section *)a)->hash < ((struct section *)b)->hash) return -1;
     else if(((struct section *)a)->hash > ((struct section *)b)->hash) return 1;
     else return strcmp(((struct section *)a)->name, ((struct section *)b)->name);

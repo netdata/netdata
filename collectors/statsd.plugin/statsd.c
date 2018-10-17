@@ -353,6 +353,7 @@ static struct statsd {
         .threads = 0,
         .collection_threads_status = NULL,
         .sockets = {
+                .config          = &netdata_config,
                 .config_section  = CONFIG_SECTION_STATSD,
                 .default_bind_to = "udp:localhost tcp:localhost",
                 .default_port    = STATSD_LISTEN_PORT,

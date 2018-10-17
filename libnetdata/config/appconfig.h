@@ -102,10 +102,6 @@ struct config {
     avl_tree_lock index;
 };
 
-extern struct config
-        netdata_config,
-        stream_config;
-
 #define CONFIG_BOOLEAN_NO   0
 #define CONFIG_BOOLEAN_YES  1
 
@@ -132,25 +128,6 @@ extern int appconfig_move(struct config *root, const char *section_old, const ch
 
 extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
 
-// ----------------------------------------------------------------------------
-// shortcuts for the default netdata configuration
-
-#define config_load(filename, overwrite_used) appconfig_load(&netdata_config, filename, overwrite_used)
-#define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
-#define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
-#define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
-#define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
-#define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
-
-#define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
-#define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
-#define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
-#define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
-#define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
-
-#define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
-#define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)
-
-#define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
+extern int appconfig_section_compare(void *a, void *b);
 
 #endif /* NETDATA_CONFIG_H */

@@ -32,12 +32,42 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
+static struct config stream_config = {
+        .sections = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+                .avl_tree = {
+                        .root = NULL,
+                        .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
+        }
+};
+
 unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
 
+static void load_stream_conf() {
+    errno = 0;
+    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
+    if(!appconfig_load(&stream_config, filename, 0)) {
+        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
+        freez(filename);
+
+        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
+        if(!appconfig_load(&stream_config, filename, 0))
+            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+    }
+    freez(filename);
+}
+
 int rrdpush_init() {
+    // --------------------------------------------------------------------
+    // load stream.conf
+    load_stream_conf();
+
     default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
