@@ -12,7 +12,24 @@ from bases.FrameworkServices.SocketService import SocketService
 priority = 60000
 retries = 60
 
-ORDER = ['requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz', 'exceptions', 'harakiri', 'respawn']
+ORDER = [
+    'requests',
+    'tx',
+    'avg_rt',
+    'memory_rss',
+    'memory_vsz',
+    'exceptions',
+    'harakiri',
+    'respawn',
+]
+
+DYNAMIC_CHARTS = [
+    'requests',
+    'tx',
+    'avg_rt',
+    'memory_rss',
+    'memory_vsz',
+]
 
 # NOTE: lines are created dynamically in `check()` method
 CHARTS = {
@@ -75,6 +92,10 @@ class Service(SocketService):
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
 
+        # Clear dynamic dimensions, these are added during `_get_data()` to allow adding workers at run-time
+        for chart in DYNAMIC_CHARTS:
+            self.definitions[chart]['lines'] = []
+
         self.last_result = {}
         self.workers = []
 
@@ -94,17 +115,11 @@ class Service(SocketService):
 
     def check(self):
         """
-        Parse configuration, check if redis is available, and dynamically create chart lines data
+        Parse configuration and check if we can read data.
         :return: boolean
         """
         self._parse_config()
-
-        # Clear dynamic dimensions, these are added during `_get_data()` to allow adding workers at run-time
-        for chart in ('requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz'):
-            self.definitions[chart]['lines'] = []
-
-        stats = self.read_data()
-        return bool(stats)
+        return bool(self.read_data())
 
     def add_worker_dimensions(self, key):
         """
@@ -112,10 +127,9 @@ class Service(SocketService):
         :param key: (int or str) worker identifier
         :return:
         """
-        for chart in ('requests', 'tx', 'avg_rt', 'memory_rss', 'memory_vsz'):
-
+        for chart in DYNAMIC_CHARTS:
             for line in CHARTS[chart]['lines']:
-                dimension_id = '%s_%s' % (line[0], key)
+                dimension_id = '{}_{}'.format(line[0], key)
                 dimension_name = str(key)
 
                 dimension = [dimension_id, dimension_name] + line[2:]
@@ -150,16 +164,16 @@ class Service(SocketService):
                 self.add_worker_dimensions(key)
                 self.workers.append(key)
 
-            result['requests_%s' % key] = worker['requests']
-            result['tx_%s' % key] = worker['tx']
-            result['avg_rt_%s' % key] = worker['avg_rt']
+            result['requests_{}'.format(key)] = worker['requests']
+            result['tx_{}'.format(key)] = worker['tx']
+            result['avg_rt_{}'.format(key)] = worker['avg_rt']
 
             # avg_rt is not reset by uwsgi, so reset here
-            if self.last_result.get('requests_%s' % key) == worker['requests']:
-                result['avg_rt_%s' % key] = 0
+            if self.last_result.get('requests_{}'.format(key)) == worker['requests']:
+                result['avg_rt_{}'.format(key)] = 0
 
-            result['memory_rss_%s' % key] = worker['rss']
-            result['memory_vsz_%s' % key] = worker['vsz']
+            result['memory_rss_{}'.format(key)] = worker['rss']
+            result['memory_vsz_{}'.format(key)] = worker['vsz']
 
             result['exceptions'] += worker['exceptions']
             result['harakiri_count'] += worker['harakiri_count']
