@@ -80,12 +80,17 @@ Recommends:	python2-psycopg2 \
 %endif
 
 Summary:	Real-time performance monitoring, done right
-Name:		@PACKAGE_NAME@
-Version:	@PACKAGE_RPM_VERSION@
+Name:		netdata
+Version:	%(git describe --abbrev=0 --tags | cut -dv -f2)
+%if %(git describe --tags --exact-match HEAD 2>/dev/null | wc -l) == 0
+Release:        git_%(git rev-parse --short HEAD)%{?dist}
+%else
 Release:	1%{?dist}
+%endif
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.gz
+#Source0:	https://github.com/netdata/%{name}/releases/download/v%{version}/%{name}-%{version}.tar.gz
+Source0:        %(ls netdata*.tar.gz)
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
@@ -126,7 +131,7 @@ so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
 %prep
-%setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
+%setup -q -n %(ls netdata*.tar.gz | cut -d. -f1-3)
 
 %build
 %configure \

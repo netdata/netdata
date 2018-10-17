@@ -4,6 +4,8 @@
 .project
 .pydevproject
 
+*.rpm
+
 *.o
 *.a
 config.h.in
@@ -29,7 +31,6 @@ libtool
 ltmain.sh
 missing
 stamp-h1
-netdata.spec
 
 # netdata binaries
 netdata
