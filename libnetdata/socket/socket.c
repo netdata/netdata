@@ -448,19 +448,19 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     listen_sockets_init(sockets);
 
-    sockets->backlog = (int) config_get_number(sockets->config_section, "listen backlog", sockets->backlog);
+    sockets->backlog = (int) appconfig_get_number(sockets->config, sockets->config_section, "listen backlog", sockets->backlog);
 
     long long int old_port = sockets->default_port;
-    long long int new_port = config_get_number(sockets->config_section, "default port", sockets->default_port);
+    long long int new_port = appconfig_get_number(sockets->config, sockets->config_section, "default port", sockets->default_port);
     if(new_port < 1 || new_port > 65535) {
         error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
-        sockets->default_port = (uint16_t) config_set_number(sockets->config_section, "default port", old_port);
+        sockets->default_port = (uint16_t) appconfig_set_number(sockets->config, sockets->config_section, "default port", old_port);
     }
     else sockets->default_port = (uint16_t)new_port;
 
     debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 
-    char *s = config_get(sockets->config_section, "bind to", sockets->default_bind_to);
+    char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
     while(*s) {
         char *e = s;
 

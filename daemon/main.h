@@ -5,6 +5,8 @@
 
 #include "common.h"
 
+extern struct config netdata_config;
+
 #define NETDATA_MAIN_THREAD_RUNNING   CONFIG_BOOLEAN_YES
 #define NETDATA_MAIN_THREAD_EXITING  (CONFIG_BOOLEAN_YES + 1)
 #define NETDATA_MAIN_THREAD_EXITED    CONFIG_BOOLEAN_NO
