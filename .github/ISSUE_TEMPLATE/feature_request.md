@@ -1,3 +1,9 @@
+---
+name: Feature request
+about: Suggest an idea for our project
+
+---
+
 <!--- Verify first that your issue is not already reported on GitHub -->
 
 ##### Feature idea summary
