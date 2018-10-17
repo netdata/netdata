@@ -5,9 +5,9 @@
 # IT IS REQUIRED TO REFERENCE ALL FILES RELATIVE TO THE PARENT
 
 # install these files
-dist_python_DATA       += yoctopuceg/yoctopuceg.chart.py
-dist_pythonconfig_DATA += yoctopuceg/yoctopuceg.conf
+dist_python_DATA       += yoctopuce/yoctopuce.chart.py
+dist_pythonconfig_DATA += yoctopuce/yoctopuce.conf
 
 # do not install these files, but include them in the distribution
-dist_noinst_DATA       += yoctopuceg/README.md yoctopuceg/Makefile.inc
+dist_noinst_DATA       += yoctopuce/README.md yoctopuce/Makefile.inc
 
