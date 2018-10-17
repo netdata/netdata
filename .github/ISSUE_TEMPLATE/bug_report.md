@@ -1,3 +1,9 @@
+---
+name: Bug report
+about: Create a bug report to help us improve
+
+---
+
 <!--- Verify first that your issue is not already reported on GitHub -->
 <!--- Also test if the latest release and devel branch are affected too -->
 
