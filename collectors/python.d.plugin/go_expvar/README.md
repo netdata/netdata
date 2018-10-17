@@ -1,9 +1,9 @@
 # go_expvar
 
-The `go_expvar` module can monitor any Go application that exposes its metrics with the use of `expvar` package from the Go standard library.
+The `go_expvar` module can monitor any Go application that exposes its metrics with the use of
+`expvar` package from the Go standard library.
 
 `go_expvar` produces charts for Go runtime memory statistics and optionally any number of custom charts.
-Please see the [wiki page](https://github.com/netdata/netdata/wiki/Monitoring-Go-Applications) for more info.
 
 For the memory statistics, it produces the following charts:
 
@@ -32,11 +32,13 @@ For the memory statistics, it produces the following charts:
 
 ## Monitoring Go Applications
 
-Netdata can be used to monitor running Go applications that expose their metrics with the use of the [expvar package](https://golang.org/pkg/expvar/) included in Go standard library.
+Netdata can be used to monitor running Go applications that expose their metrics with
+the use of the [expvar package](https://golang.org/pkg/expvar/) included in Go standard library.
 
-The `expvar` package exposes these metrics over HTTP and is very easy to use. Consider this minimal sample below:
+The `expvar` package exposes these metrics over HTTP and is very easy to use.
+Consider this minimal sample below:
 
-```
+```go
 package main
 
 import (
@@ -49,18 +51,23 @@ func main() {
 }
 ```
 
-When imported this way, the `expvar` package registers a HTTP handler at `/debug/vars` that exposes Go runtime's memory statistics in JSON format. You can inspect the output by opening the URL in your browser (or by using `wget` or `curl`). Sample output:
+When imported this way, the `expvar` package registers a HTTP handler at `/debug/vars` that
+exposes Go runtime's memory statistics in JSON format. You can inspect the output by opening
+the URL in your browser (or by using `wget` or `curl`).
 
-```
+Sample output:
+
+```json
 {
 "cmdline": ["./expvar-demo-binary"],
 "memstats": {"Alloc":630856,"TotalAlloc":630856,"Sys":3346432,"Lookups":27, <ommited for brevity>}
 }
 ```
 
-You can of course expose and monitor your own variables as well. Here is a sample Go application that exposes a few custom variables:
+You can of course expose and monitor your own variables as well.
+Here is a sample Go application that exposes a few custom variables:
 
-```
+```go
 package main
 
 import (
@@ -91,13 +98,17 @@ func main() {
 }
 ```
 
-Apart from the runtime memory stats, this application publishes two counters and the number of currently running Goroutines and updates these stats every second.
+Apart from the runtime memory stats, this application publishes two counters and the
+number of currently running Goroutines and updates these stats every second.
 
-In the next section, we will cover how to monitor and chart these exposed stats with the use of `netdata`s ```go_expvar``` module.
+In the next section, we will cover how to monitor and chart these exposed stats with
+the use of `netdata`s ```go_expvar``` module.
 
 ### Using netdata go_expvar module
 
-The `go_expvar` module is disabled by default. To enable it, edit [`python.d.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d.conf) (to edit it on your system run `/etc/netdata/edit-config python.d.conf`), and change the `go_expvar` variable to `yes`:
+The `go_expvar` module is disabled by default. To enable it, edit [`python.d.conf`](../python.d.conf)
+(to edit it on your system run `/etc/netdata/edit-config python.d.conf`), and change the `go_expvar`
+variable to `yes`:
 
 ```
 # Enable / Disable python.d.plugin modules
@@ -113,7 +124,10 @@ go_expvar: yes
 ...
 ```
 
-Next, we need to edit the module configuration file (found at [`/etc/netdata/python.d/go_expvar.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/go_expvar.conf) by default) (to edit it on your system run `/etc/netdata/edit-config python.d/go_expvar.conf`). The module configuration consists of jobs, where each job can be used to monitor a separate Go application. Let's see a sample job configuration:
+Next, we need to edit the module configuration file (found at [`/etc/netdata/python.d/go_expvar.conf`](go_expvar.conf) by default)
+(to edit it on your system run `/etc/netdata/edit-config python.d/go_expvar.conf`).
+The module configuration consists of jobs, where each job can be used to monitor a separate Go application.
+Let's see a sample job configuration:
 
 ```
 # /etc/netdata/python.d/go_expvar.conf
@@ -129,23 +143,29 @@ Let's go over each of the defined options:
 
     name: 'app1'
 
-This is the job name that will appear at the netdata dashboard. If not defined, the job_name (top level key) will be used.
+This is the job name that will appear at the netdata dashboard.
+If not defined, the job_name (top level key) will be used.
 
     url: 'http://127.0.0.1:8080/debug/vars'
 
-This is the URL of the expvar endpoint. As the expvar handler can be installed in a custom path, the whole URL has to be specified. This value is mandatory.
+This is the URL of the expvar endpoint. As the expvar handler can be installed
+in a custom path, the whole URL has to be specified. This value is mandatory.
 
     collect_memstats: true
 
-Whether to enable collecting stats about Go runtime's memory. You can find more information about the exposed values at the [runtime package docs](https://golang.org/pkg/runtime/#MemStats).
+Whether to enable collecting stats about Go runtime's memory. You can find more
+information about the exposed values at the [runtime package docs](https://golang.org/pkg/runtime/#MemStats).
 
     extra_charts: {}
 
-Enables the user to specify custom expvars to monitor and chart. Will be explained in more detail below.
+Enables the user to specify custom expvars to monitor and chart.
+Will be explained in more detail below.
 
-**Note: if `collect_memstats` is disabled and no `extra_charts` are defined, the plugin will disable itself, as there will be no data to collect!**
+**Note: if `collect_memstats` is disabled and no `extra_charts` are defined, the plugin will
+disable itself, as there will be no data to collect!**
 
-Apart from these options, each job supports options inherited from netdata's `python.d.plugin` and its base `UrlService` class. These are:
+Apart from these options, each job supports options inherited from netdata's `python.d.plugin`
+and its base `UrlService` class. These are:
 
     update_every: 1          # the job's data collection frequency
     priority:     60000      # the job's order on the dashboard
@@ -155,24 +175,30 @@ Apart from these options, each job supports options inherited from netdata's `py
 
 ### Monitoring custom vars with go_expvar
 
-Now, memory stats might be useful, but what if you want netdata to monitor some custom values that your Go application exposes? The `go_expvar` module can do that as well with the use of the `extra_charts` configuration variable.
+Now, memory stats might be useful, but what if you want netdata to monitor some custom values
+that your Go application exposes? The `go_expvar` module can do that as well with the use of
+the `extra_charts` configuration variable.
 
-The `extra_charts` variable is a YaML list of netdata chart definitions. Each chart definition has the following keys:
+The `extra_charts` variable is a YaML list of netdata chart definitions.
+Each chart definition has the following keys:
 
     id:         netdata chart ID
     options:    a key-value mapping of chart options
     lines:      a list of line definitions
 
-**Note: please do not use dots in the chart or line ID field. See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-284494195) for explanation.**
+**Note: please do not use dots in the chart or line ID field.
+See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-284494195) for explanation.**
 
 Please see these two links to the official netdata documentation for more information about the values:
 
-- [External plugins - charts](https://github.com/netdata/netdata/wiki/External-Plugins#chart)
+- [External plugins - charts](../../plugins.d/#chart)
 - [Chart variables](https://github.com/netdata/netdata/wiki/How-to-write-new-module#global-variables-order-and-chart)
 
 **Line definitions**
 
-Each chart can define multiple lines (dimensions). A line definition is a key-value mapping of line options. Each line can have the following options:
+Each chart can define multiple lines (dimensions).
+A line definition is a key-value mapping of line options.
+Each line can have the following options:
     
     # mandatory
     expvar_key: the name of the expvar as present in the JSON output of /debug/vars endpoint
@@ -187,9 +213,11 @@ Each chart can define multiple lines (dimensions). A line definition is a key-va
     hidden: False
 
 Please see the following link for more information about the options and their default values:
-[External plugins - dimensions](https://github.com/netdata/netdata/wiki/External-Plugins#dimension)
+[External plugins - dimensions](../../plugins.d/#dimension)
 
-Apart from top-level expvars, this plugin can also parse expvars stored in a multi-level map; All dicts in the resulting JSON document are then flattened to one level. Expvar names are joined together with '.' when flattening.
+Apart from top-level expvars, this plugin can also parse expvars stored in a multi-level map;
+All dicts in the resulting JSON document are then flattened to one level.
+Expvar names are joined together with '.' when flattening.
 
 Example:
 ```
@@ -199,11 +227,15 @@ Example:
 }
 ```
 
-In the above case, the exported variables will be available under `runtime.goroutines`, `counters.cnt1` and `counters.cnt2` expvar_keys. If the flattening results in a key collision, the first defined key wins and all subsequent keys with the same name are ignored.
+In the above case, the exported variables will be available under `runtime.goroutines`,
+`counters.cnt1` and `counters.cnt2` expvar_keys. If the flattening results in a key collision,
+the first defined key wins and all subsequent keys with the same name are ignored.
 
 **Configuration example**
 
-The configuration below matches the second Go application described above. Netdata will monitor and chart memory stats for the application, as well as a custom chart of running goroutines and two dummy counters.
+The configuration below matches the second Go application described above.
+Netdata will monitor and chart memory stats for the application, as well as a custom chart of
+running goroutines and two dummy counters.
 
 ```
 app1:
