@@ -1,3 +1,8 @@
+---
+name: Question
+about: You just want to ask a question? Go on.
+---
+
 <!--- Verify first that your question wasn't asked before on GitHub -->
 
 ##### Question summary
