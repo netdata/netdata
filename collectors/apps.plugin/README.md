@@ -186,3 +186,39 @@ we think it is pretty safe to allow it have these increased privileges.
 
 Keep in mind that `apps.plugin` will still run without escalated permissions,
 but it will not be able to collect all the information.
+
+## Application Badges
+
+You can create badges that you can embed anywhere you like, with URLs like this:
+
+```
+https://your.netdata.ip:19999/api/v1/badge.svg?chart=apps.processes&dimensions=myapp&value_color=green%3E0%7Cred
+```
+
+The color expression unescaped is this: `value_color=green>0|red`.
+
+Here is an example for the process group `sql` at `https://registry.my-netdata.io`:
+
+![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
+
+Netdata is able give you a lot more badges for your app.
+Examples below for process group `sql`:
+
+- CPU usage: ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
+- Disk Physical Reads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Physical Writes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Reads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Writes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Open Files ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
+- Real Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
+- Virtual Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Swap Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
+- Minor Page Faults ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Processes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
+- Threads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
+- Major Faults (swap activity) ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
+- Open Pipes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
+- Open Sockets ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
+
+
+For more information about badges check [Generating Badges](https://github.com/netdata/netdata/wiki/Generating-Badges)
