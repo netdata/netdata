@@ -539,6 +539,7 @@ void *rrdpush_sender_thread(void *ptr) {
     size_t reconnects_counter = 0;
     size_t sent_bytes = 0;
     size_t sent_bytes_on_this_connection = 0;
+    size_t send_attempts = 0;
 
 
     time_t last_sent_t = 0;
@@ -558,6 +559,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
             // if we don't have socket open, lets wait a bit
             if(unlikely(host->rrdpush_sender_socket == -1)) {
+                send_attempts = 0;
+
                 if(not_connected_loops == 0 && sent_bytes_on_this_connection > 0) {
                     // fast re-connection on first disconnect
                     sleep_usec(USEC_PER_MS * 500); // milliseconds
@@ -572,6 +575,9 @@ void *rrdpush_sender_thread(void *ptr) {
 
                     // reset the buffer, to properly send charts and metrics
                     rrdpush_sender_thread_data_flush(host);
+
+                    // send from the beginning
+                    begin = 0;
 
                     // make sure the next reconnection will be immediate
                     not_connected_loops = 0;
@@ -594,7 +600,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 continue;
             }
             else if(unlikely(now_monotonic_sec() - last_sent_t > timeout)) {
-                error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, timeout, sent_bytes_on_this_connection);
+                error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", host->hostname, connected_to, timeout, sent_bytes_on_this_connection, send_attempts);
                 rrdpush_sender_thread_close_socket(host);
             }
 
@@ -608,6 +614,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
                 ofd->events = POLLOUT;
                 fdmax = 2;
+                send_attempts++;
             }
             else {
                 debug(D_STREAM, "STREAM: Not requesting data output on streaming socket %d (nothing to send now)...", ofd->fd);
