@@ -1,8 +1,10 @@
 # fping.plugin
 
-The fping plugin supports monitoring latency, packet loss and uptime of any number of hosts, by pinging them with fping.
+The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,
+by pinging them with `fping`.
 
-A recent version of `fping` is required (one that supports option ` -N `). The supplied plugin can install it. Run:
+A recent version of `fping` is required (one that supports option ` -N `).
+The supplied plugin can install it, by running:
 
 ```sh
 /usr/libexec/netdata/plugins.d/fping.plugin install
@@ -10,7 +12,8 @@ A recent version of `fping` is required (one that supports option ` -N `). The s
 
 The above will download, build and install the right version as `/usr/local/bin/fping`.
 
-Then you need to edit `/etc/netdata/fping.conf` (to edit it on your system run `/etc/netdata/edit-config fping.conf`) like this:
+Then you need to edit `/etc/netdata/fping.conf` (to edit it on your system run
+`/etc/netdata/edit-config fping.conf`) like this:
 
 ```sh
 # uncomment the following line - it should already be there
@@ -31,12 +34,10 @@ ping_every=200
 fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 ```
 
-The latest version of the config: https://github.com/netdata/netdata/blob/master/conf.d/fping.conf
-
 ## alarms
 
 netdata will automatically attach a few alarms for each host.
-Check the latest versions of the fping alarms here: https://github.com/netdata/netdata/blob/master/conf.d/health.d/fping.conf
+Check the [latest versions of the fping alarms](https://github.com/netdata/netdata/blob/master/health/health.d/fping.conf)
 
 ## Additional Tips 
 
@@ -56,7 +57,8 @@ ping_every=5000
 
 ### Multiple fping Plugins With Different Settings
 
-You may need to run multiple fping plugins with different settings for different hosts. For example, you may need to ping a few hosts 10 times per second, and others once per second.
+You may need to run multiple fping plugins with different settings for different end points.
+For example, you may need to ping a few hosts 10 times per second, and others once per second.
 
 netdata allows you to add as many `fping` plugins as you like.
 
@@ -64,40 +66,31 @@ Follow this procedure:
 
 **1. Create New fping Configuration File**
 
-Step Into Configuration Directory
 
 ```sh
+# Step Into Configuration Directory
 cd /etc/netdata
-```
 
-Copy Original fping Configuration File To New Configuration File
-
-```sh
+# Copy Original fping Configuration File To New Configuration File
 cp fping.conf fping2.conf
 ```
 
-Edit `fping2.conf` and set the settings and the hosts you need
+Edit `fping2.conf` and set the settings and the hosts you need for the seconds instance.
 
 **2. Soft Link Original fping Plugin to New Plugin File**
 
-Become root (If The Step Step Is Performed As Non-Root User)
-
 ```sh
+# Become root (If The Step Step Is Performed As Non-Root User)
 sudo su
-```
 
-Step Into The Plugins Directory
-
-```sh
+# Step Into The Plugins Directory
 cd /usr/libexec/netdata/plugins.d
-```
 
-Link fping.plugin to fping2.plugin
-
-```sh
+# Link fping.plugin to fping2.plugin
 ln -s fping.plugin fping2.plugin
 ```
 
 That's it. netdata will detect the new plugin and start it.
 
-You can name the new plugin any name you like. Just make sure the plugin and the configuration file have the same name.
+You can name the new plugin any name you like.
+Just make sure the plugin and the configuration file have the same name.
