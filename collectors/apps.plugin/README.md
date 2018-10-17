@@ -78,7 +78,9 @@ The above are reported:
 ## Performance
 
 `apps.plugin` is a complex piece of software and has a lot of work to do
-(actually this plugin requires more CPU resources than the netdata daemon).
+We are proud that `apps.plugin` is a lot faster compared to any other similar tool,
+while collecting a lot more information for the processes, however the fact is that
+this plugin requires more CPU resources than the netdata daemon itself.
 
 Under Linux, for each process running, `apps.plugin` reads several `/proc` files
 per process. Doing this work per-second, especially on hosts with several thousands
