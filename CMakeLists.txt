@@ -135,6 +135,19 @@ IF(LINUX)
     # ${NFACCT_INCLUDE_DIRS}
 ENDIF(LINUX)
 
+
+# -----------------------------------------------------------------------------
+# Detect MacOS IOKit/Foundation framework
+
+IF(MACOS)
+    find_library(IOKIT IOKit)
+    find_library(FOUNDATION Foundation)
+    # later we use:
+    # ${FOUNDATION}
+    # ${IOKIT}
+ENDIF(MACOS)
+
+
 # -----------------------------------------------------------------------------
 # netdata files
 
@@ -474,7 +487,7 @@ ELSEIF(FREEBSD)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
-    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES} ${IOKIT} ${FOUNDATION})
     target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
