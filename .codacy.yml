@@ -6,9 +6,6 @@ exclude_paths:
   - collectors/python.d.plugin/python_modules/lm_sensors.py
   - web/gui/css/**
   - web/gui/lib/**
-  - collectors/node.d.plugin/node_modules/lib/**
-  - collectors/node.d.plugin/node_modules/asn1-ber.js
-  - collectors/node.d.plugin/node_modules/net-snmp.js
-  - collectors/node.d.plugin/node_modules/pixl-xml.js
-  - collectors/node.d.plugin/node_modules/extend.js
+  - '*.min.js'
+  - collectors/node.d.plugin/node_modules/**
   - tests/**

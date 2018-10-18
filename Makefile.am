@@ -18,7 +18,6 @@ MAINTAINERCLEANFILES= \
 EXTRA_DIST = \
 	.gitignore \
 	.codacy.yml \
-	.codeclimate.yml \
 	.csslintrc \
 	.eslintignore \
 	.eslintrc \
@@ -55,10 +54,8 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
-	cppcheck.sh \
 	configs.signatures \
 	docker \
-	netdata.cppcheck \
 	netdata.spec \
 	package.json \
 	$(NULL)
