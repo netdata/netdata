@@ -1,0 +1,16 @@
+---
+only: issues
+limitPerRun: 30
+daysUntilStale: 60
+daysUntilClose: false
+exemptLabels:
+  - bug
+exemptProjects: true
+exemptMilestones: true
+staleLabel: help wanted
+markComment: >
+  Currently netdata team doesn't have enough capacity to work on this issue.
+  We will be more than glad to accept a pull request with a solution to problem described here.
+# closeComment: >
+#   This issue has been automatically closed due to extended period of inactivity.
+#   Please reopen if it is still valid. Thank you for your contributions.
