@@ -3,11 +3,11 @@
 Module collects logical and physical devices health metrics.
 
 **Requirements:**
- * `netdata` user needs to be able to sudo the `arrconf` program without password
+ * `netdata` user needs to be able to sudo the `arcconf` program without password
 
 To grab stats it executes:
- * `sudo -n arrconf -GETCONFIG 1 LD`
- * `sudo -n arrconf -GETCONFIG 1 PD`
+ * `sudo -n arcconf -GETCONFIG 1 LD`
+ * `sudo -n arcconf -GETCONFIG 1 PD`
 
 
 It produces:

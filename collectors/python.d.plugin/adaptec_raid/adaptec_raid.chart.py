@@ -41,6 +41,9 @@ CHARTS = {
     },
 }
 
+SUDO = 'sudo'
+ARCCONF = 'arcconf'
+
 BAD_LD_STATUS = (
     'Degraded',
     'Failed',
@@ -118,28 +121,28 @@ class PD:
         return data
 
 
-class Arrconf:
-    def __init__(self, arrconf):
-        self.arrconf = arrconf
+class Arcconf:
+    def __init__(self, arcconf):
+        self.arcconf = arcconf
 
     def ld_info(self):
-        return [self.arrconf, '-GETCONFIG', '1', 'LD']
+        return [self.arcconf, '-GETCONFIG', '1', 'LD']
 
     def pd_info(self):
-        return [self.arrconf, '-GETCONFIG', '1', 'PD']
+        return [self.arcconf, '-GETCONFIG', '1', 'PD']
 
 
 # TODO: hardcoded sudo...
-class SudoArrconf:
-    def __init__(self, arrconf, sudo):
-        self.arrconf = Arrconf(arrconf)
+class SudoArcconf:
+    def __init__(self, arcconf, sudo):
+        self.arcconf = Arcconf(arcconf)
         self.sudo = sudo
 
     def ld_info(self):
-        return [self.sudo, '-n'] + self.arrconf.ld_info()
+        return [self.sudo, '-n'] + self.arcconf.ld_info()
 
     def pd_info(self):
-        return [self.sudo, '-n'] + self.arrconf.pd_info()
+        return [self.sudo, '-n'] + self.arcconf.pd_info()
 
 
 class Service(ExecutableService):
@@ -148,31 +151,31 @@ class Service(ExecutableService):
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
         self.use_sudo = self.configuration.get('use_sudo', True)
-        self.arrconf = None
+        self.arcconf = None
 
     def execute(self, command, stderr=False):
         return self._get_raw_data(command=command, stderr=stderr)
 
     def check(self):
-        sudo = find_binary('sudo')
+        sudo = find_binary(SUDO)
         if self.use_sudo:
             if not sudo:
-                self.error('can\'t locate "sudo" binary')
+                self.error('can\'t locate "{0}" binary'.format(SUDO))
                 return False
             err = self.execute([sudo, '-n', '-v'], True)
             if err:
                 self.error(' '.join(err))
                 return False
 
-        arrconf = find_binary('arrconf')
-        if not arrconf:
-            self.error('can\'t locate "arrconf" binary')
+        arcconf = find_binary(ARCCONF)
+        if not arcconf:
+            self.error('can\'t locate "{0}" binary'.format(ARCCONF))
             return False
 
         if self.use_sudo:
-            self.arrconf = SudoArrconf(arrconf, sudo)
+            self.arcconf = SudoArcconf(arcconf, sudo)
         else:
-            self.arrconf = Arrconf(arrconf)
+            self.arcconf = Arcconf(arcconf)
 
         lds = self.get_lds()
         if not lds:
@@ -201,25 +204,25 @@ class Service(ExecutableService):
         return data
 
     def get_lds(self):
-        raw_lds = self.execute(self.arrconf.ld_info())
+        raw_lds = self.execute(self.arcconf.ld_info())
         if not raw_lds:
             return None
 
         lds = find_lds(raw_lds)
         if not lds:
-            self.error('failed to parse "{0}" output'.format(' '.join(self.arrconf.ld_info())))
+            self.error('failed to parse "{0}" output'.format(' '.join(self.arcconf.ld_info())))
             self.debug('output: {0}'.format(raw_lds))
             return None
         return lds
 
     def get_pds(self):
-        raw_pds = self.execute(self.arrconf.pd_info())
+        raw_pds = self.execute(self.arcconf.pd_info())
         if not raw_pds:
             return None
 
         pds = find_pds(raw_pds)
         if not pds:
-            self.error('failed to parse "{0}" output'.format(' '.join(self.arrconf.pd_info())))
+            self.error('failed to parse "{0}" output'.format(' '.join(self.arcconf.pd_info())))
             self.debug('output: {0}'.format(raw_pds))
             return None
         return pds
