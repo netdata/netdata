@@ -1,8 +1,43 @@
-netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
+# IPMI
 
-> FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+Parameter | Value |
+:---------|:------|
+Short Description | This plugin uses the IPMI protocol to monitor sensors, system events, power, serial-over-LAN etc. |
+Category | Monitoring Tools |
+Sub-Category | Hardware | 
+Plugin | freeipmi.plugin |
+Prog. Language | C | 
+Config file | /etc/netdata/netdata.conf |
+Alarms config | health.d/ipmi.conf |
+Dependencies |  `libipmimonitoring-dev` or `libipmimonitoring-devel` |
+Live Demo | menu_ipmi |
 
-## compile `freeipmi.plugin`
+## Introduction
+
+[FreeIPMI](https://www.gnu.org/software/freeipmi/) provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+
+## Charts
+
+type.id | name | title | units | family | context | charttype | options |
+:-------|:-----|:------|:------|:-------|:--------|:----------|:------|
+ipmi.temperatures_c | | System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c | line | |
+ipmi.volts | | System Voltages read by IPMI | Volts | voltages | ipmi.voltages | line | |
+ipmi.amps | | System Current read by IPMI | Amps | current | ipmi.amps | line | |
+ipmi.rpm | | System Fans read by IPMI | RPM | fans | ipmi.rpm | line | |
+ipmi.percent | | System Metrics read by IPMI | | other | ipmi.percent | line | |
+
+## Alarms
+
+The plugin adds 2 alarms:
+
+1. Sensors in non-nominal state (i.e. warning and critical)
+2. SEL is non empty
+
+![image](https://cloud.githubusercontent.com/assets/2662304/23674138/88926a20-037d-11e7-89c0-20e74ee10cd1.png)
+
+## Installation
+
+_e.g. do I need to install an external application, do I need to configure my application so it can be monitored by netdata, do I need to restart netdata etc._
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 
@@ -12,30 +47,7 @@ Keep in mind IPMI requires root access, so the plugin is setuid to root.
 
 If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the netdata plugin will be able to work.
 
-## netdata use
-
-The plugin creates (up to) 8 charts, based on the information collected from IPMI:
-
-1. number of sensors by state
-2. number of events in SEL
-3. Temperatures CELCIUS
-4. Temperatures FAHRENHEIT
-5. Voltages
-6. Currents
-7. Power
-8. Fans
-
-
-It also adds 2 alarms:
-
-1. Sensors in non-nominal state (i.e. warning and critical)
-2. SEL is non empty
-
-![image](https://cloud.githubusercontent.com/assets/2662304/23674138/88926a20-037d-11e7-89c0-20e74ee10cd1.png)
-
-The plugin does a speed test when it starts, to find out the duration needed by the IPMI processor to respond. Depending on the speed of your IPMI processor, charts may need several seconds to show up on the dashboard.
-
-## `freeipmi.plugin` configuration
+## Configuration
 
 The plugin supports a few options. To see them, run:
 
@@ -101,7 +113,7 @@ You can set these options in `/etc/netdata/netdata.conf` at this section:
 
 Append to `command options = ` the settings you need. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
 
-## ignoring specific sensors
+### Ignoring specific sensors
 
 Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`. **However this file is not used by `libipmimonitoring`** (the library used by netdata's `freeipmi.plugin`).
 
@@ -134,8 +146,22 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 ...
 ```
 
+## Usage
 
-## debugging
+The plugin creates (up to) 8 charts, based on the information collected from IPMI:
+
+1. number of sensors by state
+2. number of events in SEL
+3. Temperatures CELCIUS
+4. Temperatures FAHRENHEIT
+5. Voltages
+6. Currents
+7. Power
+8. Fans
+
+The plugin does a speed test when it starts, to find out the duration needed by the IPMI processor to respond. Depending on the speed of your IPMI processor, charts may need several seconds to show up on the dashboard.
+
+### Debugging
 
 You can run the plugin by hand:
 
@@ -149,7 +175,9 @@ sudo su -s /bin/sh netdata
 
 You will get verbose output on what the plugin does.
 
-## kipmi0 CPU usage
+## Notes
+
+### kipmi0 CPU usage
 
 There have been reports that kipmi is showing increased CPU when the IPMI is queried.
 
