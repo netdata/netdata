@@ -368,8 +368,8 @@ set(API_PLUGIN_FILES
         web/api/rrd2json.h
         web/api/web_api_v1.c
         web/api/web_api_v1.h
-        web/api/web_buffer_svg.c
-        web/api/web_buffer_svg.h
+        web/api/badges/web_buffer_svg.c
+        web/api/badges/web_buffer_svg.h
         )
 
 set(STREAMING_PLUGIN_FILES

@@ -4,7 +4,7 @@
 #define NETDATA_WEB_API_V1_H 1
 
 #include "daemon/common.h"
-#include "web_buffer_svg.h"
+#include "web/api/badges/web_buffer_svg.h"
 #include "rrd2json.h"
 
 extern int web_client_api_request_v1_data_group(char *name, int def);

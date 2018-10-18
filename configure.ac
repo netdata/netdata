@@ -577,6 +577,7 @@ AC_CONFIG_FILES([
     database/Makefile
     diagrams/Makefile
     health/Makefile
+    health/notifications/Makefile
     libnetdata/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
@@ -602,6 +603,7 @@ AC_CONFIG_FILES([
     tests/Makefile
     web/Makefile
     web/api/Makefile
+    web/api/badges/Makefile
     web/gui/Makefile
     web/server/Makefile
     web/server/single/Makefile
