@@ -227,6 +227,7 @@ void cancel_main_threads() {
 struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
+    { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the foreground (option kept for backward compatability)"},
     { 'd', "Fork and run in the background.",             NULL,          "run in the foreground"},
     { 'h', "Display this help message.",                  NULL,          NULL},
     { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
@@ -720,6 +721,8 @@ int main(int argc, char **argv) {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
                         config_loaded = 1;
                     }
+                    break;
+                case 'D':
                     break;
                 case 'd':
                     fork = 1;
