@@ -1,7 +1,7 @@
 # netdata registry
 
-Netdata registry implemented the `my-netdata` menu on netdata dashboards.
-It lists the netdata servers you have visited.
+Netdata registry implements the `my-netdata` menu on netdata dashboards.
+The `my-netdata` menu lists the netdata servers you have visited.
 
 ## Why?
 
