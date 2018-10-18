@@ -2,7 +2,7 @@
 only: issues
 limitPerRun: 30
 daysUntilStale: 60
-daysUntilClose: 30
+daysUntilClose: 0
 exemptLabels:
   - bug
 exemptProjects: true
@@ -12,6 +12,6 @@ markComment: >
   This issue has been automatically marked as stale because it has not had
   recent activity. It will be closed if no further activity occurs. Thank you
   for your contributions.
-closeComment: >
-  This issue has been automatically closed due to extended period of inactivity.
-  Please reopen if it is still valid. Thank you for your contributions.
+# closeComment: >
+#   This issue has been automatically closed due to extended period of inactivity.
+#   Please reopen if it is still valid. Thank you for your contributions.
