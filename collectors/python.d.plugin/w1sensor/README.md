@@ -8,6 +8,6 @@ Charts are created dynamically based on the number of detected sensors.
 
 ### configuration
 
-For detailed configuration information please read [`w1sensor.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/w1sensor.conf) file.
+For detailed configuration information please read [`w1sensor.conf`](w1sensor.conf) file.
 
 ---
