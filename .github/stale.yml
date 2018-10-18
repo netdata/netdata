@@ -2,7 +2,7 @@
 only: issues
 limitPerRun: 30
 daysUntilStale: 60
-daysUntilClose: 0
+daysUntilClose: false
 exemptLabels:
   - bug
 exemptProjects: true
