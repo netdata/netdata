@@ -20,6 +20,7 @@ dist_noinst_DATA = \
 	debian/changelog \
 	debian/netdata.postrm \
 	rhel/build-netdata-rpm.sh \
+	cppcheck.sh \
 	$(NULL)
 
 dist_noinst_SCRIPTS = \
