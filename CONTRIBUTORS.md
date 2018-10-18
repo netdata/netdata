@@ -119,3 +119,4 @@ username|name|email (optional)
 @pjz|Paul Jimenez|pj@place.org
 @jgrossiord|Julien Grossiord|julien@grossiord.net
 @pohzipohzi|Poh Zi How
+@vladmovchan|Vladyslav Movchan|vladislav.movchan@gmail.com

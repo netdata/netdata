@@ -183,18 +183,18 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_sysconfdir}/%{name}
 %dir %{_libdir}/%{name}
 
-%config %{_libdir}/%{name}/*.conf
-%config %{_libdir}/%{name}/charts.d/*.conf
-%config %{_libdir}/%{name}/health.d/*.conf
-%config %{_libdir}/%{name}/node.d/*.conf
-%config %{_libdir}/%{name}/python.d/*.conf
-%config %{_libdir}/%{name}/statsd.d/*.conf
+%config %{_sysconfdir}/%{name}/*.conf
+#%config %{_sysconfdir}/%{name}/charts.d/*.conf
+#%config %{_sysconfdir}/%{name}/health.d/*.conf
+#%config %{_sysconfdir}/%{name}/node.d/*.conf
+#%config %{_sysconfdir}/%{name}/python.d/*.conf
+#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
-# To be eventually moved to %%_defaultdocdir
-%{_libdir}/%{name}/node.d/*.md
+%{_libdir}/%{name}
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+%{_sysconfdir}/%{name}/edit-config
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
@@ -215,17 +215,18 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 
 %dir %{_datadir}/%{name}
-%dir %{_sysconfdir}/%{name}/health.d
-%dir %{_libdir}/%{name}/health.d
-%dir %{_sysconfdir}/%{name}/python.d
-%dir %{_libdir}/%{name}/python.d
-%dir %{_sysconfdir}/%{name}/charts.d
-%dir %{_libdir}/%{name}/charts.d
-%dir %{_sysconfdir}/%{name}/node.d
-%dir %{_libdir}/%{name}/node.d
-%dir %{_sysconfdir}/%{name}/statsd.d
-%dir %{_libdir}/%{name}/statsd.d
 
+%dir %{_sysconfdir}/%{name}/health.d
+%dir %{_sysconfdir}/%{name}/python.d
+%dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_sysconfdir}/%{name}/node.d
+%dir %{_sysconfdir}/%{name}/statsd.d
+
+%dir %{_libdir}/%{name}/conf.d/health.d
+%dir %{_libdir}/%{name}/conf.d/python.d
+%dir %{_libdir}/%{name}/conf.d/charts.d
+%dir %{_libdir}/%{name}/conf.d/node.d
+%dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
