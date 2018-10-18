@@ -22,6 +22,7 @@ dist_plugins_SCRIPTS = \
 dist_noinst_DATA = \
     charts.d.plugin.in \
     README.md \
+    README-TEMPLATE.d \
     $(NULL)
 
 dist_charts_SCRIPTS = \

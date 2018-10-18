@@ -19,6 +19,7 @@ dist_plugins_SCRIPTS = \
 dist_noinst_DATA = \
 	node.d.plugin.in \
 	README.md \
+	README-TEMPLATE.md \
 	$(NULL)
 
 usernodeconfigdir=$(configdir)/node.d

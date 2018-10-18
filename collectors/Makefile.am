@@ -25,4 +25,5 @@ SUBDIRS = \
 
 dist_noinst_DATA = \
 	README.md \
+	README-TEMPLATE.md \
 	$(NULL)

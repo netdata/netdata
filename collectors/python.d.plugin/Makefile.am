@@ -19,6 +19,7 @@ dist_plugins_SCRIPTS = \
 dist_noinst_DATA = \
     python.d.plugin.in \
     README.md \
+    README-TEMPLATE.md \
     $(NULL)
 
 dist_python_SCRIPTS = \
