@@ -66,6 +66,7 @@ static struct netdev {
     kernel_uint_t tcollisions;
     kernel_uint_t tcarrier;
     kernel_uint_t tcompressed;
+    kernel_uint_t speed_max;
 
     // charts
     RRDSET *st_bandwidth;
@@ -503,6 +504,18 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             else
                 d->virtual = 0;
 
+            // set nic speed if present
+            procfile *df = NULL;
+            snprintfz(buffer, FILENAME_MAX, "/sys/class/net/%s/speed", d->name);
+            if(likely(!d->virtual)) df = procfile_open(buffer, " \t,:|", PROCFILE_FLAG_DEFAULT);
+            if(likely(df)) {
+              df = procfile_readall(df);
+              if(likely(df)) {
+                d->speed_max = str2kernel_uint_t(procfile_word(df, 0));
+              }
+              procfile_close(df);
+            }
+
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
             d->virtual = config_get_boolean(buffer, "virtual", d->virtual);
@@ -586,6 +599,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
+
+                RRDSETVAR *nic_speed_max = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "nic_speed_max");
+                if(nic_speed_max) rrdsetvar_custom_chart_variable_set(nic_speed_max, (calculated_number)d->speed_max);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
