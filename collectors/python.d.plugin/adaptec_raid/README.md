@@ -1,6 +1,6 @@
 # adaptec raid
 
-Module collects adapter, physical drives and battery stats.
+Module collects logical and physical devices health metrics.
 
 **Requirements:**
  * `netdata` user needs to be able to sudo the `arrconf` program without password
