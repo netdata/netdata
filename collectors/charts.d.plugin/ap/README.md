@@ -2,8 +2,6 @@
 
 The `ap` collector visualizes data related to access points.
 
-The source code is [here](https://github.com/netdata/netdata/blob/master/charts.d/ap.chart.sh).
-
 ## Example netdata charts
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/12377654/9f566e88-bd2d-11e5-855a-e0ba96b8fd98.png)
