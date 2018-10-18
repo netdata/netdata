@@ -23,11 +23,11 @@ ORDER = [
 
 CHARTS = {
     'ld_status': {
-        'options': [None, 'Status Not OK', 'bool', 'logical devices', 'adapter_raid.ld_status', 'line'],
+        'options': [None, 'Status Is Not OK', 'bool', 'logical devices', 'adapter_raid.ld_status', 'line'],
         'lines': []
     },
     'pd_state': {
-        'options': [None, 'State Not OK', 'bool', 'physical devices', 'adapter_raid.pd_state', 'line'],
+        'options': [None, 'State Is Not OK', 'bool', 'physical devices', 'adapter_raid.pd_state', 'line'],
         'lines': []
     },
     'pd_smart_warnings': {
