@@ -10,8 +10,6 @@ This collector supports:
 - each SNMP device may have a different update frequency
 - each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
 
-The source code of the plugin is [here](https://github.com/netdata/netdata/blob/master/node.d/snmp.node.js).
-
 ## Configuration
 
 You will need to create the file `/etc/netdata/node.d/snmp.conf` with data like the following.
@@ -23,7 +21,7 @@ In this example:
  - we will update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
  - we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`.
 
-```js
+```json
 {
     "enable_autodetect": false,
     "update_every": 5,
@@ -105,7 +103,7 @@ Each of the 24 new charts will have its id (1-24) appended at:
 3. its `oid` (for all dimensions), i.e. dimension `in` will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`
 3. its priority (which will be incremented for each chart so that the charts will appear on the dashboard in this order)
 
-```js
+```json
 {
     "enable_autodetect": false,
     "update_every": 10,
@@ -210,7 +208,7 @@ This switch also reports various other metrics, like snmp, packets per port, etc
 
 This switch has a very slow SNMP processors. To respond, it needs about 8 seconds, so I have set the refresh frequency (`update_every`) to 15 seconds.
 
-```js
+```json
 {
     "enable_autodetect": false,
     "update_every": 5,
