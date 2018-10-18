@@ -126,10 +126,10 @@ class Arcconf:
         self.arcconf = arcconf
 
     def ld_info(self):
-        return [self.arcconf, '-GETCONFIG', '1', 'LD']
+        return [self.arcconf, 'GETCONFIG', '1', 'LD']
 
     def pd_info(self):
-        return [self.arcconf, '-GETCONFIG', '1', 'PD']
+        return [self.arcconf, 'GETCONFIG', '1', 'PD']
 
 
 # TODO: hardcoded sudo...
