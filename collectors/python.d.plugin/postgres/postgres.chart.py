@@ -669,7 +669,7 @@ class Service(SimpleService):
                 slot_name=slot_name)
 
     def _get_data(self):
-        result, error = self._connect()
+        result, _ = self._connect()
         if result:
             cursor = self.connection.cursor(cursor_factory=DictCursor)
             try:
@@ -781,7 +781,7 @@ def add_database_stat_chart_(order, definitions, name, database_name):
     chart_template = CHARTS[name]
     chart_name = '_'.join([database_name, name])
     order.insert(0, chart_name)
-    name, title, units, family, context, chart_type = chart_template['options']
+    name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
                'options': [name, title + ': ' + database_name,  units, 'db ' + database_name, context,  chart_type],
                'lines': create_lines(database_name, chart_template['lines'])}

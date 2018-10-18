@@ -38,7 +38,7 @@ class SocketService(SimpleService):
                                                                   message=message))
         else:
             if self.__socket_config is not None:
-                af, sock_type, proto, canon_name, sa = self.__socket_config
+                _, _, _, _, sa = self.__socket_config
                 self.error('socket to "{address}" port {port}: {message}'.format(address=sa[0],
                                                                                  port=sa[1],
                                                                                  message=message))
@@ -56,7 +56,7 @@ class SocketService(SimpleService):
                 self.error("Cannot create socket to 'None':")
                 return False
 
-        af, sock_type, proto, canon_name, sa = res
+        af, sock_type, proto, _, sa = res
         try:
             self.debug('Creating socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             self._sock = socket.socket(af, sock_type, proto)
