@@ -3,17 +3,6 @@
 `plugins.d` is the netdata internal plugin that collects metrics
 from external processes, thus allowing netdata to use **external plugins**.
 
-netdata supports plugins written in **any language**. The only requirement netdata has from its plugins, is to be able to print data at their output.
-
-Plugins can be written in the appropriate language for their job. For example:
-
-- You can collect data from JMX, using a java application
-- You can collect data from a REST API, using a node.js application
-- You can collect data from a system command, using a shell script
-- etc.
-
-Many of these languages can run their code efficiently, but they require a lot of resources when they are initialized. netdata suggests that plugins will be **initialized once and run forever** (until stopped by netdata). This way, the expensive part of their execution, their initialization, is eliminated.
-
 ## Provided External Plugins
 
 plugin|language|O/S|description
@@ -33,6 +22,7 @@ Each of these modular plugins has each own methods for defining modules. Please 
 This plugin allows netdata to use **external plugins** for data collection:
 
 1. external data collection plugins may be written in any computer language.
+
 2. external data collection plugins may use O/S capabilities or `setuid` to
    run with escalated privileges (compared to the netdata daemon).
    The communication between the external plugin and netdata is unidirectional

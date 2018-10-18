@@ -25,9 +25,9 @@
 
 ---
 
-# Monitoring Disks' Performance with netdata
+# Monitoring Disks
 
-> Live demo of disk monitoring at: **[http://london.netdata.rocks](http://london.netdata.rocks/#disk)**
+> Live demo of disk monitoring at: **[http://london.netdata.rocks](https://registry.my-netdata.io/#menu_disk)**
 
 Performance monitoring for Linux disks is quite complicated. The main reason is the plethora of disk technologies available. There are many different hardware disk technologies, but there are even more **virtual disk** technologies that can provide additional storage features.
 

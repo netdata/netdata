@@ -17,4 +17,5 @@ dist_plugins_SCRIPTS = \
 
 dist_noinst_DATA = \
 	cgroup-name.sh.in \
+	README.md \
 	$(NULL)

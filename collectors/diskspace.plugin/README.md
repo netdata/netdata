@@ -1,4 +1,4 @@
-> for disks performance monitoring, see the `proc` plugin, [here](../linux-proc.plugin/#monitoring-disks-performance-with-netdata)
+> for disks performance monitoring, see the `proc` plugin, [here](../proc.plugin/#monitoring-disks-performance-with-netdata)
 
 # diskspace.plugin
 
