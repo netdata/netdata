@@ -731,6 +731,7 @@ int main(int argc, char **argv) {
                     dont_fork = 1;
                     break;
                 case 'd':
+                    dont_fork = 0;
                     break;
                 case 'h':
                     return help(0);
