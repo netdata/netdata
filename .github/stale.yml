@@ -5,6 +5,7 @@ daysUntilStale: 60
 daysUntilClose: false
 exemptLabels:
   - bug
+  - "help wanted"
 exemptProjects: true
 exemptMilestones: true
 staleLabel: help wanted
