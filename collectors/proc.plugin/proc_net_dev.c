@@ -436,6 +436,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
     static char *path_to_sys_devices_virtual_net = NULL;
+    static char *path_to_sys_net_speed = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
@@ -505,15 +506,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->virtual = 0;
 
             // set nic speed if present
-            procfile *df = NULL;
-            snprintfz(buffer, FILENAME_MAX, "/sys/class/net/%s/speed", d->name);
-            if(likely(!d->virtual)) df = procfile_open(buffer, " \t,:|", PROCFILE_FLAG_DEFAULT);
-            if(likely(df)) {
-              df = procfile_readall(df);
-              if(likely(df)) {
-                d->speed_max = str2kernel_uint_t(procfile_word(df, 0));
-              }
-              procfile_close(df);
+            if(likely(!d->virtual)) {
+              snprintfz(buffer, FILENAME_MAX, "%s/sys/class/net/%s/speed", netdata_configured_host_prefix, d->name);
+              path_to_sys_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", buffer);
+              int ret = read_single_number_file(path_to_sys_net_speed, (unsigned long long*)&d->speed_max);
+              if(ret) error("Cannot read '%s'.", path_to_sys_net_speed);
             }
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
