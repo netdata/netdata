@@ -604,6 +604,9 @@ AC_CONFIG_FILES([
     web/Makefile
     web/api/Makefile
     web/api/badges/Makefile
+    web/api/exporters/Makefile
+    web/api/exporters/shell/Makefile
+    web/api/exporters/prometheus/Makefile
     web/gui/Makefile
     web/server/Makefile
     web/server/single/Makefile

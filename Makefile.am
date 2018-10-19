@@ -289,6 +289,10 @@ API_PLUGIN_FILES = \
     web/api/web_api_v1.h \
     web/api/badges/web_buffer_svg.c \
     web/api/badges/web_buffer_svg.h \
+    web/api/exporters/allmetrics.c \
+    web/api/exporters/allmetrics.h \
+    web/api/exporters/shell/allmetrics_shell.c \
+    web/api/exporters/shell/allmetrics_shell.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
