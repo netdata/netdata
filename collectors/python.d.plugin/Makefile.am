@@ -75,6 +75,7 @@ include nginx/Makefile.inc
 include nginx_plus/Makefile.inc
 include nsd/Makefile.inc
 include ntpd/Makefile.inc
+include nvidia_smi/Makefile.inc
 include ovpn_status_log/Makefile.inc
 include phpfpm/Makefile.inc
 include portcheck/Makefile.inc
