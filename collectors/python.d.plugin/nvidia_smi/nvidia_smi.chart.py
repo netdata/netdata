@@ -10,6 +10,8 @@ import time
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.collection import find_binary
 
+disabled_by_default = True
+
 CHART_TEMPLATES = {
     'pci_bandwidth': {
         'options': [None, 'PCI express bandwidth utilization', 'KB/s', 'nvidia_smi', 'nvidia_smi', 'area'],
