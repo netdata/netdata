@@ -48,8 +48,6 @@ typedef struct rrdresult {
     calculated_number *v;   // array n x d values
     uint8_t *o;             // array n x d options
 
-    long c;                 // current line ( -1 ~ n ), ( -1 = none, use rrdr_rows() to get number of rows )
-
     long group;             // how many collected values were grouped for each row
     int update_every;       // what is the suggested update frequency in seconds
 
@@ -60,6 +58,10 @@ typedef struct rrdresult {
     time_t after;
 
     int has_st_lock;        // if st is read locked by us
+
+    // internal rrd2rrdr() members below this point
+    long group_points;
+    calculated_number group_sum_divisor;
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)
@@ -69,10 +71,8 @@ extern void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable);
 extern void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline, const char *betweenlines);
 extern calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_values_are_null);
 extern void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const char *separator, const char *suffix);
-extern calculated_number *rrdr_line_values(RRDR *r);
 
 extern void rrdr_free(RRDR *r);
-extern void rrdr_done(RRDR *r);
 extern RRDR *rrdr_create(RRDSET *st, long n);
 
 #include "query.h"

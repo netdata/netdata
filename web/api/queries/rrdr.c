@@ -549,10 +549,6 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const c
     //info("RRD2SSV(): %s: END", r->st->id);
 }
 
-inline calculated_number *rrdr_line_values(RRDR *r) {
-    return &r->v[ r->c * r->d ];
-}
-
 inline static void rrdr_lock_rrdset(RRDR *r) {
     if(unlikely(!r)) {
         error("NULL value given!");
@@ -590,12 +586,6 @@ inline void rrdr_free(RRDR *r)
     freez(r);
 }
 
-inline void rrdr_done(RRDR *r)
-{
-    r->rows = r->c + 1;
-    r->c = 0;
-}
-
 RRDR *rrdr_create(RRDSET *st, long n)
 {
     if(unlikely(!st)) {
@@ -613,7 +603,7 @@ RRDR *rrdr_create(RRDSET *st, long n)
 
     r->n = n;
 
-    r->t = mallocz(n * sizeof(time_t));
+    r->t = callocz((size_t)n, sizeof(time_t));
     r->v = mallocz(n * r->d * sizeof(calculated_number));
     r->o = mallocz(n * r->d * sizeof(uint8_t));
     r->od = mallocz(r->d * sizeof(uint8_t));
@@ -627,7 +617,6 @@ RRDR *rrdr_create(RRDSET *st, long n)
             r->od[c] = 0;
     }
 
-    r->c = -1;
     r->group = 1;
     r->update_every = 1;
 
