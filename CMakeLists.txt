@@ -374,6 +374,10 @@ set(API_PLUGIN_FILES
         web/api/exporters/allmetrics.h
         web/api/exporters/shell/allmetrics_shell.c
         web/api/exporters/shell/allmetrics_shell.h
+        web/api/queries/rrdr.c
+        web/api/queries/rrdr.h
+        web/api/queries/query.c
+        web/api/queries/query.h
         )
 
 set(STREAMING_PLUGIN_FILES
