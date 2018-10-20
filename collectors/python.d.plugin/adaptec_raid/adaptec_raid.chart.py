@@ -88,6 +88,7 @@ def find_pds(d):
         elif row.startswith('NCQ status'):
             if pd.id and pd.state and pd.smart_warnings:
                 pds.append(pd)
+            pd = PD()
 
     return pds
 
