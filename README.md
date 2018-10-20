@@ -1,6 +1,6 @@
 # netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffirehol%2Fnetdata?ref=badge_shield)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetdata%2Fnetdata.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetdata%2Fnetdata?ref=badge_shield)
 [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade)
 [![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:cpp)
@@ -419,4 +419,4 @@ Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.
 
 netdata is [GPLv3+](LICENSE).
 
-Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/REDISTRIBUTED.md).
+Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
