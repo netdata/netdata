@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # When run from the top-level repository, performs a complete clean
 # and maintainer-mode rebuild of the FireHOL package.
@@ -50,6 +50,5 @@ set -e
 autoreconf -ivf
 ./configure --enable-maintainer-mode 
 set +e
-make dist
-status=$?
-exit $status
+make dist || exit
+./packaging/tar-compare . netdata-*.tar.gz || exit

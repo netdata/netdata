@@ -1,5 +1,5 @@
 #!/sbin/openrc-run
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # The user netdata is configured to run as.
 # If you edit its configuration file to set a different

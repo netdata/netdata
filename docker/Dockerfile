@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 # author  : paulfantom
 
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
@@ -40,11 +40,13 @@ RUN chmod +x netdata-installer.sh && \
 RUN mkdir -p /app/usr/sbin/ \
              /app/usr/share \
              /app/usr/libexec \
+             /app/usr/lib \
              /app/var/cache \
              /app/var/lib \
              /app/etc && \
     mv /usr/share/netdata   /app/usr/share/ && \
     mv /usr/libexec/netdata /app/usr/libexec/ && \
+    mv /usr/lib/netdata     /app/usr/lib/ && \
     mv /var/cache/netdata   /app/var/cache/ && \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
@@ -84,7 +86,7 @@ RUN \
     addgroup -g ${NETDATA_GID} -S netdata && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
     # Apply the permissions as described in
-    # https://github.com/firehol/netdata/wiki/netdata-security#netdata-directories
+    # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown -R root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \

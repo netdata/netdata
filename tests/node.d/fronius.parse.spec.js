@@ -1,5 +1,5 @@
 "use strict";
-// SPDX-License-Identifier: GPL-3.0+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 var netdata = require("../../node.d/node_modules/netdata");
 // remember: subject will be a singleton!

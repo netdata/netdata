@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
+# GPL v3+
+#
+# This plugin requires a latest version of fping.
+# You can compile it from source, by running me with option: install
+
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
+
+if [ "${1}" = "install" ]
+    then
+    [ "${UID}" != 0 ] && echo >&2 "Please run me as root. This will install a single binary file: /usr/local/bin/fping." && exit 1
+
+    run() {
+        printf >&2 " > "
+        printf >&2 "%q " "${@}"
+        printf >&2 "\n"
+        "${@}" || exit 1
+    }
+
+    download() {
+        local curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
+        [ ! -z "${curl}" ] && run curl -s -L "${1}" && return 0
+
+        local wget="$(which wget 2>/dev/null || command -v wget 2>/dev/null)"
+        [ ! -z "${wget}" ] && run wget -q -O - "${1}" && return 0
+
+        echo >&2 "Cannot find 'curl' or 'wget' in this system." && exit 1
+    }
+
+    [ ! -d /usr/src ] && run mkdir -p /usr/src
+    [ ! -d /usr/local/bin ] && run mkdir -p /usr/local/bin
+
+    run cd /usr/src
+
+    if [ -d fping-4.0 ]
+        then
+        run rm -rf fping-4.0 || exit 1
+    fi
+
+    download 'https://github.com/schweikert/fping/releases/download/v4.0/fping-4.0.tar.gz' | run tar -zxvpf -
+    [ $? -ne 0 ] && exit 1
+    run cd fping-4.0 || exit 1
+
+    run ./configure --prefix=/usr/local
+    run make clean
+    run make
+    if [ -f /usr/local/bin/fping ]
+        then
+        run mv -f /usr/local/bin/fping /usr/local/bin/fping.old
+    fi
+    run mv src/fping /usr/local/bin/fping
+    run chown root:root /usr/local/bin/fping
+    run chmod 4755 /usr/local/bin/fping
+    echo >&2
+    echo >&2 "All done, you have a compatible fping now at /usr/local/bin/fping."
+    echo >&2
+
+    fping="$(which fping  2>/dev/null || command -v fping 2>/dev/null)"
+    if [ "${fping}" != "/usr/local/bin/fping" ]
+        then
+        echo >&2 "You have another fping installed at: ${fping}."
+        echo >&2 "Please set:"
+        echo >&2
+        echo >&2 "  fping=\"/usr/local/bin/fping\""
+        echo >&2
+        echo >&2 "at /etc/netdata/fping.conf"
+        echo >&2
+    fi
+    exit 0
+fi
+
+# -----------------------------------------------------------------------------
+
+PROGRAM_NAME="$(basename "${0}")"
+
+logdate() {
+    date "+%Y-%m-%d %H:%M:%S"
+}
+
+log() {
+    local status="${1}"
+    shift
+
+    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+
+}
+
+warning() {
+    log WARNING "${@}"
+}
+
+error() {
+    log ERROR "${@}"
+}
+
+info() {
+    log INFO "${@}"
+}
+
+fatal() {
+    log FATAL "${@}"
+	echo "DISABLE"
+    exit 1
+}
+
+debug=0
+debug() {
+    [ $debug -eq 1 ] && log DEBUG "${@}"
+}
+
+# -----------------------------------------------------------------------------
+
+# store in ${plugin} the name we run under
+# this allows us to copy/link fping.plugin under a different name
+# to have multiple fping plugins running with different settings
+plugin="${PROGRAM_NAME/.plugin/}"
+
+
+# -----------------------------------------------------------------------------
+
+# the frequency to send info to netdata
+# passed by netdata as the first parameter
+update_every="${1-1}"
+
+# the netdata configuration directory
+# passed by netdata as an environment variable
+[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+
+# -----------------------------------------------------------------------------
+# configuration options
+# can be overwritten at /etc/netdata/fping.conf
+
+# the fping binary to use
+# we need one that can output netdata friendly info (supporting: -N)
+# if you have multiple versions, put here the full filename of the right one
+fping="$( which fping 2>/dev/null || command -v fping 2>/dev/null )"
+
+# a space separated list of hosts to fping
+# we suggest to put names here and the IPs of these names in /etc/hosts
+hosts=""
+
+# the time in milliseconds (1 sec = 1000 ms)
+# to ping the hosts - by default 5 pings per host per iteration
+ping_every="$((update_every * 1000 / 5))"
+
+# fping options
+fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
+
+# -----------------------------------------------------------------------------
+# load the configuration files
+
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/${plugin}.conf" "${NETDATA_USER_CONFIG_DIR}/${plugin}.conf"
+do
+    if [ -f "${CONFIG}" ]
+        then
+        info "Loading config file '${CONFIG}'..."
+        source "${CONFIG}"
+        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+    else
+        warning "Cannot find file '${CONFIG}'."
+    fi
+done
+
+if [ -z "${hosts}" ]
+then
+	fatal "no hosts configured - nothing to do."
+fi
+
+if [ -z "${fping}" ]
+then
+	fatal "fping command is not found. Please set its full path in '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
+fi
+
+if [ ! -x "${fping}" ]
+then
+	fatal "fping command '${fping}' is not executable - cannot proceed."
+fi
+
+if [ ${ping_every} -lt 20 ]
+    then
+    warning "ping every was set to ${ping_every} but 20 is the minimum for non-root users. Setting it to 20 ms."
+    ping_every=20
+fi
+
+# the fping options we will use
+options=( -N -l -Q ${update_every} -p ${ping_every} ${fping_opts} ${hosts} )
+
+# execute fping
+info "starting fping: ${fping} ${options[*]}"
+exec "${fping}" "${options[@]}"
+
+# if we cannot execute fping, stop
+fatal "command '${fping} ${options[*]}' failed to be executed (returned code $?)."

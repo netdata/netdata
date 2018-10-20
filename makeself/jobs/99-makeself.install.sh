@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
@@ -13,18 +13,18 @@ ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
 if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
     then
     NOWNER="${ORIGIN/git@github.com:/}"
-    NOWNER="${NOWNER/\/netdata*/}"
+    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
 
 elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
     then
     NOWNER="${ORIGIN/https:\/\/github.com\//}"
-    NOWNER="${NOWNER/\/netdata*/}"
+    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
 fi
 
 # make sure it does not have any slashes in it
 NOWNER="${NOWNER//\//_}"
 
-if [ "${NOWNER}" = "firehol" ]
+if [ "${NOWNER}" = "netdata" ]
     then
     NOWNER=
 else
@@ -70,27 +70,6 @@ export PATH="${NETDATA_INSTALL_PATH}/bin:\${PATH}"
 exec "${NETDATA_INSTALL_PATH}/bin/srv/netdata" "\${@}"
 EOF
 run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
-
-
-# -----------------------------------------------------------------------------
-# move etc to protect the destination when unpacked
-
-if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
-    then
-    if [ -d "${NETDATA_INSTALL_PATH}/etc.new" ]
-        then
-        run rm -rf "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
-    fi
-
-    run mv "${NETDATA_INSTALL_PATH}/etc" \
-        "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
-
-    if [ -f "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf" ]
-        then
-        # delete the generated netdata.conf, so that the static installer will generate a new one
-        run rm "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf"
-    fi
-fi
 
 
 # -----------------------------------------------------------------------------
