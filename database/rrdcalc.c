@@ -363,7 +363,7 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             (rc->recipient)?rc->recipient:"DEFAULT",
             rc->green,
             rc->red,
-            rc->group,
+            (int)rc->group,
             rc->after,
             rc->before,
             rc->options,

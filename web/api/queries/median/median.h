@@ -4,6 +4,7 @@
 #define NETDATA_API_QUERIES_MEDIAN_H
 
 #include "../query.h"
+#include "../rrdr.h"
 
 extern void *grouping_init_median(RRDR *r);
 extern void grouping_reset_median(RRDR *r);

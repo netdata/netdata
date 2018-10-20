@@ -4,6 +4,7 @@
 #define NETDATA_API_QUERY_AVERAGE_H
 
 #include "../query.h"
+#include "../rrdr.h"
 
 extern void *grouping_init_average(RRDR *r);
 extern void grouping_reset_average(RRDR *r);

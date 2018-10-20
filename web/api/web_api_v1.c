@@ -5,21 +5,6 @@
 static struct {
     const char *name;
     uint32_t hash;
-    int value;
-} api_v1_data_groups[] = {
-          { "average"         , 0, GROUP_AVERAGE }
-        , { "median"          , 0, GROUP_MEDIAN }
-        , { "min"             , 0, GROUP_MIN }
-        , { "max"             , 0, GROUP_MAX }
-        , { "sum"             , 0, GROUP_SUM }
-        , { "incremental_sum" , 0, GROUP_INCREMENTAL_SUM }
-        , { "incremental-sum" , 0, GROUP_INCREMENTAL_SUM }
-        , { NULL              , 0, 0 }
-};
-
-static struct {
-    const char *name;
-    uint32_t hash;
     uint32_t value;
 } api_v1_data_options[] = {
         {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
@@ -84,23 +69,8 @@ static struct {
         , {           NULL, 0, 0}
 };
 
-const char *group_method2string(int group) {
-    int i;
-
-    for(i = 0; api_v1_data_groups[i].name ; i++) {
-        if(api_v1_data_groups[i].value == group) {
-            return api_v1_data_groups[i].name;
-        }
-    }
-
-    return "unknown-group-method";
-}
-
 void web_client_api_v1_init(void) {
     int i;
-
-    for(i = 0; api_v1_data_groups[i].name ; i++)
-        api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
 
     for(i = 0; api_v1_data_options[i].name ; i++)
         api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
@@ -110,17 +80,8 @@ void web_client_api_v1_init(void) {
 
     for(i = 0; api_v1_data_google_formats[i].name ; i++)
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
-}
 
-inline int web_client_api_request_v1_data_group(char *name, int def) {
-    int i;
-
-    uint32_t hash = simple_hash(name);
-    for(i = 0; api_v1_data_groups[i].name ; i++)
-        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
-            return api_v1_data_groups[i].value;
-
-    return def;
+    web_client_api_v1_init_grouping();
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -295,7 +256,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     , *group_time_str = NULL
     , *points_str = NULL;
 
-    int group = GROUP_AVERAGE;
+    int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
@@ -323,7 +284,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "format")) {
             format = web_client_api_request_v1_data_format(value);

@@ -1,8 +1,61 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query.h"
+#include "../rrd2json.h"
+#include "rrdr.h"
+#include "web/api/queries/average/average.h"
+#include "incremental_sum/incremental_sum.h"
+#include "max/max.h"
+#include "median/median.h"
+#include "min/min.h"
+#include "sum/sum.h"
 
 // ----------------------------------------------------------------------------
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    RRDR_GROUPING value;
+} api_v1_data_groups[] = {
+          { "average"         , 0, RRDR_GROUPING_AVERAGE }
+        , { "median"          , 0, RRDR_GROUPING_MEDIAN }
+        , { "min"             , 0, RRDR_GROUPING_MIN }
+        , { "max"             , 0, RRDR_GROUPING_MAX }
+        , { "sum"             , 0, RRDR_GROUPING_SUM }
+        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM }
+        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM }
+        , { NULL              , 0, RRDR_GROUPING_UNDEFINED }
+};
+
+void web_client_api_v1_init_grouping(void) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
+}
+
+const char *group_method2string(RRDR_GROUPING group) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++) {
+        if(api_v1_data_groups[i].value == group) {
+            return api_v1_data_groups[i].name;
+        }
+    }
+
+    return "unknown-group-method";
+}
+
+RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPING def) {
+    int i;
+
+    uint32_t hash = simple_hash(name);
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
+            return api_v1_data_groups[i].value;
+
+    return def;
+}
 
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
@@ -184,7 +237,7 @@ static inline void do_dimension(
 // ----------------------------------------------------------------------------
 // fill RRDR for the whole chart
 
-RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, long group_time, int aligned) {
+RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_GROUPING group_method, long group_time, int aligned) {
 #ifdef NETDATA_INTERNAL_CHECKS
     int debug = rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?1:0;
 #endif
@@ -400,7 +453,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     //info("RRD2RRDR(): %s: STARTING", st->id);
 
     switch(group_method) {
-        case GROUP_MIN:
+        case RRDR_GROUPING_MIN:
             r->grouping_init  = grouping_init_min;
             r->grouping_reset = grouping_reset_min;
             r->grouping_free  = grouping_free_min;
@@ -408,7 +461,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             r->grouping_flush = grouping_flush_min;
             break;
 
-        case GROUP_MAX:
+        case RRDR_GROUPING_MAX:
             r->grouping_init  = grouping_init_max;
             r->grouping_reset = grouping_reset_max;
             r->grouping_free  = grouping_free_max;
@@ -416,7 +469,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             r->grouping_flush = grouping_flush_max;
             break;
 
-        case GROUP_SUM:
+        case RRDR_GROUPING_SUM:
             r->grouping_init  = grouping_init_sum;
             r->grouping_reset = grouping_reset_sum;
             r->grouping_free  = grouping_free_sum;
@@ -424,7 +477,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             r->grouping_flush = grouping_flush_sum;
             break;
 
-        case GROUP_INCREMENTAL_SUM:
+        case RRDR_GROUPING_INCREMENTAL_SUM:
             r->grouping_init  = grouping_init_incremental_sum;
             r->grouping_reset = grouping_reset_incremental_sum;
             r->grouping_free  = grouping_free_incremental_sum;
@@ -432,7 +485,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             r->grouping_flush = grouping_flush_incremental_sum;
             break;
 
-        case GROUP_MEDIAN:
+        case RRDR_GROUPING_MEDIAN:
             r->grouping_init  = grouping_init_median;
             r->grouping_reset = grouping_reset_median;
             r->grouping_free  = grouping_free_median;
@@ -441,8 +494,8 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             break;
 
         default:
-        case GROUP_AVERAGE:
-        case GROUP_UNDEFINED:
+        case RRDR_GROUPING_AVERAGE:
+        case RRDR_GROUPING_UNDEFINED:
             r->grouping_init  = grouping_init_average;
             r->grouping_reset = grouping_reset_average;
             r->grouping_free  = grouping_free_average;

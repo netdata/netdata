@@ -909,7 +909,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *scale_str = NULL
     , *alarm = NULL;
 
-    int group = GROUP_AVERAGE;
+    int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
 
     while(url) {
@@ -937,7 +937,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);

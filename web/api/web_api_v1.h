@@ -7,9 +7,6 @@
 #include "web/api/badges/web_buffer_svg.h"
 #include "rrd2json.h"
 
-extern const char *group_method2string(int group);
-
-extern int web_client_api_request_v1_data_group(char *name, int def);
 extern uint32_t web_client_api_request_v1_data_options(char *o);
 extern uint32_t web_client_api_request_v1_data_format(char *name);
 extern uint32_t web_client_api_request_v1_data_google_format(char *name);

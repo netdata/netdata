@@ -3,6 +3,7 @@
 #ifndef NETDATA_QUERIES_RRDR_H
 #define NETDATA_QUERIES_RRDR_H
 
+#include "libnetdata/libnetdata.h"
 #include "../web_api_v1.h"
 
 #define RRDR_OPTION_NONZERO         0x00000001 // don't output dimensions will just zero values
@@ -81,6 +82,10 @@ extern void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, 
 
 extern void rrdr_free(RRDR *r);
 extern RRDR *rrdr_create(RRDSET *st, long n);
+
+#include "web/api/queries/query.h"
+
+extern RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_GROUPING group_method, long group_time, int aligned);
 
 #include "query.h"
 

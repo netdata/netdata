@@ -127,6 +127,7 @@
               "min",
               "max",
               "average",
+              "median",
               "sum",
               "incremental-sum"
             ],
@@ -310,6 +311,7 @@
               "min",
               "max",
               "average",
+              "median",
               "sum",
               "incremental-sum"
             ],

@@ -3,7 +3,8 @@
 #ifndef NETDATA_WEB_CLIENT_CACHE_H
 #define NETDATA_WEB_CLIENT_CACHE_H
 
-#include "web_server.h"
+#include "libnetdata/libnetdata.h"
+#include "web_client.h"
 
 struct clients_cache {
     pid_t pid;
@@ -24,5 +25,7 @@ extern void web_client_release(struct web_client *w);
 extern struct web_client *web_client_get_from_cache_or_allocate();
 extern void web_client_cache_destroy(void);
 extern void web_client_cache_verify(int force);
+
+#include "web_server.h"
 
 #endif //NETDATA_WEB_CLIENT_CACHE_H

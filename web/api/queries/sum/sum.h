@@ -4,6 +4,7 @@
 #define NETDATA_API_QUERY_SUM_H
 
 #include "../query.h"
+#include "../rrdr.h"
 
 extern void *grouping_init_sum(RRDR *r);
 extern void grouping_reset_sum(RRDR *r);
