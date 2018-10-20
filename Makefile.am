@@ -297,6 +297,16 @@ API_PLUGIN_FILES = \
     web/api/queries/rrdr.h \
     web/api/queries/query.c \
     web/api/queries/query.h \
+    web/api/queries/average/average.c \
+    web/api/queries/average/average.h \
+    web/api/queries/incremental_sum/incremental_sum.c \
+    web/api/queries/incremental_sum/incremental_sum.h \
+    web/api/queries/sum/sum.c \
+    web/api/queries/sum/sum.h \
+    web/api/queries/min/min.c \
+    web/api/queries/min/min.h \
+    web/api/queries/max/max.c \
+    web/api/queries/max/max.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \

@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "sum.h"
+
+// ----------------------------------------------------------------------------
+// sum
+
+struct grouping_sum {
+    calculated_number sum;
+    size_t count;
+};
+
+void *grouping_init_sum(RRDR *r) {
+    (void)r;
+    return callocz(1, sizeof(struct grouping_sum));
+}
+
+void grouping_reset_sum(RRDR *r) {
+    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+    g->sum = 0;
+    g->count = 0;
+}
+
+void grouping_free_sum(RRDR *r) {
+    freez(r->grouping_data);
+}
+
+void grouping_add_sum(RRDR *r, calculated_number value) {
+    if(!isnan(value)) {
+        struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+
+        if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->sum)) {
+            g->sum += value;
+            g->count++;
+        }
+    }
+}
+
+void grouping_flush_sum(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+
+    if(unlikely(!g->count)) {
+        *rrdr_value_ptr = 0.0;
+        *rrdr_value_options_ptr |= RRDR_EMPTY;
+    }
+    else {
+        *rrdr_value_ptr = g->sum;
+    }
+
+    g->sum = 0.0;
+    g->count = 0;
+}
+
+
