@@ -5,6 +5,8 @@
 
 #include "../libnetdata.h"
 
+extern void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg);
+
 extern LONG_DOUBLE average(const LONG_DOUBLE *series, size_t entries);
 extern LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t period);
 extern LONG_DOUBLE median(const LONG_DOUBLE *series, size_t entries);

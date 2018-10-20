@@ -209,99 +209,6 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
 }
 
 
-static void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims) {
-    rrdset_check_rdlock(r->st);
-
-    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
-
-    int match_ids = 0, match_names = 0;
-
-    if(unlikely(options & RRDR_OPTION_MATCH_IDS))
-        match_ids = 1;
-    if(unlikely(options & RRDR_OPTION_MATCH_NAMES))
-        match_names = 1;
-
-    if(likely(!match_ids && !match_names))
-        match_ids = match_names = 1;
-
-    SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
-
-    RRDDIM *d;
-    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
-    for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-        if(    (match_ids   && simple_pattern_matches(pattern, d->id))
-               || (match_names && simple_pattern_matches(pattern, d->name))
-                ) {
-            r->od[c] |= RRDR_SELECTED;
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) r->od[c] &= ~RRDR_HIDDEN;
-            dims_selected++;
-
-            // since the user needs this dimension
-            // make it appear as NONZERO, to return it
-            // even if the dimension has only zeros
-            // unless option non_zero is set
-            if(unlikely(!(options & RRDR_OPTION_NONZERO)))
-                r->od[c] |= RRDR_NONZERO;
-
-            // count the visible dimensions
-            if(likely(r->od[c] & RRDR_NONZERO))
-                dims_not_hidden_not_zero++;
-        }
-        else {
-            r->od[c] |= RRDR_HIDDEN;
-            if(unlikely(r->od[c] & RRDR_SELECTED)) r->od[c] &= ~RRDR_SELECTED;
-        }
-    }
-    simple_pattern_free(pattern);
-
-    // check if all dimensions are hidden
-    if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {
-        // there are a few selected dimensions
-        // but they are all zero
-        // enable the selected ones
-        // to avoid returning an empty chart
-        for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
-            if(unlikely(r->od[c] & RRDR_SELECTED))
-                r->od[c] |= RRDR_NONZERO;
-    }
-}
-
-static uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims) {
-    rrdset_check_rdlock(r->st);
-
-    (void)dims;
-
-    if(options & RRDR_OPTION_NONZERO) {
-        long i;
-
-        // commented due to #1514
-
-        //if(dims && *dims) {
-        // the caller wants specific dimensions
-        // disable NONZERO option
-        // to make sure we don't accidentally prevent
-        // the specific dimensions from being returned
-        // i = 0;
-        //}
-        //else {
-        // find how many dimensions are not zero
-        long c;
-        RRDDIM *rd;
-        for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ; c++, rd = rd->next) {
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_NONZERO))) continue;
-            i++;
-        }
-        //}
-
-        // if with nonzero we get i = 0 (no dimensions will be returned)
-        // disable nonzero to show all dimensions
-        if(!i) options &= ~RRDR_OPTION_NONZERO;
-    }
-
-    return options;
-}
-
 static void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
     switch(format) {
         case DATASOURCE_JSON:
@@ -350,7 +257,7 @@ static void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
     }
 }
 
-static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value) {
+static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value) {
     rrdset_check_rdlock(r->st);
 
     long rows = rrdr_rows(r);
@@ -393,8 +300,8 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32
                    , kq, kq);
 
     for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
@@ -417,8 +324,8 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32
                    , kq, kq);
 
     for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         buffer_strcat(wb, sq);
@@ -438,8 +345,8 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32
                    , kq, kq);
 
     for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
         i++;
@@ -480,17 +387,17 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32
         }
 
         for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             if(i) buffer_strcat(wb, ", ");
             i++;
 
             calculated_number *cn = &r->v[ (0) * r->d ];
-            uint8_t *co = &r->o[ (0) * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ (0) * r->d ];
             calculated_number n = cn[c];
 
-            if(co[c] & RRDR_EMPTY) {
+            if(co[c] & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
                     buffer_strcat(wb, "0");
                 else
@@ -572,7 +479,7 @@ int rrdset2value_api_v1(
         , time_t *db_before
         , int *value_is_null
 ) {
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, !(options & RRDR_OPTION_NOT_ALIGNED));
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions);
     if(!r) {
         if(value_is_null) *value_is_null = 1;
         return 500;
@@ -594,11 +501,6 @@ int rrdset2value_api_v1(
         else if (r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
             buffer_cacheable(wb);
     }
-
-    options = rrdr_check_options(r, options, dimensions);
-
-    if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, dimensions);
 
     if(db_after)  *db_after  = r->after;
     if(db_before) *db_before = r->before;
@@ -625,7 +527,7 @@ int rrdset2anything_api_v1(
 ) {
     st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, !(options & RRDR_OPTION_NOT_ALIGNED));
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return 500;
@@ -635,11 +537,6 @@ int rrdset2anything_api_v1(
         buffer_no_cacheable(wb);
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
         buffer_cacheable(wb);
-
-    options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
-
-    if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, options, buffer_tostring(dimensions));
 
     if(latest_timestamp && rrdr_rows(r) > 0)
         *latest_timestamp = r->before;

@@ -22,7 +22,7 @@ static struct {
     void (*reset)(struct rrdresult *r);
     void (*free)(struct rrdresult *r);
     void (*add)(struct rrdresult *r, calculated_number value);
-    void (*flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr);
+    void (*flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
           { "average"         , 0, RRDR_GROUPING_AVERAGE        , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
         , { "median"          , 0, RRDR_GROUPING_MEDIAN         , grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
@@ -66,9 +66,68 @@ RRDR_GROUPING web_client_api_request_v1_data_group(const char *name, RRDR_GROUPI
 }
 
 // ----------------------------------------------------------------------------
+
+static void rrdr_disable_not_selected_dimensions(RRDR *r, RRDR_OPTIONS options, const char *dims) {
+    rrdset_check_rdlock(r->st);
+
+    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
+
+    int match_ids = 0, match_names = 0;
+
+    if(unlikely(options & RRDR_OPTION_MATCH_IDS))
+        match_ids = 1;
+    if(unlikely(options & RRDR_OPTION_MATCH_NAMES))
+        match_names = 1;
+
+    if(likely(!match_ids && !match_names))
+        match_ids = match_names = 1;
+
+    SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    RRDDIM *d;
+    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
+    for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+        if(    (match_ids   && simple_pattern_matches(pattern, d->id))
+               || (match_names && simple_pattern_matches(pattern, d->name))
+                ) {
+            r->od[c] |= RRDR_DIMENSION_SELECTED;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) r->od[c] &= ~RRDR_DIMENSION_HIDDEN;
+            dims_selected++;
+
+            // since the user needs this dimension
+            // make it appear as NONZERO, to return it
+            // even if the dimension has only zeros
+            // unless option non_zero is set
+            if(unlikely(!(options & RRDR_OPTION_NONZERO)))
+                r->od[c] |= RRDR_DIMENSION_NONZERO;
+
+            // count the visible dimensions
+            if(likely(r->od[c] & RRDR_DIMENSION_NONZERO))
+                dims_not_hidden_not_zero++;
+        }
+        else {
+            r->od[c] |= RRDR_DIMENSION_HIDDEN;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED)) r->od[c] &= ~RRDR_DIMENSION_SELECTED;
+        }
+    }
+    simple_pattern_free(pattern);
+
+    // check if all dimensions are hidden
+    if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {
+        // there are a few selected dimensions
+        // but they are all zero
+        // enable the selected ones
+        // to avoid returning an empty chart
+        for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
+            if(unlikely(r->od[c] & RRDR_DIMENSION_SELECTED))
+                r->od[c] |= RRDR_DIMENSION_NONZERO;
+    }
+}
+
+// ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
 
-static inline uint8_t *rrdr_line_options(RRDR *r, long rrdr_line) {
+static inline RRDR_VALUE_FLAGS *rrdr_line_options(RRDR *r, long rrdr_line) {
     return &r->o[ rrdr_line * r->d ];
 }
 
@@ -129,11 +188,12 @@ static inline void do_dimension(
         stop_now = 0,
         added = 0,
         group_count = 0,
-        add_this = 0;
-
-    uint8_t
-        group_options = 0,
+        add_this = 0,
         found_non_zero = 0;
+
+    RRDR_VALUE_FLAGS
+        group_options = 0;
+
 
     #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %u (stop_at_t: %ld), before_t: %u (start_at_t: %ld), start_t(now): %u, current_entry: %ld, entries: %ld"
@@ -187,13 +247,11 @@ static inline void do_dimension(
         if(likely(does_storage_number_exist(n))) {
 
             value = unpack_storage_number(n);
-            if(likely(value != 0.0)) {
-                group_options |= RRDR_NONZERO;
+            if(likely(value != 0.0))
                 found_non_zero = 1;
-            }
 
             if(unlikely(did_storage_number_reset(n)))
-                group_options |= RRDR_RESET;
+                group_options |= RRDR_VALUE_RESET;
         }
 
         // add this value for grouping
@@ -207,17 +265,17 @@ static inline void do_dimension(
 
             // find the place to store our values
             calculated_number *rrdr_value_ptr;
-            uint8_t *rrdr_value_options_ptr;
+            RRDR_VALUE_FLAGS *rrdr_value_options_ptr;
             {
                 calculated_number *cn = rrdr_line_values(r, rrdr_line);
                 rrdr_value_ptr = &cn[dim_id_in_rrdr];
 
-                uint8_t *co = rrdr_line_options(r, rrdr_line);
+                RRDR_VALUE_FLAGS *co = rrdr_line_options(r, rrdr_line);
                 rrdr_value_options_ptr = &co[dim_id_in_rrdr];
             }
 
             // update the dimension options
-            if(likely(found_non_zero)) r->od[dim_id_in_rrdr] |= RRDR_NONZERO;
+            if(likely(found_non_zero)) r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             // store the specific point options
             *rrdr_value_options_ptr = group_options;
@@ -226,7 +284,7 @@ static inline void do_dimension(
             r->grouping_flush(r, rrdr_value_ptr, rrdr_value_options_ptr);
 
             // find the min and max for the whole chart
-            if(!(*rrdr_value_options_ptr & RRDR_EMPTY)) {
+            if(!(*rrdr_value_options_ptr & RRDR_VALUE_EMPTY)) {
                 if(*rrdr_value_ptr < r->min) r->min = *rrdr_value_ptr;
                 if(*rrdr_value_ptr > r->max) r->max = *rrdr_value_ptr;
             }
@@ -245,7 +303,18 @@ static inline void do_dimension(
 // ----------------------------------------------------------------------------
 // fill RRDR for the whole chart
 
-RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_GROUPING group_method, long group_time, int aligned) {
+RRDR *rrd2rrdr(
+        RRDSET *st
+        , long points
+        , long long after
+        , long long before
+        , RRDR_GROUPING group_method
+        , long group_time
+        , RRDR_OPTIONS options
+        , const char *dimensions
+) {
+    int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     int debug = rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?1:0;
 #endif
@@ -429,7 +498,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_
         r->result_options |= RRDR_RESULT_OPTION_RELATIVE;
 
     // find how many dimensions we have
-    long dimensions = r->d;
+    long dimensions_count = r->d;
 
     // -------------------------------------------------------------------------
     // checks for debugging
@@ -485,14 +554,19 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_
 
     r->grouping_data = r->grouping_init(r);
 
+    if(dimensions)
+        rrdr_disable_not_selected_dimensions(r, options, dimensions);
+
     rrdset_check_rdlock(st);
 
     time_t max_after = 0;
     long max_rows = 0;
 
     RRDDIM *rd;
-    long c;
-    for(rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
+    long c, dimensions_used = 0, dimensions_nonzero = 0;
+    for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+        if(unlikely(!(options & RRDR_OPTION_PERCENTAGE) && (r->od[c] & RRDR_DIMENSION_HIDDEN)))
+            continue;
 
         do_dimension(
                 r
@@ -508,9 +582,11 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_
 #endif
                 );
 
+        if(r->od[c] & RRDR_DIMENSION_NONZERO)
+            dimensions_nonzero++;
 
         // verify all dimensions are aligned
-        if(unlikely(!c)) {
+        if(unlikely(!dimensions_used)) {
             max_after = r->after;
             max_rows = r->rows;
         }
@@ -531,9 +607,20 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
         }
+
+        dimensions_used++;
     }
 
     r->grouping_free(r);
+
+    if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {
+        // all the dimensions are zero
+        // send them all
+        for(rd = st->dimensions, c = 0 ; rd && c < dimensions_count ; rd = rd->next, c++) {
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            r->od[c] |= RRDR_DIMENSION_NONZERO;
+        }
+    }
 
     //info("RRD2RRDR(): %s: END %ld loops made, %ld points generated", st->id, counter, rrdr_rows(r));
     //error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));

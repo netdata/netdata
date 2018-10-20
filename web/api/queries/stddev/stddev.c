@@ -15,7 +15,12 @@ struct grouping_stddev {
 
 void *grouping_init_stddev(RRDR *r) {
     long entries = (r->group > r->group_points) ? r->group : r->group_points;
-    return callocz(1, sizeof(struct grouping_stddev) + entries * sizeof(LONG_DOUBLE));
+    if(entries < 0) entries = 0;
+
+    struct grouping_stddev *g = (struct grouping_stddev *)callocz(1, sizeof(struct grouping_stddev) + entries * sizeof(LONG_DOUBLE));
+    g->series_size = (size_t)entries;
+
+    return g;
 }
 
 void grouping_reset_stddev(RRDR *r) {
@@ -38,23 +43,25 @@ void grouping_add_stddev(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_stddev(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+void grouping_flush_stddev(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
 
     if(unlikely(!g->next_pos)) {
         *rrdr_value_ptr = 0.0;
-        *rrdr_value_options_ptr |= RRDR_EMPTY;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
         calculated_number value = standard_deviation(g->series, g->next_pos);
 
         if(isnan(value)) {
             *rrdr_value_ptr = 0.0;
-            *rrdr_value_options_ptr |= RRDR_EMPTY;
+            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
         else {
             *rrdr_value_ptr = value;
         }
+
+        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "median");
     }
 
     g->next_pos = 0;

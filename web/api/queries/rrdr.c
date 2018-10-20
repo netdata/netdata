@@ -16,8 +16,8 @@ static void rrdr_dump(RRDR *r)
                 , d->name
                 , (r->od[c] & RRDR_EMPTY)?"EMPTY ":""
                 , (r->od[c] & RRDR_RESET)?"RESET ":""
-                , (r->od[c] & RRDR_HIDDEN)?"HIDDEN ":""
-                , (r->od[c] & RRDR_NONZERO)?"NONZERO ":""
+                , (r->od[c] & RRDR_DIMENSION_HIDDEN)?"HIDDEN ":""
+                , (r->od[c] & RRDR_DIMENSION_NONZERO)?"NONZERO ":""
                 );
     }
 
@@ -31,15 +31,15 @@ static void rrdr_dump(RRDR *r)
     // for each line in the array
     for(i = 0; i < r->rows ;i++) {
         calculated_number *cn = &r->v[ i * r->d ];
-        uint8_t *co = &r->o[ i * r->d ];
+        RRDR_DIMENSION_FLAGS *co = &r->o[ i * r->d ];
 
         // print the id and the timestamp of the line
         fprintf(stderr, "%ld %ld ", i + 1, r->t[i]);
 
         // for each dimension
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_NONZERO))) continue;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely(!(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             if(co[c] & RRDR_EMPTY)
                 fprintf(stderr, "null ");
@@ -48,8 +48,8 @@ static void rrdr_dump(RRDR *r)
                     , cn[c]
                     , (co[c] & RRDR_EMPTY)?"E":" "
                     , (co[c] & RRDR_RESET)?"R":" "
-                    , (co[c] & RRDR_HIDDEN)?"H":" "
-                    , (co[c] & RRDR_NONZERO)?"N":" "
+                    , (co[c] & RRDR_DIMENSION_HIDDEN)?"H":" "
+                    , (co[c] & RRDR_DIMENSION_NONZERO)?"N":" "
                     );
         }
 
@@ -61,7 +61,7 @@ static void rrdr_dump(RRDR *r)
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     rrdset_check_rdlock(r->st);
 
     //info("RRD2JSON(): %s: BEGIN", r->st->id);
@@ -151,8 +151,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
 
     // print the header lines
     for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         buffer_strcat(wb, pre_label);
         buffer_strcat(wb, rd->name);
@@ -185,7 +185,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
     calculated_number total = 1;
     for(i = start; i != end ;i += step) {
         calculated_number *cn = &r->v[ i * r->d ];
-        uint8_t *co = &r->o[ i * r->d ];
+        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
 
         time_t now = r->t[i];
 
@@ -211,7 +211,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
                 // google supports one annotation per row
                 int annotation_found = 0;
                 for(c = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
-                    if(co[c] & RRDR_RESET) {
+                    if(co[c] & RRDR_VALUE_RESET) {
                         buffer_strcat(wb, overflow_annotation);
                         annotation_found = 1;
                         break;
@@ -254,8 +254,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
 
         // for each dimension
         for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             calculated_number n = cn[c];
 
@@ -264,7 +264,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
             if( options & RRDR_OPTION_OBJECTSROWS )
                 buffer_sprintf(wb, "%s%s%s: ", kq, rd->name, kq);
 
-            if(co[c] & RRDR_EMPTY) {
+            if(co[c] & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
                     buffer_strcat(wb, "0");
                 else
@@ -299,7 +299,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable) {
     //info("RRD2JSON(): %s: END", r->st->id);
 }
 
-void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
+void rrdr2csv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
     rrdset_check_rdlock(r->st);
 
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
@@ -308,8 +308,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, cons
 
     // print the csv header
     for(c = 0, i = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(!i) {
             buffer_strcat(wb, startline);
@@ -341,7 +341,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, cons
     calculated_number total = 1;
     for(i = start; i != end ;i += step) {
         calculated_number *cn = &r->v[ i * r->d ];
-        uint8_t *co = &r->o[ i * r->d ];
+        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
 
         buffer_strcat(wb, betweenlines);
         buffer_strcat(wb, startline);
@@ -379,14 +379,14 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, cons
 
         // for each dimension
         for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-            if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             buffer_strcat(wb, separator);
 
             calculated_number n = cn[c];
 
-            if(co[c] & RRDR_EMPTY) {
+            if(co[c] & RRDR_VALUE_EMPTY) {
                 if(options & RRDR_OPTION_NULL2ZERO)
                     buffer_strcat(wb, "0");
                 else
@@ -417,14 +417,14 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, cons
     //info("RRD2CSV(): %s: END", r->st->id);
 }
 
-inline calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_values_are_null) {
+inline calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null) {
     rrdset_check_rdlock(r->st);
 
     long c;
     RRDDIM *d;
 
     calculated_number *cn = &r->v[ i * r->d ];
-    uint8_t *co = &r->o[ i * r->d ];
+    RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
 
     calculated_number sum = 0, min = 0, max = 0, v;
     int all_null = 1, init = 1;
@@ -448,8 +448,8 @@ inline calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_
 
     // for each dimension
     for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
-        if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
+        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         calculated_number n = cn[c];
 
@@ -480,7 +480,7 @@ inline calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_
             init = 0;
         }
 
-        if(likely(!(co[c] & RRDR_EMPTY))) {
+        if(likely(!(co[c] & RRDR_VALUE_EMPTY))) {
             all_null = 0;
             sum += n;
         }
@@ -507,7 +507,7 @@ inline calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_
     return v;
 }
 
-void rrdr2ssv(RRDR *r, BUFFER *wb, uint32_t options, const char *prefix, const char *separator, const char *suffix) {
+void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix) {
     //info("RRD2SSV(): %s: BEGIN", r->st->id);
     long i;
 
@@ -605,14 +605,14 @@ RRDR *rrdr_create(RRDSET *st, long n)
 
     r->t = callocz((size_t)n, sizeof(time_t));
     r->v = mallocz(n * r->d * sizeof(calculated_number));
-    r->o = mallocz(n * r->d * sizeof(uint8_t));
-    r->od = mallocz(r->d * sizeof(uint8_t));
+    r->o = mallocz(n * r->d * sizeof(RRDR_VALUE_FLAGS));
+    r->od = mallocz(r->d * sizeof(RRDR_DIMENSION_FLAGS));
 
     // set the hidden flag on hidden dimensions
     int c;
     for(c = 0, rd = st->dimensions ; rd ; c++, rd = rd->next) {
         if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
-            r->od[c] = RRDR_HIDDEN;
+            r->od[c] = RRDR_DIMENSION_HIDDEN;
         else
             r->od[c] = 0;
     }

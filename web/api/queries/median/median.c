@@ -15,7 +15,12 @@ struct grouping_median {
 
 void *grouping_init_median(RRDR *r) {
     long entries = (r->group > r->group_points) ? r->group : r->group_points;
-    return callocz(1, sizeof(struct grouping_median) + entries * sizeof(LONG_DOUBLE));
+    if(entries < 0) entries = 0;
+
+    struct grouping_median *g = (struct grouping_median *)callocz(1, sizeof(struct grouping_median) + entries * sizeof(LONG_DOUBLE));
+    g->series_size = (size_t)entries;
+
+    return g;
 }
 
 void grouping_reset_median(RRDR *r) {
@@ -38,12 +43,12 @@ void grouping_add_median(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_median(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+void grouping_flush_median(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_median *g = (struct grouping_median *)r->grouping_data;
 
     if(unlikely(!g->next_pos)) {
         *rrdr_value_ptr = 0.0;
-        *rrdr_value_options_ptr |= RRDR_EMPTY;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
         calculated_number value;
@@ -58,11 +63,13 @@ void grouping_flush_median(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *
 
         if(isnan(value)) {
             *rrdr_value_ptr = 0.0;
-            *rrdr_value_options_ptr |= RRDR_EMPTY;
+            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
         else {
             *rrdr_value_ptr = value;
         }
+
+        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "median");
     }
 
     g->next_pos = 0;

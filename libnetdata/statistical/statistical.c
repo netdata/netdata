@@ -2,6 +2,16 @@
 
 #include "../libnetdata.h"
 
+void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg) {
+    size_t i;
+    fprintf(stderr, "\n\n%s with array [", msg);
+    for(i = 0; i < entries ; i++) {
+        if(i > 0) fprintf(stderr, ", ");
+        fprintf(stderr, "%" LONG_DOUBLE_MODIFIER, series[i]);
+    }
+    fprintf(stderr, "] results in " CALCULATED_NUMBER_FORMAT "\n\n", result);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 inline LONG_DOUBLE sum_and_count(const LONG_DOUBLE *series, size_t entries, size_t *count) {

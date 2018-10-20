@@ -33,12 +33,12 @@ void grouping_add_average(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_average(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+void grouping_flush_average(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_average *g = (struct grouping_average *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
-        *rrdr_value_options_ptr |= RRDR_EMPTY;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
         if(unlikely(r->group_points != 1))

@@ -5,7 +5,7 @@
 static struct {
     const char *name;
     uint32_t hash;
-    uint32_t value;
+    RRDR_OPTIONS value;
 } api_v1_data_options[] = {
         {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
         , {"flip"            , 0    , RRDR_OPTION_REVERSED}
