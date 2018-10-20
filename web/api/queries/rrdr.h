@@ -62,6 +62,13 @@ typedef struct rrdresult {
     // internal rrd2rrdr() members below this point
     long group_points;
     calculated_number group_sum_divisor;
+
+    void *(*grouping_init)(struct rrdresult *r);
+    void (*grouping_reset)(struct rrdresult *r);
+    void (*grouping_free)(struct rrdresult *r);
+    void (*grouping_add)(struct rrdresult *r, calculated_number value);
+    void (*grouping_flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr);
+    void *grouping_data;
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)

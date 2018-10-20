@@ -46,28 +46,31 @@ struct grouping_average {
     size_t count;
 };
 
-static void *grouping_init_average(RRDR *r) {
+static inline void *grouping_init_average(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_average));
 }
 
-static void grouping_free_average(RRDR *r, void *data) {
-    (void)r;
-    freez(data);
+static inline void grouping_reset_average(RRDR *r) {
+    struct grouping_average *g = (struct grouping_average *)r->grouping_data;
+    g->sum = 0;
+    g->count = 0;
 }
 
-static void grouping_add_average(RRDR *r, void *data, calculated_number value) {
-    (void)r;
+static inline void grouping_free_average(RRDR *r) {
+    freez(r->grouping_data);
+}
 
+static inline void grouping_add_average(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_average *g = (struct grouping_average *)data;
+        struct grouping_average *g = (struct grouping_average *)r->grouping_data;
         g->sum += value;
         g->count++;
     }
 }
 
-static void grouping_flush_average(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data) {
-    struct grouping_average *g = (struct grouping_average *)data;
+static inline void grouping_flush_average(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_average *g = (struct grouping_average *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
@@ -92,21 +95,24 @@ struct grouping_min {
     size_t count;
 };
 
-static void *grouping_init_min(RRDR *r) {
+static inline void *grouping_init_min(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_min));
 }
 
-static void grouping_free_min(RRDR *r, void *data) {
-    (void)r;
-    freez(data);
+static inline void grouping_reset_min(RRDR *r) {
+    struct grouping_min *g = (struct grouping_min *)r->grouping_data;
+    g->min = 0;
+    g->count = 0;
 }
 
-static void grouping_add_min(RRDR *r, void *data, calculated_number value) {
-    (void)r;
+static inline void grouping_free_min(RRDR *r) {
+    freez(r->grouping_data);
+}
 
+static inline void grouping_add_min(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_min *g = (struct grouping_min *)data;
+        struct grouping_min *g = (struct grouping_min *)r->grouping_data;
 
         if(!g->count || calculated_number_fabs(value) < calculated_number_fabs(g->min)) {
             g->min = value;
@@ -115,9 +121,8 @@ static void grouping_add_min(RRDR *r, void *data, calculated_number value) {
     }
 }
 
-static void grouping_flush_min(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data) {
-    (void)r;
-    struct grouping_min *g = (struct grouping_min *)data;
+static inline void grouping_flush_min(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_min *g = (struct grouping_min *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
@@ -139,21 +144,24 @@ struct grouping_max {
     size_t count;
 };
 
-static void *grouping_init_max(RRDR *r) {
+static inline void *grouping_init_max(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_max));
 }
 
-static void grouping_free_max(RRDR *r, void *data) {
-    (void)r;
-    freez(data);
+static inline void grouping_reset_max(RRDR *r) {
+    struct grouping_max *g = (struct grouping_max *)r->grouping_data;
+    g->max = 0;
+    g->count = 0;
 }
 
-static void grouping_add_max(RRDR *r, void *data, calculated_number value) {
-    (void)r;
+static inline void grouping_free_max(RRDR *r) {
+    freez(r->grouping_data);
+}
 
+static inline void grouping_add_max(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_max *g = (struct grouping_max *)data;
+        struct grouping_max *g = (struct grouping_max *)r->grouping_data;
 
         if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->max)) {
             g->max = value;
@@ -162,9 +170,8 @@ static void grouping_add_max(RRDR *r, void *data, calculated_number value) {
     }
 }
 
-static void grouping_flush_max(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data) {
-    (void)r;
-    struct grouping_max *g = (struct grouping_max *)data;
+static inline void grouping_flush_max(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_max *g = (struct grouping_max *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
@@ -186,21 +193,24 @@ struct grouping_sum {
     size_t count;
 };
 
-static void *grouping_init_sum(RRDR *r) {
+static inline void *grouping_init_sum(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_sum));
 }
 
-static void grouping_free_sum(RRDR *r, void *data) {
-    (void)r;
-    freez(data);
+static inline void grouping_reset_sum(RRDR *r) {
+    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+    g->sum = 0;
+    g->count = 0;
 }
 
-static void grouping_add_sum(RRDR *r, void *data, calculated_number value) {
-    (void)r;
+static inline void grouping_free_sum(RRDR *r) {
+    freez(r->grouping_data);
+}
 
+static inline void grouping_add_sum(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_sum *g = (struct grouping_sum *)data;
+        struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
 
         if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->sum)) {
             g->sum += value;
@@ -209,9 +219,8 @@ static void grouping_add_sum(RRDR *r, void *data, calculated_number value) {
     }
 }
 
-static void grouping_flush_sum(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data) {
-    (void)r;
-    struct grouping_sum *g = (struct grouping_sum *)data;
+static inline void grouping_flush_sum(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
@@ -235,21 +244,25 @@ struct grouping_incremental_sum {
     size_t count;
 };
 
-static void *grouping_init_incremental_sum(RRDR *r) {
+static inline void *grouping_init_incremental_sum(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_incremental_sum));
 }
 
-static void grouping_free_incremental_sum(RRDR *r, void *data) {
-    (void)r;
-    freez(data);
+static inline void grouping_reset_incremental_sum(RRDR *r) {
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping_data;
+    g->first = 0;
+    g->last = 0;
+    g->count = 0;
 }
 
-static void grouping_add_incremental_sum(RRDR *r, void *data, calculated_number value) {
-    (void)r;
+static inline void grouping_free_incremental_sum(RRDR *r) {
+    freez(r->grouping_data);
+}
 
+static inline void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)data;
+        struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping_data;
 
         if(unlikely(!g->count)) {
             g->first = value;
@@ -262,9 +275,8 @@ static void grouping_add_incremental_sum(RRDR *r, void *data, calculated_number 
     }
 }
 
-static void grouping_flush_incremental_sum(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data) {
-    (void)r;
-    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)data;
+static inline void grouping_flush_incremental_sum(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr) {
+    struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping_data;
 
     if(unlikely(!g->count)) {
         *rrdr_value_ptr = 0.0;
@@ -295,14 +307,16 @@ static inline void do_dimension(
         , long stop_at_slot
         , time_t after
         , time_t before
-        , int group_method
+#ifdef NETDATA_INTERNAL_CHECKS
         , int debug
+#endif
 ){
     RRDSET *st = r->st;
 
-    time_t  now = rrdset_slot2time(st, start_at_slot),
-            dt = st->update_every,
-            group_start_t = 0;
+    time_t
+        now = rrdset_slot2time(st, start_at_slot),
+        dt = st->update_every,
+        group_start_t = 0;
 
     long
         slot = start_at_slot,
@@ -313,15 +327,9 @@ static inline void do_dimension(
         group_count = 0,
         add_this = 0;
 
-    // do the calculations
-    calculated_number   last_values = NAN; // keep the last value of each dimension
-
-    calculated_number   group_value = (group_method == GROUP_MAX || group_method == GROUP_MIN)?NAN:0;
-    long                values_in_group = 0; // keep the number of values added to group_value
-
-    uint8_t             group_options = 0;
-    uint8_t             found_non_zero = 0;
-
+    uint8_t
+        group_options = 0,
+        found_non_zero = 0;
 
     #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %u (stop_at_t: %ld), before_t: %u (start_at_t: %ld), start_t(now): %u, current_entry: %ld, entries: %ld"
@@ -336,51 +344,7 @@ static inline void do_dimension(
         );
     #endif
 
-    void *(*grouping_init)(struct rrdresult *r);
-    void (*grouping_free)(struct rrdresult *r, void *data);
-    void (*grouping_add)(struct rrdresult *r, void *data, calculated_number value);
-    void (*grouping_flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr, void *data);
-
-    switch(group_method) {
-        case GROUP_MIN:
-            grouping_init  = grouping_init_min;
-            grouping_free  = grouping_free_min;
-            grouping_add   = grouping_add_min;
-            grouping_flush = grouping_flush_min;
-            break;
-
-        case GROUP_MAX:
-            grouping_init  = grouping_init_max;
-            grouping_free  = grouping_free_max;
-            grouping_add   = grouping_add_max;
-            grouping_flush = grouping_flush_max;
-            break;
-
-        case GROUP_SUM:
-            grouping_init  = grouping_init_sum;
-            grouping_free  = grouping_free_sum;
-            grouping_add   = grouping_add_sum;
-            grouping_flush = grouping_flush_sum;
-            break;
-
-        case GROUP_INCREMENTAL_SUM:
-            grouping_init  = grouping_init_incremental_sum;
-            grouping_free  = grouping_free_incremental_sum;
-            grouping_add   = grouping_add_incremental_sum;
-            grouping_flush = grouping_flush_incremental_sum;
-            break;
-
-        default:
-        case GROUP_AVERAGE:
-        case GROUP_UNDEFINED:
-            grouping_init  = grouping_init_average;
-            grouping_free  = grouping_free_average;
-            grouping_add   = grouping_add_average;
-            grouping_flush = grouping_flush_average;
-            break;
-    }
-
-    // void *data = grouping_init(r);
+    r->grouping_reset(r);
 
     time_t after_to_return = now;
 
@@ -415,10 +379,10 @@ static inline void do_dimension(
         }
 
         storage_number n = rd->values[slot];
+        calculated_number value = NAN;
         if(likely(does_storage_number_exist(n))) {
-            values_in_group++;
 
-            calculated_number value = unpack_storage_number(n);
+            value = unpack_storage_number(n);
             if(likely(value != 0.0)) {
                 group_options |= RRDR_NONZERO;
                 found_non_zero = 1;
@@ -426,36 +390,10 @@ static inline void do_dimension(
 
             if(unlikely(did_storage_number_reset(n)))
                 group_options |= RRDR_RESET;
-
-            switch(group_method) {
-                case GROUP_MIN:
-                    if(unlikely(isnan(group_value)) ||
-                       calculated_number_fabs(value) < calculated_number_fabs(group_value))
-                       group_value = value;
-                    break;
-
-                case GROUP_MAX:
-                    if(unlikely(isnan(group_value)) ||
-                       calculated_number_fabs(value) > calculated_number_fabs(group_value))
-                       group_value = value;
-                    break;
-
-                default:
-                case GROUP_SUM:
-                case GROUP_AVERAGE:
-                case GROUP_UNDEFINED:
-                    group_value += value;
-                    break;
-
-                case GROUP_INCREMENTAL_SUM:
-                    if(unlikely(slot == start_at_slot))
-                        last_values = value;
-
-                    group_value += last_values - value;
-                    last_values = value;
-                    break;
-            }
         }
+
+        // add this value for grouping
+        r->grouping_add(r, value);
 
         // add it
         if(unlikely(add_this)) {
@@ -481,53 +419,18 @@ static inline void do_dimension(
             *rrdr_value_options_ptr = group_options;
 
             // store the value
-            if(unlikely(values_in_group == 0)) {
-                *rrdr_value_ptr = 0.0;
-                *rrdr_value_options_ptr |= RRDR_EMPTY;
-                group_value = (group_method == GROUP_MAX || group_method == GROUP_MIN)?NAN:0;
-            }
-            else {
-                switch(group_method) {
-                    case GROUP_MIN:
-                    case GROUP_MAX:
-                        if(unlikely(isnan(group_value)))
-                            *rrdr_value_ptr = 0;
-                        else {
-                            *rrdr_value_ptr = group_value;
-                            group_value = NAN;
-                        }
-                        break;
+            r->grouping_flush(r, rrdr_value_ptr, rrdr_value_options_ptr);
 
-                    case GROUP_SUM:
-                    case GROUP_INCREMENTAL_SUM:
-                        *rrdr_value_ptr = group_value;
-                        group_value = 0;
-                        break;
-
-                    default:
-                    case GROUP_AVERAGE:
-                    case GROUP_UNDEFINED:
-                        if(unlikely(r->group_points != 1))
-                            *rrdr_value_ptr = group_value / r->group_sum_divisor;
-                        else
-                            *rrdr_value_ptr = group_value / values_in_group;
-
-                        group_value = 0;
-                        break;
-                }
-
-                // find the min and max for the whole chart
+            // find the min and max for the whole chart
+            if(!(*rrdr_value_options_ptr & RRDR_EMPTY)) {
                 if(*rrdr_value_ptr < r->min) r->min = *rrdr_value_ptr;
                 if(*rrdr_value_ptr > r->max) r->max = *rrdr_value_ptr;
-
-                // reset for the next loop
-                values_in_group = 0;
-                group_options = 0;
             }
 
             added++;
-            group_count = 0;
             add_this = 0;
+            group_count = 0;
+            found_non_zero = 0;
         }
     }
 
@@ -753,6 +656,52 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
 
     //info("RRD2RRDR(): %s: STARTING", st->id);
 
+    switch(group_method) {
+        case GROUP_MIN:
+            r->grouping_init  = grouping_init_min;
+            r->grouping_reset = grouping_reset_min;
+            r->grouping_free  = grouping_free_min;
+            r->grouping_add   = grouping_add_min;
+            r->grouping_flush = grouping_flush_min;
+            break;
+
+        case GROUP_MAX:
+            r->grouping_init  = grouping_init_max;
+            r->grouping_reset = grouping_reset_max;
+            r->grouping_free  = grouping_free_max;
+            r->grouping_add   = grouping_add_max;
+            r->grouping_flush = grouping_flush_max;
+            break;
+
+        case GROUP_SUM:
+            r->grouping_init  = grouping_init_sum;
+            r->grouping_reset = grouping_reset_sum;
+            r->grouping_free  = grouping_free_sum;
+            r->grouping_add   = grouping_add_sum;
+            r->grouping_flush = grouping_flush_sum;
+            break;
+
+        case GROUP_INCREMENTAL_SUM:
+            r->grouping_init  = grouping_init_incremental_sum;
+            r->grouping_reset = grouping_reset_incremental_sum;
+            r->grouping_free  = grouping_free_incremental_sum;
+            r->grouping_add   = grouping_add_incremental_sum;
+            r->grouping_flush = grouping_flush_incremental_sum;
+            break;
+
+        default:
+        case GROUP_AVERAGE:
+        case GROUP_UNDEFINED:
+            r->grouping_init  = grouping_init_average;
+            r->grouping_reset = grouping_reset_average;
+            r->grouping_free  = grouping_free_average;
+            r->grouping_add   = grouping_add_average;
+            r->grouping_flush = grouping_flush_average;
+            break;
+    }
+
+    r->grouping_data = r->grouping_init(r);
+
     rrdset_check_rdlock(st);
 
     time_t max_after = 0;
@@ -771,32 +720,37 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
                 , stop_at_slot
                 , after
                 , before
-                , group_method
+#ifdef NETDATA_INTERNAL_CHECKS
                 , debug
+#endif
                 );
 
+
+        // verify all dimensions are aligned
         if(unlikely(!c)) {
             max_after = r->after;
             max_rows = r->rows;
         }
         else {
             if(r->after != max_after) {
-#ifdef NETDATA_INTERNAL_CHECKS
+                #ifdef NETDATA_INTERNAL_CHECKS
                 error("INTERNAL ERROR: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
                         st->name, (size_t)max_after, rd->name, (size_t)r->after);
-#endif
+                #endif
                 r->after = (r->after > max_after) ? r->after : max_after;
             }
 
             if(r->rows != max_rows) {
-#ifdef NETDATA_INTERNAL_CHECKS
+                #ifdef NETDATA_INTERNAL_CHECKS
                 error("INTERNAL ERROR: 'rows' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
                         st->name, (size_t)max_rows, rd->name, (size_t)r->rows);
-#endif
+                #endif
                 r->rows = (r->rows > max_rows) ? r->rows : max_rows;
             }
         }
     }
+
+    r->grouping_free(r);
 
     //info("RRD2RRDR(): %s: END %ld loops made, %ld points generated", st->id, counter, rrdr_rows(r));
     //error("SHIFT: %s: wanted %ld points, got %ld", st->id, points, rrdr_rows(r));
