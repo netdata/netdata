@@ -440,7 +440,7 @@ class Service(SimpleService):
 
     def check(self):
         if not PYMONGO:
-            self.error('Pymongo module is needed to use mongodb.chart.py')
+            self.error('Pymongo package v2.4+ is needed to use mongodb.chart.py')
             return False
         self.connection, server_status, error = self._create_connection()
         if error:

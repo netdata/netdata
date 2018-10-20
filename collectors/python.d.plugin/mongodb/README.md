@@ -3,7 +3,7 @@
 Module monitor mongodb performance and health metrics
 
 **Requirements:**
- * `python-pymongo` package.
+ * `python-pymongo` package v2.4+.
 
 You need to install it manually.
 
