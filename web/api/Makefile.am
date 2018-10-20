@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIR = \
     badges \
+    queries \
     $(NULL)
 
 dist_noinst_DATA = \
