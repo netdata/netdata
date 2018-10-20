@@ -7,13 +7,14 @@ static struct {
     uint32_t hash;
     int value;
 } api_v1_data_groups[] = {
-        {  "average"        , 0    , GROUP_AVERAGE}
-        , {"min"            , 0    , GROUP_MIN}
-        , {"max"            , 0    , GROUP_MAX}
-        , {"sum"            , 0    , GROUP_SUM}
-        , {"incremental_sum", 0    , GROUP_INCREMENTAL_SUM}
-        , {"incremental-sum", 0    , GROUP_INCREMENTAL_SUM}
-        , {                 NULL, 0, 0}
+          { "average"         , 0, GROUP_AVERAGE }
+        , { "median"          , 0, GROUP_MEDIAN }
+        , { "min"             , 0, GROUP_MIN }
+        , { "max"             , 0, GROUP_MAX }
+        , { "sum"             , 0, GROUP_SUM }
+        , { "incremental_sum" , 0, GROUP_INCREMENTAL_SUM }
+        , { "incremental-sum" , 0, GROUP_INCREMENTAL_SUM }
+        , { NULL              , 0, 0 }
 };
 
 static struct {
@@ -82,6 +83,18 @@ static struct {
         , {"tsv-excel", 0    , DATASOURCE_TSV}
         , {           NULL, 0, 0}
 };
+
+const char *group_method2string(int group) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++) {
+        if(api_v1_data_groups[i].value == group) {
+            return api_v1_data_groups[i].name;
+        }
+    }
+
+    return "unknown-group-method";
+}
 
 void web_client_api_v1_init(void) {
     int i;

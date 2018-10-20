@@ -37,13 +37,6 @@
 #define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 
-#define GROUP_UNDEFINED         0
-#define GROUP_AVERAGE           1
-#define GROUP_MIN               2
-#define GROUP_MAX               3
-#define GROUP_SUM               4
-#define GROUP_INCREMENTAL_SUM   5
-
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
 

@@ -610,8 +610,9 @@ AC_CONFIG_FILES([
     web/api/queries/Makefile
     web/api/queries/average/Makefile
     web/api/queries/incremental_sum/Makefile
-    web/api/queries/min/Makefile
     web/api/queries/max/Makefile
+    web/api/queries/median/Makefile
+    web/api/queries/min/Makefile
     web/api/queries/sum/Makefile
     web/gui/Makefile
     web/server/Makefile

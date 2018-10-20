@@ -3,6 +3,8 @@
 #include "query.h"
 
 // ----------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
 
 static inline uint8_t *rrdr_line_options(RRDR *r, long rrdr_line) {
@@ -428,6 +430,14 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             r->grouping_free  = grouping_free_incremental_sum;
             r->grouping_add   = grouping_add_incremental_sum;
             r->grouping_flush = grouping_flush_incremental_sum;
+            break;
+
+        case GROUP_MEDIAN:
+            r->grouping_init  = grouping_init_median;
+            r->grouping_reset = grouping_reset_median;
+            r->grouping_free  = grouping_free_median;
+            r->grouping_add   = grouping_add_median;
+            r->grouping_flush = grouping_flush_median;
             break;
 
         default:

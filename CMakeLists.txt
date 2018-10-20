@@ -388,6 +388,8 @@ set(API_PLUGIN_FILES
         web/api/queries/min/min.h
         web/api/queries/sum/sum.c
         web/api/queries/sum/sum.h
+        web/api/queries/median/median.c
+        web/api/queries/median/median.h
         )
 
 set(STREAMING_PLUGIN_FILES

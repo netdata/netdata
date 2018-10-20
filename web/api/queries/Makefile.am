@@ -9,6 +9,7 @@ SUBDIRS = \
     max \
     min \
     sum \
+    median \
     $(NULL)
 
 dist_noinst_DATA = \
