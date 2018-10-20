@@ -3,12 +3,14 @@
 #include "query.h"
 #include "../rrd2json.h"
 #include "rrdr.h"
-#include "web/api/queries/average/average.h"
+
+#include "average/average.h"
 #include "incremental_sum/incremental_sum.h"
 #include "max/max.h"
 #include "median/median.h"
 #include "min/min.h"
 #include "sum/sum.h"
+#include "stddev/stddev.h"
 
 // ----------------------------------------------------------------------------
 
@@ -16,15 +18,21 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_GROUPING value;
+    void *(*init)(struct rrdresult *r);
+    void (*reset)(struct rrdresult *r);
+    void (*free)(struct rrdresult *r);
+    void (*add)(struct rrdresult *r, calculated_number value);
+    void (*flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, uint8_t *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
-          { "average"         , 0, RRDR_GROUPING_AVERAGE }
-        , { "median"          , 0, RRDR_GROUPING_MEDIAN }
-        , { "min"             , 0, RRDR_GROUPING_MIN }
-        , { "max"             , 0, RRDR_GROUPING_MAX }
-        , { "sum"             , 0, RRDR_GROUPING_SUM }
-        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM }
-        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM }
-        , { NULL              , 0, RRDR_GROUPING_UNDEFINED }
+          { "average"         , 0, RRDR_GROUPING_AVERAGE        , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
+        , { "median"          , 0, RRDR_GROUPING_MEDIAN         , grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
+        , { "min"             , 0, RRDR_GROUPING_MIN            , grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
+        , { "max"             , 0, RRDR_GROUPING_MAX            , grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
+        , { "sum"             , 0, RRDR_GROUPING_SUM            , grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
+        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
+        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
 };
 
 void web_client_api_v1_init_grouping(void) {
@@ -452,56 +460,27 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_
 
     //info("RRD2RRDR(): %s: STARTING", st->id);
 
-    switch(group_method) {
-        case RRDR_GROUPING_MIN:
-            r->grouping_init  = grouping_init_min;
-            r->grouping_reset = grouping_reset_min;
-            r->grouping_free  = grouping_free_min;
-            r->grouping_add   = grouping_add_min;
-            r->grouping_flush = grouping_flush_min;
-            break;
-
-        case RRDR_GROUPING_MAX:
-            r->grouping_init  = grouping_init_max;
-            r->grouping_reset = grouping_reset_max;
-            r->grouping_free  = grouping_free_max;
-            r->grouping_add   = grouping_add_max;
-            r->grouping_flush = grouping_flush_max;
-            break;
-
-        case RRDR_GROUPING_SUM:
-            r->grouping_init  = grouping_init_sum;
-            r->grouping_reset = grouping_reset_sum;
-            r->grouping_free  = grouping_free_sum;
-            r->grouping_add   = grouping_add_sum;
-            r->grouping_flush = grouping_flush_sum;
-            break;
-
-        case RRDR_GROUPING_INCREMENTAL_SUM:
-            r->grouping_init  = grouping_init_incremental_sum;
-            r->grouping_reset = grouping_reset_incremental_sum;
-            r->grouping_free  = grouping_free_incremental_sum;
-            r->grouping_add   = grouping_add_incremental_sum;
-            r->grouping_flush = grouping_flush_incremental_sum;
-            break;
-
-        case RRDR_GROUPING_MEDIAN:
-            r->grouping_init  = grouping_init_median;
-            r->grouping_reset = grouping_reset_median;
-            r->grouping_free  = grouping_free_median;
-            r->grouping_add   = grouping_add_median;
-            r->grouping_flush = grouping_flush_median;
-            break;
-
-        default:
-        case RRDR_GROUPING_AVERAGE:
-        case RRDR_GROUPING_UNDEFINED:
+    {
+        int i, found = 0;
+        for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
+            if(api_v1_data_groups[i].value == group_method) {
+                r->grouping_init  = api_v1_data_groups[i].init;
+                r->grouping_reset = api_v1_data_groups[i].reset;
+                r->grouping_free  = api_v1_data_groups[i].free;
+                r->grouping_add   = api_v1_data_groups[i].add;
+                r->grouping_flush = api_v1_data_groups[i].flush;
+                found = 1;
+            }
+        }
+        if(!found) {
+            errno = 0;
+            error("INTERNAL ERROR: grouping method %d not found for chart '%s'. Using 'average'", (int)group_method, r->st->name);
             r->grouping_init  = grouping_init_average;
             r->grouping_reset = grouping_reset_average;
             r->grouping_free  = grouping_free_average;
             r->grouping_add   = grouping_add_average;
             r->grouping_flush = grouping_flush_average;
-            break;
+        }
     }
 
     r->grouping_data = r->grouping_init(r);

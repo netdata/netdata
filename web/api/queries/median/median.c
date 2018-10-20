@@ -31,7 +31,7 @@ void grouping_add_median(RRDR *r, calculated_number value) {
     struct grouping_median *g = (struct grouping_median *)r->grouping_data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        error("INTERNAL ERROR: median buffer overflow.");
+        error("INTERNAL ERROR: median buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld, r->group_points = %ld.", r->st->name, g->next_pos, g->series_size, r->group, r->group_points);
     }
     else {
         g->series[g->next_pos++] = (LONG_DOUBLE)value;
@@ -46,12 +46,22 @@ void grouping_flush_median(RRDR *r, calculated_number *rrdr_value_ptr, uint8_t *
         *rrdr_value_options_ptr |= RRDR_EMPTY;
     }
     else {
+        calculated_number value;
+
         if(g->next_pos > 1) {
             sort_series(g->series, g->next_pos);
-            *rrdr_value_ptr = (calculated_number)median_on_sorted_series(g->series, g->next_pos);
+            value = (calculated_number)median_on_sorted_series(g->series, g->next_pos);
         }
         else {
-            *rrdr_value_ptr = (calculated_number)g->series[0];
+            value = (calculated_number)g->series[0];
+        }
+
+        if(isnan(value)) {
+            *rrdr_value_ptr = 0.0;
+            *rrdr_value_options_ptr |= RRDR_EMPTY;
+        }
+        else {
+            *rrdr_value_ptr = value;
         }
     }
 
