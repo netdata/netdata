@@ -392,6 +392,8 @@ set(API_PLUGIN_FILES
         web/api/queries/median/median.h
         web/api/queries/stddev/stddev.c
         web/api/queries/stddev/stddev.h
+        web/api/queries/ses/ses.c
+        web/api/queries/ses/ses.h
         )
 
 set(STREAMING_PLUGIN_FILES

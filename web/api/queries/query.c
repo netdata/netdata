@@ -11,6 +11,7 @@
 #include "min/min.h"
 #include "sum/sum.h"
 #include "stddev/stddev.h"
+#include "ses/ses.h"
 
 // ----------------------------------------------------------------------------
 
@@ -25,13 +26,14 @@ static struct {
     void (*flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
           { "average"         , 0, RRDR_GROUPING_AVERAGE        , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
+        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
         , { "median"          , 0, RRDR_GROUPING_MEDIAN         , grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
         , { "min"             , 0, RRDR_GROUPING_MIN            , grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
         , { "max"             , 0, RRDR_GROUPING_MAX            , grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
-        , { "sum"             , 0, RRDR_GROUPING_SUM            , grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
+        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
         , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
-        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
-        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { "sum"             , 0, RRDR_GROUPING_SUM            , grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
         , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
 };
 
@@ -170,9 +172,9 @@ static inline void do_dimension(
         , long stop_at_slot
         , time_t after
         , time_t before
-#ifdef NETDATA_INTERNAL_CHECKS
+        #ifdef NETDATA_INTERNAL_CHECKS
         , int debug
-#endif
+        #endif
 ){
     RRDSET *st = r->st;
 
@@ -395,9 +397,9 @@ RRDR *rrd2rrdr(
         if (unlikely(group_time > duration)) {
             // group_time is above the available duration
 
-#ifdef NETDATA_INTERNAL_CHECKS
+            #ifdef NETDATA_INTERNAL_CHECKS
             info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, group_time, duration);
-#endif
+            #endif
 
             group = points; // use all the points
         }
@@ -405,9 +407,9 @@ RRDR *rrd2rrdr(
             // the points we should group to satisfy gtime
             group_points = group_time / st->update_every;
             if(unlikely(group_time % group_points)) {
-#ifdef NETDATA_INTERNAL_CHECKS
+                #ifdef NETDATA_INTERNAL_CHECKS
                 info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, group_time, st->update_every);
-#endif
+                #endif
 
                 group_points++;
             }
@@ -502,9 +504,10 @@ RRDR *rrd2rrdr(
 
     // -------------------------------------------------------------------------
     // checks for debugging
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(debug) debug(D_RRD_STATS, "INFO %s first_t: %u, last_t: %u, all_duration: %u, after: %u, before: %u, duration: %u, points: %ld, group: %ld, group_points: %ld"
+    #ifdef NETDATA_INTERNAL_CHECKS
+    if(debug) debug(D_RRD_STATS, "INFO %s grouping %s, first_t: %u, last_t: %u, all_duration: %u, after: %u, before: %u, duration: %u, points: %ld, group: %ld, group_points: %ld"
                     , st->id
+                    , group_method2string(group_method)
                     , (uint32_t)first_entry_t
                     , (uint32_t)last_entry_t
                     , (uint32_t)(last_entry_t - first_entry_t)
@@ -515,7 +518,7 @@ RRDR *rrd2rrdr(
                     , group
                     , group_points
         );
-#endif
+    #endif
 
     // -------------------------------------------------------------------------
     // the main loop
@@ -577,9 +580,9 @@ RRDR *rrd2rrdr(
                 , stop_at_slot
                 , after
                 , before
-#ifdef NETDATA_INTERNAL_CHECKS
+                #ifdef NETDATA_INTERNAL_CHECKS
                 , debug
-#endif
+                #endif
                 );
 
         if(r->od[c] & RRDR_DIMENSION_NONZERO)

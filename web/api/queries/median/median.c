@@ -39,7 +39,8 @@ void grouping_add_median(RRDR *r, calculated_number value) {
         error("INTERNAL ERROR: median buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld, r->group_points = %ld.", r->st->name, g->next_pos, g->series_size, r->group, r->group_points);
     }
     else {
-        g->series[g->next_pos++] = (LONG_DOUBLE)value;
+        if(isnormal(value))
+            g->series[g->next_pos++] = (LONG_DOUBLE)value;
     }
 }
 
@@ -61,7 +62,7 @@ void grouping_flush_median(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALU
             value = (calculated_number)g->series[0];
         }
 
-        if(isnan(value)) {
+        if(!isnormal(value)) {
             *rrdr_value_ptr = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }

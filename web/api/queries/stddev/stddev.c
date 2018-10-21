@@ -39,7 +39,8 @@ void grouping_add_stddev(RRDR *r, calculated_number value) {
         error("INTERNAL ERROR: stddev buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld, r->group_points = %ld.", r->st->name, g->next_pos, g->series_size, r->group, r->group_points);
     }
     else {
-        g->series[g->next_pos++] = (LONG_DOUBLE)value;
+        if(isnormal(value))
+            g->series[g->next_pos++] = (LONG_DOUBLE)value;
     }
 }
 
@@ -53,7 +54,7 @@ void grouping_flush_stddev(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALU
     else {
         calculated_number value = standard_deviation(g->series, g->next_pos);
 
-        if(isnan(value)) {
+        if(!isnormal(value)) {
             *rrdr_value_ptr = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
@@ -61,7 +62,7 @@ void grouping_flush_stddev(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALU
             *rrdr_value_ptr = value;
         }
 
-        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "median");
+        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "stddev");
     }
 
     g->next_pos = 0;

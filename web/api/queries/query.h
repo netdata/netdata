@@ -12,6 +12,7 @@ typedef enum rrdr_grouping {
     RRDR_GROUPING_INCREMENTAL_SUM   = 5,
     RRDR_GROUPING_MEDIAN            = 6,
     RRDR_GROUPING_STDDEV            = 7,
+    RRDR_GROUPING_SES               = 8,
 } RRDR_GROUPING;
 
 extern const char *group_method2string(RRDR_GROUPING group);

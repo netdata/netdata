@@ -303,6 +303,8 @@ API_PLUGIN_FILES = \
     web/api/queries/query.h \
     web/api/queries/rrdr.c \
     web/api/queries/rrdr.h \
+    web/api/queries/ses/ses.c \
+    web/api/queries/ses/ses.h \
     web/api/queries/stddev/stddev.c \
     web/api/queries/stddev/stddev.h \
     web/api/queries/sum/sum.c \
