@@ -168,8 +168,8 @@ static inline void do_dimension(
         , long points
         , RRDDIM *rd
         , long dim_id_in_rrdr
-        , long start_at_slot
-        , long stop_at_slot
+        , long after_slot
+        , long before_slot
         , time_t after
         , time_t before
         #ifdef NETDATA_INTERNAL_CHECKS
@@ -179,12 +179,12 @@ static inline void do_dimension(
     RRDSET *st = r->st;
 
     time_t
-        now = rrdset_slot2time(st, start_at_slot),
+        now = after,
         dt = st->update_every,
         group_start_t = 0;
 
     long
-        slot = start_at_slot,
+        slot = after_slot,
         group = r->group,
         counter = 0,
         stop_now = 0,
@@ -198,12 +198,12 @@ static inline void do_dimension(
 
 
     #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %u (stop_at_t: %ld), before_t: %u (start_at_t: %ld), start_t(now): %u, current_entry: %ld, entries: %ld"
+    if(unlikely(debug)) debug(D_RRD_STATS, "BEGIN %s after_t: %u (stop_at_t: %ld), before_t: %u (before_slot: %ld), start_t(now): %u, current_entry: %ld, entries: %ld"
                               , st->id
                               , (uint32_t)after
-                              , stop_at_slot
+                              , after_slot
                               , (uint32_t)before
-                              , start_at_slot
+                              , before_slot
                               , (uint32_t)now
                               , st->current_entry
                               , st->entries
@@ -212,12 +212,13 @@ static inline void do_dimension(
 
     r->grouping_reset(r);
 
-    time_t after_to_return = now;
+    time_t max_date, min_date;
+    max_date = min_date = now;
 
     long rrdr_line = -1;
-    for(; !stop_now ; now -= dt, slot--, counter++) {
-        if(unlikely(slot < 0)) slot = st->entries - 1;
-        if(unlikely(slot == stop_at_slot)) stop_now = counter;
+    for( ; !stop_now ; now += dt, slot++, counter++) {
+        if(unlikely(slot >= st->entries)) slot = 0;
+        if(unlikely(slot == before_slot)) stop_now = counter;
 
         #ifdef NETDATA_INTERNAL_CHECKS
         if(unlikely(debug)) debug(D_RRD_STATS, "ROW %s slot: %ld, entries_counter: %ld, group_count: %ld, added: %ld, now: %ld, %s %s"
@@ -233,14 +234,23 @@ static inline void do_dimension(
         #endif
 
         // make sure we return data in the proper time range
-        if(unlikely(now > before)) continue;
-        if(unlikely(now < after)) break;
+        if(unlikely(now > before)) {
+            error("INTERNAL ERROR: RRDR of %s, 'now' %zu goes into the future, after 'before' %zu, chart last_t %zu", r->st->name, (size_t)now, (size_t)before, (size_t)rrdset_last_entry_t(r->st));
+            break;
+        }
+        if(unlikely(now < after)) {
+            error("INTERNAL ERROR: RRDR of %s, 'now' %zu goes into the past, before 'after' %zu, chart last_t %zu", r->st->name, (size_t)now, (size_t)after, (size_t)rrdset_first_entry_t(r->st));
+            continue;
+        }
 
         if(unlikely(group_count == 0)) group_start_t = now;
         group_count++;
 
         if(unlikely(group_count == group)) {
-            if(unlikely(added >= points)) break;
+            if(unlikely(added >= points)) {
+                error("INTERNAL ERROR: RRDR of '%s', attempted to add too many points to RRDR.", r->st->name);
+                break;
+            }
             add_this = 1;
         }
 
@@ -263,7 +273,8 @@ static inline void do_dimension(
         if(unlikely(add_this)) {
             rrdr_line = rrdr_line_init(r, group_start_t, rrdr_line);
 
-            after_to_return = now;
+            if(now < min_date) min_date = now;
+            if(now > max_date) max_date = now;
 
             // find the place to store our values
             calculated_number *rrdr_value_ptr;
@@ -298,8 +309,11 @@ static inline void do_dimension(
         }
     }
 
-    r->after = after_to_return;
+    r->before = max_date;
+    r->after = min_date;
     rrdr_done(r, rrdr_line);
+    if(unlikely(r->rows != added))
+        error("INTERNAL ERROR: added %zu rows, but RRDR says I added %zu.", (size_t)added, (size_t)r->rows);
 }
 
 // ----------------------------------------------------------------------------
@@ -366,7 +380,7 @@ RRDR *rrd2rrdr(
     if(after > last_entry_t)  after = last_entry_t;
     if(after < first_entry_t) after = first_entry_t;
 
-    // check if they are upside down
+    // check if they are reversed
     if(after > before) {
         time_t tmp = before;
         before = after;
@@ -390,7 +404,7 @@ RRDR *rrd2rrdr(
     if(unlikely(group <= 0)) group = 1;
     if(unlikely(available_points % points > points / 2)) group++; // rounding to the closest integer
 
-    // group_also time enforces a certain grouping multiple
+    // group_time enforces a certain grouping multiple
     calculated_number group_sum_divisor = 1.0;
     long group_points = 1;
     if(unlikely(group_time > st->update_every)) {
@@ -423,13 +437,17 @@ RRDR *rrd2rrdr(
         }
     }
 
-    time_t after_new  = after  - (after  % ( ((aligned)?group:1) * st->update_every ));
-    time_t before_new = before - (before % ( ((aligned)?group:1) * st->update_every ));
+    time_t after_new  = after  + (after  % ( ((aligned)?group:1) * st->update_every ));
+    if(after_new < rrdset_first_entry_t(st)) after_new += ( ((aligned)?group:1) * st->update_every );
+
+    time_t before_new = before + (before % ( ((aligned)?group:1) * st->update_every ));
+    if(before_new > rrdset_last_entry_t(st)) before_new -= ( ((aligned)?group:1) * st->update_every );
+
     long points_new   = (before_new - after_new) / st->update_every / group;
 
     // find the starting and ending slots in our round robin db
-    long    start_at_slot = rrdset_time2slot(st, before_new),
-            stop_at_slot  = rrdset_time2slot(st, after_new);
+    size_t  before_slot = rrdset_time2slot(st, before_new),
+            after_slot  = rrdset_time2slot(st, after_new);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(after_new < first_entry_t)
@@ -444,11 +462,11 @@ RRDR *rrd2rrdr(
     if(before_new > last_entry_t)
         error("INTERNAL CHECK: before_new %u is too big, maximum %u", (uint32_t)before_new, (uint32_t)last_entry_t);
 
-    if(start_at_slot < 0 || start_at_slot >= st->entries)
-        error("INTERNAL CHECK: start_at_slot is invalid %ld, expected 0 to %ld", start_at_slot, st->entries - 1);
+    if(before_slot >= (size_t)st->entries)
+        error("INTERNAL CHECK: before_slot is invalid %zu, expected 0 to %ld", before_slot, st->entries - 1);
 
-    if(stop_at_slot < 0 || stop_at_slot >= st->entries)
-        error("INTERNAL CHECK: stop_at_slot is invalid %ld, expected 0 to %ld", stop_at_slot, st->entries - 1);
+    if(after_slot >= (size_t)st->entries)
+        error("INTERNAL CHECK: after_slot is invalid %zu, expected 0 to %ld", after_slot, st->entries - 1);
 
     if(points_new > (before_new - after_new) / group / st->update_every + 1)
         error("INTERNAL CHECK: points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
@@ -465,7 +483,7 @@ RRDR *rrd2rrdr(
     after = after_new;
     before = before_new;
     duration = before - after;
-    points = points_new;
+    points = points_new + 1;
 
     // Now we have:
     // before = the end time of the calculation
@@ -525,8 +543,8 @@ RRDR *rrd2rrdr(
 
     r->group = group;
     r->update_every = (int)group * st->update_every;
-    r->before = rrdset_slot2time(st, start_at_slot);
-    r->after = rrdset_slot2time(st, stop_at_slot) - st->update_every;
+    r->before = before_new;
+    r->after = after_new;
     r->group_points = group_points;
     r->group_sum_divisor = group_sum_divisor;
 
@@ -562,7 +580,7 @@ RRDR *rrd2rrdr(
 
     rrdset_check_rdlock(st);
 
-    time_t max_after = 0;
+    time_t max_after = 0, min_before = 0;
     long max_rows = 0;
 
     RRDDIM *rd;
@@ -576,10 +594,10 @@ RRDR *rrd2rrdr(
                 , points
                 , rd
                 , c
-                , start_at_slot
-                , stop_at_slot
-                , after
-                , before
+                , after_slot
+                , before_slot
+                , (time_t)after
+                , (time_t)before
                 #ifdef NETDATA_INTERNAL_CHECKS
                 , debug
                 #endif
@@ -590,6 +608,7 @@ RRDR *rrd2rrdr(
 
         // verify all dimensions are aligned
         if(unlikely(!dimensions_used)) {
+            min_before = r->before;
             max_after = r->after;
             max_rows = r->rows;
         }
@@ -600,6 +619,14 @@ RRDR *rrd2rrdr(
                         st->name, (size_t)max_after, rd->name, (size_t)r->after);
                 #endif
                 r->after = (r->after > max_after) ? r->after : max_after;
+            }
+
+            if(r->before != min_before) {
+                #ifdef NETDATA_INTERNAL_CHECKS
+                error("INTERNAL ERROR: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
+                        st->name, (size_t)min_before, rd->name, (size_t)r->before);
+                #endif
+                r->before = (r->before < min_before) ? r->before : min_before;
             }
 
             if(r->rows != max_rows) {

@@ -175,7 +175,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     }
 
     long start = 0, end = rrdr_rows(r), step = 1;
-    if((options & RRDR_OPTION_REVERSED)) {
+    if(!(options & RRDR_OPTION_REVERSED)) {
         start = rrdr_rows(r) - 1;
         end = -1;
         step = -1;
@@ -331,7 +331,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *startline, 
     }
 
     long start = 0, end = rrdr_rows(r), step = 1;
-    if((options & RRDR_OPTION_REVERSED)) {
+    if(!(options & RRDR_OPTION_REVERSED)) {
         start = rrdr_rows(r) - 1;
         end = -1;
         step = -1;
@@ -513,7 +513,7 @@ void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, con
 
     buffer_strcat(wb, prefix);
     long start = 0, end = rrdr_rows(r), step = 1;
-    if((options & RRDR_OPTION_REVERSED)) {
+    if(!(options & RRDR_OPTION_REVERSED)) {
         start = rrdr_rows(r) - 1;
         end = -1;
         step = -1;

@@ -374,7 +374,7 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_O
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-                calculated_number *cn = &r->v[ (0) * r->d ];
+                calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
                 calculated_number n = cn[c];
 
                 if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -393,8 +393,8 @@ static void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_O
             if(i) buffer_strcat(wb, ", ");
             i++;
 
-            calculated_number *cn = &r->v[ (0) * r->d ];
-            RRDR_VALUE_FLAGS *co = &r->o[ (0) * r->d ];
+            calculated_number *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
+            RRDR_VALUE_FLAGS *co = &r->o[ (rrdr_rows(r) - 1) * r->d ];
             calculated_number n = cn[c];
 
             if(co[c] & RRDR_VALUE_EMPTY) {
@@ -505,7 +505,7 @@ int rrdset2value_api_v1(
     if(db_after)  *db_after  = r->after;
     if(db_before) *db_before = r->before;
 
-    long i = (options & RRDR_OPTION_REVERSED)?rrdr_rows(r) - 1:0;
+    long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
 
     rrdr_free(r);
