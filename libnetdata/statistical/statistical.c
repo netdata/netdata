@@ -225,11 +225,11 @@ LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     if(unlikely(entries == 0))
         return NAN;
 
-    const LONG_DOUBLE *value = series, *end = &series[entries];
-    LONG_DOUBLE level = (1.0 - alpha) * (*value);
-
     if(unlikely(isnan(alpha)))
         alpha = default_single_exponential_smoothing_alpha;
+
+    const LONG_DOUBLE *value = series, *end = &series[entries];
+    LONG_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value < end; value++) {
         if(likely(isnormal(*value)))
@@ -243,11 +243,11 @@ LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size
     if(unlikely(entries == 0))
         return NAN;
 
-    const LONG_DOUBLE *value = &series[entries -1];
-    LONG_DOUBLE level = (1.0 - alpha) * (*value);
-
     if(unlikely(isnan(alpha)))
         alpha = default_single_exponential_smoothing_alpha;
+
+    const LONG_DOUBLE *value = &series[entries -1];
+    LONG_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value >= series; value--) {
         if(likely(isnormal(*value)))
