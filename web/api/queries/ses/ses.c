@@ -52,7 +52,7 @@ void grouping_flush_ses(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_F
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        calculated_number value = single_exponential_smoothing_reverse(g->series, g->next_pos, NAN);
+        calculated_number value = single_exponential_smoothing_reverse(g->series, g->next_pos, 1.0 / g->next_pos / 2);
 
         if(!isnormal(value)) {
             *rrdr_value_ptr = 0.0;
