@@ -10,6 +10,6 @@ extern void *grouping_init_min(RRDR *r);
 extern void grouping_reset_min(RRDR *r);
 extern void grouping_free_min(RRDR *r);
 extern void grouping_add_min(RRDR *r, calculated_number value);
-extern void grouping_flush_min(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+extern calculated_number grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
 #endif //NETDATA_API_QUERY_MIN_H

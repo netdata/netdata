@@ -44,21 +44,25 @@ void grouping_add_incremental_sum(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_incremental_sum(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+calculated_number grouping_flush_incremental_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping_data;
 
+    calculated_number value;
+
     if(unlikely(!g->count)) {
-        *rrdr_value_ptr = 0.0;
+        value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else if(unlikely(g->count == 1)) {
-        *rrdr_value_ptr = 0.0;
+        value = 0.0;
     }
     else {
-        *rrdr_value_ptr = g->last - g->first;
+        value = g->last - g->first;
     }
 
     g->first = 0.0;
     g->last = 0.0;
     g->count = 0;
+
+    return value;
 }

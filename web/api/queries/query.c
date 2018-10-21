@@ -23,7 +23,7 @@ static struct {
     void (*reset)(struct rrdresult *r);
     void (*free)(struct rrdresult *r);
     void (*add)(struct rrdresult *r, calculated_number value);
-    void (*flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+    calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
           { "average"         , 0, RRDR_GROUPING_AVERAGE        , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
         , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
@@ -137,19 +137,20 @@ static inline calculated_number *rrdr_line_values(RRDR *r, long rrdr_line) {
     return &r->v[ rrdr_line * r->d ];
 }
 
-
 static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
     rrdr_line++;
 
-    if(unlikely(rrdr_line >= r->n)) {
-        error("INTERNAL ERROR: requested to step above RRDR size for chart '%s'", r->st->name);
-        rrdr_line = r->n - 1;
-    }
+    #ifdef NETDATA_INTERNAL_CHECKS
 
-    // save the time
+    if(unlikely(rrdr_line >= r->n))
+        error("INTERNAL ERROR: requested to step above RRDR size for chart '%s'", r->st->name);
+
     if(unlikely(r->t[rrdr_line] != 0 && r->t[rrdr_line] != t))
         error("INTERNAL ERROR: overwriting the timestamp of RRDR line %zu from %zu to %zu, of chart '%s'", (size_t)rrdr_line, (size_t)r->t[rrdr_line], (size_t)t, r->st->name);
 
+    #endif
+
+    // save the time
     r->t[rrdr_line] = t;
 
     return rrdr_line;
@@ -189,13 +190,14 @@ static inline void do_dimension(
         points_added = 0,
         values_in_group = 0,
         values_in_group_non_zero = 0,
-        rrdr_line = -1;
+        rrdr_line = -1,
+        entries = st->entries;
 
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
 
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
-        if(unlikely(slot >= st->entries)) slot = 0;
+        if(unlikely(slot >= entries)) slot = 0;
 
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
@@ -230,28 +232,13 @@ static inline void do_dimension(
         values_in_group++;
 
         if(unlikely(values_in_group == group_size)) {
-            if(unlikely(points_added >= points_wanted)) {
-                #ifdef NETDATA_INTERNAL_CHECKS
-                r->log = "attempted to add too many points to RRDR";
-                #endif
-                break;
-            }
-
             rrdr_line = rrdr_line_init(r, now, rrdr_line);
 
             if(unlikely(!min_date)) min_date = now;
             max_date = now;
 
             // find the place to store our values
-            calculated_number *rrdr_value_ptr;
-            RRDR_VALUE_FLAGS *rrdr_value_options_ptr;
-            {
-                calculated_number *cn = rrdr_line_values(r, rrdr_line);
-                rrdr_value_ptr = &cn[dim_id_in_rrdr];
-
-                RRDR_VALUE_FLAGS *co = rrdr_line_options(r, rrdr_line);
-                rrdr_value_options_ptr = &co[dim_id_in_rrdr];
-            }
+            RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
 
             // update the dimension options
             if(likely(values_in_group_non_zero))
@@ -261,13 +248,7 @@ static inline void do_dimension(
             *rrdr_value_options_ptr = group_value_flags;
 
             // store the value
-            r->grouping_flush(r, rrdr_value_ptr, rrdr_value_options_ptr);
-
-            // find the min and max for the whole chart
-            if(!(*rrdr_value_options_ptr & RRDR_VALUE_EMPTY)) {
-                if(*rrdr_value_ptr < r->min) r->min = *rrdr_value_ptr;
-                if(*rrdr_value_ptr > r->max) r->max = *rrdr_value_ptr;
-            }
+            r->v[rrdr_line * r->d + dim_id_in_rrdr] = r->grouping_flush(r, rrdr_value_options_ptr);
 
             points_added++;
             values_in_group = 0;

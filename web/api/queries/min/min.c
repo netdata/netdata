@@ -38,18 +38,22 @@ void grouping_add_min(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_min(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+calculated_number grouping_flush_min(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_min *g = (struct grouping_min *)r->grouping_data;
 
+    calculated_number value;
+
     if(unlikely(!g->count)) {
-        *rrdr_value_ptr = 0.0;
+        value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        *rrdr_value_ptr = g->min;
+        value = g->min;
     }
 
     g->min = 0.0;
     g->count = 0;
+
+    return value;
 }
 

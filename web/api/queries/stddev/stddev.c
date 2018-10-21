@@ -46,27 +46,28 @@ void grouping_add_stddev(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_stddev(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
 
+    calculated_number value;
+
     if(unlikely(!g->next_pos)) {
-        *rrdr_value_ptr = 0.0;
+        value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        calculated_number value = standard_deviation(g->series, g->next_pos);
+        value = standard_deviation(g->series, g->next_pos);
 
         if(!isnormal(value)) {
-            *rrdr_value_ptr = 0.0;
+            value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
-        else {
-            *rrdr_value_ptr = value;
-        }
 
-        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "stddev");
+        //log_series_to_stderr(g->series, g->next_pos, value, "stddev");
     }
 
     g->next_pos = 0;
+
+    return  value;
 }
 

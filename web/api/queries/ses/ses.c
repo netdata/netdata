@@ -55,16 +55,20 @@ void grouping_add_ses(RRDR *r, calculated_number value) {
     }
 }
 
-void grouping_flush_ses(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
 
+    calculated_number value;
+
     if(unlikely(!g->count || !isnormal(g->level))) {
-        *rrdr_value_ptr = 0.0;
+        value = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        *rrdr_value_ptr = g->level;
+        value = g->level;
     }
 
     g->count = 0;
+
+    return value;
 }

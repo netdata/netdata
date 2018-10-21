@@ -77,7 +77,7 @@ typedef struct rrdresult {
     void (*grouping_reset)(struct rrdresult *r);
     void (*grouping_free)(struct rrdresult *r);
     void (*grouping_add)(struct rrdresult *r, calculated_number value);
-    void (*grouping_flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
     void *grouping_data;
 
 #ifdef NETDATA_INTERNAL_CHECKS
