@@ -15,6 +15,8 @@ void *grouping_init_max(RRDR *r) {
     return callocz(1, sizeof(struct grouping_max));
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_max(RRDR *r) {
     struct grouping_max *g = (struct grouping_max *)r->grouping_data;
     g->max = 0;

@@ -26,6 +26,7 @@ typedef enum rrdr_options {
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
+    RRDR_VALUE_NOTHING      = 0x00, // no flag set
     RRDR_VALUE_EMPTY        = 0x01, // the value is empty
     RRDR_VALUE_RESET        = 0x02, // the value has been reset
 } RRDR_VALUE_FLAGS;
@@ -78,6 +79,10 @@ typedef struct rrdresult {
     void (*grouping_add)(struct rrdresult *r, calculated_number value);
     void (*grouping_flush)(struct rrdresult *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
     void *grouping_data;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    const char *log;
+#endif
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)
@@ -93,7 +98,7 @@ extern RRDR *rrdr_create(RRDSET *st, long n);
 
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, RRDR_GROUPING group_method, long group_time, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long group_time_requested, RRDR_OPTIONS options, const char *dimensions);
 
 #include "query.h"
 

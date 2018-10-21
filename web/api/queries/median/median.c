@@ -23,6 +23,8 @@ void *grouping_init_median(RRDR *r) {
     return g;
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_median(RRDR *r) {
     struct grouping_median *g = (struct grouping_median *)r->grouping_data;
     g->next_pos = 0;

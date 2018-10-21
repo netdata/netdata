@@ -15,6 +15,8 @@ void *grouping_init_average(RRDR *r) {
     return callocz(1, sizeof(struct grouping_average));
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_average(RRDR *r) {
     struct grouping_average *g = (struct grouping_average *)r->grouping_data;
     g->sum = 0;

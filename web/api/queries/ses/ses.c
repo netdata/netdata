@@ -8,22 +8,31 @@
 
 struct grouping_ses {
     calculated_number alpha;
+    calculated_number alpha_older;
     calculated_number level;
     size_t count;
-    size_t global_count;
+    size_t has_data;
 };
+
+static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
+    g->alpha = 1.0 / r->group;
+    g->alpha_older = 1 - g->alpha;
+}
 
 void *grouping_init_ses(RRDR *r) {
     struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses));
-    g->alpha = 1.0 / r->group / 2;
+    set_alpha(r, g);
     g->level = 0.0;
     return g;
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_ses(RRDR *r) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
     g->level = 0.0;
     g->count = 0;
+    g->has_data = 0;
 }
 
 void grouping_free_ses(RRDR *r) {
@@ -35,14 +44,14 @@ void grouping_add_ses(RRDR *r, calculated_number value) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
 
     if(isnormal(value)) {
-        if(unlikely(!g->global_count))
-            g->level = (1.0 - g->alpha) * value;
+        if(unlikely(!g->has_data)) {
+            g->level = value;
+            g->has_data = 1;
+        }
 
-        else
-            g->level = g->alpha * value + (1.0 - g->alpha) * g->level;
+        g->level = g->alpha * value + g->alpha_older * g->level;
 
         g->count++;
-        g->global_count++;
     }
 }
 
@@ -59,4 +68,3 @@ void grouping_flush_ses(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_F
 
     g->count = 0;
 }
-
