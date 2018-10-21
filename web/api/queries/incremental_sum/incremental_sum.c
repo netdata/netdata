@@ -16,6 +16,8 @@ void *grouping_init_incremental_sum(RRDR *r) {
     return callocz(1, sizeof(struct grouping_incremental_sum));
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_incremental_sum(RRDR *r) {
     struct grouping_incremental_sum *g = (struct grouping_incremental_sum *)r->grouping_data;
     g->first = 0;

@@ -23,6 +23,8 @@ void *grouping_init_stddev(RRDR *r) {
     return g;
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_stddev(RRDR *r) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
     g->next_pos = 0;

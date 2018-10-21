@@ -7,64 +7,64 @@
 // single exponential smoothing
 
 struct grouping_ses {
-    size_t series_size;
-    size_t next_pos;
-
-    LONG_DOUBLE series[];
+    calculated_number alpha;
+    calculated_number alpha_older;
+    calculated_number level;
+    size_t count;
+    size_t has_data;
 };
 
+static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
+    g->alpha = 1.0 / r->group;
+    g->alpha_older = 1 - g->alpha;
+}
+
 void *grouping_init_ses(RRDR *r) {
-    long entries = (r->group > r->group_points) ? r->group : r->group_points;
-    if(entries < 0) entries = 0;
-
-    struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses) + entries * sizeof(LONG_DOUBLE));
-    g->series_size = (size_t)entries;
-
+    struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses));
+    set_alpha(r, g);
+    g->level = 0.0;
     return g;
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_ses(RRDR *r) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
-    g->next_pos = 0;
+    g->level = 0.0;
+    g->count = 0;
+    g->has_data = 0;
 }
 
 void grouping_free_ses(RRDR *r) {
     freez(r->grouping_data);
+    r->grouping_data = NULL;
 }
 
 void grouping_add_ses(RRDR *r, calculated_number value) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
 
-    if(unlikely(g->next_pos >= g->series_size)) {
-        error("INTERNAL ERROR: single exponential smoothing buffer overflow on chart '%s' - next_pos = %zu, series_size = %zu, r->group = %ld, r->group_points = %ld.", r->st->name, g->next_pos, g->series_size, r->group, r->group_points);
-    }
-    else {
-        if(isnormal(value))
-            g->series[g->next_pos++] = (LONG_DOUBLE)value;
+    if(isnormal(value)) {
+        if(unlikely(!g->has_data)) {
+            g->level = value;
+            g->has_data = 1;
+        }
+
+        g->level = g->alpha * value + g->alpha_older * g->level;
+
+        g->count++;
     }
 }
 
 void grouping_flush_ses(RRDR *r, calculated_number *rrdr_value_ptr, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_ses *g = (struct grouping_ses *)r->grouping_data;
 
-    if(unlikely(!g->next_pos)) {
+    if(unlikely(!g->count || !isnormal(g->level))) {
         *rrdr_value_ptr = 0.0;
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        calculated_number value = single_exponential_smoothing_reverse(g->series, g->next_pos, 1.0 / g->next_pos / 2);
-
-        if(!isnormal(value)) {
-            *rrdr_value_ptr = 0.0;
-            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-        }
-        else {
-            *rrdr_value_ptr = value;
-        }
-
-        //log_series_to_stderr(g->series, g->next_pos, *rrdr_value_ptr, "ses");
+        *rrdr_value_ptr = g->level;
     }
 
-    g->next_pos = 0;
+    g->count = 0;
 }
-

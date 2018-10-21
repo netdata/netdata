@@ -15,6 +15,8 @@ void *grouping_init_min(RRDR *r) {
     return callocz(1, sizeof(struct grouping_min));
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_min(RRDR *r) {
     struct grouping_min *g = (struct grouping_min *)r->grouping_data;
     g->min = 0;

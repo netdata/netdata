@@ -15,6 +15,8 @@ void *grouping_init_sum(RRDR *r) {
     return callocz(1, sizeof(struct grouping_sum));
 }
 
+// resets when switches dimensions
+// so, clear everything to restart
 void grouping_reset_sum(RRDR *r) {
     struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
     g->sum = 0;
