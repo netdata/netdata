@@ -261,8 +261,10 @@ LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size
 
 // http://grisha.org/blog/2016/02/16/triple-exponential-smoothing-forecasting-part-ii/
 LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha, LONG_DOUBLE beta, LONG_DOUBLE *forecast) {
-    size_t i, count = 0;
-    LONG_DOUBLE level = series[0], trend, sum;
+    if(unlikely(entries == 0))
+        return NAN;
+
+    LONG_DOUBLE level, trend;
 
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
@@ -270,24 +272,22 @@ LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     if(unlikely(isnan(beta)))
         beta = 0.05;
 
+    level = series[0];
+
     if(likely(entries > 1))
         trend = series[1] - series[0];
     else
         trend = 0;
 
-    sum = series[0];
+    const LONG_DOUBLE *value = series;
+    for(value++ ; value >= series; value--) {
+        if(likely(isnormal(*value))) {
 
-    for(i = 1; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
+            LONG_DOUBLE last_level = level;
+            level = alpha * *value + (1.0 - alpha) * (level + trend);
+            trend = beta * (level - last_level) + (1.0 - beta) * trend;
 
-        sum += value;
-
-        LONG_DOUBLE last_level = level;
-
-        level = alpha * value + (1.0 - alpha) * (level + trend);
-        trend = beta * (level - last_level) + (1.0 - beta) * trend;
+        }
     }
 
     if(forecast)
