@@ -23,8 +23,6 @@ dist_web_DATA = \
 	goto-host-from-alarm.html \
 	index.html \
 	infographic.html \
-	netdata-swagger.yaml \
-	netdata-swagger.json \
 	robots.txt \
 	refresh-badges.js \
 	registry.html \

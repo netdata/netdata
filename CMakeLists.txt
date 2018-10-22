@@ -124,16 +124,15 @@ IF(LINUX)
     # ${MNL_INCLUDE_DIRS}
 ENDIF(LINUX)
 
+
 # -----------------------------------------------------------------------------
 # Detect libmnl
 
-IF(LINUX)
-    pkg_check_modules(NFACCT libnetfilter_acct)
-    # later we use:
-    # ${NFACCT_LIBRARIES}
-    # ${NFACCT_CFLAGS_OTHER}
-    # ${NFACCT_INCLUDE_DIRS}
-ENDIF(LINUX)
+pkg_check_modules(NFACCT libnetfilter_acct)
+# later we use:
+# ${NFACCT_LIBRARIES}
+# ${NFACCT_CFLAGS_OTHER}
+# ${NFACCT_INCLUDE_DIRS}
 
 
 # -----------------------------------------------------------------------------
@@ -370,6 +369,30 @@ set(API_PLUGIN_FILES
         web/api/web_api_v1.h
         web/api/badges/web_buffer_svg.c
         web/api/badges/web_buffer_svg.h
+        web/api/exporters/allmetrics.c
+        web/api/exporters/allmetrics.h
+        web/api/exporters/shell/allmetrics_shell.c
+        web/api/exporters/shell/allmetrics_shell.h
+        web/api/queries/rrdr.c
+        web/api/queries/rrdr.h
+        web/api/queries/query.c
+        web/api/queries/query.h
+        web/api/queries/average/average.c
+        web/api/queries/average/average.h
+        web/api/queries/incremental_sum/incremental_sum.c
+        web/api/queries/incremental_sum/incremental_sum.h
+        web/api/queries/max/max.c
+        web/api/queries/max/max.h
+        web/api/queries/min/min.c
+        web/api/queries/min/min.h
+        web/api/queries/sum/sum.c
+        web/api/queries/sum/sum.h
+        web/api/queries/median/median.c
+        web/api/queries/median/median.h
+        web/api/queries/stddev/stddev.c
+        web/api/queries/stddev/stddev.h
+        web/api/queries/ses/ses.c
+        web/api/queries/ses/ses.h
         )
 
 set(STREAMING_PLUGIN_FILES
@@ -470,11 +493,6 @@ IF(LINUX)
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
-    IF(IPMI_LIBRARIES)
-        SET(ENABLE_PLUGIN_FREEIPMI True)
-    ELSE()
-        SET(ENABLE_PLUGIN_FREEIPMI False)
-    ENDIF()
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -483,7 +501,6 @@ ELSEIF(FREEBSD)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS True)
-    SET(ENABLE_PLUGIN_FREEIPMI False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -492,8 +509,13 @@ ELSEIF(MACOS)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
-    SET(ENABLE_PLUGIN_FREEIPMI False)
 
+ENDIF()
+
+IF(IPMI_LIBRARIES)
+    SET(ENABLE_PLUGIN_FREEIPMI True)
+ELSE()
+    SET(ENABLE_PLUGIN_FREEIPMI False)
 ENDIF()
 
 

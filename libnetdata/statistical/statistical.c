@@ -2,38 +2,35 @@
 
 #include "../libnetdata.h"
 
+LONG_DOUBLE default_single_exponential_smoothing_alpha = 0.1;
+
+void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg) {
+    const LONG_DOUBLE *value, *end = &series[entries];
+
+    fprintf(stderr, "%s of %zu entries [ ", msg, entries);
+    for(value = series; value < end ;value++) {
+        if(value != series) fprintf(stderr, ", ");
+        fprintf(stderr, "%" LONG_DOUBLE_MODIFIER, *value);
+    }
+    fprintf(stderr, " ] results in " CALCULATED_NUMBER_FORMAT "\n", result);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 inline LONG_DOUBLE sum_and_count(const LONG_DOUBLE *series, size_t entries, size_t *count) {
-    if(unlikely(entries == 0)) {
-        if(likely(count))
-            *count = 0;
-
-        return NAN;
-    }
-
-    if(unlikely(entries == 1)) {
-        if(likely(count))
-            *count = (isnan(series[0])?0:1);
-
-        return series[0];
-    }
-
-    size_t i, c = 0;
+    const LONG_DOUBLE *value, *end = &series[entries];
     LONG_DOUBLE sum = 0;
+    size_t c = 0;
 
-    for(i = 0; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-        c++;
-        sum += value;
+    for(value = series; value < end ; value++) {
+        if(isnormal(*value)) {
+            sum += *value;
+            c++;
+        }
     }
 
-    if(likely(count))
-        *count = c;
-
-    if(unlikely(c == 0))
-        return NAN;
+    if(unlikely(!c)) sum = NAN;
+    if(likely(count)) *count = c;
 
     return sum;
 }
@@ -46,9 +43,7 @@ inline LONG_DOUBLE average(const LONG_DOUBLE *series, size_t entries) {
     size_t count = 0;
     LONG_DOUBLE sum = sum_and_count(series, entries, &count);
 
-    if(unlikely(count == 0))
-        return NAN;
-
+    if(unlikely(!count)) return NAN;
     return sum / (LONG_DOUBLE)count;
 }
 
@@ -67,7 +62,7 @@ LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t per
 
     for(i = 0, count = 0; i < entries; i++) {
         LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
+        if(unlikely(!isnormal(value))) continue;
 
         if(unlikely(count < period)) {
             sum += value;
@@ -118,33 +113,25 @@ inline LONG_DOUBLE *copy_series(const LONG_DOUBLE *series, size_t entries) {
 }
 
 LONG_DOUBLE median_on_sorted_series(const LONG_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0))
-        return NAN;
+    if(unlikely(entries == 0)) return NAN;
+    if(unlikely(entries == 1)) return series[0];
+    if(unlikely(entries == 2)) return (series[0] + series[1]) / 2;
 
-    if(unlikely(entries == 1))
-        return series[0];
-
-    if(unlikely(entries == 2))
-        return (series[0] + series[1]) / 2;
-
-    LONG_DOUBLE avg;
+    LONG_DOUBLE average;
     if(entries % 2 == 0) {
         size_t m = entries / 2;
-        avg = (series[m] + series[m + 1]) / 2;
+        average = (series[m] + series[m + 1]) / 2;
     }
     else {
-        avg = series[entries / 2];
+        average = series[entries / 2];
     }
 
-    return avg;
+    return average;
 }
 
 LONG_DOUBLE median(const LONG_DOUBLE *series, size_t entries) {
-    if(unlikely(entries == 0))
-        return NAN;
-
-    if(unlikely(entries == 1))
-        return series[0];
+    if(unlikely(entries == 0)) return NAN;
+    if(unlikely(entries == 1)) return series[0];
 
     if(unlikely(entries == 2))
         return (series[0] + series[1]) / 2;
@@ -186,7 +173,7 @@ LONG_DOUBLE running_median_estimate(const LONG_DOUBLE *series, size_t entries) {
 
     for(i = 0; i < entries ; i++) {
         LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
+        if(unlikely(!isnormal(value))) continue;
 
         average += ( value - average ) * 0.1f; // rough running average.
         median += copysignl( average * 0.01, value - median );
@@ -198,47 +185,36 @@ LONG_DOUBLE running_median_estimate(const LONG_DOUBLE *series, size_t entries) {
 // --------------------------------------------------------------------------------------------------------------------
 
 LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
-    if(unlikely(entries < 1))
-        return NAN;
+    if(unlikely(entries == 0)) return NAN;
+    if(unlikely(entries == 1)) return series[0];
 
-    if(unlikely(entries == 1))
-        return series[0];
+    const LONG_DOUBLE *value, *end = &series[entries];
+    size_t count;
+    LONG_DOUBLE sum;
 
-    size_t i, count = 0;
-    LONG_DOUBLE sum = 0;
-
-    for(i = 0; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-
-        count++;
-        sum += value;
+    for(count = 0, sum = 0, value = series ; value < end ;value++) {
+        if(likely(isnormal(*value))) {
+            count++;
+            sum += *value;
+        }
     }
 
-    if(unlikely(count == 0))
-        return NAN;
-
-    if(unlikely(count == 1))
-        return sum;
+    if(unlikely(count == 0)) return NAN;
+    if(unlikely(count == 1)) return sum;
 
     LONG_DOUBLE average = sum / (LONG_DOUBLE)count;
 
-    for(i = 0, count = 0, sum = 0; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-
-        count++;
-        sum += powl(value - average, 2);
+    for(count = 0, sum = 0, value = series ; value < end ;value++) {
+        if(isnormal(*value)) {
+            count++;
+            sum += powl(*value - average, 2);
+        }
     }
 
-    if(unlikely(count == 0))
-        return NAN;
+    if(unlikely(count == 0)) return NAN;
+    if(unlikely(count == 1)) return average;
 
-    if(unlikely(count == 1))
-        return average;
-
-    LONG_DOUBLE variance = sum / (LONG_DOUBLE)(count - 1); // remove -1 to have a population stddev
-
+    LONG_DOUBLE variance = sum / (LONG_DOUBLE)(count); // remove -1 from count to have a population stddev
     LONG_DOUBLE stddev = sqrtl(variance);
     return stddev;
 }
@@ -246,21 +222,36 @@ LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
 // --------------------------------------------------------------------------------------------------------------------
 
 LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha) {
-    size_t i, count = 0;
-    LONG_DOUBLE level = 0, sum = 0;
+    if(unlikely(entries == 0))
+        return NAN;
 
     if(unlikely(isnan(alpha)))
-        alpha = 0.3;
+        alpha = default_single_exponential_smoothing_alpha;
 
-    for(i = 0; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
+    const LONG_DOUBLE *value = series, *end = &series[entries];
+    LONG_DOUBLE level = (1.0 - alpha) * (*value);
 
-        sum += value;
+    for(value++ ; value < end; value++) {
+        if(likely(isnormal(*value)))
+            level = alpha * (*value) + (1.0 - alpha) * level;
+    }
 
-        LONG_DOUBLE last_level = level;
-        level = alpha * value + (1.0 - alpha) * last_level;
+    return level;
+}
+
+LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha) {
+    if(unlikely(entries == 0))
+        return NAN;
+
+    if(unlikely(isnan(alpha)))
+        alpha = default_single_exponential_smoothing_alpha;
+
+    const LONG_DOUBLE *value = &series[entries -1];
+    LONG_DOUBLE level = (1.0 - alpha) * (*value);
+
+    for(value++ ; value >= series; value--) {
+        if(likely(isnormal(*value)))
+            level = alpha * (*value) + (1.0 - alpha) * level;
     }
 
     return level;
@@ -270,8 +261,10 @@ LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
 
 // http://grisha.org/blog/2016/02/16/triple-exponential-smoothing-forecasting-part-ii/
 LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entries, LONG_DOUBLE alpha, LONG_DOUBLE beta, LONG_DOUBLE *forecast) {
-    size_t i, count = 0;
-    LONG_DOUBLE level = series[0], trend, sum;
+    if(unlikely(entries == 0))
+        return NAN;
+
+    LONG_DOUBLE level, trend;
 
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
@@ -279,24 +272,22 @@ LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     if(unlikely(isnan(beta)))
         beta = 0.05;
 
+    level = series[0];
+
     if(likely(entries > 1))
         trend = series[1] - series[0];
     else
         trend = 0;
 
-    sum = series[0];
+    const LONG_DOUBLE *value = series;
+    for(value++ ; value >= series; value--) {
+        if(likely(isnormal(*value))) {
 
-    for(i = 1; i < entries ; i++) {
-        LONG_DOUBLE value = series[i];
-        if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
+            LONG_DOUBLE last_level = level;
+            level = alpha * *value + (1.0 - alpha) * (level + trend);
+            trend = beta * (level - last_level) + (1.0 - beta) * trend;
 
-        sum += value;
-
-        LONG_DOUBLE last_level = level;
-
-        level = alpha * value + (1.0 - alpha) * (level + trend);
-        trend = beta * (level - last_level) + (1.0 - beta) * trend;
+        }
     }
 
     if(forecast)

@@ -604,6 +604,18 @@ AC_CONFIG_FILES([
     web/Makefile
     web/api/Makefile
     web/api/badges/Makefile
+    web/api/exporters/Makefile
+    web/api/exporters/shell/Makefile
+    web/api/exporters/prometheus/Makefile
+    web/api/queries/Makefile
+    web/api/queries/average/Makefile
+    web/api/queries/incremental_sum/Makefile
+    web/api/queries/max/Makefile
+    web/api/queries/median/Makefile
+    web/api/queries/min/Makefile
+    web/api/queries/ses/Makefile
+    web/api/queries/stddev/Makefile
+    web/api/queries/sum/Makefile
     web/gui/Makefile
     web/server/Makefile
     web/server/single/Makefile

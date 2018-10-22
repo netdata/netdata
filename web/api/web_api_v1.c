@@ -5,21 +5,7 @@
 static struct {
     const char *name;
     uint32_t hash;
-    int value;
-} api_v1_data_groups[] = {
-        {  "average"        , 0    , GROUP_AVERAGE}
-        , {"min"            , 0    , GROUP_MIN}
-        , {"max"            , 0    , GROUP_MAX}
-        , {"sum"            , 0    , GROUP_SUM}
-        , {"incremental_sum", 0    , GROUP_INCREMENTAL_SUM}
-        , {"incremental-sum", 0    , GROUP_INCREMENTAL_SUM}
-        , {                 NULL, 0, 0}
-};
-
-static struct {
-    const char *name;
-    uint32_t hash;
-    uint32_t value;
+    RRDR_OPTIONS value;
 } api_v1_data_options[] = {
         {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
         , {"flip"            , 0    , RRDR_OPTION_REVERSED}
@@ -86,9 +72,6 @@ static struct {
 void web_client_api_v1_init(void) {
     int i;
 
-    for(i = 0; api_v1_data_groups[i].name ; i++)
-        api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
-
     for(i = 0; api_v1_data_options[i].name ; i++)
         api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
 
@@ -97,17 +80,8 @@ void web_client_api_v1_init(void) {
 
     for(i = 0; api_v1_data_google_formats[i].name ; i++)
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
-}
 
-inline int web_client_api_request_v1_data_group(char *name, int def) {
-    int i;
-
-    uint32_t hash = simple_hash(name);
-    for(i = 0; api_v1_data_groups[i].name ; i++)
-        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
-            return api_v1_data_groups[i].value;
-
-    return def;
+    web_client_api_v1_init_grouping();
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -254,371 +228,8 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
-struct prometheus_output_options {
-    char *name;
-    PROMETHEUS_OUTPUT_OPTIONS flag;
-} prometheus_output_flags_root[] = {
-        { "help",       PROMETHEUS_OUTPUT_HELP       },
-        { "types",      PROMETHEUS_OUTPUT_TYPES      },
-        { "names",      PROMETHEUS_OUTPUT_NAMES      },
-        { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
-        { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
-
-        // terminator
-        { NULL, PROMETHEUS_OUTPUT_NONE },
-};
-
-inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
-    int format = ALLMETRICS_SHELL;
-    const char *prometheus_server = w->client_ip;
-    uint32_t prometheus_backend_options = global_backend_options;
-    PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?PROMETHEUS_OUTPUT_NAMES:0);
-    const char *prometheus_prefix = global_backend_prefix;
-
-    while(url) {
-        char *value = mystrsep(&url, "?&");
-        if (!value || !*value) continue;
-
-        char *name = mystrsep(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
-
-        if(!strcmp(name, "format")) {
-            if(!strcmp(value, ALLMETRICS_FORMAT_SHELL))
-                format = ALLMETRICS_SHELL;
-            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
-                format = ALLMETRICS_PROMETHEUS;
-            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS))
-                format = ALLMETRICS_PROMETHEUS_ALL_HOSTS;
-            else if(!strcmp(value, ALLMETRICS_FORMAT_JSON))
-                format = ALLMETRICS_JSON;
-            else
-                format = 0;
-        }
-        else if(!strcmp(name, "server")) {
-            prometheus_server = value;
-        }
-        else if(!strcmp(name, "prefix")) {
-            prometheus_prefix = value;
-        }
-        else if(!strcmp(name, "data") || !strcmp(name, "source") || !strcmp(name, "data source") || !strcmp(name, "data-source") || !strcmp(name, "data_source") || !strcmp(name, "datasource")) {
-            prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
-        }
-        else {
-            int i;
-            for(i = 0; prometheus_output_flags_root[i].name ; i++) {
-                if(!strcmp(name, prometheus_output_flags_root[i].name)) {
-                    if(!strcmp(value, "yes") || !strcmp(value, "1") || !strcmp(value, "true"))
-                        prometheus_output_options |= prometheus_output_flags_root[i].flag;
-                    else
-                        prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
-
-                    break;
-                }
-            }
-        }
-    }
-
-    buffer_flush(w->response.data);
-    buffer_no_cacheable(w->response.data);
-
-    switch(format) {
-        case ALLMETRICS_JSON:
-            w->response.data->contenttype = CT_APPLICATION_JSON;
-            rrd_stats_api_v1_charts_allmetrics_json(host, w->response.data);
-            return 200;
-
-        case ALLMETRICS_SHELL:
-            w->response.data->contenttype = CT_TEXT_PLAIN;
-            rrd_stats_api_v1_charts_allmetrics_shell(host, w->response.data);
-            return 200;
-
-        case ALLMETRICS_PROMETHEUS:
-            w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
-                    host
-                    , w->response.data
-                    , prometheus_server
-                    , prometheus_prefix
-                    , prometheus_backend_options
-                    , prometheus_output_options
-                    );
-            return 200;
-
-        case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
-            w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
-                    host
-                    , w->response.data
-                    , prometheus_server
-                    , prometheus_prefix
-                    , prometheus_backend_options
-                    , prometheus_output_options
-                    );
-            return 200;
-
-        default:
-            w->response.data->contenttype = CT_TEXT_PLAIN;
-            buffer_strcat(w->response.data, "Which format? '" ALLMETRICS_FORMAT_SHELL "', '" ALLMETRICS_FORMAT_PROMETHEUS "', '" ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS "' and '" ALLMETRICS_FORMAT_JSON "' are currently supported.");
-            return 400;
-    }
-}
-
 inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
-}
-
-int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
-    int ret = 400;
-    buffer_flush(w->response.data);
-
-    BUFFER *dimensions = NULL;
-
-    const char *chart = NULL
-    , *before_str = NULL
-    , *after_str = NULL
-    , *points_str = NULL
-    , *multiply_str = NULL
-    , *divide_str = NULL
-    , *label = NULL
-    , *units = NULL
-    , *label_color = NULL
-    , *value_color = NULL
-    , *refresh_str = NULL
-    , *precision_str = NULL
-    , *scale_str = NULL
-    , *alarm = NULL;
-
-    int group = GROUP_AVERAGE;
-    uint32_t options = 0x00000000;
-
-    while(url) {
-        char *value = mystrsep(&url, "/?&");
-        if(!value || !*value) continue;
-
-        char *name = mystrsep(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
-
-        debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
-
-        // name and value are now the parameters
-        // they are not null and not empty
-
-        if(!strcmp(name, "chart")) chart = value;
-        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions)
-                dimensions = buffer_create(100);
-
-            buffer_strcat(dimensions, "|");
-            buffer_strcat(dimensions, value);
-        }
-        else if(!strcmp(name, "after")) after_str = value;
-        else if(!strcmp(name, "before")) before_str = value;
-        else if(!strcmp(name, "points")) points_str = value;
-        else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
-        }
-        else if(!strcmp(name, "options")) {
-            options |= web_client_api_request_v1_data_options(value);
-        }
-        else if(!strcmp(name, "label")) label = value;
-        else if(!strcmp(name, "units")) units = value;
-        else if(!strcmp(name, "label_color")) label_color = value;
-        else if(!strcmp(name, "value_color")) value_color = value;
-        else if(!strcmp(name, "multiply")) multiply_str = value;
-        else if(!strcmp(name, "divide")) divide_str = value;
-        else if(!strcmp(name, "refresh")) refresh_str = value;
-        else if(!strcmp(name, "precision")) precision_str = value;
-        else if(!strcmp(name, "scale")) scale_str = value;
-        else if(!strcmp(name, "alarm")) alarm = value;
-    }
-
-    if(!chart || !*chart) {
-        buffer_no_cacheable(w->response.data);
-        buffer_sprintf(w->response.data, "No chart id is given at the request.");
-        goto cleanup;
-    }
-
-    int scale = (scale_str && *scale_str)?str2i(scale_str):100;
-
-    RRDSET *st = rrdset_find(host, chart);
-    if(!st) st = rrdset_find_byname(host, chart);
-    if(!st) {
-        buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0);
-        ret = 200;
-        goto cleanup;
-    }
-    st->last_accessed_time = now_realtime_sec();
-
-    RRDCALC *rc = NULL;
-    if(alarm) {
-        rc = rrdcalc_find(st, alarm);
-        if (!rc) {
-            buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0);
-            ret = 200;
-            goto cleanup;
-        }
-    }
-
-    long long multiply  = (multiply_str  && *multiply_str )?str2l(multiply_str):1;
-    long long divide    = (divide_str    && *divide_str   )?str2l(divide_str):1;
-    long long before    = (before_str    && *before_str   )?str2l(before_str):0;
-    long long after     = (after_str     && *after_str    )?str2l(after_str):-st->update_every;
-    int       points    = (points_str    && *points_str   )?str2i(points_str):1;
-    int       precision = (precision_str && *precision_str)?str2i(precision_str):-1;
-
-    if(!multiply) multiply = 1;
-    if(!divide) divide = 1;
-
-    int refresh = 0;
-    if(refresh_str && *refresh_str) {
-        if(!strcmp(refresh_str, "auto")) {
-            if(rc) refresh = rc->update_every;
-            else if(options & RRDR_OPTION_NOT_ALIGNED)
-                refresh = st->update_every;
-            else {
-                refresh = (int)(before - after);
-                if(refresh < 0) refresh = -refresh;
-            }
-        }
-        else {
-            refresh = str2i(refresh_str);
-            if(refresh < 0) refresh = -refresh;
-        }
-    }
-
-    if(!label) {
-        if(alarm) {
-            char *s = (char *)alarm;
-            while(*s) {
-                if(*s == '_') *s = ' ';
-                s++;
-            }
-            label = alarm;
-        }
-        else if(dimensions) {
-            const char *dim = buffer_tostring(dimensions);
-            if(*dim == '|') dim++;
-            label = dim;
-        }
-        else
-            label = st->name;
-    }
-    if(!units) {
-        if(alarm) {
-            if(rc->units)
-                units = rc->units;
-            else
-                units = "";
-        }
-        else if(options & RRDR_OPTION_PERCENTAGE)
-            units = "%";
-        else
-            units = st->units;
-    }
-
-    debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"
-          , w->id
-          , chart
-          , alarm?alarm:""
-          , (dimensions)?buffer_tostring(dimensions):""
-          , after
-          , before
-          , points
-          , group
-          , options
-    );
-
-    if(rc) {
-        if (refresh > 0) {
-            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
-        }
-        else buffer_no_cacheable(w->response.data);
-
-        if(!value_color) {
-            switch(rc->status) {
-                case RRDCALC_STATUS_CRITICAL:
-                    value_color = "red";
-                    break;
-
-                case RRDCALC_STATUS_WARNING:
-                    value_color = "orange";
-                    break;
-
-                case RRDCALC_STATUS_CLEAR:
-                    value_color = "brightgreen";
-                    break;
-
-                case RRDCALC_STATUS_UNDEFINED:
-                    value_color = "lightgrey";
-                    break;
-
-                case RRDCALC_STATUS_UNINITIALIZED:
-                    value_color = "#000";
-                    break;
-
-                default:
-                    value_color = "grey";
-                    break;
-            }
-        }
-
-        buffer_svg(w->response.data,
-                label,
-                (isnan(rc->value)||isinf(rc->value)) ? rc->value : rc->value * multiply / divide,
-                units,
-                label_color,
-                value_color,
-                precision,
-                scale,
-                options
-        );
-        ret = 200;
-    }
-    else {
-        time_t latest_timestamp = 0;
-        int value_is_null = 1;
-        calculated_number n = NAN;
-        ret = 500;
-
-        // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
-
-        // if the value cannot be calculated, show empty badge
-        if (ret != 200) {
-            buffer_no_cacheable(w->response.data);
-            value_is_null = 1;
-            n = 0;
-            ret = 200;
-        }
-        else if (refresh > 0) {
-            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
-        }
-        else buffer_no_cacheable(w->response.data);
-
-        // render the badge
-        buffer_svg(w->response.data,
-                label,
-                (value_is_null)?NAN:(n * multiply / divide),
-                units,
-                label_color,
-                value_color,
-                precision,
-                scale,
-                options
-        );
-    }
-
-    cleanup:
-    buffer_free(dimensions);
-    return ret;
 }
 
 // returns the HTTP code
@@ -645,7 +256,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     , *group_time_str = NULL
     , *points_str = NULL;
 
-    int group = GROUP_AVERAGE;
+    int group = RRDR_GROUPING_AVERAGE;
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
@@ -673,7 +284,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "format")) {
             format = web_client_api_request_v1_data_format(value);

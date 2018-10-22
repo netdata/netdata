@@ -283,12 +283,36 @@ RRD_PLUGIN_FILES = \
     $(NULL)
 
 API_PLUGIN_FILES = \
+    web/api/badges/web_buffer_svg.c \
+    web/api/badges/web_buffer_svg.h \
+    web/api/exporters/allmetrics.c \
+    web/api/exporters/allmetrics.h \
+    web/api/exporters/shell/allmetrics_shell.c \
+    web/api/exporters/shell/allmetrics_shell.h \
+    web/api/queries/average/average.c \
+    web/api/queries/average/average.h \
+    web/api/queries/incremental_sum/incremental_sum.c \
+    web/api/queries/incremental_sum/incremental_sum.h \
+    web/api/queries/max/max.c \
+    web/api/queries/max/max.h \
+    web/api/queries/median/median.c \
+    web/api/queries/median/median.h \
+    web/api/queries/min/min.c \
+    web/api/queries/min/min.h \
+    web/api/queries/query.c \
+    web/api/queries/query.h \
+    web/api/queries/rrdr.c \
+    web/api/queries/rrdr.h \
+    web/api/queries/ses/ses.c \
+    web/api/queries/ses/ses.h \
+    web/api/queries/stddev/stddev.c \
+    web/api/queries/stddev/stddev.h \
+    web/api/queries/sum/sum.c \
+    web/api/queries/sum/sum.h \
     web/api/rrd2json.c \
     web/api/rrd2json.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
-    web/api/badges/web_buffer_svg.c \
-    web/api/badges/web_buffer_svg.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \

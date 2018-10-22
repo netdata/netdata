@@ -54,7 +54,7 @@ struct rrdcalc {
     // database lookup settings
 
     char *dimensions;               // the chart dimensions
-    int group;                      // grouping method: average, max, etc.
+    RRDR_GROUPING group;               // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     uint32_t options;               // calculation options

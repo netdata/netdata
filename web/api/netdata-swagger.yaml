@@ -3,7 +3,7 @@ swagger: '2.0'
 info:
   title: NetData API
   description: 'Real-time performance and health monitoring.'
-  version: 1.9.11_rolling
+  version: 1.11.0_rolling
 host: registry.my-netdata.io
 schemes:
   - https
@@ -94,7 +94,7 @@ paths:
           description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'min', 'max', 'average', 'sum', 'incremental-sum' ]
+          enum: [ 'min', 'max', 'average', 'median', 'stddev', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: gtime
@@ -204,7 +204,7 @@ paths:
           description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
-          enum: [ 'min', 'max', 'average', 'sum', 'incremental-sum' ]
+          enum: [ 'min', 'max', 'average', 'median', 'stddev', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
         - name: options
