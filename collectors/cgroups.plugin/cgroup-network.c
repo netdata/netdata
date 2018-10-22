@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../daemon/common.h"
+#include "libnetdata/libnetdata.h"
 
 #ifdef HAVE_SETNS
 #ifndef _GNU_SOURCE

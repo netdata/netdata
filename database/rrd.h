@@ -15,7 +15,7 @@ typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
 #include "../daemon/common.h"
-
+#include "web/api/queries/query.h"
 #include "rrdvar.h"
 #include "rrdsetvar.h"
 #include "rrddimvar.h"
@@ -749,28 +749,84 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_first_entry_t(st) ((time_t)(rrdset_last_entry_t(st) - rrdset_duration(st)))
 
 // get the last slot updated in the round robin database
-#define rrdset_last_slot(st) ((unsigned long)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
+#define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
 
 // get the first / oldest slot updated in the round robin database
-#define rrdset_first_slot(st) ((unsigned long)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
+// #define rrdset_first_slot(st) ((size_t)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
+
+// return the slot that has the oldest value
+
+static inline size_t rrdset_first_slot(RRDSET *st) {
+    if(st->counter >= (size_t)st->entries) {
+        // the database has been rotated at least once
+        // the oldest entry is the one that will be next
+        // overwritten by data collection
+        return (size_t)st->current_entry;
+    }
+
+    // we do not have rotated the db yet
+    // so 0 is the first entry
+    return 0;
+}
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
-#define rrdset_time2slot(st, t) ( \
-        (  (time_t)(t) >= rrdset_last_entry_t(st))  ? ( rrdset_last_slot(st) ) : \
-        ( ((time_t)(t) <= rrdset_first_entry_t(st)) ?   rrdset_first_slot(st) : \
-        ( (rrdset_last_slot(st) >= (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) ) ? \
-          (rrdset_last_slot(st) -  (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) ) : \
-          (rrdset_last_slot(st) -  (unsigned long)((rrdset_last_entry_t(st) - (time_t)(t)) / (unsigned long)((st)->update_every)) + (unsigned long)(st)->entries ) \
-        )))
+static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
+    size_t ret = 0;
+
+    if(t >= rrdset_last_entry_t(st)) {
+        // the requested time is after the last entry we have
+        ret = rrdset_last_slot(st);
+    }
+    else {
+        if(t <= rrdset_first_entry_t(st)) {
+            // the requested time is before the first entry we have
+            ret = rrdset_first_slot(st);
+        }
+        else {
+            if(rrdset_last_slot(st) >= ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)))
+                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every));
+            else
+                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+        }
+    }
+
+    if(unlikely(ret >= (size_t)st->entries)) {
+        error("INTERNAL ERROR: rrdset_time2slot() on %s returns values outside entries", st->name);
+        ret = (size_t)(st->entries - 1);
+    }
+
+    return ret;
+}
 
 // get the timestamp of a specific slot in the round robin database
-#define rrdset_slot2time(st, slot) ( rrdset_last_entry_t(st) - \
-        ((unsigned long)(st)->update_every * ( \
-                ( (unsigned long)(slot) > rrdset_last_slot(st)) ? \
-                ( (rrdset_last_slot(st) - (unsigned long)(slot) + (unsigned long)(st)->entries) ) : \
-                ( (rrdset_last_slot(st) - (unsigned long)(slot)) )) \
-        ))
+static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
+    time_t ret;
+
+    if(slot >= (size_t)st->entries) {
+        error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
+        slot = (size_t)st->entries - 1;
+    }
+
+    if(slot > rrdset_last_slot(st)) {
+        ret = rrdset_last_entry_t(st) - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
+    }
+    else {
+        ret = rrdset_last_entry_t(st) - (size_t)st->update_every;
+    }
+
+    if(unlikely(ret < rrdset_first_entry_t(st))) {
+        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
+        ret = rrdset_first_entry_t(st);
+    }
+
+    if(unlikely(ret > rrdset_last_entry_t(st))) {
+        error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
+        ret = rrdset_last_entry_t(st);
+    }
+
+    return ret;
+}
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions

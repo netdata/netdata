@@ -127,6 +127,8 @@
               "min",
               "max",
               "average",
+              "median",
+              "stddev",
               "sum",
               "incremental-sum"
             ],
@@ -310,6 +312,8 @@
               "min",
               "max",
               "average",
+              "median",
+              "stddev",
               "sum",
               "incremental-sum"
             ],
