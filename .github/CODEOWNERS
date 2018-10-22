@@ -21,6 +21,12 @@ packaging/ @paulfantom
 # tests/
 # web/ 
 
+# Ownership by filetype (overwrites ownership by directory)
+*.am @paulfantom @ktsaou
+
+
+# Ownership of specific files
+CHANGELOG.md @netdatabot
 .travis.yml @paulfantom
 .lgtm.yml @paulfantom
 
