@@ -89,6 +89,7 @@ RUN \
     # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
+    chown -R root:netdata /usr/lib/netdata && \
     chown -R root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
     chmod 0750 /var/lib/netdata /var/cache/netdata && \
