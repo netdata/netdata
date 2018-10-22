@@ -20,4 +20,8 @@ It produces:
 
 4. **Physical Device Temperature**
 
+Screenshot:
+
+![image](https://user-images.githubusercontent.com/22274335/47278133-6d306680-d601-11e8-87c2-cc9c0f42d686.png)
+
 ---
