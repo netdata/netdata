@@ -124,16 +124,15 @@ IF(LINUX)
     # ${MNL_INCLUDE_DIRS}
 ENDIF(LINUX)
 
+
 # -----------------------------------------------------------------------------
 # Detect libmnl
 
-IF(LINUX)
-    pkg_check_modules(NFACCT libnetfilter_acct)
-    # later we use:
-    # ${NFACCT_LIBRARIES}
-    # ${NFACCT_CFLAGS_OTHER}
-    # ${NFACCT_INCLUDE_DIRS}
-ENDIF(LINUX)
+pkg_check_modules(NFACCT libnetfilter_acct)
+# later we use:
+# ${NFACCT_LIBRARIES}
+# ${NFACCT_CFLAGS_OTHER}
+# ${NFACCT_INCLUDE_DIRS}
 
 
 # -----------------------------------------------------------------------------
@@ -494,11 +493,6 @@ IF(LINUX)
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
-    IF(IPMI_LIBRARIES)
-        SET(ENABLE_PLUGIN_FREEIPMI True)
-    ELSE()
-        SET(ENABLE_PLUGIN_FREEIPMI False)
-    ENDIF()
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -507,7 +501,6 @@ ELSEIF(FREEBSD)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS True)
-    SET(ENABLE_PLUGIN_FREEIPMI False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -516,8 +509,13 @@ ELSEIF(MACOS)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
-    SET(ENABLE_PLUGIN_FREEIPMI False)
 
+ENDIF()
+
+IF(IPMI_LIBRARIES)
+    SET(ENABLE_PLUGIN_FREEIPMI True)
+ELSE()
+    SET(ENABLE_PLUGIN_FREEIPMI False)
 ENDIF()
 
 
