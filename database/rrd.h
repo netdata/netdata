@@ -752,7 +752,22 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
 
 // get the first / oldest slot updated in the round robin database
-#define rrdset_first_slot(st) ((size_t)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
+// #define rrdset_first_slot(st) ((size_t)( (((st)->counter >= ((unsigned long)(st)->entries)) ? (unsigned long)( ((unsigned long)(st)->current_entry > 0) ? ((unsigned long)(st)->current_entry) : ((unsigned long)(st)->entries) ) - 1 : 0) ))
+
+// return the slot that has the oldest value
+
+static inline size_t rrdset_first_slot(RRDSET *st) {
+    if(st->counter >= (size_t)st->entries) {
+        // the database has been rotated at least once
+        // the oldest entry is the one that will be next
+        // overwritten by data collection
+        return (size_t)st->current_entry;
+    }
+
+    // we do not have rotated the db yet
+    // so 0 is the first entry
+    return 0;
+}
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
