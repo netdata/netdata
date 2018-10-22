@@ -10,7 +10,7 @@ about: Create a bug report to help us improve
 ##### Bug report summary
 <!-- A clear and concise description of what the bug is. -->
 
-###### OS / Environment
+##### OS / Environment
 <!--- Provide all relevant information below, e.g. OS distribution, running in container, etc. -->
 
 ##### Component Name
@@ -26,5 +26,5 @@ about: Create a bug report to help us improve
 
 <!--- HINT: You can paste gist.github.com links for larger files -->
 
-###### Expected behavior
+##### Expected behavior
 <!-- A clear and concise description of what you expected to happen. -->
