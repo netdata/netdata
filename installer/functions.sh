@@ -452,10 +452,9 @@ issystemd() {
     # if pid 1 is systemd, it is systemd
     [ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
 
-    # -- ubuntu runs systemd as init ---
-    ## if systemd is not running, it is not systemd
-    #pids=$(pidof systemd 2>/dev/null)
-    #[ -z "${pids}" ] && return 1
+    # if systemd is not running, it is not systemd
+    pids=$(pidof systemd 2>/dev/null)
+    [ -z "${pids}" ] && return 1
 
     # check if the running systemd processes are not in our namespace
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
