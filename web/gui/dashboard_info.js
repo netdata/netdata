@@ -2249,6 +2249,72 @@ netdataDashboard.context = {
 
     'logind.seats': {
         info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ProxySQL
+
+    'proxysql.pool_status': {
+        info: 'The status of the backend servers. ' +
+        '<code>1=ONLINE</code> backend server is fully operational, ' +
+        '<code>2=SHUNNED</code> backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold, ' +
+        '<code>3=OFFLINE_SOFT</code> when a server is put into OFFLINE_SOFT mode, new incoming connections aren\'t accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend, ' +
+        '<code>4=OFFLINE_HARD</code> when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren\'t accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work, ' +
+        '<code>-1</code> Unknown status.'
+    },
+
+    'proxysql.pool_net': {
+        info: 'The amount of data sent to/received from the backend ' +
+        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+    },
+
+    'proxysql.pool_overall_net': {
+        info: 'The amount of data sent to/received from the all backends ' +
+        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+    },
+
+    'proxysql.questions': {
+        info: '<code>questions</code> total number of queries sent from frontends, ' +
+        '<code>slow_queries</code> number of queries that ran for longer than the threshold in milliseconds defined in global variable <code>mysql-long_query_time</code>. '
+    },
+
+    'proxysql.connections': {
+        info: '<code>aborted</code> number of frontend connections aborted due to invalid credential or max_connections reached, ' +
+        '<code>connected</code> number of frontend connections currently connected, ' +
+        '<code>created</code> number of frontend connections created, ' +
+        '<code>non_idle</code> number of frontend connections that are not currently idle. '
+    },
+
+    'proxysql.pool_latency': {
+        info: 'The currently ping time in microseconds, as reported from Monitor.'
+    },
+
+    'proxysql.queries': {
+        info: 'The number of queries routed towards this particular backend server.'
+    },
+
+    'proxysql.pool_used_connections': {
+        info: 'The number of connections are currently used by ProxySQL for sending queries to the backend server.'
+    },
+
+    'proxysql.pool_free_connections': {
+        info: 'The number of connections are currently free. They are kept open in order to minimize the time cost of sending a query to the backend server.'
+    },
+
+    'proxysql.pool_ok_connections': {
+        info: 'The number of connections were established successfully.'
+    },
+
+    'proxysql.pool_error_connections': {
+        info: 'The number of connections weren\'t established successfully.'
+    },
+
+    'proxysql.commands_count': {
+        info: 'The total number of commands of that type executed'
+    },
+
+    'proxysql.commands_duration': {
+        info: 'The total time spent executing commands of that type, in ms'
     }
 
     // ------------------------------------------------------------------------
