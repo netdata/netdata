@@ -70,18 +70,22 @@ to extract the same number of expected metrics:
 
 test|code|string comparison|number parsing|duration
 :---:|:---:|:---:|:---:|:---:|
-1|if-else-if-else-if|`strcmp()`|`strtoull()`|4698657 usecs
-2|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`strtoull()`| 872005 usecs
-3|if-else-if-else-if|statement expression `simple_hash()` and `strcmp()`|`strtoull()`|861626 usecs
-4|if-continue|inline `simple_hash()` and `strcmp()`|`strtoull()`|871887 usecs
-5|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`str2ull()`|606541 usecs
-6|ARL|ARL|`strtoull()`|424149 usecs
-7|ARL|ARL|`str2ull()`|199324 usecs
+1|if-else-if-else-if|`strcmp()`|`strtoull()`|4630.337 ms
+2|nested loops|inline `simple_hash()` and `strcmp()`|`strtoull()`|1597.481 ms
+3|nested loops|inline `simple_hash()` and `strcmp()`|`str2ull()`|923.523 ms
+4|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`strtoull()`| 854.574 ms
+5|if-else-if-else-if|statement expression `simple_hash()` and `strcmp()`|`strtoull()`|912.013 ms
+6|if-continue|inline `simple_hash()` and `strcmp()`|`strtoull()`|842.279 ms
+7|if-else-if-else-if|inline `simple_hash()` and `strcmp()`|`str2ull()`|602.837 ms
+8|ARL|ARL|`strtoull()`|350.360 ms
+9|ARL|ARL|`str2ull()`|157.237 ms
 
-So, compared to unoptimized code (test No 1: 4.7sec), before ARL netdata was using test
-No **5** with hashing and a custom `str2ull()` to achieve 607ms.
-The current ARL implementation is test No **7** that needs only 199ms
-(23 times faster vs unoptimized code, 3 times faster vs optimized code).
+Compared to unoptimized code (test No 1: 4.6sec):
+ 
+ - before ARL netdata was using test No **7** with hashing and a custom `str2ull()` to achieve 602ms.
+ - the current ARL implementation is test No **9** that needs only 157ms (29 times faster vs unoptimized code, about 4 times faster vs optimized code).
+
+[Check the source code of this test](../../tests/profile/benchmark-value-pairs.c).
 
 ## Limitations
 
