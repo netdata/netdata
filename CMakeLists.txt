@@ -393,6 +393,8 @@ set(API_PLUGIN_FILES
         web/api/queries/stddev/stddev.h
         web/api/queries/ses/ses.c
         web/api/queries/ses/ses.h
+        web/api/queries/des/des.c
+        web/api/queries/des/des.h
         )
 
 set(STREAMING_PLUGIN_FILES
