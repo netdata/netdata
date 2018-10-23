@@ -72,12 +72,12 @@
 // ----------------------------------------------------------------------------
 // global namespace
 
-var NETDATA = window.NETDATA || {};
+const NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
 
     NETDATA.encodeURIComponent = function(s) {
-        if(typeof(s) === 'string')
+        if (typeof(s) === 'string')
             return encodeURIComponent(s);
 
         return s;
@@ -87,20 +87,20 @@ var NETDATA = window.NETDATA || {};
     // compatibility fixes
 
     // fix IE issue with console
-    if(!window.console) { window.console = { log: function(){} }; }
+    if (!window.console) { window.console = { log: function(){} }; }
 
     // if string.endsWith is not defined, define it
-    if(typeof String.prototype.endsWith !== 'function') {
+    if (typeof String.prototype.endsWith !== 'function') {
         String.prototype.endsWith = function(s) {
-            if(s.length > this.length) return false;
+            if (s.length > this.length) return false;
             return this.slice(-s.length) === s;
         };
     }
 
     // if string.startsWith is not defined, define it
-    if(typeof String.prototype.startsWith !== 'function') {
+    if (typeof String.prototype.startsWith !== 'function') {
         String.prototype.startsWith = function(s) {
-            if(s.length > this.length) return false;
+            if (s.length > this.length) return false;
             return this.slice(s.length) === s;
         };
     }
@@ -130,33 +130,33 @@ var NETDATA = window.NETDATA || {};
         },
 
         object: function(name, obj, ignore_regex) {
-            if(typeof ignore_regex !== 'undefined' && ignore_regex.test(name) === true) {
+            if (typeof ignore_regex !== 'undefined' && ignore_regex.test(name) === true) {
                 // console.log('XSS: ignoring "' + name + '"');
                 return obj;
             }
 
             switch (typeof(obj)) {
                 case 'string':
-                    var ret = this.string(obj);
-                    if(ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
+                    const ret = this.string(obj);
+                    if (ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
                     return ret;
 
                 case 'object':
-                    if(obj === null) return obj;
+                    if (obj === null) return obj;
 
-                    if(Array.isArray(obj) === true) {
+                    if (Array.isArray(obj) === true) {
                         // console.log('checking array "' + name + '"');
 
-                        var len = obj.length;
-                        while(len--)
+                        const len = obj.length;
+                        while (len--)
                             obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
                     }
                     else {
                         // console.log('checking object "' + name + '"');
 
-                        for(var i in obj) {
-                            if(obj.hasOwnProperty(i) === false) continue;
-                            if(this.string(i) !== i) {
+                        for (const i in obj) {
+                            if (obj.hasOwnProperty(i) === false) continue;
+                            if (this.string(i) !== i) {
                                 console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
                                 delete obj[i];
                             }
@@ -172,7 +172,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         checkOptional: function(name, obj, ignore_regex) {
-            if(this.enabled === true) {
+            if (this.enabled === true) {
                 //console.log('XSS: checking optional "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
@@ -185,7 +185,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         checkData: function(name, obj, ignore_regex) {
-            if(this.enabled_for_data === true) {
+            if (this.enabled_for_data === true) {
                 //console.log('XSS: checking data "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
@@ -199,13 +199,13 @@ var NETDATA = window.NETDATA || {};
     // http://stackoverflow.com/questions/984510/what-is-my-script-src-url
     // http://stackoverflow.com/questions/6941533/get-protocol-domain-and-port-from-url
     NETDATA._scriptSource = function() {
-        var script = null;
+        let script = null;
 
-        if(typeof document.currentScript !== 'undefined') {
+        if (typeof document.currentScript !== 'undefined') {
             script = document.currentScript;
         }
         else {
-            var all_scripts = document.getElementsByTagName('script');
+            const all_scripts = document.getElementsByTagName('script');
             script = all_scripts[all_scripts.length - 1];
         }
 
@@ -217,25 +217,25 @@ var NETDATA = window.NETDATA || {};
         return script;
     };
 
-    if(typeof netdataServer !== 'undefined')
+    if (typeof netdataServer !== 'undefined')
         NETDATA.serverDefault = netdataServer;
     else {
-        var s = NETDATA._scriptSource();
-        if(s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
+        let s = NETDATA._scriptSource();
+        if (s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
         else {
             console.log('WARNING: Cannot detect the URL of the netdata server.');
             NETDATA.serverDefault = null;
         }
     }
 
-    if(NETDATA.serverDefault === null)
+    if (NETDATA.serverDefault === null)
         NETDATA.serverDefault = '';
-    else if(NETDATA.serverDefault.slice(-1) !== '/')
+    else if (NETDATA.serverDefault.slice(-1) !== '/')
         NETDATA.serverDefault += '/';
 
-    if(typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null && netdataServerStatic !== '') {
+    if (typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null && netdataServerStatic !== '') {
         NETDATA.serverStatic = netdataServerStatic;
-        if(NETDATA.serverStatic.slice(-1) !== '/')
+        if (NETDATA.serverStatic.slice(-1) !== '/')
             NETDATA.serverStatic += '/';
     }
     else {
@@ -332,7 +332,7 @@ var NETDATA = window.NETDATA || {};
         }
     };
 
-    if(typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined')
+    if (typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined')
         NETDATA.themes.current = NETDATA.themes[netdataTheme];
     else
         NETDATA.themes.current = NETDATA.themes.white;
@@ -365,46 +365,46 @@ var NETDATA = window.NETDATA || {};
         noData: '<i class="fas fa-exclamation-triangle"></i>'
     };
 
-    if(typeof netdataIcons === 'object') {
-        for(var icon in NETDATA.icons) {
-            if(NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
+    if (typeof netdataIcons === 'object') {
+        for (let icon in NETDATA.icons) {
+            if (NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
                 NETDATA.icons[icon] = netdataIcons[icon];
         }
     }
 
-    if(typeof netdataSnapshotData === 'undefined')
+    if (typeof netdataSnapshotData === 'undefined')
         netdataSnapshotData = null;
 
-    if(typeof netdataShowHelp === 'undefined')
+    if (typeof netdataShowHelp === 'undefined')
         netdataShowHelp = true;
 
-    if(typeof netdataShowAlarms === 'undefined')
+    if (typeof netdataShowAlarms === 'undefined')
         netdataShowAlarms = false;
 
-    if(typeof netdataRegistryAfterMs !== 'number' || netdataRegistryAfterMs < 0)
+    if (typeof netdataRegistryAfterMs !== 'number' || netdataRegistryAfterMs < 0)
         netdataRegistryAfterMs = 1500;
 
-    if(typeof netdataRegistry === 'undefined') {
+    if (typeof netdataRegistry === 'undefined') {
         // backward compatibility
         netdataRegistry = (typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry === false);
     }
-    if(netdataRegistry === false && typeof netdataRegistryCallback === 'function')
+    if (netdataRegistry === false && typeof netdataRegistryCallback === 'function')
         netdataRegistry = true;
 
 
     // ----------------------------------------------------------------------------------------------------------------
     // detect if this is probably a slow device
 
-    var isSlowDeviceResult = undefined;
-    var isSlowDevice = function() {
-        if(isSlowDeviceResult !== undefined)
+    let isSlowDeviceResult = undefined;
+    let isSlowDevice = function() {
+        if (isSlowDeviceResult !== undefined)
             return isSlowDeviceResult;
 
         try {
-            var ua = navigator.userAgent.toLowerCase();
+            let ua = navigator.userAgent.toLowerCase();
 
-            var iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
-            var android = /android/.test(ua) && !window.MSStream;
+            let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
+            let android = /android/.test(ua) && !window.MSStream;
             isSlowDeviceResult = (iOS === true || android === true);
         }
         catch (e) {
@@ -606,9 +606,9 @@ var NETDATA = window.NETDATA || {};
         },
 
         init: function() {
-            var custom = true;
+            let custom = true;
 
-            if(window.requestAnimationFrame) {
+            if (window.requestAnimationFrame) {
                 this.step = function(callback) {
                     return window.requestAnimationFrame(callback);
                 };
@@ -617,23 +617,23 @@ var NETDATA = window.NETDATA || {};
                     return window.cancelAnimationFrame(handle.value);
                 };
             }
-            else if(window.webkitRequestAnimationFrame) {
+            else if (window.webkitRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.webkitRequestAnimationFrame(callback);
                 };
 
-                if(window.webkitCancelAnimationFrame) {
+                if (window.webkitCancelAnimationFrame) {
                     this.clear = function (handle) {
                         return window.webkitCancelAnimationFrame(handle.value);
                     };
                 }
-                else if(window.webkitCancelRequestAnimationFrame) {
+                else if (window.webkitCancelRequestAnimationFrame) {
                     this.clear = function (handle) {
                         return window.webkitCancelRequestAnimationFrame(handle.value);
                     };
                 }
             }
-            else if(window.mozRequestAnimationFrame) {
+            else if (window.mozRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.mozRequestAnimationFrame(callback);
                 };
@@ -642,7 +642,7 @@ var NETDATA = window.NETDATA || {};
                     return window.mozCancelRequestAnimationFrame(handle.value);
                 };
             }
-            else if(window.oRequestAnimationFrame) {
+            else if (window.oRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.oRequestAnimationFrame(callback);
                 };
@@ -651,7 +651,7 @@ var NETDATA = window.NETDATA || {};
                     return window.oCancelRequestAnimationFrame(handle.value);
                 };
             }
-            else if(window.msRequestAnimationFrame) {
+            else if (window.msRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.msRequestAnimationFrame(callback);
                 };
@@ -664,21 +664,21 @@ var NETDATA = window.NETDATA || {};
                 custom = false;
 
 
-            if(custom === true) {
+            if (custom === true) {
                 // we have installed custom .step() / .clear() functions
                 // overwrite the .set() too
 
                 this.set = function(callback, delay) {
-                    var that = this;
+                    let that = this;
 
-                    var start = Date.now(),
+                    let start = Date.now(),
                         handle = new Object();
 
                     function loop() {
-                        var current = Date.now(),
+                        let current = Date.now(),
                             delta = current - start;
 
-                        if(delta >= delay) {
+                        if (delta >= delay) {
                             callback.call();
                         }
                         else {
@@ -707,11 +707,11 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.localStorageTested = -1;
     NETDATA.localStorageTest = function() {
-        if(NETDATA.localStorageTested !== -1)
+        if (NETDATA.localStorageTested !== -1)
             return NETDATA.localStorageTested;
 
-        if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
-            var test = 'test';
+        if (typeof Storage !== "undefined" && typeof localStorage === 'object') {
+            let test = 'test';
             try {
                 localStorage.setItem(test, test);
                 localStorage.removeItem(test);
@@ -728,19 +728,19 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.localStorageGet = function(key, def, callback) {
-        var ret = def;
+        let ret = def;
 
-        if(typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+        if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
             NETDATA.localStorage.default[key.toString()] = def;
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if(NETDATA.localStorageTest() === true) {
+        if (NETDATA.localStorageTest() === true) {
             try {
                 // console.log('localStorage: loading "' + key.toString() + '"');
                 ret = localStorage.getItem(key.toString());
                 // console.log('netdata loaded: ' + key.toString() + ' = ' + ret.toString());
-                if(ret === null || ret === 'undefined') {
+                if (ret === null || ret === 'undefined') {
                     // console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
                     localStorage.setItem(key.toString(), JSON.stringify(def));
                     ret = def;
@@ -757,7 +757,7 @@ var NETDATA = window.NETDATA || {};
             }
         }
 
-        if(typeof ret === 'undefined' || ret === 'undefined') {
+        if (typeof ret === 'undefined' || ret === 'undefined') {
             console.log('localStorage: LOADED UNDEFINED "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
             ret = def;
         }
@@ -767,17 +767,17 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.localStorageSet = function(key, value, callback) {
-        if(typeof value === 'undefined' || value === 'undefined') {
+        if (typeof value === 'undefined' || value === 'undefined') {
             console.log('localStorage: ATTEMPT TO SET UNDEFINED "' + key.toString() + '" as value ' + value + ' of type ' + typeof(value));
         }
 
-        if(typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+        if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
             NETDATA.localStorage.default[key.toString()] = value;
             NETDATA.localStorage.current[key.toString()] = value;
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if(NETDATA.localStorageTest() === true) {
+        if (NETDATA.localStorageTest() === true) {
             // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
             try {
                 localStorage.setItem(key.toString(), JSON.stringify(value));
@@ -792,12 +792,12 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.localStorageGetRecursive = function(obj, prefix, callback) {
-        var keys = Object.keys(obj);
-        var len = keys.length;
-        while(len--) {
-            var i = keys[len];
+        let keys = Object.keys(obj);
+        let len = keys.length;
+        while (len--) {
+            let i = keys[len];
 
-            if(typeof obj[i] === 'object') {
+            if (typeof obj[i] === 'object') {
                 //console.log('object ' + prefix + '.' + i.toString());
                 NETDATA.localStorageGetRecursive(obj[i], prefix + '.' + i.toString(), callback);
                 continue;
@@ -808,16 +808,16 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.setOption = function(key, value) {
-        if(key.toString() === 'setOptionCallback') {
-            if(typeof NETDATA.options.current.setOptionCallback === 'function') {
+        if (key.toString() === 'setOptionCallback') {
+            if (typeof NETDATA.options.current.setOptionCallback === 'function') {
                 NETDATA.options.current[key.toString()] = value;
                 NETDATA.options.current.setOptionCallback();
             }
         }
-        else if(NETDATA.options.current[key.toString()] !== value) {
-            var name = 'options.' + key.toString();
+        else if (NETDATA.options.current[key.toString()] !== value) {
+            let name = 'options.' + key.toString();
 
-            if(typeof NETDATA.localStorage.default[name.toString()] === 'undefined')
+            if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined')
                 console.log('localStorage: setOption() on unsaved option: "' + name.toString() + '", value: ' + value);
 
             //console.log(NETDATA.localStorage);
@@ -825,7 +825,7 @@ var NETDATA = window.NETDATA || {};
             //console.log(NETDATA.options);
             NETDATA.options.current[key.toString()] = NETDATA.localStorageSet(name.toString(), value, null);
 
-            if(typeof NETDATA.options.current.setOptionCallback === 'function')
+            if (typeof NETDATA.options.current.setOptionCallback === 'function')
                 NETDATA.options.current.setOptionCallback();
         }
 
@@ -843,21 +843,21 @@ var NETDATA = window.NETDATA || {};
     NETDATA.setOption('stop_updates_when_focus_is_lost', true);
 
     NETDATA.resetOptions = function() {
-        var keys = Object.keys(NETDATA.localStorage.default);
-        var len = keys.length;
-        while(len--) {
-            var i = keys[len];
-            var a = i.split('.');
+        let keys = Object.keys(NETDATA.localStorage.default);
+        let len = keys.length;
+        while (len--) {
+            let i = keys[len];
+            let a = i.split('.');
 
-            if(a[0] === 'options') {
-                if(a[1] === 'setOptionCallback') continue;
-                if(typeof NETDATA.localStorage.default[i] === 'undefined') continue;
-                if(NETDATA.options.current[i] === NETDATA.localStorage.default[i]) continue;
+            if (a[0] === 'options') {
+                if (a[1] === 'setOptionCallback') continue;
+                if (typeof NETDATA.localStorage.default[i] === 'undefined') continue;
+                if (NETDATA.options.current[i] === NETDATA.localStorage.default[i]) continue;
 
                 NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
             }
-            else if(a[0] === 'chart_heights') {
-                if(typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
+            else if (a[0] === 'chart_heights') {
+                if (typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
                     NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
                 }
             }
@@ -868,7 +868,7 @@ var NETDATA = window.NETDATA || {};
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(NETDATA.options.debug.main_loop === true)
+    if (NETDATA.options.debug.main_loop === true)
         console.log('welcome to NETDATA');
 
     NETDATA.onresizeCallback = null;
@@ -876,13 +876,13 @@ var NETDATA = window.NETDATA || {};
         NETDATA.options.last_page_resize = Date.now();
         NETDATA.onscroll();
 
-        if(typeof NETDATA.onresizeCallback === 'function')
+        if (typeof NETDATA.onresizeCallback === 'function')
             NETDATA.onresizeCallback();
     };
 
     NETDATA.abort_all_refreshes = function() {
-        var targets = NETDATA.options.targets;
-        var len = targets.length;
+        let targets = NETDATA.options.targets;
+        let len = targets.length;
 
         while (len--) {
             if (targets[len].fetching_data === true) {
@@ -913,7 +913,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.onscroll_updater = function() {
         NETDATA.globalSelectionSync.stop();
 
-        if(NETDATA.options.abort_ajax_on_scroll === true)
+        if (NETDATA.options.abort_ajax_on_scroll === true)
             NETDATA.abort_all_refreshes();
 
         // when the user scrolls he sees that we have
@@ -921,10 +921,10 @@ var NETDATA = window.NETDATA || {};
         // using this little function we try to switch
         // the charts back to visible quickly
 
-        if(NETDATA.intersectionObserver.enabled() === false) {
+        if (NETDATA.intersectionObserver.enabled() === false) {
             if (NETDATA.options.current.parallel_refresher === false) {
-                var targets = NETDATA.options.targets;
-                var len = targets.length;
+                let targets = NETDATA.options.targets;
+                let len = targets.length;
 
                 while (len--)
                     if (targets[len].running === false)
@@ -946,7 +946,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
         NETDATA.scrollY = window.scrollY;
 
-        if(NETDATA.onscroll_updater_timeout_id)
+        if (NETDATA.onscroll_updater_timeout_id)
             NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
 
         NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
@@ -954,10 +954,10 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.supportsPassiveEvents = function() {
-        if(NETDATA.options.passive_events === null) {
-            var supportsPassive = false;
+        if (NETDATA.options.passive_events === null) {
+            let supportsPassive = false;
             try {
-                var opts = Object.defineProperty({}, 'passive', {
+                let opts = Object.defineProperty({}, 'passive', {
                     get: function () {
                         supportsPassive = true;
                     }
@@ -1016,12 +1016,12 @@ var NETDATA = window.NETDATA || {};
 
         console.log("ERROR " + code + ": " + NETDATA.errorCodes[code].message + ": " + msg);
 
-        var ret = true;
-        if(typeof netdataErrorCallback === 'function') {
+        let ret = true;
+        if (typeof netdataErrorCallback === 'function') {
            ret = netdataErrorCallback('system', code, msg);
         }
 
-        if(ret && NETDATA.errorCodes[code].alert)
+        if (ret && NETDATA.errorCodes[code].alert)
             alert("ERROR " + code + ": " + NETDATA.errorCodes[code].message + ": " + msg);
     };
 
@@ -1040,9 +1040,9 @@ var NETDATA = window.NETDATA || {};
 
         // this is the fastest and the preferred
         getIntlNumberFormat: function(min, max) {
-            var key = max;
-            if(min === max) {
-                if(typeof this.formatters_fixed[key] === 'undefined')
+            let key = max;
+            if (min === max) {
+                if (typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
                         // style: 'decimal',
                         // minimumIntegerDigits: 1,
@@ -1055,8 +1055,8 @@ var NETDATA = window.NETDATA || {};
 
                 return this.formatters_fixed[key];
             }
-            else if(min === 0) {
-                if(typeof this.formatters_zero_based[key] === 'undefined')
+            else if (min === 0) {
+                if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
                         // style: 'decimal',
                         // minimumIntegerDigits: 1,
@@ -1086,9 +1086,9 @@ var NETDATA = window.NETDATA || {};
 
         // this respects locale
         getLocaleString: function(min, max) {
-            var key = max;
-            if(min === max) {
-                if(typeof this.formatters_fixed[key] === 'undefined')
+            let key = max;
+            if (min === max) {
+                if (typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = {
                         format: function (value) {
                             return value.toLocaleString(undefined, {
@@ -1105,8 +1105,8 @@ var NETDATA = window.NETDATA || {};
 
                 return this.formatters_fixed[key];
             }
-            else if(min === 0) {
-                if(typeof this.formatters_zero_based[key] === 'undefined')
+            else if (min === 0) {
+                if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
                             return value.toLocaleString(undefined, {
@@ -1142,23 +1142,23 @@ var NETDATA = window.NETDATA || {};
 
         // the fallback
         getFixed: function(min, max) {
-            var key = max;
-            if(min === max) {
-                if(typeof this.formatters_fixed[key] === 'undefined')
+            let key = max;
+            if (min === max) {
+                if (typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = {
                         format: function (value) {
-                            if(value === 0) return "0";
+                            if (value === 0) return "0";
                             return value.toFixed(max);
                         }
                     };
 
                 return this.formatters_fixed[key];
             }
-            else if(min === 0) {
-                if(typeof this.formatters_zero_based[key] === 'undefined')
+            else if (min === 0) {
+                if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
-                            if(value === 0) return "0";
+                            if (value === 0) return "0";
                             return value.toFixed(max);
                         }
                     };
@@ -1168,7 +1168,7 @@ var NETDATA = window.NETDATA || {};
             else {
                 return {
                     format: function (value) {
-                        if(value === 0) return "0";
+                        if (value === 0) return "0";
                         return value.toFixed(max);
                     }
                 };
@@ -1176,12 +1176,12 @@ var NETDATA = window.NETDATA || {};
         },
 
         testIntlNumberFormat: function() {
-            var value = 1.12345;
-            var e1 = "1.12", e2 = "1,12";
-            var s = "";
+            let value = 1.12345;
+            let e1 = "1.12", e2 = "1,12";
+            let s = "";
 
             try {
-                var x = new Intl.NumberFormat(undefined, {
+                let x = new Intl.NumberFormat(undefined, {
                     useGrouping: true,
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
@@ -1198,9 +1198,9 @@ var NETDATA = window.NETDATA || {};
         },
 
         testLocaleString: function() {
-            var value = 1.12345;
-            var e1 = "1.12", e2 = "1,12";
-            var s = "";
+            let value = 1.12345;
+            let e1 = "1.12", e2 = "1,12";
+            let s = "";
 
             try {
                 s = value.toLocaleString(undefined, {
@@ -1219,11 +1219,11 @@ var NETDATA = window.NETDATA || {};
 
         // on first run we decide which formatter to use
         get: function(min, max) {
-            if(this.testIntlNumberFormat()) {
+            if (this.testIntlNumberFormat()) {
                 // console.log('numberformat');
                 this.get = this.getIntlNumberFormat;
             }
-            else if(this.testLocaleString()) {
+            else if (this.testLocaleString()) {
                 // console.log('localestring');
                 this.get = this.getLocaleString;
             }
@@ -1239,18 +1239,18 @@ var NETDATA = window.NETDATA || {};
     // element data attributes
 
     NETDATA.dataAttribute = function(element, attribute, def) {
-        var key = 'data-' + attribute.toString();
-        if(element.hasAttribute(key) === true) {
-            var data = element.getAttribute(key);
+        let key = 'data-' + attribute.toString();
+        if (element.hasAttribute(key) === true) {
+            let data = element.getAttribute(key);
 
-            if(data === 'true') return true;
-            if(data === 'false') return false;
-            if(data === 'null') return null;
+            if (data === 'true') return true;
+            if (data === 'false') return false;
+            if (data === 'null') return null;
 
             // Only convert to a number if it doesn't change the string
-            if(data === +data + '') return +data;
+            if (data === +data + '') return +data;
 
-            if(/^(?:\{[\w\W]*\}|\[[\w\W]*\])$/.test(data))
+            if (/^(?:\{[\w\W]*\}|\[[\w\W]*\])$/.test(data))
                 return JSON.parse(data);
 
             return data;
@@ -1259,22 +1259,22 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dataAttributeBoolean = function(element, attribute, def) {
-        var value = NETDATA.dataAttribute(element, attribute, def);
+        let value = NETDATA.dataAttribute(element, attribute, def);
 
-        if(value === true || value === false)
+        if (value === true || value === false)
             return value;
 
-        if(typeof(value) === 'string') {
-            if(value === 'yes' || value === 'on')
+        if (typeof(value) === 'string') {
+            if (value === 'yes' || value === 'on')
                 return true;
 
-            if(value === '' || value === 'no' || value === 'off' || value === 'null')
+            if (value === '' || value === 'no' || value === 'off' || value === 'null')
                 return false;
 
             return def;
         }
 
-        if(typeof(value) === 'number')
+        if (typeof(value) === 'number')
             return value !== 0;
 
         return def;
@@ -1293,34 +1293,34 @@ var NETDATA = window.NETDATA || {};
         },
 
         get: function(state) {
-            if(typeof state.tmp.__commonMin === 'undefined') {
+            if (typeof state.tmp.__commonMin === 'undefined') {
                 // get the commonMin setting
                 state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
             }
 
-            var min = state.data.min;
-            var name = state.tmp.__commonMin;
+            let min = state.data.min;
+            let name = state.tmp.__commonMin;
 
-            if(name === null) {
+            if (name === null) {
                 // we don't need commonMin
                 //state.log('no need for commonMin');
                 return min;
             }
 
-            var t = this.keys[name];
-            if(typeof t === 'undefined') {
+            let t = this.keys[name];
+            if (typeof t === 'undefined') {
                 // add our commonMin
                 this.keys[name] = {};
                 t = this.keys[name];
             }
 
-            var uuid = state.uuid;
-            if(typeof t[uuid] !== 'undefined') {
-                if(t[uuid] === min) {
+            let uuid = state.uuid;
+            if (typeof t[uuid] !== 'undefined') {
+                if (t[uuid] === min) {
                     //state.log('commonMin ' + state.tmp.__commonMin + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
                 }
-                else if(min < this.latest[name]) {
+                else if (min < this.latest[name]) {
                     //state.log('commonMin ' + state.tmp.__commonMin + ' increased: ' + min);
                     t[uuid] = min;
                     this.latest[name] = min;
@@ -1332,9 +1332,9 @@ var NETDATA = window.NETDATA || {};
             t[uuid] = min;
 
             // find the common min
-            var m = min;
-            for(var i in t)
-                if(t.hasOwnProperty(i) && t[i] < m) m = t[i];
+            let m = min;
+            for (let i in t)
+                if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
 
             //state.log('commonMin ' + state.tmp.__commonMin + ' updated: ' + m);
             this.latest[name] = m;
@@ -1352,34 +1352,34 @@ var NETDATA = window.NETDATA || {};
         },
 
         get: function(state) {
-            if(typeof state.tmp.__commonMax === 'undefined') {
+            if (typeof state.tmp.__commonMax === 'undefined') {
                 // get the commonMax setting
                 state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
             }
 
-            var max = state.data.max;
-            var name = state.tmp.__commonMax;
+            let max = state.data.max;
+            let name = state.tmp.__commonMax;
 
-            if(name === null) {
+            if (name === null) {
                 // we don't need commonMax
                 //state.log('no need for commonMax');
                 return max;
             }
 
-            var t = this.keys[name];
-            if(typeof t === 'undefined') {
+            let t = this.keys[name];
+            if (typeof t === 'undefined') {
                 // add our commonMax
                 this.keys[name] = {};
                 t = this.keys[name];
             }
 
-            var uuid = state.uuid;
-            if(typeof t[uuid] !== 'undefined') {
-                if(t[uuid] === max) {
+            let uuid = state.uuid;
+            if (typeof t[uuid] !== 'undefined') {
+                if (t[uuid] === max) {
                     //state.log('commonMax ' + state.tmp.__commonMax + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
                 }
-                else if(max > this.latest[name]) {
+                else if (max > this.latest[name]) {
                     //state.log('commonMax ' + state.tmp.__commonMax + ' increased: ' + max);
                     t[uuid] = max;
                     this.latest[name] = max;
@@ -1391,9 +1391,9 @@ var NETDATA = window.NETDATA || {};
             t[uuid] = max;
 
             // find the common max
-            var m = max;
-            for(var i in t)
-                if(t.hasOwnProperty(i) && t[i] > m) m = t[i];
+            let m = max;
+            for (let i in t)
+                if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
 
             //state.log('commonMax ' + state.tmp.__commonMax + ' updated: ' + m);
             this.latest[name] = m;
@@ -1409,27 +1409,27 @@ var NETDATA = window.NETDATA || {};
         },
 
         get: function(state, label) {
-            var ret = this.refill(state);
+            let ret = this.refill(state);
 
-            if(typeof ret.assigned[label] === 'undefined')
+            if (typeof ret.assigned[label] === 'undefined')
                 ret.assigned[label] = ret.available.shift();
 
             return ret.assigned[label];
         },
 
         refill: function(state) {
-            var ret, len;
+            let ret, len;
 
-            if(typeof state.tmp.__commonColors === 'undefined')
+            if (typeof state.tmp.__commonColors === 'undefined')
                 ret = this.prepare(state);
             else {
                 ret = this.keys[state.tmp.__commonColors];
-                if(typeof ret === 'undefined')
+                if (typeof ret === 'undefined')
                     ret = this.prepare(state);
             }
 
-            if(ret.available.length === 0) {
-                if(ret.copy_theme === true || ret.custom.length === 0) {
+            if (ret.available.length === 0) {
+                if (ret.copy_theme === true || ret.custom.length === 0) {
                     // copy the theme colors
                     len = NETDATA.themes.current.colors.length;
                     while (len--)
@@ -1451,10 +1451,10 @@ var NETDATA = window.NETDATA || {};
 
         __read_custom_colors: function(state, ret) {
             // add the user supplied colors
-            var c = NETDATA.dataAttribute(state.element, 'colors', undefined);
+            let c = NETDATA.dataAttribute(state.element, 'colors', undefined);
             if (typeof c === 'string' && c.length > 0) {
                 c = c.split(' ');
-                var len = c.length;
+                let len = c.length;
 
                 if (len > 0 && c[len - 1] === 'ONLY') {
                     len--;
@@ -1467,15 +1467,15 @@ var NETDATA = window.NETDATA || {};
         },
 
         prepare: function(state) {
-            var has_custom_colors = false;
+            let has_custom_colors = false;
 
-            if(typeof state.tmp.__commonColors === 'undefined') {
-                var defname = state.chart.context;
+            if (typeof state.tmp.__commonColors === 'undefined') {
+                let defname = state.chart.context;
 
                 // if this chart has data-colors=""
                 // we should use the chart uuid as the default key (private palette)
                 // (data-common-colors="NAME" will be used anyways)
-                var c = NETDATA.dataAttribute(state.element, 'colors', undefined);
+                let c = NETDATA.dataAttribute(state.element, 'colors', undefined);
                 if (typeof c === 'string' && c.length > 0) {
                     defname = state.uuid;
                     has_custom_colors = true;
@@ -1485,10 +1485,10 @@ var NETDATA = window.NETDATA || {};
                 state.tmp.__commonColors = NETDATA.dataAttribute(state.element, 'common-colors', defname);
             }
 
-            var name = state.tmp.__commonColors;
-            var ret = this.keys[name];
+            let name = state.tmp.__commonColors;
+            let ret = this.keys[name];
 
-            if(typeof ret === 'undefined') {
+            if (typeof ret === 'undefined') {
                 // add our commonMax
                 this.keys[name] = {
                     assigned: {},       // name-value of dimensions and their colors
@@ -1500,10 +1500,10 @@ var NETDATA = window.NETDATA || {};
                 ret = this.keys[name];
             }
 
-            if(typeof ret.charts[state.uuid] === 'undefined') {
+            if (typeof ret.charts[state.uuid] === 'undefined') {
                 ret.charts[state.uuid] = state;
 
-                if(has_custom_colors === true)
+                if (has_custom_colors === true)
                     this.__read_custom_colors(state, ret);
             }
 
@@ -1522,7 +1522,7 @@ var NETDATA = window.NETDATA || {};
     // Then we try to get it back with .get(). If that fails, we download it.
 
     NETDATA.fixHost = function(host) {
-        while(host.slice(-1) === '/')
+        while (host.slice(-1) === '/')
             host = host.substring(0, host.length - 1);
 
         return host;
@@ -1536,7 +1536,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         add: function(host, id, data) {
-            if(typeof this.charts[host] === 'undefined')
+            if (typeof this.charts[host] === 'undefined')
                 this.charts[host] = {};
 
             //console.log('added ' + host + '/' + id);
@@ -1544,10 +1544,10 @@ var NETDATA = window.NETDATA || {};
         },
 
         get: function(host, id) {
-            if(typeof this.charts[host] === 'undefined')
+            if (typeof this.charts[host] === 'undefined')
                 return null;
 
-            if(typeof this.charts[host][id] === 'undefined')
+            if (typeof this.charts[host][id] === 'undefined')
                 return null;
 
             //console.log('cached ' + host + '/' + id);
@@ -1557,23 +1557,23 @@ var NETDATA = window.NETDATA || {};
         downloadAll: function(host, callback) {
             host = NETDATA.fixHost(host);
 
-            var self = this;
+            let self = this;
 
             function got_data(h, data, callback) {
-                if(data !== null) {
+                if (data !== null) {
                     self.charts[h] = data.charts;
 
                     // update the server timezone in our options
-                    if(typeof data.timezone === 'string')
+                    if (typeof data.timezone === 'string')
                         NETDATA.options.server_timezone = data.timezone;
                 }
                 else NETDATA.error(406, h + '/api/v1/charts');
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     callback(data);
             }
 
-            if(netdataSnapshotData !== null) {
+            if (netdataSnapshotData !== null) {
                 got_data(host, netdataSnapshotData.charts, callback);
             }
             else {
@@ -1630,7 +1630,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         delay: function() {
-            if(NETDATA.options.debug.globalPanAndZoom === true)
+            if (NETDATA.options.debug.globalPanAndZoom === true)
                 console.log('globalPanAndZoom.delay()');
 
             NETDATA.options.auto_refresher_stop_until = Date.now() + NETDATA.options.current.global_pan_sync_time;
@@ -1640,37 +1640,37 @@ var NETDATA = window.NETDATA || {};
         setMaster: function(state, after, before) {
             this.delay();
 
-            if(NETDATA.options.current.sync_pan_and_zoom === false)
+            if (NETDATA.options.current.sync_pan_and_zoom === false)
                 return;
 
-            if(this.master === null) {
-                if(NETDATA.options.debug.globalPanAndZoom === true)
+            if (this.master === null) {
+                if (NETDATA.options.debug.globalPanAndZoom === true)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') SET MASTER');
             }
-            else if(this.master !== state) {
-                if(NETDATA.options.debug.globalPanAndZoom === true)
+            else if (this.master !== state) {
+                if (NETDATA.options.debug.globalPanAndZoom === true)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') CHANGED MASTER');
 
                 this.master.resetChart(true, true);
             }
 
-            var now = Date.now();
+            let now = Date.now();
             this.master = state;
             this.seq = now;
             this.force_after_ms = after;
             this.force_before_ms = before;
 
-            if(typeof this.callback === 'function')
+            if (typeof this.callback === 'function')
                 this.callback(true, after, before);
         },
 
         // clear the master
         clearMaster: function() {
-            if(NETDATA.options.debug.globalPanAndZoom === true)
+            if (NETDATA.options.debug.globalPanAndZoom === true)
                 console.log('globalPanAndZoom.clearMaster()');
 
-            if(this.master !== null) {
-                var st = this.master;
+            if (this.master !== null) {
+                let st = this.master;
                 this.master = null;
                 st.resetChart();
             }
@@ -1681,7 +1681,7 @@ var NETDATA = window.NETDATA || {};
             this.force_before_ms = null;
             NETDATA.options.auto_refresher_stop_until = 0;
 
-            if(typeof this.callback === 'function')
+            if (typeof this.callback === 'function')
                 this.callback(false, 0, 0);
         },
 
@@ -1699,10 +1699,10 @@ var NETDATA = window.NETDATA || {};
         // check if a chart, other than the master
         // needs to be refreshed, due to the global pan and zoom
         shouldBeAutoRefreshed: function(state) {
-            if(this.master === null || this.seq === 0)
+            if (this.master === null || this.seq === 0)
                 return false;
 
-            //if(state.needsRecreation())
+            //if (state.needsRecreation())
             //  return true;
 
             return (state.tm.pan_and_zoom_seq !== this.seq);
@@ -1737,7 +1737,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         setup: function() {
-            if(this.isActive() === true) {
+            if (this.isActive() === true) {
                 if (this.state === null)
                     this.state = NETDATA.options.targets[0];
 
@@ -1751,8 +1751,8 @@ var NETDATA = window.NETDATA || {};
         },
 
         set: function(state, after, before, view_after, view_before) {
-            if(after > before) {
-                var t = after;
+            if (after > before) {
+                let t = after;
                 after = before;
                 before = t;
             }
@@ -1772,16 +1772,16 @@ var NETDATA = window.NETDATA || {};
             this.view_after = null;
             this.view_before = null;
 
-            if(typeof this.callback === 'function')
+            if (typeof this.callback === 'function')
                 this.callback(false, 0, 0);
         },
 
         focus: function() {
-            if(this.isActive() === true && this.hasViewport() === true) {
-                if(this.state === null)
+            if (this.isActive() === true && this.hasViewport() === true) {
+                if (this.state === null)
                     this.state = NETDATA.options.targets[0];
 
-                if(NETDATA.globalPanAndZoom.isMaster(this.state) === true)
+                if (NETDATA.globalPanAndZoom.isMaster(this.state) === true)
                     NETDATA.globalPanAndZoom.clearMaster();
 
                 NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before, true);
@@ -1795,7 +1795,7 @@ var NETDATA = window.NETDATA || {};
     // TODO
     // move color assignment to dimensions, here
 
-    var dimensionStatus = function(parent, label, name_div, value_div, color) {
+    let dimensionStatus = function(parent, label, name_div, value_div, color) {
         this.enabled = false;
         this.parent = parent;
         this.label = label;
@@ -1816,21 +1816,21 @@ var NETDATA = window.NETDATA || {};
     dimensionStatus.prototype.setOptions = function(name_div, value_div, color) {
         this.color = color;
 
-        if(this.name_div !== name_div) {
+        if (this.name_div !== name_div) {
             this.name_div = name_div;
             this.name_div.title = this.label;
             this.name_div.style.setProperty('color', this.color, 'important');
-            if(this.selected === false)
+            if (this.selected === false)
                 this.name_div.className = 'netdata-legend-name not-selected';
             else
                 this.name_div.className = 'netdata-legend-name selected';
         }
 
-        if(this.value_div !== value_div) {
+        if (this.value_div !== value_div) {
             this.value_div = value_div;
             this.value_div.title = this.label;
             this.value_div.style.setProperty('color', this.color, 'important');
-            if(this.selected === false)
+            if (this.selected === false)
                 this.value_div.className = 'netdata-legend-value not-selected';
             else
                 this.value_div.className = 'netdata-legend-value selected';
@@ -1841,25 +1841,25 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.setHandler = function() {
-        if(this.enabled === false) return;
+        if (this.enabled === false) return;
 
-        var ds = this;
+        let ds = this;
 
         // this.name_div.onmousedown = this.value_div.onmousedown = function(e) {
         this.name_div.onclick = this.value_div.onclick = function(e) {
             e.preventDefault();
-            if(ds.isSelected()) {
+            if (ds.isSelected()) {
                 // this is selected
-                if(e.shiftKey === true || e.ctrlKey === true) {
+                if (e.shiftKey === true || e.ctrlKey === true) {
                     // control or shift key is pressed -> unselect this (except is none will remain selected, in which case select all)
                     ds.unselect();
 
-                    if(ds.parent.countSelected() === 0)
+                    if (ds.parent.countSelected() === 0)
                         ds.parent.selectAll();
                 }
                 else {
                     // no key is pressed -> select only this (except if it is the only selected already, in which case select all)
-                    if(ds.parent.countSelected() === 1) {
+                    if (ds.parent.countSelected() === 1) {
                         ds.parent.selectAll();
                     }
                     else {
@@ -1870,7 +1870,7 @@ var NETDATA = window.NETDATA || {};
             }
             else {
                 // this is not selected
-                if(e.shiftKey === true || e.ctrlKey === true) {
+                if (e.shiftKey === true || e.ctrlKey === true) {
                     // control or shift key is pressed -> select this too
                     ds.select();
                 }
@@ -1886,7 +1886,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.select = function() {
-        if(this.enabled === false) return;
+        if (this.enabled === false) return;
 
         this.name_div.className = 'netdata-legend-name selected';
         this.value_div.className = 'netdata-legend-value selected';
@@ -1894,7 +1894,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.unselect = function() {
-        if(this.enabled === false) return;
+        if (this.enabled === false) return;
 
         this.name_div.className = 'netdata-legend-name not-selected';
         this.value_div.className = 'netdata-legend-value hidden';
@@ -1907,7 +1907,7 @@ var NETDATA = window.NETDATA || {};
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    var dimensionsVisibility = function(state) {
+    let dimensionsVisibility = function(state) {
         this.state = state;
         this.len = 0;
         this.dimensions = {};
@@ -1916,7 +1916,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionsVisibility.prototype.dimensionAdd = function(label, name_div, value_div, color) {
-        if(typeof this.dimensions[label] === 'undefined') {
+        if (typeof this.dimensions[label] === 'undefined') {
             this.len++;
             this.dimensions[label] = new dimensionStatus(this, label, name_div, value_div, color);
         }
@@ -1931,49 +1931,49 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionsVisibility.prototype.invalidateAll = function() {
-        var keys = Object.keys(this.dimensions);
-        var len = keys.length;
-        while(len--)
+        let keys = Object.keys(this.dimensions);
+        let len = keys.length;
+        while (len--)
             this.dimensions[keys[len]].invalidate();
     };
 
     dimensionsVisibility.prototype.selectAll = function() {
-        var keys = Object.keys(this.dimensions);
-        var len = keys.length;
-        while(len--)
+        let keys = Object.keys(this.dimensions);
+        let len = keys.length;
+        while (len--)
             this.dimensions[keys[len]].select();
     };
 
     dimensionsVisibility.prototype.countSelected = function() {
-        var selected = 0;
-        var keys = Object.keys(this.dimensions);
-        var len = keys.length;
-        while(len--)
-            if(this.dimensions[keys[len]].isSelected()) selected++;
+        let selected = 0;
+        let keys = Object.keys(this.dimensions);
+        let len = keys.length;
+        while (len--)
+            if (this.dimensions[keys[len]].isSelected()) selected++;
 
         return selected;
     };
 
     dimensionsVisibility.prototype.selectNone = function() {
-        var keys = Object.keys(this.dimensions);
-        var len = keys.length;
-        while(len--)
+        let keys = Object.keys(this.dimensions);
+        let len = keys.length;
+        while (len--)
             this.dimensions[keys[len]].unselect();
     };
 
     dimensionsVisibility.prototype.selected2BooleanArray = function(array) {
-        var ret = [];
+        let ret = [];
         this.selected_count = 0;
         this.unselected_count = 0;
 
-        var len = array.length;
-        while(len--) {
-            var ds = this.dimensions[array[len]];
-            if(typeof ds === 'undefined') {
+        let len = array.length;
+        while (len--) {
+            let ds = this.dimensions[array[len]];
+            if (typeof ds === 'undefined') {
                 // console.log(array[i] + ' is not found');
                 ret.unshift(false);
             }
-            else if(ds.isSelected()) {
+            else if (ds.isSelected()) {
                 ret.unshift(true);
                 this.selected_count++;
             }
@@ -1983,7 +1983,7 @@ var NETDATA = window.NETDATA || {};
             }
         }
 
-        if(this.selected_count === 0 && this.unselected_count !== 0) {
+        if (this.selected_count === 0 && this.unselected_count !== 0) {
             this.selectAll();
             return this.selected2BooleanArray(array);
         }
@@ -2030,10 +2030,10 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.options.browser_timezone = 'cannot-detect-it';
             }
 
-            var ret = false;
+            let ret = false;
 
             try {
-                var dateOptions ={
+                let dateOptions ={
                     localeMatcher: 'best fit',
                     formatMatcher: 'best fit',
                     weekday: 'short',
@@ -2042,7 +2042,7 @@ var NETDATA = window.NETDATA || {};
                     day: '2-digit'
                 };
 
-                var timeOptions = {
+                let timeOptions = {
                     localeMatcher: 'best fit',
                     hour12: false,
                     formatMatcher: 'best fit',
@@ -2051,7 +2051,7 @@ var NETDATA = window.NETDATA || {};
                     second: '2-digit'
                 };
 
-                var xAxisOptions = {
+                let xAxisOptions = {
                     localeMatcher: 'best fit',
                     hour12: false,
                     formatMatcher: 'best fit',
@@ -2060,7 +2060,7 @@ var NETDATA = window.NETDATA || {};
                     second: '2-digit'
                 };
 
-                if(typeof timezone === 'string' && timezone !== '' && timezone !== 'default') {
+                if (typeof timezone === 'string' && timezone !== '' && timezone !== 'default') {
                     dateOptions.timeZone  = timezone;
                     timeOptions.timeZone  = timezone;
                     timeOptions.timeZoneName = 'short';
@@ -2088,8 +2088,8 @@ var NETDATA = window.NETDATA || {};
                     return this.xAxisFormat.format(d);
                 };
 
-                //var d = new Date();
-                //var t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
+                //let d = new Date();
+                //let t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
 
                 ret = true;
             }
@@ -2220,7 +2220,7 @@ var NETDATA = window.NETDATA || {};
                 'milliseconds': {
                     check: function (max) { return NETDATA.options.current.seconds_as_time && max < 1000; },
                     convert: function(milliseconds) {
-                        var tms = Math.round(milliseconds * 10);
+                        let tms = Math.round(milliseconds * 10);
                         milliseconds = Math.floor(tms / 10);
 
                         tms -= milliseconds * 10;
@@ -2233,7 +2233,7 @@ var NETDATA = window.NETDATA || {};
                     convert: function(milliseconds) {
                         milliseconds = Math.round(milliseconds);
 
-                        var seconds = Math.floor(milliseconds / 1000);
+                        let seconds = Math.floor(milliseconds / 1000);
                         milliseconds -= seconds * 1000;
 
                         milliseconds = Math.round(milliseconds / 10);
@@ -2247,10 +2247,10 @@ var NETDATA = window.NETDATA || {};
                     convert: function(milliseconds) {
                         milliseconds = Math.round(milliseconds);
 
-                        var minutes = Math.floor(milliseconds / 60000);
+                        let minutes = Math.floor(milliseconds / 60000);
                         milliseconds -= minutes * 60000;
 
-                        var seconds = Math.floor(milliseconds / 1000);
+                        let seconds = Math.floor(milliseconds / 1000);
                         milliseconds -= seconds * 1000;
 
                         milliseconds = Math.round(milliseconds / 10);
@@ -2266,27 +2266,27 @@ var NETDATA = window.NETDATA || {};
         seconds2time: function(seconds) {
             seconds = Math.abs(seconds);
 
-            var days = Math.floor(seconds / 86400);
+            let days = Math.floor(seconds / 86400);
             seconds -= days * 86400;
 
-            var hours = Math.floor(seconds / 3600);
+            let hours = Math.floor(seconds / 3600);
             seconds -= hours * 3600;
 
-            var minutes = Math.floor(seconds / 60);
+            let minutes = Math.floor(seconds / 60);
             seconds -= minutes * 60;
 
             seconds = Math.round(seconds);
 
-            var ms_txt = '';
+            let ms_txt = '';
             /*
-            var ms = seconds - Math.floor(seconds);
+            let ms = seconds - Math.floor(seconds);
             seconds -= ms;
             ms = Math.round(ms * 1000);
 
-            if(ms > 1) {
-                if(ms < 10)
+            if (ms > 1) {
+                if (ms < 10)
                     ms_txt = '.00' + ms.toString();
-                else if(ms < 100)
+                else if (ms < 100)
                     ms_txt = '.0' + ms.toString();
                 else
                     ms_txt = '.' + ms.toString();
@@ -2304,18 +2304,18 @@ var NETDATA = window.NETDATA || {};
         // + every time units are switched call the callback
         get: function(uuid, min, max, units, desired_units, common_units_name, switch_units_callback) {
             // validate the parameters
-            if(typeof units === 'undefined')
+            if (typeof units === 'undefined')
                 units = 'undefined';
 
             // check if we support units conversion
-            if(typeof this.scalableUnits[units] === 'undefined' && typeof this.convertibleUnits[units] === 'undefined') {
+            if (typeof this.scalableUnits[units] === 'undefined' && typeof this.convertibleUnits[units] === 'undefined') {
                 // we can't convert these units
                 //console.log('DEBUG: ' + uuid.toString() + ' can\'t convert units: ' + units.toString());
                 return function(value) { return value; };
             }
 
             // check if the caller wants the original units
-            if(typeof desired_units === 'undefined' || desired_units === null || desired_units === 'original' || desired_units === units) {
+            if (typeof desired_units === 'undefined' || desired_units === null || desired_units === 'original' || desired_units === units) {
                 //console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
                 switch_units_callback(units);
                 return function(value) { return value; };
@@ -2324,11 +2324,11 @@ var NETDATA = window.NETDATA || {};
             // now we know we can convert the units
             // and the caller wants some kind of conversion
 
-            var tunits = null;
-            var tdivider = 0;
-            var x;
+            let tunits = null;
+            let tdivider = 0;
+            let x;
 
-            if(typeof this.scalableUnits[units] !== 'undefined') {
+            if (typeof this.scalableUnits[units] !== 'undefined') {
                 // units that can be scaled
                 // we decide a divider
 
@@ -2346,7 +2346,7 @@ var NETDATA = window.NETDATA || {};
                     // find the smallest scale that provides integers
                     for (x in this.scalableUnits[units]) {
                         if (this.scalableUnits[units].hasOwnProperty(x)) {
-                            var m = this.scalableUnits[units][x];
+                            let m = this.scalableUnits[units][x];
                             if (m <= max && m > tdivider) {
                                 tunits = x;
                                 tdivider = m;
@@ -2354,22 +2354,22 @@ var NETDATA = window.NETDATA || {};
                         }
                     }
 
-                    if(tunits === null || tdivider <= 0) {
+                    if (tunits === null || tdivider <= 0) {
                         // we couldn't find one
                         //console.log('DEBUG: ' + uuid.toString() + ' cannot find an auto-scaling candidate for units: ' + units.toString() + ' (max: ' + max.toString() + ')');
                         switch_units_callback(units);
                         return function(value) { return value; };
                     }
 
-                    if(typeof common_units_name === 'string' && typeof uuid === 'string') {
+                    if (typeof common_units_name === 'string' && typeof uuid === 'string') {
                         // the caller wants several charts to have the same units
                         // data-common-units
 
-                        var common_units_key = common_units_name + '-' + units;
+                        let common_units_key = common_units_name + '-' + units;
 
                         // add our divider into the list of keys
-                        var t = this.keys[common_units_key];
-                        if(typeof t === 'undefined') {
+                        let t = this.keys[common_units_key];
+                        if (typeof t === 'undefined') {
                             this.keys[common_units_key] = {};
                             t = this.keys[common_units_key];
                         }
@@ -2379,15 +2379,15 @@ var NETDATA = window.NETDATA || {};
                         };
 
                         // find the max divider of all charts
-                        var common_units = t[uuid];
-                        for(x in t) {
+                        let common_units = t[uuid];
+                        for (x in t) {
                             if (t.hasOwnProperty(x) && t[x].divider > common_units.divider)
                                 common_units = t[x];
                         }
 
                         // save our common_max to the latest keys
-                        var latest = this.latest[common_units_key];
-                        if(typeof latest === 'undefined') {
+                        let latest = this.latest[common_units_key];
+                        if (typeof latest === 'undefined') {
                             this.latest[common_units_key] = {};
                             latest = this.latest[common_units_key];
                         }
@@ -2402,7 +2402,7 @@ var NETDATA = window.NETDATA || {};
                         // apply it to this chart
                         switch_units_callback(tunits);
                         return function(value) {
-                            if(tdivider !== latest.divider) {
+                            if (tdivider !== latest.divider) {
                                 // another chart switched our common units
                                 // we should switch them too
                                 //console.log('DEBUG: ' + uuid + ' switching units due to a common-units change, from ' + tunits.toString() + ' to ' + latest.units.toString());
@@ -2426,7 +2426,7 @@ var NETDATA = window.NETDATA || {};
                 else {
                     // the caller wants specific units
 
-                    if(typeof this.scalableUnits[units][desired_units] !== 'undefined') {
+                    if (typeof this.scalableUnits[units][desired_units] !== 'undefined') {
                         // all good, set the new units
                         tdivider = this.scalableUnits[units][desired_units];
                         // console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + desired_units.toString() + ' with divider ' + tdivider.toString() + ', by reference');
@@ -2441,10 +2441,10 @@ var NETDATA = window.NETDATA || {};
                     }
                 }
            }
-           else if(typeof this.convertibleUnits[units] !== 'undefined') {
+           else if (typeof this.convertibleUnits[units] !== 'undefined') {
                 // units that can be converted
-                if(desired_units === 'auto') {
-                    for(x in this.convertibleUnits[units]) {
+                if (desired_units === 'auto') {
+                    for (x in this.convertibleUnits[units]) {
                         if (this.convertibleUnits[units].hasOwnProperty(x)) {
                             if (this.convertibleUnits[units][x].check(max)) {
                                 //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
@@ -2459,7 +2459,7 @@ var NETDATA = window.NETDATA || {};
                     switch_units_callback(units);
                     return function (value) { return value; };
                 }
-                else if(typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
+                else if (typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
                     switch_units_callback(desired_units);
                     return this.convertibleUnits[units][desired_units].convert;
                 }
@@ -2505,7 +2505,7 @@ var NETDATA = window.NETDATA || {};
         enabled: function() {
             // console.log('enabled()');
             // can we globally apply selection sync?
-            if(NETDATA.options.current.sync_selection === false)
+            if (NETDATA.options.current.sync_selection === false)
                 return false;
 
             return (this.dont_sync_before <= Date.now());
@@ -2513,18 +2513,18 @@ var NETDATA = window.NETDATA || {};
 
         // set the global selection sync master
         setMaster: function(state) {
-            if(this.enabled() === false) {
+            if (this.enabled() === false) {
                 this.stop();
                 return;
             }
 
-            if(this.state === state)
+            if (this.state === state)
                 return;
 
-            if(this.state !== null)
+            if (this.state !== null)
                 this.stop();
 
-            if(NETDATA.options.debug.globalSelectionSync === true)
+            if (NETDATA.options.debug.globalSelectionSync === true)
                 console.log('globalSelectionSync.setMaster(' + state.id + ')');
 
             state.selected = true;
@@ -2532,11 +2532,11 @@ var NETDATA = window.NETDATA || {};
             this.last_t = 0;
 
             // find all slaves
-            var targets = NETDATA.intersectionObserver.targets();
+            let targets = NETDATA.intersectionObserver.targets();
             this.slaves = [];
-            var len = targets.length;
-            while(len--) {
-                var st = targets[len];
+            let len = targets.length;
+            while (len--) {
+                let st = targets[len];
                 if (this.state !== st && st.globalSelectionSyncIsEligible() === true)
                     this.slaves.push(st);
             }
@@ -2546,11 +2546,11 @@ var NETDATA = window.NETDATA || {};
 
         // stop global selection sync
         stop: function() {
-            if(this.state !== null) {
-                if(NETDATA.options.debug.globalSelectionSync === true)
+            if (this.state !== null) {
+                if (NETDATA.options.debug.globalSelectionSync === true)
                     console.log('globalSelectionSync.stop()');
 
-                var len = this.slaves.length;
+                let len = this.slaves.length;
                 while (len--)
                     this.slaves[len].clearSelection();
 
@@ -2564,11 +2564,11 @@ var NETDATA = window.NETDATA || {};
 
         // delay global selection sync for some time
         delay: function(ms) {
-            if(NETDATA.options.current.sync_selection === true) {
-                if(NETDATA.options.debug.globalSelectionSync === true)
+            if (NETDATA.options.current.sync_selection === true) {
+                if (NETDATA.options.debug.globalSelectionSync === true)
                     console.log('globalSelectionSync.delay()');
 
-                if(typeof ms === 'number')
+                if (typeof ms === 'number')
                     this.dont_sync_before = Date.now() + ms;
                 else
                     this.dont_sync_before = Date.now() + NETDATA.options.current.sync_selection_delay;
@@ -2576,12 +2576,12 @@ var NETDATA = window.NETDATA || {};
         },
 
         __syncSlaves: function() {
-            if(NETDATA.globalSelectionSync.enabled() === true) {
-                if(NETDATA.options.debug.globalSelectionSync === true)
+            if (NETDATA.globalSelectionSync.enabled() === true) {
+                if (NETDATA.options.debug.globalSelectionSync === true)
                     console.log('globalSelectionSync.__syncSlaves()');
 
-                var t = NETDATA.globalSelectionSync.last_t;
-                var len = NETDATA.globalSelectionSync.slaves.length;
+                let t = NETDATA.globalSelectionSync.last_t;
+                let len = NETDATA.globalSelectionSync.slaves.length;
                 while (len--)
                     NETDATA.globalSelectionSync.slaves[len].setSelection(t);
 
@@ -2592,13 +2592,13 @@ var NETDATA = window.NETDATA || {};
         // sync all the visible charts to the given time
         // this is to be called from the chart libraries
         sync: function(state, t) {
-            if(NETDATA.options.current.sync_selection === true) {
-                if(NETDATA.options.debug.globalSelectionSync === true)
+            if (NETDATA.options.current.sync_selection === true) {
+                if (NETDATA.options.debug.globalSelectionSync === true)
                     console.log('globalSelectionSync.sync(' + state.id + ', ' + t.toString() + ')');
 
                 this.setMaster(state);
 
-                if(t === this.last_t)
+                if (t === this.last_t)
                     return;
 
                 this.last_t = t;
@@ -2629,7 +2629,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         globalReset: function() {
-            if(this.observer !== null) {
+            if (this.observer !== null) {
                 this.visible_targets = [];
                 this.observer.disconnect();
                 this.init();
@@ -2637,16 +2637,16 @@ var NETDATA = window.NETDATA || {};
         },
 
         targets: function() {
-            if(this.enabled() === true && this.visible_targets.length > 0)
+            if (this.enabled() === true && this.visible_targets.length > 0)
                 return this.visible_targets;
             else
                 return NETDATA.options.targets;
         },
 
         switchChartVisibility: function() {
-            var old = this.__visibilityRatioOld;
+            let old = this.__visibilityRatioOld;
 
-            if(old !== this.__visibilityRatio) {
+            if (old !== this.__visibilityRatio) {
                 if (old === 0 && this.__visibilityRatio > 0)
                     this.unhideChart();
                 else if (old > 0 && this.__visibilityRatio === 0)
@@ -2658,32 +2658,32 @@ var NETDATA = window.NETDATA || {};
 
         handler: function(entries, observer) {
             entries.forEach(function(entry) {
-                var state = NETDATA.chartState(entry.target);
+                let state = NETDATA.chartState(entry.target);
 
-                var idx;
-                if(entry.intersectionRatio > 0) {
+                let idx;
+                if (entry.intersectionRatio > 0) {
                     idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
-                    if(idx === -1) {
-                        if(NETDATA.scrollUp === true)
+                    if (idx === -1) {
+                        if (NETDATA.scrollUp === true)
                             NETDATA.intersectionObserver.visible_targets.push(state);
                         else
                             NETDATA.intersectionObserver.visible_targets.unshift(state);
                     }
-                    else if(state.__visibilityRatio === 0)
+                    else if (state.__visibilityRatio === 0)
                         state.log("was not visible until now, but was already in visible_targets");
                 }
                 else {
                     idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
-                    if(idx !== -1)
+                    if (idx !== -1)
                         NETDATA.intersectionObserver.visible_targets.splice(idx, 1);
-                    else if(state.__visibilityRatio > 0)
+                    else if (state.__visibilityRatio > 0)
                         state.log("was visible, but not found in visible_targets");
                 }
 
                 state.__visibilityRatio = entry.intersectionRatio;
 
-                if(NETDATA.options.current.async_on_scroll === false) {
-                    if(window.requestIdleCallback)
+                if (NETDATA.options.current.async_on_scroll === false) {
+                    if (window.requestIdleCallback)
                         window.requestIdleCallback(function() {
                             NETDATA.intersectionObserver.switchChartVisibility.call(state);
                         }, {timeout: 100});
@@ -2694,13 +2694,13 @@ var NETDATA = window.NETDATA || {};
         },
 
         observe: function(state) {
-            if(this.enabled() === true) {
+            if (this.enabled() === true) {
                 state.__visibilityRatioOld = 0;
                 state.__visibilityRatio = 0;
                 this.observer.observe(state.element);
 
                 state.isVisible = function() {
-                    if(NETDATA.options.current.update_only_visible === false)
+                    if (NETDATA.options.current.update_only_visible === false)
                         return true;
 
                     NETDATA.intersectionObserver.switchChartVisibility.call(this);
@@ -2711,7 +2711,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         init: function() {
-            if(typeof netdataIntersectionObserver === 'undefined' || netdataIntersectionObserver === true) {
+            if (typeof netdataIntersectionObserver === 'undefined' || netdataIntersectionObserver === true) {
                 try {
                     this.observer = new IntersectionObserver(this.handler, this.options);
                 }
@@ -2730,12 +2730,12 @@ var NETDATA = window.NETDATA || {};
     // ----------------------------------------------------------------------------------------------------------------
     // Our state object, where all per-chart values are stored
 
-    var chartState = function(element) {
+    let chartState = function(element) {
         this.element = element;
 
         // IMPORTANT:
         // all private functions should use 'that', instead of 'this'
-        var that = this;
+        let that = this;
 
         // ============================================================================================================
         // ERROR HANDLING
@@ -2743,14 +2743,14 @@ var NETDATA = window.NETDATA || {};
         /* error() - private
          * show an error instead of the chart
          */
-        var error = function(msg) {
-            var ret = true;
+        let error = function(msg) {
+            let ret = true;
 
-            if(typeof netdataErrorCallback === 'function') {
+            if (typeof netdataErrorCallback === 'function') {
                 ret = netdataErrorCallback('chart', that.id, msg);
             }
 
-            if(ret) {
+            if (ret) {
                 that.element.innerHTML = that.id + ': ' + msg;
                 that.enabled = false;
                 that.current = that.pan;
@@ -2774,7 +2774,7 @@ var NETDATA = window.NETDATA || {};
 
         // string - the name of chart
         this.id = NETDATA.dataAttribute(this.element, 'netdata', undefined);
-        if(typeof this.id === 'undefined') {
+        if (typeof this.id === 'undefined') {
             error("netdata elements need data-netdata");
             return;
         }
@@ -2787,7 +2787,7 @@ var NETDATA = window.NETDATA || {};
         this.height = NETDATA.dataAttribute(this.element, 'height', NETDATA.chartDefaults.height);
         this.height_original = this.height;
 
-        if(this.settings_id !== null) {
+        if (this.settings_id !== null) {
             this.height = NETDATA.localStorageGet('chart_heights.' + this.settings_id, this.height, function(height) {
                 // this is the callback that will be called
                 // if and when the user resets all localStorage variables
@@ -2803,12 +2803,12 @@ var NETDATA = window.NETDATA || {};
         // check the requested library is available
         // we don't initialize it here - it will be initialized when
         // this chart will be first used
-        if(typeof NETDATA.chartLibraries[this.library_name] === 'undefined') {
+        if (typeof NETDATA.chartLibraries[this.library_name] === 'undefined') {
             NETDATA.error(402, this.library_name);
             error('chart library "' + this.library_name + '" is not found');
             this.enabled = false;
         }
-        else if(NETDATA.chartLibraries[this.library_name].enabled === false) {
+        else if (NETDATA.chartLibraries[this.library_name].enabled === false) {
             NETDATA.error(403, this.library_name);
             error('chart library "' + this.library_name + '" is not enabled');
             this.enabled = false;
@@ -2859,7 +2859,7 @@ var NETDATA = window.NETDATA || {};
         // PRIVATE FUNCTIONS
 
         // reset the runtime status variables to their defaults
-        var runtimeInit = function() {
+        let runtimeInit = function() {
             that.paused = false;                        // boolean - is the chart paused for any reason?
             that.selected = false;                      // boolean - is the chart shown a selection?
 
@@ -2899,8 +2899,8 @@ var NETDATA = window.NETDATA || {};
         };
 
         // initialize all the variables that are required for the chart to be rendered
-        var lateInitialization = function() {
-            if(typeof that.host !== 'undefined')
+        let lateInitialization = function() {
+            if (typeof that.host !== 'undefined')
                 return;
 
             // string - the netdata server URL, without any path
@@ -2908,7 +2908,7 @@ var NETDATA = window.NETDATA || {};
 
             // make sure the host does not end with /
             // all netdata API requests use absolute paths
-            while(that.host.slice(-1) === '/')
+            while (that.host.slice(-1) === '/')
                 that.host = that.host.substring(0, that.host.length - 1);
 
             // string - the grouping method requested by the user
@@ -2925,8 +2925,8 @@ var NETDATA = window.NETDATA || {};
 
             // the forced update_every
             that.force_update_every = NETDATA.dataAttribute(that.element, 'update-every', null);
-            if(typeof that.force_update_every !== 'number' || that.force_update_every <= 1) {
-                if(that.force_update_every !== null)
+            if (typeof that.force_update_every !== 'number' || that.force_update_every <= 1) {
+                if (that.force_update_every !== null)
                     that.log('ignoring invalid value of property data-update-every');
 
                 that.force_update_every = null;
@@ -2952,17 +2952,17 @@ var NETDATA = window.NETDATA || {};
             that.debug = NETDATA.dataAttributeBoolean(that.element, 'debug', false);
 
             that.value_decimal_detail = -1;
-            var d = NETDATA.dataAttribute(that.element, 'decimal-digits', -1);
-            if(typeof d === 'number')
+            let d = NETDATA.dataAttribute(that.element, 'decimal-digits', -1);
+            if (typeof d === 'number')
                 that.value_decimal_detail = d;
-            else if(typeof d !== 'undefined')
+            else if (typeof d !== 'undefined')
                 that.log('ignoring decimal-digits value: ' + d.toString());
 
             // if we need to report the rendering speed
             // find the element that needs to be updated
-            var refresh_dt_element_name = NETDATA.dataAttribute(that.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
+            let refresh_dt_element_name = NETDATA.dataAttribute(that.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
 
-            if(refresh_dt_element_name !== null) {
+            if (refresh_dt_element_name !== null) {
                 that.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
             }
             else
@@ -3006,14 +3006,14 @@ var NETDATA = window.NETDATA || {};
             that.chart = null;                          // object - the chart as downloaded from the server
 
             function get_foreign_element_by_id(opt) {
-                var id = NETDATA.dataAttribute(that.element, opt, null);
-                if(id === null) {
+                let id = NETDATA.dataAttribute(that.element, opt, null);
+                if (id === null) {
                     //that.log('option "' + opt + '" is undefined');
                     return null;
                 }
 
-                var el = document.getElementById(id);
-                if(typeof el === 'undefined') {
+                let el = document.getElementById(id);
+                if (typeof el === 'undefined') {
                     that.log('cannot find an element with name "' + id.toString() + '"');
                     return null;
                 }
@@ -3028,10 +3028,10 @@ var NETDATA = window.NETDATA || {};
             that.foreign_element_selection = get_foreign_element_by_id('show-selection-at');
         };
 
-        var destroyDOM = function() {
-            if(that.enabled === false) return;
+        let destroyDOM = function() {
+            if (that.enabled === false) return;
 
-            if(that.debug === true)
+            if (that.debug === true)
                 that.log('destroyDOM()');
 
             // that.element.className = 'netdata-message icon';
@@ -3049,13 +3049,13 @@ var NETDATA = window.NETDATA || {};
             that.tm.last_dom_created = 0;
         };
 
-        var createDOM = function() {
-            if(that.enabled === false) return;
+        let createDOM = function() {
+            if (that.enabled === false) return;
             lateInitialization();
 
             destroyDOM();
 
-            if(that.debug === true)
+            if (that.debug === true)
                 that.log('createDOM()');
 
             that.element_message = document.createElement('div');
@@ -3071,26 +3071,26 @@ var NETDATA = window.NETDATA || {};
             showLoading();
         };
 
-        var initDOM = function() {
+        let initDOM = function() {
             that.element.className = that.library.container_class(that);
 
-            if(typeof(that.width) === 'string')
+            if (typeof(that.width) === 'string')
                 that.element.style.width = that.width;
-            else if(typeof(that.width) === 'number')
+            else if (typeof(that.width) === 'number')
                 that.element.style.width = that.width.toString() + 'px';
 
-            if(typeof(that.library.aspect_ratio) === 'undefined') {
-                if(typeof(that.height) === 'string')
+            if (typeof(that.library.aspect_ratio) === 'undefined') {
+                if (typeof(that.height) === 'string')
                     that.element.style.height = that.height;
-                else if(typeof(that.height) === 'number')
+                else if (typeof(that.height) === 'number')
                     that.element.style.height = that.height.toString() + 'px';
             }
 
-            if(NETDATA.chartDefaults.min_width !== null)
+            if (NETDATA.chartDefaults.min_width !== null)
                 that.element.style.min_width = NETDATA.chartDefaults.min_width;
         };
 
-        var invisibleSearchableText = function() {
+        let invisibleSearchableText = function() {
             return '<span style="position:absolute; opacity: 0; width: 0px;">' + that.id + '</span>';
         };
 
@@ -3099,8 +3099,8 @@ var NETDATA = window.NETDATA || {};
          * destroy all (possibly) created state elements
          * create the basic DOM for a chart
          */
-        var init = function(opt) {
-            if(that.enabled === false) return;
+        let init = function(opt) {
+            if (that.enabled === false) return;
 
             runtimeInit();
             that.element.innerHTML = invisibleSearchableText();
@@ -3108,37 +3108,37 @@ var NETDATA = window.NETDATA || {};
             that.tm.last_initialized = Date.now();
             that.setMode('auto');
 
-            if(opt !== 'fast') {
+            if (opt !== 'fast') {
                 if (that.isVisible(true) || opt === 'force')
                     createDOM();
             }
         };
 
-        var maxMessageFontSize = function() {
-            var screenHeight = screen.height;
-            var el = that.element;
+        let maxMessageFontSize = function() {
+            let screenHeight = screen.height;
+            let el = that.element;
 
             // normally we want a font size, as tall as the element
-            var h = el.clientHeight;
+            let h = el.clientHeight;
 
             // but give it some air, 20% let's say, or 5 pixels min
-            var lost = Math.max(h * 0.2, 5);
+            let lost = Math.max(h * 0.2, 5);
             h -= lost;
 
             // center the text, vertically
-            var paddingTop = (lost - 5) / 2;
+            let paddingTop = (lost - 5) / 2;
 
             // but check the width too
             // it should fit 10 characters in it
-            var w = el.clientWidth / 10;
-            if(h > w) {
+            let w = el.clientWidth / 10;
+            if (h > w) {
                 paddingTop += (h - w) / 2;
                 h = w;
             }
 
             // and don't make it too huge
             // 5% of the screen size is good
-            if(h > screenHeight / 20) {
+            if (h > screenHeight / 20) {
                 paddingTop += (h - (screenHeight / 20)) / 2;
                 h = screenHeight / 20;
             }
@@ -3148,24 +3148,24 @@ var NETDATA = window.NETDATA || {};
             that.element_message.style.paddingTop = paddingTop.toString() + 'px';
         };
 
-        var showMessageIcon = function(icon) {
+        let showMessageIcon = function(icon) {
             that.element_message.innerHTML = icon;
             maxMessageFontSize();
             $(that.element_message).removeClass('hidden');
             that.tmp.___messageHidden___ = undefined;
         };
 
-        var hideMessage = function() {
-            if(typeof that.tmp.___messageHidden___ === 'undefined') {
+        let hideMessage = function() {
+            if (typeof that.tmp.___messageHidden___ === 'undefined') {
                 that.tmp.___messageHidden___ = true;
                 $(that.element_message).addClass('hidden');
             }
         };
 
-        var showRendering = function() {
-            var icon;
-            if(that.chart !== null) {
-                if(that.chart.chart_type === 'line')
+        let showRendering = function() {
+            let icon;
+            if (that.chart !== null) {
+                if (that.chart.chart_type === 'line')
                     icon = NETDATA.icons.lineChart;
                 else
                     icon = NETDATA.icons.areaChart;
@@ -3176,27 +3176,27 @@ var NETDATA = window.NETDATA || {};
             showMessageIcon(icon + ' netdata' + invisibleSearchableText());
         };
 
-        var showLoading = function() {
-            if(that.chart_created === false) {
+        let showLoading = function() {
+            if (that.chart_created === false) {
                 showMessageIcon(NETDATA.icons.loading + ' netdata');
                 return true;
             }
             return false;
         };
 
-        var isHidden = function() {
+        let isHidden = function() {
             return (typeof that.tmp.___chartIsHidden___ !== 'undefined');
         };
 
         // hide the chart, when it is not visible - called from isVisible()
         this.hideChart = function() {
             // hide it, if it is not already hidden
-            if(isHidden() === true) return;
+            if (isHidden() === true) return;
 
-            if(this.chart_created === true) {
-                if(NETDATA.options.current.show_help === true) {
-                    if(this.element_legend_childs.toolbox !== null) {
-                        if(this.debug === true)
+            if (this.chart_created === true) {
+                if (NETDATA.options.current.show_help === true) {
+                    if (this.element_legend_childs.toolbox !== null) {
+                        if (this.debug === true)
                             this.log('hideChart(): hidding legend popovers');
 
                         $(this.element_legend_childs.toolbox_left).popover('hide');
@@ -3206,30 +3206,30 @@ var NETDATA = window.NETDATA || {};
                         $(this.element_legend_childs.toolbox_zoomout).popover('hide');
                     }
 
-                    if(this.element_legend_childs.resize_handler !== null)
+                    if (this.element_legend_childs.resize_handler !== null)
                         $(this.element_legend_childs.resize_handler).popover('hide');
 
-                    if(this.element_legend_childs.content !== null)
+                    if (this.element_legend_childs.content !== null)
                         $(this.element_legend_childs.content).popover('hide');
                 }
 
-                if(NETDATA.options.current.destroy_on_hide === true) {
-                    if(this.debug === true)
+                if (NETDATA.options.current.destroy_on_hide === true) {
+                    if (this.debug === true)
                         this.log('hideChart(): initializing chart');
 
                     // we should destroy it
                     init('force');
                 }
                 else {
-                    if(this.debug === true)
+                    if (this.debug === true)
                         this.log('hideChart(): hiding chart');
 
                     showRendering();
                     this.element_chart.style.display = 'none';
                     this.element.style.willChange = 'auto';
-                    if(this.element_legend !== null) this.element_legend.style.display = 'none';
-                    if(this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = 'none';
-                    if(this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = 'none';
+                    if (this.element_legend !== null) this.element_legend.style.display = 'none';
+                    if (this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = 'none';
+                    if (this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = 'none';
 
                     this.tm.last_hidden = Date.now();
 
@@ -3246,13 +3246,13 @@ var NETDATA = window.NETDATA || {};
 
         // unhide the chart, when it is visible - called from isVisible()
         this.unhideChart = function() {
-            if(isHidden() === false) return;
+            if (isHidden() === false) return;
 
             this.tmp.___chartIsHidden___ = undefined;
             this.updates_since_last_unhide = 0;
 
-            if(this.chart_created === false) {
-                if(this.debug === true)
+            if (this.chart_created === false) {
+                if (this.debug === true)
                     this.log('unhideChart(): initializing chart');
 
                 // we need to re-initialize it, to show our background
@@ -3260,22 +3260,22 @@ var NETDATA = window.NETDATA || {};
                 init('force');
             }
             else {
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('unhideChart(): unhiding chart');
 
                 this.element.style.willChange = 'transform';
                 this.tm.last_unhidden = Date.now();
                 this.element_chart.style.display = '';
-                if(this.element_legend !== null) this.element_legend.style.display = '';
-                if(this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = '';
-                if(this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = '';
+                if (this.element_legend !== null) this.element_legend.style.display = '';
+                if (this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = '';
+                if (this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = '';
                 resizeChart();
                 hideMessage();
             }
 
-            if(this.__redraw_on_unhide === true) {
+            if (this.__redraw_on_unhide === true) {
 
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log("redrawing chart on unhide");
 
                 this.__redraw_on_unhide = undefined;
@@ -3283,14 +3283,14 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        var canBeRendered = function(uncached_visibility) {
-            if(that.debug === true)
+        let canBeRendered = function(uncached_visibility) {
+            if (that.debug === true)
                 that.log('canBeRendered() called');
 
-            if(NETDATA.options.current.update_only_visible === false)
+            if (NETDATA.options.current.update_only_visible === false)
                 return true;
 
-            var ret = (
+            let ret = (
                 (
                     NETDATA.options.page_is_visible === true ||
                     NETDATA.options.current.stop_updates_when_focus_is_lost === false ||
@@ -3299,31 +3299,31 @@ var NETDATA = window.NETDATA || {};
                 && isHidden() === false && that.isVisible(uncached_visibility) === true
             );
 
-            if(that.debug === true)
+            if (that.debug === true)
                 that.log('canBeRendered(): ' + ret);
 
             return ret;
         };
 
         // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
-        var callChartLibraryUpdateSafely = function(data) {
-            var status;
+        let callChartLibraryUpdateSafely = function(data) {
+            let status;
 
             // we should not do this here
             // if we prevent rendering the chart then:
             // 1. globalSelectionSync will be wrong
             // 2. globalPanAndZoom will be wrong
-            //if(canBeRendered(true) === false)
+            //if (canBeRendered(true) === false)
             //    return false;
 
-            if(NETDATA.options.fake_chart_rendering === true)
+            if (NETDATA.options.fake_chart_rendering === true)
                 return true;
 
             that.updates_counter++;
             that.updates_since_last_unhide++;
             that.updates_since_last_creation++;
 
-            if(NETDATA.options.debug.chart_errors === true)
+            if (NETDATA.options.debug.chart_errors === true)
                 status = that.library.update(that, data);
             else {
                 try {
@@ -3334,7 +3334,7 @@ var NETDATA = window.NETDATA || {};
                 }
             }
 
-            if(status === false) {
+            if (status === false) {
                 error('chart failed to be updated as ' + that.library_name);
                 return false;
             }
@@ -3343,24 +3343,24 @@ var NETDATA = window.NETDATA || {};
         };
 
         // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
-        var callChartLibraryCreateSafely = function(data) {
-            var status;
+        let callChartLibraryCreateSafely = function(data) {
+            let status;
 
             // we should not do this here
             // if we prevent rendering the chart then:
             // 1. globalSelectionSync will be wrong
             // 2. globalPanAndZoom will be wrong
-            //if(canBeRendered(true) === false)
+            //if (canBeRendered(true) === false)
             //    return false;
 
-            if(NETDATA.options.fake_chart_rendering === true)
+            if (NETDATA.options.fake_chart_rendering === true)
                 return true;
 
             that.updates_counter++;
             that.updates_since_last_unhide++;
             that.updates_since_last_creation++;
 
-            if(NETDATA.options.debug.chart_errors === true)
+            if (NETDATA.options.debug.chart_errors === true)
                 status = that.library.create(that, data);
             else {
                 try {
@@ -3371,7 +3371,7 @@ var NETDATA = window.NETDATA || {};
                 }
             }
 
-            if(status === false) {
+            if (status === false) {
                 error('chart failed to be created as ' + that.library_name);
                 return false;
             }
@@ -3387,23 +3387,23 @@ var NETDATA = window.NETDATA || {};
         // resizeChart() - private
         // to be called just before the chart library to make sure that
         // a properly sized dom is available
-        var resizeChart = function() {
-            if(that.tm.last_resized < NETDATA.options.last_page_resize) {
-                if(that.chart_created === false) return;
+        let resizeChart = function() {
+            if (that.tm.last_resized < NETDATA.options.last_page_resize) {
+                if (that.chart_created === false) return;
 
-                if(that.needsRecreation()) {
-                    if(that.debug === true)
+                if (that.needsRecreation()) {
+                    if (that.debug === true)
                         that.log('resizeChart(): initializing chart');
 
                     init('force');
                 }
-                else if(typeof that.library.resize === 'function') {
-                    if(that.debug === true)
+                else if (typeof that.library.resize === 'function') {
+                    if (that.debug === true)
                         that.log('resizeChart(): resizing chart');
 
                     that.library.resize(that);
 
-                    if(that.element_legend_childs.perfect_scroller !== null)
+                    if (that.element_legend_childs.perfect_scroller !== null)
                         Ps.update(that.element_legend_childs.perfect_scroller);
 
                     maxMessageFontSize();
@@ -3419,14 +3419,14 @@ var NETDATA = window.NETDATA || {};
         // - update the internal states
         // - resize the chart as the div changes height
         // - update the scrollbar of the legend
-        var resizeChartToHeight = function(h) {
+        let resizeChartToHeight = function(h) {
             // console.log(h);
             that.element.style.height = h;
 
-            if(that.settings_id !== null)
+            if (that.settings_id !== null)
                 NETDATA.localStorageSet('chart_heights.' + that.settings_id, h);
 
-            var now = Date.now();
+            let now = Date.now();
             NETDATA.options.last_page_scroll = now;
             NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
 
@@ -3436,13 +3436,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.resizeForPrint = function() {
-            if(typeof this.element_legend_childs !== 'undefined' && this.element_legend_childs.perfect_scroller !== null) {
-                var current = this.element.clientHeight;
-                var optimal = current
+            if (typeof this.element_legend_childs !== 'undefined' && this.element_legend_childs.perfect_scroller !== null) {
+                let current = this.element.clientHeight;
+                let optimal = current
                     + this.element_legend_childs.perfect_scroller.scrollHeight
                     - this.element_legend_childs.perfect_scroller.clientHeight;
 
-                if(optimal > current) {
+                if (optimal > current) {
                     // this.log('resized');
                     this.element.style.height = optimal + 'px';
                     this.library.resize(this);
@@ -3453,7 +3453,7 @@ var NETDATA = window.NETDATA || {};
         this.resizeHandler = function(e) {
             e.preventDefault();
 
-            if(typeof this.event_resize === 'undefined'
+            if (typeof this.event_resize === 'undefined'
                 || this.event_resize.chart_original_w === 'undefined'
                 || this.event_resize.chart_original_h === 'undefined')
                 this.event_resize = {
@@ -3462,7 +3462,7 @@ var NETDATA = window.NETDATA || {};
                     last: 0
                 };
 
-            if(e.type === 'touchstart') {
+            if (e.type === 'touchstart') {
                 this.event_resize.mouse_start_x = e.touches.item(0).pageX;
                 this.event_resize.mouse_start_y = e.touches.item(0).pageY;
             }
@@ -3476,8 +3476,8 @@ var NETDATA = window.NETDATA || {};
             this.event_resize.chart_last_w = this.element.clientWidth;
             this.event_resize.chart_last_h = this.element.clientHeight;
 
-            var now = Date.now();
-            if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed && this.element_legend_childs.perfect_scroller !== null) {
+            let now = Date.now();
+            if (now - this.event_resize.last <= NETDATA.options.current.double_click_speed && this.element_legend_childs.perfect_scroller !== null) {
                 // double click / double tap event
 
                 // console.dir(this.element_legend_childs.content);
@@ -3485,43 +3485,43 @@ var NETDATA = window.NETDATA || {};
 
                 // the optimal height of the chart
                 // showing the entire legend
-                var optimal = this.event_resize.chart_last_h
+                let optimal = this.event_resize.chart_last_h
                         + this.element_legend_childs.perfect_scroller.scrollHeight
                         - this.element_legend_childs.perfect_scroller.clientHeight;
 
                 // if we are not optimal, be optimal
-                if(this.event_resize.chart_last_h !== optimal) {
+                if (this.event_resize.chart_last_h !== optimal) {
                     // this.log('resize to optimal, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(optimal.toString() + 'px');
                 }
 
                 // else if the current height is not the original/saved height
                 // reset to the original/saved height
-                else if(this.event_resize.chart_last_h !== this.event_resize.chart_original_h) {
+                else if (this.event_resize.chart_last_h !== this.event_resize.chart_original_h) {
                     // this.log('resize to original, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(this.event_resize.chart_original_h.toString() + 'px');
                 }
 
                 // else if the current height is not the internal default height
                 // reset to the internal default height
-                else if((this.event_resize.chart_last_h.toString() + 'px') !== this.height_original) {
+                else if ((this.event_resize.chart_last_h.toString() + 'px') !== this.height_original) {
                     // this.log('resize to internal default, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(this.height_original.toString());
                 }
 
                 // else if the current height is not the firstchild's clientheight
                 // resize to it
-                else if(typeof this.element_legend_childs.perfect_scroller.firstChild !== 'undefined') {
-                    var parent_rect = this.element.getBoundingClientRect();
-                    var content_rect = this.element_legend_childs.perfect_scroller.firstElementChild.getBoundingClientRect();
-                    var wanted = content_rect.top - parent_rect.top + this.element_legend_childs.perfect_scroller.firstChild.clientHeight + 18; // 15 = toolbox + 3 space
+                else if (typeof this.element_legend_childs.perfect_scroller.firstChild !== 'undefined') {
+                    let parent_rect = this.element.getBoundingClientRect();
+                    let content_rect = this.element_legend_childs.perfect_scroller.firstElementChild.getBoundingClientRect();
+                    let wanted = content_rect.top - parent_rect.top + this.element_legend_childs.perfect_scroller.firstChild.clientHeight + 18; // 15 = toolbox + 3 space
 
                     // console.log(parent_rect);
                     // console.log(content_rect);
                     // console.log(wanted);
 
                     // this.log('resize to firstChild, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString() + 'px, firstChild = ' + wanted.toString() + 'px' );
-                    if(this.event_resize.chart_last_h !== wanted)
+                    if (this.event_resize.chart_last_h !== wanted)
                         resizeChartToHeight(wanted.toString() + 'px');
                 }
             }
@@ -3534,17 +3534,17 @@ var NETDATA = window.NETDATA || {};
                 this.element_legend_childs.resize_handler.onmousemove =
                 this.element_legend_childs.resize_handler.ontouchmove =
                     function(e) {
-                        var y = null;
+                        let y = null;
 
                         switch(e.type) {
                             case 'mousemove': y = e.clientY; break;
                             case 'touchmove': y = e.touches.item(e.touches - 1).pageY; break;
                         }
 
-                        if(y !== null) {
-                            var newH = that.event_resize.chart_start_h + y - that.event_resize.mouse_start_y;
+                        if (y !== null) {
+                            let newH = that.event_resize.chart_start_h + y - that.event_resize.mouse_start_y;
 
-                            if(newH >= 70 && newH !== that.event_resize.chart_last_h) {
+                            if (newH >= 70 && newH !== that.event_resize.chart_last_h) {
                                 resizeChartToHeight(newH.toString() + 'px');
                                 that.event_resize.chart_last_h = newH;
                             }
@@ -3578,13 +3578,13 @@ var NETDATA = window.NETDATA || {};
         };
 
 
-        var noDataToShow = function() {
+        let noDataToShow = function() {
             showMessageIcon(NETDATA.icons.noData + ' empty');
             that.legendUpdateDOM();
             that.tm.last_autorefreshed = Date.now();
             // that.data_update_every = 30 * 1000;
             //that.element_chart.style.display = 'none';
-            //if(that.element_legend !== null) that.element_legend.style.display = 'none';
+            //if (that.element_legend !== null) that.element_legend.style.display = 'none';
             //that.tmp.___chartIsHidden___ = true;
         };
 
@@ -3596,13 +3596,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.setMode = function(m) {
-            if(this.current !== null && this.current.name === m) return;
+            if (this.current !== null && this.current.name === m) return;
 
-            if(m === 'auto')
+            if (m === 'auto')
                 this.current = this.auto;
-            else if(m === 'pan')
+            else if (m === 'pan')
                 this.current = this.pan;
-            else if(m === 'zoom')
+            else if (m === 'zoom')
                 this.current = this.zoom;
             else
                 this.current = this.auto;
@@ -3627,12 +3627,12 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.setSelection = function(t) {
-            if(typeof this.library.setSelection === 'function')
+            if (typeof this.library.setSelection === 'function')
                 this.selected = (this.library.setSelection(this, t) === true);
             else
                 this.selected = true;
 
-            if(this.selected === true && this.debug === true)
+            if (this.selected === true && this.debug === true)
                 this.log('selection set to ' + t.toString());
 
             if (this.foreign_element_selection !== null)
@@ -3642,13 +3642,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.clearSelection = function() {
-            if(this.selected === true) {
-                if(typeof this.library.clearSelection === 'function')
+            if (this.selected === true) {
+                if (typeof this.library.clearSelection === 'function')
                     this.selected = (this.library.clearSelection(this) !== true);
                 else
                     this.selected = false;
 
-                if(this.selected === false && this.debug === true)
+                if (this.selected === false && this.debug === true)
                     this.log('selection cleared');
 
                 if (this.foreign_element_selection !== null)
@@ -3668,15 +3668,15 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.calculateRowForTime = function(t) {
-            if(this.timeIsVisible(t) === false) return -1;
+            if (this.timeIsVisible(t) === false) return -1;
             return Math.floor((t - this.data_after) / this.data_update_every);
         };
 
         // ----------------------------------------------------------------------------------------------------------------
 
         this.pauseChart = function() {
-            if(this.paused === false) {
-                if(this.debug === true)
+            if (this.paused === false) {
+                if (this.debug === true)
                     this.log('pauseChart()');
 
                 this.paused = true;
@@ -3684,8 +3684,8 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.unpauseChart = function() {
-            if(this.paused === true) {
-                if(this.debug === true)
+            if (this.paused === true) {
+                if (this.debug === true)
                     this.log('unpauseChart()');
 
                 this.paused = false;
@@ -3693,17 +3693,17 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.resetChart = function(dont_clear_master, dont_update) {
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
 
-            if(typeof dont_clear_master === 'undefined')
+            if (typeof dont_clear_master === 'undefined')
                 dont_clear_master = false;
 
-            if(typeof dont_update === 'undefined')
+            if (typeof dont_update === 'undefined')
                 dont_update = false;
 
-            if(dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this) === true) {
-                if(this.debug === true)
+            if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this) === true) {
+                if (this.debug === true)
                     this.log('resetChart() diverting to clearMaster().');
                 // this will call us back with master === true
                 NETDATA.globalPanAndZoom.clearMaster();
@@ -3729,33 +3729,33 @@ var NETDATA = window.NETDATA || {};
             // of a selection sync and another chart becomes
             // the new master
 
-            if(dont_update !== true && this.isVisible() === true) {
+            if (dont_update !== true && this.isVisible() === true) {
                 this.updateChart();
             }
         };
 
         this.updateChartPanOrZoom = function(after, before, callback) {
-            var logme = 'updateChartPanOrZoom(' + after + ', ' + before + '): ';
-            var ret = true;
+            let logme = 'updateChartPanOrZoom(' + after + ', ' + before + '): ';
+            let ret = true;
 
             NETDATA.globalPanAndZoom.delay();
             NETDATA.globalSelectionSync.delay();
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log(logme);
 
-            if(before < after) {
-                if(this.debug === true)
+            if (before < after) {
+                if (this.debug === true)
                     this.log(logme + 'flipped parameters, rejecting it.');
 
                 return false;
             }
 
-            if(typeof this.fixed_min_duration === 'undefined')
+            if (typeof this.fixed_min_duration === 'undefined')
                 this.fixed_min_duration = Math.round((this.chartWidth() / 30) * this.chart.update_every * 1000);
 
-            var min_duration = this.fixed_min_duration;
-            var current_duration = Math.round(this.view_before - this.view_after);
+            let min_duration = this.fixed_min_duration;
+            let current_duration = Math.round(this.view_before - this.view_after);
 
             // round the numbers
             after = Math.round(after);
@@ -3767,43 +3767,43 @@ var NETDATA = window.NETDATA || {};
             before += this.data_update_every - (before % this.data_update_every);
 
             // the final wanted duration
-            var wanted_duration = before - after;
+            let wanted_duration = before - after;
 
             // to allow panning, accept just a point below our minimum
-            if((current_duration - this.data_update_every) < min_duration)
+            if ((current_duration - this.data_update_every) < min_duration)
                 min_duration = current_duration - this.data_update_every;
 
             // we do it, but we adjust to minimum size and return false
             // when the wanted size is below the current and the minimum
             // and we zoom
-            if(wanted_duration < current_duration && wanted_duration < min_duration) {
-                if(this.debug === true)
+            if (wanted_duration < current_duration && wanted_duration < min_duration) {
+                if (this.debug === true)
                     this.log(logme + 'too small: min_duration: ' + (min_duration / 1000).toString() + ', wanted: ' + (wanted_duration / 1000).toString());
 
                 min_duration = this.fixed_min_duration;
 
-                var dt = (min_duration - wanted_duration) / 2;
+                let dt = (min_duration - wanted_duration) / 2;
                 before += dt;
                 after -= dt;
                 wanted_duration = before - after;
                 ret = false;
             }
 
-            var tolerance = this.data_update_every * 2;
-            var movement = Math.abs(before - this.view_before);
+            let tolerance = this.data_update_every * 2;
+            let movement = Math.abs(before - this.view_before);
 
-            if(Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance && ret === true) {
-                if(this.debug === true)
+            if (Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance && ret === true) {
+                if (this.debug === true)
                     this.log(logme + 'REJECTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + false);
                 return false;
             }
 
-            if(this.current.name === 'auto') {
+            if (this.current.name === 'auto') {
                 this.log(logme + 'caller called me with mode: ' + this.current.name);
                 this.setMode('pan');
             }
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log(logme + 'ACCEPTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + ret);
 
             this.current.force_update_at = Date.now() + NETDATA.options.current.pan_and_zoom_delay;
@@ -3811,7 +3811,7 @@ var NETDATA = window.NETDATA || {};
             this.current.force_before_ms = before;
             NETDATA.globalPanAndZoom.setMaster(this, after, before);
 
-            if(ret === true && typeof callback === 'function')
+            if (ret === true && typeof callback === 'function')
                 callback();
 
             return ret;
@@ -3822,14 +3822,14 @@ var NETDATA = window.NETDATA || {};
             NETDATA.globalPanAndZoom.delay();
             NETDATA.globalSelectionSync.delay();
 
-            if(NETDATA.globalPanAndZoom.isMaster(this) === false) {
+            if (NETDATA.globalPanAndZoom.isMaster(this) === false) {
                 this.pauseChart();
                 NETDATA.globalPanAndZoom.setMaster(this, after, before);
                 // NETDATA.globalSelectionSync.stop();
                 NETDATA.globalSelectionSync.setMaster(this);
             }
 
-            if(this.updateChartPanOrZoomAsyncTimeOutId)
+            if (this.updateChartPanOrZoomAsyncTimeOutId)
                 NETDATA.timeout.clear(this.updateChartPanOrZoomAsyncTimeOutId);
 
             NETDATA.timeout.set(function() {
@@ -3838,13 +3838,13 @@ var NETDATA = window.NETDATA || {};
             }, 0);
         };
 
-        var __unitsConversionLastUnits = undefined;
-        var __unitsConversionLastUnitsDesired = undefined;
-        var __unitsConversionLastMin = undefined;
-        var __unitsConversionLastMax = undefined;
-        var __unitsConversion = function(value) { return value; };
+        let __unitsConversionLastUnits = undefined;
+        let __unitsConversionLastUnitsDesired = undefined;
+        let __unitsConversionLastMin = undefined;
+        let __unitsConversionLastMax = undefined;
+        let __unitsConversion = function(value) { return value; };
         this.unitsConversionSetup = function(min, max) {
-            if(this.units !== __unitsConversionLastUnits
+            if (this.units !== __unitsConversionLastUnits
                 || this.units_desired !== __unitsConversionLastUnitsDesired
                 || min !== __unitsConversionLastMin
                 || max !== __unitsConversionLastMax) {
@@ -3862,39 +3862,39 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        var __legendFormatValueChartDecimalsLastMin = undefined;
-        var __legendFormatValueChartDecimalsLastMax = undefined;
-        var __legendFormatValueChartDecimals = -1;
-        var __intlNumberFormat = null;
+        let __legendFormatValueChartDecimalsLastMin = undefined;
+        let __legendFormatValueChartDecimalsLastMax = undefined;
+        let __legendFormatValueChartDecimals = -1;
+        let __intlNumberFormat = null;
         this.legendFormatValueDecimalsFromMinMax = function(min, max) {
-            if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
+            if (min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
                 return;
 
             this.unitsConversionSetup(min, max);
-            if(__unitsConversion !== null) {
+            if (__unitsConversion !== null) {
                 min = __unitsConversion(min);
                 max = __unitsConversion(max);
 
-                if(typeof min !== 'number' || typeof max !== 'number')
+                if (typeof min !== 'number' || typeof max !== 'number')
                     return;
             }
 
             __legendFormatValueChartDecimalsLastMin = min;
             __legendFormatValueChartDecimalsLastMax = max;
 
-            var old = __legendFormatValueChartDecimals;
+            let old = __legendFormatValueChartDecimals;
 
-            if(this.data !== null && this.data.min === this.data.max)
+            if (this.data !== null && this.data.min === this.data.max)
                 // it is a fixed number, let the visualizer decide based on the value
                 __legendFormatValueChartDecimals = -1;
 
-            else if(this.value_decimal_detail !== -1)
+            else if (this.value_decimal_detail !== -1)
                 // there is an override
                 __legendFormatValueChartDecimals = this.value_decimal_detail;
 
             else {
                 // ok, let's calculate the proper number of decimal points
-                var delta;
+                let delta;
 
                 if (min === max)
                     delta = Math.abs(min);
@@ -3911,8 +3911,8 @@ var NETDATA = window.NETDATA || {};
                 else                     __legendFormatValueChartDecimals = 7;
             }
 
-            if(__legendFormatValueChartDecimals !== old) {
-                if(__legendFormatValueChartDecimals < 0)
+            if (__legendFormatValueChartDecimals !== old) {
+                if (__legendFormatValueChartDecimals < 0)
                     __intlNumberFormat = null;
                 else
                     __intlNumberFormat = NETDATA.fastNumberFormat.get(
@@ -3923,24 +3923,24 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendFormatValue = function(value) {
-            if(typeof value !== 'number')
+            if (typeof value !== 'number')
                 return '-';
 
             value = __unitsConversion(value);
 
-            if(typeof value !== 'number')
+            if (typeof value !== 'number')
                 return value;
 
-            if(__intlNumberFormat !== null)
+            if (__intlNumberFormat !== null)
                 return __intlNumberFormat.format(value);
 
-            var dmin, dmax;
-            if(this.value_decimal_detail !== -1) {
+            let dmin, dmax;
+            if (this.value_decimal_detail !== -1) {
                 dmin = dmax = this.value_decimal_detail;
             }
             else {
                 dmin = 0;
-                var abs = (value < 0) ? -value : value;
+                let abs = (value < 0) ? -value : value;
                 if (abs > 1000)        dmax = 0;
                 else if (abs > 10)     dmax = 1;
                 else if (abs > 1)      dmax = 2;
@@ -3955,25 +3955,25 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendSetLabelValue = function(label, value) {
-            var series = this.element_legend_childs.series[label];
-            if(typeof series === 'undefined') return;
-            if(series.value === null && series.user === null) return;
+            let series = this.element_legend_childs.series[label];
+            if (typeof series === 'undefined') return;
+            if (series.value === null && series.user === null) return;
 
             /*
             // this slows down firefox and edge significantly
             // since it requires to use innerHTML(), instead of innerText()
 
             // if the value has not changed, skip DOM update
-            //if(series.last === value) return;
+            //if (series.last === value) return;
 
-            var s, r;
-            if(typeof value === 'number') {
-                var v = Math.abs(value);
+            let s, r;
+            if (typeof value === 'number') {
+                let v = Math.abs(value);
                 s = r = this.legendFormatValue(value);
 
-                if(typeof series.last === 'number') {
-                    if(v > series.last) s += '<i class="fas fa-angle-up" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
-                    else if(v < series.last) s += '<i class="fas fa-angle-down" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                if (typeof series.last === 'number') {
+                    if (v > series.last) s += '<i class="fas fa-angle-up" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                    else if (v < series.last) s += '<i class="fas fa-angle-down" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
                     else s += '<i class="fas fa-angle-left" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
                 }
                 else s += '<i class="fas fa-angle-right" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
@@ -3981,7 +3981,7 @@ var NETDATA = window.NETDATA || {};
                 series.last = v;
             }
             else {
-                if(value === null)
+                if (value === null)
                     s = r = '';
                 else
                     s = r = value;
@@ -3990,32 +3990,32 @@ var NETDATA = window.NETDATA || {};
             }
             */
 
-            var s = this.legendFormatValue(value);
+            let s = this.legendFormatValue(value);
 
             // caching: do not update the update to show the same value again
-            if(s === series.last_shown_value) return;
+            if (s === series.last_shown_value) return;
             series.last_shown_value = s;
 
-            if(series.value !== null) series.value.innerText = s;
-            if(series.user !== null) series.user.innerText = s;
+            if (series.value !== null) series.value.innerText = s;
+            if (series.user !== null) series.user.innerText = s;
         };
 
         this.legendSetDateString = function(date) {
-            if(this.element_legend_childs.title_date !== null && date !== this.tmp.__last_shown_legend_date) {
+            if (this.element_legend_childs.title_date !== null && date !== this.tmp.__last_shown_legend_date) {
                 this.element_legend_childs.title_date.innerText = date;
                 this.tmp.__last_shown_legend_date = date;
             }
         };
 
         this.legendSetTimeString = function(time) {
-            if(this.element_legend_childs.title_time !== null && time !== this.tmp.__last_shown_legend_time) {
+            if (this.element_legend_childs.title_time !== null && time !== this.tmp.__last_shown_legend_time) {
                 this.element_legend_childs.title_time.innerText = time;
                 this.tmp.__last_shown_legend_time = time;
             }
         };
 
         this.legendSetUnitsString = function(units) {
-            if(this.element_legend_childs.title_units !== null && units !== this.tmp.__last_shown_legend_units) {
+            if (this.element_legend_childs.title_units !== null && units !== this.tmp.__last_shown_legend_units) {
                 this.element_legend_childs.title_units.innerText = units;
                 this.tmp.__last_shown_legend_units = units;
             }
@@ -4028,13 +4028,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendSetDate = function(ms) {
-            if(typeof ms !== 'number') {
+            if (typeof ms !== 'number') {
                 this.legendShowUndefined();
                 return;
             }
 
-            if(this.legendSetDateLast.ms !== ms) {
-                var d = new Date(ms);
+            if (this.legendSetDateLast.ms !== ms) {
+                let d = new Date(ms);
                 this.legendSetDateLast.ms = ms;
                 this.legendSetDateLast.date = NETDATA.dateTime.localeDateString(d);
                 this.legendSetDateLast.time = NETDATA.dateTime.localeTimeString(d);
@@ -4050,45 +4050,45 @@ var NETDATA = window.NETDATA || {};
             this.legendSetTimeString(this.chart.context.toString());
             // this.legendSetUnitsString(' ');
 
-            if(this.data && this.element_legend_childs.series !== null) {
-                var labels = this.data.dimension_names;
-                var i = labels.length;
-                while(i--) {
-                    var label = labels[i];
+            if (this.data && this.element_legend_childs.series !== null) {
+                let labels = this.data.dimension_names;
+                let i = labels.length;
+                while (i--) {
+                    let label = labels[i];
 
-                    if(typeof label === 'undefined' || typeof this.element_legend_childs.series[label] === 'undefined') continue;
+                    if (typeof label === 'undefined' || typeof this.element_legend_childs.series[label] === 'undefined') continue;
                     this.legendSetLabelValue(label, null);
                 }
             }
         };
 
         this.legendShowLatestValues = function() {
-            if(this.chart === null) return;
-            if(this.selected) return;
+            if (this.chart === null) return;
+            if (this.selected) return;
 
-            if(this.data === null || this.element_legend_childs.series === null) {
+            if (this.data === null || this.element_legend_childs.series === null) {
                 this.legendShowUndefined();
                 return;
             }
 
-            var show_undefined = true;
-            if(Math.abs(this.netdata_last - this.view_before) <= this.data_update_every)
+            let show_undefined = true;
+            if (Math.abs(this.netdata_last - this.view_before) <= this.data_update_every)
                 show_undefined = false;
 
-            if(show_undefined) {
+            if (show_undefined) {
                 this.legendShowUndefined();
                 return;
             }
 
             this.legendSetDate(this.view_before);
 
-            var labels = this.data.dimension_names;
-            var i = labels.length;
-            while(i--) {
-                var label = labels[i];
+            let labels = this.data.dimension_names;
+            let i = labels.length;
+            while (i--) {
+                let label = labels[i];
 
-                if(typeof label === 'undefined') continue;
-                if(typeof this.element_legend_childs.series[label] === 'undefined') continue;
+                if (typeof label === 'undefined') continue;
+                if (typeof this.element_legend_childs.series[label] === 'undefined') continue;
 
                 this.legendSetLabelValue(label, this.data.view_latest_values[i]);
             }
@@ -4100,7 +4100,7 @@ var NETDATA = window.NETDATA || {};
 
         // this should be called just ONCE per dimension per chart
         this.__chartDimensionColor = function(label) {
-            var c = NETDATA.commonColors.get(this, label);
+            let c = NETDATA.commonColors.get(this, label);
 
             // it is important to maintain a list of colors
             // for this chart only, since the chart library
@@ -4120,13 +4120,13 @@ var NETDATA = window.NETDATA || {};
         this.chartCustomColors = function() {
             this.chartPrepareColorPalette();
 
-            var colors;
-            if(this.colors_custom.length)
+            let colors;
+            if (this.colors_custom.length)
                 colors = this.colors_custom;
             else
                 colors = this.colors;
 
-            if(this.debug === true) {
+            if (this.debug === true) {
                 this.log("chartCustomColors() returns:");
                 this.log(colors);
             }
@@ -4141,7 +4141,7 @@ var NETDATA = window.NETDATA || {};
         this.chartColors = function() {
             this.chartPrepareColorPalette();
 
-            if(this.debug === true) {
+            if (this.debug === true) {
                 this.log("chartColors() returns:");
                 this.log(this.colors);
             }
@@ -4150,17 +4150,17 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendPluginModuleString = function(withContext) {
-            var str = ' ';
-            var context = '';
+            let str = ' ';
+            let context = '';
 
-            if(typeof this.chart !== 'undefined') {
-                if(withContext && typeof this.chart.context === 'string')
+            if (typeof this.chart !== 'undefined') {
+                if (withContext && typeof this.chart.context === 'string')
                     context = this.chart.context;
 
                 if (typeof this.chart.plugin === 'string' && this.chart.plugin !== '') {
                     str = this.chart.plugin;
 
-                    if(str.endsWith(".plugin"))
+                    if (str.endsWith(".plugin"))
                         str = str.substring(0, str.length - 7);
 
                     if (typeof this.chart.module === 'string' && this.chart.module !== '')
@@ -4177,68 +4177,68 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendResolutionTooltip = function () {
-            if(!this.chart) return '';
+            if (!this.chart) return '';
 
-            var collected = this.chart.update_every;
-            var viewed = (this.data)?this.data.view_update_every:collected;
+            let collected = this.chart.update_every;
+            let viewed = (this.data)?this.data.view_update_every:collected;
 
-            if(collected === viewed)
+            if (collected === viewed)
                 return "resolution " + NETDATA.seconds4human(collected);
 
             return "resolution " + NETDATA.seconds4human(viewed) + ", collected every " + NETDATA.seconds4human(collected);
         };
 
         this.legendUpdateDOM = function() {
-            var needed = false, dim, keys, len, i;
+            let needed = false, dim, keys, len, i;
 
             // check that the legend DOM is up to date for the downloaded dimensions
-            if(typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {
+            if (typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {
                 // this.log('the legend does not have any series - requesting legend update');
                 needed = true;
             }
-            else if(this.data === null) {
+            else if (this.data === null) {
                 // this.log('the chart does not have any data - requesting legend update');
                 needed = true;
             }
-            else if(typeof this.element_legend_childs.series.labels_key === 'undefined') {
+            else if (typeof this.element_legend_childs.series.labels_key === 'undefined') {
                 needed = true;
             }
             else {
-                var labels = this.data.dimension_names.toString();
-                if(labels !== this.element_legend_childs.series.labels_key) {
+                let labels = this.data.dimension_names.toString();
+                if (labels !== this.element_legend_childs.series.labels_key) {
                     needed = true;
 
-                    if(this.debug === true)
+                    if (this.debug === true)
                         this.log('NEW LABELS: "' + labels + '" NOT EQUAL OLD LABELS: "' + this.element_legend_childs.series.labels_key + '"');
                 }
             }
 
-            if(needed === false) {
+            if (needed === false) {
                 // make sure colors available
                 this.chartPrepareColorPalette();
 
                 // do we have to update the current values?
                 // we do this, only when the visible chart is current
-                if(Math.abs(this.netdata_last - this.view_before) <= this.data_update_every) {
-                    if(this.debug === true)
+                if (Math.abs(this.netdata_last - this.view_before) <= this.data_update_every) {
+                    if (this.debug === true)
                         this.log('chart is in latest position... updating values on legend...');
 
-                    //var labels = this.data.dimension_names;
-                    //var i = labels.length;
-                    //while(i--)
+                    //let labels = this.data.dimension_names;
+                    //let i = labels.length;
+                    //while (i--)
                     //  this.legendSetLabelValue(labels[i], this.data.view_latest_values[i]);
                 }
                 return;
             }
 
-            if(this.colors === null) {
+            if (this.colors === null) {
                 // this is the first time we update the chart
                 // let's assign colors to all dimensions
-                if(this.library.track_colors() === true) {
+                if (this.library.track_colors() === true) {
                     this.colors = [];
                     keys = Object.keys(this.chart.dimensions);
                     len = keys.length;
-                    for(i = 0; i < len ;i++)
+                    for (i = 0; i < len ;i++)
                         NETDATA.commonColors.get(this, this.chart.dimensions[keys[i]].name);
                 }
             }
@@ -4247,20 +4247,20 @@ var NETDATA = window.NETDATA || {};
             // based on the dimensions this result has data for
             this.colors = [];
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('updating Legend DOM');
 
             // mark all dimensions as invalid
             this.dimensions_visibility.invalidateAll();
 
-            var genLabel = function(state, parent, dim, name, count) {
-                var color = state.__chartDimensionColor(name);
+            let genLabel = function(state, parent, dim, name, count) {
+                let color = state.__chartDimensionColor(name);
 
-                var user_element = null;
-                var user_id = NETDATA.dataAttribute(state.element, 'show-value-of-' + name.toLowerCase() + '-at', null);
-                if(user_id === null)
+                let user_element = null;
+                let user_id = NETDATA.dataAttribute(state.element, 'show-value-of-' + name.toLowerCase() + '-at', null);
+                if (user_id === null)
                     user_id = NETDATA.dataAttribute(state.element, 'show-value-of-' + dim.toLowerCase() + '-at', null);
-                if(user_id !== null) {
+                if (user_id !== null) {
                     user_element = document.getElementById(user_id) || null;
                     if (user_element === null)
                         state.log('Cannot find element with id: ' + user_id);
@@ -4274,43 +4274,43 @@ var NETDATA = window.NETDATA || {};
                     last_shown_value: null
                 };
 
-                var label = state.element_legend_childs.series[name];
+                let label = state.element_legend_childs.series[name];
 
                 // create the dimension visibility tracking for this label
                 state.dimensions_visibility.dimensionAdd(name, label.name, label.value, color);
 
-                var rgb = NETDATA.colorHex2Rgb(color);
+                let rgb = NETDATA.colorHex2Rgb(color);
                 label.name.innerHTML = '<table class="netdata-legend-name-table-'
                     + state.chart.chart_type
                     + '" style="background-color: '
                     + 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ') !important'
                     + '"><tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr></table>';
 
-                var text = document.createTextNode(' ' + name);
+                let text = document.createTextNode(' ' + name);
                 label.name.appendChild(text);
 
-                if(count > 0)
+                if (count > 0)
                     parent.appendChild(document.createElement('br'));
 
                 parent.appendChild(label.name);
                 parent.appendChild(label.value);
             };
 
-            var content = document.createElement('div');
+            let content = document.createElement('div');
 
-            if(this.element_chart === null) {
+            if (this.element_chart === null) {
                 this.element_chart = document.createElement('div');
                 this.element_chart.id = this.library_name + '-' + this.uuid + '-chart';
                 this.element.appendChild(this.element_chart);
 
-                if(this.hasLegend() === true)
+                if (this.hasLegend() === true)
                     this.element_chart.className = 'netdata-chart-with-legend-right netdata-' + this.library_name + '-chart-with-legend-right';
                 else
                     this.element_chart.className = ' netdata-chart netdata-' + this.library_name + '-chart';
             }
 
-            if(this.hasLegend() === true) {
-                if(this.element_legend === null) {
+            if (this.hasLegend() === true) {
+                if (this.element_legend === null) {
                     this.element_legend = document.createElement('div');
                     this.element_legend.className = 'netdata-chart-legend netdata-' + this.library_name + '-legend';
                     this.element.appendChild(this.element_legend);
@@ -4335,7 +4335,7 @@ var NETDATA = window.NETDATA || {};
                     series: {}
                 };
 
-                if(NETDATA.options.current.legend_toolbox === true && this.library.toolboxPanAndZoom !== null) {
+                if (NETDATA.options.current.legend_toolbox === true && this.library.toolboxPanAndZoom !== null) {
                     this.element_legend_childs.toolbox = document.createElement('div');
                     this.element_legend_childs.toolbox_left = document.createElement('div');
                     this.element_legend_childs.toolbox_right = document.createElement('div');
@@ -4344,7 +4344,7 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox_zoomout = document.createElement('div');
                     this.element_legend_childs.toolbox_volume = document.createElement('div');
 
-                    var get_pan_and_zoom_step = function(event) {
+                    let get_pan_and_zoom_step = function(event) {
                         if (event.ctrlKey)
                             return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
 
@@ -4367,13 +4367,13 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox_left.onclick = function(e) {
                         e.preventDefault();
 
-                        var step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
-                        var before = that.view_before - step;
-                        var after = that.view_after - step;
-                        if(after >= that.netdata_first)
+                        let step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+                        let before = that.view_before - step;
+                        let after = that.view_after - step;
+                        if (after >= that.netdata_first)
                             that.library.toolboxPanAndZoom(that, after, before);
                     };
-                    if(NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.toolbox_left).popover({
                         container: "body",
                         animation: false,
@@ -4393,7 +4393,7 @@ var NETDATA = window.NETDATA || {};
                         e.preventDefault();
                         NETDATA.resetAllCharts(that);
                     };
-                    if(NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.toolbox_reset).popover({
                         container: "body",
                         animation: false,
@@ -4410,13 +4410,13 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
                     this.element_legend_childs.toolbox_right.onclick = function(e) {
                         e.preventDefault();
-                        var step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
-                        var before = that.view_before + step;
-                        var after = that.view_after + step;
-                        if(before <= that.netdata_last)
+                        let step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+                        let before = that.view_before + step;
+                        let after = that.view_after + step;
+                        if (before <= that.netdata_last)
                             that.library.toolboxPanAndZoom(that, after, before);
                     };
-                    if(NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.toolbox_right).popover({
                         container: "body",
                         animation: false,
@@ -4434,12 +4434,12 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
                     this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
                         e.preventDefault();
-                        var dt = ((that.view_before - that.view_after) * (get_pan_and_zoom_step(e) * 0.8) / 2);
-                        var before = that.view_before - dt;
-                        var after = that.view_after + dt;
+                        let dt = ((that.view_before - that.view_after) * (get_pan_and_zoom_step(e) * 0.8) / 2);
+                        let before = that.view_before - dt;
+                        let after = that.view_after + dt;
                         that.library.toolboxPanAndZoom(that, after, before);
                     };
-                    if(NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.toolbox_zoomin).popover({
                         container: "body",
                         animation: false,
@@ -4456,13 +4456,13 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
                     this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
                         e.preventDefault();
-                        var dt = (((that.view_before - that.view_after) / (1.0 - (get_pan_and_zoom_step(e) * 0.8)) - (that.view_before - that.view_after)) / 2);
-                        var before = that.view_before + dt;
-                        var after = that.view_after - dt;
+                        let dt = (((that.view_before - that.view_after) / (1.0 - (get_pan_and_zoom_step(e) * 0.8)) - (that.view_before - that.view_after)) / 2);
+                        let before = that.view_before + dt;
+                        let after = that.view_after - dt;
 
                         that.library.toolboxPanAndZoom(that, after, before);
                     };
-                    if(NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.toolbox_zoomout).popover({
                         container: "body",
                         animation: false,
@@ -4484,7 +4484,7 @@ var NETDATA = window.NETDATA || {};
                     //}
                 }
 
-                if(NETDATA.options.current.resize_charts === true) {
+                if (NETDATA.options.current.resize_charts === true) {
                     this.element_legend_childs.resize_handler = document.createElement('div');
 
                     this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
@@ -4517,7 +4517,7 @@ var NETDATA = window.NETDATA || {};
                     }, false);
                 }
 
-                if(this.chart) {
+                if (this.chart) {
                     this.element_legend_childs.title_date.title = this.legendPluginModuleString(true);
                     this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
                 }
@@ -4549,7 +4549,7 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs.content = content;
 
-                if(NETDATA.options.current.show_help === true)
+                if (NETDATA.options.current.show_help === true)
                     $(content).popover({
                     container: "body",
                     animation: false,
@@ -4580,39 +4580,39 @@ var NETDATA = window.NETDATA || {};
                 };
             }
 
-            if(this.data) {
+            if (this.data) {
                 this.element_legend_childs.series.labels_key = this.data.dimension_names.toString();
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('labels from data: "' + this.element_legend_childs.series.labels_key + '"');
 
-                for(i = 0, len = this.data.dimension_names.length; i < len ;i++) {
+                for (i = 0, len = this.data.dimension_names.length; i < len ;i++) {
                     genLabel(this, content, this.data.dimension_ids[i], this.data.dimension_names[i], i);
                 }
             }
             else {
-                var tmp = [];
+                let tmp = [];
                 keys = Object.keys(this.chart.dimensions);
-                for(i = 0, len = keys.length; i < len ;i++) {
+                for (i = 0, len = keys.length; i < len ;i++) {
                     dim = keys[i];
                     tmp.push(this.chart.dimensions[dim].name);
                     genLabel(this, content, dim, this.chart.dimensions[dim].name, i);
                 }
                 this.element_legend_childs.series.labels_key = tmp.toString();
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('labels from chart: "' + this.element_legend_childs.series.labels_key + '"');
             }
 
             // create a hidden div to be used for hidding
             // the original legend of the chart library
-            var el = document.createElement('div');
-            if(this.element_legend !== null)
+            let el = document.createElement('div');
+            if (this.element_legend !== null)
                 this.element_legend.appendChild(el);
             el.style.display = 'none';
 
             this.element_legend_childs.hidden = document.createElement('div');
             el.appendChild(this.element_legend_childs.hidden);
 
-            if(this.element_legend_childs.perfect_scroller !== null) {
+            if (this.element_legend_childs.perfect_scroller !== null) {
                 Ps.initialize(this.element_legend_childs.perfect_scroller, {
                     wheelSpeed: 0.2,
                     wheelPropagation: true,
@@ -4633,11 +4633,11 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.hasLegend = function() {
-            if(typeof this.tmp.___hasLegendCache___ !== 'undefined')
+            if (typeof this.tmp.___hasLegendCache___ !== 'undefined')
                 return this.tmp.___hasLegendCache___;
 
-            var leg = false;
-            if(this.library && this.library.legend(this) === 'right-side')
+            let leg = false;
+            if (this.library && this.library.legend(this) === 'right-side')
                 leg = true;
 
             this.tmp.___hasLegendCache___ = leg;
@@ -4662,26 +4662,26 @@ var NETDATA = window.NETDATA || {};
 
         this.chartPixelsPerPoint = function() {
             // force an options provided detail
-            var px = this.pixels_per_point;
+            let px = this.pixels_per_point;
 
-            if(this.library && px < this.library.pixels_per_point(this))
+            if (this.library && px < this.library.pixels_per_point(this))
                 px = this.library.pixels_per_point(this);
 
-            if(px < NETDATA.options.current.pixels_per_point)
+            if (px < NETDATA.options.current.pixels_per_point)
                 px = NETDATA.options.current.pixels_per_point;
 
             return px;
         };
 
         this.needsRecreation = function() {
-            var ret = (
+            let ret = (
                     this.chart_created === true
                     && this.library
                     && this.library.autoresize() === false
                     && this.tm.last_resized < NETDATA.options.last_page_resize
                 );
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('needsRecreation(): ' + ret.toString() + ', chart_created = ' + this.chart_created.toString());
 
             return ret;
@@ -4692,28 +4692,28 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.chartURLOptions = function() {
-            var ret = '';
+            let ret = '';
 
-            if(this.override_options !== null)
+            if (this.override_options !== null)
                 ret = this.override_options.toString();
             else
                 ret = this.library.options(this);
 
-            if(this.append_options !== null)
+            if (this.append_options !== null)
                 ret += '%7C' + this.append_options.toString();
 
             ret += '%7C' + 'jsonwrap';
 
-            if(NETDATA.options.current.eliminate_zero_dimensions === true)
+            if (NETDATA.options.current.eliminate_zero_dimensions === true)
                 ret += '%7C' + 'nonzero';
 
             return ret;
         };
 
         this.chartURL = function() {
-            var after, before, points_multiplier = 1;
-            if(NETDATA.globalPanAndZoom.isActive()) {
-                if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
+            let after, before, points_multiplier = 1;
+            if (NETDATA.globalPanAndZoom.isActive()) {
+                if (this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
                     this.tm.pan_and_zoom_seq = 0;
 
                     before = Math.round(this.current.force_before_ms / 1000);
@@ -4721,7 +4721,7 @@ var NETDATA = window.NETDATA || {};
                     this.view_after = after * 1000;
                     this.view_before = before * 1000;
 
-                    if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
+                    if (NETDATA.options.current.pan_and_zoom_data_padding === true) {
                         this.requested_padding = Math.round((before - after) / 2);
                         after -= this.requested_padding;
                         before += this.requested_padding;
@@ -4759,8 +4759,8 @@ var NETDATA = window.NETDATA || {};
             this.requested_after = after * 1000;
             this.requested_before = before * 1000;
 
-            var data_points;
-            if(NETDATA.options.force_data_points !== 0) {
+            let data_points;
+            if (NETDATA.options.force_data_points !== 0) {
                 data_points = NETDATA.options.force_data_points;
                 this.data_points = data_points;
             }
@@ -4777,26 +4777,26 @@ var NETDATA = window.NETDATA || {};
             this.data_url += "&gtime="   + this.gtime;
             this.data_url += "&options=" + this.chartURLOptions();
 
-            if(after)
+            if (after)
                 this.data_url += "&after="  + after.toString();
 
-            if(before)
+            if (before)
                 this.data_url += "&before=" + before.toString();
 
-            if(this.dimensions)
+            if (this.dimensions)
                 this.data_url += "&dimensions=" + this.dimensions;
 
-            if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
+            if (NETDATA.options.debug.chart_data_url === true || this.debug === true)
                 this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
         };
 
         this.redrawChart = function() {
-            if(this.data !== null)
+            if (this.data !== null)
                 this.updateChartWithData(this.data);
         };
 
         this.updateChartWithData = function(data) {
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('updateChartWithData() called.');
 
             // this may force the chart to be re-created
@@ -4804,12 +4804,12 @@ var NETDATA = window.NETDATA || {};
 
             this.data = data;
 
-            var started = Date.now();
-            var view_update_every = data.view_update_every * 1000;
+            let started = Date.now();
+            let view_update_every = data.view_update_every * 1000;
 
 
-            if(this.data_update_every !== view_update_every) {
-                if(this.element_legend_childs.title_time)
+            if (this.data_update_every !== view_update_every) {
+                if (this.element_legend_childs.title_time)
                     this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
             }
 
@@ -4823,13 +4823,13 @@ var NETDATA = window.NETDATA || {};
 
             data.state = this;
 
-            if(NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
-                if(this.view_after < this.data_after) {
+            if (NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
+                if (this.view_after < this.data_after) {
                     // console.log('adjusting view_after from ' + this.view_after + ' to ' + this.data_after);
                     this.view_after = this.data_after;
                 }
 
-                if(this.view_before > this.data_before) {
+                if (this.view_before > this.data_before) {
                     // console.log('adjusting view_before from ' + this.view_before + ' to ' + this.data_before);
                     this.view_before = this.data_before;
                 }
@@ -4839,10 +4839,10 @@ var NETDATA = window.NETDATA || {};
                 this.view_before = this.data_before;
             }
 
-            if(this.debug === true) {
+            if (this.debug === true) {
                 this.log('UPDATE No ' + this.updates_counter + ' COMPLETED');
 
-                if(this.current.force_after_ms)
+                if (this.current.force_after_ms)
                     this.log('STATUS: forced    : ' + (this.current.force_after_ms / 1000).toString() + ' - ' + (this.current.force_before_ms / 1000).toString());
                 else
                     this.log('STATUS: forced    : unset');
@@ -4853,13 +4853,13 @@ var NETDATA = window.NETDATA || {};
                 this.log('STATUS: points    : ' + (this.data_points).toString());
             }
 
-            if(this.data_points === 0) {
+            if (this.data_points === 0) {
                 noDataToShow();
                 return;
             }
 
-            if(this.updates_since_last_creation >= this.library.max_updates_to_recreate()) {
-                if(this.debug === true)
+            if (this.updates_since_last_creation >= this.library.max_updates_to_recreate()) {
+                if (this.debug === true)
                     this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 
                 init('force');
@@ -4869,46 +4869,46 @@ var NETDATA = window.NETDATA || {};
             // check and update the legend
             this.legendUpdateDOM();
 
-            if(this.chart_created === true
+            if (this.chart_created === true
                 && typeof this.library.update === 'function') {
 
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('updating chart...');
 
-                if(callChartLibraryUpdateSafely(data) === false)
+                if (callChartLibraryUpdateSafely(data) === false)
                     return;
             }
             else {
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('creating chart...');
 
-                if(callChartLibraryCreateSafely(data) === false)
+                if (callChartLibraryCreateSafely(data) === false)
                     return;
             }
-            if(this.isVisible() === true) {
+            if (this.isVisible() === true) {
                 hideMessage();
                 this.legendShowLatestValues();
             }
             else {
                 this.__redraw_on_unhide = true;
 
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log("drawn while not visible");
             }
 
-            if(this.selected === true)
+            if (this.selected === true)
                 NETDATA.globalSelectionSync.stop();
 
             // update the performance counters
-            var now = Date.now();
+            let now = Date.now();
             this.tm.last_updated = now;
 
             // don't update last_autorefreshed if this chart is
             // forced to be updated with global PanAndZoom
-            if(NETDATA.globalPanAndZoom.isActive())
+            if (NETDATA.globalPanAndZoom.isActive())
                 this.tm.last_autorefreshed = 0;
             else {
-                if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes === true && typeof this.force_update_every !== 'number')
+                if (NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes === true && typeof this.force_update_every !== 'number')
                     this.tm.last_autorefreshed = now - (now % this.data_update_every);
                 else
                     this.tm.last_autorefreshed = now;
@@ -4917,46 +4917,46 @@ var NETDATA = window.NETDATA || {};
             this.refresh_dt_ms = now - started;
             NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
 
-            if(this.refresh_dt_element !== null)
+            if (this.refresh_dt_element !== null)
                 this.refresh_dt_element.innerText = this.refresh_dt_ms.toString();
 
-            if(this.foreign_element_before !== null)
+            if (this.foreign_element_before !== null)
                 this.foreign_element_before.innerText = NETDATA.dateTime.localeDateString(this.view_before) + ' ' + NETDATA.dateTime.localeTimeString(this.view_before);
 
-            if(this.foreign_element_after !== null)
+            if (this.foreign_element_after !== null)
                 this.foreign_element_after.innerText = NETDATA.dateTime.localeDateString(this.view_after) + ' ' + NETDATA.dateTime.localeTimeString(this.view_after);
 
-            if(this.foreign_element_duration !== null)
+            if (this.foreign_element_duration !== null)
                 this.foreign_element_duration.innerText = NETDATA.seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
 
-            if(this.foreign_element_update_every !== null)
+            if (this.foreign_element_update_every !== null)
                 this.foreign_element_update_every.innerText = NETDATA.seconds4human(Math.floor(this.data_update_every / 1000));
         };
 
         this.getSnapshotData = function(key) {
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('updating from snapshot: ' + key);
 
-            if(typeof netdataSnapshotData.data[key] === 'undefined') {
+            if (typeof netdataSnapshotData.data[key] === 'undefined') {
                 this.log('snapshot does not include data for key "' + key + '"');
                 return null;
             }
 
-            if(typeof netdataSnapshotData.data[key] !== 'string') {
+            if (typeof netdataSnapshotData.data[key] !== 'string') {
                 this.log('snapshot data for key "' + key + '" is not string');
                 return null;
             }
 
-            var uncompressed;
+            let uncompressed;
             try {
                 uncompressed = netdataSnapshotData.uncompress(netdataSnapshotData.data[key]);
 
-                if(uncompressed === null) {
+                if (uncompressed === null) {
                     this.log('uncompressed snapshot data for key ' + key + ' is null');
                     return null;
                 }
 
-                if(typeof uncompressed === 'undefined') {
+                if (typeof uncompressed === 'undefined') {
                     this.log('uncompressed snapshot data for key ' + key + ' is undefined');
                     return null;
                 }
@@ -4967,12 +4967,12 @@ var NETDATA = window.NETDATA || {};
                 uncompressed = null;
             }
 
-            if(typeof uncompressed !== 'string') {
+            if (typeof uncompressed !== 'string') {
                 this.log('uncompressed snapshot data for key ' + key + ' is not string');
                 return null;
             }
 
-            var data;
+            let data;
             try {
                 data = JSON.parse(uncompressed);
             }
@@ -5037,9 +5037,9 @@ var NETDATA = window.NETDATA || {};
                 });
             }
 
-            if(this.library.initialized === false) {
-                if(this.library.enabled === true) {
-                    if(this.debug === true)
+            if (this.library.initialized === false) {
+                if (this.library.enabled === true) {
+                    if (this.debug === true)
                         this.log('updateChart(): initializing chart library');
 
                     return this.library.initialize(function () {
@@ -5049,7 +5049,7 @@ var NETDATA = window.NETDATA || {};
                 else {
                     error('chart library "' + this.library_name + '" is not available.');
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(false, 'library not available');
 
                     return;
@@ -5062,15 +5062,15 @@ var NETDATA = window.NETDATA || {};
             NETDATA.statistics.refreshes_total++;
             NETDATA.statistics.refreshes_active++;
 
-            if(NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
+            if (NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
                 NETDATA.statistics.refreshes_active_max = NETDATA.statistics.refreshes_active;
 
-            var ok = false;
+            let ok = false;
             this.fetching_data = true;
 
-            if(netdataSnapshotData !== null) {
-                var key = this.chartDataUniqueID();
-                var data = this.getSnapshotData(key);
+            if (netdataSnapshotData !== null) {
+                let key = this.chartDataUniqueID();
+                let data = this.getSnapshotData(key);
                 if (data !== null) {
                     ok = true;
                     data = NETDATA.xss.checkData('/api/v1/data', data, this.library.xssRegexIgnore);
@@ -5085,13 +5085,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.statistics.refreshes_active--;
                 this.fetching_data = false;
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     callback(ok, 'snapshot');
 
                 return;
             }
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('updating from ' + this.data_url);
 
             this.xhr = $.ajax( {
@@ -5111,7 +5111,7 @@ var NETDATA = window.NETDATA || {};
                 that.retries_on_data_failures = 0;
                 ok = true;
 
-                if(that.debug === true)
+                if (that.debug === true)
                     that.log('data received. updating chart.');
 
                 that.updateChartWithData(data);
@@ -5119,9 +5119,9 @@ var NETDATA = window.NETDATA || {};
             .fail(function(msg) {
                 that.xhr = undefined;
 
-                if(msg.statusText !== 'abort') {
+                if (msg.statusText !== 'abort') {
                     that.retries_on_data_failures++;
-                    if(that.retries_on_data_failures > NETDATA.options.current.retries_on_data_failures) {
+                    if (that.retries_on_data_failures > NETDATA.options.current.retries_on_data_failures) {
                         // that.log('failed ' + that.retries_on_data_failures.toString() + ' times - giving up');
                         that.retries_on_data_failures = 0;
                         error('data download failed for url: ' + that.data_url);
@@ -5138,33 +5138,33 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.statistics.refreshes_active--;
                 that.fetching_data = false;
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback(ok, 'download');
             });
         };
 
-        var __isVisible = function() {
-            var ret = true;
+        let __isVisible = function() {
+            let ret = true;
 
-            if(NETDATA.options.current.update_only_visible !== false) {
+            if (NETDATA.options.current.update_only_visible !== false) {
                 // tolerance is the number of pixels a chart can be off-screen
                 // to consider it as visible and refresh it as if was visible
-                var tolerance = 0;
+                let tolerance = 0;
 
                 that.tm.last_visible_check = Date.now();
 
-                var rect = that.element.getBoundingClientRect();
+                let rect = that.element.getBoundingClientRect();
 
-                var screenTop = window.scrollY;
-                var screenBottom = screenTop + window.innerHeight;
+                let screenTop = window.scrollY;
+                let screenBottom = screenTop + window.innerHeight;
 
-                var chartTop = rect.top + screenTop;
-                var chartBottom = chartTop + rect.height;
+                let chartTop = rect.top + screenTop;
+                let chartBottom = chartTop + rect.height;
 
                 ret = !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
             }
 
-            if(that.debug === true)
+            if (that.debug === true)
                 that.log('__isVisible(): ' + ret);
 
             return ret;
@@ -5175,7 +5175,7 @@ var NETDATA = window.NETDATA || {};
 
             // caching - we do not evaluate the charts visibility
             // if the page has not been scrolled since the last check
-            if((typeof nocache !== 'undefined' && nocache === true)
+            if ((typeof nocache !== 'undefined' && nocache === true)
                 || typeof this.tmp.___isVisible___ === 'undefined'
                 || this.tm.last_visible_check <= NETDATA.options.last_page_scroll) {
                 this.tmp.___isVisible___ = __isVisible();
@@ -5183,7 +5183,7 @@ var NETDATA = window.NETDATA || {};
                 else this.hideChart();
             }
 
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('isVisible(' + nocache + '): ' + this.tmp.___isVisible___);
 
             return this.tmp.___isVisible___;
@@ -5194,110 +5194,110 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.canBeAutoRefreshed = function() {
-            if(this.enabled === false) {
-                if(this.debug === true)
+            if (this.enabled === false) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> not enabled');
 
                 return false;
             }
 
-            if(this.running === true) {
-                if(this.debug === true)
+            if (this.running === true) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> already running');
 
                 return false;
             }
 
-            if(this.library === null || this.library.enabled === false) {
+            if (this.library === null || this.library.enabled === false) {
                 error('charting library "' + this.library_name + '" is not available');
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> chart library ' + this.library_name + ' is not available');
 
                 return false;
             }
 
-            if(this.isVisible() === false) {
-                if(NETDATA.options.debug.visibility === true || this.debug === true)
+            if (this.isVisible() === false) {
+                if (NETDATA.options.debug.visibility === true || this.debug === true)
                     this.log('canBeAutoRefreshed() -> not visible');
 
                 return false;
             }
 
-            var now = Date.now();
+            let now = Date.now();
 
-            if(this.current.force_update_at !== 0 && this.current.force_update_at < now) {
-                if(this.debug === true)
+            if (this.current.force_update_at !== 0 && this.current.force_update_at < now) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> timed force update - allowing this update');
 
                 this.current.force_update_at = 0;
                 return true;
             }
 
-            if(this.isAutoRefreshable() === false) {
-                if(this.debug === true)
+            if (this.isAutoRefreshable() === false) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> not auto-refreshable');
 
                 return false;
             }
 
             // allow the first update, even if the page is not visible
-            if(NETDATA.options.page_is_visible === false && this.updates_counter && this.updates_since_last_unhide) {
-                if(NETDATA.options.debug.focus === true || this.debug === true)
+            if (NETDATA.options.page_is_visible === false && this.updates_counter && this.updates_since_last_unhide) {
+                if (NETDATA.options.debug.focus === true || this.debug === true)
                     this.log('canBeAutoRefreshed() -> not the first update, and page does not have focus');
 
                 return false;
             }
 
-            if(this.needsRecreation() === true) {
-                if(this.debug === true)
+            if (this.needsRecreation() === true) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> needs re-creation.');
 
                 return true;
             }
 
-            if(NETDATA.options.auto_refresher_stop_until >= now) {
-                if(this.debug === true)
+            if (NETDATA.options.auto_refresher_stop_until >= now) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed() -> stopped until is in future.');
 
                 return false;
             }
 
             // options valid only for autoRefresh()
-            if(NETDATA.globalPanAndZoom.isActive()) {
-                if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
-                    if(this.debug === true)
+            if (NETDATA.globalPanAndZoom.isActive()) {
+                if (NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
+                    if (this.debug === true)
                         this.log('canBeAutoRefreshed(): global panning: I need an update.');
 
                     return true;
                 }
                 else {
-                    if(this.debug === true)
+                    if (this.debug === true)
                         this.log('canBeAutoRefreshed(): global panning: I am already up to date.');
 
                     return false;
                 }
             }
 
-            if(this.selected === true) {
-                if(this.debug === true)
+            if (this.selected === true) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed(): I have a selection in place.');
 
                 return false;
             }
 
-            if(this.paused === true) {
-                if(this.debug === true)
+            if (this.paused === true) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed(): I am paused.');
 
                 return false;
             }
 
-            var data_update_every = this.data_update_every;
-            if(typeof this.force_update_every === 'number')
+            let data_update_every = this.data_update_every;
+            if (typeof this.force_update_every === 'number')
                 data_update_every = this.force_update_every;
 
-            if(now - this.tm.last_autorefreshed >= data_update_every) {
-                if(this.debug === true)
+            if (now - this.tm.last_autorefreshed >= data_update_every) {
+                if (this.debug === true)
                     this.log('canBeAutoRefreshed(): It is time to update me. Now: ' + now.toString() + ', last_autorefreshed: ' + this.tm.last_autorefreshed + ', data_update_every: ' + data_update_every + ', delta: ' + (now - this.tm.last_autorefreshed).toString());
 
                 return true;
@@ -5307,20 +5307,20 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.autoRefresh = function(callback) {
-            var state = that;
+            let state = that;
 
-            if(state.canBeAutoRefreshed() === true && state.running === false) {
+            if (state.canBeAutoRefreshed() === true && state.running === false) {
 
                 state.running = true;
                 state.updateChart(function() {
                     state.running = false;
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback();
                 });
             }
             else {
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback();
             }
         };
@@ -5332,10 +5332,10 @@ var NETDATA = window.NETDATA || {};
             this.data_points = Math.round(this.chartWidth() / this.chartPixelsPerPoint());
             this.tm.last_info_downloaded = Date.now();
 
-            if(this.title === null)
+            if (this.title === null)
                 this.title = chart.title;
 
-            if(this.units === null) {
+            if (this.units === null) {
                 this.units = chart.units;
                 this.units_current = this.units;
             }
@@ -5344,25 +5344,25 @@ var NETDATA = window.NETDATA || {};
         // fetch the chart description from the netdata server
         this.getChart = function(callback) {
             this.chart = NETDATA.chartRegistry.get(this.host, this.id);
-            if(this.chart) {
+            if (this.chart) {
                 this.__defaultsFromDownloadedChart(this.chart);
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback();
             }
-            else if(netdataSnapshotData !== null) {
+            else if (netdataSnapshotData !== null) {
                 // console.log(this);
                 // console.log(NETDATA.chartRegistry);
                 NETDATA.error(404, 'host: ' + this.host + ', chart: ' +  this.id);
                 error('chart not found in snapshot');
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback();
             }
             else {
                 this.chart_url = "/api/v1/chart?chart=" + this.id;
 
-                if(this.debug === true)
+                if (this.debug === true)
                     this.log('downloading ' + this.chart_url);
 
                 $.ajax( {
@@ -5383,7 +5383,7 @@ var NETDATA = window.NETDATA || {};
                     error('chart not found on url "' + that.chart_url + '"');
                 })
                 .always(function() {
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback();
                 });
             }
@@ -5404,8 +5404,8 @@ var NETDATA = window.NETDATA || {};
         // there are 2 possibilities here
         // a. state is the global Pan and Zoom master
         // b. state is not the global Pan and Zoom master
-        var master = true;
-        if(NETDATA.globalPanAndZoom.isMaster(state) === false)
+        let master = true;
+        if (NETDATA.globalPanAndZoom.isMaster(state) === false)
             master = false;
 
         // clear the global Pan and Zoom
@@ -5416,16 +5416,16 @@ var NETDATA = window.NETDATA || {};
         // if we were not the master, reset our status too
         // this is required because most probably the mouse
         // is over this chart, blocking it from auto-refreshing
-        if(master === false && (state.paused === true || state.selected === true))
+        if (master === false && (state.paused === true || state.selected === true))
             state.resetChart();
     };
 
     // get or create a chart state, given a DOM element
     NETDATA.chartState = function(element) {
-        var self = $(element);
+        let self = $(element);
 
-        var state = self.data('netdata-state-object') || null;
-        if(state === null) {
+        let state = self.data('netdata-state-object') || null;
+        if (state === null) {
             state = new chartState(element);
             self.data('netdata-state-object', state);
         }
@@ -5438,28 +5438,28 @@ var NETDATA = window.NETDATA || {};
     // Load a script without jquery
     // This is used to load jquery - after it is loaded, we use jquery
     NETDATA._loadjQuery = function(callback) {
-        if(typeof jQuery === 'undefined') {
-            if(NETDATA.options.debug.main_loop === true)
+        if (typeof jQuery === 'undefined') {
+            if (NETDATA.options.debug.main_loop === true)
                 console.log('loading ' + NETDATA.jQuery);
 
-            var script = document.createElement('script');
+            let script = document.createElement('script');
             script.type = 'text/javascript';
             script.async = true;
             script.src = NETDATA.jQuery;
 
             // script.onabort = onError;
             script.onerror = function() { NETDATA.error(101, NETDATA.jQuery); };
-            if(typeof callback === "function") {
+            if (typeof callback === "function") {
                 script.onload = function () {
                     $ = jQuery;
                     return callback();
                 };
             }
 
-            var s = document.getElementsByTagName('script')[0];
+            let s = document.getElementsByTagName('script')[0];
             s.parentNode.insertBefore(script, s);
         }
-        else if(typeof callback === "function") {
+        else if (typeof callback === "function") {
             $ = jQuery;
             return callback();
         }
@@ -5470,7 +5470,7 @@ var NETDATA = window.NETDATA || {};
         // styles are loaded before jQuery
         // to eliminate showing an unstyled page to the user
 
-        var fileref = document.createElement("link");
+        let fileref = document.createElement("link");
         fileref.setAttribute("rel", "stylesheet");
         fileref.setAttribute("type", "text/css");
         fileref.setAttribute("href", filename);
@@ -5481,12 +5481,12 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.colorHex2Rgb = function(hex) {
         // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
-        var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+        let shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
             hex = hex.replace(shorthandRegex, function(m, r, g, b) {
             return r + r + g + g + b + b;
         });
 
-        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? {
             r: parseInt(result[1], 16),
             g: parseInt(result[2], 16),
@@ -5503,7 +5503,7 @@ var NETDATA = window.NETDATA || {};
         lum = lum || 0;
 
         // convert to decimal and change luminosity
-        var rgb = "#", c, i;
+        let rgb = "#", c, i;
         for (i = 0; i < 3; i++) {
             c = parseInt(hex.substr(i*2,2), 16);
             c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
@@ -5524,7 +5524,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.zeropad = function(x) {
-        if(x > -10 && x < 10) return '0' + x.toString();
+        if (x > -10 && x < 10) return '0' + x.toString();
         else return x.toString();
     };
 
@@ -5539,7 +5539,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.pause = function(callback) {
-        if(typeof callback === 'function') {
+        if (typeof callback === 'function') {
             if (NETDATA.options.pause === true)
                 return callback();
             else
@@ -5554,7 +5554,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.seconds4human = function (seconds, options) {
-        var default_options = {
+        let default_options = {
             now: 'now',
             space: ' ',
             negative_suffix: 'ago',
@@ -5569,55 +5569,55 @@ var NETDATA = window.NETDATA || {};
             and: 'and'
         };
 
-        if(typeof options !== 'object')
+        if (typeof options !== 'object')
             options = default_options;
         else {
-            var x;
-            for(x in default_options) {
-                if(typeof options[x] !== 'string')
+            let x;
+            for (x in default_options) {
+                if (typeof options[x] !== 'string')
                     options[x] = default_options[x];
             }
         }
 
-        if(typeof seconds === 'string')
+        if (typeof seconds === 'string')
             seconds = parseInt(seconds, 10);
 
-        if(seconds === 0)
+        if (seconds === 0)
             return options.now;
 
-        var suffix = '';
-        if(seconds < 0) {
+        let suffix = '';
+        if (seconds < 0) {
             seconds = -seconds;
-            if(options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
+            if (options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
         }
 
-        var days = Math.floor(seconds / 86400);
+        let days = Math.floor(seconds / 86400);
         seconds -= (days * 86400);
 
-        var hours = Math.floor(seconds / 3600);
+        let hours = Math.floor(seconds / 3600);
         seconds -= (hours * 3600);
 
-        var minutes = Math.floor(seconds / 60);
+        let minutes = Math.floor(seconds / 60);
         seconds -= (minutes * 60);
 
-        var strings = [];
+        let strings = [];
 
-        if(days > 1) strings.push(days.toString() + options.space + options.days);
-        else if(days === 1) strings.push(days.toString() + options.space + options.day);
+        if (days > 1) strings.push(days.toString() + options.space + options.days);
+        else if (days === 1) strings.push(days.toString() + options.space + options.day);
 
-        if(hours > 1) strings.push(hours.toString() + options.space + options.hours);
-        else if(hours === 1) strings.push(hours.toString() + options.space + options.hour);
+        if (hours > 1) strings.push(hours.toString() + options.space + options.hours);
+        else if (hours === 1) strings.push(hours.toString() + options.space + options.hour);
 
-        if(minutes > 1) strings.push(minutes.toString() + options.space + options.minutes);
-        else if(minutes === 1) strings.push(minutes.toString() + options.space + options.minute);
+        if (minutes > 1) strings.push(minutes.toString() + options.space + options.minutes);
+        else if (minutes === 1) strings.push(minutes.toString() + options.space + options.minute);
 
-        if(seconds > 1) strings.push(Math.floor(seconds).toString() + options.space + options.seconds);
-        else if(seconds === 1) strings.push(Math.floor(seconds).toString() + options.space + options.second);
+        if (seconds > 1) strings.push(Math.floor(seconds).toString() + options.space + options.seconds);
+        else if (seconds === 1) strings.push(Math.floor(seconds).toString() + options.space + options.second);
 
-        if(strings.length === 1)
+        if (strings.length === 1)
             return strings.pop() + suffix;
 
-        var last = strings.pop();
+        let last = strings.pop();
         return strings.join(", ") + " " + options.and + " " + last + suffix;
     };
 
@@ -5626,32 +5626,32 @@ var NETDATA = window.NETDATA || {};
     // this is purely sequential charts refresher
     // it is meant to be autonomous
     NETDATA.chartRefresherNoParallel = function(index, callback) {
-        var targets = NETDATA.intersectionObserver.targets();
+        let targets = NETDATA.intersectionObserver.targets();
 
-        if(NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop === true)
             console.log('NETDATA.chartRefresherNoParallel(' + index + ')');
 
-        if(NETDATA.options.updated_dom === true) {
+        if (NETDATA.options.updated_dom === true) {
             // the dom has been updated
             // get the dom parts again
             NETDATA.parseDom(callback);
             return;
         }
-        if(index >= targets.length) {
-            if(NETDATA.options.debug.main_loop === true)
+        if (index >= targets.length) {
+            if (NETDATA.options.debug.main_loop === true)
                 console.log('waiting to restart main loop...');
 
             NETDATA.options.auto_refresher_fast_weight = 0;
             callback();
         }
         else {
-            var state = targets[index];
+            let state = targets[index];
 
-            if(NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
-                if(NETDATA.options.debug.main_loop === true)
+            if (NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
+                if (NETDATA.options.debug.main_loop === true)
                     console.log('fast rendering...');
 
-                if(state.isVisible() === true)
+                if (state.isVisible() === true)
                     NETDATA.timeout.set(function() {
                         state.autoRefresh(function () {
                             NETDATA.chartRefresherNoParallel(++index, callback);
@@ -5661,7 +5661,7 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.chartRefresherNoParallel(++index, callback);
             }
             else {
-                if(NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
+                if (NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
                 NETDATA.options.auto_refresher_fast_weight = 0;
 
                 NETDATA.timeout.set(function() {
@@ -5683,8 +5683,8 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRefresherTimeoutId = undefined;
 
     NETDATA.chartRefresherReschedule = function() {
-        if(NETDATA.options.current.async_on_scroll === true) {
-            if(NETDATA.chartRefresherTimeoutId)
+        if (NETDATA.options.current.async_on_scroll === true) {
+            if (NETDATA.chartRefresherTimeoutId)
                 NETDATA.timeout.clear(NETDATA.chartRefresherTimeoutId);
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(NETDATA.chartRefresher, NETDATA.options.current.onscroll_worker_duration_threshold);
             //console.log('chartRefresherReschedule()');
@@ -5694,7 +5694,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRefresher = function() {
         // console.log('chartRefresher() begin ' + (Date.now() - NETDATA.chartRefresherLastRun).toString() + ' ms since last run');
 
-        if(NETDATA.options.page_is_visible === false
+        if (NETDATA.options.page_is_visible === false
             && NETDATA.options.current.stop_updates_when_focus_is_lost === true
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_resize
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_scroll
@@ -5710,10 +5710,10 @@ var NETDATA = window.NETDATA || {};
         }
         NETDATA.chartRefresherRunsAfterParseDom++;
 
-        var now = Date.now();
+        let now = Date.now();
         NETDATA.chartRefresherLastRun = now;
 
-        if( now < NETDATA.options.on_scroll_refresher_stop_until ) {
+        if ( now < NETDATA.options.on_scroll_refresher_stop_until ) {
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
                 NETDATA.chartRefresherWaitTime()
@@ -5723,7 +5723,7 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if( now < NETDATA.options.auto_refresher_stop_until ) {
+        if ( now < NETDATA.options.auto_refresher_stop_until ) {
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
                 NETDATA.chartRefresherWaitTime()
@@ -5733,7 +5733,7 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if(NETDATA.options.pause === true) {
+        if (NETDATA.options.pause === true) {
             // console.log('auto-refresher is paused');
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
@@ -5744,7 +5744,7 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if(typeof NETDATA.options.pauseCallback === 'function') {
+        if (typeof NETDATA.options.pauseCallback === 'function') {
             // console.log('auto-refresher is calling pauseCallback');
 
             NETDATA.options.pause = true;
@@ -5755,7 +5755,7 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if(NETDATA.options.current.parallel_refresher === false) {
+        if (NETDATA.options.current.parallel_refresher === false) {
             // console.log('auto-refresher is calling chartRefresherNoParallel(0)');
             NETDATA.chartRefresherNoParallel(0, function() {
                 NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
@@ -5767,7 +5767,7 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if(NETDATA.options.updated_dom === true) {
+        if (NETDATA.options.updated_dom === true) {
             // the dom has been updated
             // get the dom parts again
             // console.log('auto-refresher is calling parseDom()');
@@ -5776,18 +5776,18 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
-        if(NETDATA.globalSelectionSync.active() === false) {
-            var parallel = [];
-            var targets = NETDATA.intersectionObserver.targets();
-            var len = targets.length;
-            var state;
-            while(len--) {
+        if (NETDATA.globalSelectionSync.active() === false) {
+            let parallel = [];
+            let targets = NETDATA.intersectionObserver.targets();
+            let len = targets.length;
+            let state;
+            while (len--) {
                 state = targets[len];
-                if(state.running === true || state.isVisible() === false)
+                if (state.running === true || state.isVisible() === false)
                     continue;
 
-                if(state.library.initialized === false) {
-                    if(state.library.enabled === true) {
+                if (state.library.initialized === false) {
+                    if (state.library.enabled === true) {
                         state.library.initialize(NETDATA.chartRefresher);
                         //console.log('chartRefresher() end6 (library init)');
                         return;
@@ -5797,7 +5797,7 @@ var NETDATA = window.NETDATA || {};
                     }
                 }
 
-                if(NETDATA.scrollUp === true)
+                if (NETDATA.scrollUp === true)
                     parallel.unshift(state);
                 else
                     parallel.push(state);
@@ -5833,28 +5833,28 @@ var NETDATA = window.NETDATA || {};
         NETDATA.options.updated_dom = false;
         NETDATA.chartRefresherRunsAfterParseDom = 0;
 
-        var targets = $('div[data-netdata]'); //.filter(':visible');
+        let targets = $('div[data-netdata]'); //.filter(':visible');
 
-        if(NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop === true)
             console.log('DOM updated - there are ' + targets.length + ' charts on page.');
 
         NETDATA.intersectionObserver.globalReset();
         NETDATA.options.targets = [];
-        var len = targets.length;
-        while(len--) {
+        let len = targets.length;
+        while (len--) {
             // the initialization will take care of sizing
             // and the "loading..." message
-            var state = NETDATA.chartState(targets[len]);
+            let state = NETDATA.chartState(targets[len]);
             NETDATA.options.targets.push(state);
             NETDATA.intersectionObserver.observe(state);
         }
 
-        if(NETDATA.globalChartUnderlay.isActive() === true)
+        if (NETDATA.globalChartUnderlay.isActive() === true)
             NETDATA.globalChartUnderlay.setup();
         else
             NETDATA.globalChartUnderlay.clear();
 
-        if(typeof callback === 'function')
+        if (typeof callback === 'function')
             return callback();
     };
 
@@ -5863,7 +5863,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.start = function() {
         // this should be called only once
 
-        if(NETDATA.started === true) {
+        if (NETDATA.started === true) {
             console.log('netdata is already started');
             return;
         }
@@ -5872,25 +5872,25 @@ var NETDATA = window.NETDATA || {};
         NETDATA.options.page_is_visible = true;
 
         $(window).blur(function() {
-            if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
                 NETDATA.options.page_is_visible = false;
-                if(NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus === true)
                     console.log('Lost Focus!');
             }
         });
 
         $(window).focus(function() {
-            if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
                 NETDATA.options.page_is_visible = true;
-                if(NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus === true)
                     console.log('Focus restored!');
             }
         });
 
-        if(typeof document.hasFocus === 'function' && !document.hasFocus()) {
-            if(NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
                 NETDATA.options.page_is_visible = false;
-                if(NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus === true)
                     console.log('Document has no focus!');
             }
         }
@@ -5899,12 +5899,12 @@ var NETDATA = window.NETDATA || {};
         $('a[data-toggle="tab"]').on('shown.bs.tab', NETDATA.onscroll);
 
         // bootstrap modal switching
-        var $modal = $('.modal');
+        let $modal = $('.modal');
         $modal.on('hidden.bs.modal', NETDATA.onscroll);
         $modal.on('shown.bs.modal', NETDATA.onscroll);
 
         // bootstrap collapse switching
-        var $collapse = $('.collapse');
+        let $collapse = $('.collapse');
         $collapse.on('hidden.bs.collapse', NETDATA.onscroll);
         $collapse.on('shown.bs.collapse', NETDATA.onscroll);
 
@@ -5916,7 +5916,7 @@ var NETDATA = window.NETDATA || {};
         // Registry initialization
         setTimeout(NETDATA.registry.init, netdataRegistryAfterMs);
 
-        if(typeof netdataCallback === 'function')
+        if (typeof netdataCallback === 'function')
             netdataCallback();
     };
 
@@ -5938,7 +5938,7 @@ var NETDATA = window.NETDATA || {};
     // peity
 
     NETDATA.peityInitialize = function(callback) {
-        if(typeof netdataNoPeitys === 'undefined' || !netdataNoPeitys) {
+        if (typeof netdataNoPeitys === 'undefined' || !netdataNoPeitys) {
             $.ajax({
                 url: NETDATA.peity_js,
                 cache: true,
@@ -5953,13 +5953,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.peity_js);
             })
             .always(function() {
-                if(typeof callback === "function")
+                if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.peity.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -5967,9 +5967,9 @@ var NETDATA = window.NETDATA || {};
     NETDATA.peityChartUpdate = function(state, data) {
         state.peity_instance.innerHTML = data.result;
 
-        if(state.peity_options.stroke !== state.chartCustomColors()[0]) {
+        if (state.peity_options.stroke !== state.chartCustomColors()[0]) {
             state.peity_options.stroke = state.chartCustomColors()[0];
-            if(state.chart.chart_type === 'line')
+            if (state.chart.chart_type === 'line')
                 state.peity_options.fill = NETDATA.themes.current.background;
             else
                 state.peity_options.fill = NETDATA.colorLuminance(state.chartCustomColors()[0], NETDATA.chartDefaults.fill_luminance);
@@ -5999,7 +5999,7 @@ var NETDATA = window.NETDATA || {};
     // sparkline
 
     NETDATA.sparklineInitialize = function(callback) {
-        if(typeof netdataNoSparklines === 'undefined' || !netdataNoSparklines) {
+        if (typeof netdataNoSparklines === 'undefined' || !netdataNoSparklines) {
             $.ajax({
                 url: NETDATA.sparkline_js,
                 cache: true,
@@ -6014,13 +6014,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.sparkline_js);
             })
             .always(function() {
-                if(typeof callback === "function")
+                if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.sparkline.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -6034,55 +6034,55 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.sparklineChartCreate = function(state, data) {
-        var type = NETDATA.dataAttribute(state.element, 'sparkline-type', 'line');
-        var lineColor = NETDATA.dataAttribute(state.element, 'sparkline-linecolor', state.chartCustomColors()[0]);
-        var fillColor = NETDATA.dataAttribute(state.element, 'sparkline-fillcolor', ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance)));
-        var chartRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemin', undefined);
-        var chartRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemax', undefined);
-        var composite = NETDATA.dataAttribute(state.element, 'sparkline-composite', undefined);
-        var enableTagOptions = NETDATA.dataAttribute(state.element, 'sparkline-enabletagoptions', undefined);
-        var tagOptionPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tagoptionprefix', undefined);
-        var tagValuesAttribute = NETDATA.dataAttribute(state.element, 'sparkline-tagvaluesattribute', undefined);
-        var disableHiddenCheck = NETDATA.dataAttribute(state.element, 'sparkline-disablehiddencheck', undefined);
-        var defaultPixelsPerValue = NETDATA.dataAttribute(state.element, 'sparkline-defaultpixelspervalue', undefined);
-        var spotColor = NETDATA.dataAttribute(state.element, 'sparkline-spotcolor', undefined);
-        var minSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-minspotcolor', undefined);
-        var maxSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-maxspotcolor', undefined);
-        var spotRadius = NETDATA.dataAttribute(state.element, 'sparkline-spotradius', undefined);
-        var valueSpots = NETDATA.dataAttribute(state.element, 'sparkline-valuespots', undefined);
-        var highlightSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightspotcolor', undefined);
-        var highlightLineColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightlinecolor', undefined);
-        var lineWidth = NETDATA.dataAttribute(state.element, 'sparkline-linewidth', undefined);
-        var normalRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemin', undefined);
-        var normalRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemax', undefined);
-        var drawNormalOnTop = NETDATA.dataAttribute(state.element, 'sparkline-drawnormalontop', undefined);
-        var xvalues = NETDATA.dataAttribute(state.element, 'sparkline-xvalues', undefined);
-        var chartRangeClip = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeclip', undefined);
-        var chartRangeMinX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeminx', undefined);
-        var chartRangeMaxX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemaxx', undefined);
-        var disableInteraction = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disableinteraction', false);
-        var disableTooltips = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disabletooltips', false);
-        var disableHighlight = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disablehighlight', false);
-        var highlightLighten = NETDATA.dataAttribute(state.element, 'sparkline-highlightlighten', 1.4);
-        var highlightColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightcolor', undefined);
-        var tooltipContainer = NETDATA.dataAttribute(state.element, 'sparkline-tooltipcontainer', undefined);
-        var tooltipClassname = NETDATA.dataAttribute(state.element, 'sparkline-tooltipclassname', undefined);
-        var tooltipFormat = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformat', undefined);
-        var tooltipPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipprefix', undefined);
-        var tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units_current);
-        var tooltipSkipNull = NETDATA.dataAttributeBoolean(state.element, 'sparkline-tooltipskipnull', true);
-        var tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
-        var tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
-        var tooltipFormatFieldlistKey = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlistkey', undefined);
-        var numberFormatter = NETDATA.dataAttribute(state.element, 'sparkline-numberformatter', function(n){ return n.toFixed(2); });
-        var numberDigitGroupSep = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupsep', undefined);
-        var numberDecimalMark = NETDATA.dataAttribute(state.element, 'sparkline-numberdecimalmark', undefined);
-        var numberDigitGroupCount = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupcount', undefined);
-        var animatedZooms = NETDATA.dataAttributeBoolean(state.element, 'sparkline-animatedzooms', false);
+        let type = NETDATA.dataAttribute(state.element, 'sparkline-type', 'line');
+        let lineColor = NETDATA.dataAttribute(state.element, 'sparkline-linecolor', state.chartCustomColors()[0]);
+        let fillColor = NETDATA.dataAttribute(state.element, 'sparkline-fillcolor', ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance)));
+        let chartRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemin', undefined);
+        let chartRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemax', undefined);
+        let composite = NETDATA.dataAttribute(state.element, 'sparkline-composite', undefined);
+        let enableTagOptions = NETDATA.dataAttribute(state.element, 'sparkline-enabletagoptions', undefined);
+        let tagOptionPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tagoptionprefix', undefined);
+        let tagValuesAttribute = NETDATA.dataAttribute(state.element, 'sparkline-tagvaluesattribute', undefined);
+        let disableHiddenCheck = NETDATA.dataAttribute(state.element, 'sparkline-disablehiddencheck', undefined);
+        let defaultPixelsPerValue = NETDATA.dataAttribute(state.element, 'sparkline-defaultpixelspervalue', undefined);
+        let spotColor = NETDATA.dataAttribute(state.element, 'sparkline-spotcolor', undefined);
+        let minSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-minspotcolor', undefined);
+        let maxSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-maxspotcolor', undefined);
+        let spotRadius = NETDATA.dataAttribute(state.element, 'sparkline-spotradius', undefined);
+        let valueSpots = NETDATA.dataAttribute(state.element, 'sparkline-valuespots', undefined);
+        let highlightSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightspotcolor', undefined);
+        let highlightLineColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightlinecolor', undefined);
+        let lineWidth = NETDATA.dataAttribute(state.element, 'sparkline-linewidth', undefined);
+        let normalRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemin', undefined);
+        let normalRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemax', undefined);
+        let drawNormalOnTop = NETDATA.dataAttribute(state.element, 'sparkline-drawnormalontop', undefined);
+        let xvalues = NETDATA.dataAttribute(state.element, 'sparkline-xvalues', undefined);
+        let chartRangeClip = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeclip', undefined);
+        let chartRangeMinX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeminx', undefined);
+        let chartRangeMaxX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemaxx', undefined);
+        let disableInteraction = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disableinteraction', false);
+        let disableTooltips = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disabletooltips', false);
+        let disableHighlight = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disablehighlight', false);
+        let highlightLighten = NETDATA.dataAttribute(state.element, 'sparkline-highlightlighten', 1.4);
+        let highlightColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightcolor', undefined);
+        let tooltipContainer = NETDATA.dataAttribute(state.element, 'sparkline-tooltipcontainer', undefined);
+        let tooltipClassname = NETDATA.dataAttribute(state.element, 'sparkline-tooltipclassname', undefined);
+        let tooltipFormat = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformat', undefined);
+        let tooltipPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipprefix', undefined);
+        let tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units_current);
+        let tooltipSkipNull = NETDATA.dataAttributeBoolean(state.element, 'sparkline-tooltipskipnull', true);
+        let tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
+        let tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
+        let tooltipFormatFieldlistKey = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlistkey', undefined);
+        let numberFormatter = NETDATA.dataAttribute(state.element, 'sparkline-numberformatter', function(n){ return n.toFixed(2); });
+        let numberDigitGroupSep = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupsep', undefined);
+        let numberDecimalMark = NETDATA.dataAttribute(state.element, 'sparkline-numberdecimalmark', undefined);
+        let numberDigitGroupCount = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupcount', undefined);
+        let animatedZooms = NETDATA.dataAttributeBoolean(state.element, 'sparkline-animatedzooms', false);
 
-        if(spotColor === 'disable') spotColor='';
-        if(minSpotColor === 'disable') minSpotColor='';
-        if(maxSpotColor === 'disable') maxSpotColor='';
+        if (spotColor === 'disable') spotColor='';
+        if (minSpotColor === 'disable') minSpotColor='';
+        if (maxSpotColor === 'disable') maxSpotColor='';
 
         // state.log('sparkline type ' + type + ', lineColor: ' + lineColor + ', fillColor: ' + fillColor);
 
@@ -6150,10 +6150,10 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
-        if(after < state.netdata_first)
+        if (after < state.netdata_first)
             after = state.netdata_first;
 
-        if(before > state.netdata_last)
+        if (before > state.netdata_last)
             before = state.netdata_last;
 
         state.setMode('zoom');
@@ -6167,9 +6167,9 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphSetSelection = function(state, t) {
-        if(typeof state.tmp.dygraph_instance !== 'undefined') {
-            var r = state.calculateRowForTime(t);
-            if(r !== -1) {
+        if (typeof state.tmp.dygraph_instance !== 'undefined') {
+            let r = state.calculateRowForTime(t);
+            if (r !== -1) {
                 state.tmp.dygraph_instance.setSelection(r);
                 return true;
             }
@@ -6183,7 +6183,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphClearSelection = function(state) {
-        if(typeof state.tmp.dygraph_instance !== 'undefined') {
+        if (typeof state.tmp.dygraph_instance !== 'undefined') {
             state.tmp.dygraph_instance.clearSelection();
         }
         return true;
@@ -6204,13 +6204,13 @@ var NETDATA = window.NETDATA || {};
             NETDATA.dygraph.smooth = false;
         })
         .always(function() {
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         });
     };
 
     NETDATA.dygraphInitialize = function(callback) {
-        if(typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
+        if (typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
             $.ajax({
                 url: NETDATA.dygraph_js,
                 cache: true,
@@ -6225,23 +6225,23 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.dygraph_js);
             })
             .always(function() {
-                if(NETDATA.chartLibraries.dygraph.enabled === true && NETDATA.options.current.smooth_plot === true)
+                if (NETDATA.chartLibraries.dygraph.enabled === true && NETDATA.options.current.smooth_plot === true)
                     NETDATA.dygraphSmoothInitialize(callback);
-                else if(typeof callback === "function")
+                else if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.dygraph.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
 
     NETDATA.dygraphChartUpdate = function(state, data) {
-        var dygraph = state.tmp.dygraph_instance;
+        let dygraph = state.tmp.dygraph_instance;
 
-        if(typeof dygraph === 'undefined')
+        if (typeof dygraph === 'undefined')
             return NETDATA.dygraphChartCreate(state, data);
 
         // when the chart is not visible, and hidden
@@ -6249,10 +6249,10 @@ var NETDATA = window.NETDATA || {};
         // its element size as 0x0.
         // this will make it re-appear properly
 
-        if(state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
+        if (state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
             dygraph.resize();
 
-        var options = {
+        let options = {
                 file: data.result.data,
                 colors: state.chartColors(),
                 labels: data.result.labels,
@@ -6261,29 +6261,29 @@ var NETDATA = window.NETDATA || {};
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         };
 
-        if(state.tmp.dygraph_chart_type === 'stacked') {
-            if(options.includeZero === true && state.dimensions_visibility.countSelected() < options.visibility.length)
+        if (state.tmp.dygraph_chart_type === 'stacked') {
+            if (options.includeZero === true && state.dimensions_visibility.countSelected() < options.visibility.length)
                 options.includeZero = 0;
         }
 
-        if(!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+        if (!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
             options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
         }
 
-        if(state.tmp.dygraph_force_zoom === true) {
-            if(NETDATA.options.debug.dygraph === true || state.debug === true)
+        if (state.tmp.dygraph_force_zoom === true) {
+            if (NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() forced zoom update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
             //options.isZoomedIgnoreProgrammaticZoom = true;
             state.tmp.dygraph_force_zoom = false;
         }
-        else if(state.current.name !== 'auto') {
-            if(NETDATA.options.debug.dygraph === true || state.debug === true)
+        else if (state.current.name !== 'auto') {
+            if (NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() loose update');
         }
         else {
-            if(NETDATA.options.debug.dygraph === true || state.debug === true)
+            if (NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() strict update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
@@ -6292,7 +6292,7 @@ var NETDATA = window.NETDATA || {};
 
         options.valueRange = state.tmp.dygraph_options.valueRange;
 
-        var oldMax = null, oldMin = null;
+        let oldMax = null, oldMin = null;
         if (state.tmp.__commonMin !== null) {
             state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
             oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
@@ -6302,40 +6302,40 @@ var NETDATA = window.NETDATA || {};
             oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
 
-        if(state.tmp.dygraph_smooth_eligible === true) {
-            if((NETDATA.options.current.smooth_plot === true && state.tmp.dygraph_options.plotter !== smoothPlotter)
+        if (state.tmp.dygraph_smooth_eligible === true) {
+            if ((NETDATA.options.current.smooth_plot === true && state.tmp.dygraph_options.plotter !== smoothPlotter)
                 || (NETDATA.options.current.smooth_plot === false && state.tmp.dygraph_options.plotter === smoothPlotter)) {
                 NETDATA.dygraphChartCreate(state, data);
                 return;
             }
         }
 
-        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
             //options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
-        if(NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
-            if(Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
+        if (NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+            if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
                 options.valueRange[0] = null;
         }
 
         dygraph.updateOptions(options);
 
-        var redraw = false;
-        if(oldMin !== null && oldMin > state.tmp.dygraph_instance.axes_[0].extremeRange[0]) {
+        let redraw = false;
+        if (oldMin !== null && oldMin > state.tmp.dygraph_instance.axes_[0].extremeRange[0]) {
             state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
             options.valueRange[0] = NETDATA.commonMin.get(state);
             redraw = true;
         }
-        if(oldMax !== null && oldMax < state.tmp.dygraph_instance.axes_[0].extremeRange[1]) {
+        if (oldMax !== null && oldMax < state.tmp.dygraph_instance.axes_[0].extremeRange[1]) {
             state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
             options.valueRange[1] = NETDATA.commonMax.get(state);
             redraw = true;
         }
 
-        if(redraw === true) {
+        if (redraw === true) {
             // state.log('forcing redraw to adapt to common- min/max');
             dygraph.updateOptions(options);
         }
@@ -6345,21 +6345,21 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphChartCreate = function(state, data) {
-        if(NETDATA.options.debug.dygraph === true || state.debug === true)
+        if (NETDATA.options.debug.dygraph === true || state.debug === true)
             state.log('dygraphChartCreate()');
 
         state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
-        if(state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
-        if(state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) state.tmp.dygraph_chart_type = 'area';
+        if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
+        if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) state.tmp.dygraph_chart_type = 'area';
 
-        var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
+        let highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
-        var smooth = (NETDATA.dygraph.smooth === true)
+        let smooth = (NETDATA.dygraph.smooth === true)
             ?(NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
             :false;
 
         state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
-        var drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
+        let drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
 
         state.tmp.dygraph_options = {
             colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
@@ -6466,17 +6466,17 @@ var NETDATA = window.NETDATA || {};
                             this.axes_[0].extremeRange[1]
                         );
 
-                        var old_units = this.user_attrs_.ylabel;
-                        var v = state.legendFormatValue(y);
-                        var new_units = state.units_current;
+                        let old_units = this.user_attrs_.ylabel;
+                        let v = state.legendFormatValue(y);
+                        let new_units = state.units_current;
 
-                        if(state.units_desired === 'auto' && typeof old_units !== 'undefined' && new_units !== old_units && !NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+                        if (state.units_desired === 'auto' && typeof old_units !== 'undefined' && new_units !== old_units && !NETDATA.chartLibraries.dygraph.isSparkline(state)) {
                             // console.log(this);
                             // state.log('units discrepancy: old = ' + old_units + ', new = ' + new_units);
-                            var len = this.plugins_.length;
-                            while(len--) {
+                            let len = this.plugins_.length;
+                            while (len--) {
                                 // console.log(this.plugins_[len]);
-                                if(typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined'
+                                if (typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined'
                                     && this.plugins_[len].plugin.ylabel_div_ !== null
                                     && typeof this.plugins_[len].plugin.ylabel_div_.children !== 'undefined'
                                     && this.plugins_[len].plugin.ylabel_div_.children !== null
@@ -6489,7 +6489,7 @@ var NETDATA = window.NETDATA || {};
                                 }
                             }
 
-                            if(len < 0)
+                            if (len < 0)
                                 state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
                         }
 
@@ -6498,21 +6498,21 @@ var NETDATA = window.NETDATA || {};
                 }
             },
             legendFormatter: function(data) {
-                if(state.tmp.dygraph_mouse_down === true)
+                if (state.tmp.dygraph_mouse_down === true)
                     return;
 
-                var elements = state.element_legend_childs;
+                let elements = state.element_legend_childs;
 
                 // if the hidden div is not there
                 // we are not managing the legend
-                if(elements.hidden === null) return;
+                if (elements.hidden === null) return;
 
                 if (typeof data.x !== 'undefined') {
                     state.legendSetDate(data.x);
-                    var i = data.series.length;
-                    while(i--) {
-                        var series = data.series[i];
-                        if(series.isVisible === true)
+                    let i = data.series.length;
+                    while (i--) {
+                        let series = data.series[i];
+                        if (series.isVisible === true)
                             state.legendSetLabelValue(series.label, series.y);
                         else
                             state.legendSetLabelValue(series.label, null);
@@ -6532,18 +6532,18 @@ var NETDATA = window.NETDATA || {};
                 // - when true, this is initiated by a user
                 // - when false, this is feedback
 
-                if(state.current.name !== 'auto' && state.tmp.dygraph_user_action === true) {
+                if (state.current.name !== 'auto' && state.tmp.dygraph_user_action === true) {
                     state.tmp.dygraph_user_action = false;
 
-                    var x_range = dygraph.xAxisRange();
-                    var after = Math.round(x_range[0]);
-                    var before = Math.round(x_range[1]);
+                    let x_range = dygraph.xAxisRange();
+                    let after = Math.round(x_range[0]);
+                    let before = Math.round(x_range[1]);
 
-                    if(NETDATA.options.debug.dygraph === true)
+                    if (NETDATA.options.debug.dygraph === true)
                         state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): mode ' + state.current.name + ' ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
                         //console.log(state);
 
-                    if(before <= state.netdata_last && after >= state.netdata_first)
+                    if (before <= state.netdata_last && after >= state.netdata_first)
                         // update only when we are within the data limits
                         state.updateChartPanOrZoom(after, before);
                 }
@@ -6556,7 +6556,7 @@ var NETDATA = window.NETDATA || {};
 
                 void(yRanges);
 
-                if(NETDATA.options.debug.dygraph === true)
+                if (NETDATA.options.debug.dygraph === true)
                     state.log('dygraphZoomCallback(): ' + state.current.name);
 
                 NETDATA.globalSelectionSync.stop();
@@ -6577,10 +6577,10 @@ var NETDATA = window.NETDATA || {};
                 // the time it thinks is selected is wrong
                 // here we calculate the time t based on the row number selected
                 // which is ok
-                // var t = state.data_after + row * state.data_update_every;
+                // let t = state.data_after + row * state.data_update_every;
                 // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
 
-                if(state.tmp.dygraph_mouse_down !== true)
+                if (state.tmp.dygraph_mouse_down !== true)
                     NETDATA.globalSelectionSync.sync(state, x);
 
                 // fix legend zIndex using the internal structures of dygraph legend module
@@ -6590,10 +6590,10 @@ var NETDATA = window.NETDATA || {};
             unhighlightCallback: function(event) {
                 void(event);
 
-                if(state.tmp.dygraph_mouse_down === true)
+                if (state.tmp.dygraph_mouse_down === true)
                     return;
 
-                if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                if (NETDATA.options.debug.dygraph === true || state.debug === true)
                     state.log('dygraphUnhighlightCallback()');
 
                 state.unpauseChart();
@@ -6604,22 +6604,22 @@ var NETDATA = window.NETDATA || {};
                 // the chart is about to be drawn
                 // this function renders global highlighted time-frame
 
-                if(NETDATA.globalChartUnderlay.isActive()) {
-                    var after = NETDATA.globalChartUnderlay.after;
-                    var before = NETDATA.globalChartUnderlay.before;
+                if (NETDATA.globalChartUnderlay.isActive()) {
+                    let after = NETDATA.globalChartUnderlay.after;
+                    let before = NETDATA.globalChartUnderlay.before;
 
-                    if(after < state.view_after)
+                    if (after < state.view_after)
                         after = state.view_after;
 
-                    if(before > state.view_before)
+                    if (before > state.view_before)
                         before = state.view_before;
 
-                    if(after < before) {
-                        var bottom_left = g.toDomCoords(after, -20);
-                        var top_right = g.toDomCoords(before, +20);
+                    if (after < before) {
+                        let bottom_left = g.toDomCoords(after, -20);
+                        let top_right = g.toDomCoords(before, +20);
 
-                        var left = bottom_left[0];
-                        var right = top_right[0];
+                        let left = bottom_left[0];
+                        let right = top_right[0];
 
                         canvas.fillStyle = NETDATA.themes.current.highlight;
                         canvas.fillRect(left, area.y, right - left, area.h);
@@ -6628,16 +6628,16 @@ var NETDATA = window.NETDATA || {};
             },
             interactionModel : {
                 mousedown: function(event, dygraph, context) {
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mousedown()');
 
                     state.tmp.dygraph_user_action = true;
 
-                    if(NETDATA.options.debug.dygraph === true)
+                    if (NETDATA.options.debug.dygraph === true)
                         state.log('dygraphMouseDown()');
 
                     // Right-click should not initiate anything.
-                    if(event.button && event.button === 2) return;
+                    if (event.button && event.button === 2) return;
 
                     NETDATA.globalSelectionSync.stop();
                     NETDATA.globalSelectionSync.delay();
@@ -6646,7 +6646,7 @@ var NETDATA = window.NETDATA || {};
                     context.initializeMouseDown(event, dygraph, context);
 
                     //console.log(event);
-                    if(event.button && event.button === 1) {
+                    if (event.button && event.button === 1) {
                         if (event.shiftKey) {
                             //console.log('middle mouse button dragging (PAN)');
 
@@ -6655,7 +6655,7 @@ var NETDATA = window.NETDATA || {};
                             state.tmp.dygraph_highlight_after = null;
                             Dygraph.startPan(event, dygraph, context);
                         }
-                        else if(event.altKey || event.ctrlKey || event.metaKey) {
+                        else if (event.altKey || event.ctrlKey || event.metaKey) {
                             //console.log('middle mouse button highlight');
 
                             if (!(event.offsetX && event.offsetY)) {
@@ -6683,7 +6683,7 @@ var NETDATA = window.NETDATA || {};
                             state.tmp.dygraph_highlight_after = null;
                             Dygraph.startZoom(event, dygraph, context);
                         }
-                        else if(event.altKey || event.ctrlKey || event.metaKey) {
+                        else if (event.altKey || event.ctrlKey || event.metaKey) {
                             //console.log('left mouse button highlight');
 
                             if (!(event.offsetX && event.offsetY)) {
@@ -6704,10 +6704,10 @@ var NETDATA = window.NETDATA || {};
                     }
                 },
                 mousemove: function(event, dygraph, context) {
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mousemove()');
 
-                    if(state.tmp.dygraph_highlight_after !== null) {
+                    if (state.tmp.dygraph_highlight_after !== null) {
                         //console.log('highlight selection...');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6717,7 +6717,7 @@ var NETDATA = window.NETDATA || {};
                         Dygraph.moveZoom(event, dygraph, context);
                         event.preventDefault();
                     }
-                    else if(context.isPanning) {
+                    else if (context.isPanning) {
                         //console.log('panning...');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6730,7 +6730,7 @@ var NETDATA = window.NETDATA || {};
                         context.is2DPan = false;
                         Dygraph.movePan(event, dygraph, context);
                     }
-                    else if(context.isZooming) {
+                    else if (context.isZooming) {
                         //console.log('zooming...');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6746,10 +6746,10 @@ var NETDATA = window.NETDATA || {};
                 mouseup: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = false;
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mouseup()');
 
-                    if(state.tmp.dygraph_highlight_after !== null) {
+                    if (state.tmp.dygraph_highlight_after !== null) {
                         //console.log('done highlight selection');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6805,7 +6805,7 @@ var NETDATA = window.NETDATA || {};
                     void(dygraph);
                     void(context);
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.click()');
 
                     event.preventDefault();
@@ -6815,14 +6815,14 @@ var NETDATA = window.NETDATA || {};
                     void(dygraph);
                     void(context);
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.dblclick()');
                     NETDATA.resetAllCharts(state);
                 },
                 wheel: function(event, dygraph, context) {
                     void(context);
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.wheel()');
 
                     // Take the offset of a mouse event on the dygraph canvas and
@@ -6830,28 +6830,28 @@ var NETDATA = window.NETDATA || {};
                     // (Not top left, bottom is where the lower value is.)
                     function offsetToPercentage(g, offsetX, offsetY) {
                         // This is calculating the pixel offset of the leftmost date.
-                        var xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
-                        var yar0 = g.yAxisRange(0);
+                        let xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
+                        let yar0 = g.yAxisRange(0);
 
                         // This is calculating the pixel of the highest value. (Top pixel)
-                        var yOffset = g.toDomCoords(null, yar0[1])[1];
+                        let yOffset = g.toDomCoords(null, yar0[1])[1];
 
                         // x y w and h are relative to the corner of the drawing area,
                         // so that the upper corner of the drawing area is (0, 0).
-                        var x = offsetX - xOffset;
-                        var y = offsetY - yOffset;
+                        let x = offsetX - xOffset;
+                        let y = offsetY - yOffset;
 
                         // This is computing the rightmost pixel, effectively defining the
                         // width.
-                        var w = g.toDomCoords(g.xAxisRange()[1], null)[0] - xOffset;
+                        let w = g.toDomCoords(g.xAxisRange()[1], null)[0] - xOffset;
 
                         // This is computing the lowest pixel, effectively defining the height.
-                        var h = g.toDomCoords(null, yar0[0])[1] - yOffset;
+                        let h = g.toDomCoords(null, yar0[0])[1] - yOffset;
 
                         // Percentage from the left.
-                        var xPct = w === 0 ? 0 : (x / w);
+                        let xPct = w === 0 ? 0 : (x / w);
                         // Percentage from the top.
-                        var yPct = h === 0 ? 0 : (y / h);
+                        let yPct = h === 0 ? 0 : (y / h);
 
                         // The (1-) part below changes it from "% distance down from the top"
                         // to "% distance up from the bottom".
@@ -6868,61 +6868,61 @@ var NETDATA = window.NETDATA || {};
                         yBias = yBias || 0.5;
 
                         function adjustAxis(axis, zoomInPercentage, bias) {
-                            var delta = axis[1] - axis[0];
-                            var increment = delta * zoomInPercentage;
-                            var foo = [increment * bias, increment * (1-bias)];
+                            let delta = axis[1] - axis[0];
+                            let increment = delta * zoomInPercentage;
+                            let foo = [increment * bias, increment * (1-bias)];
 
                             return [ axis[0] + foo[0], axis[1] - foo[1] ];
                         }
 
-                        var yAxes = g.yAxisRanges();
-                        var newYAxes = [];
-                        for (var i = 0; i < yAxes.length; i++) {
+                        let yAxes = g.yAxisRanges();
+                        let newYAxes = [];
+                        for (let i = 0; i < yAxes.length; i++) {
                             newYAxes[i] = adjustAxis(yAxes[i], zoomInPercentage, yBias);
                         }
 
                         return adjustAxis(g.xAxisRange(), zoomInPercentage, xBias);
                     }
 
-                    if(event.altKey || event.shiftKey) {
+                    if (event.altKey || event.shiftKey) {
                         state.tmp.dygraph_user_action = true;
 
                         NETDATA.globalSelectionSync.stop();
                         NETDATA.globalSelectionSync.delay();
 
                         // http://dygraphs.com/gallery/interaction-api.js
-                        var normal_def;
-                        if(typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
+                        let normal_def;
+                        if (typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
                             // chrome
                             normal_def = event.wheelDelta / 40;
                         else
                             // firefox
                             normal_def = event.deltaY * -1.2;
 
-                        var normal = (event.detail) ? event.detail * -1 : normal_def;
-                        var percentage = normal / 50;
+                        let normal = (event.detail) ? event.detail * -1 : normal_def;
+                        let percentage = normal / 50;
 
                         if (!(event.offsetX && event.offsetY)){
                             event.offsetX = event.layerX - event.target.offsetLeft;
                             event.offsetY = event.layerY - event.target.offsetTop;
                         }
 
-                        var percentages = offsetToPercentage(dygraph, event.offsetX, event.offsetY);
-                        var xPct = percentages[0];
-                        var yPct = percentages[1];
+                        let percentages = offsetToPercentage(dygraph, event.offsetX, event.offsetY);
+                        let xPct = percentages[0];
+                        let yPct = percentages[1];
 
-                        var new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
-                        var after = new_x_range[0];
-                        var before = new_x_range[1];
+                        let new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
+                        let after = new_x_range[0];
+                        let before = new_x_range[1];
 
-                        var first = state.netdata_first + state.data_update_every;
-                        var last = state.netdata_last + state.data_update_every;
+                        let first = state.netdata_first + state.data_update_every;
+                        let last = state.netdata_last + state.data_update_every;
 
-                        if(before > last) {
+                        if (before > last) {
                             after -= (before - last);
                             before = last;
                         }
-                        if(after < first) {
+                        if (after < first) {
                             after = first;
                         }
 
@@ -6937,7 +6937,7 @@ var NETDATA = window.NETDATA || {};
                 touchstart: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = true;
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchstart()');
 
                     state.tmp.dygraph_user_action = true;
@@ -6956,13 +6956,13 @@ var NETDATA = window.NETDATA || {};
                     state.dygraph_last_touch_start = Date.now();
                     state.dygraph_last_touch_move = 0;
 
-                    if(typeof event.touches[0].pageX === 'number')
+                    if (typeof event.touches[0].pageX === 'number')
                         state.dygraph_last_touch_page_x = event.touches[0].pageX;
                     else
                         state.dygraph_last_touch_page_x = 0;
                 },
                 touchmove: function(event, dygraph, context) {
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchmove()');
 
                     NETDATA.globalSelectionSync.stop();
@@ -6976,7 +6976,7 @@ var NETDATA = window.NETDATA || {};
                 touchend: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = false;
 
-                    if(NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchend()');
 
                     NETDATA.globalSelectionSync.stop();
@@ -6986,26 +6986,26 @@ var NETDATA = window.NETDATA || {};
                     Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
 
                     // if it didn't move, it is a selection
-                    if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
+                    if (state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
                         NETDATA.globalSelectionSync.dont_sync_before = 0;
                         NETDATA.globalSelectionSync.setMaster(state);
 
                         // internal api of dygraph
-                        var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
+                        let pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
                         console.log('pct: ' + pct.toString());
 
-                        var t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
-                        if(NETDATA.dygraphSetSelection(state, t) === true) {
+                        let t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
+                        if (NETDATA.dygraphSetSelection(state, t) === true) {
                             NETDATA.globalSelectionSync.sync(state, t);
                         }
                     }
 
                     // if it was double tap within double click time, reset the charts
-                    var now = Date.now();
-                    if(typeof state.dygraph_last_touch_end !== 'undefined') {
-                        if(state.dygraph_last_touch_move === 0) {
-                            var dt = now - state.dygraph_last_touch_end;
-                            if(dt <= NETDATA.options.current.double_click_speed)
+                    let now = Date.now();
+                    if (typeof state.dygraph_last_touch_end !== 'undefined') {
+                        if (state.dygraph_last_touch_move === 0) {
+                            let dt = now - state.dygraph_last_touch_end;
+                            if (dt <= NETDATA.options.current.double_click_speed)
                                 NETDATA.resetAllCharts(state);
                         }
                     }
@@ -7019,12 +7019,12 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        if(NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
-            if(Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
+        if (NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+            if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
                 state.tmp.dygraph_options.valueRange[0] = null;
         }
 
-        if(NETDATA.chartLibraries.dygraph.isSparkline(state) === true) {
+        if (NETDATA.chartLibraries.dygraph.isSparkline(state) === true) {
             state.tmp.dygraph_options.drawGrid = false;
             state.tmp.dygraph_options.drawAxis = false;
             state.tmp.dygraph_options.title = undefined;
@@ -7039,15 +7039,15 @@ var NETDATA = window.NETDATA || {};
             state.tmp.dygraph_options.axes.y.drawAxis = false;
         }
 
-        if(smooth === true) {
+        if (smooth === true) {
             state.tmp.dygraph_smooth_eligible = true;
 
-            if(NETDATA.options.current.smooth_plot === true)
+            if (NETDATA.options.current.smooth_plot === true)
                 state.tmp.dygraph_options.plotter = smoothPlotter;
         }
         else state.tmp.dygraph_smooth_eligible = false;
 
-        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
             //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
@@ -7061,7 +7061,7 @@ var NETDATA = window.NETDATA || {};
         state.tmp.dygraph_last_rendered = Date.now();
         state.tmp.dygraph_highlight_after = null;
 
-        if(state.tmp.dygraph_options.valueRange[0] === null && state.tmp.dygraph_options.valueRange[1] === null) {
+        if (state.tmp.dygraph_options.valueRange[0] === null && state.tmp.dygraph_options.valueRange[1] === null) {
             if (typeof state.tmp.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
                 state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
                 state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
@@ -7085,18 +7085,18 @@ var NETDATA = window.NETDATA || {};
     // morris
 
     NETDATA.morrisInitialize = function(callback) {
-        if(typeof netdataNoMorris === 'undefined' || !netdataNoMorris) {
+        if (typeof netdataNoMorris === 'undefined' || !netdataNoMorris) {
 
             // morris requires raphael
-            if(!NETDATA.chartLibraries.raphael.initialized) {
-                if(NETDATA.chartLibraries.raphael.enabled) {
+            if (!NETDATA.chartLibraries.raphael.initialized) {
+                if (NETDATA.chartLibraries.raphael.enabled) {
                     NETDATA.raphaelInitialize(function() {
                         NETDATA.morrisInitialize(callback);
                     });
                 }
                 else {
                     NETDATA.chartLibraries.morris.enabled = false;
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 }
             }
@@ -7117,14 +7117,14 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.error(100, NETDATA.morris_js);
                 })
                 .always(function() {
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 });
             }
         }
         else {
             NETDATA.chartLibraries.morris.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -7151,10 +7151,10 @@ var NETDATA = window.NETDATA || {};
                 behaveLikeLine: false
         };
 
-        if(state.chart.chart_type === 'line')
+        if (state.chart.chart_type === 'line')
             state.morris_instance = new Morris.Line(state.morris_options);
 
-        else if(state.chart.chart_type === 'area') {
+        else if (state.chart.chart_type === 'area') {
             state.morris_options.behaveLikeLine = true;
             state.morris_instance = new Morris.Area(state.morris_options);
         }
@@ -7168,7 +7168,7 @@ var NETDATA = window.NETDATA || {};
     // raphael
 
     NETDATA.raphaelInitialize = function(callback) {
-        if(typeof netdataStopRaphael === 'undefined' || !netdataStopRaphael) {
+        if (typeof netdataStopRaphael === 'undefined' || !netdataStopRaphael) {
             $.ajax({
                 url: NETDATA.raphael_js,
                 cache: true,
@@ -7183,13 +7183,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.raphael_js);
             })
             .always(function() {
-                if(typeof callback === "function")
+                if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.raphael.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -7216,18 +7216,18 @@ var NETDATA = window.NETDATA || {};
     // C3
 
     NETDATA.c3Initialize = function(callback) {
-        if(typeof netdataNoC3 === 'undefined' || !netdataNoC3) {
+        if (typeof netdataNoC3 === 'undefined' || !netdataNoC3) {
 
             // C3 requires D3
-            if(!NETDATA.chartLibraries.d3.initialized) {
-                if(NETDATA.chartLibraries.d3.enabled) {
+            if (!NETDATA.chartLibraries.d3.initialized) {
+                if (NETDATA.chartLibraries.d3.enabled) {
                     NETDATA.d3Initialize(function() {
                         NETDATA.c3Initialize(callback);
                     });
                 }
                 else {
                     NETDATA.chartLibraries.c3.enabled = false;
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 }
             }
@@ -7248,14 +7248,14 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.error(100, NETDATA.c3_js);
                 })
                 .always(function() {
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 });
             }
         }
         else {
             NETDATA.chartLibraries.c3.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -7332,18 +7332,18 @@ var NETDATA = window.NETDATA || {};
     // d3pie
 
     NETDATA.d3pieInitialize = function(callback) {
-        if(typeof netdataNoD3pie === 'undefined' || !netdataNoD3pie) {
+        if (typeof netdataNoD3pie === 'undefined' || !netdataNoD3pie) {
 
             // d3pie requires D3
-            if(!NETDATA.chartLibraries.d3.initialized) {
-                if(NETDATA.chartLibraries.d3.enabled) {
+            if (!NETDATA.chartLibraries.d3.initialized) {
+                if (NETDATA.chartLibraries.d3.enabled) {
                     NETDATA.d3Initialize(function() {
                         NETDATA.d3pieInitialize(callback);
                     });
                 }
                 else {
                     NETDATA.chartLibraries.d3pie.enabled = false;
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 }
             }
@@ -7362,14 +7362,14 @@ var NETDATA = window.NETDATA || {};
                         NETDATA.error(100, NETDATA.d3pie_js);
                     })
                     .always(function() {
-                        if(typeof callback === "function")
+                        if (typeof callback === "function")
                             return callback();
                     });
             }
         }
         else {
             NETDATA.chartLibraries.d3pie.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -7380,15 +7380,15 @@ var NETDATA = window.NETDATA || {};
             data.max
         );
 
-        var content = [];
-        var colors = state.chartColors();
-        var len = data.result.labels.length;
-        for(var i = 1; i < len ; i++) {
-            var label = data.result.labels[i];
-            var value = data.result.data[index][label];
-            var color = colors[i - 1];
+        let content = [];
+        let colors = state.chartColors();
+        let len = data.result.labels.length;
+        for (let i = 1; i < len ; i++) {
+            let label = data.result.labels[i];
+            let value = data.result.data[index][label];
+            let color = colors[i - 1];
 
-            if(value !== null && value > 0) {
+            if (value !== null && value > 0) {
                 content.push({
                     label: label,
                     value: value,
@@ -7397,7 +7397,7 @@ var NETDATA = window.NETDATA || {};
             }
         }
 
-        if(content.length === 0)
+        if (content.length === 0)
             content.push({
                 label: 'no data',
                 value: 100,
@@ -7409,39 +7409,39 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.d3pieDateRange = function(state, data, index) {
-        var dt = Math.round((data.before - data.after + 1) / data.points);
-        var dt_str = NETDATA.seconds4human(dt);
+        let dt = Math.round((data.before - data.after + 1) / data.points);
+        let dt_str = NETDATA.seconds4human(dt);
 
-        var before = data.result.data[index].time;
-        var after = before - (dt * 1000);
+        let before = data.result.data[index].time;
+        let after = before - (dt * 1000);
 
-        var d1 = NETDATA.dateTime.localeDateString(after);
-        var t1 = NETDATA.dateTime.localeTimeString(after);
-        var d2 = NETDATA.dateTime.localeDateString(before);
-        var t2 = NETDATA.dateTime.localeTimeString(before);
+        let d1 = NETDATA.dateTime.localeDateString(after);
+        let t1 = NETDATA.dateTime.localeTimeString(after);
+        let d2 = NETDATA.dateTime.localeDateString(before);
+        let t2 = NETDATA.dateTime.localeTimeString(before);
 
-        if(d1 === d2)
+        if (d1 === d2)
             return d1 + ' ' + t1 + ' to ' + t2 + ', ' + dt_str;
 
         return d1 + ' ' + t1 + ' to ' + d2 + ' ' + t2 + ', ' + dt_str;
     };
 
     NETDATA.d3pieSetSelection = function(state, t) {
-        if(state.timeIsVisible(t) !== true)
+        if (state.timeIsVisible(t) !== true)
             return NETDATA.d3pieClearSelection(state, true);
 
-        var slot = state.calculateRowForTime(t);
+        let slot = state.calculateRowForTime(t);
         slot = state.data.result.data.length - slot - 1;
 
-        if(slot < 0 || slot >= state.data.result.length)
+        if (slot < 0 || slot >= state.data.result.length)
             return NETDATA.d3pieClearSelection(state, true);
 
-        if(state.tmp.d3pie_last_slot === slot) {
+        if (state.tmp.d3pie_last_slot === slot) {
             // we already show this slot, don't do anything
             return true;
         }
 
-        if(state.tmp.d3pie_timer === undefined) {
+        if (state.tmp.d3pie_timer === undefined) {
             state.tmp.d3pie_timer = NETDATA.timeout.set(function() {
                 state.tmp.d3pie_timer = undefined;
                 NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, slot), NETDATA.d3pieDateRange(state, state.data, slot));
@@ -7452,16 +7452,16 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.d3pieClearSelection = function(state, force) {
-        if(typeof state.tmp.d3pie_timer !== 'undefined') {
+        if (typeof state.tmp.d3pie_timer !== 'undefined') {
             NETDATA.timeout.clear(state.tmp.d3pie_timer);
             state.tmp.d3pie_timer = undefined;
         }
 
-        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.d3pieChartUpdate(state, state.data);
         }
         else {
-            if(state.tmp.d3pie_last_slot !== -1) {
+            if (state.tmp.d3pie_last_slot !== -1) {
                 state.tmp.d3pie_last_slot = -1;
                 NETDATA.d3pieChange(state, [{label: 'no data', value: 1, color: '#666666'}], 'no data available');
             }
@@ -7471,12 +7471,12 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.d3pieChange = function(state, content, footer) {
-        if(state.d3pie_forced_subtitle === null) {
+        if (state.d3pie_forced_subtitle === null) {
             //state.d3pie_instance.updateProp("header.subtitle.text", state.units_current);
             state.d3pie_instance.options.header.subtitle.text = state.units_current;
         }
 
-        if(state.d3pie_forced_footer === null) {
+        if (state.d3pie_forced_footer === null) {
             //state.d3pie_instance.updateProp("footer.text", footer);
             state.d3pie_instance.options.footer.text = footer;
         }
@@ -7497,7 +7497,7 @@ var NETDATA = window.NETDATA || {};
         state.element_chart.id = 'd3pie-' + state.uuid;
         // console.log('id = ' + state.element_chart.id);
 
-        var content = NETDATA.d3pieSetContent(state, data, 0);
+        let content = NETDATA.d3pieSetContent(state, data, 0);
 
         state.d3pie_forced_title = NETDATA.dataAttribute(state.element, 'd3pie-title', null);
         state.d3pie_forced_subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', null);
@@ -7593,9 +7593,9 @@ var NETDATA = window.NETDATA || {};
                 },
                 formatter: function(context) {
                     // console.log(context);
-                    if(context.part === 'value')
+                    if (context.part === 'value')
                         return state.legendFormatValue(context.value);
-                    if(context.part === 'percentage')
+                    if (context.part === 'percentage')
                         return context.label + '%';
 
                     return context.label;
@@ -7669,7 +7669,7 @@ var NETDATA = window.NETDATA || {};
     // D3
 
     NETDATA.d3Initialize = function(callback) {
-        if(typeof netdataStopD3 === 'undefined' || !netdataStopD3) {
+        if (typeof netdataStopD3 === 'undefined' || !netdataStopD3) {
             $.ajax({
                 url: NETDATA.d3_js,
                 cache: true,
@@ -7684,13 +7684,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.d3_js);
             })
             .always(function() {
-                if(typeof callback === "function")
+                if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.d3.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
@@ -7713,7 +7713,7 @@ var NETDATA = window.NETDATA || {};
     // google charts
 
     NETDATA.googleInitialize = function(callback) {
-        if(typeof netdataNoGoogleCharts === 'undefined' || !netdataNoGoogleCharts) {
+        if (typeof netdataNoGoogleCharts === 'undefined' || !netdataNoGoogleCharts) {
             $.ajax({
                 url: NETDATA.google_js,
                 cache: true,
@@ -7730,25 +7730,25 @@ var NETDATA = window.NETDATA || {};
             .fail(function() {
                 NETDATA.chartLibraries.google.enabled = false;
                 NETDATA.error(100, NETDATA.google_js);
-                if(typeof callback === "function")
+                if (typeof callback === "function")
                     return callback();
             });
         }
         else {
             NETDATA.chartLibraries.google.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
 
     NETDATA.googleChartUpdate = function(state, data) {
-        var datatable = new google.visualization.DataTable(data.result);
+        let datatable = new google.visualization.DataTable(data.result);
         state.google_instance.draw(datatable, state.google_options);
         return true;
     };
 
     NETDATA.googleChartCreate = function(state, data) {
-        var datatable = new google.visualization.DataTable(data.result);
+        let datatable = new google.visualization.DataTable(data.result);
 
         state.google_options = {
             colors: state.chartColors(),
@@ -7842,41 +7842,41 @@ var NETDATA = window.NETDATA || {};
     // ----------------------------------------------------------------------------------------------------------------
 
     NETDATA.easypiechartPercentFromValueMinMax = function(state, value, min, max) {
-        if(typeof value !== 'number') value = 0;
-        if(typeof min !== 'number') min = 0;
-        if(typeof max !== 'number') max = 0;
+        if (typeof value !== 'number') value = 0;
+        if (typeof min !== 'number') min = 0;
+        if (typeof max !== 'number') max = 0;
 
-        if(min > max) {
-            var t = min;
+        if (min > max) {
+            let t = min;
             min = max;
             max = t;
         }
 
-        if(min > value) min = value;
-        if(max < value) max = value;
+        if (min > value) min = value;
+        if (max < value) max = value;
 
         state.legendFormatValueDecimalsFromMinMax(min, max);
 
-        if(state.tmp.easyPieChartMin === null && min > 0) min = 0;
-        if(state.tmp.easyPieChartMax === null && max < 0) max = 0;
+        if (state.tmp.easyPieChartMin === null && min > 0) min = 0;
+        if (state.tmp.easyPieChartMax === null && max < 0) max = 0;
 
-        var pcent;
+        let pcent;
 
-        if(min < 0 && max > 0) {
+        if (min < 0 && max > 0) {
             // it is both positive and negative
             // zero at the top center of the chart
             max = (-min > max)? -min : max;
             pcent = Math.round(value * 100 / max);
         }
-        else if(value >= 0 && min >= 0 && max >= 0) {
+        else if (value >= 0 && min >= 0 && max >= 0) {
             // clockwise
             pcent = Math.round((value - min) * 100 / (max - min));
-            if(pcent === 0) pcent = 0.1;
+            if (pcent === 0) pcent = 0.1;
         }
         else {
             // counter clockwise
             pcent = Math.round((value - max) * 100 / (max - min));
-            if(pcent === 0) pcent = -0.1;
+            if (pcent === 0) pcent = -0.1;
         }
 
         return pcent;
@@ -7886,7 +7886,7 @@ var NETDATA = window.NETDATA || {};
     // easy-pie-chart
 
     NETDATA.easypiechartInitialize = function(callback) {
-        if(typeof netdataNoEasyPieChart === 'undefined' || !netdataNoEasyPieChart) {
+        if (typeof netdataNoEasyPieChart === 'undefined' || !netdataNoEasyPieChart) {
             $.ajax({
                 url: NETDATA.easypiechart_js,
                 cache: true,
@@ -7901,24 +7901,24 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.error(100, NETDATA.easypiechart_js);
                 })
                 .always(function() {
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 })
         }
         else {
             NETDATA.chartLibraries.easypiechart.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
 
     NETDATA.easypiechartClearSelection = function(state, force) {
-        if(typeof state.tmp.easyPieChartEvent !== 'undefined' && typeof state.tmp.easyPieChartEvent.timer !== 'undefined') {
+        if (typeof state.tmp.easyPieChartEvent !== 'undefined' && typeof state.tmp.easyPieChartEvent.timer !== 'undefined') {
             NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
             state.tmp.easyPieChartEvent.timer = undefined;
         }
 
-        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.easypiechartChartUpdate(state, state.data);
         }
         else {
@@ -7931,14 +7931,14 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.easypiechartSetSelection = function(state, t) {
-        if(state.timeIsVisible(t) !== true)
+        if (state.timeIsVisible(t) !== true)
             return NETDATA.easypiechartClearSelection(state, true);
 
-        var slot = state.calculateRowForTime(t);
-        if(slot < 0 || slot >= state.data.result.length)
+        let slot = state.calculateRowForTime(t);
+        if (slot < 0 || slot >= state.data.result.length)
             return NETDATA.easypiechartClearSelection(state, true);
 
-        if(typeof state.tmp.easyPieChartEvent === 'undefined') {
+        if (typeof state.tmp.easyPieChartEvent === 'undefined') {
             state.tmp.easyPieChartEvent = {
                 timer: undefined,
                 value: 0,
@@ -7946,16 +7946,16 @@ var NETDATA = window.NETDATA || {};
             };
         }
 
-        var value = state.data.result[state.data.result.length - 1 - slot];
-        var min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
-        var max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
-        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+        let value = state.data.result[state.data.result.length - 1 - slot];
+        let min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
+        let max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
+        let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
 
         state.tmp.easyPieChartEvent.value = value;
         state.tmp.easyPieChartEvent.pcent = pcent;
         state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
 
-        if(state.tmp.easyPieChartEvent.timer === undefined) {
+        if (state.tmp.easyPieChartEvent.timer === undefined) {
             state.tmp.easyPieChart_instance.disableAnimation();
 
             state.tmp.easyPieChartEvent.timer = NETDATA.timeout.set(function() {
@@ -7968,9 +7968,9 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.easypiechartChartUpdate = function(state, data) {
-        var value, min, max, pcent;
+        let value, min, max, pcent;
 
-        if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
+        if (NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
             value = null;
             pcent = 0;
         }
@@ -7987,32 +7987,32 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.easypiechartChartCreate = function(state, data) {
-        var chart = $(state.element_chart);
+        let chart = $(state.element_chart);
 
-        var value = data.result[0];
-        var min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
-        var max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
+        let value = data.result[0];
+        let min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
+        let max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
 
-        if(min === null) {
+        if (min === null) {
             min = NETDATA.commonMin.get(state);
             state.tmp.easyPieChartMin = null;
         }
         else
             state.tmp.easyPieChartMin = min;
 
-        if(max === null) {
+        if (max === null) {
             max = NETDATA.commonMax.get(state);
             state.tmp.easyPieChartMax = null;
         }
         else
             state.tmp.easyPieChartMax = max;
 
-        var size = state.chartWidth();
-        var stroke = Math.floor(size / 22);
-        if(stroke < 3) stroke = 2;
+        let size = state.chartWidth();
+        let stroke = Math.floor(size / 22);
+        if (stroke < 3) stroke = 2;
 
-        var valuefontsize = Math.floor((size * 2 / 3) / 5);
-        var valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
+        let valuefontsize = Math.floor((size * 2 / 3) / 5);
+        let valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
         state.tmp.easyPieChartLabel = document.createElement('span');
         state.tmp.easyPieChartLabel.className = 'easyPieChartLabel';
         state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
@@ -8020,8 +8020,8 @@ var NETDATA = window.NETDATA || {};
         state.tmp.easyPieChartLabel.style.top = valuetop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.easyPieChartLabel);
 
-        var titlefontsize = Math.round(valuefontsize * 1.6 / 3);
-        var titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
+        let titlefontsize = Math.round(valuefontsize * 1.6 / 3);
+        let titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
         state.tmp.easyPieChartTitle = document.createElement('span');
         state.tmp.easyPieChartTitle.className = 'easyPieChartTitle';
         state.tmp.easyPieChartTitle.innerText = state.title;
@@ -8030,8 +8030,8 @@ var NETDATA = window.NETDATA || {};
         state.tmp.easyPieChartTitle.style.top = titletop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.easyPieChartTitle);
 
-        var unitfontsize = Math.round(titlefontsize * 0.9);
-        var unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
+        let unitfontsize = Math.round(titlefontsize * 0.9);
+        let unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
         state.tmp.easyPieChartUnits = document.createElement('span');
         state.tmp.easyPieChartUnits.className = 'easyPieChartUnits';
         state.tmp.easyPieChartUnits.innerText = state.units_current;
@@ -8039,17 +8039,17 @@ var NETDATA = window.NETDATA || {};
         state.tmp.easyPieChartUnits.style.top = unittop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.easyPieChartUnits);
 
-        var barColor = NETDATA.dataAttribute(state.element, 'easypiechart-barcolor', undefined);
-        if(typeof barColor === 'undefined' || barColor === null)
+        let barColor = NETDATA.dataAttribute(state.element, 'easypiechart-barcolor', undefined);
+        if (typeof barColor === 'undefined' || barColor === null)
             barColor = state.chartCustomColors()[0];
         else {
             // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
-            var tmp = eval(barColor);
-            if(typeof tmp === 'function')
+            let tmp = eval(barColor);
+            if (typeof tmp === 'function')
                 barColor = tmp;
         }
 
-        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+        let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         chart.data('data-percent', pcent);
 
         chart.easyPieChart({
@@ -8068,23 +8068,23 @@ var NETDATA = window.NETDATA || {};
 
         // when we just re-create the chart
         // do not animate the first update
-        var animate = true;
-        if(typeof state.tmp.easyPieChart_instance !== 'undefined')
+        let animate = true;
+        if (typeof state.tmp.easyPieChart_instance !== 'undefined')
             animate = false;
 
         state.tmp.easyPieChart_instance = chart.data('easyPieChart');
-        if(animate === false) state.tmp.easyPieChart_instance.disableAnimation();
+        if (animate === false) state.tmp.easyPieChart_instance.disableAnimation();
         state.tmp.easyPieChart_instance.update(pcent);
-        if(animate === false) state.tmp.easyPieChart_instance.enableAnimation();
+        if (animate === false) state.tmp.easyPieChart_instance.enableAnimation();
 
         state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.easyPieChartUnits !== 'undefined' && state.tmp.units !== units) {
+            if (typeof state.tmp.easyPieChartUnits !== 'undefined' && state.tmp.units !== units) {
                 state.tmp.easyPieChartUnits.innerText = units;
                 state.tmp.units = units;
             }
         };
         state.legendShowUndefined = function() {
-            if(typeof state.tmp.easyPieChart_instance !== 'undefined')
+            if (typeof state.tmp.easyPieChart_instance !== 'undefined')
                 NETDATA.easypiechartClearSelection(state);
         };
 
@@ -8095,7 +8095,7 @@ var NETDATA = window.NETDATA || {};
     // gauge.js
 
     NETDATA.gaugeInitialize = function(callback) {
-        if(typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
+        if (typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
             $.ajax({
                 url: NETDATA.gauge_js,
                 cache: true,
@@ -8110,23 +8110,23 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.error(100, NETDATA.gauge_js);
                 })
                 .always(function() {
-                    if(typeof callback === "function")
+                    if (typeof callback === "function")
                         return callback();
                 })
         }
         else {
             NETDATA.chartLibraries.gauge.enabled = false;
-            if(typeof callback === "function")
+            if (typeof callback === "function")
                 return callback();
         }
     };
 
     NETDATA.gaugeAnimation = function(state, status) {
-        var speed = 32;
+        let speed = 32;
 
-        if(typeof status === 'boolean' && status === false)
+        if (typeof status === 'boolean' && status === false)
             speed = 1000000000;
-        else if(typeof status === 'number')
+        else if (typeof status === 'number')
             speed = status;
 
         // console.log('gauge speed ' + speed);
@@ -8135,17 +8135,17 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeSet = function(state, value, min, max) {
-        if(typeof value !== 'number') value = 0;
-        if(typeof min !== 'number') min = 0;
-        if(typeof max !== 'number') max = 0;
-        if(value > max) max = value;
-        if(value < min) min = value;
-        if(min > max) {
-            var t = min;
+        if (typeof value !== 'number') value = 0;
+        if (typeof min !== 'number') min = 0;
+        if (typeof max !== 'number') max = 0;
+        if (value > max) max = value;
+        if (value < min) min = value;
+        if (min > max) {
+            let t = min;
             min = max;
             max = t;
         }
-        else if(min === max)
+        else if (min === max)
             max = min + 1;
 
         state.legendFormatValueDecimalsFromMinMax(min, max);
@@ -8158,12 +8158,12 @@ var NETDATA = window.NETDATA || {};
         // to prevent it, we always feed it
         // with a percentage, so that the needle
         // is always between min and max
-        var pcent = (value - min) * 100 / (max - min);
+        let pcent = (value - min) * 100 / (max - min);
 
         // bug fix for gauge.js 1.3.1
         // if the value is the absolute min or max, the chart is broken
-        if(pcent < 0.001) pcent = 0.001;
-        if(pcent > 99.999) pcent = 99.999;
+        if (pcent < 0.001) pcent = 0.001;
+        if (pcent > 99.999) pcent = 99.999;
 
         state.tmp.gauge_instance.set(pcent);
         // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
@@ -8174,27 +8174,27 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeSetLabels = function(state, value, min, max) {
-        if(state.tmp.___gaugeOld__.valueLabel !== value) {
+        if (state.tmp.___gaugeOld__.valueLabel !== value) {
             state.tmp.___gaugeOld__.valueLabel = value;
             state.tmp.gaugeChartLabel.innerText = state.legendFormatValue(value);
         }
-        if(state.tmp.___gaugeOld__.minLabel !== min) {
+        if (state.tmp.___gaugeOld__.minLabel !== min) {
             state.tmp.___gaugeOld__.minLabel = min;
             state.tmp.gaugeChartMin.innerText = state.legendFormatValue(min);
         }
-        if(state.tmp.___gaugeOld__.maxLabel !== max) {
+        if (state.tmp.___gaugeOld__.maxLabel !== max) {
             state.tmp.___gaugeOld__.maxLabel = max;
             state.tmp.gaugeChartMax.innerText = state.legendFormatValue(max);
         }
     };
 
     NETDATA.gaugeClearSelection = function(state, force) {
-        if(typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
+        if (typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
             NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
             state.tmp.gaugeEvent.timer = undefined;
         }
 
-        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.gaugeChartUpdate(state, state.data);
         }
         else {
@@ -8208,14 +8208,14 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeSetSelection = function(state, t) {
-        if(state.timeIsVisible(t) !== true)
+        if (state.timeIsVisible(t) !== true)
             return NETDATA.gaugeClearSelection(state, true);
 
-        var slot = state.calculateRowForTime(t);
-        if(slot < 0 || slot >= state.data.result.length)
+        let slot = state.calculateRowForTime(t);
+        if (slot < 0 || slot >= state.data.result.length)
             return NETDATA.gaugeClearSelection(state, true);
 
-        if(typeof state.tmp.gaugeEvent === 'undefined') {
+        if (typeof state.tmp.gaugeEvent === 'undefined') {
             state.tmp.gaugeEvent = {
                 timer: undefined,
                 value: 0,
@@ -8224,21 +8224,21 @@ var NETDATA = window.NETDATA || {};
             };
         }
 
-        var value = state.data.result[state.data.result.length - 1 - slot];
-        var min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
-        var max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
+        let value = state.data.result[state.data.result.length - 1 - slot];
+        let min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
+        let max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
 
         // make sure it is zero based
         // but only if it has not been set by the user
-        if(state.tmp.gaugeMin === null && min > 0) min = 0;
-        if(state.tmp.gaugeMax === null && max < 0) max = 0;
+        if (state.tmp.gaugeMin === null && min > 0) min = 0;
+        if (state.tmp.gaugeMax === null && max < 0) max = 0;
 
         state.tmp.gaugeEvent.value = value;
         state.tmp.gaugeEvent.min = min;
         state.tmp.gaugeEvent.max = max;
         NETDATA.gaugeSetLabels(state, value, min, max);
 
-        if(state.tmp.gaugeEvent.timer === undefined) {
+        if (state.tmp.gaugeEvent.timer === undefined) {
             NETDATA.gaugeAnimation(state, false);
 
             state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function() {
@@ -8251,9 +8251,9 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeChartUpdate = function(state, data) {
-        var value, min, max;
+        let value, min, max;
 
-        if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
+        if (NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
             NETDATA.gaugeSetLabels(state, null, null, null);
             state.tmp.gauge_instance.set(0);
         }
@@ -8261,13 +8261,13 @@ var NETDATA = window.NETDATA || {};
             value = data.result[0];
             min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
             max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
-            if(value < min) min = value;
-            if(value > max) max = value;
+            if (value < min) min = value;
+            if (value > max) max = value;
 
             // make sure it is zero based
             // but only if it has not been set by the user
-            if(state.tmp.gaugeMin === null && min > 0) min = 0;
-            if(state.tmp.gaugeMax === null && max < 0) max = 0;
+            if (state.tmp.gaugeMin === null && min > 0) min = 0;
+            if (state.tmp.gaugeMax === null && max < 0) max = 0;
 
             NETDATA.gaugeSet(state, value, min, max);
             NETDATA.gaugeSetLabels(state, value, min, max);
@@ -8277,26 +8277,26 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeChartCreate = function(state, data) {
-        // var chart = $(state.element_chart);
+        // let chart = $(state.element_chart);
 
-        var value = data.result[0];
-        var min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
-        var max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
-        // var adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
-        var pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
-        var strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
-        var startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
-        var stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
-        var generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
+        let value = data.result[0];
+        let min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
+        let max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
+        // let adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
+        let pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
+        let strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
+        let startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
+        let stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
+        let generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
 
-        if(min === null) {
+        if (min === null) {
             min = NETDATA.commonMin.get(state);
             state.tmp.gaugeMin = null;
         }
         else
             state.tmp.gaugeMin = min;
 
-        if(max === null) {
+        if (max === null) {
             max = NETDATA.commonMax.get(state);
             state.tmp.gaugeMax = null;
         }
@@ -8305,10 +8305,10 @@ var NETDATA = window.NETDATA || {};
 
         // make sure it is zero based
         // but only if it has not been set by the user
-        if(state.tmp.gaugeMin === null && min > 0) min = 0;
-        if(state.tmp.gaugeMax === null && max < 0) max = 0;
+        if (state.tmp.gaugeMin === null && min > 0) min = 0;
+        if (state.tmp.gaugeMax === null && max < 0) max = 0;
 
-        var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
+        let width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
         // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
         //switch(adjust) {
         //  case 'width': width = height * ratio; break;
@@ -8318,9 +8318,9 @@ var NETDATA = window.NETDATA || {};
         //state.element.style.width = width.toString() + 'px';
         //state.element.style.height = height.toString() + 'px';
 
-        var lum_d = 0.05;
+        let lum_d = 0.05;
 
-        var options = {
+        let options = {
             lines: 12,                  // The number of lines to draw
             angle: 0.14,                // The span of the gauge arc
             lineWidth: 0.57,            // The line thickness
@@ -8348,21 +8348,21 @@ var NETDATA = window.NETDATA || {};
             // data-gauge-gradient-percent-color-100="#000000"
 
             options.percentColors = [];
-            var len = generateGradient.length;
-            while(len--) {
-                var pcent = generateGradient[len];
-                var color = NETDATA.dataAttribute(state.element, 'gauge-gradient-percent-color-' + pcent.toString(), false);
-                if(color !== false) {
-                    var a = [];
+            let len = generateGradient.length;
+            while (len--) {
+                let pcent = generateGradient[len];
+                let color = NETDATA.dataAttribute(state.element, 'gauge-gradient-percent-color-' + pcent.toString(), false);
+                if (color !== false) {
+                    let a = [];
                     a[0] = pcent / 100;
                     a[1] = color;
                     options.percentColors.unshift(a);
                 }
             }
-            if(options.percentColors.length === 0)
+            if (options.percentColors.length === 0)
                 delete options.percentColors;
         }
-        else if(generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
+        else if (generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
             //noinspection PointlessArithmeticExpressionJS
             options.percentColors = [
                 [0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
@@ -8385,16 +8385,16 @@ var NETDATA = window.NETDATA || {};
         state.tmp.gauge_canvas.height = height;
         state.element_chart.appendChild(state.tmp.gauge_canvas);
 
-        var valuefontsize = Math.floor(height / 5);
-        var valuetop = Math.round((height - valuefontsize) / 3.2);
+        let valuefontsize = Math.floor(height / 5);
+        let valuetop = Math.round((height - valuefontsize) / 3.2);
         state.tmp.gaugeChartLabel = document.createElement('span');
         state.tmp.gaugeChartLabel.className = 'gaugeChartLabel';
         state.tmp.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
         state.tmp.gaugeChartLabel.style.top = valuetop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.gaugeChartLabel);
 
-        var titlefontsize = Math.round(valuefontsize / 2.1);
-        var titletop = 0;
+        let titlefontsize = Math.round(valuefontsize / 2.1);
+        let titletop = 0;
         state.tmp.gaugeChartTitle = document.createElement('span');
         state.tmp.gaugeChartTitle.className = 'gaugeChartTitle';
         state.tmp.gaugeChartTitle.innerText = state.title;
@@ -8403,7 +8403,7 @@ var NETDATA = window.NETDATA || {};
         state.tmp.gaugeChartTitle.style.top = titletop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.gaugeChartTitle);
 
-        var unitfontsize = Math.round(titlefontsize * 0.9);
+        let unitfontsize = Math.round(titlefontsize * 0.9);
         state.tmp.gaugeChartUnits = document.createElement('span');
         state.tmp.gaugeChartUnits.className = 'gaugeChartUnits';
         state.tmp.gaugeChartUnits.innerText = state.units_current;
@@ -8422,8 +8422,8 @@ var NETDATA = window.NETDATA || {};
 
         // when we just re-create the chart
         // do not animate the first update
-        var animate = true;
-        if(typeof state.tmp.gauge_instance !== 'undefined')
+        let animate = true;
+        if (typeof state.tmp.gauge_instance !== 'undefined')
             animate = false;
 
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
@@ -8447,7 +8447,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.gaugeAnimation(state, true);
 
         state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
+            if (typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
                 state.tmp.gaugeChartUnits.innerText = units;
                 state.tmp.___gaugeOld__.valueLabel = null;
                 state.tmp.___gaugeOld__.minLabel = null;
@@ -8456,7 +8456,7 @@ var NETDATA = window.NETDATA || {};
             }
         };
         state.legendShowUndefined = function() {
-            if(typeof state.tmp.gauge_instance !== 'undefined')
+            if (typeof state.tmp.gauge_instance !== 'undefined')
                 NETDATA.gaugeClearSelection(state);
         };
 
@@ -8472,7 +8472,7 @@ var NETDATA = window.NETDATA || {};
             create: NETDATA.dygraphChartCreate,
             update: NETDATA.dygraphChartUpdate,
             resize: function(state) {
-                if(typeof state.tmp.dygraph_instance !== 'undefined' && typeof state.tmp.dygraph_instance.resize === 'function')
+                if (typeof state.tmp.dygraph_instance !== 'undefined' && typeof state.tmp.dygraph_instance.resize === 'function')
                     state.tmp.dygraph_instance.resize();
             },
             setSelection: NETDATA.dygraphSetSelection,
@@ -8493,24 +8493,24 @@ var NETDATA = window.NETDATA || {};
                 return (this.isSparkline(state) === false)?3:2;
             },
             isSparkline: function(state) {
-                if(typeof state.tmp.dygraph_sparkline === 'undefined') {
+                if (typeof state.tmp.dygraph_sparkline === 'undefined') {
                     state.tmp.dygraph_sparkline = (this.theme(state) === 'sparkline');
                 }
                 return state.tmp.dygraph_sparkline;
             },
             isLogScale: function(state) {
-                if(typeof state.tmp.dygraph_logscale === 'undefined') {
+                if (typeof state.tmp.dygraph_logscale === 'undefined') {
                     state.tmp.dygraph_logscale = (this.theme(state) === 'logscale');
                 }
                 return state.tmp.dygraph_logscale;
             },
             theme: function(state) {
-                if(typeof state.tmp.dygraph_theme === 'undefined')
+                if (typeof state.tmp.dygraph_theme === 'undefined')
                     state.tmp.dygraph_theme = NETDATA.dataAttribute(state.element, 'dygraph-theme', 'default');
                 return state.tmp.dygraph_theme;
             },
             container_class: function(state) {
-                if(this.legend(state) !== null)
+                if (this.legend(state) !== null)
                     return 'netdata-container-with-legend';
                 return 'netdata-container';
             }
@@ -8720,7 +8720,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.registerChartLibrary = function(library, url) {
-        if(NETDATA.options.debug.libraries === true)
+        if (NETDATA.options.debug.libraries === true)
             console.log("registering chart library: " + library);
 
         NETDATA.chartLibraries[library].url = url;
@@ -8737,7 +8737,7 @@ var NETDATA = window.NETDATA || {};
             async: false,
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
-                if(typeof $().emulateTransitionEnd === 'function')
+                if (typeof $().emulateTransitionEnd === 'function')
                     return true;
                 else {
                     return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
@@ -8772,23 +8772,23 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.loadedRequiredJs = 0;
     NETDATA.loadRequiredJs = function(index, callback) {
-        if(index >= NETDATA.requiredJs.length) {
-            if(typeof callback === 'function')
+        if (index >= NETDATA.requiredJs.length) {
+            if (typeof callback === 'function')
                 return callback();
             return;
         }
 
-        if(NETDATA.requiredJs[index].isAlreadyLoaded()) {
+        if (NETDATA.requiredJs[index].isAlreadyLoaded()) {
             NETDATA.loadedRequiredJs++;
             NETDATA.loadRequiredJs(++index, callback);
             return;
         }
 
-        if(NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop === true)
             console.log('loading ' + NETDATA.requiredJs[index].url);
 
-        var async = true;
-        if(typeof NETDATA.requiredJs[index].async !== 'undefined' && NETDATA.requiredJs[index].async === false)
+        let async = true;
+        if (typeof NETDATA.requiredJs[index].async !== 'undefined' && NETDATA.requiredJs[index].async === false)
             async = false;
 
         $.ajax({
@@ -8798,7 +8798,7 @@ var NETDATA = window.NETDATA || {};
             xhrFields: { withCredentials: true } // required for the cookie
         })
         .done(function() {
-            if(NETDATA.options.debug.main_loop === true)
+            if (NETDATA.options.debug.main_loop === true)
                 console.log('loaded ' + NETDATA.requiredJs[index].url);
         })
         .fail(function() {
@@ -8807,24 +8807,24 @@ var NETDATA = window.NETDATA || {};
         .always(function() {
             NETDATA.loadedRequiredJs++;
 
-            if(async === false)
+            if (async === false)
                 NETDATA.loadRequiredJs(++index, callback);
         });
 
-        if(async === true)
+        if (async === true)
             NETDATA.loadRequiredJs(++index, callback);
     };
 
     NETDATA.loadRequiredCSS = function(index) {
-        if(index >= NETDATA.requiredCSS.length)
+        if (index >= NETDATA.requiredCSS.length)
             return;
 
-        if(NETDATA.requiredCSS[index].isAlreadyLoaded()) {
+        if (NETDATA.requiredCSS[index].isAlreadyLoaded()) {
             NETDATA.loadRequiredCSS(++index);
             return;
         }
 
-        if(NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop === true)
             console.log('loading ' + NETDATA.requiredCSS[index].url);
 
         NETDATA._loadCSS(NETDATA.requiredCSS[index].url);
@@ -8866,13 +8866,13 @@ var NETDATA = window.NETDATA || {};
         recipients: null,               // the list (array) of recipients to show alarms for, or null
 
         recipientMatches: function(to_string, wanted_array) {
-            if(typeof wanted_array === 'undefined' || wanted_array === null || Array.isArray(wanted_array) === false)
+            if (typeof wanted_array === 'undefined' || wanted_array === null || Array.isArray(wanted_array) === false)
                 return true;
 
-            var r = ' ' + to_string.toString() + ' ';
-            var len = wanted_array.length;
-            while(len--) {
-                if(r.indexOf(' ' + wanted_array[len] + ' ') >= 0)
+            let r = ' ' + to_string.toString() + ' ';
+            let len = wanted_array.length;
+            while (len--) {
+                if (r.indexOf(' ' + wanted_array[len] + ' ') >= 0)
                     return true;
             }
 
@@ -8880,17 +8880,17 @@ var NETDATA = window.NETDATA || {};
         },
 
         activeForRecipients: function() {
-            var active = {};
-            var data = NETDATA.alarms.current;
+            let active = {};
+            let data = NETDATA.alarms.current;
 
-            if(typeof data === 'undefined' || data === null)
+            if (typeof data === 'undefined' || data === null)
                 return active;
 
-            for(var x in data.alarms) {
-                if(!data.alarms.hasOwnProperty(x)) continue;
+            for (let x in data.alarms) {
+                if (!data.alarms.hasOwnProperty(x)) continue;
 
-                var alarm = data.alarms[x];
-                if((alarm.status === 'WARNING' || alarm.status === 'CRITICAL') && NETDATA.alarms.recipientMatches(alarm.recipient, NETDATA.alarms.recipients))
+                let alarm = data.alarms[x];
+                if ((alarm.status === 'WARNING' || alarm.status === 'CRITICAL') && NETDATA.alarms.recipientMatches(alarm.recipient, NETDATA.alarms.recipients))
                     active[x] = alarm;
             }
 
@@ -8900,28 +8900,28 @@ var NETDATA = window.NETDATA || {};
         notify: function(entry) {
             // console.log('alarm ' + entry.unique_id);
 
-            if(entry.updated === true) {
+            if (entry.updated === true) {
                 // console.log('alarm ' + entry.unique_id + ' has been updated by another alarm');
                 return;
             }
 
-            var value_string = entry.value_string;
+            let value_string = entry.value_string;
 
-            if(NETDATA.alarms.current !== null) {
+            if (NETDATA.alarms.current !== null) {
                 // get the current value_string
-                var t = NETDATA.alarms.current.alarms[entry.chart + '.' + entry.name];
-                if(typeof t !== 'undefined' && entry.status === t.status && typeof t.value_string !== 'undefined')
+                let t = NETDATA.alarms.current.alarms[entry.chart + '.' + entry.name];
+                if (typeof t !== 'undefined' && entry.status === t.status && typeof t.value_string !== 'undefined')
                     value_string = t.value_string;
             }
 
-            var name = entry.name.replace(/_/g, ' ');
-            var status = entry.status.toLowerCase();
-            var title = name + ' = ' + value_string.toString();
-            var tag = entry.alarm_id;
-            var icon = 'images/seo-performance-128.png';
-            var interaction = false;
-            var data = entry;
-            var show = true;
+            let name = entry.name.replace(/_/g, ' ');
+            let status = entry.status.toLowerCase();
+            let title = name + ' = ' + value_string.toString();
+            let tag = entry.alarm_id;
+            let icon = 'images/seo-performance-128.png';
+            let interaction = false;
+            let data = entry;
+            let show = true;
 
             // console.log('alarm ' + entry.unique_id + ' ' + entry.chart + '.' + entry.name + ' is ' +  entry.status);
 
@@ -8937,15 +8937,15 @@ var NETDATA = window.NETDATA || {};
                     return;
 
                 case 'CLEAR':
-                    if(entry.unique_id < NETDATA.alarms.first_notification_id) {
+                    if (entry.unique_id < NETDATA.alarms.first_notification_id) {
                         // console.log('alarm ' + entry.unique_id + ' is not current');
                         return;
                     }
-                    if(entry.old_status === 'UNINITIALIZED' || entry.old_status === 'UNDEFINED') {
+                    if (entry.old_status === 'UNINITIALIZED' || entry.old_status === 'UNDEFINED') {
                         // console.log('alarm' + entry.unique_id + ' switch to CLEAR from ' + entry.old_status);
                         return;
                     }
-                    if(entry.no_clear_notification === true) {
+                    if (entry.no_clear_notification === true) {
                         // console.log('alarm' + entry.unique_id + ' is CLEAR but has no_clear_notification flag');
                         return;
                     }
@@ -8955,7 +8955,7 @@ var NETDATA = window.NETDATA || {};
                     break;
 
                 case 'WARNING':
-                    if(entry.old_status === 'CRITICAL')
+                    if (entry.old_status === 'CRITICAL')
                         status = 'demoted to ' + entry.status.toLowerCase();
 
                     icon = 'images/alert-128-orange.png';
@@ -8963,7 +8963,7 @@ var NETDATA = window.NETDATA || {};
                     break;
 
                 case 'CRITICAL':
-                    if(entry.old_status === 'WARNING')
+                    if (entry.old_status === 'WARNING')
                         status = 'escalated to ' + entry.status.toLowerCase();
                     
                     icon = 'images/alert-128-red.png';
@@ -8976,17 +8976,17 @@ var NETDATA = window.NETDATA || {};
             }
 
             // filter recipients
-            if(show === true)
+            if (show === true)
                 show = NETDATA.alarms.recipientMatches(entry.recipient, NETDATA.alarms.recipients);
 
             /*
             // cleanup old notifications with the same alarm_id as this one
             // it does not seem to work on any web browser - so notifications cannot be removed
 
-            var len = NETDATA.alarms.notifications_shown.length;
-            while(len--) {
-                var n = NETDATA.alarms.notifications_shown[len];
-                if(n.data.alarm_id === entry.alarm_id) {
+            let len = NETDATA.alarms.notifications_shown.length;
+            while (len--) {
+                let n = NETDATA.alarms.notifications_shown[len];
+                if (n.data.alarm_id === entry.alarm_id) {
                     console.log('removing old alarm ' + n.data.unique_id);
 
                     // close the notification
@@ -8999,15 +8999,15 @@ var NETDATA = window.NETDATA || {};
             }
             */
 
-            if(show === true) {
-                if(typeof NETDATA.alarms.notificationCallback === 'function')
+            if (show === true) {
+                if (typeof NETDATA.alarms.notificationCallback === 'function')
                     show = NETDATA.alarms.notificationCallback(entry);
 
-                if(show === true) {
+                if (show === true) {
                     setTimeout(function() {
                         // show this notification
                         // console.log('new notification: ' + title);
-                        var n = new Notification(title, {
+                        let n = new Notification(title, {
                             body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
                             tag: tag,
                             requireInteraction: interaction,
@@ -9031,9 +9031,9 @@ var NETDATA = window.NETDATA || {};
         },
 
         scrollToChart: function(chart_id) {
-            if(typeof chart_id === 'string') {
-                var offset = $('#' + NETDATA.alarms.chart_div_id_prefix + NETDATA.name2id(chart_id)).offset();
-                if(typeof offset !== 'undefined') {
+            if (typeof chart_id === 'string') {
+                let offset = $('#' + NETDATA.alarms.chart_div_id_prefix + NETDATA.name2id(chart_id)).offset();
+                if (typeof offset !== 'undefined') {
                     $('html, body').animate({ scrollTop: offset.top + NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
                     return true;
                 }
@@ -9042,10 +9042,10 @@ var NETDATA = window.NETDATA || {};
         },
 
         scrollToAlarm: function(alarm) {
-            if(typeof alarm === 'object') {
-                var ret = NETDATA.alarms.scrollToChart(alarm.chart);
+            if (typeof alarm === 'object') {
+                let ret = NETDATA.alarms.scrollToChart(alarm.chart);
 
-                if(ret === true && NETDATA.options.page_is_visible === false)
+                if (ret === true && NETDATA.options.page_is_visible === false)
                     window.focus();
                 //    alert('netdata dashboard will now scroll to chart: ' + alarm.chart + '\n\nThis alarm opened to bring the browser window in front of the screen. Click on the dashboard to prevent it from appearing again.');
             }
@@ -9057,12 +9057,12 @@ var NETDATA = window.NETDATA || {};
             NETDATA.alarms.get_log(NETDATA.alarms.last_notification_id, function(data) {
                 // console.log('ALARM LOG FETCHED');
 
-                if(data === null || typeof data !== 'object') {
+                if (data === null || typeof data !== 'object') {
                     console.log('invalid alarms log response');
                     return;
                 }
 
-                if(data.length === 0) {
+                if (data.length === 0) {
                     console.log('received empty alarm log');
                     return;
                 }
@@ -9070,16 +9070,16 @@ var NETDATA = window.NETDATA || {};
                 // console.log('received alarm log of ' + data.length + ' entries, from ' + data[data.length - 1].unique_id.toString() + ' to ' + data[0].unique_id.toString());
 
                 data.sort(function(a, b) {
-                    if(a.unique_id > b.unique_id) return -1;
-                    if(a.unique_id < b.unique_id) return 1;
+                    if (a.unique_id > b.unique_id) return -1;
+                    if (a.unique_id < b.unique_id) return 1;
                     return 0;
                 });
 
                 NETDATA.alarms.ms_penalty = 0;
 
-                var len = data.length;
-                while(len--) {
-                    if(data[len].unique_id > NETDATA.alarms.last_notification_id) {
+                let len = data.length;
+                while (len--) {
+                    if (data[len].unique_id > NETDATA.alarms.last_notification_id) {
                         NETDATA.alarms.notify(data[len]);
                     }
                     //else
@@ -9088,7 +9088,7 @@ var NETDATA = window.NETDATA || {};
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
 
-                if(typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true)
+                if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true)
                     NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
                 // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
@@ -9097,20 +9097,20 @@ var NETDATA = window.NETDATA || {};
         check_notifications: function() {
             // returns true if we should fire 1+ notifications
 
-            if(NETDATA.alarms.notifications !== true) {
+            if (NETDATA.alarms.notifications !== true) {
                 // console.log('web notifications are not available');
                 return false;
             }
 
-            if(Notification.permission !== 'granted') {
+            if (Notification.permission !== 'granted') {
                 // console.log('web notifications are not granted');
                 return false;
             }
 
-            if(typeof NETDATA.alarms.current !== 'undefined' && typeof NETDATA.alarms.current.alarms === 'object') {
+            if (typeof NETDATA.alarms.current !== 'undefined' && typeof NETDATA.alarms.current.alarms === 'object') {
                 // console.log('can do alarms: old id = ' + NETDATA.alarms.last_notification_id + ' new id = ' + NETDATA.alarms.current.latest_alarm_log_unique_id);
 
-                if(NETDATA.alarms.current.latest_alarm_log_unique_id > NETDATA.alarms.last_notification_id) {
+                if (NETDATA.alarms.current.latest_alarm_log_unique_id > NETDATA.alarms.last_notification_id) {
                     // console.log('new alarms detected');
                     return true;
                 }
@@ -9135,29 +9135,29 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkOptional('/api/v1/alarms', data /*, '.*\.(calc|calc_parsed|warn|warn_parsed|crit|crit_parsed)$' */);
 
-                    if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
+                    if (NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
                         NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(415, NETDATA.alarms.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
 
         update_forever: function() {
-            if(netdataShowAlarms !== true || netdataSnapshotData !== null)
+            if (netdataShowAlarms !== true || netdataSnapshotData !== null)
                 return;
 
             NETDATA.alarms.get('active', function(data) {
-                if(data !== null) {
+                if (data !== null) {
                     NETDATA.alarms.current = data;
 
-                    if(NETDATA.alarms.check_notifications() === true) {
+                    if (NETDATA.alarms.check_notifications() === true) {
                         NETDATA.alarms.notifyAll();
                     }
 
@@ -9166,7 +9166,7 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     // Health monitoring is disabled on this netdata
-                    if(data.status === false) return;
+                    if (data.status === false) return;
                 }
 
                 setTimeout(NETDATA.alarms.update_forever, NETDATA.alarms.update_every);
@@ -9188,13 +9188,13 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkOptional('/api/v1/alarm_log', data);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(416, NETDATA.alarms.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
@@ -9202,25 +9202,25 @@ var NETDATA = window.NETDATA || {};
         init: function() {
             NETDATA.alarms.server = NETDATA.fixHost(NETDATA.serverDefault);
 
-            if(typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true) {
+            if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true) {
                 NETDATA.alarms.last_notification_id =
                     NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
             }
 
-            if(NETDATA.alarms.onclick === null)
+            if (NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
 
-            if(typeof netdataAlarmsRecipients !== 'undefined' && Array.isArray(netdataAlarmsRecipients))
+            if (typeof netdataAlarmsRecipients !== 'undefined' && Array.isArray(netdataAlarmsRecipients))
                 NETDATA.alarms.recipients = netdataAlarmsRecipients;
 
-            if(netdataShowAlarms === true) {
+            if (netdataShowAlarms === true) {
                 NETDATA.alarms.update_forever();
             
-                if('Notification' in window) {
+                if ('Notification' in window) {
                     // console.log('notifications available');
                     NETDATA.alarms.notifications = true;
 
-                    if(Notification.permission === 'default')
+                    if (Notification.permission === 'default')
                         Notification.requestPermission();
                 }
             }
@@ -9243,17 +9243,17 @@ var NETDATA = window.NETDATA || {};
             // console.log(person_urls);
             NETDATA.registry.person_urls = person_urls;
 
-            if(person_urls) {
+            if (person_urls) {
                 NETDATA.registry.machines = {};
                 NETDATA.registry.machines_array = [];
 
-                var apu = person_urls;
-                var i = apu.length;
-                while(i--) {
-                    if(typeof NETDATA.registry.machines[apu[i][0]] === 'undefined') {
+                let apu = person_urls;
+                let i = apu.length;
+                while (i--) {
+                    if (typeof NETDATA.registry.machines[apu[i][0]] === 'undefined') {
                         // console.log('adding: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
 
-                        var obj = {
+                        let obj = {
                             guid: apu[i][0],
                             url: apu[i][1],
                             last_t: apu[i][2],
@@ -9269,8 +9269,8 @@ var NETDATA = window.NETDATA || {};
                     else {
                         // console.log('appending: ' + apu[i][4] + ', ' + ((now - apu[i][2]) / 1000).toString());
 
-                        var pu = NETDATA.registry.machines[apu[i][0]];
-                        if(pu.last_t < apu[i][2]) {
+                        let pu = NETDATA.registry.machines[apu[i][0]];
+                        if (pu.last_t < apu[i][2]) {
                             pu.url = apu[i][1];
                             pu.last_t = apu[i][2];
                             pu.name = apu[i][4];
@@ -9281,15 +9281,15 @@ var NETDATA = window.NETDATA || {};
                 }
             }
 
-            if(typeof netdataRegistryCallback === 'function')
+            if (typeof netdataRegistryCallback === 'function')
                 netdataRegistryCallback(NETDATA.registry.machines_array);
         },
 
         init: function() {
-            if(netdataRegistry !== true) return;
+            if (netdataRegistry !== true) return;
 
             NETDATA.registry.hello(NETDATA.serverDefault, function(data) {
-                if(data) {
+                if (data) {
                     NETDATA.registry.server = data.registry;
                     NETDATA.registry.machine_guid = data.machine_guid;
                     NETDATA.registry.hostname = data.hostname;
@@ -9321,18 +9321,18 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkOptional('/api/v1/registry?action=hello', data);
 
-                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                    if (typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(408, host + ' response: ' + JSON.stringify(data));
                         data = null;
                     }
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(407, host);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
@@ -9356,37 +9356,37 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkAlways('/api/v1/registry?action=access', data);
 
-                    var redirect = null;
-                    if(typeof data.registry === 'string')
+                    let redirect = null;
+                    if (typeof data.registry === 'string')
                         redirect = data.registry;
 
-                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                    if (typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(409, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
                     }
 
-                    if(data === null) {
-                        if(redirect !== null && max_redirects > 0) {
+                    if (data === null) {
+                        if (redirect !== null && max_redirects > 0) {
                             NETDATA.registry.server = redirect;
                             NETDATA.registry.access(max_redirects - 1, callback);
                         }
                         else {
-                            if(typeof callback === 'function')
+                            if (typeof callback === 'function')
                                 return callback(null);
                         }
                     }
                     else {
-                        if(typeof data.person_guid === 'string')
+                        if (typeof data.person_guid === 'string')
                             NETDATA.registry.person_guid = data.person_guid;
 
-                        if(typeof callback === 'function')
+                        if (typeof callback === 'function')
                             return callback(data.urls);
                     }
                 })
                 .fail(function() {
                     NETDATA.error(410, NETDATA.registry.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
@@ -9406,18 +9406,18 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkAlways('/api/v1/registry?action=delete', data);
 
-                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                    if (typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(411, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
                     }
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(412, NETDATA.registry.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
@@ -9437,18 +9437,18 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkAlways('/api/v1/registry?action=search', data);
 
-                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                    if (typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(417, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
                     }
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(418, NETDATA.registry.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         },
@@ -9468,18 +9468,18 @@ var NETDATA = window.NETDATA || {};
                 .done(function(data) {
                     data = NETDATA.xss.checkAlways('/api/v1/registry?action=switch', data);
 
-                    if(typeof data.status !== 'string' || data.status !== 'ok') {
+                    if (typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(413, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
                     }
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(414, NETDATA.registry.server);
 
-                    if(typeof callback === 'function')
+                    if (typeof callback === 'function')
                         return callback(null);
                 });
         }
@@ -9488,7 +9488,7 @@ var NETDATA = window.NETDATA || {};
     // ----------------------------------------------------------------------------------------------------------------
     // Boot it!
 
-    if(typeof netdataPrepCallback === 'function')
+    if (typeof netdataPrepCallback === 'function')
         netdataPrepCallback();
 
     NETDATA.errorReset();
@@ -9496,13 +9496,13 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA._loadjQuery(function() {
         NETDATA.loadRequiredJs(0, function() {
-            if(typeof $().emulateTransitionEnd !== 'function') {
+            if (typeof $().emulateTransitionEnd !== 'function') {
                 // bootstrap is not available
                 NETDATA.options.current.show_help = false;
             }
 
-            if(typeof netdataDontStart === 'undefined' || !netdataDontStart) {
-                if(NETDATA.options.debug.main_loop === true)
+            if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
+                if (NETDATA.options.debug.main_loop === true)
                     console.log('starting chart refresh thread');
 
                 NETDATA.start();
