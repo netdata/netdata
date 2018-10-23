@@ -54,9 +54,9 @@ void grouping_add_stddev(RRDR *r, calculated_number value) {
     }
 }
 
-//static inline calculated_number mean(struct grouping_stddev *g) {
-//    return (g->count > 0) ? g->m_newM : 0.0;
-//}
+static inline calculated_number mean(struct grouping_stddev *g) {
+    return (g->count > 0) ? g->m_newM : 0.0;
+}
 
 static inline calculated_number variance(struct grouping_stddev *g) {
     return ( (g->count > 1) ? g->m_newS/(g->count - 1) : 0.0 );
@@ -76,6 +76,31 @@ calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_op
     }
     else {
         value = stddev(g);
+
+        if(!isnormal(value)) {
+            value = 0.0;
+            *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
+        }
+    }
+
+    grouping_reset_stddev(r);
+
+    return  value;
+}
+
+// https://en.wikipedia.org/wiki/Coefficient_of_variation
+calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+
+    calculated_number value;
+
+    if(unlikely(!g->count)) {
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
+    }
+    else {
+        calculated_number m = mean(g);
+        value = 100.0 * stddev(g) / ((m < 0)? -m : m);
 
         if(!isnormal(value)) {
             value = 0.0;

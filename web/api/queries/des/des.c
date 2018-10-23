@@ -18,22 +18,28 @@ struct grouping_des {
     size_t count;
 };
 
+#define MAX_WINDOW_SIZE 10
+
 static inline void set_alpha(RRDR *r, struct grouping_des *g) {
     // https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
     // A commonly used value for alpha is 2 / (N + 1)
-    g->alpha = 2.0 / ((calculated_number)r->group + 1.0);
+    calculated_number window = (r->group > MAX_WINDOW_SIZE) ? MAX_WINDOW_SIZE : r->group;
+
+    g->alpha = 2.0 / ((calculated_number)window + 1.0);
     g->alpha_other = 1.0 - g->alpha;
 
-    info("alpha for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->alpha);
+    //info("alpha for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->alpha);
 }
 
 static inline void set_beta(RRDR *r, struct grouping_des *g) {
     // https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
     // A commonly used value for alpha is 2 / (N + 1)
-    g->beta = 2.0 / ((calculated_number)r->group + 1.0);
+    calculated_number window = (r->group > MAX_WINDOW_SIZE) ? MAX_WINDOW_SIZE : r->group;
+
+    g->beta = 2.0 / ((calculated_number)window + 1.0);
     g->beta_other = 1.0 - g->beta;
 
-    info("beta for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->beta);
+    //info("beta for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->beta);
 }
 
 void *grouping_init_des(RRDR *r) {
@@ -89,7 +95,7 @@ void grouping_add_des(RRDR *r, calculated_number value) {
         g->count++;
     }
 
-    // fprintf(stderr, CALCULATED_NUMBER_FORMAT ", ", value);
+    //fprintf(stderr, "value: " CALCULATED_NUMBER_FORMAT ", level: " CALCULATED_NUMBER_FORMAT ", trend: " CALCULATED_NUMBER_FORMAT "\n", value, g->level, g->trend);
 }
 
 calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
@@ -100,7 +106,7 @@ calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
         return 0.0;
     }
 
-    // fprintf(stderr, " = " CALCULATED_NUMBER_FORMAT " \n", g->level);
+    //fprintf(stderr, " RESULT for %zu values = " CALCULATED_NUMBER_FORMAT " \n", g->count, g->level);
 
     return g->level;
 }
