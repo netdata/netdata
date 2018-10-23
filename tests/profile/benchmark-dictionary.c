@@ -7,7 +7,8 @@
  *
  */
 
-#include "common.h"
+#include "config.h"
+#include "libnetdata/libnetdata.h"
 
 struct myvalue {
 	int i;

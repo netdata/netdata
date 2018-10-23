@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+
 #include "config.h"
-#include "common.h"
-#include "clocks.h"
+#include "libnetdata/libnetdata.h"
 
 void netdata_cleanup_and_exit(int ret) {
 	exit(ret);
