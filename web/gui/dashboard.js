@@ -147,7 +147,7 @@ const NETDATA = window.NETDATA || {};
                     if (Array.isArray(obj) === true) {
                         // console.log('checking array "' + name + '"');
 
-                        const len = obj.length;
+                        let len = obj.length;
                         while (len--)
                             obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
                     }
@@ -388,6 +388,7 @@ const NETDATA = window.NETDATA || {};
         // backward compatibility
         netdataRegistry = (typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry === false);
     }
+
     if (netdataRegistry === false && typeof netdataRegistryCallback === 'function')
         netdataRegistry = true;
 
@@ -397,8 +398,9 @@ const NETDATA = window.NETDATA || {};
 
     let isSlowDeviceResult = undefined;
     let isSlowDevice = function() {
-        if (isSlowDeviceResult !== undefined)
+        if (isSlowDeviceResult !== undefined) {
             return isSlowDeviceResult;
+        }
 
         try {
             let ua = navigator.userAgent.toLowerCase();
@@ -406,8 +408,7 @@ const NETDATA = window.NETDATA || {};
             let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
             let android = /android/.test(ua) && !window.MSStream;
             isSlowDeviceResult = (iOS === true || android === true);
-        }
-        catch (e) {
+        } catch (e) {
             isSlowDeviceResult = false;
         }
 
@@ -616,8 +617,7 @@ const NETDATA = window.NETDATA || {};
                 this.clear = function(handle) {
                     return window.cancelAnimationFrame(handle.value);
                 };
-            }
-            else if (window.webkitRequestAnimationFrame) {
+            } else if (window.webkitRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.webkitRequestAnimationFrame(callback);
                 };
@@ -632,8 +632,7 @@ const NETDATA = window.NETDATA || {};
                         return window.webkitCancelRequestAnimationFrame(handle.value);
                     };
                 }
-            }
-            else if (window.mozRequestAnimationFrame) {
+            } else if (window.mozRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.mozRequestAnimationFrame(callback);
                 };
@@ -641,8 +640,7 @@ const NETDATA = window.NETDATA || {};
                 this.clear = function(handle) {
                     return window.mozCancelRequestAnimationFrame(handle.value);
                 };
-            }
-            else if (window.oRequestAnimationFrame) {
+            } else if (window.oRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.oRequestAnimationFrame(callback);
                 };
@@ -650,8 +648,7 @@ const NETDATA = window.NETDATA || {};
                 this.clear = function(handle) {
                     return window.oCancelRequestAnimationFrame(handle.value);
                 };
-            }
-            else if (window.msRequestAnimationFrame) {
+            } else if (window.msRequestAnimationFrame) {
                 this.step = function(callback) {
                     return window.msRequestAnimationFrame(callback);
                 };
@@ -659,9 +656,9 @@ const NETDATA = window.NETDATA || {};
                 this.clear = function(handle) {
                     return window.msCancelRequestAnimationFrame(handle.value);
                 };
-            }
-            else
+            } else {
                 custom = false;
+            }
 
 
             if (custom === true) {
@@ -680,8 +677,7 @@ const NETDATA = window.NETDATA || {};
 
                         if (delta >= delay) {
                             callback.call();
-                        }
-                        else {
+                        } else {
                             handle.value = that.step(loop);
                         }
                     }
@@ -716,13 +712,12 @@ const NETDATA = window.NETDATA || {};
                 localStorage.setItem(test, test);
                 localStorage.removeItem(test);
                 NETDATA.localStorageTested = true;
-            }
-            catch (e) {
+            } catch (e) {
                 NETDATA.localStorageTested = false;
             }
-        }
-        else
+        } else {
             NETDATA.localStorageTested = false;
+        }
 
         return NETDATA.localStorageTested;
     };
@@ -744,14 +739,12 @@ const NETDATA = window.NETDATA || {};
                     // console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
                     localStorage.setItem(key.toString(), JSON.stringify(def));
                     ret = def;
-                }
-                else {
+                } else {
                     // console.log('localStorage: got "' + key.toString() + '" with value "' + ret + '"');
                     ret = JSON.parse(ret);
                     // console.log('localStorage: loaded "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
                 }
-            }
-            catch(error) {
+            } catch(error) {
                 console.log('localStorage: failed to read "' + key.toString() + '", using default: "' + def.toString() + '"');
                 ret = def;
             }
@@ -781,8 +774,7 @@ const NETDATA = window.NETDATA || {};
             // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
             try {
                 localStorage.setItem(key.toString(), JSON.stringify(value));
-            }
-            catch(e) {
+            } catch(e) {
                 console.log('localStorage: failed to save "' + key.toString() + '" with value: "' + value.toString() + '"');
             }
         }
@@ -813,8 +805,7 @@ const NETDATA = window.NETDATA || {};
                 NETDATA.options.current[key.toString()] = value;
                 NETDATA.options.current.setOptionCallback();
             }
-        }
-        else if (NETDATA.options.current[key.toString()] !== value) {
+        } else if (NETDATA.options.current[key.toString()] !== value) {
             let name = 'options.' + key.toString();
 
             if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined')
@@ -825,8 +816,9 @@ const NETDATA = window.NETDATA || {};
             //console.log(NETDATA.options);
             NETDATA.options.current[key.toString()] = NETDATA.localStorageSet(name.toString(), value, null);
 
-            if (typeof NETDATA.options.current.setOptionCallback === 'function')
+            if (typeof NETDATA.options.current.setOptionCallback === 'function') {
                 NETDATA.options.current.setOptionCallback();
+            }
         }
 
         return true;
@@ -845,6 +837,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.resetOptions = function() {
         let keys = Object.keys(NETDATA.localStorage.default);
         let len = keys.length;
+        
         while (len--) {
             let i = keys[len];
             let a = i.split('.');
@@ -855,8 +848,7 @@ const NETDATA = window.NETDATA || {};
                 if (NETDATA.options.current[i] === NETDATA.localStorage.default[i]) continue;
 
                 NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
-            }
-            else if (a[0] === 'chart_heights') {
+            } else if (a[0] === 'chart_heights') {
                 if (typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
                     NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
                 }
@@ -926,9 +918,11 @@ const NETDATA = window.NETDATA || {};
                 let targets = NETDATA.options.targets;
                 let len = targets.length;
 
-                while (len--)
-                    if (targets[len].running === false)
+                while (len--) {
+                    if (targets[len].running === false) {
                         targets[len].isVisible();
+                    }
+                }
             }
         }
 
@@ -946,8 +940,9 @@ const NETDATA = window.NETDATA || {};
         NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
         NETDATA.scrollY = window.scrollY;
 
-        if (NETDATA.onscroll_updater_timeout_id)
+        if (NETDATA.onscroll_updater_timeout_id) {
             NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
+        }
 
         NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
         //console.log('onscroll() end');
@@ -1054,8 +1049,7 @@ const NETDATA = window.NETDATA || {};
                     });
 
                 return this.formatters_fixed[key];
-            }
-            else if (min === 0) {
+            } else if (min === 0) {
                 if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
                         // style: 'decimal',
@@ -1068,8 +1062,7 @@ const NETDATA = window.NETDATA || {};
                     });
 
                 return this.formatters_zero_based[key];
-            }
-            else {
+            } else {
                 // this is never used
                 // it is added just for completeness
                 return new Intl.NumberFormat(undefined, {
@@ -1104,8 +1097,7 @@ const NETDATA = window.NETDATA || {};
                     };
 
                 return this.formatters_fixed[key];
-            }
-            else if (min === 0) {
+            } else if (min === 0) {
                 if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
@@ -1122,8 +1114,7 @@ const NETDATA = window.NETDATA || {};
                     };
 
                 return this.formatters_zero_based[key];
-            }
-            else {
+            } else {
                 return {
                     format: function (value) {
                         return value.toLocaleString(undefined, {
@@ -1153,8 +1144,7 @@ const NETDATA = window.NETDATA || {};
                     };
 
                 return this.formatters_fixed[key];
-            }
-            else if (min === 0) {
+            } else if (min === 0) {
                 if (typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
@@ -1164,8 +1154,7 @@ const NETDATA = window.NETDATA || {};
                     };
 
                 return this.formatters_zero_based[key];
-            }
-            else {
+            } else {
                 return {
                     format: function (value) {
                         if (value === 0) return "0";
@@ -1188,8 +1177,7 @@ const NETDATA = window.NETDATA || {};
                 });
 
                 s = x.format(value);
-            }
-            catch(e) {
+            } catch(e) {
                 s = "";
             }
 
@@ -1208,8 +1196,7 @@ const NETDATA = window.NETDATA || {};
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 });
-            }
-            catch(e) {
+            } catch(e) {
                 s = "";
             }
 
@@ -1222,12 +1209,10 @@ const NETDATA = window.NETDATA || {};
             if (this.testIntlNumberFormat()) {
                 // console.log('numberformat');
                 this.get = this.getIntlNumberFormat;
-            }
-            else if (this.testLocaleString()) {
+            } else if (this.testLocaleString()) {
                 // console.log('localestring');
                 this.get = this.getLocaleString;
-            }
-            else {
+            } else {
                 // console.log('fixed');
                 this.get = this.getFixed;
             }
@@ -1254,8 +1239,9 @@ const NETDATA = window.NETDATA || {};
                 return JSON.parse(data);
 
             return data;
+        } else {
+            return def;
         }
-        else return def;
     };
 
     NETDATA.dataAttributeBoolean = function(element, attribute, def) {
@@ -1319,8 +1305,7 @@ const NETDATA = window.NETDATA || {};
                 if (t[uuid] === min) {
                     //state.log('commonMin ' + state.tmp.__commonMin + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
-                }
-                else if (min < this.latest[name]) {
+                } else if (min < this.latest[name]) {
                     //state.log('commonMin ' + state.tmp.__commonMin + ' increased: ' + min);
                     t[uuid] = min;
                     this.latest[name] = min;
@@ -1333,8 +1318,9 @@ const NETDATA = window.NETDATA || {};
 
             // find the common min
             let m = min;
-            for (let i in t)
+            for (let i in t) {
                 if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
+            }
 
             //state.log('commonMin ' + state.tmp.__commonMin + ' updated: ' + m);
             this.latest[name] = m;
@@ -1378,8 +1364,7 @@ const NETDATA = window.NETDATA || {};
                 if (t[uuid] === max) {
                     //state.log('commonMax ' + state.tmp.__commonMax + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
-                }
-                else if (max > this.latest[name]) {
+                } else if (max > this.latest[name]) {
                     //state.log('commonMax ' + state.tmp.__commonMax + ' increased: ' + max);
                     t[uuid] = max;
                     this.latest[name] = max;
@@ -1392,8 +1377,9 @@ const NETDATA = window.NETDATA || {};
 
             // find the common max
             let m = max;
-            for (let i in t)
+            for (let i in t) {
                 if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
+            }
 
             //state.log('commonMax ' + state.tmp.__commonMax + ' updated: ' + m);
             this.latest[name] = m;
@@ -1438,8 +1424,9 @@ const NETDATA = window.NETDATA || {};
 
                 // copy the custom colors
                 len = ret.custom.length;
-                while (len--)
+                while (len--) {
                     ret.available.unshift(ret.custom[len]);
+                }
             }
 
             state.colors_assigned = ret.assigned;
@@ -1575,8 +1562,7 @@ const NETDATA = window.NETDATA || {};
 
             if (netdataSnapshotData !== null) {
                 got_data(host, netdataSnapshotData.charts, callback);
-            }
-            else {
+            } else {
                 $.ajax({
                     url: host + '/api/v1/charts',
                     async: true,
@@ -1743,8 +1729,7 @@ const NETDATA = window.NETDATA || {};
 
                 if (typeof this.callback === 'function')
                     this.callback(true, this.after, this.before);
-            }
-            else {
+            } else {
                 if (typeof this.callback === 'function')
                     this.callback(false, 0, 0);
             }
@@ -1856,13 +1841,11 @@ const NETDATA = window.NETDATA || {};
 
                     if (ds.parent.countSelected() === 0)
                         ds.parent.selectAll();
-                }
-                else {
+                } else {
                     // no key is pressed -> select only this (except if it is the only selected already, in which case select all)
                     if (ds.parent.countSelected() === 1) {
                         ds.parent.selectAll();
-                    }
-                    else {
+                    } else {
                         ds.parent.selectNone();
                         ds.select();
                     }
@@ -1873,8 +1856,7 @@ const NETDATA = window.NETDATA || {};
                 if (e.shiftKey === true || e.ctrlKey === true) {
                     // control or shift key is pressed -> select this too
                     ds.select();
-                }
-                else {
+                } else {
                     // no key is pressed -> select only this
                     ds.parent.selectNone();
                     ds.select();
@@ -1933,8 +1915,9 @@ const NETDATA = window.NETDATA || {};
     dimensionsVisibility.prototype.invalidateAll = function() {
         let keys = Object.keys(this.dimensions);
         let len = keys.length;
-        while (len--)
+        while (len--) {
             this.dimensions[keys[len]].invalidate();
+        }
     };
 
     dimensionsVisibility.prototype.selectAll = function() {
@@ -1972,12 +1955,10 @@ const NETDATA = window.NETDATA || {};
             if (typeof ds === 'undefined') {
                 // console.log(array[i] + ' is not found');
                 ret.unshift(false);
-            }
-            else if (ds.isSelected()) {
+            } else if (ds.isSelected()) {
                 ret.unshift(true);
                 this.selected_count++;
-            }
-            else {
+            } else {
                 ret.unshift(false);
                 this.unselected_count++;
             }
@@ -2024,8 +2005,7 @@ const NETDATA = window.NETDATA || {};
             // detect browser timezone
             try {
                 NETDATA.options.browser_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            }
-            catch(e) {
+            } catch(e) {
                 console.log('failed to detect browser timezone: ' + e.toString());
                 NETDATA.options.browser_timezone = 'cannot-detect-it';
             }
@@ -2066,8 +2046,7 @@ const NETDATA = window.NETDATA || {};
                     timeOptions.timeZoneName = 'short';
                     xAxisOptions.timeZone = timezone;
                     this.using_timezone = true;
-                }
-                else {
+                } else {
                     timezone = 'default';
                     this.using_timezone = false;
                 }
@@ -2092,8 +2071,7 @@ const NETDATA = window.NETDATA || {};
                 //let t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
 
                 ret = true;
-            }
-            catch(e) {
+            } catch(e) {
                 console.log('Cannot setup Date/Time formatting: ' + e.toString());
 
                 timezone = 'default';
@@ -2413,8 +2391,7 @@ const NETDATA = window.NETDATA || {};
 
                             return value / tdivider;
                         };
-                    }
-                    else {
+                    } else {
                         // the caller did not give data-common-units
                         // this chart auto-scales independently of all others
                         //console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + tunits.toString() + ' with divider ' + tdivider.toString() + ', autonomously');
@@ -2422,8 +2399,7 @@ const NETDATA = window.NETDATA || {};
                         switch_units_callback(tunits);
                         return function (value) { return value / tdivider; };
                     }
-                }
-                else {
+                } else {
                     // the caller wants specific units
 
                     if (typeof this.scalableUnits[units][desired_units] !== 'undefined') {
@@ -2432,16 +2408,14 @@ const NETDATA = window.NETDATA || {};
                         // console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + desired_units.toString() + ' with divider ' + tdivider.toString() + ', by reference');
                         switch_units_callback(desired_units);
                         return function (value) { return value / tdivider; };
-                    }
-                    else {
+                    } else {
                         // oops! switch back to original units
                         console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
                         switch_units_callback(units);
                         return function (value) { return value; };
                     }
                 }
-           }
-           else if (typeof this.convertibleUnits[units] !== 'undefined') {
+           } else if (typeof this.convertibleUnits[units] !== 'undefined') {
                 // units that can be converted
                 if (desired_units === 'auto') {
                     for (x in this.convertibleUnits[units]) {
@@ -2458,18 +2432,15 @@ const NETDATA = window.NETDATA || {};
                     //console.log('DEBUG: ' + uuid.toString() + ' no conversion available for ' + units.toString() + ' to: ' + desired_units.toString());
                     switch_units_callback(units);
                     return function (value) { return value; };
-                }
-                else if (typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
+                } else if (typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
                     switch_units_callback(desired_units);
                     return this.convertibleUnits[units][desired_units].convert;
-                }
-                else {
+                } else {
                     console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
                     switch_units_callback(units);
                     return function (value) { return value; };
                 }
-           }
-           else {
+           } else {
                 // hm... did we forget to implement the new type?
                 console.log('Unmatched unit conversion method for units ' + units.toString());
                 switch_units_callback(units);
@@ -2671,8 +2642,7 @@ const NETDATA = window.NETDATA || {};
                     }
                     else if (state.__visibilityRatio === 0)
                         state.log("was not visible until now, but was already in visible_targets");
-                }
-                else {
+                } else {
                     idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
                     if (idx !== -1)
                         NETDATA.intersectionObserver.visible_targets.splice(idx, 1);
@@ -2807,14 +2777,13 @@ const NETDATA = window.NETDATA || {};
             NETDATA.error(402, this.library_name);
             error('chart library "' + this.library_name + '" is not found');
             this.enabled = false;
-        }
-        else if (NETDATA.chartLibraries[this.library_name].enabled === false) {
+        } else if (NETDATA.chartLibraries[this.library_name].enabled === false) {
             NETDATA.error(403, this.library_name);
             error('chart library "' + this.library_name + '" is not enabled');
             this.enabled = false;
-        }
-        else
+        } else {
             this.library = NETDATA.chartLibraries[this.library_name];
+        }
 
         this.auto = {
             name: 'auto',
@@ -2930,9 +2899,9 @@ const NETDATA = window.NETDATA || {};
                     that.log('ignoring invalid value of property data-update-every');
 
                 that.force_update_every = null;
-            }
-            else
+            } else {
                 that.force_update_every *= 1000;
+            }
 
             // the dimensions requested by the user
             that.dimensions = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'dimensions', null));
@@ -3219,8 +3188,7 @@ const NETDATA = window.NETDATA || {};
 
                     // we should destroy it
                     init('force');
-                }
-                else {
+                } else {
                     if (this.debug === true)
                         this.log('hideChart(): hiding chart');
 
@@ -3258,8 +3226,7 @@ const NETDATA = window.NETDATA || {};
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
                 init('force');
-            }
-            else {
+            } else {
                 if (this.debug === true)
                     this.log('unhideChart(): unhiding chart');
 
@@ -3396,8 +3363,7 @@ const NETDATA = window.NETDATA || {};
                         that.log('resizeChart(): initializing chart');
 
                     init('force');
-                }
-                else if (typeof that.library.resize === 'function') {
+                } else if (typeof that.library.resize === 'function') {
                     if (that.debug === true)
                         that.log('resizeChart(): resizing chart');
 
@@ -3465,8 +3431,7 @@ const NETDATA = window.NETDATA || {};
             if (e.type === 'touchstart') {
                 this.event_resize.mouse_start_x = e.touches.item(0).pageX;
                 this.event_resize.mouse_start_y = e.touches.item(0).pageY;
-            }
-            else {
+            } else {
                 this.event_resize.mouse_start_x = e.clientX;
                 this.event_resize.mouse_start_y = e.clientY;
             }
@@ -3524,8 +3489,7 @@ const NETDATA = window.NETDATA || {};
                     if (this.event_resize.chart_last_h !== wanted)
                         resizeChartToHeight(wanted.toString() + 'px');
                 }
-            }
-            else {
+            } else {
                 this.event_resize.last = now;
 
                 // process movement event
@@ -3937,8 +3901,7 @@ const NETDATA = window.NETDATA || {};
             let dmin, dmax;
             if (this.value_decimal_detail !== -1) {
                 dmin = dmax = this.value_decimal_detail;
-            }
-            else {
+            } else {
                 dmin = 0;
                 let abs = (value < 0) ? -value : value;
                 if (abs > 1000)        dmax = 0;
@@ -4195,15 +4158,12 @@ const NETDATA = window.NETDATA || {};
             if (typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {
                 // this.log('the legend does not have any series - requesting legend update');
                 needed = true;
-            }
-            else if (this.data === null) {
+            } else if (this.data === null) {
                 // this.log('the chart does not have any data - requesting legend update');
                 needed = true;
-            }
-            else if (typeof this.element_legend_childs.series.labels_key === 'undefined') {
+            } else if (typeof this.element_legend_childs.series.labels_key === 'undefined') {
                 needed = true;
-            }
-            else {
+            } else {
                 let labels = this.data.dimension_names.toString();
                 if (labels !== this.element_legend_childs.series.labels_key) {
                     needed = true;
@@ -4238,8 +4198,9 @@ const NETDATA = window.NETDATA || {};
                     this.colors = [];
                     keys = Object.keys(this.chart.dimensions);
                     len = keys.length;
-                    for (i = 0; i < len ;i++)
+                    for (i = 0; i < len ;i++) {
                         NETDATA.commonColors.get(this, this.chart.dimensions[keys[i]].name);
+                    }
                 }
             }
 
@@ -4560,8 +4521,7 @@ const NETDATA = window.NETDATA || {};
                     delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                     content: 'You can click or tap on the values or the labels to select dimensions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
                 });
-            }
-            else {
+            } else {
                 this.element_legend_childs = {
                     content: content,
                     resize_handler: null,
@@ -4588,8 +4548,7 @@ const NETDATA = window.NETDATA || {};
                 for (i = 0, len = this.data.dimension_names.length; i < len ;i++) {
                     genLabel(this, content, this.data.dimension_ids[i], this.data.dimension_names[i], i);
                 }
-            }
-            else {
+            } else {
                 let tmp = [];
                 keys = Object.keys(this.chart.dimensions);
                 for (i = 0, len = keys.length; i < len ;i++) {
@@ -4731,8 +4690,7 @@ const NETDATA = window.NETDATA || {};
 
                     this.current.force_before_ms = null;
                     this.current.force_after_ms = null;
-                }
-                else {
+                } else {
                     this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
 
                     after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
@@ -4743,8 +4701,7 @@ const NETDATA = window.NETDATA || {};
                     this.requested_padding = null;
                     points_multiplier = 1;
                 }
-            }
-            else {
+            } else {
                 this.tm.pan_and_zoom_seq = 0;
 
                 before = this.before;
@@ -4763,8 +4720,7 @@ const NETDATA = window.NETDATA || {};
             if (NETDATA.options.force_data_points !== 0) {
                 data_points = NETDATA.options.force_data_points;
                 this.data_points = data_points;
-            }
-            else {
+            } else {
                 this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
                 data_points = this.data_points * points_multiplier;
             }
@@ -4833,8 +4789,7 @@ const NETDATA = window.NETDATA || {};
                     // console.log('adjusting view_before from ' + this.view_before + ' to ' + this.data_before);
                     this.view_before = this.data_before;
                 }
-            }
-            else {
+            } else {
                 this.view_after = this.data_after;
                 this.view_before = this.data_before;
             }
@@ -4877,8 +4832,7 @@ const NETDATA = window.NETDATA || {};
 
                 if (callChartLibraryUpdateSafely(data) === false)
                     return;
-            }
-            else {
+            } else {
                 if (this.debug === true)
                     this.log('creating chart...');
 
@@ -4888,8 +4842,7 @@ const NETDATA = window.NETDATA || {};
             if (this.isVisible() === true) {
                 hideMessage();
                 this.legendShowLatestValues();
-            }
-            else {
+            } else {
                 this.__redraw_on_unhide = true;
 
                 if (this.debug === true)
@@ -4960,8 +4913,7 @@ const NETDATA = window.NETDATA || {};
                     this.log('uncompressed snapshot data for key ' + key + ' is undefined');
                     return null;
                 }
-            }
-            catch(e) {
+            } catch(e) {
                 this.log('decompression of snapshot data for key ' + key + ' failed');
                 console.log(e);
                 uncompressed = null;
@@ -4975,8 +4927,7 @@ const NETDATA = window.NETDATA || {};
             let data;
             try {
                 data = JSON.parse(uncompressed);
-            }
-            catch(e) {
+            } catch(e) {
                 this.log('parsing snapshot data for key ' + key + ' failed');
                 console.log(e);
                 data = null;
@@ -5045,8 +4996,7 @@ const NETDATA = window.NETDATA || {};
                     return this.library.initialize(function () {
                         return that.updateChart(callback);
                     });
-                }
-                else {
+                } else {
                     error('chart library "' + this.library_name + '" is not available.');
 
                     if (typeof callback === 'function')
@@ -5075,8 +5025,7 @@ const NETDATA = window.NETDATA || {};
                     ok = true;
                     data = NETDATA.xss.checkData('/api/v1/data', data, this.library.xssRegexIgnore);
                     this.updateChartWithData(data);
-                }
-                else {
+                } else {
                     ok = false;
                     error('cannot get data from snapshot for key: "' + key + '"');
                     that.tm.last_autorefreshed = Date.now();
@@ -5318,8 +5267,7 @@ const NETDATA = window.NETDATA || {};
                     if (typeof callback === 'function')
                         return callback();
                 });
-            }
-            else {
+            } else {
                 if (typeof callback === 'function')
                     return callback();
             }
@@ -5349,8 +5297,7 @@ const NETDATA = window.NETDATA || {};
 
                 if (typeof callback === 'function')
                     return callback();
-            }
-            else if (netdataSnapshotData !== null) {
+            } else if (netdataSnapshotData !== null) {
                 // console.log(this);
                 // console.log(NETDATA.chartRegistry);
                 NETDATA.error(404, 'host: ' + this.host + ', chart: ' +  this.id);
@@ -5358,8 +5305,7 @@ const NETDATA = window.NETDATA || {};
 
                 if (typeof callback === 'function')
                     return callback();
-            }
-            else {
+            } else {
                 this.chart_url = "/api/v1/chart?chart=" + this.id;
 
                 if (this.debug === true)
@@ -5643,8 +5589,7 @@ const NETDATA = window.NETDATA || {};
 
             NETDATA.options.auto_refresher_fast_weight = 0;
             callback();
-        }
-        else {
+        } else {
             let state = targets[index];
 
             if (NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
@@ -5659,8 +5604,7 @@ const NETDATA = window.NETDATA || {};
                     }, 0);
                 else
                     NETDATA.chartRefresherNoParallel(++index, callback);
-            }
-            else {
+            } else {
                 if (NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
                 NETDATA.options.auto_refresher_fast_weight = 0;
 
@@ -5956,8 +5900,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.peity.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -6017,8 +5960,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.sparkline.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -6172,8 +6114,7 @@ const NETDATA = window.NETDATA || {};
             if (r !== -1) {
                 state.tmp.dygraph_instance.setSelection(r);
                 return true;
-            }
-            else {
+            } else {
                 state.tmp.dygraph_instance.clearSelection();
                 state.legendShowUndefined();
             }
@@ -6230,8 +6171,7 @@ const NETDATA = window.NETDATA || {};
                 else if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.dygraph.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -6277,12 +6217,10 @@ const NETDATA = window.NETDATA || {};
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
             //options.isZoomedIgnoreProgrammaticZoom = true;
             state.tmp.dygraph_force_zoom = false;
-        }
-        else if (state.current.name !== 'auto') {
+        } else if (state.current.name !== 'auto') {
             if (NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() loose update');
-        }
-        else {
+        } else {
             if (NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() strict update');
 
@@ -6654,8 +6592,7 @@ const NETDATA = window.NETDATA || {};
                             // NETDATA.globalSelectionSync.delay();
                             state.tmp.dygraph_highlight_after = null;
                             Dygraph.startPan(event, dygraph, context);
-                        }
-                        else if (event.altKey || event.ctrlKey || event.metaKey) {
+                        } else if (event.altKey || event.ctrlKey || event.metaKey) {
                             //console.log('middle mouse button highlight');
 
                             if (!(event.offsetX && event.offsetY)) {
@@ -6664,8 +6601,7 @@ const NETDATA = window.NETDATA || {};
                             }
                             state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
                             Dygraph.startZoom(event, dygraph, context);
-                        }
-                        else {
+                        } else {
                             //console.log('middle mouse button selection for zoom (ZOOM)');
 
                             state.setMode('zoom');
@@ -6673,8 +6609,7 @@ const NETDATA = window.NETDATA || {};
                             state.tmp.dygraph_highlight_after = null;
                             Dygraph.startZoom(event, dygraph, context);
                         }
-                    }
-                    else {
+                    } else {
                         if (event.shiftKey) {
                             //console.log('left mouse button selection for zoom (ZOOM)');
 
@@ -6682,8 +6617,7 @@ const NETDATA = window.NETDATA || {};
                             // NETDATA.globalSelectionSync.delay();
                             state.tmp.dygraph_highlight_after = null;
                             Dygraph.startZoom(event, dygraph, context);
-                        }
-                        else if (event.altKey || event.ctrlKey || event.metaKey) {
+                        } else if (event.altKey || event.ctrlKey || event.metaKey) {
                             //console.log('left mouse button highlight');
 
                             if (!(event.offsetX && event.offsetY)) {
@@ -6692,8 +6626,7 @@ const NETDATA = window.NETDATA || {};
                             }
                             state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
                             Dygraph.startZoom(event, dygraph, context);
-                        }
-                        else {
+                        } else {
                             //console.log('left mouse button dragging (PAN)');
 
                             state.setMode('pan');
@@ -6716,8 +6649,7 @@ const NETDATA = window.NETDATA || {};
                         state.tmp.dygraph_user_action = true;
                         Dygraph.moveZoom(event, dygraph, context);
                         event.preventDefault();
-                    }
-                    else if (context.isPanning) {
+                    } else if (context.isPanning) {
                         //console.log('panning...');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6729,8 +6661,7 @@ const NETDATA = window.NETDATA || {};
                         state.setMode('pan');
                         context.is2DPan = false;
                         Dygraph.movePan(event, dygraph, context);
-                    }
-                    else if (context.isZooming) {
+                    } else if (context.isZooming) {
                         //console.log('zooming...');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6775,8 +6706,7 @@ const NETDATA = window.NETDATA || {};
 
                         // refresh all the charts immediately
                         NETDATA.options.auto_refresher_stop_until = 0;
-                    }
-                    else if (context.isPanning) {
+                    } else if (context.isPanning) {
                         //console.log('done panning');
 
                         NETDATA.globalSelectionSync.stop();
@@ -6787,8 +6717,7 @@ const NETDATA = window.NETDATA || {};
 
                         // refresh all the charts immediately
                         NETDATA.options.auto_refresher_stop_until = 0;
-                    }
-                    else if (context.isZooming) {
+                    } else if (context.isZooming) {
                         //console.log('done zomming');
 
                         NETDATA.globalSelectionSync.stop();
@@ -7065,14 +6994,12 @@ const NETDATA = window.NETDATA || {};
             if (typeof state.tmp.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
                 state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
                 state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
-            }
-            else {
+            } else {
                 state.log('incompatible version of Dygraph detected');
                 state.tmp.__commonMin = null;
                 state.tmp.__commonMax = null;
             }
-        }
-        else {
+        } else {
             // if the user gave a valueRange, respect it
             state.tmp.__commonMin = null;
             state.tmp.__commonMax = null;
@@ -7093,14 +7020,12 @@ const NETDATA = window.NETDATA || {};
                     NETDATA.raphaelInitialize(function() {
                         NETDATA.morrisInitialize(callback);
                     });
-                }
-                else {
+                } else {
                     NETDATA.chartLibraries.morris.enabled = false;
                     if (typeof callback === "function")
                         return callback();
                 }
-            }
-            else {
+            } else {
                 NETDATA._loadCSS(NETDATA.morris_css);
 
                 $.ajax({
@@ -7121,8 +7046,7 @@ const NETDATA = window.NETDATA || {};
                         return callback();
                 });
             }
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.morris.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7186,8 +7110,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.raphael.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7224,14 +7147,12 @@ const NETDATA = window.NETDATA || {};
                     NETDATA.d3Initialize(function() {
                         NETDATA.c3Initialize(callback);
                     });
-                }
-                else {
+                } else {
                     NETDATA.chartLibraries.c3.enabled = false;
                     if (typeof callback === "function")
                         return callback();
                 }
-            }
-            else {
+            } else {
                 NETDATA._loadCSS(NETDATA.c3_css);
 
                 $.ajax({
@@ -7252,8 +7173,7 @@ const NETDATA = window.NETDATA || {};
                         return callback();
                 });
             }
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.c3.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7340,14 +7260,12 @@ const NETDATA = window.NETDATA || {};
                     NETDATA.d3Initialize(function() {
                         NETDATA.d3pieInitialize(callback);
                     });
-                }
-                else {
+                } else {
                     NETDATA.chartLibraries.d3pie.enabled = false;
                     if (typeof callback === "function")
                         return callback();
                 }
-            }
-            else {
+            } else {
                 $.ajax({
                     url: NETDATA.d3pie_js,
                     cache: true,
@@ -7366,8 +7284,7 @@ const NETDATA = window.NETDATA || {};
                             return callback();
                     });
             }
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.d3pie.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7459,8 +7376,7 @@ const NETDATA = window.NETDATA || {};
 
         if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.d3pieChartUpdate(state, state.data);
-        }
-        else {
+        } else {
             if (state.tmp.d3pie_last_slot !== -1) {
                 state.tmp.d3pie_last_slot = -1;
                 NETDATA.d3pieChange(state, [{label: 'no data', value: 1, color: '#666666'}], 'no data available');
@@ -7687,8 +7603,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.d3.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7733,8 +7648,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof callback === "function")
                     return callback();
             });
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.google.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -7867,13 +7781,11 @@ const NETDATA = window.NETDATA || {};
             // zero at the top center of the chart
             max = (-min > max)? -min : max;
             pcent = Math.round(value * 100 / max);
-        }
-        else if (value >= 0 && min >= 0 && max >= 0) {
+        } else if (value >= 0 && min >= 0 && max >= 0) {
             // clockwise
             pcent = Math.round((value - min) * 100 / (max - min));
             if (pcent === 0) pcent = 0.1;
-        }
-        else {
+        } else {
             // counter clockwise
             pcent = Math.round((value - max) * 100 / (max - min));
             if (pcent === 0) pcent = -0.1;
@@ -7904,8 +7816,7 @@ const NETDATA = window.NETDATA || {};
                     if (typeof callback === "function")
                         return callback();
                 })
-        }
-        else {
+        } else {
             NETDATA.chartLibraries.easypiechart.enabled = false;
             if (typeof callback === "function")
                 return callback();
@@ -8196,8 +8107,7 @@ const NETDATA = window.NETDATA || {};
 
         if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.gaugeChartUpdate(state, state.data);
-        }
-        else {
+        } else {
             NETDATA.gaugeAnimation(state, false);
             NETDATA.gaugeSetLabels(state, null, null, null);
             NETDATA.gaugeSet(state, null, null, null);
@@ -8256,8 +8166,7 @@ const NETDATA = window.NETDATA || {};
         if (NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
             NETDATA.gaugeSetLabels(state, null, null, null);
             state.tmp.gauge_instance.set(0);
-        }
-        else {
+        } else {
             value = data.result[0];
             min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
             max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
