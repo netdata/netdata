@@ -446,7 +446,7 @@ RRDR *rrd2rrdr(
             info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, group_time_requested, duration);
             #endif
 
-            group = points_requested; // use all the points
+            group = available_points; // use all the points
         }
         else {
             // the points we should group to satisfy gtime
