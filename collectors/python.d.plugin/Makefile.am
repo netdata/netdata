@@ -37,6 +37,7 @@ dist_pythonconfig_DATA = \
     $(top_srcdir)/installer/.keep \
     $(NULL)
 
+include adaptec_raid/Makefile.inc
 include apache/Makefile.inc
 include beanstalk/Makefile.inc
 include bind_rndc/Makefile.inc

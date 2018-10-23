@@ -22,6 +22,7 @@ dist_userhealthconfig_DATA = \
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     $(top_srcdir)/installer/.keep \
+    health.d/adaptec_raid.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
     health.d/backend.conf \
