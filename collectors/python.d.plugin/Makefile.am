@@ -81,6 +81,7 @@ include portcheck/Makefile.inc
 include postfix/Makefile.inc
 include postgres/Makefile.inc
 include powerdns/Makefile.inc
+include proxysql/Makefile.inc
 include puppet/Makefile.inc
 include rabbitmq/Makefile.inc
 include redis/Makefile.inc
