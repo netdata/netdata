@@ -19,11 +19,7 @@ packaging/ @paulfantom
 # streaming/
 # system/ 
 # tests/
-# web/ 
-
-# Ownership by filetype (overwrites ownership by directory)
-*.am @paulfantom @ktsaou
-
+# web/
 
 # Ownership of specific files
 CHANGELOG.md @netdatabot
