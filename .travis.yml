@@ -1,67 +1,91 @@
+---
 dist: trusty
 sudo: true
-#
+
 # C includes autotools and make by default
 language: c
 services:
   - docker
-os:
-  - linux
-  - osx
-compiler:
- - gcc
- - clang
-#
-# Extra packages
-addons:
-  apt:
-    packages:
-    - gnupg
-    - libcap2-bin
-    - zlib1g-dev
-    - uuid-dev
-    - fakeroot
-#
-# Setup environment
-before_install:
- - eval "$(ssh-agent -s)"
- - ./.travis/decrypt-if-have-key decb6f6387c4
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew uninstall gnupg || echo; brew install gpg; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fakeroot; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ossp-uuid; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install xz; fi
-#
-# Run
-before_script:
- - gpg --import packaging/gpg.keys
- # Run the commit hooks in case the developer didn't
- - git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 | ./packaging/check-files -
-script:
-   # make release packages
- - fakeroot ./packaging/git-build
-   # make self-extractor
- - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./makeself/build-x86_64-static.sh; fi
-   # test build and installer
- - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-#
-# Deploy as required
-after_success:
-  - for i in *.tar.*; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then for i in *.gz.run; do md5sum -b $i > $i.md5; sha512sum -b $i > $i.sha; done; fi
-  - ./.travis/deploy-if-have-key
-deploy:
-  # Upload results to GitHub (tag only)
-  - provider: releases
-    draft: true
-    api_key:
-      secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
-    skip_cleanup: true
-    file_glob: true
-    file:
-      - "netdata*.tar.*"
-      - "netdata*.gz.run*"
-    on:
-      condition: $CC = gcc && $TRAVIS_OS_NAME = linux
-      repo: firehol/netdata
-      tags: true
+
+stages:
+  - lint
+  - test
+  - build
+  - name: release
+    if: branch = master AND type != pull_request
+  - name: package
+    if: branch = master AND type != pull_request
+
+jobs:
+  include:
+    - stage: "lint"
+      name: "python"
+      install: skip
+      script: docker run -ti --rm -v $(pwd):/code alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 /code/collectors/python.d.plugin/python.d.plugin.in /code/
+    - name: "css"
+      install: skip
+      script: docker run --rm -v $(pwd):/code eeacms/csslint sh -c "csslint /code/web/gui/*.css" || echo "OK"
+    - name: "bash"
+      install: skip
+      script: docker run --rm --volume "$(pwd)":/code:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /code/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi'
+    - stage: "test"
+      name: "C"
+      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
+      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+#      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
+#    - name: "Node.js"
+#      script: tests/run_nodejs.sh
+    - name: "coverity"
+      install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+      script: ./coverity-scan.sh || echo "Coverity failed :("
+      env: INSTALL_COVERITY="true"
+      if: type = cron
+
+    - stage: "build"
+      name: "OSX"
+      install: brew install fakeroot ossp-uuid
+      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+      os: osx
+    - name: "ubuntu 14.04 (not containerized)"
+      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
+      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
+    - name: "ubuntu 18.04"
+      script: ./.travis/containerized_build.sh ubuntu1804
+    - name: "CentOS 7"
+      script: ./.travis/containerized_build.sh centos7
+    - name: "CentOS 6"
+      script: ./.travis/containerized_build.sh centos6
+    - name: "alpine"
+      script: ./.travis/containerized_build.sh alpine
+
+    - stage: "release"
+      name: "Create release"
+      script: .travis/releaser.sh
+
+    - stage: "package"
+      name: "Archive and self-extractor"
+      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+      script: .travis/create_artifacts.sh
+      deploy:
+        - provider: releases
+          draft: true
+          api_key:
+            secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
+          skip_cleanup: true
+          file_glob: true
+          file:
+            - "netdata*.tar.gz*"
+            - "netdata*.gz.run*"
+            - "sha256sums.txt"
+          on:
+            repo: netdata/netdata
+            tags: true
+    - name: "Docker images"
+      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
+      script: docker/build.sh
+      env: REPOSITORY="netdata/netdata"
+      if: type = cron OR tag =~ ^v
+
+notifications:
+  webhooks: https://app.fossa.io/hooks/travisci

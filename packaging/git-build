@@ -1,9 +1,10 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # When run from the top-level repository, performs a complete clean
 # and maintainer-mode rebuild of the FireHOL package.
 
-if [ ! -f .gitignore -o ! -f configure.ac -o ! -x autogen.sh ]
+if [ ! -f .gitignore -o ! -f configure.ac ]
 then
   echo "Run as ./packaging/git-build from an autotools git repository"
   exit 1
@@ -46,9 +47,8 @@ then
 fi
 
 set -e
-./autogen.sh
+autoreconf -ivf
 ./configure --enable-maintainer-mode 
 set +e
-make dist
-status=$?
-exit $status
+make dist || exit
+./packaging/tar-compare . netdata-*.tar.gz || exit

@@ -1,4 +1,6 @@
 # no shebang necessary - this is a library to be sourced
+# SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC1091,SC1117,SC2002,SC2004,SC2034,SC2046,SC2059,SC2086,SC2129,SC2148,SC2154,SC2155,SC2162,SC2166,SC2181,SC2193
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -8,8 +10,8 @@
 # checking the availability of commands
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {
@@ -120,6 +122,7 @@ netdata_banner() {
 # portable service command
 
 service_cmd="$(which_cmd service)"
+rcservice_cmd="$(which_cmd rc-service)"
 systemctl_cmd="$(which_cmd systemctl)"
 service() {
     local cmd="${1}" action="${2}"
@@ -132,9 +135,70 @@ service() {
     then
         run "${service_cmd}" "${cmd}" "${action}"
         return $?
+    elif [ ! -z "${rcservice_cmd}" ]
+    then
+        run "${rcservice_cmd}" "${cmd}" "${action}"
+        return $?
     fi
     return 1
 }
+
+# -----------------------------------------------------------------------------
+# portable pidof
+
+pidof_cmd="$(which_cmd pidof)"
+pidof() {
+    if [ ! -z "${pidof_cmd}" ]
+    then
+        ${pidof_cmd} "${@}"
+        return $?
+    else
+        ps -acxo pid,comm |\
+            sed "s/^ *//g" |\
+            grep netdata |\
+            cut -d ' ' -f 1
+        return $?
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# portable delete recursively interactively
+
+portable_deletedir_recursively_interactively() {
+    if [ ! -z "$1" -a -d "$1" ]
+        then
+        if [ "$(uname -s)" = "Darwin" ]
+        then
+            echo >&2
+            read >&2 -p "Press ENTER to recursively delete directory '$1' > "
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -R "$1"
+        else
+            echo >&2
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -I -R "$1"
+        fi
+    else
+        echo "Directory '$1' does not exist."
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
+
+export SYSTEM_CPUS=1
+portable_find_processors() {
+    if [ -f "/proc/cpuinfo" ]
+    then
+        # linux
+        SYSTEM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+    else
+        # freebsd
+        SYSTEM_CPUS=$(sysctl hw.ncpu 2>/dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
+    fi
+    [ -z "${SYSTEM_CPUS}" -o $(( SYSTEM_CPUS )) -lt 1 ] && SYSTEM_CPUS=1
+}
+portable_find_processors
 
 # -----------------------------------------------------------------------------
 
@@ -239,31 +303,34 @@ portable_check_user_in_group() {
 }
 
 portable_add_user() {
-    local username="${1}"
+    local username="${1}" homedir="${2}"
+
+    [ -z "${homedir}" ] && homedir="/tmp"
 
     portable_check_user_exists "${username}"
     [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
-    echo >&2 "Adding ${username} user account ..."
+    echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
+    # shellcheck disable=SC2230
     local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
     # Linux
     if check_cmd useradd
     then
-        run useradd -r -g "${username}" -c "${username}" -s "${nologin}" -d / "${username}" && return 0
+        run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
     fi
 
     # FreeBSD
     if check_cmd pw
     then
-        run pw useradd "${username}" -d / -g "${username}" -s "${nologin}" && return 0
+        run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
     fi
 
     # BusyBox
     if check_cmd adduser
     then
-        run adduser -D -G "${username}" "${username}" && return 0
+        run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
     fi
 
     echo >&2 "Failed to add ${username} user account !"
@@ -374,10 +441,11 @@ iscontainer() {
 issystemd() {
     local pids p myns ns systemctl
 
-    # if the directory /etc/systemd/system does not exit, it is not systemd
-    [ ! -d /etc/systemd/system ] && return 1
+    # if the directory /lib/systemd/system does not exit, it is not systemd
+    [ ! -d /lib/systemd/system ] && return 1
 
     # if there is no systemctl command, it is not systemd
+    # shellcheck disable=SC2230
     systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
     [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 
@@ -395,7 +463,7 @@ issystemd() {
         ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
 
         # if pid of systemd is in our namespace, it is systemd
-        [ ! -z "${myns}" && "${myns}" = "${ns}" ] && return 0
+        [ ! -z "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
     done
 
     # else, it is not systemd
@@ -437,7 +505,7 @@ install_non_systemd_init() {
             run update-rc.d netdata defaults && \
             run update-rc.d netdata enable && \
             return 0
-        elif [[ "${key}" =~ ^(amzn-201[567]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).* ]]
+        elif [[ "${key}" =~ ^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).* ]]
             then
             echo >&2 "Installing init.d file..."
             run cp system/netdata-init-d /etc/init.d/netdata && \
@@ -463,24 +531,47 @@ NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
 install_netdata_service() {
+    local uname="$(uname 2>/dev/null)"
+
     if [ "${UID}" -eq 0 ]
     then
-        if issystemd
+        if [ "${uname}" = "Darwin" ]
+        then
+
+            if [ -f "/Library/LaunchDaemons/com.github.netdata.plist" ]
+                then
+                echo >&2 "file '/Library/LaunchDaemons/com.github.netdata.plist' already exists."
+                return 0
+            else
+                echo >&2 "Installing MacOS X plist file..."
+                run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist && \
+                run launchctl load /Library/LaunchDaemons/com.github.netdata.plist && \
+                return 0
+            fi
+
+        elif [ "${uname}" = "FreeBSD" ]
+        then
+
+            run cp system/netdata-freebsd /etc/rc.d/netdata && \
+                NETDATA_START_CMD="service netdata start" && \
+                NETDATA_STOP_CMD="service netdata stop" && \
+                return 0
+
+        elif issystemd
         then
             # systemd is running on this system
             NETDATA_START_CMD="systemctl start netdata"
             NETDATA_STOP_CMD="systemctl stop netdata"
 
-            if [ ! -f /etc/systemd/system/netdata.service ]
+            if [ -d "/lib/systemd/system" ]
             then
                 echo >&2 "Installing systemd service..."
-                run cp system/netdata.service /etc/systemd/system/netdata.service && \
+                run cp system/netdata.service /lib/systemd/system/netdata.service && \
                     run systemctl daemon-reload && \
                     run systemctl enable netdata && \
                     return 0
             else
-                echo >&2 "file '/etc/systemd/system/netdata.service' already exists."
-                return 0
+                echo >&2 "no '/lib/systemd/system' directory; cannot install netdata.service"
             fi
         else
             install_non_systemd_init
@@ -488,8 +579,15 @@ install_netdata_service() {
 
             if [ ${ret} -eq 0 ]
             then
-                NETDATA_START_CMD="service netdata start"
-                NETDATA_STOP_CMD="service netdata stop"
+                if [ ! -z "${service_cmd}" ]
+                then
+                    NETDATA_START_CMD="service netdata start"
+                    NETDATA_STOP_CMD="service netdata stop"
+                elif [ ! -z "${rcservice_cmd}" ]
+                then
+                    NETDATA_START_CMD="rc-service netdata start"
+                    NETDATA_STOP_CMD="rc-service netdata stop"
+                fi
             fi
 
             return ${ret}
@@ -546,7 +644,7 @@ stop_netdata_on_pid() {
     return 0
 }
 
-stop_all_netdata() {
+netdata_pids() {
     local p myns ns
 
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
@@ -562,8 +660,16 @@ stop_all_netdata() {
 
         if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
             then
-            stop_netdata_on_pid ${p}
+            pidisnetdata ${p} && echo "${p}"
         fi
+    done
+}
+
+stop_all_netdata() {
+    local p
+    for p in $(netdata_pids)
+    do
+        stop_netdata_on_pid ${p}
     done
 }
 
@@ -584,10 +690,22 @@ restart_netdata() {
         stop_all_netdata
         service netdata restart && started=1
 
+        if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+        then
+            echo >&2 "Ooops! it seems netdata is not started."
+            started=0
+        fi
+
         if [ ${started} -eq 0 ]
         then
             service netdata start && started=1
         fi
+    fi
+
+    if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+    then
+        echo >&2 "Hm... it seems netdata is still not started."
+        started=0
     fi
 
     if [ ${started} -eq 0 ]
@@ -628,29 +746,109 @@ install_netdata_logrotate() {
 }
 
 # -----------------------------------------------------------------------------
+# download netdata.conf
+
+fix_netdata_conf() {
+    local owner="${1}"
+
+    if [ "${UID}" -eq 0 ]
+        then
+        run chown "${owner}" "${filename}"
+    fi
+    run chmod 0664 "${filename}"
+}
+
+generate_netdata_conf() {
+    local owner="${1}" filename="${2}" url="${3}"
+
+    if [ ! -s "${filename}" ]
+        then
+        cat >"${filename}" <<EOFCONF
+# netdata can generate its own config.
+# Get it with:
+#
+# wget -O ${filename} "${url}"
+#
+# or
+#
+# curl -s -o ${filename} "${url}"
+#
+EOFCONF
+        fix_netdata_conf "${owner}"
+    fi
+}
+
+download_netdata_conf() {
+    local owner="${1}" filename="${2}" url="${3}"
+
+    if [ ! -s "${filename}" ]
+        then
+        echo >&2
+        echo >&2 "-------------------------------------------------------------------------------"
+        echo >&2
+        echo >&2 "Downloading default configuration from netdata..."
+        sleep 5
+
+        # remove a possibly obsolete download
+        [ -f "${filename}.new" ] && rm "${filename}.new"
+
+        # disable a proxy to get data from the local netdata
+        export http_proxy=
+        export https_proxy=
+
+        # try curl
+        run curl -s -o "${filename}.new" "${url}"
+        ret=$?
+
+        if [ ${ret} -ne 0 -o ! -s "${filename}.new" ]
+            then
+            # try wget
+            run wget -O "${filename}.new" "${url}"
+            ret=$?
+        fi
+
+        if [ ${ret} -eq 0 -a -s "${filename}.new" ]
+            then
+            run mv "${filename}.new" "${filename}"
+            run_ok "New configuration saved for you to edit at ${filename}"
+        else
+            [ -f "${filename}.new" ] && rm "${filename}.new"
+            run_failed "Cannnot download configuration from netdata daemon using url '${url}'"
+
+            generate_netdata_conf "${owner}" "${filename}" "${url}"
+        fi
+
+        fix_netdata_conf "${owner}"
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
 # add netdata user and group
 
-NETDATA_ADDED_TO_DOCKER=0
-NETDATA_ADDED_TO_NGINX=0
-NETDATA_ADDED_TO_VARNISH=0
-NETDATA_ADDED_TO_HAPROXY=0
-NETDATA_ADDED_TO_ADM=0
-NETDATA_ADDED_TO_NSD=0
-NETDATA_ADDED_TO_PROXY=0
-NETDATA_ADDED_TO_SQUID=0
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_ADDED_TO_GROUPS=""
 add_netdata_user_and_group() {
+    local homedir="${1}" g
+
     if [ ${UID} -eq 0 ]
         then
         portable_add_group netdata || return 1
-        portable_add_user netdata || return 1
-        portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
-        portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
-        portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
-        portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
-        portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
-        portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-        portable_add_user_to_group proxy      netdata && NETDATA_ADDED_TO_PROXY=1
-        portable_add_user_to_group squid      netdata && NETDATA_ADDED_TO_SQUID=1
+        portable_add_user netdata "${homedir}"  || return 1
+
+        for g in ${NETDATA_WANTED_GROUPS}
+        do
+            portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+        done
+
+        [ ~netdata = / ] && cat <<USERMOD
+
+The netdata user has its home directory set to /
+You may want to change it, using this command:
+
+# usermod -d "${homedir}" netdata
+
+USERMOD
         return 0
     fi
 

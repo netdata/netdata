@@ -1,0 +1,31 @@
+# Global (default) code owner
+* @ktsaou
+
+# Ownership by directory structure
+.travis/ @paulfantom
+# backends/
+build/ @paulfantom
+collectors/python.d.plugin/ @l2isbad @Ferroin
+contrib/ @paulfantom
+daemon/ @ktsaou
+database/ @ktsaou
+docker/ @paulfantom
+# health/ 
+# installer/
+# libnetdata/ 
+# makeself/ 
+packaging/ @paulfantom
+# registry/
+# streaming/
+# system/ 
+# tests/
+# web/
+
+# Ownership of specific files
+CHANGELOG.md @netdatabot
+.travis.yml @paulfantom
+.lgtm.yml @paulfantom
+
+# Ownership by filetype (overwrites ownership by directory)
+*.am @paulfantom @ktsaou
+*.c *.h @ktsaou @vlvkobal

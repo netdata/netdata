@@ -1,10 +1,11 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 AC_PREREQ(2.60)
 
 define([VERSION_MAJOR], [1])
-define([VERSION_MINOR], [8])
+define([VERSION_MINOR], [10])
 define([VERSION_FIX], [1])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
 define([VERSION_SUFFIX], [_rolling])
@@ -34,11 +35,19 @@ AC_SUBST([PACKAGE_RPM_RELEASE])
 
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_SRCDIR([src/main.c])
-AM_INIT_AUTOMAKE([tar-pax])
+AC_CONFIG_MACRO_DIR([build/m4])
+AC_CONFIG_SRCDIR([daemon/main.c])
+define([AUTOMATE_INIT_OPTIONS], [tar-pax subdir-objects])
+m4_ifdef([AM_SILENT_RULES], [
+    define([AUTOMATE_INIT_OPTIONS], [tar-pax silent-rules subdir-objects])
+    ])
+AM_INIT_AUTOMAKE(AUTOMATE_INIT_OPTIONS)
+m4_ifdef([AM_SILENT_RULES], [
+    AM_SILENT_RULES([yes])
+    ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
@@ -124,13 +133,14 @@ AC_ARG_ENABLE(
 AX_GCC_FUNC_ATTRIBUTE([returns_nonnull])
 AX_GCC_FUNC_ATTRIBUTE([malloc])
 AX_GCC_FUNC_ATTRIBUTE([noreturn])
+AX_GCC_FUNC_ATTRIBUTE([noinline])
 AX_GCC_FUNC_ATTRIBUTE([format])
 AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 
 AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
 AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
-AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
+AC_CHECK_FUNCS([sched_setscheduler sched_getscheduler sched_getparam sched_get_priority_min sched_get_priority_max getpriority setpriority nice])
 AC_CHECK_FUNCS([recvmmsg])
 
 AC_TYPE_INT8_T
@@ -152,6 +162,10 @@ AC_HEADER_MAJOR
 AC_HEADER_RESOLV
 
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
+AC_CHECK_HEADERS_ONCE([sys/vfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statfs.h])
+AC_CHECK_HEADERS_ONCE([sys/statvfs.h])
+AC_CHECK_HEADERS_ONCE([sys/mount.h])
 
 if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)
@@ -164,21 +178,24 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
+    build_target_id=2
     CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
 darwin*)
     build_target=macos
+    build_target_id=3
     LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
     ;;
 *)
     build_target=linux
+    build_target_id=1
     ;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
-AC_MSG_RESULT([${build_target}])
+AC_MSG_RESULT([${build_target} with id ${build_target_id}])
 
 
 # -----------------------------------------------------------------------------
@@ -480,16 +497,41 @@ AC_MSG_RESULT([${enable_lto}])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
-AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
-AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
-AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
-AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
-AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
-AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
-AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
-AC_SUBST([logdir], ["\$(localstatedir)/log/netdata"])
-AC_SUBST([pluginsdir], ["\$(libexecdir)/netdata/plugins.d"])
+varlibdir="${localstatedir}/lib/netdata"
+registrydir="${localstatedir}/lib/netdata/registry"
+cachedir="${localstatedir}/cache/netdata"
+chartsdir="${libexecdir}/netdata/charts.d"
+nodedir="${libexecdir}/netdata/node.d"
+pythondir="${libexecdir}/netdata/python.d"
+configdir="${sysconfdir}/netdata"
+libconfigdir="${libdir}/netdata/conf.d"
+logdir="${localstatedir}/log/netdata"
+pluginsdir="${libexecdir}/netdata/plugins.d"
+
+AC_SUBST([build_target])
+AC_SUBST([varlibdir])
+AC_SUBST([registrydir])
+AC_SUBST([cachedir])
+AC_SUBST([chartsdir])
+AC_SUBST([nodedir])
+AC_SUBST([pythondir])
+AC_SUBST([configdir])
+AC_SUBST([libconfigdir])
+AC_SUBST([logdir])
+AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+
+CPPFLAGS="\
+    -DTARGET_OS=${build_target_id} \
+	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
+	-DCACHE_DIR=\"\\\"${cachedir}\\\"\" \
+	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
+	-DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
+	-DLOG_DIR=\"\\\"${logdir}\\\"\" \
+	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
+	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
+	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
+"
 
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
@@ -506,19 +548,79 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
-    charts.d/Makefile
-    conf.d/Makefile
     netdata.spec
-    python.d/Makefile
-    node.d/Makefile
-    plugins.d/Makefile
-    src/Makefile
-    system/Makefile
-    web/Makefile
-    diagrams/Makefile
-    makeself/Makefile
+    backends/graphite/Makefile
+    backends/json/Makefile
+    backends/Makefile
+    backends/opentsdb/Makefile
+    backends/prometheus/Makefile
+    collectors/Makefile
+    collectors/apps.plugin/Makefile
+    collectors/cgroups.plugin/Makefile
+    collectors/charts.d.plugin/Makefile
+    collectors/checks.plugin/Makefile
+    collectors/diskspace.plugin/Makefile
+    collectors/fping.plugin/Makefile
+    collectors/freebsd.plugin/Makefile
+    collectors/freeipmi.plugin/Makefile
+    collectors/idlejitter.plugin/Makefile
+    collectors/macos.plugin/Makefile
+    collectors/nfacct.plugin/Makefile
+    collectors/node.d.plugin/Makefile
+    collectors/plugins.d/Makefile
+    collectors/proc.plugin/Makefile
+    collectors/python.d.plugin/Makefile
+    collectors/statsd.plugin/Makefile
+    collectors/tc.plugin/Makefile
     contrib/Makefile
+    daemon/Makefile
+    database/Makefile
+    diagrams/Makefile
+    health/Makefile
+    health/notifications/Makefile
+    libnetdata/Makefile
+    libnetdata/adaptive_resortable_list/Makefile
+    libnetdata/avl/Makefile
+    libnetdata/buffer/Makefile
+    libnetdata/clocks/Makefile
+    libnetdata/config/Makefile
+    libnetdata/dictionary/Makefile
+    libnetdata/eval/Makefile
+    libnetdata/locks/Makefile
+    libnetdata/log/Makefile
+    libnetdata/popen/Makefile
+    libnetdata/procfile/Makefile
+    libnetdata/simple_pattern/Makefile
+    libnetdata/socket/Makefile
+    libnetdata/statistical/Makefile
+    libnetdata/storage_number/Makefile
+    libnetdata/threads/Makefile
+    libnetdata/url/Makefile
+    makeself/Makefile
+    registry/Makefile
+    streaming/Makefile
+    system/Makefile
     tests/Makefile
+    web/Makefile
+    web/api/Makefile
+    web/api/badges/Makefile
+    web/api/exporters/Makefile
+    web/api/exporters/shell/Makefile
+    web/api/exporters/prometheus/Makefile
+    web/api/queries/Makefile
+    web/api/queries/average/Makefile
+    web/api/queries/incremental_sum/Makefile
+    web/api/queries/max/Makefile
+    web/api/queries/median/Makefile
+    web/api/queries/min/Makefile
+    web/api/queries/ses/Makefile
+    web/api/queries/stddev/Makefile
+    web/api/queries/sum/Makefile
+    web/gui/Makefile
+    web/server/Makefile
+    web/server/single/Makefile
+    web/server/multi/Makefile
+    web/server/static/Makefile
 ])
 AC_OUTPUT
 
