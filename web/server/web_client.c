@@ -368,11 +368,20 @@ int mysendfile(struct web_client *w, char *filename) {
     char webfilename[FILENAME_MAX + 1];
     snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
 
-    struct stat statbuf;
+    struct stat lstatbuf; // stat on symlink
+    struct stat tstatbuf; // stat on symlink target
+    // if webfilename is a regular file, lstatbuf == tstatbuf
     int done = 0;
     while(!done) {
         // check if the file exists
-        if (lstat(webfilename, &statbuf) != 0) {
+        if (lstat(webfilename, &lstatbuf) != 0) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+            buffer_strcat_htmlescape(w->response.data, webfilename);
+            return 404;
+        }
+        if (lstat(webfilename, &tstatbuf) != 0) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
@@ -380,25 +389,25 @@ int mysendfile(struct web_client *w, char *filename) {
             return 404;
         }
 
-        if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+        if ((tstatbuf.st_mode & S_IFMT) == S_IFDIR) {
             snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
             continue;
         }
 
-        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+        if ((tstatbuf.st_mode & S_IFMT) != S_IFREG) {
             error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
             return access_to_file_is_not_permitted(w, webfilename);
         }
 
         // check if the file is owned by expected user
-        if (statbuf.st_uid != web_files_uid()) {
-            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, statbuf.st_uid, web_files_uid());
+        if (tstatbuf.st_uid != web_files_uid()) {
+            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, tstatbuf.st_uid, web_files_uid());
             return access_to_file_is_not_permitted(w, webfilename);
         }
 
         // check if the file is owned by expected group
-        if (statbuf.st_gid != web_files_gid()) {
-            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, statbuf.st_gid, web_files_gid());
+        if (tstatbuf.st_gid != web_files_gid()) {
+            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, tstatbuf.st_gid, web_files_gid());
             return access_to_file_is_not_permitted(w, webfilename);
         }
 
@@ -430,18 +439,18 @@ int mysendfile(struct web_client *w, char *filename) {
     sock_setnonblock(w->ifd);
 
     w->response.data->contenttype = contenttype_for_filename(webfilename);
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, tstatbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
     buffer_flush(w->response.data);
-    buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
-    w->response.rlen = (size_t)statbuf.st_size;
+    buffer_need_bytes(w->response.data, (size_t)tstatbuf.st_size);
+    w->response.rlen = (size_t)tstatbuf.st_size;
 #ifdef __APPLE__
-    w->response.data->date = statbuf.st_mtimespec.tv_sec;
+    w->response.data->date = tstatbuf.st_mtimespec.tv_sec;
 #else
-    w->response.data->date = statbuf.st_mtim.tv_sec;
+    w->response.data->date = tstatbuf.st_mtim.tv_sec;
 #endif /* __APPLE__ */
     buffer_cacheable(w->response.data);
 
