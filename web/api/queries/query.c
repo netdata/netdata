@@ -145,7 +145,17 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_CV,
                 .init  = NULL,
-                .create= grouping_create_stddev,   // not an error, stddev calculates this too
+                .create= grouping_create_stddev, // not an error, stddev calculates this too
+                .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
+                .free  = grouping_free_stddev,   // not an error, stddev calculates this too
+                .add   = grouping_add_stddev,    // not an error, stddev calculates this too
+                .flush = grouping_flush_coefficient_of_variation
+        },
+        {.name = "rsd",                          // alias of 'cv'
+                .hash  = 0,
+                .value = RRDR_GROUPING_CV,
+                .init  = NULL,
+                .create= grouping_create_stddev, // not an error, stddev calculates this too
                 .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
                 .free  = grouping_free_stddev,   // not an error, stddev calculates this too
                 .add   = grouping_add_stddev,    // not an error, stddev calculates this too

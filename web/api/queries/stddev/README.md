@@ -41,7 +41,9 @@ Check [https://en.wikipedia.org/wiki/Standard_deviation](https://en.wikipedia.or
 
 # Coefficient of variation (`cv`)
 
-The coefficient of variation (`cv``), also known as relative standard deviation (RSD),
+> This query is also available as `rsd`.
+
+The coefficient of variation (`cv`), also known as relative standard deviation (`rsd`),
 is a standardized measure of dispersion of a probability distribution or frequency distribution.
 
 It is defined as the ratio of the **standard deviation** to the **mean**.  
