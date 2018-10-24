@@ -12,6 +12,7 @@
 #include "sum/sum.h"
 #include "stddev/stddev.h"
 #include "ses/ses.h"
+#include "des/des.h"
 
 // ----------------------------------------------------------------------------
 
@@ -31,9 +32,23 @@ static struct {
         , { "median"          , 0, RRDR_GROUPING_MEDIAN         , grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
         , { "min"             , 0, RRDR_GROUPING_MIN            , grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
         , { "max"             , 0, RRDR_GROUPING_MAX            , grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
-        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
-        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
         , { "sum"             , 0, RRDR_GROUPING_SUM            , grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
+
+        // stddev module provides mean, variance and coefficient of variation
+        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
+        , { "cv"              , 0, RRDR_GROUPING_CV             , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_coefficient_of_variation }
+        //, { "mean"            , 0, RRDR_GROUPING_MEAN           , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_mean }
+        //, { "variance"        , 0, RRDR_GROUPING_VARIANCE       , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_variance }
+
+        // single exponential smoothing or exponential weighted moving average
+        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        , { "ema"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        , { "ewma"            , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+
+        // double exponential smoothing
+        , { "des"             , 0, RRDR_GROUPING_DES            , grouping_init_des            , grouping_reset_des            , grouping_free_des            , grouping_add_des            , grouping_flush_des }
+
+        // terminator
         , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
 };
 
@@ -431,7 +446,7 @@ RRDR *rrd2rrdr(
             info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, group_time_requested, duration);
             #endif
 
-            group = points_requested; // use all the points
+            group = available_points; // use all the points
         }
         else {
             // the points we should group to satisfy gtime

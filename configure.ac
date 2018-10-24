@@ -609,6 +609,7 @@ AC_CONFIG_FILES([
     web/api/exporters/prometheus/Makefile
     web/api/queries/Makefile
     web/api/queries/average/Makefile
+    web/api/queries/des/Makefile
     web/api/queries/incremental_sum/Makefile
     web/api/queries/max/Makefile
     web/api/queries/median/Makefile
