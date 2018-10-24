@@ -21,31 +21,32 @@ static struct {
     uint32_t hash;
     RRDR_GROUPING value;
 
-    // one time initialization for the module
-    // this is called once, when netdata starts
+    // One time initialization for the module.
+    // This is called once, when netdata starts.
     void (*setup)(void);
 
-    // allocate all required structures for a single run
-    // this is called per netdata query
+    // Allocate all required structures for a query.
+    // This is called once for each netdata query.
     void *(*create)(struct rrdresult *r);
 
-    // cleanup collected values, but don't destroy the structures
-    // this is called when the query engine switches dimensions
-    // as part of the same query (so same chart, switching metric)
+    // Cleanup collected values, but don't destroy the structures.
+    // This is called when the query engine switches dimensions,
+    // as part of the same query (so same chart, switching metric).
     void (*reset)(struct rrdresult *r);
 
-    // free all resources allocated for the query
+    // Free all resources allocated for the query.
     void (*free)(struct rrdresult *r);
 
-    // add a single value into the calculation
-    // the module may decide to cache it, or use it in the fly
+    // Add a single value into the calculation.
+    // The module may decide to cache it, or use it in the fly.
     void (*add)(struct rrdresult *r, calculated_number value);
 
-    // generate a single result for the values added so far
-    // more values and points may be requested later
-    // it is up to the plugin to reset its internal structures
-    // when flushing it (so a few modules it may be better to continue
-    // as if nothing was flushed, for others a flush is required)
+    // Generate a single result for the values added so far.
+    // More values and points may be requested later.
+    // It is up to the module to reset its internal structures
+    // when flushing it (so for a few modules it may be better to
+    // continue after a flush as if nothing changed, for others a
+    // cleanup of the internal structures may be required).
     calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
         {.name = "average",
