@@ -20,43 +20,48 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_GROUPING value;
+    void (*setup)(void);
     void *(*init)(struct rrdresult *r);
     void (*reset)(struct rrdresult *r);
     void (*free)(struct rrdresult *r);
     void (*add)(struct rrdresult *r, calculated_number value);
     calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
-          { "average"         , 0, RRDR_GROUPING_AVERAGE        , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
-        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
-        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
-        , { "median"          , 0, RRDR_GROUPING_MEDIAN         , grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
-        , { "min"             , 0, RRDR_GROUPING_MIN            , grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
-        , { "max"             , 0, RRDR_GROUPING_MAX            , grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
-        , { "sum"             , 0, RRDR_GROUPING_SUM            , grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
+          { "average"         , 0, RRDR_GROUPING_AVERAGE        , NULL, grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
+        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, NULL,  grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, NULL,  grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
+        , { "median"          , 0, RRDR_GROUPING_MEDIAN         , NULL,  grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
+        , { "min"             , 0, RRDR_GROUPING_MIN            , NULL,  grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
+        , { "max"             , 0, RRDR_GROUPING_MAX            , NULL,  grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
+        , { "sum"             , 0, RRDR_GROUPING_SUM            , NULL,  grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
 
         // stddev module provides mean, variance and coefficient of variation
-        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
-        , { "cv"              , 0, RRDR_GROUPING_CV             , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_coefficient_of_variation }
-        //, { "mean"            , 0, RRDR_GROUPING_MEAN           , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_mean }
-        //, { "variance"        , 0, RRDR_GROUPING_VARIANCE       , grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_variance }
+        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
+        , { "cv"              , 0, RRDR_GROUPING_CV             , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_coefficient_of_variation }
+        //, { "mean"            , 0, RRDR_GROUPING_MEAN           , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_mean }
+        //, { "variance"        , 0, RRDR_GROUPING_VARIANCE       , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_variance }
 
         // single exponential smoothing or exponential weighted moving average
-        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
-        , { "ema"             , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
-        , { "ewma"            , 0, RRDR_GROUPING_SES            , grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_setup_ses,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        , { "ema"             , 0, RRDR_GROUPING_SES            , NULL,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        , { "ewma"            , 0, RRDR_GROUPING_SES            , NULL,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
 
         // double exponential smoothing
-        , { "des"             , 0, RRDR_GROUPING_DES            , grouping_init_des            , grouping_reset_des            , grouping_free_des            , grouping_add_des            , grouping_flush_des }
+        , { "des"             , 0, RRDR_GROUPING_DES            , grouping_setup_des,  grouping_init_des            , grouping_reset_des            , grouping_free_des            , grouping_add_des            , grouping_flush_des }
 
         // terminator
-        , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
+        , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , NULL,  grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
 };
 
 void web_client_api_v1_init_grouping(void) {
     int i;
 
-    for(i = 0; api_v1_data_groups[i].name ; i++)
+    for(i = 0; api_v1_data_groups[i].name ; i++) {
         api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
+
+        if(api_v1_data_groups[i].setup)
+            api_v1_data_groups[i].setup();
+    }
 }
 
 const char *group_method2string(RRDR_GROUPING group) {
@@ -217,13 +222,13 @@ static inline void do_dimension(
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            r->log = "stopped, because attempted to access the db after 'wanted before'";
+            r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
             #endif
             break;
         }
         if(unlikely(now < after_wanted)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            r->log = "skipped, because attempted to access the db before 'wanted after'";
+            r->internal.log = "skipped, because attempted to access the db before 'wanted after'";
             #endif
             continue;
         }
@@ -243,7 +248,7 @@ static inline void do_dimension(
         }
 
         // add this value for grouping
-        r->grouping_add(r, value);
+        r->internal.grouping_add(r, value);
         values_in_group++;
 
         if(unlikely(values_in_group == group_size)) {
@@ -263,7 +268,7 @@ static inline void do_dimension(
             *rrdr_value_options_ptr = group_value_flags;
 
             // store the value
-            r->v[rrdr_line * r->d + dim_id_in_rrdr] = r->grouping_flush(r, rrdr_value_options_ptr);
+            r->v[rrdr_line * r->d + dim_id_in_rrdr] = r->internal.grouping_flush(r, rrdr_value_options_ptr);
 
             points_added++;
             values_in_group = 0;
@@ -359,7 +364,7 @@ RRDR *rrd2rrdr(
         , long long after_requested
         , long long before_requested
         , RRDR_GROUPING group_method
-        , long group_time_requested
+        , long resampling_time_requested
         , RRDR_OPTIONS options
         , const char *dimensions
 ) {
@@ -435,36 +440,36 @@ RRDR *rrd2rrdr(
     if(unlikely(group <= 0)) group = 1;
     if(unlikely(available_points % points_requested > points_requested / 2)) group++; // rounding to the closest integer
 
-    // group_time enforces a certain grouping multiple
-    calculated_number group_sum_divisor = 1.0;
-    long group_points = 1;
-    if(unlikely(group_time_requested > st->update_every)) {
-        if (unlikely(group_time_requested > duration)) {
+    // resampling_time_requested enforces a certain grouping multiple
+    calculated_number resampling_divisor = 1.0;
+    long resampling_points = 1;
+    if(unlikely(resampling_time_requested > st->update_every)) {
+        if (unlikely(resampling_time_requested > duration)) {
             // group_time is above the available duration
 
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, group_time_requested, duration);
+            info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, resampling_time_requested, duration);
             #endif
 
             group = available_points; // use all the points
         }
         else {
             // the points we should group to satisfy gtime
-            group_points = group_time_requested / st->update_every;
-            if(unlikely(group_time_requested % group_points)) {
+            resampling_points = resampling_time_requested / st->update_every;
+            if(unlikely(resampling_time_requested % resampling_points)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
-                info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, group_time_requested, st->update_every);
+                info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
                 #endif
 
-                group_points++;
+                resampling_points++;
             }
 
-            // adapt group according to group_points
-            if(unlikely(group < group_points)) group = group_points; // do not allow grouping below the desired one
-            if(unlikely(group % group_points)) group += group_points - (group % group_points); // make sure group is multiple of group_points
+            // adapt group according to resampling_points
+            if(unlikely(group < resampling_points)) group = resampling_points; // do not allow grouping below the desired one
+            if(unlikely(group % resampling_points)) group += resampling_points - (group % resampling_points); // make sure group is multiple of resampling_points
 
-            //group_sum_divisor = group / group_points;
-            group_sum_divisor = (calculated_number)(group * st->update_every) / (calculated_number)group_time_requested;
+            //resampling_divisor = group / resampling_points;
+            resampling_divisor = (calculated_number)(group * st->update_every) / (calculated_number)resampling_time_requested;
         }
     }
 
@@ -553,11 +558,11 @@ RRDR *rrd2rrdr(
     if(points_wanted > (before_wanted - after_wanted) / group / st->update_every + 1)
         error("INTERNAL CHECK: points_wanted %ld is more than points %ld", points_wanted, (before_wanted - after_wanted) / group / st->update_every + 1);
 
-    if(group < group_points)
-        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, group_points);
+    if(group < resampling_points)
+        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, resampling_points);
 
-    if(group > group_points && group % group_points)
-        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, group_points);
+    if(group > resampling_points && group % resampling_points)
+        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, resampling_points);
 #endif
 
     // -------------------------------------------------------------------------
@@ -594,8 +599,9 @@ RRDR *rrd2rrdr(
     r->update_every = (int)group * st->update_every;
     r->before = before_wanted;
     r->after = after_wanted;
-    r->group_points = group_points;
-    r->group_sum_divisor = group_sum_divisor;
+    r->internal.points_wanted = points_wanted;
+    r->internal.resampling_points = resampling_points;
+    r->internal.resampling_divisor = resampling_divisor;
 
 
     // -------------------------------------------------------------------------
@@ -605,11 +611,11 @@ RRDR *rrd2rrdr(
         int i, found = 0;
         for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
             if(api_v1_data_groups[i].value == group_method) {
-                r->grouping_init  = api_v1_data_groups[i].init;
-                r->grouping_reset = api_v1_data_groups[i].reset;
-                r->grouping_free  = api_v1_data_groups[i].free;
-                r->grouping_add   = api_v1_data_groups[i].add;
-                r->grouping_flush = api_v1_data_groups[i].flush;
+                r->internal.grouping_init  = api_v1_data_groups[i].init;
+                r->internal.grouping_reset = api_v1_data_groups[i].reset;
+                r->internal.grouping_free  = api_v1_data_groups[i].free;
+                r->internal.grouping_add   = api_v1_data_groups[i].add;
+                r->internal.grouping_flush = api_v1_data_groups[i].flush;
                 found = 1;
             }
         }
@@ -618,16 +624,16 @@ RRDR *rrd2rrdr(
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
             #endif
-            r->grouping_init  = grouping_init_average;
-            r->grouping_reset = grouping_reset_average;
-            r->grouping_free  = grouping_free_average;
-            r->grouping_add   = grouping_add_average;
-            r->grouping_flush = grouping_flush_average;
+            r->internal.grouping_init  = grouping_init_average;
+            r->internal.grouping_reset = grouping_reset_average;
+            r->internal.grouping_free  = grouping_free_average;
+            r->internal.grouping_add   = grouping_add_average;
+            r->internal.grouping_flush = grouping_flush_average;
         }
     }
 
     // allocate any memory required by the grouping method
-    r->grouping_data = r->grouping_init(r);
+    r->internal.grouping_data = r->internal.grouping_init(r);
 
 
     // -------------------------------------------------------------------------
@@ -654,7 +660,7 @@ RRDR *rrd2rrdr(
             continue;
 
         // reset the grouping for the new dimension
-        r->grouping_reset(r);
+        r->internal.grouping_reset(r);
 
         do_dimension(
                 r
@@ -707,33 +713,33 @@ RRDR *rrd2rrdr(
 
     #ifdef NETDATA_INTERNAL_CHECKS
 
-    if(r->log)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->log);
+    if(r->internal.log)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
 
     if(r->rows != points_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
 
     if(aligned && (r->before % group) != 0)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
 
     // 'after' should not be aligned, since we start inside the first group
     //if(aligned && (r->after % group) != 0)
-    //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
+    //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
     if(r->before != before_requested)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
 
     if(r->before != before_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
 
     // reported 'after' varies, depending on group
     if((r->after - (group - 1) * r->st->update_every) != after_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
 
     #endif
 
     // free all resources used by the grouping method
-    r->grouping_free(r);
+    r->internal.grouping_free(r);
 
     // when all the dimensions are zero, we should return all of them
     if(unlikely(options & RRDR_OPTION_NONZERO && !dimensions_nonzero)) {

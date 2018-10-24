@@ -6,6 +6,8 @@
 #include "../query.h"
 #include "../rrdr.h"
 
+extern void grouping_setup_ses(void);
+
 extern void *grouping_init_ses(RRDR *r);
 extern void grouping_reset_ses(RRDR *r);
 extern void grouping_free_ses(RRDR *r);
