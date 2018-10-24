@@ -144,7 +144,7 @@ const NETDATA = window.NETDATA || {};
                 case 'object':
                     if (obj === null) return obj;
 
-                    if (Array.isArray(obj) === true) {
+                    if (Array.isArray(obj)) {
                         // console.log('checking array "' + name + '"');
 
                         let len = obj.length;
@@ -172,7 +172,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         checkOptional: function(name, obj, ignore_regex) {
-            if (this.enabled === true) {
+            if (this.enabled) {
                 //console.log('XSS: checking optional "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
@@ -185,7 +185,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         checkData: function(name, obj, ignore_regex) {
-            if (this.enabled_for_data === true) {
+            if (this.enabled_for_data) {
                 //console.log('XSS: checking data "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
@@ -397,7 +397,7 @@ const NETDATA = window.NETDATA || {};
     // detect if this is probably a slow device
 
     let isSlowDeviceResult = undefined;
-    let isSlowDevice = function() {
+    const isSlowDevice = function() {
         if (isSlowDeviceResult !== undefined) {
             return isSlowDeviceResult;
         }
@@ -407,7 +407,7 @@ const NETDATA = window.NETDATA || {};
 
             let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
             let android = /android/.test(ua) && !window.MSStream;
-            isSlowDeviceResult = (iOS === true || android === true);
+            isSlowDeviceResult = (iOS || android);
         } catch (e) {
             isSlowDeviceResult = false;
         }
@@ -626,8 +626,7 @@ const NETDATA = window.NETDATA || {};
                     this.clear = function (handle) {
                         return window.webkitCancelAnimationFrame(handle.value);
                     };
-                }
-                else if (window.webkitCancelRequestAnimationFrame) {
+                } else if (window.webkitCancelRequestAnimationFrame) {
                     this.clear = function (handle) {
                         return window.webkitCancelRequestAnimationFrame(handle.value);
                     };
@@ -661,7 +660,7 @@ const NETDATA = window.NETDATA || {};
             }
 
 
-            if (custom === true) {
+            if (custom) {
                 // we have installed custom .step() / .clear() functions
                 // overwrite the .set() too
 
@@ -730,7 +729,7 @@ const NETDATA = window.NETDATA || {};
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if (NETDATA.localStorageTest() === true) {
+        if (NETDATA.localStorageTest()) {
             try {
                 // console.log('localStorage: loading "' + key.toString() + '"');
                 ret = localStorage.getItem(key.toString());
@@ -744,7 +743,7 @@ const NETDATA = window.NETDATA || {};
                     ret = JSON.parse(ret);
                     // console.log('localStorage: loaded "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
                 }
-            } catch(error) {
+            } catch (error) {
                 console.log('localStorage: failed to read "' + key.toString() + '", using default: "' + def.toString() + '"');
                 ret = def;
             }
@@ -774,7 +773,7 @@ const NETDATA = window.NETDATA || {};
             // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
             try {
                 localStorage.setItem(key.toString(), JSON.stringify(value));
-            } catch(e) {
+            } catch (e) {
                 console.log('localStorage: failed to save "' + key.toString() + '" with value: "' + value.toString() + '"');
             }
         }
@@ -860,8 +859,9 @@ const NETDATA = window.NETDATA || {};
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if (NETDATA.options.debug.main_loop === true)
+    if (NETDATA.options.debug.main_loop) {
         console.log('welcome to NETDATA');
+    }
 
     NETDATA.onresizeCallback = null;
     NETDATA.onresize = function() {
@@ -877,7 +877,7 @@ const NETDATA = window.NETDATA || {};
         let len = targets.length;
 
         while (len--) {
-            if (targets[len].fetching_data === true) {
+            if (targets[len].fetching_data) {
                 if (typeof targets[len].xhr !== 'undefined') {
                     targets[len].xhr.abort();
                     targets[len].running = false;
@@ -905,21 +905,25 @@ const NETDATA = window.NETDATA || {};
     NETDATA.onscroll_updater = function() {
         NETDATA.globalSelectionSync.stop();
 
-        if (NETDATA.options.abort_ajax_on_scroll === true)
+        if (NETDATA.options.abort_ajax_on_scroll) {
             NETDATA.abort_all_refreshes();
+        }
 
         // when the user scrolls he sees that we have
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
 
-        if (NETDATA.intersectionObserver.enabled() === false) {
-            if (NETDATA.options.current.parallel_refresher === false) {
+        // if (NETDATA.intersectionObserver.enabled() === false) {
+        if (!NETDATA.intersectionObserver.enabled()) {
+            // if (NETDATA.options.current.parallel_refresher === false) {
+            if (!NETDATA.options.current.parallel_refresher) {
                 let targets = NETDATA.options.targets;
                 let len = targets.length;
 
                 while (len--) {
-                    if (targets[len].running === false) {
+                    if (!targets[len].running) {
+                    // if (targets[len].running === false) {
                         targets[len].isVisible();
                     }
                 }
@@ -1177,7 +1181,7 @@ const NETDATA = window.NETDATA || {};
                 });
 
                 s = x.format(value);
-            } catch(e) {
+            } catch (e) {
                 s = "";
             }
 
@@ -1196,7 +1200,7 @@ const NETDATA = window.NETDATA || {};
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 });
-            } catch(e) {
+            } catch (e) {
                 s = "";
             }
 
@@ -1225,7 +1229,7 @@ const NETDATA = window.NETDATA || {};
 
     NETDATA.dataAttribute = function(element, attribute, def) {
         let key = 'data-' + attribute.toString();
-        if (element.hasAttribute(key) === true) {
+        if (element.hasAttribute(key)) {
             let data = element.getAttribute(key);
 
             if (data === 'true') return true;
@@ -1425,7 +1429,7 @@ const NETDATA = window.NETDATA || {};
             }
 
             if (ret.available.length === 0) {
-                if (ret.copy_theme === true || ret.custom.length === 0) {
+                if (ret.copy_theme || ret.custom.length === 0) {
                     // copy the theme colors
                     len = NETDATA.themes.current.colors.length;
                     while (len--) {
@@ -1501,7 +1505,7 @@ const NETDATA = window.NETDATA || {};
             if (typeof ret.charts[state.uuid] === 'undefined') {
                 ret.charts[state.uuid] = state;
 
-                if (has_custom_colors === true)
+                if (has_custom_colors)
                     this.__read_custom_colors(state, ret);
             }
 
@@ -1630,8 +1634,9 @@ const NETDATA = window.NETDATA || {};
         },
 
         delay: function() {
-            if (NETDATA.options.debug.globalPanAndZoom === true)
+            if (NETDATA.options.debug.globalPanAndZoom) {
                 console.log('globalPanAndZoom.delay()');
+            }
 
             NETDATA.options.auto_refresher_stop_until = Date.now() + NETDATA.options.current.global_pan_sync_time;
         },
@@ -1647,10 +1652,10 @@ const NETDATA = window.NETDATA || {};
             }
 
             if (this.master === null) {
-                if (NETDATA.options.debug.globalPanAndZoom === true)
+                if (NETDATA.options.debug.globalPanAndZoom)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') SET MASTER');
             } else if (this.master !== state) {
-                if (NETDATA.options.debug.globalPanAndZoom === true)
+                if (NETDATA.options.debug.globalPanAndZoom)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') CHANGED MASTER');
 
                 this.master.resetChart(true, true);
@@ -1743,7 +1748,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         setup: function() {
-            if (this.isActive() === true) {
+            if (this.isActive()) {
                 if (this.state === null) {
                     this.state = NETDATA.options.targets[0];
                 }
@@ -1789,12 +1794,14 @@ const NETDATA = window.NETDATA || {};
         },
 
         focus: function() {
-            if (this.isActive() === true && this.hasViewport() === true) {
-                if (this.state === null)
+            if (this.isActive() && this.hasViewport()) {
+                if (this.state === null) {
                     this.state = NETDATA.options.targets[0];
+                }
 
-                if (NETDATA.globalPanAndZoom.isMaster(this.state) === true)
+                if (NETDATA.globalPanAndZoom.isMaster(this.state)) {
                     NETDATA.globalPanAndZoom.clearMaster();
+                }
 
                 NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before, true);
             }
@@ -1832,10 +1839,12 @@ const NETDATA = window.NETDATA || {};
             this.name_div = name_div;
             this.name_div.title = this.label;
             this.name_div.style.setProperty('color', this.color, 'important');
-            if (this.selected === false)
+            // if (this.selected === false)
+            if (!this.selected) {
                 this.name_div.className = 'netdata-legend-name not-selected';
-            else
+            } else {
                 this.name_div.className = 'netdata-legend-name selected';
+            }
         }
 
         if (this.value_div !== value_div) {
@@ -1853,7 +1862,8 @@ const NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.setHandler = function() {
-        if (this.enabled === false) return;
+        // if (this.enabled === false) return;
+        if (!this.enabled) return;
 
         let ds = this;
 
@@ -1862,7 +1872,7 @@ const NETDATA = window.NETDATA || {};
             e.preventDefault();
             if (ds.isSelected()) {
                 // this is selected
-                if (e.shiftKey === true || e.ctrlKey === true) {
+                if (e.shiftKey || e.ctrlKey) {
                     // control or shift key is pressed -> unselect this (except is none will remain selected, in which case select all)
                     ds.unselect();
 
@@ -1881,7 +1891,7 @@ const NETDATA = window.NETDATA || {};
             }
             else {
                 // this is not selected
-                if (e.shiftKey === true || e.ctrlKey === true) {
+                if (e.shiftKey || e.ctrlKey) {
                     // control or shift key is pressed -> select this too
                     ds.select();
                 } else {
@@ -1896,7 +1906,8 @@ const NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.select = function() {
-        if (this.enabled === false) return;
+        // if (this.enabled === false) return;
+        if (!this.enabled) return;
 
         this.name_div.className = 'netdata-legend-name selected';
         this.value_div.className = 'netdata-legend-value selected';
@@ -1904,7 +1915,8 @@ const NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.unselect = function() {
-        if (this.enabled === false) return;
+        // if (this.enabled === false) return;
+        if (!this.enabled) return;
 
         this.name_div.className = 'netdata-legend-name not-selected';
         this.value_div.className = 'netdata-legend-value hidden';
@@ -1912,7 +1924,8 @@ const NETDATA = window.NETDATA || {};
     };
 
     dimensionStatus.prototype.isSelected = function() {
-        return(this.enabled === true && this.selected === true);
+        // return(this.enabled === true && this.selected === true);
+        return this.enabled && this.selected;
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -2036,7 +2049,7 @@ const NETDATA = window.NETDATA || {};
             // detect browser timezone
             try {
                 NETDATA.options.browser_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            } catch(e) {
+            } catch (e) {
                 console.log('failed to detect browser timezone: ' + e.toString());
                 NETDATA.options.browser_timezone = 'cannot-detect-it';
             }
@@ -2102,7 +2115,7 @@ const NETDATA = window.NETDATA || {};
                 //let t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
 
                 ret = true;
-            } catch(e) {
+            } catch (e) {
                 console.log('Cannot setup Date/Time formatting: ' + e.toString());
 
                 timezone = 'default';
@@ -3350,7 +3363,7 @@ const NETDATA = window.NETDATA || {};
             } else {
                 try {
                     status = that.library.update(that, data);
-                } catch(err) {
+                } catch (err) {
                     status = false;
                 }
             }
@@ -3387,7 +3400,7 @@ const NETDATA = window.NETDATA || {};
             } else {
                 try {
                     status = that.library.create(that, data);
-                } catch(err) {
+                } catch (err) {
                     status = false;
                 }
             }
@@ -4965,7 +4978,7 @@ const NETDATA = window.NETDATA || {};
                     this.log('uncompressed snapshot data for key ' + key + ' is undefined');
                     return null;
                 }
-            } catch(e) {
+            } catch (e) {
                 this.log('decompression of snapshot data for key ' + key + ' failed');
                 console.log(e);
                 uncompressed = null;
@@ -4979,7 +4992,7 @@ const NETDATA = window.NETDATA || {};
             let data;
             try {
                 data = JSON.parse(uncompressed);
-            } catch(e) {
+            } catch (e) {
                 this.log('parsing snapshot data for key ' + key + ' failed');
                 console.log(e);
                 data = null;
@@ -9176,7 +9189,7 @@ const NETDATA = window.NETDATA || {};
             if (typeof netdataAlarmsRecipients !== 'undefined' && Array.isArray(netdataAlarmsRecipients))
                 NETDATA.alarms.recipients = netdataAlarmsRecipients;
 
-            if (netdataShowAlarms === true) {
+            if (netdataShowAlarms) {
                 NETDATA.alarms.update_forever();
             
                 if ('Notification' in window) {
@@ -9464,7 +9477,7 @@ const NETDATA = window.NETDATA || {};
             }
 
             if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
-                if (NETDATA.options.debug.main_loop === true)
+                if (NETDATA.options.debug.main_loop)
                     console.log('starting chart refresh thread');
 
                 NETDATA.start();
