@@ -20,18 +20,39 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_GROUPING value;
+
+    // one time initialization for the module
+    // this is called once, when netdata starts
     void (*setup)(void);
-    void *(*init)(struct rrdresult *r);
+
+    // allocate all required structures for a single run
+    // this is called per netdata query
+    void *(*create)(struct rrdresult *r);
+
+    // cleanup collected values, but don't destroy the structures
+    // this is called when the query engine switches dimensions
+    // as part of the same query (so same chart, switching metric)
     void (*reset)(struct rrdresult *r);
+
+    // free all resources allocated for the query
     void (*free)(struct rrdresult *r);
+
+    // add a single value into the calculation
+    // the module may decide to cache it, or use it in the fly
     void (*add)(struct rrdresult *r, calculated_number value);
+
+    // generate a single result for the values added so far
+    // more values and points may be requested later
+    // it is up to the plugin to reset its internal structures
+    // when flushing it (so a few modules it may be better to continue
+    // as if nothing was flushed, for others a flush is required)
     calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
         {.name = "average",
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
                 .setup = NULL,
-                .init  = grouping_init_average,
+                .create= grouping_init_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -41,7 +62,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
                 .setup = NULL,
-                .init  = grouping_init_average,
+                .create= grouping_init_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -52,7 +73,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
                 .setup = NULL,
-                .init  = grouping_init_incremental_sum,
+                .create= grouping_init_incremental_sum,
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
@@ -62,7 +83,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
                 .setup = NULL,
-                .init  = grouping_init_incremental_sum,
+                .create= grouping_init_incremental_sum,
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
@@ -72,7 +93,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_MEDIAN,
                 .setup = NULL,
-                .init  = grouping_init_median,
+                .create= grouping_init_median,
                 .reset = grouping_reset_median,
                 .free  = grouping_free_median,
                 .add   = grouping_add_median,
@@ -82,7 +103,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_MIN,
                 .setup = NULL,
-                .init  = grouping_init_min,
+                .create= grouping_init_min,
                 .reset = grouping_reset_min,
                 .free  = grouping_free_min,
                 .add   = grouping_add_min,
@@ -92,7 +113,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_MAX,
                 .setup = NULL,
-                .init  = grouping_init_max,
+                .create= grouping_init_max,
                 .reset = grouping_reset_max,
                 .free  = grouping_free_max,
                 .add   = grouping_add_max,
@@ -102,7 +123,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_SUM,
                 .setup = NULL,
-                .init  = grouping_init_sum,
+                .create= grouping_init_sum,
                 .reset = grouping_reset_sum,
                 .free  = grouping_free_sum,
                 .add   = grouping_add_sum,
@@ -114,7 +135,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_STDDEV,
                 .setup = NULL,
-                .init  = grouping_init_stddev,
+                .create= grouping_init_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -124,7 +145,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_CV,
                 .setup = NULL,
-                .init  = grouping_init_stddev,   // not an error, stddev calculates this too
+                .create= grouping_init_stddev,   // not an error, stddev calculates this too
                 .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
                 .free  = grouping_free_stddev,   // not an error, stddev calculates this too
                 .add   = grouping_add_stddev,    // not an error, stddev calculates this too
@@ -136,7 +157,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_MEAN,
                 .setup = NULL,
-                .init  = grouping_init_stddev,
+                .create= grouping_init_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -149,7 +170,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_VARIANCE,
                 .setup = NULL,
-                .init  = grouping_init_stddev,
+                .create= grouping_init_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -162,7 +183,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
                 .setup = grouping_setup_ses,
-                .init  = grouping_init_ses,
+                .create= grouping_init_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -172,7 +193,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
                 .setup = NULL,
-                .init  = grouping_init_ses,
+                .create= grouping_init_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -182,7 +203,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
                 .setup = NULL,
-                .init  = grouping_init_ses,
+                .create= grouping_init_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -194,7 +215,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_DES,
                 .setup = grouping_setup_des,
-                .init  = grouping_init_des,
+                .create= grouping_init_des,
                 .reset = grouping_reset_des,
                 .free  = grouping_free_des,
                 .add   = grouping_add_des,
@@ -206,7 +227,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_UNDEFINED,
                 .setup = NULL,
-                .init  = grouping_init_average,
+                .create= grouping_init_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -772,7 +793,7 @@ RRDR *rrd2rrdr(
         int i, found = 0;
         for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
             if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_init  = api_v1_data_groups[i].init;
+                r->internal.grouping_init  = api_v1_data_groups[i].create;
                 r->internal.grouping_reset = api_v1_data_groups[i].reset;
                 r->internal.grouping_free  = api_v1_data_groups[i].free;
                 r->internal.grouping_add   = api_v1_data_groups[i].add;
