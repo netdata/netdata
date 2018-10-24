@@ -1428,8 +1428,9 @@ const NETDATA = window.NETDATA || {};
                 if (ret.copy_theme === true || ret.custom.length === 0) {
                     // copy the theme colors
                     len = NETDATA.themes.current.colors.length;
-                    while (len--)
+                    while (len--) {
                         ret.available.unshift(NETDATA.themes.current.colors[len]);
+                    }
                 }
 
                 // copy the custom colors
@@ -1519,8 +1520,9 @@ const NETDATA = window.NETDATA || {};
     // Then we try to get it back with .get(). If that fails, we download it.
 
     NETDATA.fixHost = function(host) {
-        while (host.slice(-1) === '/')
+        while (host.slice(-1) === '/') {
             host = host.substring(0, host.length - 1);
+        }
 
         return host;
     };
@@ -1563,11 +1565,13 @@ const NETDATA = window.NETDATA || {};
                     // update the server timezone in our options
                     if (typeof data.timezone === 'string')
                         NETDATA.options.server_timezone = data.timezone;
+                } else {
+                    NETDATA.error(406, h + '/api/v1/charts');
                 }
-                else NETDATA.error(406, h + '/api/v1/charts');
 
-                if (typeof callback === 'function')
+                if (typeof callback === 'function') {
                     callback(data);
+                }
             }
 
             if (netdataSnapshotData !== null) {
@@ -1636,14 +1640,16 @@ const NETDATA = window.NETDATA || {};
         setMaster: function(state, after, before) {
             this.delay();
 
-            if (NETDATA.options.current.sync_pan_and_zoom === false)
+            // if (NETDATA.options.current.sync_pan_and_zoom === false)
+            //     return;
+            if (!NETDATA.options.current.sync_pan_and_zoom) {
                 return;
+            }
 
             if (this.master === null) {
                 if (NETDATA.options.debug.globalPanAndZoom === true)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') SET MASTER');
-            }
-            else if (this.master !== state) {
+            } else if (this.master !== state) {
                 if (NETDATA.options.debug.globalPanAndZoom === true)
                     console.log('globalPanAndZoom.setMaster(' + state.id + ', ' + after + ', ' + before + ') CHANGED MASTER');
 
@@ -1662,8 +1668,11 @@ const NETDATA = window.NETDATA || {};
 
         // clear the master
         clearMaster: function() {
-            if (NETDATA.options.debug.globalPanAndZoom === true)
+            // if (NETDATA.options.debug.globalPanAndZoom === true)
+            //     console.log('globalPanAndZoom.clearMaster()');
+            if (NETDATA.options.debug.globalPanAndZoom) {
                 console.log('globalPanAndZoom.clearMaster()');
+            }
 
             if (this.master !== null) {
                 let st = this.master;
@@ -1695,8 +1704,9 @@ const NETDATA = window.NETDATA || {};
         // check if a chart, other than the master
         // needs to be refreshed, due to the global pan and zoom
         shouldBeAutoRefreshed: function(state) {
-            if (this.master === null || this.seq === 0)
+            if (this.master === null || this.seq === 0) {
                 return false;
+            }
 
             //if (state.needsRecreation())
             //  return true;
@@ -1734,14 +1744,17 @@ const NETDATA = window.NETDATA || {};
 
         setup: function() {
             if (this.isActive() === true) {
-                if (this.state === null)
+                if (this.state === null) {
                     this.state = NETDATA.options.targets[0];
+                }
 
-                if (typeof this.callback === 'function')
+                if (typeof this.callback === 'function') {
                     this.callback(true, this.after, this.before);
+                }
             } else {
-                if (typeof this.callback === 'function')
+                if (typeof this.callback === 'function') {
                     this.callback(false, 0, 0);
+                }
             }
         },
 
@@ -1754,8 +1767,11 @@ const NETDATA = window.NETDATA || {};
 
             this.init(state, after, before, view_after, view_before);
 
-            if (this.hasViewport() === true)
+            // if (this.hasViewport() === true)
+            //     NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before);
+            if (this.hasViewport()) {
                 NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before);
+            }
 
             this.setup();
         },
@@ -1767,8 +1783,9 @@ const NETDATA = window.NETDATA || {};
             this.view_after = null;
             this.view_before = null;
 
-            if (typeof this.callback === 'function')
+            if (typeof this.callback === 'function') {
                 this.callback(false, 0, 0);
+            }
         },
 
         focus: function() {
@@ -1849,8 +1866,9 @@ const NETDATA = window.NETDATA || {};
                     // control or shift key is pressed -> unselect this (except is none will remain selected, in which case select all)
                     ds.unselect();
 
-                    if (ds.parent.countSelected() === 0)
+                    if (ds.parent.countSelected() === 0) {
                         ds.parent.selectAll();
+                    }
                 } else {
                     // no key is pressed -> select only this (except if it is the only selected already, in which case select all)
                     if (ds.parent.countSelected() === 1) {
@@ -1911,9 +1929,9 @@ const NETDATA = window.NETDATA || {};
         if (typeof this.dimensions[label] === 'undefined') {
             this.len++;
             this.dimensions[label] = new dimensionStatus(this, label, name_div, value_div, color);
-        }
-        else
+        } else {
             this.dimensions[label].setOptions(name_div, value_div, color);
+        }
 
         return this.dimensions[label];
     };
@@ -1933,16 +1951,18 @@ const NETDATA = window.NETDATA || {};
     dimensionsVisibility.prototype.selectAll = function() {
         let keys = Object.keys(this.dimensions);
         let len = keys.length;
-        while (len--)
+        while (len--) {
             this.dimensions[keys[len]].select();
+        }
     };
 
     dimensionsVisibility.prototype.countSelected = function() {
         let selected = 0;
         let keys = Object.keys(this.dimensions);
         let len = keys.length;
-        while (len--)
+        while (len--) {
             if (this.dimensions[keys[len]].isSelected()) selected++;
+        }
 
         return selected;
     };
@@ -1950,8 +1970,9 @@ const NETDATA = window.NETDATA || {};
     dimensionsVisibility.prototype.selectNone = function() {
         let keys = Object.keys(this.dimensions);
         let len = keys.length;
-        while (len--)
+        while (len--) {
             this.dimensions[keys[len]].unselect();
+        }
     };
 
     dimensionsVisibility.prototype.selected2BooleanArray = function(array) {
@@ -2306,7 +2327,9 @@ const NETDATA = window.NETDATA || {};
             if (typeof desired_units === 'undefined' || desired_units === null || desired_units === 'original' || desired_units === units) {
                 //console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
                 switch_units_callback(units);
-                return function(value) { return value; };
+                return function(value) { 
+                    return value; 
+                };
             }
 
             // now we know we can convert the units
