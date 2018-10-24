@@ -793,7 +793,7 @@ RRDR *rrd2rrdr(
         int i, found = 0;
         for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
             if(api_v1_data_groups[i].value == group_method) {
-                r->internal.grouping_init  = api_v1_data_groups[i].create;
+                r->internal.grouping_create= api_v1_data_groups[i].create;
                 r->internal.grouping_reset = api_v1_data_groups[i].reset;
                 r->internal.grouping_free  = api_v1_data_groups[i].free;
                 r->internal.grouping_add   = api_v1_data_groups[i].add;
@@ -806,7 +806,7 @@ RRDR *rrd2rrdr(
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
             #endif
-            r->internal.grouping_init  = grouping_create_average;
+            r->internal.grouping_create= grouping_create_average;
             r->internal.grouping_reset = grouping_reset_average;
             r->internal.grouping_free  = grouping_free_average;
             r->internal.grouping_add   = grouping_add_average;
@@ -815,7 +815,7 @@ RRDR *rrd2rrdr(
     }
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_data = r->internal.grouping_init(r);
+    r->internal.grouping_data = r->internal.grouping_create(r);
 
 
     // -------------------------------------------------------------------------

@@ -75,7 +75,7 @@ typedef struct rrdresult {
         long resampling_group;
         calculated_number resampling_divisor;
 
-        void *(*grouping_init)(struct rrdresult *r);
+        void *(*grouping_create)(struct rrdresult *r);
         void (*grouping_reset)(struct rrdresult *r);
         void (*grouping_free)(struct rrdresult *r);
         void (*grouping_add)(struct rrdresult *r, calculated_number value);
