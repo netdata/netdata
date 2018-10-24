@@ -334,7 +334,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          // duration
          , (size_t)(r->before - r->after + r->st->update_every)
          , (size_t)(before_wanted - after_wanted + r->st->update_every)
-         , (size_t)(before_requested - after_requested + r->st->update_every)
+         , (size_t)(before_requested - after_requested)
          , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
 
          // slot
@@ -468,22 +468,25 @@ RRDR *rrd2rrdr(
         }
     }
 
-    size_t before_slot, after_slot;
+    // now that we have group,
+    // align the requested timeframe to fit it.
 
-    time_t before_wanted = before_requested - (before_requested % ( ((aligned)?group:1) * st->update_every )) + ( ((aligned)?group:1) * st->update_every );
-    if(unlikely(before_wanted > last_entry_t)) {
-        before_wanted = last_entry_t - (last_entry_t % ((aligned) ? group : 1) * st->update_every);
-
-        if(unlikely(before_wanted > last_entry_t)) {
-            #ifdef NETDATA_INTERNAL_CHECKS
-            error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
-            #endif
-
-            while(before_wanted > last_entry_t)
-                before_wanted -= (((aligned) ? group : 1) * st->update_every);
-        }
+    if(aligned) {
+        // alignement has been requested, so align the values
+        before_requested -= (before_requested % group);
+        after_requested  -= (after_requested % group);
     }
-    before_slot = rrdset_time2slot(st, before_wanted);
+
+    // we align the request on requested_before
+    time_t before_wanted = before_requested;
+    if(likely(before_wanted > last_entry_t)) {
+        #ifdef NETDATA_INTERNAL_CHECKS
+        error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
+        #endif
+
+        before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * st->update_every ));
+    }
+    size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
@@ -502,11 +505,10 @@ RRDR *rrd2rrdr(
             error("INTERNAL ERROR: rrd2rrdr() on %s, after_wanted is before db min", st->name);
             #endif
 
-            while(after_wanted < first_entry_t)
-                after_wanted += (((aligned) ? group : 1) * st->update_every);
+            after_wanted = first_entry_t - (first_entry_t % ( ((aligned)?group:1) * st->update_every )) + ( ((aligned)?group:1) * st->update_every );
         }
     }
-    after_slot  = rrdset_time2slot(st, after_wanted);
+    size_t after_slot  = rrdset_time2slot(st, after_wanted);
 
     // check if they are reversed
     if(unlikely(after_wanted > before_wanted)) {
@@ -527,9 +529,9 @@ RRDR *rrd2rrdr(
         points_wanted = 0;
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     duration = before_wanted - after_wanted;
 
-#ifdef NETDATA_INTERNAL_CHECKS
     if(after_wanted < first_entry_t)
         error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
 
@@ -717,6 +719,9 @@ RRDR *rrd2rrdr(
     // 'after' should not be aligned, since we start inside the first group
     //if(aligned && (r->after % group) != 0)
     //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
+
+    if(r->before != before_requested)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
 
     if(r->before != before_wanted)
         rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, group_time_requested, group_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
