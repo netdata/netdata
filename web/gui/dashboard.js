@@ -148,10 +148,10 @@ const NETDATA = window.NETDATA || {};
                         // console.log('checking array "' + name + '"');
 
                         let len = obj.length;
-                        while (len--)
+                        while (len--) {
                             obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
-                    }
-                    else {
+                        }
+                    } else {
                         // console.log('checking object "' + name + '"');
 
                         for (const i in obj) {
@@ -159,9 +159,9 @@ const NETDATA = window.NETDATA || {};
                             if (this.string(i) !== i) {
                                 console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
                                 delete obj[i];
-                            }
-                            else
+                            } else {
                                 obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
+                            }
                         }
                     }
                     return obj;
@@ -2783,6 +2783,12 @@ const NETDATA = window.NETDATA || {};
             console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
         };
 
+        this.debugLog = function(msg) {
+            if (this.debug) {
+                this.log(msg);
+            }
+        }
+
 
         // ============================================================================================================
         // EARLY INITIALIZATION
@@ -3219,9 +3225,7 @@ const NETDATA = window.NETDATA || {};
             if (this.chart_created === true) {
                 if (NETDATA.options.current.show_help === true) {
                     if (this.element_legend_childs.toolbox !== null) {
-                        if (this.debug) {
-                            this.log('hideChart(): hidding legend popovers');
-                        }
+                        if (this.debug) this.log('hideChart(): hidding legend popovers');
 
                         $(this.element_legend_childs.toolbox_left).popover('hide');
                         $(this.element_legend_childs.toolbox_reset).popover('hide');
@@ -3240,16 +3244,12 @@ const NETDATA = window.NETDATA || {};
                 }
 
                 if (NETDATA.options.current.destroy_on_hide) {
-                    if (this.debug) {
-                        this.log('hideChart(): initializing chart');
-                    }
+                    if (this.debug) this.log('hideChart(): initializing chart');
 
                     // we should destroy it
                     init('force');
                 } else {
-                    if (this.debug) {
-                        this.log('hideChart(): hiding chart');
-                    }
+                    if (this.debug) this.log('hideChart(): hiding chart');
 
                     showRendering();
                     this.element_chart.style.display = 'none';
@@ -3279,15 +3279,13 @@ const NETDATA = window.NETDATA || {};
             this.updates_since_last_unhide = 0;
 
             if (this.chart_created === false) {
-                if (this.debug)
-                    this.log('unhideChart(): initializing chart');
+                if (this.debug) this.log('unhideChart(): initializing chart');
 
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
                 init('force');
             } else {
-                if (this.debug)
-                    this.log('unhideChart(): unhiding chart');
+                if (this.debug) this.log('unhideChart(): unhiding chart');
 
                 this.element.style.willChange = 'transform';
                 this.tm.last_unhidden = Date.now();
@@ -3300,7 +3298,6 @@ const NETDATA = window.NETDATA || {};
             }
 
             if (this.__redraw_on_unhide === true) {
-
                 if (this.debug) this.log("redrawing chart on unhide");
 
                 this.__redraw_on_unhide = undefined;
@@ -3311,7 +3308,8 @@ const NETDATA = window.NETDATA || {};
         const canBeRendered = function(uncached_visibility) {
             if (that.debug) that.log('canBeRendered() called');
 
-            if (NETDATA.options.current.update_only_visible === false)
+            // if (NETDATA.options.current.update_only_visible === false)
+            if (!NETDATA.options.current.update_only_visible)
                 return true;
 
             let ret = (
@@ -3339,14 +3337,15 @@ const NETDATA = window.NETDATA || {};
             //if (canBeRendered(true) === false)
             //    return false;
 
-            if (NETDATA.options.fake_chart_rendering === true)
+            if (NETDATA.options.fake_chart_rendering) {
                 return true;
+            }
 
             that.updates_counter++;
             that.updates_since_last_unhide++;
             that.updates_since_last_creation++;
 
-            if (NETDATA.options.debug.chart_errors === true) {
+            if (NETDATA.options.debug.chart_errors) {
                 status = that.library.update(that, data);
             } else {
                 try {
@@ -3356,7 +3355,7 @@ const NETDATA = window.NETDATA || {};
                 }
             }
 
-            if (status === false) {
+            if (!status) {
                 error('chart failed to be updated as ' + that.library_name);
                 return false;
             }
@@ -3375,14 +3374,15 @@ const NETDATA = window.NETDATA || {};
             //if (canBeRendered(true) === false)
             //    return false;
 
-            if (NETDATA.options.fake_chart_rendering === true)
+            if (NETDATA.options.fake_chart_rendering) {
                 return true;
+            }
 
             that.updates_counter++;
             that.updates_since_last_unhide++;
             that.updates_since_last_creation++;
 
-            if (NETDATA.options.debug.chart_errors === true) {
+            if (NETDATA.options.debug.chart_errors) {
                 status = that.library.create(that, data);
             } else {
                 try {
@@ -3392,7 +3392,7 @@ const NETDATA = window.NETDATA || {};
                 }
             }
 
-            if (status === false) {
+            if (!status) {
                 error('chart failed to be created as ' + that.library_name);
                 return false;
             }
@@ -3410,8 +3410,10 @@ const NETDATA = window.NETDATA || {};
         // a properly sized dom is available
         const resizeChart = function() {
             if (that.tm.last_resized < NETDATA.options.last_page_resize) {
-                if (that.chart_created === false) return;
-
+                if (!that.chart_created) {
+                    return;
+                }
+                
                 if (that.needsRecreation()) {
                     if (that.debug) that.log('resizeChart(): initializing chart');
 
@@ -3709,8 +3711,7 @@ const NETDATA = window.NETDATA || {};
         };
 
         this.resetChart = function(dont_clear_master, dont_update) {
-            if (this.debug)
-                this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
+            if (this.debug) this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
 
             if (typeof dont_clear_master === 'undefined')
                 dont_clear_master = false;
@@ -3719,8 +3720,7 @@ const NETDATA = window.NETDATA || {};
                 dont_update = false;
 
             if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this) === true) {
-                if (this.debug)
-                    this.log('resetChart() diverting to clearMaster().');
+                if (this.debug) this.log('resetChart() diverting to clearMaster().');
                 // this will call us back with master === true
                 NETDATA.globalPanAndZoom.clearMaster();
                 return;
