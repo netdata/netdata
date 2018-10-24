@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define BACKENDS_INTERNALS
 #include "backends.h"
 
 // ----------------------------------------------------------------------------
@@ -48,7 +49,7 @@ size_t backend_name_copy(char *d, const char *s, size_t usable) {
 // calculate the SUM or AVERAGE of a dimension, for any timeframe
 // may return NAN if the database does not have any value in the give timeframe
 
-inline calculated_number backend_calculate_value_from_stored_data(
+calculated_number backend_calculate_value_from_stored_data(
           RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
