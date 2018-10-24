@@ -617,7 +617,7 @@ RRDR *rrd2rrdr(
         else {
             // the points we should group to satisfy gtime
             resampling_points = resampling_time_requested / st->update_every;
-            if(unlikely(resampling_time_requested % resampling_points)) {
+            if(unlikely(resampling_time_requested % st->update_every)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
                 #endif
