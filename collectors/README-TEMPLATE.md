@@ -34,7 +34,7 @@ _This can contain subsections and will appear as is. It should give a high level
 
 _Detailed list of metrics collected, one line per type of CHART generated. Notice the exact match with the parameters expected to the CHART output line. The "options" column does not need to be detailed, but we want the table to explain what we will see in each chart, so use your judgement _
 
-_For explanation of the columns in the table below, see the [CHART output documentation](../plugins.d/#CHART)_
+_For explanation of the columns in the table below, see the [CHART output documentation](plugins.d/#CHART)_
 
 type.id | name | title | units | family | context | charttype | options |
 :-------|:-----|:------|:------|:-------|:--------|:----------|:------|
