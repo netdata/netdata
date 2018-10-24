@@ -21,7 +21,7 @@ struct grouping_des {
 
 static size_t max_window_size = 15;
 
-void grouping_setup_des(void) {
+void grouping_init_des(void) {
     long long ret = config_get_number(CONFIG_SECTION_WEB, "des max window", (long long)max_window_size);
     if(ret <= 1) {
         config_set_number(CONFIG_SECTION_WEB, "des max window", (long long)max_window_size);
@@ -69,7 +69,7 @@ static inline void set_beta(RRDR *r, struct grouping_des *g) {
     //info("beta for chart '%s' is " CALCULATED_NUMBER_FORMAT, r->st->name, g->beta);
 }
 
-void *grouping_init_des(RRDR *r) {
+void *grouping_create_des(RRDR *r) {
     struct grouping_des *g = (struct grouping_des *)malloc(sizeof(struct grouping_des));
     set_alpha(r, g);
     set_beta(r, g);

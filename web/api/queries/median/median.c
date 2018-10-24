@@ -13,7 +13,7 @@ struct grouping_median {
     LONG_DOUBLE series[];
 };
 
-void *grouping_init_median(RRDR *r) {
+void *grouping_create_median(RRDR *r) {
     long entries = r->group;
     if(entries < 0) entries = 0;
 

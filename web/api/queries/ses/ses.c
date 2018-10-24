@@ -15,7 +15,7 @@ struct grouping_ses {
 
 static size_t max_window_size = 15;
 
-void grouping_setup_ses(void) {
+void grouping_init_ses(void) {
     long long ret = config_get_number(CONFIG_SECTION_WEB, "ses max window", (long long)max_window_size);
     if(ret <= 1) {
         config_set_number(CONFIG_SECTION_WEB, "ses max window", (long long)max_window_size);
@@ -48,7 +48,7 @@ static inline void set_alpha(RRDR *r, struct grouping_ses *g) {
     g->alpha_other = 1.0 - g->alpha;
 }
 
-void *grouping_init_ses(RRDR *r) {
+void *grouping_create_ses(RRDR *r) {
     struct grouping_ses *g = (struct grouping_ses *)callocz(1, sizeof(struct grouping_ses));
     set_alpha(r, g);
     g->level = 0.0;

@@ -10,7 +10,7 @@ struct grouping_min {
     size_t count;
 };
 
-void *grouping_init_min(RRDR *r) {
+void *grouping_create_min(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_min));
 }

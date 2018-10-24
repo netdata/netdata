@@ -10,7 +10,7 @@ struct grouping_max {
     size_t count;
 };
 
-void *grouping_init_max(RRDR *r) {
+void *grouping_create_max(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_max));
 }

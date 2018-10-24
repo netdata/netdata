@@ -14,7 +14,7 @@ struct grouping_stddev {
     calculated_number m_oldM, m_newM, m_oldS, m_newS;
 };
 
-void *grouping_init_stddev(RRDR *r) {
+void *grouping_create_stddev(RRDR *r) {
     long entries = r->group;
     if(entries < 0) entries = 0;
 

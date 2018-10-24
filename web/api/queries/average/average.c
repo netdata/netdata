@@ -10,7 +10,7 @@ struct grouping_average {
     size_t count;
 };
 
-void *grouping_init_average(RRDR *r) {
+void *grouping_create_average(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_average));
 }

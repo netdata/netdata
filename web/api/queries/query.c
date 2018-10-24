@@ -23,7 +23,7 @@ static struct {
 
     // One time initialization for the module.
     // This is called once, when netdata starts.
-    void (*setup)(void);
+    void (*init)(void);
 
     // Allocate all required structures for a query.
     // This is called once for each netdata query.
@@ -52,8 +52,8 @@ static struct {
         {.name = "average",
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
-                .setup = NULL,
-                .create= grouping_init_average,
+                .init  = NULL,
+                .create= grouping_create_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -62,8 +62,8 @@ static struct {
         {.name = "mean",                           // alias on 'average'
                 .hash  = 0,
                 .value = RRDR_GROUPING_AVERAGE,
-                .setup = NULL,
-                .create= grouping_init_average,
+                .init  = NULL,
+                .create= grouping_create_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -73,8 +73,8 @@ static struct {
                 .name  = "incremental_sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
-                .setup = NULL,
-                .create= grouping_init_incremental_sum,
+                .init  = NULL,
+                .create= grouping_create_incremental_sum,
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
@@ -83,8 +83,8 @@ static struct {
         {.name = "incremental-sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
-                .setup = NULL,
-                .create= grouping_init_incremental_sum,
+                .init  = NULL,
+                .create= grouping_create_incremental_sum,
                 .reset = grouping_reset_incremental_sum,
                 .free  = grouping_free_incremental_sum,
                 .add   = grouping_add_incremental_sum,
@@ -93,8 +93,8 @@ static struct {
         {.name = "median",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MEDIAN,
-                .setup = NULL,
-                .create= grouping_init_median,
+                .init  = NULL,
+                .create= grouping_create_median,
                 .reset = grouping_reset_median,
                 .free  = grouping_free_median,
                 .add   = grouping_add_median,
@@ -103,8 +103,8 @@ static struct {
         {.name = "min",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MIN,
-                .setup = NULL,
-                .create= grouping_init_min,
+                .init  = NULL,
+                .create= grouping_create_min,
                 .reset = grouping_reset_min,
                 .free  = grouping_free_min,
                 .add   = grouping_add_min,
@@ -113,8 +113,8 @@ static struct {
         {.name = "max",
                 .hash  = 0,
                 .value = RRDR_GROUPING_MAX,
-                .setup = NULL,
-                .create= grouping_init_max,
+                .init  = NULL,
+                .create= grouping_create_max,
                 .reset = grouping_reset_max,
                 .free  = grouping_free_max,
                 .add   = grouping_add_max,
@@ -123,8 +123,8 @@ static struct {
         {.name = "sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_SUM,
-                .setup = NULL,
-                .create= grouping_init_sum,
+                .init  = NULL,
+                .create= grouping_create_sum,
                 .reset = grouping_reset_sum,
                 .free  = grouping_free_sum,
                 .add   = grouping_add_sum,
@@ -135,8 +135,8 @@ static struct {
         {.name = "stddev",
                 .hash  = 0,
                 .value = RRDR_GROUPING_STDDEV,
-                .setup = NULL,
-                .create= grouping_init_stddev,
+                .init  = NULL,
+                .create= grouping_create_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -145,8 +145,8 @@ static struct {
         {.name = "cv",                           // coefficient variation is calculated by stddev
                 .hash  = 0,
                 .value = RRDR_GROUPING_CV,
-                .setup = NULL,
-                .create= grouping_init_stddev,   // not an error, stddev calculates this too
+                .init  = NULL,
+                .create= grouping_create_stddev,   // not an error, stddev calculates this too
                 .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
                 .free  = grouping_free_stddev,   // not an error, stddev calculates this too
                 .add   = grouping_add_stddev,    // not an error, stddev calculates this too
@@ -158,7 +158,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_MEAN,
                 .setup = NULL,
-                .create= grouping_init_stddev,
+                .create= grouping_create_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -171,7 +171,7 @@ static struct {
                 .hash  = 0,
                 .value = RRDR_GROUPING_VARIANCE,
                 .setup = NULL,
-                .create= grouping_init_stddev,
+                .create= grouping_create_stddev,
                 .reset = grouping_reset_stddev,
                 .free  = grouping_free_stddev,
                 .add   = grouping_add_stddev,
@@ -183,8 +183,8 @@ static struct {
         {.name = "ses",
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
-                .setup = grouping_setup_ses,
-                .create= grouping_init_ses,
+                .init = grouping_init_ses,
+                .create= grouping_create_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -193,8 +193,8 @@ static struct {
         {.name = "ema",                         // alias for 'ses'
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
-                .setup = NULL,
-                .create= grouping_init_ses,
+                .init = NULL,
+                .create= grouping_create_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -203,8 +203,8 @@ static struct {
         {.name = "ewma",                        // alias for ses
                 .hash  = 0,
                 .value = RRDR_GROUPING_SES,
-                .setup = NULL,
-                .create= grouping_init_ses,
+                .init = NULL,
+                .create= grouping_create_ses,
                 .reset = grouping_reset_ses,
                 .free  = grouping_free_ses,
                 .add   = grouping_add_ses,
@@ -215,8 +215,8 @@ static struct {
         {.name = "des",
                 .hash  = 0,
                 .value = RRDR_GROUPING_DES,
-                .setup = grouping_setup_des,
-                .create= grouping_init_des,
+                .init = grouping_init_des,
+                .create= grouping_create_des,
                 .reset = grouping_reset_des,
                 .free  = grouping_free_des,
                 .add   = grouping_add_des,
@@ -227,8 +227,8 @@ static struct {
         {.name = NULL,
                 .hash  = 0,
                 .value = RRDR_GROUPING_UNDEFINED,
-                .setup = NULL,
-                .create= grouping_init_average,
+                .init = NULL,
+                .create= grouping_create_average,
                 .reset = grouping_reset_average,
                 .free  = grouping_free_average,
                 .add   = grouping_add_average,
@@ -242,8 +242,8 @@ void web_client_api_v1_init_grouping(void) {
     for(i = 0; api_v1_data_groups[i].name ; i++) {
         api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
 
-        if(api_v1_data_groups[i].setup)
-            api_v1_data_groups[i].setup();
+        if(api_v1_data_groups[i].init)
+            api_v1_data_groups[i].init();
     }
 }
 
@@ -807,7 +807,7 @@ RRDR *rrd2rrdr(
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: grouping method %u not found for chart '%s'. Using 'average'", (unsigned int)group_method, r->st->name);
             #endif
-            r->internal.grouping_init  = grouping_init_average;
+            r->internal.grouping_init  = grouping_create_average;
             r->internal.grouping_reset = grouping_reset_average;
             r->internal.grouping_free  = grouping_free_average;
             r->internal.grouping_add   = grouping_add_average;

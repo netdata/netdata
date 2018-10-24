@@ -10,7 +10,7 @@ struct grouping_sum {
     size_t count;
 };
 
-void *grouping_init_sum(RRDR *r) {
+void *grouping_create_sum(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_sum));
 }
