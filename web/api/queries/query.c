@@ -69,8 +69,7 @@ static struct {
                 .add   = grouping_add_average,
                 .flush = grouping_flush_average
         },
-        {
-                .name  = "incremental_sum",
+        {.name  = "incremental_sum",
                 .hash  = 0,
                 .value = RRDR_GROUPING_INCREMENTAL_SUM,
                 .init  = NULL,
