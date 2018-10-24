@@ -27,30 +27,181 @@ static struct {
     void (*add)(struct rrdresult *r, calculated_number value);
     calculated_number (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 } api_v1_data_groups[] = {
-          { "average"         , 0, RRDR_GROUPING_AVERAGE        , NULL, grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
-        , { "incremental_sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, NULL,  grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
-        , { "incremental-sum" , 0, RRDR_GROUPING_INCREMENTAL_SUM, NULL,  grouping_init_incremental_sum, grouping_reset_incremental_sum, grouping_free_incremental_sum, grouping_add_incremental_sum, grouping_flush_incremental_sum }
-        , { "median"          , 0, RRDR_GROUPING_MEDIAN         , NULL,  grouping_init_median         , grouping_reset_median         , grouping_free_median         , grouping_add_median         , grouping_flush_median }
-        , { "min"             , 0, RRDR_GROUPING_MIN            , NULL,  grouping_init_min            , grouping_reset_min            , grouping_free_min            , grouping_add_min            , grouping_flush_min }
-        , { "max"             , 0, RRDR_GROUPING_MAX            , NULL,  grouping_init_max            , grouping_reset_max            , grouping_free_max            , grouping_add_max            , grouping_flush_max }
-        , { "sum"             , 0, RRDR_GROUPING_SUM            , NULL,  grouping_init_sum            , grouping_reset_sum            , grouping_free_sum            , grouping_add_sum            , grouping_flush_sum }
+        {.name = "average",
+                .hash  = 0,
+                .value = RRDR_GROUPING_AVERAGE,
+                .setup = NULL,
+                .init  = grouping_init_average,
+                .reset = grouping_reset_average,
+                .free  = grouping_free_average,
+                .add   = grouping_add_average,
+                .flush = grouping_flush_average
+        },
+        {
+                .name  = "incremental_sum",
+                .hash  = 0,
+                .value = RRDR_GROUPING_INCREMENTAL_SUM,
+                .setup = NULL,
+                .init  = grouping_init_incremental_sum,
+                .reset = grouping_reset_incremental_sum,
+                .free  = grouping_free_incremental_sum,
+                .add   = grouping_add_incremental_sum,
+                .flush = grouping_flush_incremental_sum
+        },
+        {.name = "incremental-sum",
+                .hash  = 0,
+                .value = RRDR_GROUPING_INCREMENTAL_SUM,
+                .setup = NULL,
+                .init  = grouping_init_incremental_sum,
+                .reset = grouping_reset_incremental_sum,
+                .free  = grouping_free_incremental_sum,
+                .add   = grouping_add_incremental_sum,
+                .flush = grouping_flush_incremental_sum
+        },
+        {.name = "median",
+                .hash  = 0,
+                .value = RRDR_GROUPING_MEDIAN,
+                .setup = NULL,
+                .init  = grouping_init_median,
+                .reset = grouping_reset_median,
+                .free  = grouping_free_median,
+                .add   = grouping_add_median,
+                .flush = grouping_flush_median
+        },
+        {.name = "min",
+                .hash  = 0,
+                .value = RRDR_GROUPING_MIN,
+                .setup = NULL,
+                .init  = grouping_init_min,
+                .reset = grouping_reset_min,
+                .free  = grouping_free_min,
+                .add   = grouping_add_min,
+                .flush = grouping_flush_min
+        },
+        {.name = "max",
+                .hash  = 0,
+                .value = RRDR_GROUPING_MAX,
+                .setup = NULL,
+                .init  = grouping_init_max,
+                .reset = grouping_reset_max,
+                .free  = grouping_free_max,
+                .add   = grouping_add_max,
+                .flush = grouping_flush_max
+        },
+        {.name = "sum",
+                .hash  = 0,
+                .value = RRDR_GROUPING_SUM,
+                .setup = NULL,
+                .init  = grouping_init_sum,
+                .reset = grouping_reset_sum,
+                .free  = grouping_free_sum,
+                .add   = grouping_add_sum,
+                .flush = grouping_flush_sum
+        },
 
-        // stddev module provides mean, variance and coefficient of variation
-        , { "stddev"          , 0, RRDR_GROUPING_STDDEV         , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_stddev }
-        , { "cv"              , 0, RRDR_GROUPING_CV             , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_coefficient_of_variation }
-        //, { "mean"            , 0, RRDR_GROUPING_MEAN           , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_mean }
-        //, { "variance"        , 0, RRDR_GROUPING_VARIANCE       , NULL,  grouping_init_stddev         , grouping_reset_stddev         , grouping_free_stddev         , grouping_add_stddev         , grouping_flush_variance }
+        // standard deviation
+        {.name = "stddev",
+                .hash  = 0,
+                .value = RRDR_GROUPING_STDDEV,
+                .setup = NULL,
+                .init  = grouping_init_stddev,
+                .reset = grouping_reset_stddev,
+                .free  = grouping_free_stddev,
+                .add   = grouping_add_stddev,
+                .flush = grouping_flush_stddev
+        },
+        {.name = "cv",                           // coefficient variation is calculated by stddev
+                .hash  = 0,
+                .value = RRDR_GROUPING_CV,
+                .setup = NULL,
+                .init  = grouping_init_stddev,   // not an error, stddev calculates this too
+                .reset = grouping_reset_stddev,  // not an error, stddev calculates this too
+                .free  = grouping_free_stddev,   // not an error, stddev calculates this too
+                .add   = grouping_add_stddev,    // not an error, stddev calculates this too
+                .flush = grouping_flush_coefficient_of_variation
+        },
 
-        // single exponential smoothing or exponential weighted moving average
-        , { "ses"             , 0, RRDR_GROUPING_SES            , grouping_setup_ses,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
-        , { "ema"             , 0, RRDR_GROUPING_SES            , NULL,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
-        , { "ewma"            , 0, RRDR_GROUPING_SES            , NULL,  grouping_init_ses            , grouping_reset_ses            , grouping_free_ses            , grouping_add_ses            , grouping_flush_ses }
+        /*
+        {.name = "mean",                        // same as average, no need to define it again
+                .hash  = 0,
+                .value = RRDR_GROUPING_MEAN,
+                .setup = NULL,
+                .init  = grouping_init_stddev,
+                .reset = grouping_reset_stddev,
+                .free  = grouping_free_stddev,
+                .add   = grouping_add_stddev,
+                .flush = grouping_flush_mean
+        },
+        */
+
+        /*
+        {.name = "variance",                    // meaningless to offer
+                .hash  = 0,
+                .value = RRDR_GROUPING_VARIANCE,
+                .setup = NULL,
+                .init  = grouping_init_stddev,
+                .reset = grouping_reset_stddev,
+                .free  = grouping_free_stddev,
+                .add   = grouping_add_stddev,
+                .flush = grouping_flush_variance
+        },
+        */
+
+        // single exponential smoothing
+        {.name = "ses",
+                .hash  = 0,
+                .value = RRDR_GROUPING_SES,
+                .setup = grouping_setup_ses,
+                .init  = grouping_init_ses,
+                .reset = grouping_reset_ses,
+                .free  = grouping_free_ses,
+                .add   = grouping_add_ses,
+                .flush = grouping_flush_ses
+        },
+        {.name = "ema",                         // alias for 'ses'
+                .hash  = 0,
+                .value = RRDR_GROUPING_SES,
+                .setup = NULL,
+                .init  = grouping_init_ses,
+                .reset = grouping_reset_ses,
+                .free  = grouping_free_ses,
+                .add   = grouping_add_ses,
+                .flush = grouping_flush_ses
+        },
+        {.name = "ewma",                        // alias for ses
+                .hash  = 0,
+                .value = RRDR_GROUPING_SES,
+                .setup = NULL,
+                .init  = grouping_init_ses,
+                .reset = grouping_reset_ses,
+                .free  = grouping_free_ses,
+                .add   = grouping_add_ses,
+                .flush = grouping_flush_ses
+        },
 
         // double exponential smoothing
-        , { "des"             , 0, RRDR_GROUPING_DES            , grouping_setup_des,  grouping_init_des            , grouping_reset_des            , grouping_free_des            , grouping_add_des            , grouping_flush_des }
+        {.name = "des",
+                .hash  = 0,
+                .value = RRDR_GROUPING_DES,
+                .setup = grouping_setup_des,
+                .init  = grouping_init_des,
+                .reset = grouping_reset_des,
+                .free  = grouping_free_des,
+                .add   = grouping_add_des,
+                .flush = grouping_flush_des
+        },
 
         // terminator
-        , { NULL              , 0, RRDR_GROUPING_UNDEFINED      , NULL,  grouping_init_average        , grouping_reset_average        , grouping_free_average        , grouping_add_average        , grouping_flush_average }
+        {.name = NULL,
+                .hash  = 0,
+                .value = RRDR_GROUPING_UNDEFINED,
+                .setup = NULL,
+                .init  = grouping_init_average,
+                .reset = grouping_reset_average,
+                .free  = grouping_free_average,
+                .add   = grouping_add_average,
+                .flush = grouping_flush_average
+        }
 };
 
 void web_client_api_v1_init_grouping(void) {
