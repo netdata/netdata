@@ -31,11 +31,8 @@ void grouping_free_sum(RRDR *r) {
 void grouping_add_sum(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
         struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
-
-        if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->sum)) {
-            g->sum += value;
-            g->count++;
-        }
+        g->sum += value;
+        g->count++;
     }
 }
 
