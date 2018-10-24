@@ -203,8 +203,7 @@ const NETDATA = window.NETDATA || {};
 
         if (typeof document.currentScript !== 'undefined') {
             script = document.currentScript;
-        }
-        else {
+        } else {
             const all_scripts = document.getElementsByTagName('script');
             script = all_scripts[all_scripts.length - 1];
         }
@@ -217,12 +216,13 @@ const NETDATA = window.NETDATA || {};
         return script;
     };
 
-    if (typeof netdataServer !== 'undefined')
+    if (typeof netdataServer !== 'undefined') {
         NETDATA.serverDefault = netdataServer;
-    else {
+    } else {
         let s = NETDATA._scriptSource();
-        if (s) NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
-        else {
+        if (s) {
+            NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
+        } else {
             console.log('WARNING: Cannot detect the URL of the netdata server.');
             NETDATA.serverDefault = null;
         }
@@ -237,8 +237,7 @@ const NETDATA = window.NETDATA || {};
         NETDATA.serverStatic = netdataServerStatic;
         if (NETDATA.serverStatic.slice(-1) !== '/')
             NETDATA.serverStatic += '/';
-    }
-    else {
+    } else {
         NETDATA.serverStatic = NETDATA.serverDefault;
     }
 
@@ -332,10 +331,11 @@ const NETDATA = window.NETDATA || {};
         }
     };
 
-    if (typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined')
+    if (typeof netdataTheme !== 'undefined' && typeof NETDATA.themes[netdataTheme] !== 'undefined') {
         NETDATA.themes.current = NETDATA.themes[netdataTheme];
-    else
+    } else {
         NETDATA.themes.current = NETDATA.themes.white;
+    }
 
     NETDATA.colors = NETDATA.themes.current.colors;
 
@@ -1235,8 +1235,9 @@ const NETDATA = window.NETDATA || {};
             // Only convert to a number if it doesn't change the string
             if (data === +data + '') return +data;
 
-            if (/^(?:\{[\w\W]*\}|\[[\w\W]*\])$/.test(data))
+            if (/^(?:\{[\w\W]*\}|\[[\w\W]*\])$/.test(data)) {
                 return JSON.parse(data);
+            }
 
             return data;
         } else {
@@ -1251,17 +1252,20 @@ const NETDATA = window.NETDATA || {};
             return value;
 
         if (typeof(value) === 'string') {
-            if (value === 'yes' || value === 'on')
+            if (value === 'yes' || value === 'on') {
                 return true;
+            }
 
-            if (value === '' || value === 'no' || value === 'off' || value === 'null')
+            if (value === '' || value === 'no' || value === 'off' || value === 'null') {
                 return false;
+            }
 
             return def;
         }
 
-        if (typeof(value) === 'number')
+        if (typeof(value) === 'number') {
             return value !== 0;
+        }
 
         return def;
     };
@@ -1318,8 +1322,11 @@ const NETDATA = window.NETDATA || {};
 
             // find the common min
             let m = min;
-            for (let i in t) {
-                if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
+            // for (let i in t) {
+            //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
+            // }
+            for (let ti of t) {
+                if (ti < m) m = ti;
             }
 
             //state.log('commonMin ' + state.tmp.__commonMin + ' updated: ' + m);
@@ -1377,8 +1384,11 @@ const NETDATA = window.NETDATA || {};
 
             // find the common max
             let m = max;
-            for (let i in t) {
-                if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
+            // for (let i in t) {
+            //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
+            // }
+            for (let ti of t) {
+                if (ti > m) m = ti;
             }
 
             //state.log('commonMax ' + state.tmp.__commonMax + ' updated: ' + m);
