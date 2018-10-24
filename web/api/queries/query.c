@@ -37,6 +37,16 @@ static struct {
                 .add   = grouping_add_average,
                 .flush = grouping_flush_average
         },
+        {.name = "mean",                           // alias on 'average'
+                .hash  = 0,
+                .value = RRDR_GROUPING_AVERAGE,
+                .setup = NULL,
+                .init  = grouping_init_average,
+                .reset = grouping_reset_average,
+                .free  = grouping_free_average,
+                .add   = grouping_add_average,
+                .flush = grouping_flush_average
+        },
         {
                 .name  = "incremental_sum",
                 .hash  = 0,

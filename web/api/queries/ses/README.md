@@ -8,10 +8,19 @@ exponentially. The weighting for each older datum decreases exponentially, never
 
 In simple terms, this is like an average value, but more recent values are given more weight.
 
-Netdata automatically adjusts the weight based on the number of values processed, using the formula:
+Netdata automatically adjusts the weight (`alpha`) based on the number of values processed,
+using the formula:
 
 ```
-alpha = 2 / (number_of_values + 1)
+window = max(number of values, 15)
+alpha  = 2 / (window + 1)
+```
+
+You can change the fixed value `15` by setting in `netdata.conf`:
+
+```
+[web]
+   ses max window = 15
 ```
 
 ## how to use
@@ -34,10 +43,10 @@ It can also be used in APIs and badges as `&group=ses` in the URL.
 
 Examining last 1 minute `successful` web server responses:
 
-- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&dimensions=success&group=min&after=-60&label=min)
-- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&dimensions=success&group=average&after=-60&label=average&value_color=yellow)
-- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&dimensions=success&group=ses&after=-60&label=single+exponential+smoothing&value_color=orange)
-- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&dimensions=success&group=max&after=-60&label=max)
+- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=min&after=-60&label=min)
+- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=average&after=-60&label=average&value_color=yellow)
+- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=ses&after=-60&label=single+exponential+smoothing&value_color=orange)
+- ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=max&after=-60&label=max)
 
 ## References
 
