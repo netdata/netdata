@@ -10,7 +10,8 @@ Module  | nginx/nginx.chart.py |
 Prog. Language | Python | 
 Config file | python.d/nginx.conf |
 Alarms config | health.d/nginx.conf |
-Dependencies |  nginx with configured 'ngx_http_stub_status_module' |
+System Requirements |  |
+External Dependencies |  nginx with configured 'ngx_http_stub_status_module' |
 Live Demo | [See it live](https://singapore.my-netdata.io/#menu_nginx_local) |
 
 
@@ -19,6 +20,8 @@ Live Demo | [See it live](https://singapore.my-netdata.io/#menu_nginx_local) |
 Retrieves connection and request information from the nging servers configured in python.d/nginx.conf, using the [nginx http stub_status module](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html)
 
 ## Charts
+
+_For explanation of the columns in the table below, see the [CHART output documentation](../../plugins.d/#CHART)_
 
 type.id | name | title | units | family | context | charttype | options |
 :-------|:-----|:------|:------|:-------|:--------|:----------|:--------|

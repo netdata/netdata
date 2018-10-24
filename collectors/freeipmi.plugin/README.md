@@ -9,7 +9,8 @@ Plugin | freeipmi.plugin |
 Prog. Language | C | 
 Config file | /etc/netdata/netdata.conf |
 Alarms config | health.d/ipmi.conf |
-Dependencies |  `libipmimonitoring-dev` or `libipmimonitoring-devel` |
+System Requirements | `libipmimonitoring-dev` or `libipmimonitoring-devel`. Verification that `ipmimonitoring` returns sensors information |
+External Dependencies |  |
 Live Demo | menu_ipmi |
 
 ## Introduction
@@ -17,6 +18,8 @@ Live Demo | menu_ipmi |
 [FreeIPMI](https://www.gnu.org/software/freeipmi/) provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
 ## Charts
+
+_For explanation of the columns in the table below, see the [CHART output documentation](../plugins.d/#CHART)_
 
 type.id | name | title | units | family | context | charttype | options |
 :-------|:-----|:------|:------|:-------|:--------|:----------|:------|
@@ -36,8 +39,6 @@ The plugin adds 2 alarms:
 ![image](https://cloud.githubusercontent.com/assets/2662304/23674138/88926a20-037d-11e7-89c0-20e74ee10cd1.png)
 
 ## Installation
-
-_e.g. do I need to install an external application, do I need to configure my application so it can be monitored by netdata, do I need to restart netdata etc._
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 

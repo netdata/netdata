@@ -14,7 +14,8 @@ Module | COLLECTOR_IDENTIFIER |
 Prog. Language | Python | 
 Config file | CONFIG_FILE |
 Alarms config | ALARM_CONFIG_FILE |
-Dependencies |  DEPENDENCIES |
+System Requirements | REQUIREMENTS |
+External Dependencies |  DEPENDENCIES |
 Live Demo | URL_OR_SUBURL |
 
 
@@ -22,7 +23,8 @@ _The README always starts with the table above after the main header. Any other 
 - CATEGORY is one of the following: Web, Cloud, Data Store, Messaging (Queues), Monitoring Tools, Operating System, Application Instrumentation, Other
 - SUBCATEGORY could be Application, Metric type (e.g.) 
 - PLUGIN_IDENTIFIER The first part of the directory the plugin is in. e.g. freeipmi, python.d etc.
-- DEPENDENCIES contains a one line description of what is needed outside of netdata for the plugin to work
+- REQUIREMENTS lists what's needed on the system on which netdata is installed, for the module to run. 
+- DEPENDENCIES contains a one line description of what is needed on the system monitored by netdata, for the particular plugin to be able to collect metrics
 - URL_OR_SUBURL: If a full URL appears here, we will show it as is and also parse the path after the hash tag. If it's not a link format, we'll assume that we are given the path after the hash tag.
 _
 
@@ -33,6 +35,8 @@ _This can contain subsections and will appear as is. It should give a high level
 ## Charts
 
 _Detailed list of metrics collected, one line per type of CHART generated. Notice the exact match with the parameters expected to the CHART output line. The "options" column does not need to be detailed, but we want the table to explain what we will see in each chart, so use your judgement _
+
+_For explanation of the columns in the table below, see the [CHART output documentation](../plugins.d/#CHART)_
 
 type.id | name | title | units | family | context | charttype | options |
 :-------|:-----|:------|:------|:-------|:--------|:----------|:------|
