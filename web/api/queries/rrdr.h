@@ -72,7 +72,7 @@ typedef struct rrdresult {
     // internal rrd2rrdr() members below this point
     struct {
         long points_wanted;
-        long resampling_points;
+        long resampling_group;
         calculated_number resampling_divisor;
 
         void *(*grouping_init)(struct rrdresult *r);

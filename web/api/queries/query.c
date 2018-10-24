@@ -456,8 +456,8 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         , RRDR_GROUPING group_method
         , int aligned
         , long group
-        , long group_time
-        , long group_points
+        , long resampling_time
+        , long resampling_group
         , time_t after_wanted
         , time_t after_requested
         , time_t before_wanted
@@ -468,7 +468,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         , size_t before_slot
         , const char *msg
         ) {
-    info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, gtime: %ld, gpoints: %ld), "
+    info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %zu, db: %zu), "
          "before (got: %zu, want: %zu, req: %zu, db: %zu), "
          "duration (got: %zu, want: %zu, req: %zu, db: %zu), "
@@ -482,8 +482,8 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , (aligned) ? "aligned" : "unaligned"
          , group_method2string(group_method)
          , group
-         , group_time
-         , group_points
+         , resampling_time
+         , resampling_group
 
          // after
          , (size_t)r->after - (group - 1) * r->st->update_every
@@ -603,7 +603,7 @@ RRDR *rrd2rrdr(
 
     // resampling_time_requested enforces a certain grouping multiple
     calculated_number resampling_divisor = 1.0;
-    long resampling_points = 1;
+    long resampling_group = 1;
     if(unlikely(resampling_time_requested > st->update_every)) {
         if (unlikely(resampling_time_requested > duration)) {
             // group_time is above the available duration
@@ -616,20 +616,20 @@ RRDR *rrd2rrdr(
         }
         else {
             // the points we should group to satisfy gtime
-            resampling_points = resampling_time_requested / st->update_every;
+            resampling_group = resampling_time_requested / st->update_every;
             if(unlikely(resampling_time_requested % st->update_every)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
                 #endif
 
-                resampling_points++;
+                resampling_group++;
             }
 
-            // adapt group according to resampling_points
-            if(unlikely(group < resampling_points)) group = resampling_points; // do not allow grouping below the desired one
-            if(unlikely(group % resampling_points)) group += resampling_points - (group % resampling_points); // make sure group is multiple of resampling_points
+            // adapt group according to resampling_group
+            if(unlikely(group < resampling_group)) group  = resampling_group; // do not allow grouping below the desired one
+            if(unlikely(group % resampling_group)) group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
 
-            //resampling_divisor = group / resampling_points;
+            //resampling_divisor = group / resampling_group;
             resampling_divisor = (calculated_number)(group * st->update_every) / (calculated_number)resampling_time_requested;
         }
     }
@@ -719,11 +719,11 @@ RRDR *rrd2rrdr(
     if(points_wanted > (before_wanted - after_wanted) / group / st->update_every + 1)
         error("INTERNAL CHECK: points_wanted %ld is more than points %ld", points_wanted, (before_wanted - after_wanted) / group / st->update_every + 1);
 
-    if(group < resampling_points)
-        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, resampling_points);
+    if(group < resampling_group)
+        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, resampling_group);
 
-    if(group > resampling_points && group % resampling_points)
-        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, resampling_points);
+    if(group > resampling_group && group % resampling_group)
+        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, resampling_group);
 #endif
 
     // -------------------------------------------------------------------------
@@ -761,7 +761,7 @@ RRDR *rrd2rrdr(
     r->before = before_wanted;
     r->after = after_wanted;
     r->internal.points_wanted = points_wanted;
-    r->internal.resampling_points = resampling_points;
+    r->internal.resampling_group = resampling_group;
     r->internal.resampling_divisor = resampling_divisor;
 
 
@@ -875,27 +875,27 @@ RRDR *rrd2rrdr(
     #ifdef NETDATA_INTERNAL_CHECKS
 
     if(r->internal.log)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
 
     if(r->rows != points_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
 
     if(aligned && (r->before % group) != 0)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
 
     // 'after' should not be aligned, since we start inside the first group
     //if(aligned && (r->after % group) != 0)
-    //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
+    //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
     if(r->before != before_requested)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
 
     if(r->before != before_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
 
     // reported 'after' varies, depending on group
     if((r->after - (group - 1) * r->st->update_every) != after_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_points, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
 
     #endif
 
