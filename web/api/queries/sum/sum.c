@@ -10,7 +10,7 @@ struct grouping_sum {
     size_t count;
 };
 
-void *grouping_init_sum(RRDR *r) {
+void *grouping_create_sum(RRDR *r) {
     (void)r;
     return callocz(1, sizeof(struct grouping_sum));
 }
@@ -18,18 +18,19 @@ void *grouping_init_sum(RRDR *r) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_sum(RRDR *r) {
-    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+    struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
     g->sum = 0;
     g->count = 0;
 }
 
 void grouping_free_sum(RRDR *r) {
-    freez(r->grouping_data);
+    freez(r->internal.grouping_data);
+    r->internal.grouping_data = NULL;
 }
 
 void grouping_add_sum(RRDR *r, calculated_number value) {
     if(!isnan(value)) {
-        struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+        struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
 
         if(!g->count || calculated_number_fabs(value) > calculated_number_fabs(g->sum)) {
             g->sum += value;
@@ -39,7 +40,7 @@ void grouping_add_sum(RRDR *r, calculated_number value) {
 }
 
 calculated_number grouping_flush_sum(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_sum *g = (struct grouping_sum *)r->grouping_data;
+    struct grouping_sum *g = (struct grouping_sum *)r->internal.grouping_data;
 
     calculated_number value;
 

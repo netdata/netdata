@@ -14,8 +14,8 @@ struct grouping_stddev {
     calculated_number m_oldM, m_newM, m_oldS, m_newS;
 };
 
-void *grouping_init_stddev(RRDR *r) {
-    long entries = (r->group > r->group_points) ? r->group : r->group_points;
+void *grouping_create_stddev(RRDR *r) {
+    long entries = r->group;
     if(entries < 0) entries = 0;
 
     return callocz(1, sizeof(struct grouping_stddev) + entries * sizeof(LONG_DOUBLE));
@@ -24,16 +24,17 @@ void *grouping_init_stddev(RRDR *r) {
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_stddev(RRDR *r) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
     g->count = 0;
 }
 
 void grouping_free_stddev(RRDR *r) {
-    freez(r->grouping_data);
+    freez(r->internal.grouping_data);
+    r->internal.grouping_data = NULL;
 }
 
 void grouping_add_stddev(RRDR *r, calculated_number value) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     if(isnormal(value)) {
         g->count++;
@@ -66,21 +67,24 @@ static inline calculated_number stddev(struct grouping_stddev *g) {
 }
 
 calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     calculated_number value;
 
-    if(unlikely(!g->count)) {
-        value = 0.0;
-        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-    }
-    else {
+    if(likely(g->count > 1)) {
         value = stddev(g);
 
         if(!isnormal(value)) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
+    }
+    else if(g->count == 1) {
+        value = 0.0;
+    }
+    else {
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
 
     grouping_reset_stddev(r);
@@ -90,22 +94,27 @@ calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_op
 
 // https://en.wikipedia.org/wiki/Coefficient_of_variation
 calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     calculated_number value;
 
-    if(unlikely(!g->count)) {
-        value = 0.0;
-        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
-    }
-    else {
+    if(likely(g->count > 1)) {
         calculated_number m = mean(g);
         value = 100.0 * stddev(g) / ((m < 0)? -m : m);
 
-        if(!isnormal(value)) {
+        if(unlikely(!isnormal(value))) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
+    }
+    else if(g->count == 1) {
+        // one value collected
+        value = 0.0;
+    }
+    else {
+        // no values collected
+        value = 0.0;
+        *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
 
     grouping_reset_stddev(r);
@@ -118,7 +127,7 @@ calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FL
  * Mean = average
  *
 calculated_number grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     calculated_number value;
 
@@ -145,7 +154,7 @@ calculated_number grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_opti
  * It is not advised to use this version of variance directly
  *
 calculated_number grouping_flush_variance(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
     calculated_number value;
 

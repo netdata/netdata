@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define BACKENDS_INTERNALS
 #include "backend_prometheus.h"
 
 // ----------------------------------------------------------------------------

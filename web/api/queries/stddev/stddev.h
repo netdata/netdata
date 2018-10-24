@@ -6,7 +6,7 @@
 #include "../query.h"
 #include "../rrdr.h"
 
-extern void *grouping_init_stddev(RRDR *r);
+extern void *grouping_create_stddev(RRDR *r);
 extern void grouping_reset_stddev(RRDR *r);
 extern void grouping_free_stddev(RRDR *r);
 extern void grouping_add_stddev(RRDR *r, calculated_number value);

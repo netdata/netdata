@@ -6,7 +6,9 @@
 #include "../query.h"
 #include "../rrdr.h"
 
-extern void *grouping_init_des(RRDR *r);
+extern void grouping_init_des(void);
+
+extern void *grouping_create_des(RRDR *r);
 extern void grouping_reset_des(RRDR *r);
 extern void grouping_free_des(RRDR *r);
 extern void grouping_add_des(RRDR *r, calculated_number value);

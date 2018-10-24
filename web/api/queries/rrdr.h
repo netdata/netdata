@@ -70,19 +70,22 @@ typedef struct rrdresult {
     int has_st_lock;        // if st is read locked by us
 
     // internal rrd2rrdr() members below this point
-    long group_points;
-    calculated_number group_sum_divisor;
+    struct {
+        long points_wanted;
+        long resampling_group;
+        calculated_number resampling_divisor;
 
-    void *(*grouping_init)(struct rrdresult *r);
-    void (*grouping_reset)(struct rrdresult *r);
-    void (*grouping_free)(struct rrdresult *r);
-    void (*grouping_add)(struct rrdresult *r, calculated_number value);
-    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-    void *grouping_data;
+        void *(*grouping_create)(struct rrdresult *r);
+        void (*grouping_reset)(struct rrdresult *r);
+        void (*grouping_free)(struct rrdresult *r);
+        void (*grouping_add)(struct rrdresult *r, calculated_number value);
+        calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+        void *grouping_data;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    const char *log;
-#endif
+        #ifdef NETDATA_INTERNAL_CHECKS
+        const char *log;
+        #endif
+    } internal;
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)
@@ -98,7 +101,7 @@ extern RRDR *rrdr_create(RRDSET *st, long n);
 
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long group_time_requested, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions);
 
 #include "query.h"
 
