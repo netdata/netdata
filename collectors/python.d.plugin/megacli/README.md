@@ -24,7 +24,7 @@ It produces:
 
 5. **Battery Cycle Count**
 
-### configuration
+### prerequisite
 This module uses `megacli` which can only be executed by root.  It uses
 `sudo` and assumes that it is configured such that the `netdata` user can
 execute `megacli` as root without password.
@@ -33,8 +33,16 @@ Add to `sudoers`:
 
     netdata ALL=(root)       NOPASSWD: /path/to/megacli
 
-**megacli** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+### configuration
 
-Battery stats disabled by default in the module configuration file.
+**megacli** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+```yaml
+megacli: yes
+```
+
+Battery stats disabled by default. To enable them modify `megacli.conf`.
+```yaml
+do_battery: yes
+```
 
 ---

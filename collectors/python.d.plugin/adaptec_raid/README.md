@@ -22,7 +22,7 @@ It produces:
 
 4. **Physical Device Temperature**
 
-#### configuration
+### prerequisite
 This module uses `arcconf` which can only be executed by root.  It uses
 `sudo` and assumes that it is configured such that the `netdata` user can
 execute `arcconf` as root without password.
@@ -31,7 +31,13 @@ Add to `sudoers`:
 
     netdata ALL=(root)       NOPASSWD: /path/to/arcconf
 
+### configuration
+
  **adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
+
+```yaml
+adapterc_raid: yes
+```
 
 #### Screenshot:
 

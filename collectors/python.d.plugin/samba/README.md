@@ -47,7 +47,7 @@ It produces the following charts:
  * break
  * sessetup
 
-### configuration
+### prerequisite
 This module uses `smbstatus` which can only be executed by root.  It uses
 `sudo` and assumes that it is configured such that the `netdata` user can
 execute `smbstatus` as root without password.
@@ -56,10 +56,12 @@ Add to `sudoers`:
 
     netdata ALL=(root)       NOPASSWD: /path/to/smbstatus
 
+### configuration
+
  **samba** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
-update_every : 5 # update frequency
+samba: yes
 ```
 
 ---
