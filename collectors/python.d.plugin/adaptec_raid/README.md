@@ -3,7 +3,7 @@
 Module collects logical and physical devices health metrics.
 
 **Requirements:**
-* `arrconf` program
+* `arcconf` program
 * `sudo` program
 * `netdata` user needs to be able to sudo the `arcconf` program without password
 
@@ -36,7 +36,7 @@ Add to `sudoers`:
  **adaptec_raid** is disabled by default. Should be explicitly enabled in `python.d.conf`.
 
 ```yaml
-adapterc_raid: yes
+adaptec_raid: yes
 ```
 
 #### Screenshot:
