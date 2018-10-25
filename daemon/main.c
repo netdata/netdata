@@ -228,6 +228,7 @@ struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
     { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
+    { 'd', "Fork. Run in the background.",                NULL,          "run in the background"},
     { 'h', "Display this help message.",                  NULL,          NULL},
     { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
     { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
@@ -728,6 +729,9 @@ int main(int argc, char **argv) {
                     break;
                 case 'D':
                     dont_fork = 1;
+                    break;
+                case 'd':
+                    dont_fork = 0;
                     break;
                 case 'h':
                     return help(0);
