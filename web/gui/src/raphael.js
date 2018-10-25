@@ -1,4 +1,6 @@
 
+// DEPRECATED: will be removed!
+
 // raphael
 
 NETDATA.raphaelInitialize = function(callback) {
