@@ -5,13 +5,16 @@ cat src/prologue.js.inc \
     src/compatibility.js \
     src/xss.js \
     src/colors.js \
+    src/localstorage.js \
     src/units-conversion.js \
     src/charting/dygraph.js \
     src/charting/sparkline.js \
     src/charting/google-charts.js \
     src/charting/gauge.js \
     src/charting/easy-pie-chart.js \
+    src/charting/d3pie.js \
     src/charting/d3.js \
+    src/charting/peity.js \
     src/main.js \
     src/epilogue.js.inc \
     > dashboard.js
