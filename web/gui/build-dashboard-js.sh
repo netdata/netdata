@@ -17,5 +17,6 @@ cat src/prologue.js.inc \
     src/charting/d3.js \
     src/charting/peity.js \
     src/main.js \
+    src/boot.js \
     src/epilogue.js.inc \
     > dashboard.js
