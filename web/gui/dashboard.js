@@ -429,6 +429,179 @@ NETDATA.colorLuminance = function (hex, lum) {
 
     return rgb;
 };
+
+// local storage options
+
+NETDATA.localStorage = {
+    default: {},
+    current: {},
+    callback: {} // only used for resetting back to defaults
+};
+
+NETDATA.localStorageTested = -1;
+NETDATA.localStorageTest = function () {
+    if (NETDATA.localStorageTested !== -1) {
+        return NETDATA.localStorageTested;
+    }
+
+    if (typeof Storage !== "undefined" && typeof localStorage === 'object') {
+        let test = 'test';
+        try {
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            NETDATA.localStorageTested = true;
+        } catch (e) {
+            NETDATA.localStorageTested = false;
+        }
+    } else {
+        NETDATA.localStorageTested = false;
+    }
+
+    return NETDATA.localStorageTested;
+};
+
+NETDATA.localStorageGet = function (key, def, callback) {
+    let ret = def;
+
+    if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+        NETDATA.localStorage.default[key.toString()] = def;
+        NETDATA.localStorage.callback[key.toString()] = callback;
+    }
+
+    if (NETDATA.localStorageTest()) {
+        try {
+            // console.log('localStorage: loading "' + key.toString() + '"');
+            ret = localStorage.getItem(key.toString());
+            // console.log('netdata loaded: ' + key.toString() + ' = ' + ret.toString());
+            if (ret === null || ret === 'undefined') {
+                // console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
+                localStorage.setItem(key.toString(), JSON.stringify(def));
+                ret = def;
+            } else {
+                // console.log('localStorage: got "' + key.toString() + '" with value "' + ret + '"');
+                ret = JSON.parse(ret);
+                // console.log('localStorage: loaded "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
+            }
+        } catch (error) {
+            console.log('localStorage: failed to read "' + key.toString() + '", using default: "' + def.toString() + '"');
+            ret = def;
+        }
+    }
+
+    if (typeof ret === 'undefined' || ret === 'undefined') {
+        console.log('localStorage: LOADED UNDEFINED "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
+        ret = def;
+    }
+
+    NETDATA.localStorage.current[key.toString()] = ret;
+    return ret;
+};
+
+NETDATA.localStorageSet = function (key, value, callback) {
+    if (typeof value === 'undefined' || value === 'undefined') {
+        console.log('localStorage: ATTEMPT TO SET UNDEFINED "' + key.toString() + '" as value ' + value + ' of type ' + typeof(value));
+    }
+
+    if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
+        NETDATA.localStorage.default[key.toString()] = value;
+        NETDATA.localStorage.current[key.toString()] = value;
+        NETDATA.localStorage.callback[key.toString()] = callback;
+    }
+
+    if (NETDATA.localStorageTest()) {
+        // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
+        try {
+            localStorage.setItem(key.toString(), JSON.stringify(value));
+        } catch (e) {
+            console.log('localStorage: failed to save "' + key.toString() + '" with value: "' + value.toString() + '"');
+        }
+    }
+
+    NETDATA.localStorage.current[key.toString()] = value;
+    return value;
+};
+
+NETDATA.localStorageGetRecursive = function (obj, prefix, callback) {
+    let keys = Object.keys(obj);
+    let len = keys.length;
+    while (len--) {
+        let i = keys[len];
+
+        if (typeof obj[i] === 'object') {
+            //console.log('object ' + prefix + '.' + i.toString());
+            NETDATA.localStorageGetRecursive(obj[i], prefix + '.' + i.toString(), callback);
+            continue;
+        }
+
+        obj[i] = NETDATA.localStorageGet(prefix + '.' + i.toString(), obj[i], callback);
+    }
+};
+
+NETDATA.setOption = function (key, value) {
+    if (key.toString() === 'setOptionCallback') {
+        if (typeof NETDATA.options.current.setOptionCallback === 'function') {
+            NETDATA.options.current[key.toString()] = value;
+            NETDATA.options.current.setOptionCallback();
+        }
+    } else if (NETDATA.options.current[key.toString()] !== value) {
+        let name = 'options.' + key.toString();
+
+        if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined') {
+            console.log('localStorage: setOption() on unsaved option: "' + name.toString() + '", value: ' + value);
+        }
+
+        //console.log(NETDATA.localStorage);
+        //console.log('setOption: setting "' + key.toString() + '" to "' + value + '" of type ' + typeof(value) + ' original type ' + typeof(NETDATA.options.current[key.toString()]));
+        //console.log(NETDATA.options);
+        NETDATA.options.current[key.toString()] = NETDATA.localStorageSet(name.toString(), value, null);
+
+        if (typeof NETDATA.options.current.setOptionCallback === 'function') {
+            NETDATA.options.current.setOptionCallback();
+        }
+    }
+
+    return true;
+};
+
+NETDATA.getOption = function (key) {
+    return NETDATA.options.current[key.toString()];
+};
+
+// read settings from local storage
+NETDATA.localStorageGetRecursive(NETDATA.options.current, 'options', null);
+
+// always start with this option enabled.
+NETDATA.setOption('stop_updates_when_focus_is_lost', true);
+
+NETDATA.resetOptions = function () {
+    let keys = Object.keys(NETDATA.localStorage.default);
+    let len = keys.length;
+
+    while (len--) {
+        let i = keys[len];
+        let a = i.split('.');
+
+        if (a[0] === 'options') {
+            if (a[1] === 'setOptionCallback') {
+                continue;
+            }
+            if (typeof NETDATA.localStorage.default[i] === 'undefined') {
+                continue;
+            }
+            if (NETDATA.options.current[i] === NETDATA.localStorage.default[i]) {
+                continue;
+            }
+
+            NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
+        } else if (a[0] === 'chart_heights') {
+            if (typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
+                NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
+            }
+        }
+    }
+
+    NETDATA.dateTime.init(NETDATA.options.current.timezone);
+};
 NETDATA.unitsConversion = {
     keys: {},       // keys for data-common-units
     latest: {},     // latest selected units for data-common-units
@@ -2776,23 +2949,407 @@ NETDATA.easypiechartChartCreate = function (state, data) {
 
     return true;
 };
+
+// d3pie
+
+NETDATA.d3pieInitialize = function (callback) {
+    if (typeof netdataNoD3pie === 'undefined' || !netdataNoD3pie) {
+
+        // d3pie requires D3
+        if (!NETDATA.chartLibraries.d3.initialized) {
+            if (NETDATA.chartLibraries.d3.enabled) {
+                NETDATA.d3Initialize(function () {
+                    NETDATA.d3pieInitialize(callback);
+                });
+            } else {
+                NETDATA.chartLibraries.d3pie.enabled = false;
+                if (typeof callback === "function") {
+                    return callback();
+                }
+            }
+        } else {
+            $.ajax({
+                url: NETDATA.d3pie_js,
+                cache: true,
+                dataType: "script",
+                xhrFields: {withCredentials: true} // required for the cookie
+            })
+                .done(function () {
+                    NETDATA.registerChartLibrary('d3pie', NETDATA.d3pie_js);
+                })
+                .fail(function () {
+                    NETDATA.chartLibraries.d3pie.enabled = false;
+                    NETDATA.error(100, NETDATA.d3pie_js);
+                })
+                .always(function () {
+                    if (typeof callback === "function") {
+                        return callback();
+                    }
+                });
+        }
+    } else {
+        NETDATA.chartLibraries.d3pie.enabled = false;
+        if (typeof callback === "function") {
+            return callback();
+        }
+    }
+};
+
+NETDATA.d3pieSetContent = function (state, data, index) {
+    state.legendFormatValueDecimalsFromMinMax(
+        data.min,
+        data.max
+    );
+
+    let content = [];
+    let colors = state.chartColors();
+    let len = data.result.labels.length;
+    for (let i = 1; i < len; i++) {
+        let label = data.result.labels[i];
+        let value = data.result.data[index][label];
+        let color = colors[i - 1];
+
+        if (value !== null && value > 0) {
+            content.push({
+                label: label,
+                value: value,
+                color: color
+            });
+        }
+    }
+
+    if (content.length === 0) {
+        content.push({
+            label: 'no data',
+            value: 100,
+            color: '#666666'
+        });
+    }
+
+    state.tmp.d3pie_last_slot = index;
+    return content;
+};
+
+NETDATA.d3pieDateRange = function (state, data, index) {
+    let dt = Math.round((data.before - data.after + 1) / data.points);
+    let dt_str = NETDATA.seconds4human(dt);
+
+    let before = data.result.data[index].time;
+    let after = before - (dt * 1000);
+
+    let d1 = NETDATA.dateTime.localeDateString(after);
+    let t1 = NETDATA.dateTime.localeTimeString(after);
+    let d2 = NETDATA.dateTime.localeDateString(before);
+    let t2 = NETDATA.dateTime.localeTimeString(before);
+
+    if (d1 === d2) {
+        return d1 + ' ' + t1 + ' to ' + t2 + ', ' + dt_str;
+    }
+
+    return d1 + ' ' + t1 + ' to ' + d2 + ' ' + t2 + ', ' + dt_str;
+};
+
+NETDATA.d3pieSetSelection = function (state, t) {
+    if (state.timeIsVisible(t) !== true) {
+        return NETDATA.d3pieClearSelection(state, true);
+    }
+
+    let slot = state.calculateRowForTime(t);
+    slot = state.data.result.data.length - slot - 1;
+
+    if (slot < 0 || slot >= state.data.result.length) {
+        return NETDATA.d3pieClearSelection(state, true);
+    }
+
+    if (state.tmp.d3pie_last_slot === slot) {
+        // we already show this slot, don't do anything
+        return true;
+    }
+
+    if (state.tmp.d3pie_timer === undefined) {
+        state.tmp.d3pie_timer = NETDATA.timeout.set(function () {
+            state.tmp.d3pie_timer = undefined;
+            NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, slot), NETDATA.d3pieDateRange(state, state.data, slot));
+        }, 0);
+    }
+
+    return true;
+};
+
+NETDATA.d3pieClearSelection = function (state, force) {
+    if (typeof state.tmp.d3pie_timer !== 'undefined') {
+        NETDATA.timeout.clear(state.tmp.d3pie_timer);
+        state.tmp.d3pie_timer = undefined;
+    }
+
+    if (state.isAutoRefreshable() && state.data !== null && force !== true) {
+        NETDATA.d3pieChartUpdate(state, state.data);
+    } else {
+        if (state.tmp.d3pie_last_slot !== -1) {
+            state.tmp.d3pie_last_slot = -1;
+            NETDATA.d3pieChange(state, [{label: 'no data', value: 1, color: '#666666'}], 'no data available');
+        }
+    }
+
+    return true;
+};
+
+NETDATA.d3pieChange = function (state, content, footer) {
+    if (state.d3pie_forced_subtitle === null) {
+        //state.d3pie_instance.updateProp("header.subtitle.text", state.units_current);
+        state.d3pie_instance.options.header.subtitle.text = state.units_current;
+    }
+
+    if (state.d3pie_forced_footer === null) {
+        //state.d3pie_instance.updateProp("footer.text", footer);
+        state.d3pie_instance.options.footer.text = footer;
+    }
+
+    //state.d3pie_instance.updateProp("data.content", content);
+    state.d3pie_instance.options.data.content = content;
+    state.d3pie_instance.destroy();
+    state.d3pie_instance.recreate();
+    return true;
+};
+
+NETDATA.d3pieChartUpdate = function (state, data) {
+    return NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, data, 0), NETDATA.d3pieDateRange(state, data, 0));
+};
+
+NETDATA.d3pieChartCreate = function (state, data) {
+
+    state.element_chart.id = 'd3pie-' + state.uuid;
+    // console.log('id = ' + state.element_chart.id);
+
+    let content = NETDATA.d3pieSetContent(state, data, 0);
+
+    state.d3pie_forced_title = NETDATA.dataAttribute(state.element, 'd3pie-title', null);
+    state.d3pie_forced_subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', null);
+    state.d3pie_forced_footer = NETDATA.dataAttribute(state.element, 'd3pie-footer', null);
+
+    state.d3pie_options = {
+        header: {
+            title: {
+                text: (state.d3pie_forced_title !== null) ? state.d3pie_forced_title : state.title,
+                color: NETDATA.dataAttribute(state.element, 'd3pie-title-color', NETDATA.themes.current.d3pie.title),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-title-fontsize', 12),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-title-fontweight', "bold"),
+                font: NETDATA.dataAttribute(state.element, 'd3pie-title-font', "arial")
+            },
+            subtitle: {
+                text: (state.d3pie_forced_subtitle !== null) ? state.d3pie_forced_subtitle : state.units_current,
+                color: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-color', NETDATA.themes.current.d3pie.subtitle),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontsize', 10),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontweight', "normal"),
+                font: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-font', "arial")
+            },
+            titleSubtitlePadding: 1
+        },
+        footer: {
+            text: (state.d3pie_forced_footer !== null) ? state.d3pie_forced_footer : NETDATA.d3pieDateRange(state, data, 0),
+            color: NETDATA.dataAttribute(state.element, 'd3pie-footer-color', NETDATA.themes.current.d3pie.footer),
+            fontSize: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontsize', 9),
+            fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontweight', "bold"),
+            font: NETDATA.dataAttribute(state.element, 'd3pie-footer-font', "arial"),
+            location: NETDATA.dataAttribute(state.element, 'd3pie-footer-location', "bottom-center") // bottom-left, bottom-center, bottom-right
+        },
+        size: {
+            canvasHeight: state.chartHeight(),
+            canvasWidth: state.chartWidth(),
+            pieInnerRadius: NETDATA.dataAttribute(state.element, 'd3pie-pieinnerradius', "45%"),
+            pieOuterRadius: NETDATA.dataAttribute(state.element, 'd3pie-pieouterradius', "80%")
+        },
+        data: {
+            // none, random, value-asc, value-desc, label-asc, label-desc
+            sortOrder: NETDATA.dataAttribute(state.element, 'd3pie-sortorder', "value-desc"),
+            smallSegmentGrouping: {
+                enabled: NETDATA.dataAttributeBoolean(state.element, "d3pie-smallsegmentgrouping-enabled", false),
+                value: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-value', 1),
+                // percentage, value
+                valueType: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-valuetype', "percentage"),
+                label: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-label', "other"),
+                color: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-color', NETDATA.themes.current.d3pie.other)
+            },
+
+            // REQUIRED! This is where you enter your pie data; it needs to be an array of objects
+            // of this form: { label: "label", value: 1.5, color: "#000000" } - color is optional
+            content: content
+        },
+        labels: {
+            outer: {
+                // label, value, percentage, label-value1, label-value2, label-percentage1, label-percentage2
+                format: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-format', "label-value1"),
+                hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-hidewhenlessthanpercentage', null),
+                pieDistance: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-piedistance', 15)
+            },
+            inner: {
+                // label, value, percentage, label-value1, label-value2, label-percentage1, label-percentage2
+                format: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-format', "percentage"),
+                hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-hidewhenlessthanpercentage', 2)
+            },
+            mainLabel: {
+                color: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-color', NETDATA.themes.current.d3pie.mainlabel), // or 'segment' for dynamic color
+                font: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-font', "arial"),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontsize', 10),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontweight', "normal")
+            },
+            percentage: {
+                color: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-color', NETDATA.themes.current.d3pie.percentage),
+                font: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-font', "arial"),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-fontsize', 10),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-fontweight', "bold"),
+                decimalPlaces: 0
+            },
+            value: {
+                color: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-color', NETDATA.themes.current.d3pie.value),
+                font: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-font', "arial"),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontsize', 10),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontweight', "bold")
+            },
+            lines: {
+                enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-labels-lines-enabled', true),
+                style: NETDATA.dataAttribute(state.element, 'd3pie-labels-lines-style', "curved"),
+                color: NETDATA.dataAttribute(state.element, 'd3pie-labels-lines-color', "segment") // "segment" or a hex color
+            },
+            truncation: {
+                enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-labels-truncation-enabled', false),
+                truncateLength: NETDATA.dataAttribute(state.element, 'd3pie-labels-truncation-truncatelength', 30)
+            },
+            formatter: function (context) {
+                // console.log(context);
+                if (context.part === 'value') {
+                    return state.legendFormatValue(context.value);
+                }
+                if (context.part === 'percentage') {
+                    return context.label + '%';
+                }
+
+                return context.label;
+            }
+        },
+        effects: {
+            load: {
+                effect: "none", // none / default
+                speed: 0 // commented in the d3pie code to speed it up
+            },
+            pullOutSegmentOnClick: {
+                effect: "bounce", // none / linear / bounce / elastic / back
+                speed: 400,
+                size: 5
+            },
+            highlightSegmentOnMouseover: true,
+            highlightLuminosity: -0.2
+        },
+        tooltips: {
+            enabled: false,
+            type: "placeholder", // caption|placeholder
+            string: "",
+            placeholderParser: null, // function
+            styles: {
+                fadeInSpeed: 250,
+                backgroundColor: NETDATA.themes.current.d3pie.tooltip_bg,
+                backgroundOpacity: 0.5,
+                color: NETDATA.themes.current.d3pie.tooltip_fg,
+                borderRadius: 2,
+                font: "arial",
+                fontSize: 12,
+                padding: 4
+            }
+        },
+        misc: {
+            colors: {
+                background: 'transparent', // transparent or color #
+                // segments: state.chartColors(),
+                segmentStroke: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-segmentstroke', NETDATA.themes.current.d3pie.segment_stroke)
+            },
+            gradient: {
+                enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-misc-gradient-enabled', false),
+                percentage: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-percentage', 95),
+                color: NETDATA.dataAttribute(state.element, 'd3pie-misc-gradient-color', NETDATA.themes.current.d3pie.gradient_color)
+            },
+            canvasPadding: {
+                top: 5,
+                right: 5,
+                bottom: 5,
+                left: 5
+            },
+            pieCenterOffset: {
+                x: 0,
+                y: 0
+            },
+            cssPrefix: NETDATA.dataAttribute(state.element, 'd3pie-cssprefix', null)
+        },
+        callbacks: {
+            onload: null,
+            onMouseoverSegment: null,
+            onMouseoutSegment: null,
+            onClickSegment: null
+        }
+    };
+
+    state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
+    return true;
+};
+
 // ----------------------------------------------------------------------------------------------------------------
 // D3
 
-NETDATA.d3Initialize = function (callback) {
+NETDATA.d3Initialize = function(callback) {
     if (typeof netdataStopD3 === 'undefined' || !netdataStopD3) {
         $.ajax({
             url: NETDATA.d3_js,
             cache: true,
             dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+        .done(function() {
+            NETDATA.registerChartLibrary('d3', NETDATA.d3_js);
+        })
+        .fail(function() {
+            NETDATA.chartLibraries.d3.enabled = false;
+            NETDATA.error(100, NETDATA.d3_js);
+        })
+        .always(function() {
+            if (typeof callback === "function")
+                return callback();
+        });
+    } else {
+        NETDATA.chartLibraries.d3.enabled = false;
+        if (typeof callback === "function")
+            return callback();
+    }
+};
+
+NETDATA.d3ChartUpdate = function(state, data) {
+    void(state);
+    void(data);
+
+    return false;
+};
+
+NETDATA.d3ChartCreate = function(state, data) {
+    void(state);
+    void(data);
+
+    return false;
+};
+
+// peity
+
+NETDATA.peityInitialize = function (callback) {
+    if (typeof netdataNoPeitys === 'undefined' || !netdataNoPeitys) {
+        $.ajax({
+            url: NETDATA.peity_js,
+            cache: true,
+            dataType: "script",
             xhrFields: {withCredentials: true} // required for the cookie
         })
             .done(function () {
-                NETDATA.registerChartLibrary('d3', NETDATA.d3_js);
+                NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
             })
             .fail(function () {
-                NETDATA.chartLibraries.d3.enabled = false;
-                NETDATA.error(100, NETDATA.d3_js);
+                NETDATA.chartLibraries.peity.enabled = false;
+                NETDATA.error(100, NETDATA.peity_js);
             })
             .always(function () {
                 if (typeof callback === "function") {
@@ -2800,25 +3357,43 @@ NETDATA.d3Initialize = function (callback) {
                 }
             });
     } else {
-        NETDATA.chartLibraries.d3.enabled = false;
+        NETDATA.chartLibraries.peity.enabled = false;
         if (typeof callback === "function") {
             return callback();
         }
     }
 };
 
-NETDATA.d3ChartUpdate = function (state, data) {
-    void(state);
-    void(data);
+NETDATA.peityChartUpdate = function (state, data) {
+    state.peity_instance.innerHTML = data.result;
 
-    return false;
+    if (state.peity_options.stroke !== state.chartCustomColors()[0]) {
+        state.peity_options.stroke = state.chartCustomColors()[0];
+        if (state.chart.chart_type === 'line') {
+            state.peity_options.fill = NETDATA.themes.current.background;
+        } else {
+            state.peity_options.fill = NETDATA.colorLuminance(state.chartCustomColors()[0], NETDATA.chartDefaults.fill_luminance);
+        }
+    }
+
+    $(state.peity_instance).peity('line', state.peity_options);
+    return true;
 };
 
-NETDATA.d3ChartCreate = function (state, data) {
-    void(state);
-    void(data);
+NETDATA.peityChartCreate = function (state, data) {
+    state.peity_instance = document.createElement('div');
+    state.element_chart.appendChild(state.peity_instance);
 
-    return false;
+    state.peity_options = {
+        stroke: NETDATA.themes.current.foreground,
+        strokeWidth: NETDATA.dataAttribute(state.element, 'peity-strokewidth', 1),
+        width: state.chartWidth(),
+        height: state.chartHeight(),
+        fill: NETDATA.themes.current.foreground
+    };
+
+    NETDATA.peityChartUpdate(state, data);
+    return true;
 };
 // ----------------------------------------------------------------------------------------------------------------
 // Detect the netdata server
@@ -2870,7 +3445,6 @@ if (typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null &
 } else {
     NETDATA.serverStatic = NETDATA.serverDefault;
 }
-
 
 // default URLs for all the external files we need
 // make them RELATIVE so that the whole thing can also be
@@ -3206,7 +3780,6 @@ NETDATA.statistics = {
     refreshes_active_max: 0
 };
 
-
 // ----------------------------------------------------------------------------------------------------------------
 
 NETDATA.timeout = {
@@ -3277,7 +3850,6 @@ NETDATA.timeout = {
             custom = false;
         }
 
-
         if (custom) {
             // we have installed custom .step() / .clear() functions
             // overwrite the .set() too
@@ -3307,181 +3879,6 @@ NETDATA.timeout = {
 };
 
 NETDATA.timeout.init();
-
-
-// ----------------------------------------------------------------------------------------------------------------
-// local storage options
-
-NETDATA.localStorage = {
-    default: {},
-    current: {},
-    callback: {} // only used for resetting back to defaults
-};
-
-NETDATA.localStorageTested = -1;
-NETDATA.localStorageTest = function () {
-    if (NETDATA.localStorageTested !== -1) {
-        return NETDATA.localStorageTested;
-    }
-
-    if (typeof Storage !== "undefined" && typeof localStorage === 'object') {
-        let test = 'test';
-        try {
-            localStorage.setItem(test, test);
-            localStorage.removeItem(test);
-            NETDATA.localStorageTested = true;
-        } catch (e) {
-            NETDATA.localStorageTested = false;
-        }
-    } else {
-        NETDATA.localStorageTested = false;
-    }
-
-    return NETDATA.localStorageTested;
-};
-
-NETDATA.localStorageGet = function (key, def, callback) {
-    let ret = def;
-
-    if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
-        NETDATA.localStorage.default[key.toString()] = def;
-        NETDATA.localStorage.callback[key.toString()] = callback;
-    }
-
-    if (NETDATA.localStorageTest()) {
-        try {
-            // console.log('localStorage: loading "' + key.toString() + '"');
-            ret = localStorage.getItem(key.toString());
-            // console.log('netdata loaded: ' + key.toString() + ' = ' + ret.toString());
-            if (ret === null || ret === 'undefined') {
-                // console.log('localStorage: cannot load it, saving "' + key.toString() + '" with value "' + JSON.stringify(def) + '"');
-                localStorage.setItem(key.toString(), JSON.stringify(def));
-                ret = def;
-            } else {
-                // console.log('localStorage: got "' + key.toString() + '" with value "' + ret + '"');
-                ret = JSON.parse(ret);
-                // console.log('localStorage: loaded "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
-            }
-        } catch (error) {
-            console.log('localStorage: failed to read "' + key.toString() + '", using default: "' + def.toString() + '"');
-            ret = def;
-        }
-    }
-
-    if (typeof ret === 'undefined' || ret === 'undefined') {
-        console.log('localStorage: LOADED UNDEFINED "' + key.toString() + '" as value ' + ret + ' of type ' + typeof(ret));
-        ret = def;
-    }
-
-    NETDATA.localStorage.current[key.toString()] = ret;
-    return ret;
-};
-
-NETDATA.localStorageSet = function (key, value, callback) {
-    if (typeof value === 'undefined' || value === 'undefined') {
-        console.log('localStorage: ATTEMPT TO SET UNDEFINED "' + key.toString() + '" as value ' + value + ' of type ' + typeof(value));
-    }
-
-    if (typeof NETDATA.localStorage.default[key.toString()] === 'undefined') {
-        NETDATA.localStorage.default[key.toString()] = value;
-        NETDATA.localStorage.current[key.toString()] = value;
-        NETDATA.localStorage.callback[key.toString()] = callback;
-    }
-
-    if (NETDATA.localStorageTest()) {
-        // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
-        try {
-            localStorage.setItem(key.toString(), JSON.stringify(value));
-        } catch (e) {
-            console.log('localStorage: failed to save "' + key.toString() + '" with value: "' + value.toString() + '"');
-        }
-    }
-
-    NETDATA.localStorage.current[key.toString()] = value;
-    return value;
-};
-
-NETDATA.localStorageGetRecursive = function (obj, prefix, callback) {
-    let keys = Object.keys(obj);
-    let len = keys.length;
-    while (len--) {
-        let i = keys[len];
-
-        if (typeof obj[i] === 'object') {
-            //console.log('object ' + prefix + '.' + i.toString());
-            NETDATA.localStorageGetRecursive(obj[i], prefix + '.' + i.toString(), callback);
-            continue;
-        }
-
-        obj[i] = NETDATA.localStorageGet(prefix + '.' + i.toString(), obj[i], callback);
-    }
-};
-
-NETDATA.setOption = function (key, value) {
-    if (key.toString() === 'setOptionCallback') {
-        if (typeof NETDATA.options.current.setOptionCallback === 'function') {
-            NETDATA.options.current[key.toString()] = value;
-            NETDATA.options.current.setOptionCallback();
-        }
-    } else if (NETDATA.options.current[key.toString()] !== value) {
-        let name = 'options.' + key.toString();
-
-        if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined') {
-            console.log('localStorage: setOption() on unsaved option: "' + name.toString() + '", value: ' + value);
-        }
-
-        //console.log(NETDATA.localStorage);
-        //console.log('setOption: setting "' + key.toString() + '" to "' + value + '" of type ' + typeof(value) + ' original type ' + typeof(NETDATA.options.current[key.toString()]));
-        //console.log(NETDATA.options);
-        NETDATA.options.current[key.toString()] = NETDATA.localStorageSet(name.toString(), value, null);
-
-        if (typeof NETDATA.options.current.setOptionCallback === 'function') {
-            NETDATA.options.current.setOptionCallback();
-        }
-    }
-
-    return true;
-};
-
-NETDATA.getOption = function (key) {
-    return NETDATA.options.current[key.toString()];
-};
-
-// read settings from local storage
-NETDATA.localStorageGetRecursive(NETDATA.options.current, 'options', null);
-
-// always start with this option enabled.
-NETDATA.setOption('stop_updates_when_focus_is_lost', true);
-
-NETDATA.resetOptions = function () {
-    let keys = Object.keys(NETDATA.localStorage.default);
-    let len = keys.length;
-
-    while (len--) {
-        let i = keys[len];
-        let a = i.split('.');
-
-        if (a[0] === 'options') {
-            if (a[1] === 'setOptionCallback') {
-                continue;
-            }
-            if (typeof NETDATA.localStorage.default[i] === 'undefined') {
-                continue;
-            }
-            if (NETDATA.options.current[i] === NETDATA.localStorage.default[i]) {
-                continue;
-            }
-
-            NETDATA.setOption(a[1], NETDATA.localStorage.default[i]);
-        } else if (a[0] === 'chart_heights') {
-            if (typeof NETDATA.localStorage.callback[i] === 'function' && typeof NETDATA.localStorage.default[i] !== 'undefined') {
-                NETDATA.localStorage.callback[i](NETDATA.localStorage.default[i]);
-            }
-        }
-    }
-
-    NETDATA.dateTime.init(NETDATA.options.current.timezone);
-};
 
 // ----------------------------------------------------------------------------------------------------------------
 
@@ -5068,7 +5465,6 @@ let chartState = function (element) {
         }
     }
 
-
     // ============================================================================================================
     // EARLY INITIALIZATION
 
@@ -5935,7 +6331,6 @@ let chartState = function (element) {
                             };
         }
     };
-
 
     const noDataToShow = function () {
         showMessageIcon(NETDATA.icons.noData + ' empty');
@@ -6836,7 +7231,6 @@ let chartState = function (element) {
                     });
                 }
 
-
                 this.element_legend_childs.toolbox_reset.className += ' netdata-legend-toolbox-button';
                 this.element_legend_childs.toolbox_reset.innerHTML = NETDATA.icons.reset;
                 this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_reset);
@@ -6887,7 +7281,6 @@ let chartState = function (element) {
                         content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
                     });
                 }
-
 
                 this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
                 this.element_legend_childs.toolbox_zoomin.innerHTML = NETDATA.icons.zoomIn;
@@ -8374,69 +8767,6 @@ NETDATA.globalReset = function () {
 };
 
 // ----------------------------------------------------------------------------------------------------------------
-// peity
-
-NETDATA.peityInitialize = function (callback) {
-    if (typeof netdataNoPeitys === 'undefined' || !netdataNoPeitys) {
-        $.ajax({
-            url: NETDATA.peity_js,
-            cache: true,
-            dataType: "script",
-            xhrFields: {withCredentials: true} // required for the cookie
-        })
-            .done(function () {
-                NETDATA.registerChartLibrary('peity', NETDATA.peity_js);
-            })
-            .fail(function () {
-                NETDATA.chartLibraries.peity.enabled = false;
-                NETDATA.error(100, NETDATA.peity_js);
-            })
-            .always(function () {
-                if (typeof callback === "function") {
-                    return callback();
-                }
-            });
-    } else {
-        NETDATA.chartLibraries.peity.enabled = false;
-        if (typeof callback === "function") {
-            return callback();
-        }
-    }
-};
-
-NETDATA.peityChartUpdate = function (state, data) {
-    state.peity_instance.innerHTML = data.result;
-
-    if (state.peity_options.stroke !== state.chartCustomColors()[0]) {
-        state.peity_options.stroke = state.chartCustomColors()[0];
-        if (state.chart.chart_type === 'line') {
-            state.peity_options.fill = NETDATA.themes.current.background;
-        } else {
-            state.peity_options.fill = NETDATA.colorLuminance(state.chartCustomColors()[0], NETDATA.chartDefaults.fill_luminance);
-        }
-    }
-
-    $(state.peity_instance).peity('line', state.peity_options);
-    return true;
-};
-
-NETDATA.peityChartCreate = function (state, data) {
-    state.peity_instance = document.createElement('div');
-    state.element_chart.appendChild(state.peity_instance);
-
-    state.peity_options = {
-        stroke: NETDATA.themes.current.foreground,
-        strokeWidth: NETDATA.dataAttribute(state.element, 'peity-strokewidth', 1),
-        width: state.chartWidth(),
-        height: state.chartHeight(),
-        fill: NETDATA.themes.current.foreground
-    };
-
-    NETDATA.peityChartUpdate(state, data);
-    return true;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
 // d3pie
 
 NETDATA.d3pieInitialize = function (callback) {
@@ -9345,7 +9675,6 @@ NETDATA.loadRequiredCSS = function (index) {
     NETDATA._loadCSS(NETDATA.requiredCSS[index].url);
     NETDATA.loadRequiredCSS(++index);
 };
-
 
 // ----------------------------------------------------------------------------------------------------------------
 // Registry of netdata hosts
