@@ -408,6 +408,7 @@ static inline void do_dimension(
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
 
+    calculated_number min = NAN, max = NAN;
     size_t db_points_read = 0;
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
@@ -462,7 +463,15 @@ static inline void do_dimension(
             *rrdr_value_options_ptr = group_value_flags;
 
             // store the value
-            r->v[rrdr_line * r->d + dim_id_in_rrdr] = r->internal.grouping_flush(r, rrdr_value_options_ptr);
+            calculated_number value = r->internal.grouping_flush(r, rrdr_value_options_ptr);
+            r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
+
+            if(likely(points_added)) {
+                if(unlikely(value < min)) min = value;
+                if(unlikely(value > max)) max = value;
+            }
+            else
+                min = max = value;
 
             points_added++;
             values_in_group = 0;
@@ -474,6 +483,8 @@ static inline void do_dimension(
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
 
+    r->min = min;
+    r->max = max;
     r->before = max_date;
     r->after = min_date;
     rrdr_done(r, rrdr_line);
