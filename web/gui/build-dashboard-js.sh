@@ -7,6 +7,7 @@ cat src/prologue.js.inc \
     src/colors.js \
     src/units-conversion.js \
     src/sparkline.js \
+    src/google-charts.js \
     src/main.js \
     src/epilogue.js.inc \
     > dashboard.js
