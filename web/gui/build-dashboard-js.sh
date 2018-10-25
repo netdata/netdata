@@ -5,8 +5,9 @@ cat src/prologue.js.inc \
     src/compatibility.js \
     src/xss.js \
     src/colors.js \
-    src/localstorage.js \
     src/units-conversion.js \
+    src/options.js \
+    src/localstorage.js \
     src/charting/dygraph.js \
     src/charting/sparkline.js \
     src/charting/google-charts.js \
