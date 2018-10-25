@@ -49,7 +49,6 @@ if (typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null &
     NETDATA.serverStatic = NETDATA.serverDefault;
 }
 
-
 // default URLs for all the external files we need
 // make them RELATIVE so that the whole thing can also be
 // installed under a web server
@@ -384,7 +383,6 @@ NETDATA.statistics = {
     refreshes_active_max: 0
 };
 
-
 // ----------------------------------------------------------------------------------------------------------------
 
 NETDATA.timeout = {
@@ -455,7 +453,6 @@ NETDATA.timeout = {
             custom = false;
         }
 
-
         if (custom) {
             // we have installed custom .step() / .clear() functions
             // overwrite the .set() too
@@ -485,7 +482,6 @@ NETDATA.timeout = {
 };
 
 NETDATA.timeout.init();
-
 
 // ----------------------------------------------------------------------------------------------------------------
 // local storage options
@@ -2246,7 +2242,6 @@ let chartState = function (element) {
         }
     }
 
-
     // ============================================================================================================
     // EARLY INITIALIZATION
 
@@ -3113,7 +3108,6 @@ let chartState = function (element) {
                             };
         }
     };
-
 
     const noDataToShow = function () {
         showMessageIcon(NETDATA.icons.noData + ' empty');
@@ -4014,7 +4008,6 @@ let chartState = function (element) {
                     });
                 }
 
-
                 this.element_legend_childs.toolbox_reset.className += ' netdata-legend-toolbox-button';
                 this.element_legend_childs.toolbox_reset.innerHTML = NETDATA.icons.reset;
                 this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_reset);
@@ -4065,7 +4058,6 @@ let chartState = function (element) {
                         content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
                     });
                 }
-
 
                 this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
                 this.element_legend_childs.toolbox_zoomin.innerHTML = NETDATA.icons.zoomIn;
@@ -6523,7 +6515,6 @@ NETDATA.loadRequiredCSS = function (index) {
     NETDATA._loadCSS(NETDATA.requiredCSS[index].url);
     NETDATA.loadRequiredCSS(++index);
 };
-
 
 // ----------------------------------------------------------------------------------------------------------------
 // Registry of netdata hosts
