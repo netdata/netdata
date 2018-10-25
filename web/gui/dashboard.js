@@ -85,6 +85,26 @@ NETDATA.encodeURIComponent = function(s) {
     return s;
 };
 
+/// A heuristic for detecting slow devices.
+let isSlowDeviceResult = undefined;
+const isSlowDevice = function() {
+    if (!isSlowDeviceResult) {
+        return isSlowDeviceResult;
+    }
+
+    try {
+        let ua = navigator.userAgent.toLowerCase();
+
+        let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
+        let android = /android/.test(ua) && !window.MSStream;
+        isSlowDeviceResult = (iOS || android);
+    } catch (e) {
+        isSlowDeviceResult = false;
+    }
+
+    return isSlowDeviceResult;
+};
+
 // ------------------------------------------------------------------------
 // compatibility fixes
 
@@ -194,6 +214,7 @@ NETDATA.xss = {
         return obj;
     }
 };
+
 
 // ----------------------------------------------------------------------------------------------------------------
 // Detect the netdata server
@@ -398,29 +419,6 @@ if (typeof netdataRegistry === 'undefined') {
 
 if (netdataRegistry === false && typeof netdataRegistryCallback === 'function')
     netdataRegistry = true;
-
-
-// ----------------------------------------------------------------------------------------------------------------
-// detect if this is probably a slow device
-
-let isSlowDeviceResult = undefined;
-const isSlowDevice = function() {
-    if (isSlowDeviceResult !== undefined) {
-        return isSlowDeviceResult;
-    }
-
-    try {
-        let ua = navigator.userAgent.toLowerCase();
-
-        let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
-        let android = /android/.test(ua) && !window.MSStream;
-        isSlowDeviceResult = (iOS || android);
-    } catch (e) {
-        isSlowDeviceResult = false;
-    }
-
-    return isSlowDeviceResult;
-};
 
 // ----------------------------------------------------------------------------------------------------------------
 // the defaults for all charts
@@ -1337,7 +1335,7 @@ NETDATA.commonMin = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
         // }
-        for (let ti of t) {
+        for (let ti of Object.values(t)) {
             if (ti < m) m = ti;
         }
 
@@ -1399,7 +1397,7 @@ NETDATA.commonMax = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
         // }
-        for (let ti of t) {
+        for (let ti of Object.values(t)) {            
             if (ti > m) m = ti;
         }
 

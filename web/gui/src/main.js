@@ -1,119 +1,4 @@
-NETDATA.encodeURIComponent = function(s) {
-    if (typeof(s) === 'string')
-        return encodeURIComponent(s);
 
-    return s;
-};
-
-// ------------------------------------------------------------------------
-// compatibility fixes
-
-// fix IE issue with console
-if (!window.console) { window.console = { log: function(){} }; }
-
-// if string.endsWith is not defined, define it
-if (typeof String.prototype.endsWith !== 'function') {
-    String.prototype.endsWith = function(s) {
-        if (s.length > this.length) return false;
-        return this.slice(-s.length) === s;
-    };
-}
-
-// if string.startsWith is not defined, define it
-if (typeof String.prototype.startsWith !== 'function') {
-    String.prototype.startsWith = function(s) {
-        if (s.length > this.length) return false;
-        return this.slice(s.length) === s;
-    };
-}
-
-NETDATA.name2id = function(s) {
-    return s
-        .replace(/ /g, '_')
-        .replace(/\(/g, '_')
-        .replace(/\)/g, '_')
-        .replace(/\./g, '_')
-        .replace(/\//g, '_');
-};
-
-// ----------------------------------------------------------------------------------------------------------------
-// XSS checks
-
-NETDATA.xss = {
-    enabled: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
-    enabled_for_data: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
-
-    string: function (s) {
-        return s.toString()
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    },
-
-    object: function(name, obj, ignore_regex) {
-        if (typeof ignore_regex !== 'undefined' && ignore_regex.test(name)) {
-            // console.log('XSS: ignoring "' + name + '"');
-            return obj;
-        }
-
-        switch (typeof(obj)) {
-            case 'string':
-                const ret = this.string(obj);
-                if (ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
-                return ret;
-
-            case 'object':
-                if (obj === null) return obj;
-
-                if (Array.isArray(obj)) {
-                    // console.log('checking array "' + name + '"');
-
-                    let len = obj.length;
-                    while (len--) {
-                        obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
-                    }
-                } else {
-                    // console.log('checking object "' + name + '"');
-
-                    for (const i in obj) {
-                        if (obj.hasOwnProperty(i) === false) continue;
-                        if (this.string(i) !== i) {
-                            console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
-                            delete obj[i];
-                        } else {
-                            obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
-                        }
-                    }
-                }
-                return obj;
-
-            default:
-                return obj;
-        }
-    },
-
-    checkOptional: function(name, obj, ignore_regex) {
-        if (this.enabled) {
-            //console.log('XSS: checking optional "' + name + '"...');
-            return this.object(name, obj, ignore_regex);
-        }
-        return obj;
-    },
-
-    checkAlways: function(name, obj, ignore_regex) {
-        //console.log('XSS: checking always "' + name + '"...');
-        return this.object(name, obj, ignore_regex);
-    },
-
-    checkData: function(name, obj, ignore_regex) {
-        if (this.enabled_for_data) {
-            //console.log('XSS: checking data "' + name + '"...');
-            return this.object(name, obj, ignore_regex);
-        }
-        return obj;
-    }
-};
 
 // ----------------------------------------------------------------------------------------------------------------
 // Detect the netdata server
@@ -318,29 +203,6 @@ if (typeof netdataRegistry === 'undefined') {
 
 if (netdataRegistry === false && typeof netdataRegistryCallback === 'function')
     netdataRegistry = true;
-
-
-// ----------------------------------------------------------------------------------------------------------------
-// detect if this is probably a slow device
-
-let isSlowDeviceResult = undefined;
-const isSlowDevice = function() {
-    if (isSlowDeviceResult !== undefined) {
-        return isSlowDeviceResult;
-    }
-
-    try {
-        let ua = navigator.userAgent.toLowerCase();
-
-        let iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
-        let android = /android/.test(ua) && !window.MSStream;
-        isSlowDeviceResult = (iOS || android);
-    } catch (e) {
-        isSlowDeviceResult = false;
-    }
-
-    return isSlowDeviceResult;
-};
 
 // ----------------------------------------------------------------------------------------------------------------
 // the defaults for all charts
@@ -1257,7 +1119,7 @@ NETDATA.commonMin = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
         // }
-        for (let ti of t) {
+        for (let ti of Object.values(t)) {
             if (ti < m) m = ti;
         }
 
@@ -1319,7 +1181,7 @@ NETDATA.commonMax = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
         // }
-        for (let ti of t) {
+        for (let ti of Object.values(t)) {            
             if (ti > m) m = ti;
         }
 
