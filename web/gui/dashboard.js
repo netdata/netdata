@@ -1335,7 +1335,7 @@ const NETDATA = window.NETDATA || {};
             // for (let i in t) {
             //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
             // }
-            for (let ti of t) {
+            for (let ti of Object.values(t)) {
                 if (ti < m) m = ti;
             }
 
@@ -1397,7 +1397,7 @@ const NETDATA = window.NETDATA || {};
             // for (let i in t) {
             //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
             // }
-            for (let ti of t) {
+            for (let ti of Object.values(t)) {
                 if (ti > m) m = ti;
             }
 
