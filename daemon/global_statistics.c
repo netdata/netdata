@@ -2,7 +2,26 @@
 
 #include "common.h"
 
-volatile struct global_statistics global_statistics = {
+#define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
+
+
+static struct global_statistics {
+    volatile uint16_t connected_clients;
+
+    volatile uint64_t web_requests;
+    volatile uint64_t web_usec;
+    volatile uint64_t web_usec_max;
+    volatile uint64_t bytes_received;
+    volatile uint64_t bytes_sent;
+    volatile uint64_t content_size;
+    volatile uint64_t compressed_content_size;
+
+    volatile uint64_t web_client_count;
+
+    volatile uint64_t rrdr_queries_made;
+    volatile uint64_t rrdr_db_points_read;
+    volatile uint64_t rrdr_result_points_generated;
+} global_statistics = {
         .connected_clients = 0,
         .web_requests = 0,
         .web_usec = 0,
@@ -10,17 +29,44 @@ volatile struct global_statistics global_statistics = {
         .bytes_sent = 0,
         .content_size = 0,
         .compressed_content_size = 0,
-        .web_client_count = 1
+        .web_client_count = 1,
+
+        .rrdr_queries_made = 0,
+        .rrdr_db_points_read = 0,
+        .rrdr_result_points_generated = 0,
 };
 
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+#else
 netdata_mutex_t global_statistics_mutex = NETDATA_MUTEX_INITIALIZER;
 
-inline void global_statistics_lock(void) {
+static inline void global_statistics_lock(void) {
     netdata_mutex_lock(&global_statistics_mutex);
 }
 
-inline void global_statistics_unlock(void) {
+static inline void global_statistics_unlock(void) {
     netdata_mutex_unlock(&global_statistics_mutex);
+}
+#endif
+
+
+void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_SEQ_CST);
+#else
+    #warning NOT using atomic operations - using locks for global statistics
+    if (web_server_is_multithreaded)
+        global_statistics_lock();
+
+    global_statistics.rrdr_queries_made++;
+    global_statistics.rrdr_db_points_read += db_points_read;
+    global_statistics.rrdr_result_points_generated += result_points_generated;
+
+    if (web_server_is_multithreaded)
+        global_statistics_unlock();
+#endif
 }
 
 void finished_web_request_statistics(uint64_t dt,
@@ -92,17 +138,21 @@ void web_client_disconnected(void) {
 }
 
 
-inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
+static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
 #if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    gs->connected_clients       = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
-    gs->web_requests            = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
-    gs->web_usec                = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
-    gs->web_usec_max            = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_SEQ_CST);
-    gs->bytes_received          = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_SEQ_CST);
-    gs->bytes_sent              = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
-    gs->content_size            = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
-    gs->compressed_content_size = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
-    gs->web_client_count        = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
+    gs->connected_clients            = __atomic_fetch_add(&global_statistics.connected_clients, 0, __ATOMIC_SEQ_CST);
+    gs->web_requests                 = __atomic_fetch_add(&global_statistics.web_requests, 0, __ATOMIC_SEQ_CST);
+    gs->web_usec                     = __atomic_fetch_add(&global_statistics.web_usec, 0, __ATOMIC_SEQ_CST);
+    gs->web_usec_max                 = __atomic_fetch_add(&global_statistics.web_usec_max, 0, __ATOMIC_SEQ_CST);
+    gs->bytes_received               = __atomic_fetch_add(&global_statistics.bytes_received, 0, __ATOMIC_SEQ_CST);
+    gs->bytes_sent                   = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
+    gs->content_size                 = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
+    gs->compressed_content_size      = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
+    gs->web_client_count             = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
+
+    gs->rrdr_queries_made            = __atomic_fetch_add(&global_statistics.rrdr_queries_made, 0, __ATOMIC_SEQ_CST);
+    gs->rrdr_db_points_read          = __atomic_fetch_add(&global_statistics.rrdr_db_points_read, 0, __ATOMIC_SEQ_CST);
+    gs->rrdr_result_points_generated = __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, 0, __ATOMIC_SEQ_CST);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
@@ -412,5 +462,72 @@ void global_statistics_charts(void) {
             rrddim_set_by_pointer(st_compression, rd_savings, compression_ratio);
 
         rrdset_done(st_compression);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.rrdr_queries_made) {
+        static RRDSET *st_rrdr_queries = NULL;
+        static RRDDIM *rd_queries = NULL;
+
+        if (unlikely(!st_rrdr_queries)) {
+            st_rrdr_queries = rrdset_create_localhost(
+                    "netdata"
+                    , "queries"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "NetData API Queries"
+                    , "queries/s"
+                    , "netdata"
+                    , "stats"
+                    , 130500
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_queries = rrddim_add(st_rrdr_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_rrdr_queries);
+
+        rrddim_set_by_pointer(st_rrdr_queries, rd_queries, (collected_number)gs.rrdr_queries_made);
+
+        rrdset_done(st_rrdr_queries);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.rrdr_db_points_read || gs.rrdr_result_points_generated) {
+        static RRDSET *st_rrdr_points = NULL;
+        static RRDDIM *rd_points_read = NULL;
+        static RRDDIM *rd_points_generated = NULL;
+
+        if (unlikely(!st_rrdr_points)) {
+            st_rrdr_points = rrdset_create_localhost(
+                    "netdata"
+                    , "db_points"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "NetData API Points"
+                    , "points/s"
+                    , "netdata"
+                    , "stats"
+                    , 130501
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_points_read = rrddim_add(st_rrdr_points, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_points_generated = rrddim_add(st_rrdr_points, "generated", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_rrdr_points);
+
+        rrddim_set_by_pointer(st_rrdr_points, rd_points_read, (collected_number)gs.rrdr_db_points_read);
+        rrddim_set_by_pointer(st_rrdr_points, rd_points_generated, (collected_number)gs.rrdr_result_points_generated);
+
+        rrdset_done(st_rrdr_points);
     }
 }

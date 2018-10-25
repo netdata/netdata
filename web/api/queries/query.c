@@ -408,6 +408,7 @@ static inline void do_dimension(
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
 
+    size_t db_points_read = 0;
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
 
@@ -442,6 +443,7 @@ static inline void do_dimension(
         // add this value for grouping
         r->internal.grouping_add(r, value);
         values_in_group++;
+        db_points_read++;
 
         if(unlikely(values_in_group == group_size)) {
             rrdr_line = rrdr_line_init(r, now, rrdr_line);
@@ -468,6 +470,9 @@ static inline void do_dimension(
             values_in_group_non_zero = 0;
         }
     }
+
+    r->internal.db_points_read += db_points_read;
+    r->internal.result_points_generated += points_added;
 
     r->before = max_date;
     r->after = min_date;
@@ -943,5 +948,6 @@ RRDR *rrd2rrdr(
         }
     }
 
+    rrdr_query_completed(r->internal.db_points_read, r->internal.result_points_generated);
     return r;
 }
