@@ -12,6 +12,8 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 from bases.collection import find_binary
 
 
+disabled_by_default = True
+
 update_every = 5
 
 ORDER = [
@@ -158,6 +160,11 @@ class Service(ExecutableService):
         return self._get_raw_data(command=command, stderr=stderr)
 
     def check(self):
+        arcconf = find_binary(ARCCONF)
+        if not arcconf:
+            self.error('can\'t locate "{0}" binary'.format(ARCCONF))
+            return False
+
         sudo = find_binary(SUDO)
         if self.use_sudo:
             if not sudo:
@@ -167,11 +174,6 @@ class Service(ExecutableService):
             if err:
                 self.error(' '.join(err))
                 return False
-
-        arcconf = find_binary(ARCCONF)
-        if not arcconf:
-            self.error('can\'t locate "{0}" binary'.format(ARCCONF))
-            return False
 
         if self.use_sudo:
             self.arcconf = SudoArcconf(arcconf, sudo)
