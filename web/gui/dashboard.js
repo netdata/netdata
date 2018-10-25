@@ -366,9 +366,14 @@ const NETDATA = window.NETDATA || {};
     };
 
     if (typeof netdataIcons === 'object') {
-        for (let icon in NETDATA.icons) {
-            if (NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
-                NETDATA.icons[icon] = netdataIcons[icon];
+        // for (let icon in NETDATA.icons) {
+        //     if (NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
+        //         NETDATA.icons[icon] = netdataIcons[icon];
+        // }
+        for (const icon of Object.keys(NETDATA.icons)) {
+            if (typeof(netdataIcons[icon]) === 'string') {
+                NETDATA.icons[icon] = netdataIcons[icon]
+            }
         }
     }
 
@@ -2492,7 +2497,7 @@ const NETDATA = window.NETDATA || {};
                 }
            } else {
                 // hm... did we forget to implement the new type?
-                console.log('Unmatched unit conversion method for units ' + units.toString());
+                console.log(`Unmatched unit conversion method for units ${units.toString()}`);
                 switch_units_callback(units);
                 return function (value) { 
                     return value; 
