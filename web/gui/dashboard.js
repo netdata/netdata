@@ -754,6 +754,933 @@ NETDATA.unitsConversion = {
     }
 };
 
+// dygraph
+
+NETDATA.dygraph = {
+    smooth: false
+};
+
+NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
+    if (after < state.netdata_first)
+        after = state.netdata_first;
+
+    if (before > state.netdata_last)
+        before = state.netdata_last;
+
+    state.setMode('zoom');
+    NETDATA.globalSelectionSync.stop();
+    NETDATA.globalSelectionSync.delay();
+    state.tmp.dygraph_user_action = true;
+    state.tmp.dygraph_force_zoom = true;
+    // state.log('toolboxPanAndZoom');
+    state.updateChartPanOrZoom(after, before);
+    NETDATA.globalPanAndZoom.setMaster(state, after, before);
+};
+
+NETDATA.dygraphSetSelection = function(state, t) {
+    if (typeof state.tmp.dygraph_instance !== 'undefined') {
+        let r = state.calculateRowForTime(t);
+        if (r !== -1) {
+            state.tmp.dygraph_instance.setSelection(r);
+            return true;
+        } else {
+            state.tmp.dygraph_instance.clearSelection();
+            state.legendShowUndefined();
+        }
+    }
+
+    return false;
+};
+
+NETDATA.dygraphClearSelection = function(state) {
+    if (typeof state.tmp.dygraph_instance !== 'undefined') {
+        state.tmp.dygraph_instance.clearSelection();
+    }
+    return true;
+};
+
+NETDATA.dygraphSmoothInitialize = function(callback) {
+    $.ajax({
+        url: NETDATA.dygraph_smooth_js,
+        cache: true,
+        dataType: "script",
+        xhrFields: { withCredentials: true } // required for the cookie
+    })
+    .done(function() {
+        NETDATA.dygraph.smooth = true;
+        smoothPlotter.smoothing = 0.3;
+    })
+    .fail(function() {
+        NETDATA.dygraph.smooth = false;
+    })
+    .always(function() {
+        if (typeof callback === "function")
+            return callback();
+    });
+};
+
+NETDATA.dygraphInitialize = function(callback) {
+    if (typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
+        $.ajax({
+            url: NETDATA.dygraph_js,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+        .done(function() {
+            NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
+        })
+        .fail(function() {
+            NETDATA.chartLibraries.dygraph.enabled = false;
+            NETDATA.error(100, NETDATA.dygraph_js);
+        })
+        .always(function() {
+            if (NETDATA.chartLibraries.dygraph.enabled && NETDATA.options.current.smooth_plot) {
+                NETDATA.dygraphSmoothInitialize(callback);
+            } else if (typeof callback === "function") {
+                return callback();
+            }
+        });
+    } else {
+        NETDATA.chartLibraries.dygraph.enabled = false;
+        if (typeof callback === "function")
+            return callback();
+    }
+};
+
+NETDATA.dygraphChartUpdate = function(state, data) {
+    let dygraph = state.tmp.dygraph_instance;
+
+    if (typeof dygraph === 'undefined')
+        return NETDATA.dygraphChartCreate(state, data);
+
+    // when the chart is not visible, and hidden
+    // if there is a window resize, dygraph detects
+    // its element size as 0x0.
+    // this will make it re-appear properly
+
+    if (state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
+        dygraph.resize();
+
+    let options = {
+            file: data.result.data,
+            colors: state.chartColors(),
+            labels: data.result.labels,
+            //labelsDivWidth: state.chartWidth() - 70,
+            includeZero: state.tmp.dygraph_include_zero,
+            visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
+    };
+
+    if (state.tmp.dygraph_chart_type === 'stacked') {
+        if (options.includeZero && state.dimensions_visibility.countSelected() < options.visibility.length)
+            options.includeZero = 0;
+    }
+
+    if (!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+        options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
+    }
+
+    if (state.tmp.dygraph_force_zoom) {
+        if (NETDATA.options.debug.dygraph || state.debug)
+            state.log('dygraphChartUpdate() forced zoom update');
+
+        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
+        //options.isZoomedIgnoreProgrammaticZoom = true;
+        state.tmp.dygraph_force_zoom = false;
+    } else if (state.current.name !== 'auto') {
+        if (NETDATA.options.debug.dygraph || state.debug)
+            state.log('dygraphChartUpdate() loose update');
+    } else {
+        if (NETDATA.options.debug.dygraph || state.debug)
+            state.log('dygraphChartUpdate() strict update');
+
+        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
+        //options.isZoomedIgnoreProgrammaticZoom = true;
+    }
+
+    options.valueRange = state.tmp.dygraph_options.valueRange;
+
+    let oldMax = null, oldMin = null;
+    if (state.tmp.__commonMin !== null) {
+        state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
+        oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
+    }
+    if (state.tmp.__commonMax !== null) {
+        state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
+        oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
+    }
+
+    if (state.tmp.dygraph_smooth_eligible) {
+        if ((NETDATA.options.current.smooth_plot && state.tmp.dygraph_options.plotter !== smoothPlotter)
+            || (NETDATA.options.current.smooth_plot === false && state.tmp.dygraph_options.plotter === smoothPlotter)) {
+            NETDATA.dygraphChartCreate(state, data);
+            return;
+        }
+    }
+
+    if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        // pan and zoom on snapshots
+        options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+        //options.isZoomedIgnoreProgrammaticZoom = true;
+    }
+
+    if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
+        if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
+            options.valueRange[0] = null;
+    }
+
+    dygraph.updateOptions(options);
+
+    let redraw = false;
+    if (oldMin !== null && oldMin > state.tmp.dygraph_instance.axes_[0].extremeRange[0]) {
+        state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
+        options.valueRange[0] = NETDATA.commonMin.get(state);
+        redraw = true;
+    }
+    if (oldMax !== null && oldMax < state.tmp.dygraph_instance.axes_[0].extremeRange[1]) {
+        state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
+        options.valueRange[1] = NETDATA.commonMax.get(state);
+        redraw = true;
+    }
+
+    if (redraw) {
+        // state.log('forcing redraw to adapt to common- min/max');
+        dygraph.updateOptions(options);
+    }
+
+    state.tmp.dygraph_last_rendered = Date.now();
+    return true;
+};
+
+NETDATA.dygraphChartCreate = function(state, data) {
+    if (NETDATA.options.debug.dygraph || state.debug)
+        state.log('dygraphChartCreate()');
+
+    state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
+    if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
+    if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state)) state.tmp.dygraph_chart_type = 'area';
+
+    let highlightCircleSize = NETDATA.chartLibraries.dygraph.isSparkline(state) ? 3 : 4;
+
+    let smooth = NETDATA.dygraph.smooth
+        ? (NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
+        : false;
+
+    state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
+    let drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
+
+    state.tmp.dygraph_options = {
+        colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
+
+        // leave a few pixels empty on the right of the chart
+        rightGap:               NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
+        showRangeSelector:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-showrangeselector', false),
+        showRoller:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-showroller', false),
+        title:                  NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
+        titleHeight:            NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
+        legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
+        labels:                 data.result.labels,
+        labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
+        //labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
+        //labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
+        labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
+        labelsShowZeroValues:   NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
+        labelsKMB:              false,
+        labelsKMG2:             false,
+        showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
+        hideOverlayOnMouseOut:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
+        includeZero:            state.tmp.dygraph_include_zero,
+        xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
+        yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
+        valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
+        ylabel:                 state.units_current, // (state.units_desired === 'auto')?"":state.units_current,
+        yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
+
+                                // the function to plot the chart
+        plotter:                null,
+
+                                // The width of the lines connecting data points.
+                                // This can be used to increase the contrast or some graphs.
+        strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
+        strokePattern:          NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
+
+                                // The size of the dot to draw on each point in pixels (see drawPoints).
+                                // A dot is always drawn when a point is "isolated",
+                                // i.e. there is a missing point on either side of it.
+                                // This also controls the size of those dots.
+        drawPoints:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawpoints', false),
+
+                                // Draw points at the edges of gaps in the data.
+                                // This improves visibility of small data segments or other data irregularities.
+        drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
+        connectSeparatedPoints: NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
+        pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
+
+                                // enabling this makes the chart with little square lines
+        stepPlot:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-stepplot', false),
+
+                                // Draw a border around graph lines to make crossing lines more easily
+                                // distinguishable. Useful for graphs with many lines.
+        strokeBorderColor:      NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
+        strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked')?0.0:0.0),
+        fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
+        fillAlpha:              NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
+                                ((state.tmp.dygraph_chart_type === 'stacked')
+                                    ?NETDATA.options.current.color_fill_opacity_stacked
+                                    :NETDATA.options.current.color_fill_opacity_area)
+                                ),
+        stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
+        stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
+        drawAxis:               drawAxis,
+        axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
+        axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
+        axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
+        drawGrid:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgrid', true),
+        gridLinePattern:        NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
+        gridLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
+        gridLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
+        maxNumberWidth:         NETDATA.dataAttribute(state.element, 'dygraph-maxnumberwidth', 8),
+        sigFigs:                NETDATA.dataAttribute(state.element, 'dygraph-sigfigs', null),
+        digitsAfterDecimal:     NETDATA.dataAttribute(state.element, 'dygraph-digitsafterdecimal', 2),
+        valueFormatter:         NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
+        highlightCircleSize:    NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
+        highlightSeriesOpts:    NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
+        highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
+        pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
+        visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+        logscale:               NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
+
+        axes: {
+            x: {
+                pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
+                ticker: Dygraph.dateTicker,
+                axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-xaxislabelwidth', 60),
+                drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawxaxis', drawAxis),
+                axisLabelFormatter: function (d, gran) {
+                    void(gran);
+                    return NETDATA.dateTime.xAxisTimeString(d);
+                }
+            },
+            y: {
+                logscale: NETDATA.chartLibraries.dygraph.isLogScale(state) ? true : undefined,
+                pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
+                axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
+                drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', drawAxis),
+                axisLabelFormatter: function (y) {
+
+                    // unfortunately, we have to call this every single time
+                    state.legendFormatValueDecimalsFromMinMax(
+                        this.axes_[0].extremeRange[0],
+                        this.axes_[0].extremeRange[1]
+                    );
+
+                    let old_units = this.user_attrs_.ylabel;
+                    let v = state.legendFormatValue(y);
+                    let new_units = state.units_current;
+
+                    if (state.units_desired === 'auto' && typeof old_units !== 'undefined' && new_units !== old_units && !NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+                        // console.log(this);
+                        // state.log('units discrepancy: old = ' + old_units + ', new = ' + new_units);
+                        let len = this.plugins_.length;
+                        while (len--) {
+                            // console.log(this.plugins_[len]);
+                            if (typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined'
+                                && this.plugins_[len].plugin.ylabel_div_ !== null
+                                && typeof this.plugins_[len].plugin.ylabel_div_.children !== 'undefined'
+                                && this.plugins_[len].plugin.ylabel_div_.children !== null
+                                && typeof this.plugins_[len].plugin.ylabel_div_.children[0].children !== 'undefined'
+                                && this.plugins_[len].plugin.ylabel_div_.children[0].children !== null
+                            ) {
+                                this.plugins_[len].plugin.ylabel_div_.children[0].children[0].innerHTML = new_units;
+                                this.user_attrs_.ylabel = new_units;
+                                break;
+                            }
+                        }
+
+                        if (len < 0)
+                            state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
+                    }
+
+                    return v;
+                }
+            }
+        },
+        legendFormatter: function(data) {
+            if (state.tmp.dygraph_mouse_down)
+                return;
+
+            let elements = state.element_legend_childs;
+
+            // if the hidden div is not there
+            // we are not managing the legend
+            if (elements.hidden === null) return;
+
+            if (typeof data.x !== 'undefined') {
+                state.legendSetDate(data.x);
+                let i = data.series.length;
+                while (i--) {
+                    let series = data.series[i];
+                    if (series.isVisible)
+                        state.legendSetLabelValue(series.label, series.y);
+                    else
+                        state.legendSetLabelValue(series.label, null);
+                }
+            }
+
+            return '';
+        },
+        drawCallback: function(dygraph, is_initial) {
+
+            // the user has panned the chart and this is called to re-draw the chart
+            // 1. refresh this chart by adding data to it
+            // 2. notify all the other charts about the update they need
+
+            // to prevent an infinite loop (feedback), we use
+            //     state.tmp.dygraph_user_action
+            // - when true, this is initiated by a user
+            // - when false, this is feedback
+
+            if (state.current.name !== 'auto' && state.tmp.dygraph_user_action) {
+                state.tmp.dygraph_user_action = false;
+
+                let x_range = dygraph.xAxisRange();
+                let after = Math.round(x_range[0]);
+                let before = Math.round(x_range[1]);
+
+                if (NETDATA.options.debug.dygraph) {
+                    state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): mode ' + state.current.name + ' ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
+                    //console.log(state);
+                }
+
+                if (before <= state.netdata_last && after >= state.netdata_first) {
+                    // update only when we are within the data limits
+                    state.updateChartPanOrZoom(after, before);
+                }
+            }
+        },
+        zoomCallback: function(minDate, maxDate, yRanges) {
+
+            // the user has selected a range on the chart
+            // 1. refresh this chart by adding data to it
+            // 2. notify all the other charts about the update they need
+
+            void(yRanges);
+
+            if (NETDATA.options.debug.dygraph)
+                state.log('dygraphZoomCallback(): ' + state.current.name);
+
+            NETDATA.globalSelectionSync.stop();
+            NETDATA.globalSelectionSync.delay();
+            state.setMode('zoom');
+
+            // refresh it to the greatest possible zoom level
+            state.tmp.dygraph_user_action = true;
+            state.tmp.dygraph_force_zoom = true;
+            state.updateChartPanOrZoom(minDate, maxDate);
+        },
+        highlightCallback: function(event, x, points, row, seriesName) {
+            void(seriesName);
+
+            state.pauseChart();
+
+            // there is a bug in dygraph when the chart is zoomed enough
+            // the time it thinks is selected is wrong
+            // here we calculate the time t based on the row number selected
+            // which is ok
+            // let t = state.data_after + row * state.data_update_every;
+            // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
+
+            if (state.tmp.dygraph_mouse_down !== true)
+                NETDATA.globalSelectionSync.sync(state, x);
+
+            // fix legend zIndex using the internal structures of dygraph legend module
+            // this works, but it is a hack!
+            // state.tmp.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
+        },
+        unhighlightCallback: function(event) {
+            void(event);
+
+            if (state.tmp.dygraph_mouse_down)
+                return;
+
+            if (NETDATA.options.debug.dygraph || state.debug)
+                state.log('dygraphUnhighlightCallback()');
+
+            state.unpauseChart();
+            NETDATA.globalSelectionSync.stop();
+        },
+        underlayCallback: function(canvas, area, g) {
+
+            // the chart is about to be drawn
+            // this function renders global highlighted time-frame
+
+            if (NETDATA.globalChartUnderlay.isActive()) {
+                let after = NETDATA.globalChartUnderlay.after;
+                let before = NETDATA.globalChartUnderlay.before;
+
+                if (after < state.view_after)
+                    after = state.view_after;
+
+                if (before > state.view_before)
+                    before = state.view_before;
+
+                if (after < before) {
+                    let bottom_left = g.toDomCoords(after, -20);
+                    let top_right = g.toDomCoords(before, +20);
+
+                    let left = bottom_left[0];
+                    let right = top_right[0];
+
+                    canvas.fillStyle = NETDATA.themes.current.highlight;
+                    canvas.fillRect(left, area.y, right - left, area.h);
+                }
+            }
+        },
+        interactionModel : {
+            mousedown: function(event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.mousedown()');
+
+                state.tmp.dygraph_user_action = true;
+
+                if (NETDATA.options.debug.dygraph)
+                    state.log('dygraphMouseDown()');
+
+                // Right-click should not initiate anything.
+                if (event.button && event.button === 2) return;
+
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalSelectionSync.delay();
+
+                state.tmp.dygraph_mouse_down = true;
+                context.initializeMouseDown(event, dygraph, context);
+
+                //console.log(event);
+                if (event.button && event.button === 1) {
+                    if (event.shiftKey) {
+                        //console.log('middle mouse button dragging (PAN)');
+
+                        state.setMode('pan');
+                        // NETDATA.globalSelectionSync.delay();
+                        state.tmp.dygraph_highlight_after = null;
+                        Dygraph.startPan(event, dygraph, context);
+                    } else if (event.altKey || event.ctrlKey || event.metaKey) {
+                        //console.log('middle mouse button highlight');
+
+                        if (!(event.offsetX && event.offsetY)) {
+                            event.offsetX = event.layerX - event.target.offsetLeft;
+                            event.offsetY = event.layerY - event.target.offsetTop;
+                        }
+                        state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
+                        Dygraph.startZoom(event, dygraph, context);
+                    } else {
+                        //console.log('middle mouse button selection for zoom (ZOOM)');
+
+                        state.setMode('zoom');
+                        // NETDATA.globalSelectionSync.delay();
+                        state.tmp.dygraph_highlight_after = null;
+                        Dygraph.startZoom(event, dygraph, context);
+                    }
+                } else {
+                    if (event.shiftKey) {
+                        //console.log('left mouse button selection for zoom (ZOOM)');
+
+                        state.setMode('zoom');
+                        // NETDATA.globalSelectionSync.delay();
+                        state.tmp.dygraph_highlight_after = null;
+                        Dygraph.startZoom(event, dygraph, context);
+                    } else if (event.altKey || event.ctrlKey || event.metaKey) {
+                        //console.log('left mouse button highlight');
+
+                        if (!(event.offsetX && event.offsetY)) {
+                            event.offsetX = event.layerX - event.target.offsetLeft;
+                            event.offsetY = event.layerY - event.target.offsetTop;
+                        }
+                        state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
+                        Dygraph.startZoom(event, dygraph, context);
+                    } else {
+                        //console.log('left mouse button dragging (PAN)');
+
+                        state.setMode('pan');
+                        // NETDATA.globalSelectionSync.delay();
+                        state.tmp.dygraph_highlight_after = null;
+                        Dygraph.startPan(event, dygraph, context);
+                    }
+                }
+            },
+            mousemove: function(event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.mousemove()');
+
+                if (state.tmp.dygraph_highlight_after !== null) {
+                    //console.log('highlight selection...');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    state.tmp.dygraph_user_action = true;
+                    Dygraph.moveZoom(event, dygraph, context);
+                    event.preventDefault();
+                } else if (context.isPanning) {
+                    //console.log('panning...');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    state.tmp.dygraph_user_action = true;
+                    //NETDATA.globalSelectionSync.stop();
+                    //NETDATA.globalSelectionSync.delay();
+                    state.setMode('pan');
+                    context.is2DPan = false;
+                    Dygraph.movePan(event, dygraph, context);
+                } else if (context.isZooming) {
+                    //console.log('zooming...');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    state.tmp.dygraph_user_action = true;
+                    //NETDATA.globalSelectionSync.stop();
+                    //NETDATA.globalSelectionSync.delay();
+                    state.setMode('zoom');
+                    Dygraph.moveZoom(event, dygraph, context);
+                }
+            },
+            mouseup: function(event, dygraph, context) {
+                state.tmp.dygraph_mouse_down = false;
+
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.mouseup()');
+
+                if (state.tmp.dygraph_highlight_after !== null) {
+                    //console.log('done highlight selection');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    if (!(event.offsetX && event.offsetY)){
+                        event.offsetX = event.layerX - event.target.offsetLeft;
+                        event.offsetY = event.layerY - event.target.offsetTop;
+                    }
+
+                    NETDATA.globalChartUnderlay.set(state
+                        , state.tmp.dygraph_highlight_after
+                        , dygraph.toDataXCoord(event.offsetX)
+                        , state.view_after
+                        , state.view_before
+                    );
+
+                    state.tmp.dygraph_highlight_after = null;
+
+                    context.isZooming = false;
+                    dygraph.clearZoomRect_();
+                    dygraph.drawGraph_(false);
+
+                    // refresh all the charts immediately
+                    NETDATA.options.auto_refresher_stop_until = 0;
+                } else if (context.isPanning) {
+                    //console.log('done panning');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    state.tmp.dygraph_user_action = true;
+                    Dygraph.endPan(event, dygraph, context);
+
+                    // refresh all the charts immediately
+                    NETDATA.options.auto_refresher_stop_until = 0;
+                } else if (context.isZooming) {
+                    //console.log('done zomming');
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    state.tmp.dygraph_user_action = true;
+                    Dygraph.endZoom(event, dygraph, context);
+
+                    // refresh all the charts immediately
+                    NETDATA.options.auto_refresher_stop_until = 0;
+                }
+            },
+            click: function(event, dygraph, context) {
+                void(dygraph);
+                void(context);
+
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.click()');
+
+                event.preventDefault();
+            },
+            dblclick: function(event, dygraph, context) {
+                void(event);
+                void(dygraph);
+                void(context);
+
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.dblclick()');
+                NETDATA.resetAllCharts(state);
+            },
+            wheel: function(event, dygraph, context) {
+                void(context);
+
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.wheel()');
+
+                // Take the offset of a mouse event on the dygraph canvas and
+                // convert it to a pair of percentages from the bottom left.
+                // (Not top left, bottom is where the lower value is.)
+                function offsetToPercentage(g, offsetX, offsetY) {
+                    // This is calculating the pixel offset of the leftmost date.
+                    let xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
+                    let yar0 = g.yAxisRange(0);
+
+                    // This is calculating the pixel of the highest value. (Top pixel)
+                    let yOffset = g.toDomCoords(null, yar0[1])[1];
+
+                    // x y w and h are relative to the corner of the drawing area,
+                    // so that the upper corner of the drawing area is (0, 0).
+                    let x = offsetX - xOffset;
+                    let y = offsetY - yOffset;
+
+                    // This is computing the rightmost pixel, effectively defining the
+                    // width.
+                    let w = g.toDomCoords(g.xAxisRange()[1], null)[0] - xOffset;
+
+                    // This is computing the lowest pixel, effectively defining the height.
+                    let h = g.toDomCoords(null, yar0[0])[1] - yOffset;
+
+                    // Percentage from the left.
+                    let xPct = w === 0 ? 0 : (x / w);
+                    // Percentage from the top.
+                    let yPct = h === 0 ? 0 : (y / h);
+
+                    // The (1-) part below changes it from "% distance down from the top"
+                    // to "% distance up from the bottom".
+                    return [xPct, (1-yPct)];
+                }
+
+                // Adjusts [x, y] toward each other by zoomInPercentage%
+                // Split it so the left/bottom axis gets xBias/yBias of that change and
+                // tight/top gets (1-xBias)/(1-yBias) of that change.
+                //
+                // If a bias is missing it splits it down the middle.
+                function zoomRange(g, zoomInPercentage, xBias, yBias) {
+                    xBias = xBias || 0.5;
+                    yBias = yBias || 0.5;
+
+                    function adjustAxis(axis, zoomInPercentage, bias) {
+                        let delta = axis[1] - axis[0];
+                        let increment = delta * zoomInPercentage;
+                        let foo = [increment * bias, increment * (1-bias)];
+
+                        return [ axis[0] + foo[0], axis[1] - foo[1] ];
+                    }
+
+                    let yAxes = g.yAxisRanges();
+                    let newYAxes = [];
+                    for (let i = 0; i < yAxes.length; i++) {
+                        newYAxes[i] = adjustAxis(yAxes[i], zoomInPercentage, yBias);
+                    }
+
+                    return adjustAxis(g.xAxisRange(), zoomInPercentage, xBias);
+                }
+
+                if (event.altKey || event.shiftKey) {
+                    state.tmp.dygraph_user_action = true;
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
+                    // http://dygraphs.com/gallery/interaction-api.js
+                    let normal_def;
+                    if (typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
+                        // chrome
+                        normal_def = event.wheelDelta / 40;
+                    else
+                        // firefox
+                        normal_def = event.deltaY * -1.2;
+
+                    let normal = (event.detail) ? event.detail * -1 : normal_def;
+                    let percentage = normal / 50;
+
+                    if (!(event.offsetX && event.offsetY)){
+                        event.offsetX = event.layerX - event.target.offsetLeft;
+                        event.offsetY = event.layerY - event.target.offsetTop;
+                    }
+
+                    let percentages = offsetToPercentage(dygraph, event.offsetX, event.offsetY);
+                    let xPct = percentages[0];
+                    let yPct = percentages[1];
+
+                    let new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
+                    let after = new_x_range[0];
+                    let before = new_x_range[1];
+
+                    let first = state.netdata_first + state.data_update_every;
+                    let last = state.netdata_last + state.data_update_every;
+
+                    if (before > last) {
+                        after -= (before - last);
+                        before = last;
+                    }
+                    if (after < first) {
+                        after = first;
+                    }
+
+                    state.setMode('zoom');
+                    state.updateChartPanOrZoom(after, before, function() {
+                        dygraph.updateOptions({ dateWindow: [ after, before ] });
+                    });
+
+                    event.preventDefault();
+                }
+            },
+            touchstart: function(event, dygraph, context) {
+                state.tmp.dygraph_mouse_down = true;
+
+                if (NETDATA.options.debug.dygraph || state.debug) {
+                    state.log('interactionModel.touchstart()');
+                }
+
+                state.tmp.dygraph_user_action = true;
+                state.setMode('zoom');
+                state.pauseChart();
+
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalSelectionSync.delay();
+
+                Dygraph.defaultInteractionModel.touchstart(event, dygraph, context);
+
+                // we overwrite the touch directions at the end, to overwrite
+                // the internal default of dygraph
+                context.touchDirections = { x: true, y: false };
+
+                state.dygraph_last_touch_start = Date.now();
+                state.dygraph_last_touch_move = 0;
+
+                if (typeof event.touches[0].pageX === 'number')
+                    state.dygraph_last_touch_page_x = event.touches[0].pageX;
+                else
+                    state.dygraph_last_touch_page_x = 0;
+            },
+            touchmove: function(event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug) 
+                    state.log('interactionModel.touchmove()');
+
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalSelectionSync.delay();
+
+                state.tmp.dygraph_user_action = true;
+                Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
+
+                state.dygraph_last_touch_move = Date.now();
+            },
+            touchend: function(event, dygraph, context) {
+                state.tmp.dygraph_mouse_down = false;
+
+                if (NETDATA.options.debug.dygraph || state.debug)
+                    state.log('interactionModel.touchend()');
+
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalSelectionSync.delay();
+
+                state.tmp.dygraph_user_action = true;
+                Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
+
+                // if it didn't move, it is a selection
+                if (state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
+                    NETDATA.globalSelectionSync.dont_sync_before = 0;
+                    NETDATA.globalSelectionSync.setMaster(state);
+
+                    // internal api of dygraph
+                    let pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
+                    console.log('pct: ' + pct.toString());
+
+                    let t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
+                    if (NETDATA.dygraphSetSelection(state, t)) {
+                        NETDATA.globalSelectionSync.sync(state, t);
+                    }
+                }
+
+                // if it was double tap within double click time, reset the charts
+                let now = Date.now();
+                if (typeof state.dygraph_last_touch_end !== 'undefined') {
+                    if (state.dygraph_last_touch_move === 0) {
+                        let dt = now - state.dygraph_last_touch_end;
+                        if (dt <= NETDATA.options.current.double_click_speed)
+                            NETDATA.resetAllCharts(state);
+                    }
+                }
+
+                // remember the timestamp of the last touch end
+                state.dygraph_last_touch_end = now;
+
+                // refresh all the charts immediately
+                NETDATA.options.auto_refresher_stop_until = 0;
+            }
+        }
+    };
+
+    if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
+        if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
+            state.tmp.dygraph_options.valueRange[0] = null;
+    }
+
+    if (NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+        state.tmp.dygraph_options.drawGrid = false;
+        state.tmp.dygraph_options.drawAxis = false;
+        state.tmp.dygraph_options.title = undefined;
+        state.tmp.dygraph_options.ylabel = undefined;
+        state.tmp.dygraph_options.yLabelWidth = 0;
+        //state.tmp.dygraph_options.labelsDivWidth = 120;
+        //state.tmp.dygraph_options.labelsDivStyles.width = '120px';
+        state.tmp.dygraph_options.labelsSeparateLines = true;
+        state.tmp.dygraph_options.rightGap = 0;
+        state.tmp.dygraph_options.yRangePad = 1;
+        state.tmp.dygraph_options.axes.x.drawAxis = false;
+        state.tmp.dygraph_options.axes.y.drawAxis = false;
+    }
+
+    if (smooth) {
+        state.tmp.dygraph_smooth_eligible = true;
+
+        if (NETDATA.options.current.smooth_plot)
+            state.tmp.dygraph_options.plotter = smoothPlotter;
+    }
+    else state.tmp.dygraph_smooth_eligible = false;
+
+    if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        // pan and zoom on snapshots
+        state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+        //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
+    }
+
+    state.tmp.dygraph_instance = new Dygraph(state.element_chart,
+        data.result.data, state.tmp.dygraph_options);
+
+    state.tmp.dygraph_force_zoom = false;
+    state.tmp.dygraph_user_action = false;
+    state.tmp.dygraph_last_rendered = Date.now();
+    state.tmp.dygraph_highlight_after = null;
+
+    if (state.tmp.dygraph_options.valueRange[0] === null && state.tmp.dygraph_options.valueRange[1] === null) {
+        if (typeof state.tmp.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
+            state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
+            state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
+        } else {
+            state.log('incompatible version of Dygraph detected');
+            state.tmp.__commonMin = null;
+            state.tmp.__commonMax = null;
+        }
+    } else {
+        // if the user gave a valueRange, respect it
+        state.tmp.__commonMin = null;
+        state.tmp.__commonMax = null;
+    }
+
+    return true;
+};
+
 // ----------------------------------------------------------------------------------------------------------------
 // sparkline
 
@@ -1028,6 +1955,666 @@ NETDATA.googleChartCreate = function(state, data) {
     return true;
 };
 
+// gauge.js
+
+NETDATA.gaugeInitialize = function(callback) {
+    if (typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
+        $.ajax({
+            url: NETDATA.gauge_js,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+            .done(function() {
+                NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
+            })
+            .fail(function() {
+                NETDATA.chartLibraries.gauge.enabled = false;
+                NETDATA.error(100, NETDATA.gauge_js);
+            })
+            .always(function() {
+                if (typeof callback === "function")
+                    return callback();
+            })
+    }
+    else {
+        NETDATA.chartLibraries.gauge.enabled = false;
+        if (typeof callback === "function")
+            return callback();
+    }
+};
+
+NETDATA.gaugeAnimation = function(state, status) {
+    let speed = 32;
+
+    if (typeof status === 'boolean' && status === false)
+        speed = 1000000000;
+    else if (typeof status === 'number')
+        speed = status;
+
+    // console.log('gauge speed ' + speed);
+    state.tmp.gauge_instance.animationSpeed = speed;
+    state.tmp.___gaugeOld__.speed = speed;
+};
+
+NETDATA.gaugeSet = function(state, value, min, max) {
+    if (typeof value !== 'number') value = 0;
+    if (typeof min !== 'number') min = 0;
+    if (typeof max !== 'number') max = 0;
+    if (value > max) max = value;
+    if (value < min) min = value;
+    if (min > max) {
+        let t = min;
+        min = max;
+        max = t;
+    }
+    else if (min === max)
+        max = min + 1;
+
+    state.legendFormatValueDecimalsFromMinMax(min, max);
+
+    // gauge.js has an issue if the needle
+    // is smaller than min or larger than max
+    // when we set the new values
+    // the needle will go crazy
+
+    // to prevent it, we always feed it
+    // with a percentage, so that the needle
+    // is always between min and max
+    let pcent = (value - min) * 100 / (max - min);
+
+    // bug fix for gauge.js 1.3.1
+    // if the value is the absolute min or max, the chart is broken
+    if (pcent < 0.001) pcent = 0.001;
+    if (pcent > 99.999) pcent = 99.999;
+
+    state.tmp.gauge_instance.set(pcent);
+    // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
+
+    state.tmp.___gaugeOld__.value = value;
+    state.tmp.___gaugeOld__.min = min;
+    state.tmp.___gaugeOld__.max = max;
+};
+
+NETDATA.gaugeSetLabels = function(state, value, min, max) {
+    if (state.tmp.___gaugeOld__.valueLabel !== value) {
+        state.tmp.___gaugeOld__.valueLabel = value;
+        state.tmp.gaugeChartLabel.innerText = state.legendFormatValue(value);
+    }
+    if (state.tmp.___gaugeOld__.minLabel !== min) {
+        state.tmp.___gaugeOld__.minLabel = min;
+        state.tmp.gaugeChartMin.innerText = state.legendFormatValue(min);
+    }
+    if (state.tmp.___gaugeOld__.maxLabel !== max) {
+        state.tmp.___gaugeOld__.maxLabel = max;
+        state.tmp.gaugeChartMax.innerText = state.legendFormatValue(max);
+    }
+};
+
+NETDATA.gaugeClearSelection = function(state, force) {
+    if (typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
+        NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
+        state.tmp.gaugeEvent.timer = undefined;
+    }
+
+    if (state.isAutoRefreshable() && state.data !== null && force !== true) {
+        NETDATA.gaugeChartUpdate(state, state.data);
+    } else {
+        NETDATA.gaugeAnimation(state, false);
+        NETDATA.gaugeSetLabels(state, null, null, null);
+        NETDATA.gaugeSet(state, null, null, null);
+    }
+
+    NETDATA.gaugeAnimation(state, true);
+    return true;
+};
+
+NETDATA.gaugeSetSelection = function(state, t) {
+    if (state.timeIsVisible(t) !== true)
+        return NETDATA.gaugeClearSelection(state, true);
+
+    let slot = state.calculateRowForTime(t);
+    if (slot < 0 || slot >= state.data.result.length)
+        return NETDATA.gaugeClearSelection(state, true);
+
+    if (typeof state.tmp.gaugeEvent === 'undefined') {
+        state.tmp.gaugeEvent = {
+            timer: undefined,
+            value: 0,
+            min: 0,
+            max: 0
+        };
+    }
+
+    let value = state.data.result[state.data.result.length - 1 - slot];
+    let min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
+    let max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
+
+    // make sure it is zero based
+    // but only if it has not been set by the user
+    if (state.tmp.gaugeMin === null && min > 0) min = 0;
+    if (state.tmp.gaugeMax === null && max < 0) max = 0;
+
+    state.tmp.gaugeEvent.value = value;
+    state.tmp.gaugeEvent.min = min;
+    state.tmp.gaugeEvent.max = max;
+    NETDATA.gaugeSetLabels(state, value, min, max);
+
+    if (state.tmp.gaugeEvent.timer === undefined) {
+        NETDATA.gaugeAnimation(state, false);
+
+        state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function() {
+            state.tmp.gaugeEvent.timer = undefined;
+            NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
+        }, 0);
+    }
+
+    return true;
+};
+
+NETDATA.gaugeChartUpdate = function(state, data) {
+    let value, min, max;
+
+    if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
+        NETDATA.gaugeSetLabels(state, null, null, null);
+        state.tmp.gauge_instance.set(0);
+    } else {
+        value = data.result[0];
+        min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
+        max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
+        if (value < min) min = value;
+        if (value > max) max = value;
+
+        // make sure it is zero based
+        // but only if it has not been set by the user
+        if (state.tmp.gaugeMin === null && min > 0) min = 0;
+        if (state.tmp.gaugeMax === null && max < 0) max = 0;
+
+        NETDATA.gaugeSet(state, value, min, max);
+        NETDATA.gaugeSetLabels(state, value, min, max);
+    }
+
+    return true;
+};
+
+NETDATA.gaugeChartCreate = function(state, data) {
+    // let chart = $(state.element_chart);
+
+    let value = data.result[0];
+    let min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
+    let max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
+    // let adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
+    let pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
+    let strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
+    let startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
+    let stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
+    let generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
+
+    if (min === null) {
+        min = NETDATA.commonMin.get(state);
+        state.tmp.gaugeMin = null;
+    } else {
+        state.tmp.gaugeMin = min;
+    }
+
+    if (max === null) {
+        max = NETDATA.commonMax.get(state);
+        state.tmp.gaugeMax = null;
+    } else {
+        state.tmp.gaugeMax = max;
+    }
+
+    // make sure it is zero based
+    // but only if it has not been set by the user
+    if (state.tmp.gaugeMin === null && min > 0) min = 0;
+    if (state.tmp.gaugeMax === null && max < 0) max = 0;
+
+    let width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
+    // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
+    //switch(adjust) {
+    //  case 'width': width = height * ratio; break;
+    //  case 'height':
+    //  default: height = width / ratio; break;
+    //}
+    //state.element.style.width = width.toString() + 'px';
+    //state.element.style.height = height.toString() + 'px';
+
+    let lum_d = 0.05;
+
+    let options = {
+        lines: 12,                  // The number of lines to draw
+        angle: 0.14,                // The span of the gauge arc
+        lineWidth: 0.57,            // The line thickness
+        radiusScale: 1.0,           // Relative radius
+        pointer: {
+            length: 0.85,           // 0.9 The radius of the inner circle
+            strokeWidth: 0.045,     // The rotation offset
+            color: pointerColor     // Fill color
+        },
+        limitMax: true,             // If false, the max value of the gauge will be updated if value surpass max
+        limitMin: true,             // If true, the min value of the gauge will be fixed unless you set it manually
+        colorStart: startColor,     // Colors
+        colorStop: stopColor,       // just experiment with them
+        strokeColor: strokeColor,   // to see which ones work best for you
+        generateGradient: (generateGradient === true), // gmosx: 
+        gradientType: 0,
+        highDpiSupport: true        // High resolution support
+    };
+
+    if (generateGradient.constructor === Array) {
+        // example options:
+        // data-gauge-generate-gradient="[0, 50, 100]"
+        // data-gauge-gradient-percent-color-0="#FFFFFF"
+        // data-gauge-gradient-percent-color-50="#999900"
+        // data-gauge-gradient-percent-color-100="#000000"
+
+        options.percentColors = [];
+        let len = generateGradient.length;
+        while (len--) {
+            let pcent = generateGradient[len];
+            let color = NETDATA.dataAttribute(state.element, 'gauge-gradient-percent-color-' + pcent.toString(), false);
+            if (color !== false) {
+                let a = [];
+                a[0] = pcent / 100;
+                a[1] = color;
+                options.percentColors.unshift(a);
+            }
+        }
+        if (options.percentColors.length === 0) {
+            delete options.percentColors;
+        }
+    } else if (generateGradient === false && NETDATA.themes.current.gauge_gradient) {
+        //noinspection PointlessArithmeticExpressionJS
+        options.percentColors = [
+            [0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
+            [0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
+            [0.2, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 2))],
+            [0.3, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 3))],
+            [0.4, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 4))],
+            [0.5, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 5))],
+            [0.6, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 6))],
+            [0.7, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 7))],
+            [0.8, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 8))],
+            [0.9, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 9))],
+            [1.0, NETDATA.colorLuminance(startColor, 0.0)]];
+    }
+
+    state.tmp.gauge_canvas = document.createElement('canvas');
+    state.tmp.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
+    state.tmp.gauge_canvas.className = 'gaugeChart';
+    state.tmp.gauge_canvas.width  = width;
+    state.tmp.gauge_canvas.height = height;
+    state.element_chart.appendChild(state.tmp.gauge_canvas);
+
+    let valuefontsize = Math.floor(height / 5);
+    let valuetop = Math.round((height - valuefontsize) / 3.2);
+    state.tmp.gaugeChartLabel = document.createElement('span');
+    state.tmp.gaugeChartLabel.className = 'gaugeChartLabel';
+    state.tmp.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
+    state.tmp.gaugeChartLabel.style.top = valuetop.toString() + 'px';
+    state.element_chart.appendChild(state.tmp.gaugeChartLabel);
+
+    let titlefontsize = Math.round(valuefontsize / 2.1);
+    let titletop = 0;
+    state.tmp.gaugeChartTitle = document.createElement('span');
+    state.tmp.gaugeChartTitle.className = 'gaugeChartTitle';
+    state.tmp.gaugeChartTitle.innerText = state.title;
+    state.tmp.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
+    state.tmp.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
+    state.tmp.gaugeChartTitle.style.top = titletop.toString() + 'px';
+    state.element_chart.appendChild(state.tmp.gaugeChartTitle);
+
+    let unitfontsize = Math.round(titlefontsize * 0.9);
+    state.tmp.gaugeChartUnits = document.createElement('span');
+    state.tmp.gaugeChartUnits.className = 'gaugeChartUnits';
+    state.tmp.gaugeChartUnits.innerText = state.units_current;
+    state.tmp.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
+    state.element_chart.appendChild(state.tmp.gaugeChartUnits);
+
+    state.tmp.gaugeChartMin = document.createElement('span');
+    state.tmp.gaugeChartMin.className = 'gaugeChartMin';
+    state.tmp.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+    state.element_chart.appendChild(state.tmp.gaugeChartMin);
+
+    state.tmp.gaugeChartMax = document.createElement('span');
+    state.tmp.gaugeChartMax.className = 'gaugeChartMax';
+    state.tmp.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+    state.element_chart.appendChild(state.tmp.gaugeChartMax);
+
+    // when we just re-create the chart
+    // do not animate the first update
+    let animate = true;
+    if (typeof state.tmp.gauge_instance !== 'undefined')
+        animate = false;
+
+    state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
+
+    state.tmp.___gaugeOld__ = {
+        value: value,
+        min: min,
+        max: max,
+        valueLabel: null,
+        minLabel: null,
+        maxLabel: null
+    };
+
+    // we will always feed a percentage
+    state.tmp.gauge_instance.minValue = 0;
+    state.tmp.gauge_instance.maxValue = 100;
+
+    NETDATA.gaugeAnimation(state, animate);
+    NETDATA.gaugeSet(state, value, min, max);
+    NETDATA.gaugeSetLabels(state, value, min, max);
+    NETDATA.gaugeAnimation(state, true);
+
+    state.legendSetUnitsString = function(units) {
+        if (typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
+            state.tmp.gaugeChartUnits.innerText = units;
+            state.tmp.___gaugeOld__.valueLabel = null;
+            state.tmp.___gaugeOld__.minLabel = null;
+            state.tmp.___gaugeOld__.maxLabel = null;
+            state.tmp.units = units;
+        }
+    };
+    state.legendShowUndefined = function() {
+        if (typeof state.tmp.gauge_instance !== 'undefined')
+            NETDATA.gaugeClearSelection(state);
+    };
+
+    return true;
+};
+
+// ----------------------------------------------------------------------------------------------------------------
+
+NETDATA.easypiechartPercentFromValueMinMax = function(state, value, min, max) {
+    if (typeof value !== 'number') value = 0;
+    if (typeof min !== 'number') min = 0;
+    if (typeof max !== 'number') max = 0;
+
+    if (min > max) {
+        let t = min;
+        min = max;
+        max = t;
+    }
+
+    if (min > value) min = value;
+    if (max < value) max = value;
+
+    state.legendFormatValueDecimalsFromMinMax(min, max);
+
+    if (state.tmp.easyPieChartMin === null && min > 0) min = 0;
+    if (state.tmp.easyPieChartMax === null && max < 0) max = 0;
+
+    let pcent;
+
+    if (min < 0 && max > 0) {
+        // it is both positive and negative
+        // zero at the top center of the chart
+        max = (-min > max)? -min : max;
+        pcent = Math.round(value * 100 / max);
+    } else if (value >= 0 && min >= 0 && max >= 0) {
+        // clockwise
+        pcent = Math.round((value - min) * 100 / (max - min));
+        if (pcent === 0) pcent = 0.1;
+    } else {
+        // counter clockwise
+        pcent = Math.round((value - max) * 100 / (max - min));
+        if (pcent === 0) pcent = -0.1;
+    }
+
+    return pcent;
+};
+
+// ----------------------------------------------------------------------------------------------------------------
+// easy-pie-chart
+
+NETDATA.easypiechartInitialize = function(callback) {
+    if (typeof netdataNoEasyPieChart === 'undefined' || !netdataNoEasyPieChart) {
+        $.ajax({
+            url: NETDATA.easypiechart_js,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+            .done(function() {
+                NETDATA.registerChartLibrary('easypiechart', NETDATA.easypiechart_js);
+            })
+            .fail(function() {
+                NETDATA.chartLibraries.easypiechart.enabled = false;
+                NETDATA.error(100, NETDATA.easypiechart_js);
+            })
+            .always(function() {
+                if (typeof callback === "function")
+                    return callback();
+            })
+    } else {
+        NETDATA.chartLibraries.easypiechart.enabled = false;
+        if (typeof callback === "function")
+            return callback();
+    }
+};
+
+NETDATA.easypiechartClearSelection = function(state, force) {
+    if (typeof state.tmp.easyPieChartEvent !== 'undefined' && typeof state.tmp.easyPieChartEvent.timer !== 'undefined') {
+        NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
+        state.tmp.easyPieChartEvent.timer = undefined;
+    }
+
+    if (state.isAutoRefreshable() && state.data !== null && force !== true) {
+        NETDATA.easypiechartChartUpdate(state, state.data);
+    }
+    else {
+        state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(null);
+        state.tmp.easyPieChart_instance.update(0);
+    }
+    state.tmp.easyPieChart_instance.enableAnimation();
+
+    return true;
+};
+
+NETDATA.easypiechartSetSelection = function(state, t) {
+    if (state.timeIsVisible(t) !== true)
+        return NETDATA.easypiechartClearSelection(state, true);
+
+    let slot = state.calculateRowForTime(t);
+    if (slot < 0 || slot >= state.data.result.length)
+        return NETDATA.easypiechartClearSelection(state, true);
+
+    if (typeof state.tmp.easyPieChartEvent === 'undefined') {
+        state.tmp.easyPieChartEvent = {
+            timer: undefined,
+            value: 0,
+            pcent: 0
+        };
+    }
+
+    let value = state.data.result[state.data.result.length - 1 - slot];
+    let min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
+    let max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
+    let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+
+    state.tmp.easyPieChartEvent.value = value;
+    state.tmp.easyPieChartEvent.pcent = pcent;
+    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
+
+    if (state.tmp.easyPieChartEvent.timer === undefined) {
+        state.tmp.easyPieChart_instance.disableAnimation();
+
+        state.tmp.easyPieChartEvent.timer = NETDATA.timeout.set(function() {
+            state.tmp.easyPieChartEvent.timer = undefined;
+            state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
+        }, 0);
+    }
+
+    return true;
+};
+
+NETDATA.easypiechartChartUpdate = function(state, data) {
+    let value, min, max, pcent;
+
+    if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
+        value = null;
+        pcent = 0;
+    }
+    else {
+        value = data.result[0];
+        min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
+        max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
+        pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+    }
+
+    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
+    state.tmp.easyPieChart_instance.update(pcent);
+    return true;
+};
+
+NETDATA.easypiechartChartCreate = function(state, data) {
+    let chart = $(state.element_chart);
+
+    let value = data.result[0];
+    let min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
+    let max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
+
+    if (min === null) {
+        min = NETDATA.commonMin.get(state);
+        state.tmp.easyPieChartMin = null;
+    }
+    else
+        state.tmp.easyPieChartMin = min;
+
+    if (max === null) {
+        max = NETDATA.commonMax.get(state);
+        state.tmp.easyPieChartMax = null;
+    }
+    else
+        state.tmp.easyPieChartMax = max;
+
+    let size = state.chartWidth();
+    let stroke = Math.floor(size / 22);
+    if (stroke < 3) stroke = 2;
+
+    let valuefontsize = Math.floor((size * 2 / 3) / 5);
+    let valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
+    state.tmp.easyPieChartLabel = document.createElement('span');
+    state.tmp.easyPieChartLabel.className = 'easyPieChartLabel';
+    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
+    state.tmp.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
+    state.tmp.easyPieChartLabel.style.top = valuetop.toString() + 'px';
+    state.element_chart.appendChild(state.tmp.easyPieChartLabel);
+
+    let titlefontsize = Math.round(valuefontsize * 1.6 / 3);
+    let titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
+    state.tmp.easyPieChartTitle = document.createElement('span');
+    state.tmp.easyPieChartTitle.className = 'easyPieChartTitle';
+    state.tmp.easyPieChartTitle.innerText = state.title;
+    state.tmp.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
+    state.tmp.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
+    state.tmp.easyPieChartTitle.style.top = titletop.toString() + 'px';
+    state.element_chart.appendChild(state.tmp.easyPieChartTitle);
+
+    let unitfontsize = Math.round(titlefontsize * 0.9);
+    let unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
+    state.tmp.easyPieChartUnits = document.createElement('span');
+    state.tmp.easyPieChartUnits.className = 'easyPieChartUnits';
+    state.tmp.easyPieChartUnits.innerText = state.units_current;
+    state.tmp.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
+    state.tmp.easyPieChartUnits.style.top = unittop.toString() + 'px';
+    state.element_chart.appendChild(state.tmp.easyPieChartUnits);
+
+    let barColor = NETDATA.dataAttribute(state.element, 'easypiechart-barcolor', undefined);
+    if (typeof barColor === 'undefined' || barColor === null)
+        barColor = state.chartCustomColors()[0];
+    else {
+        // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
+        let tmp = eval(barColor);
+        if (typeof tmp === 'function')
+            barColor = tmp;
+    }
+
+    let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+    chart.data('data-percent', pcent);
+
+    chart.easyPieChart({
+        barColor: barColor,
+        trackColor: NETDATA.dataAttribute(state.element, 'easypiechart-trackcolor', NETDATA.themes.current.easypiechart_track),
+        scaleColor: NETDATA.dataAttribute(state.element, 'easypiechart-scalecolor', NETDATA.themes.current.easypiechart_scale),
+        scaleLength: NETDATA.dataAttribute(state.element, 'easypiechart-scalelength', 5),
+        lineCap: NETDATA.dataAttribute(state.element, 'easypiechart-linecap', 'round'),
+        lineWidth: NETDATA.dataAttribute(state.element, 'easypiechart-linewidth', stroke),
+        trackWidth: NETDATA.dataAttribute(state.element, 'easypiechart-trackwidth', undefined),
+        size: NETDATA.dataAttribute(state.element, 'easypiechart-size', size),
+        rotate: NETDATA.dataAttribute(state.element, 'easypiechart-rotate', 0),
+        animate: NETDATA.dataAttribute(state.element, 'easypiechart-animate', {duration: 500, enabled: true}),
+        easing: NETDATA.dataAttribute(state.element, 'easypiechart-easing', undefined)
+    });
+
+    // when we just re-create the chart
+    // do not animate the first update
+    let animate = true;
+    if (typeof state.tmp.easyPieChart_instance !== 'undefined')
+        animate = false;
+
+    state.tmp.easyPieChart_instance = chart.data('easyPieChart');
+    if (animate === false) state.tmp.easyPieChart_instance.disableAnimation();
+    state.tmp.easyPieChart_instance.update(pcent);
+    if (animate === false) state.tmp.easyPieChart_instance.enableAnimation();
+
+    state.legendSetUnitsString = function(units) {
+        if (typeof state.tmp.easyPieChartUnits !== 'undefined' && state.tmp.units !== units) {
+            state.tmp.easyPieChartUnits.innerText = units;
+            state.tmp.units = units;
+        }
+    };
+    state.legendShowUndefined = function() {
+        if (typeof state.tmp.easyPieChart_instance !== 'undefined')
+            NETDATA.easypiechartClearSelection(state);
+    };
+
+    return true;
+};
+
+// ----------------------------------------------------------------------------------------------------------------
+// D3
+
+NETDATA.d3Initialize = function(callback) {
+    if (typeof netdataStopD3 === 'undefined' || !netdataStopD3) {
+        $.ajax({
+            url: NETDATA.d3_js,
+            cache: true,
+            dataType: "script",
+            xhrFields: { withCredentials: true } // required for the cookie
+        })
+        .done(function() {
+            NETDATA.registerChartLibrary('d3', NETDATA.d3_js);
+        })
+        .fail(function() {
+            NETDATA.chartLibraries.d3.enabled = false;
+            NETDATA.error(100, NETDATA.d3_js);
+        })
+        .always(function() {
+            if (typeof callback === "function")
+                return callback();
+        });
+    } else {
+        NETDATA.chartLibraries.d3.enabled = false;
+        if (typeof callback === "function")
+            return callback();
+    }
+};
+
+NETDATA.d3ChartUpdate = function(state, data) {
+    void(state);
+    void(data);
+
+    return false;
+};
+
+NETDATA.d3ChartCreate = function(state, data) {
+    void(state);
+    void(data);
+
+    return false;
+};
 
 // ----------------------------------------------------------------------------------------------------------------
 // Detect the netdata server
@@ -1044,10 +2631,11 @@ NETDATA._scriptSource = function() {
         script = all_scripts[all_scripts.length - 1];
     }
 
-    if (typeof script.getAttribute.length !== 'undefined')
+    if (typeof script.getAttribute.length !== 'undefined') {
         script = script.src;
-    else
+    } else {
         script = script.getAttribute('src', -1);
+    }
 
     return script;
 };
@@ -1088,13 +2676,13 @@ NETDATA.easypiechart_js     = NETDATA.serverStatic + 'lib/jquery.easypiechart-97
 NETDATA.gauge_js            = NETDATA.serverStatic + 'lib/gauge-1.3.2.min.js';
 NETDATA.dygraph_js          = NETDATA.serverStatic + 'lib/dygraph-c91c859.min.js';
 NETDATA.dygraph_smooth_js   = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-c91c859.js';
-NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
-NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
-NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
+// NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
+// NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
+// NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
 NETDATA.d3pie_js            = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-3.js';
 NETDATA.d3_js               = NETDATA.serverStatic + 'lib/d3-4.12.2.min.js';
-NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
-NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
+// NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
+// NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
 NETDATA.google_js           = 'https://www.google.com/jsapi';
 
 NETDATA.themes = {
@@ -6292,934 +7880,6 @@ NETDATA.peityChartCreate = function(state, data) {
 };
 
 // ----------------------------------------------------------------------------------------------------------------
-// dygraph
-
-NETDATA.dygraph = {
-    smooth: false
-};
-
-NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
-    if (after < state.netdata_first)
-        after = state.netdata_first;
-
-    if (before > state.netdata_last)
-        before = state.netdata_last;
-
-    state.setMode('zoom');
-    NETDATA.globalSelectionSync.stop();
-    NETDATA.globalSelectionSync.delay();
-    state.tmp.dygraph_user_action = true;
-    state.tmp.dygraph_force_zoom = true;
-    // state.log('toolboxPanAndZoom');
-    state.updateChartPanOrZoom(after, before);
-    NETDATA.globalPanAndZoom.setMaster(state, after, before);
-};
-
-NETDATA.dygraphSetSelection = function(state, t) {
-    if (typeof state.tmp.dygraph_instance !== 'undefined') {
-        let r = state.calculateRowForTime(t);
-        if (r !== -1) {
-            state.tmp.dygraph_instance.setSelection(r);
-            return true;
-        } else {
-            state.tmp.dygraph_instance.clearSelection();
-            state.legendShowUndefined();
-        }
-    }
-
-    return false;
-};
-
-NETDATA.dygraphClearSelection = function(state) {
-    if (typeof state.tmp.dygraph_instance !== 'undefined') {
-        state.tmp.dygraph_instance.clearSelection();
-    }
-    return true;
-};
-
-NETDATA.dygraphSmoothInitialize = function(callback) {
-    $.ajax({
-        url: NETDATA.dygraph_smooth_js,
-        cache: true,
-        dataType: "script",
-        xhrFields: { withCredentials: true } // required for the cookie
-    })
-    .done(function() {
-        NETDATA.dygraph.smooth = true;
-        smoothPlotter.smoothing = 0.3;
-    })
-    .fail(function() {
-        NETDATA.dygraph.smooth = false;
-    })
-    .always(function() {
-        if (typeof callback === "function")
-            return callback();
-    });
-};
-
-NETDATA.dygraphInitialize = function(callback) {
-    if (typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
-        $.ajax({
-            url: NETDATA.dygraph_js,
-            cache: true,
-            dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
-        })
-        .done(function() {
-            NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
-        })
-        .fail(function() {
-            NETDATA.chartLibraries.dygraph.enabled = false;
-            NETDATA.error(100, NETDATA.dygraph_js);
-        })
-        .always(function() {
-            if (NETDATA.chartLibraries.dygraph.enabled && NETDATA.options.current.smooth_plot) {
-                NETDATA.dygraphSmoothInitialize(callback);
-            } else if (typeof callback === "function") {
-                return callback();
-            }
-        });
-    } else {
-        NETDATA.chartLibraries.dygraph.enabled = false;
-        if (typeof callback === "function")
-            return callback();
-    }
-};
-
-NETDATA.dygraphChartUpdate = function(state, data) {
-    let dygraph = state.tmp.dygraph_instance;
-
-    if (typeof dygraph === 'undefined')
-        return NETDATA.dygraphChartCreate(state, data);
-
-    // when the chart is not visible, and hidden
-    // if there is a window resize, dygraph detects
-    // its element size as 0x0.
-    // this will make it re-appear properly
-
-    if (state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
-        dygraph.resize();
-
-    let options = {
-            file: data.result.data,
-            colors: state.chartColors(),
-            labels: data.result.labels,
-            //labelsDivWidth: state.chartWidth() - 70,
-            includeZero: state.tmp.dygraph_include_zero,
-            visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
-    };
-
-    if (state.tmp.dygraph_chart_type === 'stacked') {
-        if (options.includeZero && state.dimensions_visibility.countSelected() < options.visibility.length)
-            options.includeZero = 0;
-    }
-
-    if (!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
-        options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
-    }
-
-    if (state.tmp.dygraph_force_zoom) {
-        if (NETDATA.options.debug.dygraph || state.debug)
-            state.log('dygraphChartUpdate() forced zoom update');
-
-        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-        //options.isZoomedIgnoreProgrammaticZoom = true;
-        state.tmp.dygraph_force_zoom = false;
-    } else if (state.current.name !== 'auto') {
-        if (NETDATA.options.debug.dygraph || state.debug)
-            state.log('dygraphChartUpdate() loose update');
-    } else {
-        if (NETDATA.options.debug.dygraph || state.debug)
-            state.log('dygraphChartUpdate() strict update');
-
-        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-        //options.isZoomedIgnoreProgrammaticZoom = true;
-    }
-
-    options.valueRange = state.tmp.dygraph_options.valueRange;
-
-    let oldMax = null, oldMin = null;
-    if (state.tmp.__commonMin !== null) {
-        state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
-        oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
-    }
-    if (state.tmp.__commonMax !== null) {
-        state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
-        oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
-    }
-
-    if (state.tmp.dygraph_smooth_eligible) {
-        if ((NETDATA.options.current.smooth_plot && state.tmp.dygraph_options.plotter !== smoothPlotter)
-            || (NETDATA.options.current.smooth_plot === false && state.tmp.dygraph_options.plotter === smoothPlotter)) {
-            NETDATA.dygraphChartCreate(state, data);
-            return;
-        }
-    }
-
-    if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
-        // pan and zoom on snapshots
-        options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
-        //options.isZoomedIgnoreProgrammaticZoom = true;
-    }
-
-    if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
-        if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
-            options.valueRange[0] = null;
-    }
-
-    dygraph.updateOptions(options);
-
-    let redraw = false;
-    if (oldMin !== null && oldMin > state.tmp.dygraph_instance.axes_[0].extremeRange[0]) {
-        state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
-        options.valueRange[0] = NETDATA.commonMin.get(state);
-        redraw = true;
-    }
-    if (oldMax !== null && oldMax < state.tmp.dygraph_instance.axes_[0].extremeRange[1]) {
-        state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
-        options.valueRange[1] = NETDATA.commonMax.get(state);
-        redraw = true;
-    }
-
-    if (redraw) {
-        // state.log('forcing redraw to adapt to common- min/max');
-        dygraph.updateOptions(options);
-    }
-
-    state.tmp.dygraph_last_rendered = Date.now();
-    return true;
-};
-
-NETDATA.dygraphChartCreate = function(state, data) {
-    if (NETDATA.options.debug.dygraph || state.debug)
-        state.log('dygraphChartCreate()');
-
-    state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
-    if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
-    if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state)) state.tmp.dygraph_chart_type = 'area';
-
-    let highlightCircleSize = NETDATA.chartLibraries.dygraph.isSparkline(state) ? 3 : 4;
-
-    let smooth = NETDATA.dygraph.smooth
-        ? (NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
-        : false;
-
-    state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
-    let drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
-
-    state.tmp.dygraph_options = {
-        colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
-
-        // leave a few pixels empty on the right of the chart
-        rightGap:               NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
-        showRangeSelector:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-showrangeselector', false),
-        showRoller:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-showroller', false),
-        title:                  NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
-        titleHeight:            NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
-        legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
-        labels:                 data.result.labels,
-        labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
-        //labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
-        //labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
-        labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
-        labelsShowZeroValues:   NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
-        labelsKMB:              false,
-        labelsKMG2:             false,
-        showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
-        hideOverlayOnMouseOut:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
-        includeZero:            state.tmp.dygraph_include_zero,
-        xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
-        yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
-        valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
-        ylabel:                 state.units_current, // (state.units_desired === 'auto')?"":state.units_current,
-        yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
-
-                                // the function to plot the chart
-        plotter:                null,
-
-                                // The width of the lines connecting data points.
-                                // This can be used to increase the contrast or some graphs.
-        strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
-        strokePattern:          NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
-
-                                // The size of the dot to draw on each point in pixels (see drawPoints).
-                                // A dot is always drawn when a point is "isolated",
-                                // i.e. there is a missing point on either side of it.
-                                // This also controls the size of those dots.
-        drawPoints:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawpoints', false),
-
-                                // Draw points at the edges of gaps in the data.
-                                // This improves visibility of small data segments or other data irregularities.
-        drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
-        connectSeparatedPoints: NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
-        pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
-
-                                // enabling this makes the chart with little square lines
-        stepPlot:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-stepplot', false),
-
-                                // Draw a border around graph lines to make crossing lines more easily
-                                // distinguishable. Useful for graphs with many lines.
-        strokeBorderColor:      NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
-        strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked')?0.0:0.0),
-        fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
-        fillAlpha:              NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
-                                ((state.tmp.dygraph_chart_type === 'stacked')
-                                    ?NETDATA.options.current.color_fill_opacity_stacked
-                                    :NETDATA.options.current.color_fill_opacity_area)
-                                ),
-        stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
-        stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
-        drawAxis:               drawAxis,
-        axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
-        axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
-        axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
-        drawGrid:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgrid', true),
-        gridLinePattern:        NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
-        gridLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
-        gridLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
-        maxNumberWidth:         NETDATA.dataAttribute(state.element, 'dygraph-maxnumberwidth', 8),
-        sigFigs:                NETDATA.dataAttribute(state.element, 'dygraph-sigfigs', null),
-        digitsAfterDecimal:     NETDATA.dataAttribute(state.element, 'dygraph-digitsafterdecimal', 2),
-        valueFormatter:         NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
-        highlightCircleSize:    NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
-        highlightSeriesOpts:    NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
-        highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
-        pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
-        visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
-        logscale:               NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
-
-        axes: {
-            x: {
-                pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
-                ticker: Dygraph.dateTicker,
-                axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-xaxislabelwidth', 60),
-                drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawxaxis', drawAxis),
-                axisLabelFormatter: function (d, gran) {
-                    void(gran);
-                    return NETDATA.dateTime.xAxisTimeString(d);
-                }
-            },
-            y: {
-                logscale: NETDATA.chartLibraries.dygraph.isLogScale(state) ? true : undefined,
-                pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
-                axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
-                drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', drawAxis),
-                axisLabelFormatter: function (y) {
-
-                    // unfortunately, we have to call this every single time
-                    state.legendFormatValueDecimalsFromMinMax(
-                        this.axes_[0].extremeRange[0],
-                        this.axes_[0].extremeRange[1]
-                    );
-
-                    let old_units = this.user_attrs_.ylabel;
-                    let v = state.legendFormatValue(y);
-                    let new_units = state.units_current;
-
-                    if (state.units_desired === 'auto' && typeof old_units !== 'undefined' && new_units !== old_units && !NETDATA.chartLibraries.dygraph.isSparkline(state)) {
-                        // console.log(this);
-                        // state.log('units discrepancy: old = ' + old_units + ', new = ' + new_units);
-                        let len = this.plugins_.length;
-                        while (len--) {
-                            // console.log(this.plugins_[len]);
-                            if (typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined'
-                                && this.plugins_[len].plugin.ylabel_div_ !== null
-                                && typeof this.plugins_[len].plugin.ylabel_div_.children !== 'undefined'
-                                && this.plugins_[len].plugin.ylabel_div_.children !== null
-                                && typeof this.plugins_[len].plugin.ylabel_div_.children[0].children !== 'undefined'
-                                && this.plugins_[len].plugin.ylabel_div_.children[0].children !== null
-                            ) {
-                                this.plugins_[len].plugin.ylabel_div_.children[0].children[0].innerHTML = new_units;
-                                this.user_attrs_.ylabel = new_units;
-                                break;
-                            }
-                        }
-
-                        if (len < 0)
-                            state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
-                    }
-
-                    return v;
-                }
-            }
-        },
-        legendFormatter: function(data) {
-            if (state.tmp.dygraph_mouse_down)
-                return;
-
-            let elements = state.element_legend_childs;
-
-            // if the hidden div is not there
-            // we are not managing the legend
-            if (elements.hidden === null) return;
-
-            if (typeof data.x !== 'undefined') {
-                state.legendSetDate(data.x);
-                let i = data.series.length;
-                while (i--) {
-                    let series = data.series[i];
-                    if (series.isVisible)
-                        state.legendSetLabelValue(series.label, series.y);
-                    else
-                        state.legendSetLabelValue(series.label, null);
-                }
-            }
-
-            return '';
-        },
-        drawCallback: function(dygraph, is_initial) {
-
-            // the user has panned the chart and this is called to re-draw the chart
-            // 1. refresh this chart by adding data to it
-            // 2. notify all the other charts about the update they need
-
-            // to prevent an infinite loop (feedback), we use
-            //     state.tmp.dygraph_user_action
-            // - when true, this is initiated by a user
-            // - when false, this is feedback
-
-            if (state.current.name !== 'auto' && state.tmp.dygraph_user_action) {
-                state.tmp.dygraph_user_action = false;
-
-                let x_range = dygraph.xAxisRange();
-                let after = Math.round(x_range[0]);
-                let before = Math.round(x_range[1]);
-
-                if (NETDATA.options.debug.dygraph) {
-                    state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): mode ' + state.current.name + ' ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
-                    //console.log(state);
-                }
-
-                if (before <= state.netdata_last && after >= state.netdata_first) {
-                    // update only when we are within the data limits
-                    state.updateChartPanOrZoom(after, before);
-                }
-            }
-        },
-        zoomCallback: function(minDate, maxDate, yRanges) {
-
-            // the user has selected a range on the chart
-            // 1. refresh this chart by adding data to it
-            // 2. notify all the other charts about the update they need
-
-            void(yRanges);
-
-            if (NETDATA.options.debug.dygraph)
-                state.log('dygraphZoomCallback(): ' + state.current.name);
-
-            NETDATA.globalSelectionSync.stop();
-            NETDATA.globalSelectionSync.delay();
-            state.setMode('zoom');
-
-            // refresh it to the greatest possible zoom level
-            state.tmp.dygraph_user_action = true;
-            state.tmp.dygraph_force_zoom = true;
-            state.updateChartPanOrZoom(minDate, maxDate);
-        },
-        highlightCallback: function(event, x, points, row, seriesName) {
-            void(seriesName);
-
-            state.pauseChart();
-
-            // there is a bug in dygraph when the chart is zoomed enough
-            // the time it thinks is selected is wrong
-            // here we calculate the time t based on the row number selected
-            // which is ok
-            // let t = state.data_after + row * state.data_update_every;
-            // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
-
-            if (state.tmp.dygraph_mouse_down !== true)
-                NETDATA.globalSelectionSync.sync(state, x);
-
-            // fix legend zIndex using the internal structures of dygraph legend module
-            // this works, but it is a hack!
-            // state.tmp.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
-        },
-        unhighlightCallback: function(event) {
-            void(event);
-
-            if (state.tmp.dygraph_mouse_down)
-                return;
-
-            if (NETDATA.options.debug.dygraph || state.debug)
-                state.log('dygraphUnhighlightCallback()');
-
-            state.unpauseChart();
-            NETDATA.globalSelectionSync.stop();
-        },
-        underlayCallback: function(canvas, area, g) {
-
-            // the chart is about to be drawn
-            // this function renders global highlighted time-frame
-
-            if (NETDATA.globalChartUnderlay.isActive()) {
-                let after = NETDATA.globalChartUnderlay.after;
-                let before = NETDATA.globalChartUnderlay.before;
-
-                if (after < state.view_after)
-                    after = state.view_after;
-
-                if (before > state.view_before)
-                    before = state.view_before;
-
-                if (after < before) {
-                    let bottom_left = g.toDomCoords(after, -20);
-                    let top_right = g.toDomCoords(before, +20);
-
-                    let left = bottom_left[0];
-                    let right = top_right[0];
-
-                    canvas.fillStyle = NETDATA.themes.current.highlight;
-                    canvas.fillRect(left, area.y, right - left, area.h);
-                }
-            }
-        },
-        interactionModel : {
-            mousedown: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.mousedown()');
-
-                state.tmp.dygraph_user_action = true;
-
-                if (NETDATA.options.debug.dygraph)
-                    state.log('dygraphMouseDown()');
-
-                // Right-click should not initiate anything.
-                if (event.button && event.button === 2) return;
-
-                NETDATA.globalSelectionSync.stop();
-                NETDATA.globalSelectionSync.delay();
-
-                state.tmp.dygraph_mouse_down = true;
-                context.initializeMouseDown(event, dygraph, context);
-
-                //console.log(event);
-                if (event.button && event.button === 1) {
-                    if (event.shiftKey) {
-                        //console.log('middle mouse button dragging (PAN)');
-
-                        state.setMode('pan');
-                        // NETDATA.globalSelectionSync.delay();
-                        state.tmp.dygraph_highlight_after = null;
-                        Dygraph.startPan(event, dygraph, context);
-                    } else if (event.altKey || event.ctrlKey || event.metaKey) {
-                        //console.log('middle mouse button highlight');
-
-                        if (!(event.offsetX && event.offsetY)) {
-                            event.offsetX = event.layerX - event.target.offsetLeft;
-                            event.offsetY = event.layerY - event.target.offsetTop;
-                        }
-                        state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
-                        Dygraph.startZoom(event, dygraph, context);
-                    } else {
-                        //console.log('middle mouse button selection for zoom (ZOOM)');
-
-                        state.setMode('zoom');
-                        // NETDATA.globalSelectionSync.delay();
-                        state.tmp.dygraph_highlight_after = null;
-                        Dygraph.startZoom(event, dygraph, context);
-                    }
-                } else {
-                    if (event.shiftKey) {
-                        //console.log('left mouse button selection for zoom (ZOOM)');
-
-                        state.setMode('zoom');
-                        // NETDATA.globalSelectionSync.delay();
-                        state.tmp.dygraph_highlight_after = null;
-                        Dygraph.startZoom(event, dygraph, context);
-                    } else if (event.altKey || event.ctrlKey || event.metaKey) {
-                        //console.log('left mouse button highlight');
-
-                        if (!(event.offsetX && event.offsetY)) {
-                            event.offsetX = event.layerX - event.target.offsetLeft;
-                            event.offsetY = event.layerY - event.target.offsetTop;
-                        }
-                        state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
-                        Dygraph.startZoom(event, dygraph, context);
-                    } else {
-                        //console.log('left mouse button dragging (PAN)');
-
-                        state.setMode('pan');
-                        // NETDATA.globalSelectionSync.delay();
-                        state.tmp.dygraph_highlight_after = null;
-                        Dygraph.startPan(event, dygraph, context);
-                    }
-                }
-            },
-            mousemove: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.mousemove()');
-
-                if (state.tmp.dygraph_highlight_after !== null) {
-                    //console.log('highlight selection...');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    state.tmp.dygraph_user_action = true;
-                    Dygraph.moveZoom(event, dygraph, context);
-                    event.preventDefault();
-                } else if (context.isPanning) {
-                    //console.log('panning...');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    state.tmp.dygraph_user_action = true;
-                    //NETDATA.globalSelectionSync.stop();
-                    //NETDATA.globalSelectionSync.delay();
-                    state.setMode('pan');
-                    context.is2DPan = false;
-                    Dygraph.movePan(event, dygraph, context);
-                } else if (context.isZooming) {
-                    //console.log('zooming...');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    state.tmp.dygraph_user_action = true;
-                    //NETDATA.globalSelectionSync.stop();
-                    //NETDATA.globalSelectionSync.delay();
-                    state.setMode('zoom');
-                    Dygraph.moveZoom(event, dygraph, context);
-                }
-            },
-            mouseup: function(event, dygraph, context) {
-                state.tmp.dygraph_mouse_down = false;
-
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.mouseup()');
-
-                if (state.tmp.dygraph_highlight_after !== null) {
-                    //console.log('done highlight selection');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    if (!(event.offsetX && event.offsetY)){
-                        event.offsetX = event.layerX - event.target.offsetLeft;
-                        event.offsetY = event.layerY - event.target.offsetTop;
-                    }
-
-                    NETDATA.globalChartUnderlay.set(state
-                        , state.tmp.dygraph_highlight_after
-                        , dygraph.toDataXCoord(event.offsetX)
-                        , state.view_after
-                        , state.view_before
-                    );
-
-                    state.tmp.dygraph_highlight_after = null;
-
-                    context.isZooming = false;
-                    dygraph.clearZoomRect_();
-                    dygraph.drawGraph_(false);
-
-                    // refresh all the charts immediately
-                    NETDATA.options.auto_refresher_stop_until = 0;
-                } else if (context.isPanning) {
-                    //console.log('done panning');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    state.tmp.dygraph_user_action = true;
-                    Dygraph.endPan(event, dygraph, context);
-
-                    // refresh all the charts immediately
-                    NETDATA.options.auto_refresher_stop_until = 0;
-                } else if (context.isZooming) {
-                    //console.log('done zomming');
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    state.tmp.dygraph_user_action = true;
-                    Dygraph.endZoom(event, dygraph, context);
-
-                    // refresh all the charts immediately
-                    NETDATA.options.auto_refresher_stop_until = 0;
-                }
-            },
-            click: function(event, dygraph, context) {
-                void(dygraph);
-                void(context);
-
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.click()');
-
-                event.preventDefault();
-            },
-            dblclick: function(event, dygraph, context) {
-                void(event);
-                void(dygraph);
-                void(context);
-
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.dblclick()');
-                NETDATA.resetAllCharts(state);
-            },
-            wheel: function(event, dygraph, context) {
-                void(context);
-
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.wheel()');
-
-                // Take the offset of a mouse event on the dygraph canvas and
-                // convert it to a pair of percentages from the bottom left.
-                // (Not top left, bottom is where the lower value is.)
-                function offsetToPercentage(g, offsetX, offsetY) {
-                    // This is calculating the pixel offset of the leftmost date.
-                    let xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
-                    let yar0 = g.yAxisRange(0);
-
-                    // This is calculating the pixel of the highest value. (Top pixel)
-                    let yOffset = g.toDomCoords(null, yar0[1])[1];
-
-                    // x y w and h are relative to the corner of the drawing area,
-                    // so that the upper corner of the drawing area is (0, 0).
-                    let x = offsetX - xOffset;
-                    let y = offsetY - yOffset;
-
-                    // This is computing the rightmost pixel, effectively defining the
-                    // width.
-                    let w = g.toDomCoords(g.xAxisRange()[1], null)[0] - xOffset;
-
-                    // This is computing the lowest pixel, effectively defining the height.
-                    let h = g.toDomCoords(null, yar0[0])[1] - yOffset;
-
-                    // Percentage from the left.
-                    let xPct = w === 0 ? 0 : (x / w);
-                    // Percentage from the top.
-                    let yPct = h === 0 ? 0 : (y / h);
-
-                    // The (1-) part below changes it from "% distance down from the top"
-                    // to "% distance up from the bottom".
-                    return [xPct, (1-yPct)];
-                }
-
-                // Adjusts [x, y] toward each other by zoomInPercentage%
-                // Split it so the left/bottom axis gets xBias/yBias of that change and
-                // tight/top gets (1-xBias)/(1-yBias) of that change.
-                //
-                // If a bias is missing it splits it down the middle.
-                function zoomRange(g, zoomInPercentage, xBias, yBias) {
-                    xBias = xBias || 0.5;
-                    yBias = yBias || 0.5;
-
-                    function adjustAxis(axis, zoomInPercentage, bias) {
-                        let delta = axis[1] - axis[0];
-                        let increment = delta * zoomInPercentage;
-                        let foo = [increment * bias, increment * (1-bias)];
-
-                        return [ axis[0] + foo[0], axis[1] - foo[1] ];
-                    }
-
-                    let yAxes = g.yAxisRanges();
-                    let newYAxes = [];
-                    for (let i = 0; i < yAxes.length; i++) {
-                        newYAxes[i] = adjustAxis(yAxes[i], zoomInPercentage, yBias);
-                    }
-
-                    return adjustAxis(g.xAxisRange(), zoomInPercentage, xBias);
-                }
-
-                if (event.altKey || event.shiftKey) {
-                    state.tmp.dygraph_user_action = true;
-
-                    NETDATA.globalSelectionSync.stop();
-                    NETDATA.globalSelectionSync.delay();
-
-                    // http://dygraphs.com/gallery/interaction-api.js
-                    let normal_def;
-                    if (typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
-                        // chrome
-                        normal_def = event.wheelDelta / 40;
-                    else
-                        // firefox
-                        normal_def = event.deltaY * -1.2;
-
-                    let normal = (event.detail) ? event.detail * -1 : normal_def;
-                    let percentage = normal / 50;
-
-                    if (!(event.offsetX && event.offsetY)){
-                        event.offsetX = event.layerX - event.target.offsetLeft;
-                        event.offsetY = event.layerY - event.target.offsetTop;
-                    }
-
-                    let percentages = offsetToPercentage(dygraph, event.offsetX, event.offsetY);
-                    let xPct = percentages[0];
-                    let yPct = percentages[1];
-
-                    let new_x_range = zoomRange(dygraph, percentage, xPct, yPct);
-                    let after = new_x_range[0];
-                    let before = new_x_range[1];
-
-                    let first = state.netdata_first + state.data_update_every;
-                    let last = state.netdata_last + state.data_update_every;
-
-                    if (before > last) {
-                        after -= (before - last);
-                        before = last;
-                    }
-                    if (after < first) {
-                        after = first;
-                    }
-
-                    state.setMode('zoom');
-                    state.updateChartPanOrZoom(after, before, function() {
-                        dygraph.updateOptions({ dateWindow: [ after, before ] });
-                    });
-
-                    event.preventDefault();
-                }
-            },
-            touchstart: function(event, dygraph, context) {
-                state.tmp.dygraph_mouse_down = true;
-
-                if (NETDATA.options.debug.dygraph || state.debug) {
-                    state.log('interactionModel.touchstart()');
-                }
-
-                state.tmp.dygraph_user_action = true;
-                state.setMode('zoom');
-                state.pauseChart();
-
-                NETDATA.globalSelectionSync.stop();
-                NETDATA.globalSelectionSync.delay();
-
-                Dygraph.defaultInteractionModel.touchstart(event, dygraph, context);
-
-                // we overwrite the touch directions at the end, to overwrite
-                // the internal default of dygraph
-                context.touchDirections = { x: true, y: false };
-
-                state.dygraph_last_touch_start = Date.now();
-                state.dygraph_last_touch_move = 0;
-
-                if (typeof event.touches[0].pageX === 'number')
-                    state.dygraph_last_touch_page_x = event.touches[0].pageX;
-                else
-                    state.dygraph_last_touch_page_x = 0;
-            },
-            touchmove: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug) 
-                    state.log('interactionModel.touchmove()');
-
-                NETDATA.globalSelectionSync.stop();
-                NETDATA.globalSelectionSync.delay();
-
-                state.tmp.dygraph_user_action = true;
-                Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
-
-                state.dygraph_last_touch_move = Date.now();
-            },
-            touchend: function(event, dygraph, context) {
-                state.tmp.dygraph_mouse_down = false;
-
-                if (NETDATA.options.debug.dygraph || state.debug)
-                    state.log('interactionModel.touchend()');
-
-                NETDATA.globalSelectionSync.stop();
-                NETDATA.globalSelectionSync.delay();
-
-                state.tmp.dygraph_user_action = true;
-                Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
-
-                // if it didn't move, it is a selection
-                if (state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
-                    NETDATA.globalSelectionSync.dont_sync_before = 0;
-                    NETDATA.globalSelectionSync.setMaster(state);
-
-                    // internal api of dygraph
-                    let pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
-                    console.log('pct: ' + pct.toString());
-
-                    let t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
-                    if (NETDATA.dygraphSetSelection(state, t)) {
-                        NETDATA.globalSelectionSync.sync(state, t);
-                    }
-                }
-
-                // if it was double tap within double click time, reset the charts
-                let now = Date.now();
-                if (typeof state.dygraph_last_touch_end !== 'undefined') {
-                    if (state.dygraph_last_touch_move === 0) {
-                        let dt = now - state.dygraph_last_touch_end;
-                        if (dt <= NETDATA.options.current.double_click_speed)
-                            NETDATA.resetAllCharts(state);
-                    }
-                }
-
-                // remember the timestamp of the last touch end
-                state.dygraph_last_touch_end = now;
-
-                // refresh all the charts immediately
-                NETDATA.options.auto_refresher_stop_until = 0;
-            }
-        }
-    };
-
-    if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
-        if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
-            state.tmp.dygraph_options.valueRange[0] = null;
-    }
-
-    if (NETDATA.chartLibraries.dygraph.isSparkline(state)) {
-        state.tmp.dygraph_options.drawGrid = false;
-        state.tmp.dygraph_options.drawAxis = false;
-        state.tmp.dygraph_options.title = undefined;
-        state.tmp.dygraph_options.ylabel = undefined;
-        state.tmp.dygraph_options.yLabelWidth = 0;
-        //state.tmp.dygraph_options.labelsDivWidth = 120;
-        //state.tmp.dygraph_options.labelsDivStyles.width = '120px';
-        state.tmp.dygraph_options.labelsSeparateLines = true;
-        state.tmp.dygraph_options.rightGap = 0;
-        state.tmp.dygraph_options.yRangePad = 1;
-        state.tmp.dygraph_options.axes.x.drawAxis = false;
-        state.tmp.dygraph_options.axes.y.drawAxis = false;
-    }
-
-    if (smooth) {
-        state.tmp.dygraph_smooth_eligible = true;
-
-        if (NETDATA.options.current.smooth_plot)
-            state.tmp.dygraph_options.plotter = smoothPlotter;
-    }
-    else state.tmp.dygraph_smooth_eligible = false;
-
-    if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
-        // pan and zoom on snapshots
-        state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
-        //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
-    }
-
-    state.tmp.dygraph_instance = new Dygraph(state.element_chart,
-        data.result.data, state.tmp.dygraph_options);
-
-    state.tmp.dygraph_force_zoom = false;
-    state.tmp.dygraph_user_action = false;
-    state.tmp.dygraph_last_rendered = Date.now();
-    state.tmp.dygraph_highlight_after = null;
-
-    if (state.tmp.dygraph_options.valueRange[0] === null && state.tmp.dygraph_options.valueRange[1] === null) {
-        if (typeof state.tmp.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
-            state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
-            state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
-        } else {
-            state.log('incompatible version of Dygraph detected');
-            state.tmp.__commonMin = null;
-            state.tmp.__commonMax = null;
-        }
-    } else {
-        // if the user gave a valueRange, respect it
-        state.tmp.__commonMin = null;
-        state.tmp.__commonMax = null;
-    }
-
-    return true;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
 // d3pie
 
 NETDATA.d3pieInitialize = function(callback) {
@@ -7549,668 +8209,6 @@ NETDATA.d3pieChartCreate = function(state, data) {
     };
 
     state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
-    return true;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
-// D3
-
-NETDATA.d3Initialize = function(callback) {
-    if (typeof netdataStopD3 === 'undefined' || !netdataStopD3) {
-        $.ajax({
-            url: NETDATA.d3_js,
-            cache: true,
-            dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
-        })
-        .done(function() {
-            NETDATA.registerChartLibrary('d3', NETDATA.d3_js);
-        })
-        .fail(function() {
-            NETDATA.chartLibraries.d3.enabled = false;
-            NETDATA.error(100, NETDATA.d3_js);
-        })
-        .always(function() {
-            if (typeof callback === "function")
-                return callback();
-        });
-    } else {
-        NETDATA.chartLibraries.d3.enabled = false;
-        if (typeof callback === "function")
-            return callback();
-    }
-};
-
-NETDATA.d3ChartUpdate = function(state, data) {
-    void(state);
-    void(data);
-
-    return false;
-};
-
-NETDATA.d3ChartCreate = function(state, data) {
-    void(state);
-    void(data);
-
-    return false;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
-
-NETDATA.easypiechartPercentFromValueMinMax = function(state, value, min, max) {
-    if (typeof value !== 'number') value = 0;
-    if (typeof min !== 'number') min = 0;
-    if (typeof max !== 'number') max = 0;
-
-    if (min > max) {
-        let t = min;
-        min = max;
-        max = t;
-    }
-
-    if (min > value) min = value;
-    if (max < value) max = value;
-
-    state.legendFormatValueDecimalsFromMinMax(min, max);
-
-    if (state.tmp.easyPieChartMin === null && min > 0) min = 0;
-    if (state.tmp.easyPieChartMax === null && max < 0) max = 0;
-
-    let pcent;
-
-    if (min < 0 && max > 0) {
-        // it is both positive and negative
-        // zero at the top center of the chart
-        max = (-min > max)? -min : max;
-        pcent = Math.round(value * 100 / max);
-    } else if (value >= 0 && min >= 0 && max >= 0) {
-        // clockwise
-        pcent = Math.round((value - min) * 100 / (max - min));
-        if (pcent === 0) pcent = 0.1;
-    } else {
-        // counter clockwise
-        pcent = Math.round((value - max) * 100 / (max - min));
-        if (pcent === 0) pcent = -0.1;
-    }
-
-    return pcent;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
-// easy-pie-chart
-
-NETDATA.easypiechartInitialize = function(callback) {
-    if (typeof netdataNoEasyPieChart === 'undefined' || !netdataNoEasyPieChart) {
-        $.ajax({
-            url: NETDATA.easypiechart_js,
-            cache: true,
-            dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
-        })
-            .done(function() {
-                NETDATA.registerChartLibrary('easypiechart', NETDATA.easypiechart_js);
-            })
-            .fail(function() {
-                NETDATA.chartLibraries.easypiechart.enabled = false;
-                NETDATA.error(100, NETDATA.easypiechart_js);
-            })
-            .always(function() {
-                if (typeof callback === "function")
-                    return callback();
-            })
-    } else {
-        NETDATA.chartLibraries.easypiechart.enabled = false;
-        if (typeof callback === "function")
-            return callback();
-    }
-};
-
-NETDATA.easypiechartClearSelection = function(state, force) {
-    if (typeof state.tmp.easyPieChartEvent !== 'undefined' && typeof state.tmp.easyPieChartEvent.timer !== 'undefined') {
-        NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
-        state.tmp.easyPieChartEvent.timer = undefined;
-    }
-
-    if (state.isAutoRefreshable() && state.data !== null && force !== true) {
-        NETDATA.easypiechartChartUpdate(state, state.data);
-    }
-    else {
-        state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(null);
-        state.tmp.easyPieChart_instance.update(0);
-    }
-    state.tmp.easyPieChart_instance.enableAnimation();
-
-    return true;
-};
-
-NETDATA.easypiechartSetSelection = function(state, t) {
-    if (state.timeIsVisible(t) !== true)
-        return NETDATA.easypiechartClearSelection(state, true);
-
-    let slot = state.calculateRowForTime(t);
-    if (slot < 0 || slot >= state.data.result.length)
-        return NETDATA.easypiechartClearSelection(state, true);
-
-    if (typeof state.tmp.easyPieChartEvent === 'undefined') {
-        state.tmp.easyPieChartEvent = {
-            timer: undefined,
-            value: 0,
-            pcent: 0
-        };
-    }
-
-    let value = state.data.result[state.data.result.length - 1 - slot];
-    let min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
-    let max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
-    let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
-
-    state.tmp.easyPieChartEvent.value = value;
-    state.tmp.easyPieChartEvent.pcent = pcent;
-    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
-
-    if (state.tmp.easyPieChartEvent.timer === undefined) {
-        state.tmp.easyPieChart_instance.disableAnimation();
-
-        state.tmp.easyPieChartEvent.timer = NETDATA.timeout.set(function() {
-            state.tmp.easyPieChartEvent.timer = undefined;
-            state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
-        }, 0);
-    }
-
-    return true;
-};
-
-NETDATA.easypiechartChartUpdate = function(state, data) {
-    let value, min, max, pcent;
-
-    if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
-        value = null;
-        pcent = 0;
-    }
-    else {
-        value = data.result[0];
-        min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
-        max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
-        pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
-    }
-
-    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
-    state.tmp.easyPieChart_instance.update(pcent);
-    return true;
-};
-
-NETDATA.easypiechartChartCreate = function(state, data) {
-    let chart = $(state.element_chart);
-
-    let value = data.result[0];
-    let min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
-    let max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
-
-    if (min === null) {
-        min = NETDATA.commonMin.get(state);
-        state.tmp.easyPieChartMin = null;
-    }
-    else
-        state.tmp.easyPieChartMin = min;
-
-    if (max === null) {
-        max = NETDATA.commonMax.get(state);
-        state.tmp.easyPieChartMax = null;
-    }
-    else
-        state.tmp.easyPieChartMax = max;
-
-    let size = state.chartWidth();
-    let stroke = Math.floor(size / 22);
-    if (stroke < 3) stroke = 2;
-
-    let valuefontsize = Math.floor((size * 2 / 3) / 5);
-    let valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
-    state.tmp.easyPieChartLabel = document.createElement('span');
-    state.tmp.easyPieChartLabel.className = 'easyPieChartLabel';
-    state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
-    state.tmp.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
-    state.tmp.easyPieChartLabel.style.top = valuetop.toString() + 'px';
-    state.element_chart.appendChild(state.tmp.easyPieChartLabel);
-
-    let titlefontsize = Math.round(valuefontsize * 1.6 / 3);
-    let titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
-    state.tmp.easyPieChartTitle = document.createElement('span');
-    state.tmp.easyPieChartTitle.className = 'easyPieChartTitle';
-    state.tmp.easyPieChartTitle.innerText = state.title;
-    state.tmp.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
-    state.tmp.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
-    state.tmp.easyPieChartTitle.style.top = titletop.toString() + 'px';
-    state.element_chart.appendChild(state.tmp.easyPieChartTitle);
-
-    let unitfontsize = Math.round(titlefontsize * 0.9);
-    let unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
-    state.tmp.easyPieChartUnits = document.createElement('span');
-    state.tmp.easyPieChartUnits.className = 'easyPieChartUnits';
-    state.tmp.easyPieChartUnits.innerText = state.units_current;
-    state.tmp.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
-    state.tmp.easyPieChartUnits.style.top = unittop.toString() + 'px';
-    state.element_chart.appendChild(state.tmp.easyPieChartUnits);
-
-    let barColor = NETDATA.dataAttribute(state.element, 'easypiechart-barcolor', undefined);
-    if (typeof barColor === 'undefined' || barColor === null)
-        barColor = state.chartCustomColors()[0];
-    else {
-        // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
-        let tmp = eval(barColor);
-        if (typeof tmp === 'function')
-            barColor = tmp;
-    }
-
-    let pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
-    chart.data('data-percent', pcent);
-
-    chart.easyPieChart({
-        barColor: barColor,
-        trackColor: NETDATA.dataAttribute(state.element, 'easypiechart-trackcolor', NETDATA.themes.current.easypiechart_track),
-        scaleColor: NETDATA.dataAttribute(state.element, 'easypiechart-scalecolor', NETDATA.themes.current.easypiechart_scale),
-        scaleLength: NETDATA.dataAttribute(state.element, 'easypiechart-scalelength', 5),
-        lineCap: NETDATA.dataAttribute(state.element, 'easypiechart-linecap', 'round'),
-        lineWidth: NETDATA.dataAttribute(state.element, 'easypiechart-linewidth', stroke),
-        trackWidth: NETDATA.dataAttribute(state.element, 'easypiechart-trackwidth', undefined),
-        size: NETDATA.dataAttribute(state.element, 'easypiechart-size', size),
-        rotate: NETDATA.dataAttribute(state.element, 'easypiechart-rotate', 0),
-        animate: NETDATA.dataAttribute(state.element, 'easypiechart-animate', {duration: 500, enabled: true}),
-        easing: NETDATA.dataAttribute(state.element, 'easypiechart-easing', undefined)
-    });
-
-    // when we just re-create the chart
-    // do not animate the first update
-    let animate = true;
-    if (typeof state.tmp.easyPieChart_instance !== 'undefined')
-        animate = false;
-
-    state.tmp.easyPieChart_instance = chart.data('easyPieChart');
-    if (animate === false) state.tmp.easyPieChart_instance.disableAnimation();
-    state.tmp.easyPieChart_instance.update(pcent);
-    if (animate === false) state.tmp.easyPieChart_instance.enableAnimation();
-
-    state.legendSetUnitsString = function(units) {
-        if (typeof state.tmp.easyPieChartUnits !== 'undefined' && state.tmp.units !== units) {
-            state.tmp.easyPieChartUnits.innerText = units;
-            state.tmp.units = units;
-        }
-    };
-    state.legendShowUndefined = function() {
-        if (typeof state.tmp.easyPieChart_instance !== 'undefined')
-            NETDATA.easypiechartClearSelection(state);
-    };
-
-    return true;
-};
-
-// ----------------------------------------------------------------------------------------------------------------
-// gauge.js
-
-NETDATA.gaugeInitialize = function(callback) {
-    if (typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
-        $.ajax({
-            url: NETDATA.gauge_js,
-            cache: true,
-            dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
-        })
-            .done(function() {
-                NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
-            })
-            .fail(function() {
-                NETDATA.chartLibraries.gauge.enabled = false;
-                NETDATA.error(100, NETDATA.gauge_js);
-            })
-            .always(function() {
-                if (typeof callback === "function")
-                    return callback();
-            })
-    }
-    else {
-        NETDATA.chartLibraries.gauge.enabled = false;
-        if (typeof callback === "function")
-            return callback();
-    }
-};
-
-NETDATA.gaugeAnimation = function(state, status) {
-    let speed = 32;
-
-    if (typeof status === 'boolean' && status === false)
-        speed = 1000000000;
-    else if (typeof status === 'number')
-        speed = status;
-
-    // console.log('gauge speed ' + speed);
-    state.tmp.gauge_instance.animationSpeed = speed;
-    state.tmp.___gaugeOld__.speed = speed;
-};
-
-NETDATA.gaugeSet = function(state, value, min, max) {
-    if (typeof value !== 'number') value = 0;
-    if (typeof min !== 'number') min = 0;
-    if (typeof max !== 'number') max = 0;
-    if (value > max) max = value;
-    if (value < min) min = value;
-    if (min > max) {
-        let t = min;
-        min = max;
-        max = t;
-    }
-    else if (min === max)
-        max = min + 1;
-
-    state.legendFormatValueDecimalsFromMinMax(min, max);
-
-    // gauge.js has an issue if the needle
-    // is smaller than min or larger than max
-    // when we set the new values
-    // the needle will go crazy
-
-    // to prevent it, we always feed it
-    // with a percentage, so that the needle
-    // is always between min and max
-    let pcent = (value - min) * 100 / (max - min);
-
-    // bug fix for gauge.js 1.3.1
-    // if the value is the absolute min or max, the chart is broken
-    if (pcent < 0.001) pcent = 0.001;
-    if (pcent > 99.999) pcent = 99.999;
-
-    state.tmp.gauge_instance.set(pcent);
-    // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
-
-    state.tmp.___gaugeOld__.value = value;
-    state.tmp.___gaugeOld__.min = min;
-    state.tmp.___gaugeOld__.max = max;
-};
-
-NETDATA.gaugeSetLabels = function(state, value, min, max) {
-    if (state.tmp.___gaugeOld__.valueLabel !== value) {
-        state.tmp.___gaugeOld__.valueLabel = value;
-        state.tmp.gaugeChartLabel.innerText = state.legendFormatValue(value);
-    }
-    if (state.tmp.___gaugeOld__.minLabel !== min) {
-        state.tmp.___gaugeOld__.minLabel = min;
-        state.tmp.gaugeChartMin.innerText = state.legendFormatValue(min);
-    }
-    if (state.tmp.___gaugeOld__.maxLabel !== max) {
-        state.tmp.___gaugeOld__.maxLabel = max;
-        state.tmp.gaugeChartMax.innerText = state.legendFormatValue(max);
-    }
-};
-
-NETDATA.gaugeClearSelection = function(state, force) {
-    if (typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
-        NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
-        state.tmp.gaugeEvent.timer = undefined;
-    }
-
-    if (state.isAutoRefreshable() && state.data !== null && force !== true) {
-        NETDATA.gaugeChartUpdate(state, state.data);
-    } else {
-        NETDATA.gaugeAnimation(state, false);
-        NETDATA.gaugeSetLabels(state, null, null, null);
-        NETDATA.gaugeSet(state, null, null, null);
-    }
-
-    NETDATA.gaugeAnimation(state, true);
-    return true;
-};
-
-NETDATA.gaugeSetSelection = function(state, t) {
-    if (state.timeIsVisible(t) !== true)
-        return NETDATA.gaugeClearSelection(state, true);
-
-    let slot = state.calculateRowForTime(t);
-    if (slot < 0 || slot >= state.data.result.length)
-        return NETDATA.gaugeClearSelection(state, true);
-
-    if (typeof state.tmp.gaugeEvent === 'undefined') {
-        state.tmp.gaugeEvent = {
-            timer: undefined,
-            value: 0,
-            min: 0,
-            max: 0
-        };
-    }
-
-    let value = state.data.result[state.data.result.length - 1 - slot];
-    let min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
-    let max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
-
-    // make sure it is zero based
-    // but only if it has not been set by the user
-    if (state.tmp.gaugeMin === null && min > 0) min = 0;
-    if (state.tmp.gaugeMax === null && max < 0) max = 0;
-
-    state.tmp.gaugeEvent.value = value;
-    state.tmp.gaugeEvent.min = min;
-    state.tmp.gaugeEvent.max = max;
-    NETDATA.gaugeSetLabels(state, value, min, max);
-
-    if (state.tmp.gaugeEvent.timer === undefined) {
-        NETDATA.gaugeAnimation(state, false);
-
-        state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function() {
-            state.tmp.gaugeEvent.timer = undefined;
-            NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
-        }, 0);
-    }
-
-    return true;
-};
-
-NETDATA.gaugeChartUpdate = function(state, data) {
-    let value, min, max;
-
-    if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
-        NETDATA.gaugeSetLabels(state, null, null, null);
-        state.tmp.gauge_instance.set(0);
-    } else {
-        value = data.result[0];
-        min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
-        max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
-        if (value < min) min = value;
-        if (value > max) max = value;
-
-        // make sure it is zero based
-        // but only if it has not been set by the user
-        if (state.tmp.gaugeMin === null && min > 0) min = 0;
-        if (state.tmp.gaugeMax === null && max < 0) max = 0;
-
-        NETDATA.gaugeSet(state, value, min, max);
-        NETDATA.gaugeSetLabels(state, value, min, max);
-    }
-
-    return true;
-};
-
-NETDATA.gaugeChartCreate = function(state, data) {
-    // let chart = $(state.element_chart);
-
-    let value = data.result[0];
-    let min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
-    let max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
-    // let adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
-    let pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
-    let strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
-    let startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
-    let stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
-    let generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
-
-    if (min === null) {
-        min = NETDATA.commonMin.get(state);
-        state.tmp.gaugeMin = null;
-    } else {
-        state.tmp.gaugeMin = min;
-    }
-
-    if (max === null) {
-        max = NETDATA.commonMax.get(state);
-        state.tmp.gaugeMax = null;
-    } else {
-        state.tmp.gaugeMax = max;
-    }
-
-    // make sure it is zero based
-    // but only if it has not been set by the user
-    if (state.tmp.gaugeMin === null && min > 0) min = 0;
-    if (state.tmp.gaugeMax === null && max < 0) max = 0;
-
-    let width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
-    // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
-    //switch(adjust) {
-    //  case 'width': width = height * ratio; break;
-    //  case 'height':
-    //  default: height = width / ratio; break;
-    //}
-    //state.element.style.width = width.toString() + 'px';
-    //state.element.style.height = height.toString() + 'px';
-
-    let lum_d = 0.05;
-
-    let options = {
-        lines: 12,                  // The number of lines to draw
-        angle: 0.14,                // The span of the gauge arc
-        lineWidth: 0.57,            // The line thickness
-        radiusScale: 1.0,           // Relative radius
-        pointer: {
-            length: 0.85,           // 0.9 The radius of the inner circle
-            strokeWidth: 0.045,     // The rotation offset
-            color: pointerColor     // Fill color
-        },
-        limitMax: true,             // If false, the max value of the gauge will be updated if value surpass max
-        limitMin: true,             // If true, the min value of the gauge will be fixed unless you set it manually
-        colorStart: startColor,     // Colors
-        colorStop: stopColor,       // just experiment with them
-        strokeColor: strokeColor,   // to see which ones work best for you
-        generateGradient: (generateGradient === true), // gmosx: 
-        gradientType: 0,
-        highDpiSupport: true        // High resolution support
-    };
-
-    if (generateGradient.constructor === Array) {
-        // example options:
-        // data-gauge-generate-gradient="[0, 50, 100]"
-        // data-gauge-gradient-percent-color-0="#FFFFFF"
-        // data-gauge-gradient-percent-color-50="#999900"
-        // data-gauge-gradient-percent-color-100="#000000"
-
-        options.percentColors = [];
-        let len = generateGradient.length;
-        while (len--) {
-            let pcent = generateGradient[len];
-            let color = NETDATA.dataAttribute(state.element, 'gauge-gradient-percent-color-' + pcent.toString(), false);
-            if (color !== false) {
-                let a = [];
-                a[0] = pcent / 100;
-                a[1] = color;
-                options.percentColors.unshift(a);
-            }
-        }
-        if (options.percentColors.length === 0) {
-            delete options.percentColors;
-        }
-    } else if (generateGradient === false && NETDATA.themes.current.gauge_gradient) {
-        //noinspection PointlessArithmeticExpressionJS
-        options.percentColors = [
-            [0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
-            [0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
-            [0.2, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 2))],
-            [0.3, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 3))],
-            [0.4, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 4))],
-            [0.5, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 5))],
-            [0.6, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 6))],
-            [0.7, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 7))],
-            [0.8, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 8))],
-            [0.9, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 9))],
-            [1.0, NETDATA.colorLuminance(startColor, 0.0)]];
-    }
-
-    state.tmp.gauge_canvas = document.createElement('canvas');
-    state.tmp.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
-    state.tmp.gauge_canvas.className = 'gaugeChart';
-    state.tmp.gauge_canvas.width  = width;
-    state.tmp.gauge_canvas.height = height;
-    state.element_chart.appendChild(state.tmp.gauge_canvas);
-
-    let valuefontsize = Math.floor(height / 5);
-    let valuetop = Math.round((height - valuefontsize) / 3.2);
-    state.tmp.gaugeChartLabel = document.createElement('span');
-    state.tmp.gaugeChartLabel.className = 'gaugeChartLabel';
-    state.tmp.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
-    state.tmp.gaugeChartLabel.style.top = valuetop.toString() + 'px';
-    state.element_chart.appendChild(state.tmp.gaugeChartLabel);
-
-    let titlefontsize = Math.round(valuefontsize / 2.1);
-    let titletop = 0;
-    state.tmp.gaugeChartTitle = document.createElement('span');
-    state.tmp.gaugeChartTitle.className = 'gaugeChartTitle';
-    state.tmp.gaugeChartTitle.innerText = state.title;
-    state.tmp.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
-    state.tmp.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
-    state.tmp.gaugeChartTitle.style.top = titletop.toString() + 'px';
-    state.element_chart.appendChild(state.tmp.gaugeChartTitle);
-
-    let unitfontsize = Math.round(titlefontsize * 0.9);
-    state.tmp.gaugeChartUnits = document.createElement('span');
-    state.tmp.gaugeChartUnits.className = 'gaugeChartUnits';
-    state.tmp.gaugeChartUnits.innerText = state.units_current;
-    state.tmp.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
-    state.element_chart.appendChild(state.tmp.gaugeChartUnits);
-
-    state.tmp.gaugeChartMin = document.createElement('span');
-    state.tmp.gaugeChartMin.className = 'gaugeChartMin';
-    state.tmp.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
-    state.element_chart.appendChild(state.tmp.gaugeChartMin);
-
-    state.tmp.gaugeChartMax = document.createElement('span');
-    state.tmp.gaugeChartMax.className = 'gaugeChartMax';
-    state.tmp.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
-    state.element_chart.appendChild(state.tmp.gaugeChartMax);
-
-    // when we just re-create the chart
-    // do not animate the first update
-    let animate = true;
-    if (typeof state.tmp.gauge_instance !== 'undefined')
-        animate = false;
-
-    state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
-
-    state.tmp.___gaugeOld__ = {
-        value: value,
-        min: min,
-        max: max,
-        valueLabel: null,
-        minLabel: null,
-        maxLabel: null
-    };
-
-    // we will always feed a percentage
-    state.tmp.gauge_instance.minValue = 0;
-    state.tmp.gauge_instance.maxValue = 100;
-
-    NETDATA.gaugeAnimation(state, animate);
-    NETDATA.gaugeSet(state, value, min, max);
-    NETDATA.gaugeSetLabels(state, value, min, max);
-    NETDATA.gaugeAnimation(state, true);
-
-    state.legendSetUnitsString = function(units) {
-        if (typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
-            state.tmp.gaugeChartUnits.innerText = units;
-            state.tmp.___gaugeOld__.valueLabel = null;
-            state.tmp.___gaugeOld__.minLabel = null;
-            state.tmp.___gaugeOld__.maxLabel = null;
-            state.tmp.units = units;
-        }
-    };
-    state.legendShowUndefined = function() {
-        if (typeof state.tmp.gauge_instance !== 'undefined')
-            NETDATA.gaugeClearSelection(state);
-    };
-
     return true;
 };
 

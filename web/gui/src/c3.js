@@ -1,5 +1,7 @@
 
-// C3
+// DEPRECATED: will be removed!
+
+// c3
 
 NETDATA.c3Initialize = function(callback) {
     if (typeof netdataNoC3 === 'undefined' || !netdataNoC3) {

@@ -1,4 +1,6 @@
 
+// DEPRECATED: will be removed!
+
 // morris
 
 NETDATA.morrisInitialize = function(callback) {
