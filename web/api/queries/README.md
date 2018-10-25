@@ -100,18 +100,20 @@ For each value it calls the **grouping method** given with the `&group=` query p
 The following grouping methods are supported. These are given all the values in the time-frame
 and they group the values every `group points`.
 
-Name|Identifier(s)|Description|Live Example
-:---:|:---:|:---:|:---
-Min|`min`|finds the minimum value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=min&after=-60&label=min)
-Max|`max`|finds the maximum value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=max&after=-60&label=max)
-Average|`average`, `mean`|finds the average value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=average&after=-60&label=average)
-Sum|`sum`|adds all the values and returns the sum|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=sum&after=-60&label=1m+sum&units=requests)
-Median|`median`|sorts the values and returns the value in the middle of the list|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=median&after=-60&label=median)
-Standard Deviation|`stddev`|finds the standard deviation of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=stddev&after=-60&label=stddev)
-Coefficient of Variation|`cv`, `rds`|finds the relative standard deviation of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=cv&after=-60&label=cv&units=pcent)
-Single Exponential Smoothing|`ses`, `ema`, `ewma`|finds the exponential weighted moving average of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=ses&after=-60&label=ses)
-Double Exponential Smoothing|`des`|applies Holt-Winters double exponential smoothing|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=des&after=-60&label=des)
-Incremental Sum|`incremental_sum`, `incremental-sum`|find the difference of the last vs the first values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=incremental_sum&after=-60&label=inc.+sum)
+Identifier(s)|Description|Live 1-minute Example
+:---:|:---:|:--------
+`min`|finds the minimum value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=min&after=-60&label=min)
+`max`|finds the maximum value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=max&after=-60&label=max)
+`average`, `mean`|finds the average value|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=average&after=-60&label=average)
+`sum`|adds all the values and returns the sum|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=sum&after=-60&label=1m+sum&units=requests)
+`median`|sorts the values and returns the value in the middle of the list|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=median&after=-60&label=median)
+`stddev`|finds the standard deviation of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=stddev&after=-60&label=stddev)
+`cv`, `rds`|finds the relative standard deviation of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=cv&after=-60&label=cv&units=pcent)
+`ses`, `ema`, `ewma`|finds the exponential weighted moving average of the values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=ses&after=-60&label=ses)
+`des`|applies Holt-Winters double exponential smoothing|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=des&after=-60&label=des)
+`incremental_sum`,<br/>`incremental-sum`|find the difference of the last vs the first values|![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=incremental_sum&after=-60&label=inc.+sum)
+
+The examples shown above, are live information from the `successful` web requests of the global netdata registry.
 
 ## Further processing
 
