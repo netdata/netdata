@@ -134,7 +134,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         // check if the mount point is a directory #2407
         // but only when it is enabled by default #4491
-        if(def_space != CONFIG_BOOLEAN_YES || def_inodes != CONFIG_BOOLEAN_YES) {
+        if(def_space != CONFIG_BOOLEAN_NO || def_inodes != CONFIG_BOOLEAN_NO) {
             struct stat bs;
             if(stat(mi->mount_point, &bs) == -1) {
                 error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
