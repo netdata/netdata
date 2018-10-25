@@ -6,12 +6,12 @@ cat src/prologue.js.inc \
     src/xss.js \
     src/colors.js \
     src/units-conversion.js \
-    src/dygraph.js \
-    src/sparkline.js \
-    src/google-charts.js \
-    src/gauge.js \
-    src/easy-pie-chart.js \
-    src/d3.js \
+    src/charting/dygraph.js \
+    src/charting/sparkline.js \
+    src/charting/google-charts.js \
+    src/charting/gauge.js \
+    src/charting/easy-pie-chart.js \
+    src/charting/d3.js \
     src/main.js \
     src/epilogue.js.inc \
     > dashboard.js
