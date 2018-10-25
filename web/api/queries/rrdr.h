@@ -85,6 +85,9 @@ typedef struct rrdresult {
         #ifdef NETDATA_INTERNAL_CHECKS
         const char *log;
         #endif
+
+        size_t db_points_read;
+        size_t result_points_generated;
     } internal;
 } RRDR;
 
