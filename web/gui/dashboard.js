@@ -130,7 +130,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         object: function(name, obj, ignore_regex) {
-            if (typeof ignore_regex !== 'undefined' && ignore_regex.test(name) === true) {
+            if (typeof ignore_regex !== 'undefined' && ignore_regex.test(name)) {
                 // console.log('XSS: ignoring "' + name + '"');
                 return obj;
             }
@@ -529,11 +529,11 @@ const NETDATA = window.NETDATA || {};
 
             update_only_visible: true,  // enable or disable visibility management / used for printing
 
-            parallel_refresher: (isSlowDevice() === false), // enable parallel refresh of charts
+            parallel_refresher: !isSlowDevice(), // enable parallel refresh of charts
 
             concurrent_refreshes: true, // when parallel_refresher is enabled, sync also the charts
 
-            destroy_on_hide: (isSlowDevice() === true), // destroy charts when they are not visible
+            destroy_on_hide: isSlowDevice(), // destroy charts when they are not visible
 
             show_help: netdataShowHelp, // when enabled the charts will show some help
             show_help_delay_show_ms: 500,
@@ -546,7 +546,7 @@ const NETDATA = window.NETDATA || {};
 
             double_click_speed: 500,    // ms - time between clicks / taps to detect double click/tap
 
-            smooth_plot: (isSlowDevice() === false), // enable smooth plot, where possible
+            smooth_plot: !isSlowDevice(), // enable smooth plot, where possible
 
             color_fill_opacity_line: 1.0,
             color_fill_opacity_area: 0.2,
@@ -769,7 +769,7 @@ const NETDATA = window.NETDATA || {};
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if (NETDATA.localStorageTest() === true) {
+        if (NETDATA.localStorageTest()) {
             // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
             try {
                 localStorage.setItem(key.toString(), JSON.stringify(value));
@@ -892,13 +892,13 @@ const NETDATA = window.NETDATA || {};
 
         NETDATA.options.on_scroll_refresher_stop_until =
             NETDATA.options.last_page_scroll
-            + ((NETDATA.options.current.async_on_scroll === true) ? 1000 : 0);
+            + (NETDATA.options.current.async_on_scroll ? 1000 : 0);
     };
 
     NETDATA.onscroll_end_delay = function() {
         NETDATA.options.on_scroll_refresher_stop_until =
             Date.now()
-            + ((NETDATA.options.current.async_on_scroll === true) ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
+            + (NETDATA.options.current.async_on_scroll ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
     };
 
     NETDATA.onscroll_updater_timeout_id = undefined;
@@ -1252,7 +1252,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.dataAttributeBoolean = function(element, attribute, def) {
         let value = NETDATA.dataAttribute(element, attribute, def);
 
-        if (value === true || value === false)
+        if (value === true || value === false) // gmosx: Love this :)
             return value;
 
         if (typeof(value) === 'string') {
@@ -2528,7 +2528,8 @@ const NETDATA = window.NETDATA || {};
         enabled: function() {
             // console.log('enabled()');
             // can we globally apply selection sync?
-            if (NETDATA.options.current.sync_selection === false) {
+            // if (NETDATA.options.current.sync_selection === false) {
+            if (!NETDATA.options.current.sync_selection) {
                 return false;
             }
 
@@ -2537,7 +2538,8 @@ const NETDATA = window.NETDATA || {};
 
         // set the global selection sync master
         setMaster: function(state) {
-            if (this.enabled() === false) {
+            // if (this.enabled() === false) {
+            if (!this.enabled()) {
                 this.stop();
                 return;
             }
@@ -2549,8 +2551,9 @@ const NETDATA = window.NETDATA || {};
                 this.stop();
             }
 
-            if (NETDATA.options.debug.globalSelectionSync === true)
+            if (NETDATA.options.debug.globalSelectionSync) {
                 console.log('globalSelectionSync.setMaster(' + state.id + ')');
+            }
 
             state.selected = true;
             this.state = state;
@@ -2562,7 +2565,7 @@ const NETDATA = window.NETDATA || {};
             let len = targets.length;
             while (len--) {
                 let st = targets[len];
-                if (this.state !== st && st.globalSelectionSyncIsEligible() === true)
+                if (this.state !== st && st.globalSelectionSyncIsEligible())
                     this.slaves.push(st);
             }
 
@@ -2572,7 +2575,7 @@ const NETDATA = window.NETDATA || {};
         // stop global selection sync
         stop: function() {
             if (this.state !== null) {
-                if (NETDATA.options.debug.globalSelectionSync === true) {
+                if (NETDATA.options.debug.globalSelectionSync) {
                     console.log('globalSelectionSync.stop()');
                 }
 
@@ -2591,7 +2594,7 @@ const NETDATA = window.NETDATA || {};
 
         // delay global selection sync for some time
         delay: function(ms) {
-            if (NETDATA.options.current.sync_selection === true) {
+            if (NETDATA.options.current.sync_selection) {
                 // if (NETDATA.options.debug.globalSelectionSync === true) {
                 if (NETDATA.options.debug.globalSelectionSync) {
                     console.log('globalSelectionSync.delay()');
@@ -2673,7 +2676,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         targets: function() {
-            if (this.enabled() === true && this.visible_targets.length > 0)
+            if (this.enabled() && this.visible_targets.length > 0)
                 return this.visible_targets;
             else
                 return NETDATA.options.targets;
@@ -2700,7 +2703,7 @@ const NETDATA = window.NETDATA || {};
                 if (entry.intersectionRatio > 0) {
                     idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
                     if (idx === -1) {
-                        if (NETDATA.scrollUp === true)
+                        if (NETDATA.scrollUp)
                             NETDATA.intersectionObserver.visible_targets.push(state);
                         else
                             NETDATA.intersectionObserver.visible_targets.unshift(state);
@@ -2729,7 +2732,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         observe: function(state) {
-            if (this.enabled() === true) {
+            if (this.enabled()) {
                 state.__visibilityRatioOld = 0;
                 state.__visibilityRatio = 0;
                 this.observer.observe(state.element);
@@ -2746,7 +2749,7 @@ const NETDATA = window.NETDATA || {};
         },
 
         init: function() {
-            if (typeof netdataIntersectionObserver === 'undefined' || netdataIntersectionObserver === true) {
+            if (typeof netdataIntersectionObserver === 'undefined' || netdataIntersectionObserver) {
                 try {
                     this.observer = new IntersectionObserver(this.handler, this.options);
                 } catch (e) {
@@ -3235,8 +3238,8 @@ const NETDATA = window.NETDATA || {};
             // if (isHidden() === true) return;
             if (isHidden()) return;
 
-            if (this.chart_created === true) {
-                if (NETDATA.options.current.show_help === true) {
+            if (this.chart_created) {
+                if (NETDATA.options.current.show_help) {
                     if (this.element_legend_childs.toolbox !== null) {
                         if (this.debug) this.log('hideChart(): hidding legend popovers');
 
@@ -3310,7 +3313,7 @@ const NETDATA = window.NETDATA || {};
                 hideMessage();
             }
 
-            if (this.__redraw_on_unhide === true) {
+            if (this.__redraw_on_unhide) {
                 if (this.debug) this.log("redrawing chart on unhide");
 
                 this.__redraw_on_unhide = undefined;
@@ -3327,11 +3330,11 @@ const NETDATA = window.NETDATA || {};
 
             let ret = (
                 (
-                    NETDATA.options.page_is_visible === true ||
+                    NETDATA.options.page_is_visible ||
                     NETDATA.options.current.stop_updates_when_focus_is_lost === false ||
                     that.updates_since_last_unhide === 0
                 )
-                && isHidden() === false && that.isVisible(uncached_visibility) === true
+                && isHidden() === false && that.isVisible(uncached_visibility)
             );
 
             if (that.debug) that.log('canBeRendered(): ' + ret);
@@ -3654,16 +3657,18 @@ const NETDATA = window.NETDATA || {};
         // can the chart participate to the global selection sync as a slave?
         this.globalSelectionSyncIsEligible = function() {
             return (
-                this.enabled === true && 
+                this.enabled && 
                 this.library !== null && 
                 typeof this.library.setSelection === 'function' && 
-                this.isVisible() === true && 
-                this.chart_created === true);
+                this.isVisible() && 
+                this.chart_created
+            );
         };
 
         this.setSelection = function(t) {
             if (typeof this.library.setSelection === 'function') {
-                this.selected = (this.library.setSelection(this, t) === true);
+                // this.selected = this.library.setSelection(this, t) === true;
+                this.selected = this.library.setSelection(this, t);
             } else {
                 this.selected = true;
             }
@@ -3720,7 +3725,7 @@ const NETDATA = window.NETDATA || {};
         };
 
         this.unpauseChart = function() {
-            if (this.paused === true) {
+            if (this.paused) {
                 if (this.debug) this.log('unpauseChart()');
 
                 this.paused = false;
@@ -3736,7 +3741,7 @@ const NETDATA = window.NETDATA || {};
             if (typeof dont_update === 'undefined')
                 dont_update = false;
 
-            if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this) === true) {
+            if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this)) {
                 if (this.debug) this.log('resetChart() diverting to clearMaster().');
                 // this will call us back with master === true
                 NETDATA.globalPanAndZoom.clearMaster();
@@ -3762,7 +3767,7 @@ const NETDATA = window.NETDATA || {};
             // of a selection sync and another chart becomes
             // the new master
 
-            if (dont_update !== true && this.isVisible() === true) {
+            if (dont_update !== true && this.isVisible()) {
                 this.updateChart();
             }
         };
@@ -3822,7 +3827,7 @@ const NETDATA = window.NETDATA || {};
             let tolerance = this.data_update_every * 2;
             let movement = Math.abs(before - this.view_before);
 
-            if (Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance && ret === true) {
+            if (Math.abs(current_duration - wanted_duration) <= tolerance && movement <= tolerance && ret) {
                 if (this.debug) this.log(logme + 'REJECTING UPDATE: current/min duration: ' + (current_duration / 1000).toString() + '/' + (this.fixed_min_duration / 1000).toString() + ', wanted duration: ' + (wanted_duration / 1000).toString() + ', duration diff: ' + (Math.round(Math.abs(current_duration - wanted_duration) / 1000)).toString() + ', movement: ' + (movement / 1000).toString() + ', tolerance: ' + (tolerance / 1000).toString() + ', returning: ' + false);
                 return false;
             }
@@ -4260,7 +4265,7 @@ const NETDATA = window.NETDATA || {};
             if (this.colors === null) {
                 // this is the first time we update the chart
                 // let's assign colors to all dimensions
-                if (this.library.track_colors() === true) {
+                if (this.library.track_colors()) {
                     this.colors = [];
                     keys = Object.keys(this.chart.dimensions);
                     len = keys.length;
@@ -4362,7 +4367,7 @@ const NETDATA = window.NETDATA || {};
                     series: {}
                 };
 
-                if (NETDATA.options.current.legend_toolbox === true && this.library.toolboxPanAndZoom !== null) {
+                if (NETDATA.options.current.legend_toolbox && this.library.toolboxPanAndZoom !== null) {
                     this.element_legend_childs.toolbox = document.createElement('div');
                     this.element_legend_childs.toolbox_left = document.createElement('div');
                     this.element_legend_childs.toolbox_right = document.createElement('div');
@@ -4400,7 +4405,7 @@ const NETDATA = window.NETDATA || {};
                         if (after >= that.netdata_first)
                             that.library.toolboxPanAndZoom(that, after, before);
                     };
-                    if (NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help)
                         $(this.element_legend_childs.toolbox_left).popover({
                         container: "body",
                         animation: false,
@@ -4420,7 +4425,7 @@ const NETDATA = window.NETDATA || {};
                         e.preventDefault();
                         NETDATA.resetAllCharts(that);
                     };
-                    if (NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help)
                         $(this.element_legend_childs.toolbox_reset).popover({
                         container: "body",
                         animation: false,
@@ -4517,7 +4522,7 @@ const NETDATA = window.NETDATA || {};
                     this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
                     this.element_legend_childs.resize_handler.innerHTML = NETDATA.icons.resize;
                     this.element.appendChild(this.element_legend_childs.resize_handler);
-                    if (NETDATA.options.current.show_help === true)
+                    if (NETDATA.options.current.show_help) {
                         $(this.element_legend_childs.resize_handler).popover({
                             container: "body",
                             animation: false,
@@ -4531,6 +4536,7 @@ const NETDATA = window.NETDATA || {};
                             title: 'Chart Resize',
                             content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
                         });
+                    }
 
                     // mousedown event
                     this.element_legend_childs.resize_handler.onmousedown =
@@ -4700,7 +4706,7 @@ const NETDATA = window.NETDATA || {};
 
         this.needsRecreation = function() {
             let ret = (
-                    this.chart_created === true && 
+                    this.chart_created && 
                     this.library && 
                     this.library.autoresize() === false && 
                     this.tm.last_resized < NETDATA.options.last_page_resize
@@ -4728,8 +4734,9 @@ const NETDATA = window.NETDATA || {};
 
             ret += '%7C' + 'jsonwrap';
 
-            if (NETDATA.options.current.eliminate_zero_dimensions === true)
+            if (NETDATA.options.current.eliminate_zero_dimensions) {
                 ret += '%7C' + 'nonzero';
+            }
 
             return ret;
         };
@@ -4745,7 +4752,7 @@ const NETDATA = window.NETDATA || {};
                     this.view_after = after * 1000;
                     this.view_before = before * 1000;
 
-                    if (NETDATA.options.current.pan_and_zoom_data_padding === true) {
+                    if (NETDATA.options.current.pan_and_zoom_data_padding) {
                         this.requested_padding = Math.round((before - after) / 2);
                         after -= this.requested_padding;
                         before += this.requested_padding;
@@ -4807,18 +4814,19 @@ const NETDATA = window.NETDATA || {};
             if (this.dimensions)
                 this.data_url += "&dimensions=" + this.dimensions;
 
-            if (NETDATA.options.debug.chart_data_url === true || this.debug)
+            if (NETDATA.options.debug.chart_data_url || this.debug) {
                 this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
+            }
         };
 
         this.redrawChart = function() {
-            if (this.data !== null)
+            if (this.data !== null) {
                 this.updateChartWithData(this.data);
+            }
         };
 
         this.updateChartWithData = function(data) {
-            if (this.debug)
-                this.log('updateChartWithData() called.');
+            if (this.debug) this.log('updateChartWithData() called.');
 
             // this may force the chart to be re-created
             resizeChart();
@@ -4827,7 +4835,6 @@ const NETDATA = window.NETDATA || {};
 
             let started = Date.now();
             let view_update_every = data.view_update_every * 1000;
-
 
             if (this.data_update_every !== view_update_every) {
                 if (this.element_legend_childs.title_time) {
@@ -4845,7 +4852,7 @@ const NETDATA = window.NETDATA || {};
 
             data.state = this;
 
-            if (NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
+            if (NETDATA.options.current.pan_and_zoom_data_padding && this.requested_padding !== null) {
                 if (this.view_after < this.data_after) {
                     // console.log('adjusting view_after from ' + this.view_after + ' to ' + this.data_after);
                     this.view_after = this.data_after;
@@ -5051,7 +5058,7 @@ const NETDATA = window.NETDATA || {};
             }
 
             if (this.library.initialized === false) {
-                if (this.library.enabled === true) {
+                if (this.library.enabled) {
                     if (this.debug)
                         this.log('updateChart(): initializing chart library');
 
@@ -5186,16 +5193,15 @@ const NETDATA = window.NETDATA || {};
 
             // caching - we do not evaluate the charts visibility
             // if the page has not been scrolled since the last check
-            if ((typeof nocache !== 'undefined' && nocache === true)
+            if ((typeof nocache !== 'undefined' && nocache)
                 || typeof this.tmp.___isVisible___ === 'undefined'
                 || this.tm.last_visible_check <= NETDATA.options.last_page_scroll) {
                 this.tmp.___isVisible___ = __isVisible();
-                if (this.tmp.___isVisible___ === true) this.unhideChart();
+                if (this.tmp.___isVisible___) this.unhideChart();
                 else this.hideChart();
             }
 
-            if (this.debug)
-                this.log('isVisible(' + nocache + '): ' + this.tmp.___isVisible___);
+            if (this.debug) this.log('isVisible(' + nocache + '): ' + this.tmp.___isVisible___);
 
             return this.tmp.___isVisible___;
         };
@@ -5212,23 +5218,22 @@ const NETDATA = window.NETDATA || {};
                 return false;
             }
 
-            if (this.running === true) {
-                if (this.debug)
-                    this.log('canBeAutoRefreshed() -> already running');
+            if (this.running) {
+                if (this.debug) this.log('canBeAutoRefreshed() -> already running');
 
                 return false;
             }
 
             if (this.library === null || this.library.enabled === false) {
                 error('charting library "' + this.library_name + '" is not available');
-                if (this.debug)
-                    this.log('canBeAutoRefreshed() -> chart library ' + this.library_name + ' is not available');
+                if (this.debug) this.log('canBeAutoRefreshed() -> chart library ' + this.library_name + ' is not available');
 
                 return false;
             }
 
-            if (this.isVisible() === false) {
-                if (NETDATA.options.debug.visibility === true || this.debug)
+            // if (this.isVisible() === false) {
+            if (!this.isVisible()) {
+                if (NETDATA.options.debug.visibility || this.debug)
                     this.log('canBeAutoRefreshed() -> not visible');
 
                 return false;
@@ -5253,13 +5258,13 @@ const NETDATA = window.NETDATA || {};
 
             // allow the first update, even if the page is not visible
             if (NETDATA.options.page_is_visible === false && this.updates_counter && this.updates_since_last_unhide) {
-                if (NETDATA.options.debug.focus === true || this.debug)
+                if (NETDATA.options.debug.focus || this.debug)
                     this.log('canBeAutoRefreshed() -> not the first update, and page does not have focus');
 
                 return false;
             }
 
-            if (this.needsRecreation() === true) {
+            if (this.needsRecreation()) {
                 if (this.debug)
                     this.log('canBeAutoRefreshed() -> needs re-creation.');
 
@@ -5289,16 +5294,14 @@ const NETDATA = window.NETDATA || {};
                 }
             }
 
-            if (this.selected === true) {
-                if (this.debug)
-                    this.log('canBeAutoRefreshed(): I have a selection in place.');
+            if (this.selected) {
+                if (this.debug) this.log('canBeAutoRefreshed(): I have a selection in place.');
 
                 return false;
             }
 
-            if (this.paused === true) {
-                if (this.debug)
-                    this.log('canBeAutoRefreshed(): I am paused.');
+            if (this.paused) {
+                if (this.debug) this.log('canBeAutoRefreshed(): I am paused.');
 
                 return false;
             }
@@ -5320,8 +5323,7 @@ const NETDATA = window.NETDATA || {};
         this.autoRefresh = function(callback) {
             let state = that;
 
-            if (state.canBeAutoRefreshed() === true && state.running === false) {
-
+            if (state.canBeAutoRefreshed() && state.running === false) {
                 state.running = true;
                 state.updateChart(function() {
                     state.running = false;
@@ -5424,7 +5426,7 @@ const NETDATA = window.NETDATA || {};
         // if we were not the master, reset our status too
         // this is required because most probably the mouse
         // is over this chart, blocking it from auto-refreshing
-        if (master === false && (state.paused === true || state.selected === true))
+        if (master === false && (state.paused || state.selected))
             state.resetChart();
     };
 
@@ -5447,7 +5449,7 @@ const NETDATA = window.NETDATA || {};
     // This is used to load jquery - after it is loaded, we use jquery
     NETDATA._loadjQuery = function(callback) {
         if (typeof jQuery === 'undefined') {
-            if (NETDATA.options.debug.main_loop === true)
+            if (NETDATA.options.debug.main_loop)
                 console.log('loading ' + NETDATA.jQuery);
 
             let script = document.createElement('script');
@@ -5548,10 +5550,11 @@ const NETDATA = window.NETDATA || {};
 
     NETDATA.pause = function(callback) {
         if (typeof callback === 'function') {
-            if (NETDATA.options.pause === true)
+            if (NETDATA.options.pause) {
                 return callback();
-            else
+            } else {
                 NETDATA.options.pauseCallback = callback;
+            }
         }
     };
 
@@ -5577,9 +5580,9 @@ const NETDATA = window.NETDATA || {};
             and: 'and'
         };
 
-        if (typeof options !== 'object')
+        if (typeof options !== 'object') {
             options = default_options;
-        else {
+        } else {
             let x;
             for (x in default_options) {
                 if (typeof options[x] !== 'string')
@@ -5636,17 +5639,17 @@ const NETDATA = window.NETDATA || {};
     NETDATA.chartRefresherNoParallel = function(index, callback) {
         let targets = NETDATA.intersectionObserver.targets();
 
-        if (NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop)
             console.log('NETDATA.chartRefresherNoParallel(' + index + ')');
 
-        if (NETDATA.options.updated_dom === true) {
+        if (NETDATA.options.updated_dom) {
             // the dom has been updated
             // get the dom parts again
             NETDATA.parseDom(callback);
             return;
         }
         if (index >= targets.length) {
-            if (NETDATA.options.debug.main_loop === true)
+            if (NETDATA.options.debug.main_loop)
                 console.log('waiting to restart main loop...');
 
             NETDATA.options.auto_refresher_fast_weight = 0;
@@ -5655,19 +5658,20 @@ const NETDATA = window.NETDATA || {};
             let state = targets[index];
 
             if (NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
-                if (NETDATA.options.debug.main_loop === true)
+                if (NETDATA.options.debug.main_loop)
                     console.log('fast rendering...');
 
-                if (state.isVisible() === true)
+                if (state.isVisible()) {
                     NETDATA.timeout.set(function() {
                         state.autoRefresh(function () {
                             NETDATA.chartRefresherNoParallel(++index, callback);
                         });
                     }, 0);
-                else
+                } else {
                     NETDATA.chartRefresherNoParallel(++index, callback);
+                }
             } else {
-                if (NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
+                if (NETDATA.options.debug.main_loop) console.log('waiting for next refresh...');
                 NETDATA.options.auto_refresher_fast_weight = 0;
 
                 NETDATA.timeout.set(function() {
@@ -5689,7 +5693,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.chartRefresherTimeoutId = undefined;
 
     NETDATA.chartRefresherReschedule = function() {
-        if (NETDATA.options.current.async_on_scroll === true) {
+        if (NETDATA.options.current.async_on_scroll) {
             if (NETDATA.chartRefresherTimeoutId)
                 NETDATA.timeout.clear(NETDATA.chartRefresherTimeoutId);
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(NETDATA.chartRefresher, NETDATA.options.current.onscroll_worker_duration_threshold);
@@ -5701,7 +5705,7 @@ const NETDATA = window.NETDATA || {};
         // console.log('chartRefresher() begin ' + (Date.now() - NETDATA.chartRefresherLastRun).toString() + ' ms since last run');
 
         if (NETDATA.options.page_is_visible === false
-            && NETDATA.options.current.stop_updates_when_focus_is_lost === true
+            && NETDATA.options.current.stop_updates_when_focus_is_lost
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_resize
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_scroll
             && NETDATA.chartRefresherRunsAfterParseDom > 10
@@ -5719,7 +5723,7 @@ const NETDATA = window.NETDATA || {};
         let now = Date.now();
         NETDATA.chartRefresherLastRun = now;
 
-        if ( now < NETDATA.options.on_scroll_refresher_stop_until ) {
+        if (now < NETDATA.options.on_scroll_refresher_stop_until) {
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
                 NETDATA.chartRefresherWaitTime()
@@ -5739,7 +5743,7 @@ const NETDATA = window.NETDATA || {};
             return;
         }
 
-        if (NETDATA.options.pause === true) {
+        if (NETDATA.options.pause) {
             // console.log('auto-refresher is paused');
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
@@ -5773,7 +5777,7 @@ const NETDATA = window.NETDATA || {};
             return;
         }
 
-        if (NETDATA.options.updated_dom === true) {
+        if (NETDATA.options.updated_dom) {
             // the dom has been updated
             // get the dom parts again
             // console.log('auto-refresher is calling parseDom()');
@@ -5789,11 +5793,11 @@ const NETDATA = window.NETDATA || {};
             let state;
             while (len--) {
                 state = targets[len];
-                if (state.running === true || state.isVisible() === false)
+                if (state.running || state.isVisible() === false)
                     continue;
 
                 if (state.library.initialized === false) {
-                    if (state.library.enabled === true) {
+                    if (state.library.enabled) {
                         state.library.initialize(NETDATA.chartRefresher);
                         //console.log('chartRefresher() end6 (library init)');
                         return;
@@ -5803,7 +5807,7 @@ const NETDATA = window.NETDATA || {};
                     }
                 }
 
-                if (NETDATA.scrollUp === true)
+                if (NETDATA.scrollUp)
                     parallel.unshift(state);
                 else
                     parallel.push(state);
@@ -5841,7 +5845,7 @@ const NETDATA = window.NETDATA || {};
 
         let targets = $('div[data-netdata]'); //.filter(':visible');
 
-        if (NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop)
             console.log('DOM updated - there are ' + targets.length + ' charts on page.');
 
         NETDATA.intersectionObserver.globalReset();
@@ -5855,7 +5859,7 @@ const NETDATA = window.NETDATA || {};
             NETDATA.intersectionObserver.observe(state);
         }
 
-        if (NETDATA.globalChartUnderlay.isActive() === true)
+        if (NETDATA.globalChartUnderlay.isActive())
             NETDATA.globalChartUnderlay.setup();
         else
             NETDATA.globalChartUnderlay.clear();
@@ -5869,7 +5873,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.start = function() {
         // this should be called only once
 
-        if (NETDATA.started === true) {
+        if (NETDATA.started) {
             console.log('netdata is already started');
             return;
         }
@@ -5878,26 +5882,27 @@ const NETDATA = window.NETDATA || {};
         NETDATA.options.page_is_visible = true;
 
         $(window).blur(function() {
-            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost) {
                 NETDATA.options.page_is_visible = false;
-                if (NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus)
                     console.log('Lost Focus!');
             }
         });
 
         $(window).focus(function() {
-            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost) {
                 NETDATA.options.page_is_visible = true;
-                if (NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus)
                     console.log('Focus restored!');
             }
         });
 
         if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
-            if (NETDATA.options.current.stop_updates_when_focus_is_lost === true) {
+            if (NETDATA.options.current.stop_updates_when_focus_is_lost) {
                 NETDATA.options.page_is_visible = false;
-                if (NETDATA.options.debug.focus === true)
+                if (NETDATA.options.debug.focus) {
                     console.log('Document has no focus!');
+                }
             }
         }
 
@@ -6228,10 +6233,11 @@ const NETDATA = window.NETDATA || {};
                 NETDATA.error(100, NETDATA.dygraph_js);
             })
             .always(function() {
-                if (NETDATA.chartLibraries.dygraph.enabled === true && NETDATA.options.current.smooth_plot === true)
+                if (NETDATA.chartLibraries.dygraph.enabled && NETDATA.options.current.smooth_plot) {
                     NETDATA.dygraphSmoothInitialize(callback);
-                else if (typeof callback === "function")
+                } else if (typeof callback === "function") {
                     return callback();
+                }
             });
         } else {
             NETDATA.chartLibraries.dygraph.enabled = false;
@@ -6264,7 +6270,7 @@ const NETDATA = window.NETDATA || {};
         };
 
         if (state.tmp.dygraph_chart_type === 'stacked') {
-            if (options.includeZero === true && state.dimensions_visibility.countSelected() < options.visibility.length)
+            if (options.includeZero && state.dimensions_visibility.countSelected() < options.visibility.length)
                 options.includeZero = 0;
         }
 
@@ -6272,18 +6278,18 @@ const NETDATA = window.NETDATA || {};
             options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
         }
 
-        if (state.tmp.dygraph_force_zoom === true) {
-            if (NETDATA.options.debug.dygraph === true || state.debug === true)
+        if (state.tmp.dygraph_force_zoom) {
+            if (NETDATA.options.debug.dygraph || state.debug)
                 state.log('dygraphChartUpdate() forced zoom update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
             //options.isZoomedIgnoreProgrammaticZoom = true;
             state.tmp.dygraph_force_zoom = false;
         } else if (state.current.name !== 'auto') {
-            if (NETDATA.options.debug.dygraph === true || state.debug === true)
+            if (NETDATA.options.debug.dygraph || state.debug)
                 state.log('dygraphChartUpdate() loose update');
         } else {
-            if (NETDATA.options.debug.dygraph === true || state.debug === true)
+            if (NETDATA.options.debug.dygraph || state.debug)
                 state.log('dygraphChartUpdate() strict update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
@@ -6302,21 +6308,21 @@ const NETDATA = window.NETDATA || {};
             oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
 
-        if (state.tmp.dygraph_smooth_eligible === true) {
-            if ((NETDATA.options.current.smooth_plot === true && state.tmp.dygraph_options.plotter !== smoothPlotter)
+        if (state.tmp.dygraph_smooth_eligible) {
+            if ((NETDATA.options.current.smooth_plot && state.tmp.dygraph_options.plotter !== smoothPlotter)
                 || (NETDATA.options.current.smooth_plot === false && state.tmp.dygraph_options.plotter === smoothPlotter)) {
                 NETDATA.dygraphChartCreate(state, data);
                 return;
             }
         }
 
-        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
             //options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
-        if (NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+        if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
             if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
                 options.valueRange[0] = null;
         }
@@ -6335,7 +6341,7 @@ const NETDATA = window.NETDATA || {};
             redraw = true;
         }
 
-        if (redraw === true) {
+        if (redraw) {
             // state.log('forcing redraw to adapt to common- min/max');
             dygraph.updateOptions(options);
         }
@@ -6345,18 +6351,18 @@ const NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphChartCreate = function(state, data) {
-        if (NETDATA.options.debug.dygraph === true || state.debug === true)
+        if (NETDATA.options.debug.dygraph || state.debug)
             state.log('dygraphChartCreate()');
 
         state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
         if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
-        if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) state.tmp.dygraph_chart_type = 'area';
+        if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state)) state.tmp.dygraph_chart_type = 'area';
 
-        let highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
+        let highlightCircleSize = NETDATA.chartLibraries.dygraph.isSparkline(state) ? 3 : 4;
 
-        let smooth = (NETDATA.dygraph.smooth === true)
-            ?(NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
-            :false;
+        let smooth = NETDATA.dygraph.smooth
+            ? (NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
+            : false;
 
         state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
         let drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
@@ -6376,7 +6382,7 @@ const NETDATA = window.NETDATA || {};
             //labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
             //labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
             labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
-            labelsShowZeroValues:   (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
+            labelsShowZeroValues:   NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
             labelsKMB:              false,
             labelsKMG2:             false,
             showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
@@ -6405,7 +6411,7 @@ const NETDATA = window.NETDATA || {};
                                     // Draw points at the edges of gaps in the data.
                                     // This improves visibility of small data segments or other data irregularities.
             drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
-            connectSeparatedPoints: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
+            connectSeparatedPoints: NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
             pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
 
                                     // enabling this makes the chart with little square lines
@@ -6440,7 +6446,7 @@ const NETDATA = window.NETDATA || {};
             highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
             pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
-            logscale:               (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?'y':undefined,
+            logscale:               NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
 
             axes: {
                 x: {
@@ -6454,7 +6460,7 @@ const NETDATA = window.NETDATA || {};
                     }
                 },
                 y: {
-                    logscale: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?true:undefined,
+                    logscale: NETDATA.chartLibraries.dygraph.isLogScale(state) ? true : undefined,
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
                     drawAxis: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawyaxis', drawAxis),
@@ -6498,7 +6504,7 @@ const NETDATA = window.NETDATA || {};
                 }
             },
             legendFormatter: function(data) {
-                if (state.tmp.dygraph_mouse_down === true)
+                if (state.tmp.dygraph_mouse_down)
                     return;
 
                 let elements = state.element_legend_childs;
@@ -6512,7 +6518,7 @@ const NETDATA = window.NETDATA || {};
                     let i = data.series.length;
                     while (i--) {
                         let series = data.series[i];
-                        if (series.isVisible === true)
+                        if (series.isVisible)
                             state.legendSetLabelValue(series.label, series.y);
                         else
                             state.legendSetLabelValue(series.label, null);
@@ -6532,20 +6538,22 @@ const NETDATA = window.NETDATA || {};
                 // - when true, this is initiated by a user
                 // - when false, this is feedback
 
-                if (state.current.name !== 'auto' && state.tmp.dygraph_user_action === true) {
+                if (state.current.name !== 'auto' && state.tmp.dygraph_user_action) {
                     state.tmp.dygraph_user_action = false;
 
                     let x_range = dygraph.xAxisRange();
                     let after = Math.round(x_range[0]);
                     let before = Math.round(x_range[1]);
 
-                    if (NETDATA.options.debug.dygraph === true)
+                    if (NETDATA.options.debug.dygraph) {
                         state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): mode ' + state.current.name + ' ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
                         //console.log(state);
+                    }
 
-                    if (before <= state.netdata_last && after >= state.netdata_first)
+                    if (before <= state.netdata_last && after >= state.netdata_first) {
                         // update only when we are within the data limits
                         state.updateChartPanOrZoom(after, before);
+                    }
                 }
             },
             zoomCallback: function(minDate, maxDate, yRanges) {
@@ -6556,7 +6564,7 @@ const NETDATA = window.NETDATA || {};
 
                 void(yRanges);
 
-                if (NETDATA.options.debug.dygraph === true)
+                if (NETDATA.options.debug.dygraph)
                     state.log('dygraphZoomCallback(): ' + state.current.name);
 
                 NETDATA.globalSelectionSync.stop();
@@ -6590,10 +6598,10 @@ const NETDATA = window.NETDATA || {};
             unhighlightCallback: function(event) {
                 void(event);
 
-                if (state.tmp.dygraph_mouse_down === true)
+                if (state.tmp.dygraph_mouse_down)
                     return;
 
-                if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                if (NETDATA.options.debug.dygraph || state.debug)
                     state.log('dygraphUnhighlightCallback()');
 
                 state.unpauseChart();
@@ -6628,12 +6636,12 @@ const NETDATA = window.NETDATA || {};
             },
             interactionModel : {
                 mousedown: function(event, dygraph, context) {
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.mousedown()');
 
                     state.tmp.dygraph_user_action = true;
 
-                    if (NETDATA.options.debug.dygraph === true)
+                    if (NETDATA.options.debug.dygraph)
                         state.log('dygraphMouseDown()');
 
                     // Right-click should not initiate anything.
@@ -6699,7 +6707,7 @@ const NETDATA = window.NETDATA || {};
                     }
                 },
                 mousemove: function(event, dygraph, context) {
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.mousemove()');
 
                     if (state.tmp.dygraph_highlight_after !== null) {
@@ -6739,7 +6747,7 @@ const NETDATA = window.NETDATA || {};
                 mouseup: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = false;
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.mouseup()');
 
                     if (state.tmp.dygraph_highlight_after !== null) {
@@ -6796,7 +6804,7 @@ const NETDATA = window.NETDATA || {};
                     void(dygraph);
                     void(context);
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.click()');
 
                     event.preventDefault();
@@ -6806,14 +6814,14 @@ const NETDATA = window.NETDATA || {};
                     void(dygraph);
                     void(context);
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.dblclick()');
                     NETDATA.resetAllCharts(state);
                 },
                 wheel: function(event, dygraph, context) {
                     void(context);
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.wheel()');
 
                     // Take the offset of a mouse event on the dygraph canvas and
@@ -6928,8 +6936,9 @@ const NETDATA = window.NETDATA || {};
                 touchstart: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = true;
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug) {
                         state.log('interactionModel.touchstart()');
+                    }
 
                     state.tmp.dygraph_user_action = true;
                     state.setMode('zoom');
@@ -6953,7 +6962,7 @@ const NETDATA = window.NETDATA || {};
                         state.dygraph_last_touch_page_x = 0;
                 },
                 touchmove: function(event, dygraph, context) {
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug) 
                         state.log('interactionModel.touchmove()');
 
                     NETDATA.globalSelectionSync.stop();
@@ -6967,7 +6976,7 @@ const NETDATA = window.NETDATA || {};
                 touchend: function(event, dygraph, context) {
                     state.tmp.dygraph_mouse_down = false;
 
-                    if (NETDATA.options.debug.dygraph === true || state.debug === true)
+                    if (NETDATA.options.debug.dygraph || state.debug)
                         state.log('interactionModel.touchend()');
 
                     NETDATA.globalSelectionSync.stop();
@@ -6986,7 +6995,7 @@ const NETDATA = window.NETDATA || {};
                         console.log('pct: ' + pct.toString());
 
                         let t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
-                        if (NETDATA.dygraphSetSelection(state, t) === true) {
+                        if (NETDATA.dygraphSetSelection(state, t)) {
                             NETDATA.globalSelectionSync.sync(state, t);
                         }
                     }
@@ -7010,12 +7019,12 @@ const NETDATA = window.NETDATA || {};
             }
         };
 
-        if (NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+        if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
             if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
                 state.tmp.dygraph_options.valueRange[0] = null;
         }
 
-        if (NETDATA.chartLibraries.dygraph.isSparkline(state) === true) {
+        if (NETDATA.chartLibraries.dygraph.isSparkline(state)) {
             state.tmp.dygraph_options.drawGrid = false;
             state.tmp.dygraph_options.drawAxis = false;
             state.tmp.dygraph_options.title = undefined;
@@ -7030,15 +7039,15 @@ const NETDATA = window.NETDATA || {};
             state.tmp.dygraph_options.axes.y.drawAxis = false;
         }
 
-        if (smooth === true) {
+        if (smooth) {
             state.tmp.dygraph_smooth_eligible = true;
 
-            if (NETDATA.options.current.smooth_plot === true)
+            if (NETDATA.options.current.smooth_plot)
                 state.tmp.dygraph_options.plotter = smoothPlotter;
         }
         else state.tmp.dygraph_smooth_eligible = false;
 
-        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+        if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
             //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
@@ -7436,7 +7445,7 @@ const NETDATA = window.NETDATA || {};
             state.tmp.d3pie_timer = undefined;
         }
 
-        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() && state.data !== null && force !== true) {
             NETDATA.d3pieChartUpdate(state, state.data);
         } else {
             if (state.tmp.d3pie_last_slot !== -1) {
@@ -7891,7 +7900,7 @@ const NETDATA = window.NETDATA || {};
             state.tmp.easyPieChartEvent.timer = undefined;
         }
 
-        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() && state.data !== null && force !== true) {
             NETDATA.easypiechartChartUpdate(state, state.data);
         }
         else {
@@ -7943,7 +7952,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.easypiechartChartUpdate = function(state, data) {
         let value, min, max, pcent;
 
-        if (NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
+        if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
             value = null;
             pcent = 0;
         }
@@ -8167,7 +8176,7 @@ const NETDATA = window.NETDATA || {};
             state.tmp.gaugeEvent.timer = undefined;
         }
 
-        if (state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+        if (state.isAutoRefreshable() && state.data !== null && force !== true) {
             NETDATA.gaugeChartUpdate(state, state.data);
         } else {
             NETDATA.gaugeAnimation(state, false);
@@ -8225,7 +8234,7 @@ const NETDATA = window.NETDATA || {};
     NETDATA.gaugeChartUpdate = function(state, data) {
         let value, min, max;
 
-        if (NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
+        if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
             NETDATA.gaugeSetLabels(state, null, null, null);
             state.tmp.gauge_instance.set(0);
         } else {
@@ -8306,7 +8315,7 @@ const NETDATA = window.NETDATA || {};
             colorStart: startColor,     // Colors
             colorStop: stopColor,       // just experiment with them
             strokeColor: strokeColor,   // to see which ones work best for you
-            generateGradient: (generateGradient === true),
+            generateGradient: (generateGradient === true), // gmosx: 
             gradientType: 0,
             highDpiSupport: true        // High resolution support
         };
@@ -8333,7 +8342,7 @@ const NETDATA = window.NETDATA || {};
             if (options.percentColors.length === 0) {
                 delete options.percentColors;
             }
-        } else if (generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
+        } else if (generateGradient === false && NETDATA.themes.current.gauge_gradient) {
             //noinspection PointlessArithmeticExpressionJS
             options.percentColors = [
                 [0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
@@ -8691,7 +8700,7 @@ const NETDATA = window.NETDATA || {};
     };
 
     NETDATA.registerChartLibrary = function(library, url) {
-        if (NETDATA.options.debug.libraries === true)
+        if (NETDATA.options.debug.libraries)
             console.log("registering chart library: " + library);
 
         NETDATA.chartLibraries[library].url = url;
@@ -8711,7 +8720,7 @@ const NETDATA = window.NETDATA || {};
                 if (typeof $().emulateTransitionEnd === 'function')
                     return true;
                 else {
-                    return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
+                    return typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap;
                 }
             }
         },
@@ -8719,7 +8728,7 @@ const NETDATA = window.NETDATA || {};
             url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.1.min.js',
             async: true,
             isAlreadyLoaded: function() {
-                return (typeof netdataNoFontAwesome !== 'undefined' && netdataNoFontAwesome === true);
+                return typeof netdataNoFontAwesome !== 'undefined' && netdataNoFontAwesome;
             }
         },
         {
@@ -8732,7 +8741,7 @@ const NETDATA = window.NETDATA || {};
         {
             url: NETDATA.themes.current.bootstrap_css,
             isAlreadyLoaded: function() {
-                return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
+                return typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap;
             }
         },
         {
@@ -8755,7 +8764,7 @@ const NETDATA = window.NETDATA || {};
             return;
         }
 
-        if (NETDATA.options.debug.main_loop === true)
+        if (NETDATA.options.debug.main_loop)
             console.log('loading ' + NETDATA.requiredJs[index].url);
 
         let async = true;
@@ -8769,8 +8778,9 @@ const NETDATA = window.NETDATA || {};
             xhrFields: { withCredentials: true } // required for the cookie
         })
         .done(function() {
-            if (NETDATA.options.debug.main_loop === true)
+            if (NETDATA.options.debug.main_loop) {
                 console.log('loaded ' + NETDATA.requiredJs[index].url);
+            }
         })
         .fail(function() {
             alert('Cannot load required JS library: ' + NETDATA.requiredJs[index].url);
@@ -8876,7 +8886,7 @@ const NETDATA = window.NETDATA || {};
         notify: function(entry) {
             // console.log('alarm ' + entry.unique_id);
 
-            if (entry.updated === true) {
+            if (entry.updated) {
                 // console.log('alarm ' + entry.unique_id + ' has been updated by another alarm');
                 return;
             }
@@ -8921,7 +8931,7 @@ const NETDATA = window.NETDATA || {};
                         // console.log('alarm' + entry.unique_id + ' switch to CLEAR from ' + entry.old_status);
                         return;
                     }
-                    if (entry.no_clear_notification === true) {
+                    if (entry.no_clear_notification) {
                         // console.log('alarm' + entry.unique_id + ' is CLEAR but has no_clear_notification flag');
                         return;
                     }
@@ -8952,7 +8962,7 @@ const NETDATA = window.NETDATA || {};
             }
 
             // filter recipients
-            if (show === true)
+            if (show)
                 show = NETDATA.alarms.recipientMatches(entry.recipient, NETDATA.alarms.recipients);
 
             /*
@@ -8975,11 +8985,11 @@ const NETDATA = window.NETDATA || {};
             }
             */
 
-            if (show === true) {
+            if (show) {
                 if (typeof NETDATA.alarms.notificationCallback === 'function')
                     show = NETDATA.alarms.notificationCallback(entry);
 
-                if (show === true) {
+                if (show) {
                     setTimeout(function() {
                         // show this notification
                         // console.log('new notification: ' + title);
@@ -9021,7 +9031,7 @@ const NETDATA = window.NETDATA || {};
             if (typeof alarm === 'object') {
                 let ret = NETDATA.alarms.scrollToChart(alarm.chart);
 
-                if (ret === true && NETDATA.options.page_is_visible === false)
+                if (ret && NETDATA.options.page_is_visible === false)
                     window.focus();
                 //    alert('netdata dashboard will now scroll to chart: ' + alarm.chart + '\n\nThis alarm opened to bring the browser window in front of the screen. Click on the dashboard to prevent it from appearing again.');
             }
@@ -9064,7 +9074,7 @@ const NETDATA = window.NETDATA || {};
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
 
-                if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true)
+                if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember)
                     NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
                 // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
@@ -9133,7 +9143,7 @@ const NETDATA = window.NETDATA || {};
                 if (data !== null) {
                     NETDATA.alarms.current = data;
 
-                    if (NETDATA.alarms.check_notifications() === true) {
+                    if (NETDATA.alarms.check_notifications()) {
                         NETDATA.alarms.notifyAll();
                     }
 
@@ -9178,7 +9188,7 @@ const NETDATA = window.NETDATA || {};
         init: function() {
             NETDATA.alarms.server = NETDATA.fixHost(NETDATA.serverDefault);
 
-            if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true) {
+            if (typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember) {
                 NETDATA.alarms.last_notification_id =
                     NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
             }
