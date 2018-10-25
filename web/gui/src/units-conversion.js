@@ -1,9 +1,8 @@
-
 NETDATA.unitsConversion = {
     keys: {},       // keys for data-common-units
     latest: {},     // latest selected units for data-common-units
 
-    globalReset: function() {
+    globalReset: function () {
         this.keys = {};
         this.latest = {};
     },
@@ -48,7 +47,7 @@ NETDATA.unitsConversion = {
             'TB': 1024 * 1024 * 1024
         },
         'MB': {
-            'B':  1 / (1024 * 1024),
+            'B': 1 / (1024 * 1024),
             'KB': 1 / 1024,
             'MB': 1,
             'GB': 1024,
@@ -56,7 +55,7 @@ NETDATA.unitsConversion = {
             'PB': 1024 * 1024 * 1024
         },
         'GB': {
-            'B':  1 / (1024 * 1024 * 1024),
+            'B': 1 / (1024 * 1024 * 1024),
             'KB': 1 / (1024 * 1024),
             'MB': 1 / 1024,
             'GB': 1,
@@ -81,26 +80,43 @@ NETDATA.unitsConversion = {
     convertibleUnits: {
         'Celsius': {
             'Fahrenheit': {
-                check: function(max) { void(max); return NETDATA.options.current.temperature === 'fahrenheit'; },
-                convert: function(value) { return value * 9 / 5 + 32; }
+                check: function (max) {
+                    void(max);
+                    return NETDATA.options.current.temperature === 'fahrenheit';
+                },
+                convert: function (value) {
+                    return value * 9 / 5 + 32;
+                }
             }
         },
         'celsius': {
             'fahrenheit': {
-                check: function(max) { void(max); return NETDATA.options.current.temperature === 'fahrenheit'; },
-                convert: function(value) { return value * 9 / 5 + 32; }
+                check: function (max) {
+                    void(max);
+                    return NETDATA.options.current.temperature === 'fahrenheit';
+                },
+                convert: function (value) {
+                    return value * 9 / 5 + 32;
+                }
             }
         },
         'seconds': {
             'time': {
-                check: function (max) { void(max); return NETDATA.options.current.seconds_as_time; },
-                convert: function(seconds) { return NETDATA.unitsConversion.seconds2time(seconds); }
+                check: function (max) {
+                    void(max);
+                    return NETDATA.options.current.seconds_as_time;
+                },
+                convert: function (seconds) {
+                    return NETDATA.unitsConversion.seconds2time(seconds);
+                }
             }
         },
         'milliseconds': {
             'milliseconds': {
-                check: function (max) { return NETDATA.options.current.seconds_as_time && max < 1000; },
-                convert: function(milliseconds) {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time && max < 1000;
+                },
+                convert: function (milliseconds) {
                     let tms = Math.round(milliseconds * 10);
                     milliseconds = Math.floor(tms / 10);
 
@@ -110,8 +126,10 @@ NETDATA.unitsConversion = {
                 }
             },
             'seconds': {
-                check: function (max) { return NETDATA.options.current.seconds_as_time && max >= 1000 && max < 60000; },
-                convert: function(milliseconds) {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time && max >= 1000 && max < 60000;
+                },
+                convert: function (milliseconds) {
                     milliseconds = Math.round(milliseconds);
 
                     let seconds = Math.floor(milliseconds / 1000);
@@ -124,8 +142,10 @@ NETDATA.unitsConversion = {
                 }
             },
             'M:SS.ms': {
-                check: function (max) { return NETDATA.options.current.seconds_as_time && max >= 60000; },
-                convert: function(milliseconds) {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time && max >= 60000;
+                },
+                convert: function (milliseconds) {
                     milliseconds = Math.round(milliseconds);
 
                     let minutes = Math.floor(milliseconds / 60000);
@@ -144,7 +164,7 @@ NETDATA.unitsConversion = {
         }
     },
 
-    seconds2time: function(seconds) {
+    seconds2time: function (seconds) {
         seconds = Math.abs(seconds);
 
         let days = Math.floor(seconds / 86400);
@@ -174,7 +194,7 @@ NETDATA.unitsConversion = {
         }
         */
 
-        return ((days > 0)?days.toString() + 'd:':'').toString()
+        return ((days > 0) ? days.toString() + 'd:' : '').toString()
             + NETDATA.zeropad(hours) + ':'
             + NETDATA.zeropad(minutes) + ':'
             + NETDATA.zeropad(seconds)
@@ -183,24 +203,27 @@ NETDATA.unitsConversion = {
 
     // get a function that converts the units
     // + every time units are switched call the callback
-    get: function(uuid, min, max, units, desired_units, common_units_name, switch_units_callback) {
+    get: function (uuid, min, max, units, desired_units, common_units_name, switch_units_callback) {
         // validate the parameters
-        if (typeof units === 'undefined')
+        if (typeof units === 'undefined') {
             units = 'undefined';
+        }
 
         // check if we support units conversion
         if (typeof this.scalableUnits[units] === 'undefined' && typeof this.convertibleUnits[units] === 'undefined') {
             // we can't convert these units
             //console.log('DEBUG: ' + uuid.toString() + ' can\'t convert units: ' + units.toString());
-            return function(value) { return value; };
+            return function (value) {
+                return value;
+            };
         }
 
         // check if the caller wants the original units
         if (typeof desired_units === 'undefined' || desired_units === null || desired_units === 'original' || desired_units === units) {
             //console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
             switch_units_callback(units);
-            return function(value) { 
-                return value; 
+            return function (value) {
+                return value;
             };
         }
 
@@ -224,7 +247,9 @@ NETDATA.unitsConversion = {
                 // based on this we decide the scale
                 min = Math.abs(min);
                 max = Math.abs(max);
-                if (min > max) max = min;
+                if (min > max) {
+                    max = min;
+                }
 
                 // find the smallest scale that provides integers
                 // for (x in this.scalableUnits[units]) {
@@ -249,7 +274,9 @@ NETDATA.unitsConversion = {
                     // we couldn't find one
                     //console.log('DEBUG: ' + uuid.toString() + ' cannot find an auto-scaling candidate for units: ' + units.toString() + ' (max: ' + max.toString() + ')');
                     switch_units_callback(units);
-                    return function(value) { return value; };
+                    return function (value) {
+                        return value;
+                    };
                 }
 
                 if (typeof common_units_name === 'string' && typeof uuid === 'string') {
@@ -272,8 +299,9 @@ NETDATA.unitsConversion = {
                     // find the max divider of all charts
                     let common_units = t[uuid];
                     for (x in t) {
-                        if (t.hasOwnProperty(x) && t[x].divider > common_units.divider)
+                        if (t.hasOwnProperty(x) && t[x].divider > common_units.divider) {
                             common_units = t[x];
+                        }
                     }
 
                     // save our common_max to the latest keys
@@ -292,7 +320,7 @@ NETDATA.unitsConversion = {
 
                     // apply it to this chart
                     switch_units_callback(tunits);
-                    return function(value) {
+                    return function (value) {
                         if (tdivider !== latest.divider) {
                             // another chart switched our common units
                             // we should switch them too
@@ -310,8 +338,8 @@ NETDATA.unitsConversion = {
                     //console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + tunits.toString() + ' with divider ' + tdivider.toString() + ', autonomously');
 
                     switch_units_callback(tunits);
-                    return function (value) { 
-                        return value / tdivider; 
+                    return function (value) {
+                        return value / tdivider;
                     };
                 }
             } else {
@@ -322,15 +350,19 @@ NETDATA.unitsConversion = {
                     tdivider = this.scalableUnits[units][desired_units];
                     // console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + desired_units.toString() + ' with divider ' + tdivider.toString() + ', by reference');
                     switch_units_callback(desired_units);
-                    return function (value) { return value / tdivider; };
+                    return function (value) {
+                        return value / tdivider;
+                    };
                 } else {
                     // oops! switch back to original units
                     console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
                     switch_units_callback(units);
-                    return function (value) { return value; };
+                    return function (value) {
+                        return value;
+                    };
                 }
             }
-       } else if (typeof this.convertibleUnits[units] !== 'undefined') {
+        } else if (typeof this.convertibleUnits[units] !== 'undefined') {
             // units that can be converted
             if (desired_units === 'auto') {
                 for (x in this.convertibleUnits[units]) {
@@ -346,24 +378,26 @@ NETDATA.unitsConversion = {
                 // none checked ok
                 //console.log('DEBUG: ' + uuid.toString() + ' no conversion available for ' + units.toString() + ' to: ' + desired_units.toString());
                 switch_units_callback(units);
-                return function (value) { return value; };
+                return function (value) {
+                    return value;
+                };
             } else if (typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
                 switch_units_callback(desired_units);
                 return this.convertibleUnits[units][desired_units].convert;
             } else {
                 console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
                 switch_units_callback(units);
-                return function (value) { 
-                    return value; 
+                return function (value) {
+                    return value;
                 };
             }
-       } else {
+        } else {
             // hm... did we forget to implement the new type?
             console.log(`Unmatched unit conversion method for units ${units.toString()}`);
             switch_units_callback(units);
-            return function (value) { 
-                return value; 
+            return function (value) {
+                return value;
             };
-       }
+        }
     }
 };

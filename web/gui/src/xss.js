@@ -1,10 +1,9 @@
-
 // ----------------------------------------------------------------------------------------------------------------
 // XSS checks
 
 NETDATA.xss = {
-    enabled: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
-    enabled_for_data: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
+    enabled: (typeof netdataCheckXSS === 'undefined') ? false : netdataCheckXSS,
+    enabled_for_data: (typeof netdataCheckXSS === 'undefined') ? false : netdataCheckXSS,
 
     string: function (s) {
         return s.toString()
@@ -14,7 +13,7 @@ NETDATA.xss = {
             .replace(/'/g, '&#39;');
     },
 
-    object: function(name, obj, ignore_regex) {
+    object: function (name, obj, ignore_regex) {
         if (typeof ignore_regex !== 'undefined' && ignore_regex.test(name)) {
             // console.log('XSS: ignoring "' + name + '"');
             return obj;
@@ -23,11 +22,15 @@ NETDATA.xss = {
         switch (typeof(obj)) {
             case 'string':
                 const ret = this.string(obj);
-                if (ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
+                if (ret !== obj) {
+                    console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
+                }
                 return ret;
 
             case 'object':
-                if (obj === null) return obj;
+                if (obj === null) {
+                    return obj;
+                }
 
                 if (Array.isArray(obj)) {
                     // console.log('checking array "' + name + '"');
@@ -40,7 +43,9 @@ NETDATA.xss = {
                     // console.log('checking object "' + name + '"');
 
                     for (const i in obj) {
-                        if (obj.hasOwnProperty(i) === false) continue;
+                        if (obj.hasOwnProperty(i) === false) {
+                            continue;
+                        }
                         if (this.string(i) !== i) {
                             console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
                             delete obj[i];
@@ -56,7 +61,7 @@ NETDATA.xss = {
         }
     },
 
-    checkOptional: function(name, obj, ignore_regex) {
+    checkOptional: function (name, obj, ignore_regex) {
         if (this.enabled) {
             //console.log('XSS: checking optional "' + name + '"...');
             return this.object(name, obj, ignore_regex);
@@ -64,12 +69,12 @@ NETDATA.xss = {
         return obj;
     },
 
-    checkAlways: function(name, obj, ignore_regex) {
+    checkAlways: function (name, obj, ignore_regex) {
         //console.log('XSS: checking always "' + name + '"...');
         return this.object(name, obj, ignore_regex);
     },
 
-    checkData: function(name, obj, ignore_regex) {
+    checkData: function (name, obj, ignore_regex) {
         if (this.enabled_for_data) {
             //console.log('XSS: checking data "' + name + '"...');
             return this.object(name, obj, ignore_regex);
