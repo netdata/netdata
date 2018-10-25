@@ -408,7 +408,7 @@ static inline void do_dimension(
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
 
-    calculated_number min = NAN, max = NAN;
+    calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
@@ -466,12 +466,18 @@ static inline void do_dimension(
             calculated_number value = r->internal.grouping_flush(r, rrdr_value_options_ptr);
             r->v[rrdr_line * r->d + dim_id_in_rrdr] = value;
 
-            if(likely(points_added)) {
+            if(likely(points_added || dim_id_in_rrdr)) {
+                // find the min/max across all dimensions
+
                 if(unlikely(value < min)) min = value;
                 if(unlikely(value > max)) max = value;
+
             }
-            else
+            else {
+                // runs only when dim_id_in_rrdr == 0 && points_added == 0
+                // so, on the first point added for the query.
                 min = max = value;
+            }
 
             points_added++;
             values_in_group = 0;
