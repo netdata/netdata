@@ -1,16 +1,17 @@
-
 // dygraph
 
 NETDATA.dygraph = {
     smooth: false
 };
 
-NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
-    if (after < state.netdata_first)
+NETDATA.dygraphToolboxPanAndZoom = function (state, after, before) {
+    if (after < state.netdata_first) {
         after = state.netdata_first;
+    }
 
-    if (before > state.netdata_last)
+    if (before > state.netdata_last) {
         before = state.netdata_last;
+    }
 
     state.setMode('zoom');
     NETDATA.globalSelectionSync.stop();
@@ -22,7 +23,7 @@ NETDATA.dygraphToolboxPanAndZoom = function(state, after, before) {
     NETDATA.globalPanAndZoom.setMaster(state, after, before);
 };
 
-NETDATA.dygraphSetSelection = function(state, t) {
+NETDATA.dygraphSetSelection = function (state, t) {
     if (typeof state.tmp.dygraph_instance !== 'undefined') {
         let r = state.calculateRowForTime(t);
         if (r !== -1) {
@@ -37,88 +38,93 @@ NETDATA.dygraphSetSelection = function(state, t) {
     return false;
 };
 
-NETDATA.dygraphClearSelection = function(state) {
+NETDATA.dygraphClearSelection = function (state) {
     if (typeof state.tmp.dygraph_instance !== 'undefined') {
         state.tmp.dygraph_instance.clearSelection();
     }
     return true;
 };
 
-NETDATA.dygraphSmoothInitialize = function(callback) {
+NETDATA.dygraphSmoothInitialize = function (callback) {
     $.ajax({
         url: NETDATA.dygraph_smooth_js,
         cache: true,
         dataType: "script",
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
-    .done(function() {
-        NETDATA.dygraph.smooth = true;
-        smoothPlotter.smoothing = 0.3;
-    })
-    .fail(function() {
-        NETDATA.dygraph.smooth = false;
-    })
-    .always(function() {
-        if (typeof callback === "function")
-            return callback();
-    });
+        .done(function () {
+            NETDATA.dygraph.smooth = true;
+            smoothPlotter.smoothing = 0.3;
+        })
+        .fail(function () {
+            NETDATA.dygraph.smooth = false;
+        })
+        .always(function () {
+            if (typeof callback === "function") {
+                return callback();
+            }
+        });
 };
 
-NETDATA.dygraphInitialize = function(callback) {
+NETDATA.dygraphInitialize = function (callback) {
     if (typeof netdataNoDygraphs === 'undefined' || !netdataNoDygraphs) {
         $.ajax({
             url: NETDATA.dygraph_js,
             cache: true,
             dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
+            xhrFields: {withCredentials: true} // required for the cookie
         })
-        .done(function() {
-            NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
-        })
-        .fail(function() {
-            NETDATA.chartLibraries.dygraph.enabled = false;
-            NETDATA.error(100, NETDATA.dygraph_js);
-        })
-        .always(function() {
-            if (NETDATA.chartLibraries.dygraph.enabled && NETDATA.options.current.smooth_plot) {
-                NETDATA.dygraphSmoothInitialize(callback);
-            } else if (typeof callback === "function") {
-                return callback();
-            }
-        });
+            .done(function () {
+                NETDATA.registerChartLibrary('dygraph', NETDATA.dygraph_js);
+            })
+            .fail(function () {
+                NETDATA.chartLibraries.dygraph.enabled = false;
+                NETDATA.error(100, NETDATA.dygraph_js);
+            })
+            .always(function () {
+                if (NETDATA.chartLibraries.dygraph.enabled && NETDATA.options.current.smooth_plot) {
+                    NETDATA.dygraphSmoothInitialize(callback);
+                } else if (typeof callback === "function") {
+                    return callback();
+                }
+            });
     } else {
         NETDATA.chartLibraries.dygraph.enabled = false;
-        if (typeof callback === "function")
+        if (typeof callback === "function") {
             return callback();
+        }
     }
 };
 
-NETDATA.dygraphChartUpdate = function(state, data) {
+NETDATA.dygraphChartUpdate = function (state, data) {
     let dygraph = state.tmp.dygraph_instance;
 
-    if (typeof dygraph === 'undefined')
+    if (typeof dygraph === 'undefined') {
         return NETDATA.dygraphChartCreate(state, data);
+    }
 
     // when the chart is not visible, and hidden
     // if there is a window resize, dygraph detects
     // its element size as 0x0.
     // this will make it re-appear properly
 
-    if (state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
+    if (state.tm.last_unhidden > state.tmp.dygraph_last_rendered) {
         dygraph.resize();
+    }
 
     let options = {
-            file: data.result.data,
-            colors: state.chartColors(),
-            labels: data.result.labels,
-            //labelsDivWidth: state.chartWidth() - 70,
-            includeZero: state.tmp.dygraph_include_zero,
-            visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
+        file: data.result.data,
+        colors: state.chartColors(),
+        labels: data.result.labels,
+        //labelsDivWidth: state.chartWidth() - 70,
+        includeZero: state.tmp.dygraph_include_zero,
+        visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
     };
 
     if (state.tmp.dygraph_chart_type === 'stacked') {
-        if (options.includeZero && state.dimensions_visibility.countSelected() < options.visibility.length)
+        if (options.includeZero && state.dimensions_visibility.countSelected() < options.visibility.length) {
             options.includeZero = 0;
+        }
     }
 
     if (!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
@@ -126,20 +132,23 @@ NETDATA.dygraphChartUpdate = function(state, data) {
     }
 
     if (state.tmp.dygraph_force_zoom) {
-        if (NETDATA.options.debug.dygraph || state.debug)
+        if (NETDATA.options.debug.dygraph || state.debug) {
             state.log('dygraphChartUpdate() forced zoom update');
+        }
 
-        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
+        options.dateWindow = (state.requested_padding !== null) ? [state.view_after, state.view_before] : null;
         //options.isZoomedIgnoreProgrammaticZoom = true;
         state.tmp.dygraph_force_zoom = false;
     } else if (state.current.name !== 'auto') {
-        if (NETDATA.options.debug.dygraph || state.debug)
+        if (NETDATA.options.debug.dygraph || state.debug) {
             state.log('dygraphChartUpdate() loose update');
+        }
     } else {
-        if (NETDATA.options.debug.dygraph || state.debug)
+        if (NETDATA.options.debug.dygraph || state.debug) {
             state.log('dygraphChartUpdate() strict update');
+        }
 
-        options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
+        options.dateWindow = (state.requested_padding !== null) ? [state.view_after, state.view_before] : null;
         //options.isZoomedIgnoreProgrammaticZoom = true;
     }
 
@@ -165,13 +174,14 @@ NETDATA.dygraphChartUpdate = function(state, data) {
 
     if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
         // pan and zoom on snapshots
-        options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+        options.dateWindow = [NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms];
         //options.isZoomedIgnoreProgrammaticZoom = true;
     }
 
     if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
-        if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
+        if (Array.isArray(options.valueRange) && options.valueRange[0] <= 0) {
             options.valueRange[0] = null;
+        }
     }
 
     dygraph.updateOptions(options);
@@ -197,13 +207,18 @@ NETDATA.dygraphChartUpdate = function(state, data) {
     return true;
 };
 
-NETDATA.dygraphChartCreate = function(state, data) {
-    if (NETDATA.options.debug.dygraph || state.debug)
+NETDATA.dygraphChartCreate = function (state, data) {
+    if (NETDATA.options.debug.dygraph || state.debug) {
         state.log('dygraphChartCreate()');
+    }
 
     state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
-    if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
-    if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state)) state.tmp.dygraph_chart_type = 'area';
+    if (state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) {
+        state.tmp.dygraph_chart_type = 'area';
+    }
+    if (state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state)) {
+        state.tmp.dygraph_chart_type = 'area';
+    }
 
     let highlightCircleSize = NETDATA.chartLibraries.dygraph.isSparkline(state) ? 3 : 4;
 
@@ -215,85 +230,85 @@ NETDATA.dygraphChartCreate = function(state, data) {
     let drawAxis = NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true);
 
     state.tmp.dygraph_options = {
-        colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
+        colors: NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
 
         // leave a few pixels empty on the right of the chart
-        rightGap:               NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
-        showRangeSelector:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-showrangeselector', false),
-        showRoller:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-showroller', false),
-        title:                  NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
-        titleHeight:            NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
-        legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
-        labels:                 data.result.labels,
-        labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
+        rightGap: NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
+        showRangeSelector: NETDATA.dataAttributeBoolean(state.element, 'dygraph-showrangeselector', false),
+        showRoller: NETDATA.dataAttributeBoolean(state.element, 'dygraph-showroller', false),
+        title: NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
+        titleHeight: NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
+        legend: NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
+        labels: data.result.labels,
+        labelsDiv: NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
         //labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
         //labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
-        labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
-        labelsShowZeroValues:   NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
-        labelsKMB:              false,
-        labelsKMG2:             false,
-        showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
-        hideOverlayOnMouseOut:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
-        includeZero:            state.tmp.dygraph_include_zero,
-        xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
-        yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
-        valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
-        ylabel:                 state.units_current, // (state.units_desired === 'auto')?"":state.units_current,
-        yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
+        labelsSeparateLines: NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
+        labelsShowZeroValues: NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
+        labelsKMB: false,
+        labelsKMG2: false,
+        showLabelsOnHighlight: NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
+        hideOverlayOnMouseOut: NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
+        includeZero: state.tmp.dygraph_include_zero,
+        xRangePad: NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
+        yRangePad: NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
+        valueRange: NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [null, null]),
+        ylabel: state.units_current, // (state.units_desired === 'auto')?"":state.units_current,
+        yLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
 
-                                // the function to plot the chart
-        plotter:                null,
+        // the function to plot the chart
+        plotter: null,
 
-                                // The width of the lines connecting data points.
-                                // This can be used to increase the contrast or some graphs.
-        strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
-        strokePattern:          NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
+        // The width of the lines connecting data points.
+        // This can be used to increase the contrast or some graphs.
+        strokeWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked') ? 0.1 : ((smooth === true) ? 1.5 : 0.7))),
+        strokePattern: NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
 
-                                // The size of the dot to draw on each point in pixels (see drawPoints).
-                                // A dot is always drawn when a point is "isolated",
-                                // i.e. there is a missing point on either side of it.
-                                // This also controls the size of those dots.
-        drawPoints:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawpoints', false),
+        // The size of the dot to draw on each point in pixels (see drawPoints).
+        // A dot is always drawn when a point is "isolated",
+        // i.e. there is a missing point on either side of it.
+        // This also controls the size of those dots.
+        drawPoints: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawpoints', false),
 
-                                // Draw points at the edges of gaps in the data.
-                                // This improves visibility of small data segments or other data irregularities.
-        drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
+        // Draw points at the edges of gaps in the data.
+        // This improves visibility of small data segments or other data irregularities.
+        drawGapEdgePoints: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
         connectSeparatedPoints: NETDATA.chartLibraries.dygraph.isLogScale(state) ? false : NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
-        pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
+        pointSize: NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
 
-                                // enabling this makes the chart with little square lines
-        stepPlot:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-stepplot', false),
+        // enabling this makes the chart with little square lines
+        stepPlot: NETDATA.dataAttributeBoolean(state.element, 'dygraph-stepplot', false),
 
-                                // Draw a border around graph lines to make crossing lines more easily
-                                // distinguishable. Useful for graphs with many lines.
-        strokeBorderColor:      NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
-        strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked')?0.0:0.0),
-        fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
-        fillAlpha:              NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
-                                ((state.tmp.dygraph_chart_type === 'stacked')
-                                    ?NETDATA.options.current.color_fill_opacity_stacked
-                                    :NETDATA.options.current.color_fill_opacity_area)
-                                ),
-        stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
-        stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
-        drawAxis:               drawAxis,
-        axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
-        axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
-        axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
-        drawGrid:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgrid', true),
-        gridLinePattern:        NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
-        gridLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
-        gridLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
-        maxNumberWidth:         NETDATA.dataAttribute(state.element, 'dygraph-maxnumberwidth', 8),
-        sigFigs:                NETDATA.dataAttribute(state.element, 'dygraph-sigfigs', null),
-        digitsAfterDecimal:     NETDATA.dataAttribute(state.element, 'dygraph-digitsafterdecimal', 2),
-        valueFormatter:         NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
-        highlightCircleSize:    NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
-        highlightSeriesOpts:    NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
+        // Draw a border around graph lines to make crossing lines more easily
+        // distinguishable. Useful for graphs with many lines.
+        strokeBorderColor: NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
+        strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked') ? 0.0 : 0.0),
+        fillGraph: NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
+        fillAlpha: NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
+            ((state.tmp.dygraph_chart_type === 'stacked')
+                ? NETDATA.options.current.color_fill_opacity_stacked
+                : NETDATA.options.current.color_fill_opacity_area)
+        ),
+        stackedGraph: NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
+        stackedGraphNaNFill: NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
+        drawAxis: drawAxis,
+        axisLabelFontSize: NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
+        axisLineColor: NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
+        axisLineWidth: NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
+        drawGrid: NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgrid', true),
+        gridLinePattern: NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
+        gridLineWidth: NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
+        gridLineColor: NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
+        maxNumberWidth: NETDATA.dataAttribute(state.element, 'dygraph-maxnumberwidth', 8),
+        sigFigs: NETDATA.dataAttribute(state.element, 'dygraph-sigfigs', null),
+        digitsAfterDecimal: NETDATA.dataAttribute(state.element, 'dygraph-digitsafterdecimal', 2),
+        valueFormatter: NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
+        highlightCircleSize: NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
+        highlightSeriesOpts: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
         highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
-        pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
-        visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
-        logscale:               NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
+        pointClickCallback: NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
+        visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+        logscale: NETDATA.chartLibraries.dygraph.isLogScale(state) ? 'y' : undefined,
 
         axes: {
             x: {
@@ -342,39 +357,44 @@ NETDATA.dygraphChartCreate = function(state, data) {
                             }
                         }
 
-                        if (len < 0)
+                        if (len < 0) {
                             state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
+                        }
                     }
 
                     return v;
                 }
             }
         },
-        legendFormatter: function(data) {
-            if (state.tmp.dygraph_mouse_down)
+        legendFormatter: function (data) {
+            if (state.tmp.dygraph_mouse_down) {
                 return;
+            }
 
             let elements = state.element_legend_childs;
 
             // if the hidden div is not there
             // we are not managing the legend
-            if (elements.hidden === null) return;
+            if (elements.hidden === null) {
+                return;
+            }
 
             if (typeof data.x !== 'undefined') {
                 state.legendSetDate(data.x);
                 let i = data.series.length;
                 while (i--) {
                     let series = data.series[i];
-                    if (series.isVisible)
+                    if (series.isVisible) {
                         state.legendSetLabelValue(series.label, series.y);
-                    else
+                    } else {
                         state.legendSetLabelValue(series.label, null);
+                    }
                 }
             }
 
             return '';
         },
-        drawCallback: function(dygraph, is_initial) {
+        drawCallback: function (dygraph, is_initial) {
 
             // the user has panned the chart and this is called to re-draw the chart
             // 1. refresh this chart by adding data to it
@@ -403,7 +423,7 @@ NETDATA.dygraphChartCreate = function(state, data) {
                 }
             }
         },
-        zoomCallback: function(minDate, maxDate, yRanges) {
+        zoomCallback: function (minDate, maxDate, yRanges) {
 
             // the user has selected a range on the chart
             // 1. refresh this chart by adding data to it
@@ -411,8 +431,9 @@ NETDATA.dygraphChartCreate = function(state, data) {
 
             void(yRanges);
 
-            if (NETDATA.options.debug.dygraph)
+            if (NETDATA.options.debug.dygraph) {
                 state.log('dygraphZoomCallback(): ' + state.current.name);
+            }
 
             NETDATA.globalSelectionSync.stop();
             NETDATA.globalSelectionSync.delay();
@@ -423,7 +444,7 @@ NETDATA.dygraphChartCreate = function(state, data) {
             state.tmp.dygraph_force_zoom = true;
             state.updateChartPanOrZoom(minDate, maxDate);
         },
-        highlightCallback: function(event, x, points, row, seriesName) {
+        highlightCallback: function (event, x, points, row, seriesName) {
             void(seriesName);
 
             state.pauseChart();
@@ -435,26 +456,29 @@ NETDATA.dygraphChartCreate = function(state, data) {
             // let t = state.data_after + row * state.data_update_every;
             // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
 
-            if (state.tmp.dygraph_mouse_down !== true)
+            if (state.tmp.dygraph_mouse_down !== true) {
                 NETDATA.globalSelectionSync.sync(state, x);
+            }
 
             // fix legend zIndex using the internal structures of dygraph legend module
             // this works, but it is a hack!
             // state.tmp.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
         },
-        unhighlightCallback: function(event) {
+        unhighlightCallback: function (event) {
             void(event);
 
-            if (state.tmp.dygraph_mouse_down)
+            if (state.tmp.dygraph_mouse_down) {
                 return;
+            }
 
-            if (NETDATA.options.debug.dygraph || state.debug)
+            if (NETDATA.options.debug.dygraph || state.debug) {
                 state.log('dygraphUnhighlightCallback()');
+            }
 
             state.unpauseChart();
             NETDATA.globalSelectionSync.stop();
         },
-        underlayCallback: function(canvas, area, g) {
+        underlayCallback: function (canvas, area, g) {
 
             // the chart is about to be drawn
             // this function renders global highlighted time-frame
@@ -463,11 +487,13 @@ NETDATA.dygraphChartCreate = function(state, data) {
                 let after = NETDATA.globalChartUnderlay.after;
                 let before = NETDATA.globalChartUnderlay.before;
 
-                if (after < state.view_after)
+                if (after < state.view_after) {
                     after = state.view_after;
+                }
 
-                if (before > state.view_before)
+                if (before > state.view_before) {
                     before = state.view_before;
+                }
 
                 if (after < before) {
                     let bottom_left = g.toDomCoords(after, -20);
@@ -481,18 +507,22 @@ NETDATA.dygraphChartCreate = function(state, data) {
                 }
             }
         },
-        interactionModel : {
-            mousedown: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug)
+        interactionModel: {
+            mousedown: function (event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.mousedown()');
+                }
 
                 state.tmp.dygraph_user_action = true;
 
-                if (NETDATA.options.debug.dygraph)
+                if (NETDATA.options.debug.dygraph) {
                     state.log('dygraphMouseDown()');
+                }
 
                 // Right-click should not initiate anything.
-                if (event.button && event.button === 2) return;
+                if (event.button && event.button === 2) {
+                    return;
+                }
 
                 NETDATA.globalSelectionSync.stop();
                 NETDATA.globalSelectionSync.delay();
@@ -553,9 +583,10 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     }
                 }
             },
-            mousemove: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug)
+            mousemove: function (event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.mousemove()');
+                }
 
                 if (state.tmp.dygraph_highlight_after !== null) {
                     //console.log('highlight selection...');
@@ -591,11 +622,12 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     Dygraph.moveZoom(event, dygraph, context);
                 }
             },
-            mouseup: function(event, dygraph, context) {
+            mouseup: function (event, dygraph, context) {
                 state.tmp.dygraph_mouse_down = false;
 
-                if (NETDATA.options.debug.dygraph || state.debug)
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.mouseup()');
+                }
 
                 if (state.tmp.dygraph_highlight_after !== null) {
                     //console.log('done highlight selection');
@@ -603,7 +635,7 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     NETDATA.globalSelectionSync.stop();
                     NETDATA.globalSelectionSync.delay();
 
-                    if (!(event.offsetX && event.offsetY)){
+                    if (!(event.offsetX && event.offsetY)) {
                         event.offsetX = event.layerX - event.target.offsetLeft;
                         event.offsetY = event.layerY - event.target.offsetTop;
                     }
@@ -647,29 +679,32 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     NETDATA.options.auto_refresher_stop_until = 0;
                 }
             },
-            click: function(event, dygraph, context) {
+            click: function (event, dygraph, context) {
                 void(dygraph);
                 void(context);
 
-                if (NETDATA.options.debug.dygraph || state.debug)
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.click()');
+                }
 
                 event.preventDefault();
             },
-            dblclick: function(event, dygraph, context) {
+            dblclick: function (event, dygraph, context) {
                 void(event);
                 void(dygraph);
                 void(context);
 
-                if (NETDATA.options.debug.dygraph || state.debug)
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.dblclick()');
+                }
                 NETDATA.resetAllCharts(state);
             },
-            wheel: function(event, dygraph, context) {
+            wheel: function (event, dygraph, context) {
                 void(context);
 
-                if (NETDATA.options.debug.dygraph || state.debug)
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.wheel()');
+                }
 
                 // Take the offset of a mouse event on the dygraph canvas and
                 // convert it to a pair of percentages from the bottom left.
@@ -701,7 +736,7 @@ NETDATA.dygraphChartCreate = function(state, data) {
 
                     // The (1-) part below changes it from "% distance down from the top"
                     // to "% distance up from the bottom".
-                    return [xPct, (1-yPct)];
+                    return [xPct, (1 - yPct)];
                 }
 
                 // Adjusts [x, y] toward each other by zoomInPercentage%
@@ -716,9 +751,9 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     function adjustAxis(axis, zoomInPercentage, bias) {
                         let delta = axis[1] - axis[0];
                         let increment = delta * zoomInPercentage;
-                        let foo = [increment * bias, increment * (1-bias)];
+                        let foo = [increment * bias, increment * (1 - bias)];
 
-                        return [ axis[0] + foo[0], axis[1] - foo[1] ];
+                        return [axis[0] + foo[0], axis[1] - foo[1]];
                     }
 
                     let yAxes = g.yAxisRanges();
@@ -739,16 +774,19 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     // http://dygraphs.com/gallery/interaction-api.js
                     let normal_def;
                     if (typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
-                        // chrome
+                    // chrome
+                    {
                         normal_def = event.wheelDelta / 40;
-                    else
-                        // firefox
+                    } else
+                    // firefox
+                    {
                         normal_def = event.deltaY * -1.2;
+                    }
 
                     let normal = (event.detail) ? event.detail * -1 : normal_def;
                     let percentage = normal / 50;
 
-                    if (!(event.offsetX && event.offsetY)){
+                    if (!(event.offsetX && event.offsetY)) {
                         event.offsetX = event.layerX - event.target.offsetLeft;
                         event.offsetY = event.layerY - event.target.offsetTop;
                     }
@@ -773,14 +811,14 @@ NETDATA.dygraphChartCreate = function(state, data) {
                     }
 
                     state.setMode('zoom');
-                    state.updateChartPanOrZoom(after, before, function() {
-                        dygraph.updateOptions({ dateWindow: [ after, before ] });
+                    state.updateChartPanOrZoom(after, before, function () {
+                        dygraph.updateOptions({dateWindow: [after, before]});
                     });
 
                     event.preventDefault();
                 }
             },
-            touchstart: function(event, dygraph, context) {
+            touchstart: function (event, dygraph, context) {
                 state.tmp.dygraph_mouse_down = true;
 
                 if (NETDATA.options.debug.dygraph || state.debug) {
@@ -798,19 +836,21 @@ NETDATA.dygraphChartCreate = function(state, data) {
 
                 // we overwrite the touch directions at the end, to overwrite
                 // the internal default of dygraph
-                context.touchDirections = { x: true, y: false };
+                context.touchDirections = {x: true, y: false};
 
                 state.dygraph_last_touch_start = Date.now();
                 state.dygraph_last_touch_move = 0;
 
-                if (typeof event.touches[0].pageX === 'number')
+                if (typeof event.touches[0].pageX === 'number') {
                     state.dygraph_last_touch_page_x = event.touches[0].pageX;
-                else
+                } else {
                     state.dygraph_last_touch_page_x = 0;
+                }
             },
-            touchmove: function(event, dygraph, context) {
-                if (NETDATA.options.debug.dygraph || state.debug) 
+            touchmove: function (event, dygraph, context) {
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.touchmove()');
+                }
 
                 NETDATA.globalSelectionSync.stop();
                 NETDATA.globalSelectionSync.delay();
@@ -820,11 +860,12 @@ NETDATA.dygraphChartCreate = function(state, data) {
 
                 state.dygraph_last_touch_move = Date.now();
             },
-            touchend: function(event, dygraph, context) {
+            touchend: function (event, dygraph, context) {
                 state.tmp.dygraph_mouse_down = false;
 
-                if (NETDATA.options.debug.dygraph || state.debug)
+                if (NETDATA.options.debug.dygraph || state.debug) {
                     state.log('interactionModel.touchend()');
+                }
 
                 NETDATA.globalSelectionSync.stop();
                 NETDATA.globalSelectionSync.delay();
@@ -852,8 +893,9 @@ NETDATA.dygraphChartCreate = function(state, data) {
                 if (typeof state.dygraph_last_touch_end !== 'undefined') {
                     if (state.dygraph_last_touch_move === 0) {
                         let dt = now - state.dygraph_last_touch_end;
-                        if (dt <= NETDATA.options.current.double_click_speed)
+                        if (dt <= NETDATA.options.current.double_click_speed) {
                             NETDATA.resetAllCharts(state);
+                        }
                     }
                 }
 
@@ -867,8 +909,9 @@ NETDATA.dygraphChartCreate = function(state, data) {
     };
 
     if (NETDATA.chartLibraries.dygraph.isLogScale(state)) {
-        if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
+        if (Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0) {
             state.tmp.dygraph_options.valueRange[0] = null;
+        }
     }
 
     if (NETDATA.chartLibraries.dygraph.isSparkline(state)) {
@@ -889,14 +932,17 @@ NETDATA.dygraphChartCreate = function(state, data) {
     if (smooth) {
         state.tmp.dygraph_smooth_eligible = true;
 
-        if (NETDATA.options.current.smooth_plot)
+        if (NETDATA.options.current.smooth_plot) {
             state.tmp.dygraph_options.plotter = smoothPlotter;
+        }
     }
-    else state.tmp.dygraph_smooth_eligible = false;
+    else {
+        state.tmp.dygraph_smooth_eligible = false;
+    }
 
     if (netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(state) === false) {
         // pan and zoom on snapshots
-        state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+        state.tmp.dygraph_options.dateWindow = [NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms];
         //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
     }
 

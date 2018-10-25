@@ -1,4 +1,3 @@
-
 // ----------------------------------------------------------------------------------------------------------------
 // sparkline
 
@@ -8,7 +7,7 @@ NETDATA.sparklineInitialize = function (callback) {
             url: NETDATA.sparkline_js,
             cache: true,
             dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
+            xhrFields: {withCredentials: true} // required for the cookie
         })
             .done(function () {
                 NETDATA.registerChartLibrary('sparkline', NETDATA.sparkline_js);
@@ -18,13 +17,15 @@ NETDATA.sparklineInitialize = function (callback) {
                 NETDATA.error(100, NETDATA.sparkline_js);
             })
             .always(function () {
-                if (typeof callback === "function")
+                if (typeof callback === "function") {
                     return callback();
+                }
             });
     } else {
         NETDATA.chartLibraries.sparkline.enabled = false;
-        if (typeof callback === "function")
+        if (typeof callback === "function") {
             return callback();
+        }
     }
 };
 
@@ -77,15 +78,23 @@ NETDATA.sparklineChartCreate = function (state, data) {
     let tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
     let tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
     let tooltipFormatFieldlistKey = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlistkey', undefined);
-    let numberFormatter = NETDATA.dataAttribute(state.element, 'sparkline-numberformatter', function (n) { return n.toFixed(2); });
+    let numberFormatter = NETDATA.dataAttribute(state.element, 'sparkline-numberformatter', function (n) {
+        return n.toFixed(2);
+    });
     let numberDigitGroupSep = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupsep', undefined);
     let numberDecimalMark = NETDATA.dataAttribute(state.element, 'sparkline-numberdecimalmark', undefined);
     let numberDigitGroupCount = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupcount', undefined);
     let animatedZooms = NETDATA.dataAttributeBoolean(state.element, 'sparkline-animatedzooms', false);
 
-    if (spotColor === 'disable') spotColor = '';
-    if (minSpotColor === 'disable') minSpotColor = '';
-    if (maxSpotColor === 'disable') maxSpotColor = '';
+    if (spotColor === 'disable') {
+        spotColor = '';
+    }
+    if (minSpotColor === 'disable') {
+        minSpotColor = '';
+    }
+    if (maxSpotColor === 'disable') {
+        maxSpotColor = '';
+    }
 
     // state.log('sparkline type ' + type + ', lineColor: ' + lineColor + ', fillColor: ' + fillColor);
 

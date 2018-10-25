@@ -1,59 +1,72 @@
-
 // gauge.js
 
-NETDATA.gaugeInitialize = function(callback) {
+NETDATA.gaugeInitialize = function (callback) {
     if (typeof netdataNoGauge === 'undefined' || !netdataNoGauge) {
         $.ajax({
             url: NETDATA.gauge_js,
             cache: true,
             dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
+            xhrFields: {withCredentials: true} // required for the cookie
         })
-            .done(function() {
+            .done(function () {
                 NETDATA.registerChartLibrary('gauge', NETDATA.gauge_js);
             })
-            .fail(function() {
+            .fail(function () {
                 NETDATA.chartLibraries.gauge.enabled = false;
                 NETDATA.error(100, NETDATA.gauge_js);
             })
-            .always(function() {
-                if (typeof callback === "function")
+            .always(function () {
+                if (typeof callback === "function") {
                     return callback();
+                }
             })
     }
     else {
         NETDATA.chartLibraries.gauge.enabled = false;
-        if (typeof callback === "function")
+        if (typeof callback === "function") {
             return callback();
+        }
     }
 };
 
-NETDATA.gaugeAnimation = function(state, status) {
+NETDATA.gaugeAnimation = function (state, status) {
     let speed = 32;
 
-    if (typeof status === 'boolean' && status === false)
+    if (typeof status === 'boolean' && status === false) {
         speed = 1000000000;
-    else if (typeof status === 'number')
+    } else if (typeof status === 'number') {
         speed = status;
+    }
 
     // console.log('gauge speed ' + speed);
     state.tmp.gauge_instance.animationSpeed = speed;
     state.tmp.___gaugeOld__.speed = speed;
 };
 
-NETDATA.gaugeSet = function(state, value, min, max) {
-    if (typeof value !== 'number') value = 0;
-    if (typeof min !== 'number') min = 0;
-    if (typeof max !== 'number') max = 0;
-    if (value > max) max = value;
-    if (value < min) min = value;
+NETDATA.gaugeSet = function (state, value, min, max) {
+    if (typeof value !== 'number') {
+        value = 0;
+    }
+    if (typeof min !== 'number') {
+        min = 0;
+    }
+    if (typeof max !== 'number') {
+        max = 0;
+    }
+    if (value > max) {
+        max = value;
+    }
+    if (value < min) {
+        min = value;
+    }
     if (min > max) {
         let t = min;
         min = max;
         max = t;
     }
-    else if (min === max)
+    else if (min === max) {
         max = min + 1;
+    }
 
     state.legendFormatValueDecimalsFromMinMax(min, max);
 
@@ -69,8 +82,12 @@ NETDATA.gaugeSet = function(state, value, min, max) {
 
     // bug fix for gauge.js 1.3.1
     // if the value is the absolute min or max, the chart is broken
-    if (pcent < 0.001) pcent = 0.001;
-    if (pcent > 99.999) pcent = 99.999;
+    if (pcent < 0.001) {
+        pcent = 0.001;
+    }
+    if (pcent > 99.999) {
+        pcent = 99.999;
+    }
 
     state.tmp.gauge_instance.set(pcent);
     // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
@@ -80,7 +97,7 @@ NETDATA.gaugeSet = function(state, value, min, max) {
     state.tmp.___gaugeOld__.max = max;
 };
 
-NETDATA.gaugeSetLabels = function(state, value, min, max) {
+NETDATA.gaugeSetLabels = function (state, value, min, max) {
     if (state.tmp.___gaugeOld__.valueLabel !== value) {
         state.tmp.___gaugeOld__.valueLabel = value;
         state.tmp.gaugeChartLabel.innerText = state.legendFormatValue(value);
@@ -95,7 +112,7 @@ NETDATA.gaugeSetLabels = function(state, value, min, max) {
     }
 };
 
-NETDATA.gaugeClearSelection = function(state, force) {
+NETDATA.gaugeClearSelection = function (state, force) {
     if (typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
         NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
         state.tmp.gaugeEvent.timer = undefined;
@@ -113,13 +130,15 @@ NETDATA.gaugeClearSelection = function(state, force) {
     return true;
 };
 
-NETDATA.gaugeSetSelection = function(state, t) {
-    if (state.timeIsVisible(t) !== true)
+NETDATA.gaugeSetSelection = function (state, t) {
+    if (state.timeIsVisible(t) !== true) {
         return NETDATA.gaugeClearSelection(state, true);
+    }
 
     let slot = state.calculateRowForTime(t);
-    if (slot < 0 || slot >= state.data.result.length)
+    if (slot < 0 || slot >= state.data.result.length) {
         return NETDATA.gaugeClearSelection(state, true);
+    }
 
     if (typeof state.tmp.gaugeEvent === 'undefined') {
         state.tmp.gaugeEvent = {
@@ -131,13 +150,17 @@ NETDATA.gaugeSetSelection = function(state, t) {
     }
 
     let value = state.data.result[state.data.result.length - 1 - slot];
-    let min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
-    let max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
+    let min = (state.tmp.gaugeMin === null) ? NETDATA.commonMin.get(state) : state.tmp.gaugeMin;
+    let max = (state.tmp.gaugeMax === null) ? NETDATA.commonMax.get(state) : state.tmp.gaugeMax;
 
     // make sure it is zero based
     // but only if it has not been set by the user
-    if (state.tmp.gaugeMin === null && min > 0) min = 0;
-    if (state.tmp.gaugeMax === null && max < 0) max = 0;
+    if (state.tmp.gaugeMin === null && min > 0) {
+        min = 0;
+    }
+    if (state.tmp.gaugeMax === null && max < 0) {
+        max = 0;
+    }
 
     state.tmp.gaugeEvent.value = value;
     state.tmp.gaugeEvent.min = min;
@@ -147,7 +170,7 @@ NETDATA.gaugeSetSelection = function(state, t) {
     if (state.tmp.gaugeEvent.timer === undefined) {
         NETDATA.gaugeAnimation(state, false);
 
-        state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function() {
+        state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function () {
             state.tmp.gaugeEvent.timer = undefined;
             NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
         }, 0);
@@ -156,7 +179,7 @@ NETDATA.gaugeSetSelection = function(state, t) {
     return true;
 };
 
-NETDATA.gaugeChartUpdate = function(state, data) {
+NETDATA.gaugeChartUpdate = function (state, data) {
     let value, min, max;
 
     if (NETDATA.globalPanAndZoom.isActive() || state.isAutoRefreshable() === false) {
@@ -164,15 +187,23 @@ NETDATA.gaugeChartUpdate = function(state, data) {
         state.tmp.gauge_instance.set(0);
     } else {
         value = data.result[0];
-        min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
-        max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
-        if (value < min) min = value;
-        if (value > max) max = value;
+        min = (state.tmp.gaugeMin === null) ? NETDATA.commonMin.get(state) : state.tmp.gaugeMin;
+        max = (state.tmp.gaugeMax === null) ? NETDATA.commonMax.get(state) : state.tmp.gaugeMax;
+        if (value < min) {
+            min = value;
+        }
+        if (value > max) {
+            max = value;
+        }
 
         // make sure it is zero based
         // but only if it has not been set by the user
-        if (state.tmp.gaugeMin === null && min > 0) min = 0;
-        if (state.tmp.gaugeMax === null && max < 0) max = 0;
+        if (state.tmp.gaugeMin === null && min > 0) {
+            min = 0;
+        }
+        if (state.tmp.gaugeMax === null && max < 0) {
+            max = 0;
+        }
 
         NETDATA.gaugeSet(state, value, min, max);
         NETDATA.gaugeSetLabels(state, value, min, max);
@@ -181,7 +212,7 @@ NETDATA.gaugeChartUpdate = function(state, data) {
     return true;
 };
 
-NETDATA.gaugeChartCreate = function(state, data) {
+NETDATA.gaugeChartCreate = function (state, data) {
     // let chart = $(state.element_chart);
 
     let value = data.result[0];
@@ -210,8 +241,12 @@ NETDATA.gaugeChartCreate = function(state, data) {
 
     // make sure it is zero based
     // but only if it has not been set by the user
-    if (state.tmp.gaugeMin === null && min > 0) min = 0;
-    if (state.tmp.gaugeMax === null && max < 0) max = 0;
+    if (state.tmp.gaugeMin === null && min > 0) {
+        min = 0;
+    }
+    if (state.tmp.gaugeMax === null && max < 0) {
+        max = 0;
+    }
 
     let width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
     // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
@@ -286,7 +321,7 @@ NETDATA.gaugeChartCreate = function(state, data) {
     state.tmp.gauge_canvas = document.createElement('canvas');
     state.tmp.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
     state.tmp.gauge_canvas.className = 'gaugeChart';
-    state.tmp.gauge_canvas.width  = width;
+    state.tmp.gauge_canvas.width = width;
     state.tmp.gauge_canvas.height = height;
     state.element_chart.appendChild(state.tmp.gauge_canvas);
 
@@ -328,8 +363,9 @@ NETDATA.gaugeChartCreate = function(state, data) {
     // when we just re-create the chart
     // do not animate the first update
     let animate = true;
-    if (typeof state.tmp.gauge_instance !== 'undefined')
+    if (typeof state.tmp.gauge_instance !== 'undefined') {
         animate = false;
+    }
 
     state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
@@ -351,7 +387,7 @@ NETDATA.gaugeChartCreate = function(state, data) {
     NETDATA.gaugeSetLabels(state, value, min, max);
     NETDATA.gaugeAnimation(state, true);
 
-    state.legendSetUnitsString = function(units) {
+    state.legendSetUnitsString = function (units) {
         if (typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
             state.tmp.gaugeChartUnits.innerText = units;
             state.tmp.___gaugeOld__.valueLabel = null;
@@ -360,9 +396,10 @@ NETDATA.gaugeChartCreate = function(state, data) {
             state.tmp.units = units;
         }
     };
-    state.legendShowUndefined = function() {
-        if (typeof state.tmp.gauge_instance !== 'undefined')
+    state.legendShowUndefined = function () {
+        if (typeof state.tmp.gauge_instance !== 'undefined') {
             NETDATA.gaugeClearSelection(state);
+        }
     };
 
     return true;

@@ -1,41 +1,42 @@
-
 // google charts
 
-NETDATA.googleInitialize = function(callback) {
+NETDATA.googleInitialize = function (callback) {
     if (typeof netdataNoGoogleCharts === 'undefined' || !netdataNoGoogleCharts) {
         $.ajax({
             url: NETDATA.google_js,
             cache: true,
             dataType: "script",
-            xhrFields: { withCredentials: true } // required for the cookie
+            xhrFields: {withCredentials: true} // required for the cookie
         })
-        .done(function() {
-            NETDATA.registerChartLibrary('google', NETDATA.google_js);
-            google.load('visualization', '1.1', {
-                'packages': ['corechart', 'controls'],
-                'callback': callback
+            .done(function () {
+                NETDATA.registerChartLibrary('google', NETDATA.google_js);
+                google.load('visualization', '1.1', {
+                    'packages': ['corechart', 'controls'],
+                    'callback': callback
+                });
+            })
+            .fail(function () {
+                NETDATA.chartLibraries.google.enabled = false;
+                NETDATA.error(100, NETDATA.google_js);
+                if (typeof callback === "function") {
+                    return callback();
+                }
             });
-        })
-        .fail(function() {
-            NETDATA.chartLibraries.google.enabled = false;
-            NETDATA.error(100, NETDATA.google_js);
-            if (typeof callback === "function")
-                return callback();
-        });
     } else {
         NETDATA.chartLibraries.google.enabled = false;
-        if (typeof callback === "function")
+        if (typeof callback === "function") {
             return callback();
+        }
     }
 };
 
-NETDATA.googleChartUpdate = function(state, data) {
+NETDATA.googleChartUpdate = function (state, data) {
     let datatable = new google.visualization.DataTable(data.result);
     state.google_instance.draw(datatable, state.google_options);
     return true;
 };
 
-NETDATA.googleChartCreate = function(state, data) {
+NETDATA.googleChartCreate = function (state, data) {
     let datatable = new google.visualization.DataTable(data.result);
 
     state.google_options = {
@@ -48,11 +49,11 @@ NETDATA.googleChartCreate = function(state, data) {
         title: state.title,
         fontSize: 11,
         hAxis: {
-        //  title: "Time of Day",
-        //  format:'HH:mm:ss',
+            //  title: "Time of Day",
+            //  format:'HH:mm:ss',
             viewWindowMode: 'maximized',
             slantedText: false,
-            format:'HH:mm:ss',
+            format: 'HH:mm:ss',
             textStyle: {
                 fontSize: 9
             },
@@ -100,7 +101,7 @@ NETDATA.googleChartCreate = function(state, data) {
         isStacked: false
     };
 
-    switch(state.chart.chart_type) {
+    switch (state.chart.chart_type) {
         case "area":
             state.google_options.vAxis.viewWindowMode = 'maximized';
             state.google_options.areaOpacity = NETDATA.options.current.color_fill_opacity_area;
