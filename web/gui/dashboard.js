@@ -492,7 +492,7 @@ const NETDATA = window.NETDATA || {};
             legend_toolbox: true,       // show the legend toolbox on charts
             resize_charts: true,        // show the resize handler on charts
 
-            pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
+            pixels_per_point: isSlowDevice() ? 5 : 1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
                                         // each chart library has its own limit too
                                         // the max of this and the chart library is used
@@ -812,8 +812,9 @@ const NETDATA = window.NETDATA || {};
         } else if (NETDATA.options.current[key.toString()] !== value) {
             let name = 'options.' + key.toString();
 
-            if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined')
+            if (typeof NETDATA.localStorage.default[name.toString()] === 'undefined') {
                 console.log('localStorage: setOption() on unsaved option: "' + name.toString() + '", value: ' + value);
+            }
 
             //console.log(NETDATA.localStorage);
             //console.log('setOption: setting "' + key.toString() + '" to "' + value + '" of type ' + typeof(value) + ' original type ' + typeof(NETDATA.options.current[key.toString()]));
@@ -2373,13 +2374,21 @@ const NETDATA = window.NETDATA || {};
                     if (min > max) max = min;
 
                     // find the smallest scale that provides integers
-                    for (x in this.scalableUnits[units]) {
-                        if (this.scalableUnits[units].hasOwnProperty(x)) {
-                            let m = this.scalableUnits[units][x];
-                            if (m <= max && m > tdivider) {
-                                tunits = x;
-                                tdivider = m;
-                            }
+                    // for (x in this.scalableUnits[units]) {
+                    //     if (this.scalableUnits[units].hasOwnProperty(x)) {
+                    //         let m = this.scalableUnits[units][x];
+                    //         if (m <= max && m > tdivider) {
+                    //             tunits = x;
+                    //             tdivider = m;
+                    //         }
+                    //     }
+                    // }
+                    const sunit = this.scalableUnits[units]
+                    for (const x of Object.keys(sunit)) {
+                        let m = sunit[x];
+                        if (m <= max && m > tdivider) {
+                            tunits = x;
+                            tdivider = m;
                         }
                     }
 
