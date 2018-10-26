@@ -1582,7 +1582,7 @@ let chartState = function (element) {
         if (this.debug) {
             this.log(msg);
         }
-    }
+    };
 
     // ============================================================================================================
     // EARLY INITIALIZATION
