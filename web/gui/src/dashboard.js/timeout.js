@@ -1,5 +1,5 @@
 
-// *** src/dashboard.js/server-detection.js
+// *** src/dashboard.js/timeout.js
 
 // TODO: Better name needed
 // TODO: Remove excessive compatibility tests, even use requestAnimationFrame() always.
