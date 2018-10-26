@@ -189,3 +189,209 @@ NETDATA.dataAttributeBoolean = function (element, attribute, def) {
 
     return def;
 };
+
+// ----------------------------------------------------------------------------------------------------------------
+// fast numbers formatting
+
+NETDATA.fastNumberFormat = {
+    formatters_fixed: [],
+    formatters_zero_based: [],
+
+    // this is the fastest and the preferred
+    getIntlNumberFormat: function (min, max) {
+        let key = max;
+        if (min === max) {
+            if (typeof this.formatters_fixed[key] === 'undefined') {
+                this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
+                    // style: 'decimal',
+                    // minimumIntegerDigits: 1,
+                    // minimumSignificantDigits: 1,
+                    // maximumSignificantDigits: 1,
+                    useGrouping: true,
+                    minimumFractionDigits: min,
+                    maximumFractionDigits: max
+                });
+            }
+
+            return this.formatters_fixed[key];
+        } else if (min === 0) {
+            if (typeof this.formatters_zero_based[key] === 'undefined') {
+                this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
+                    // style: 'decimal',
+                    // minimumIntegerDigits: 1,
+                    // minimumSignificantDigits: 1,
+                    // maximumSignificantDigits: 1,
+                    useGrouping: true,
+                    minimumFractionDigits: min,
+                    maximumFractionDigits: max
+                });
+            }
+
+            return this.formatters_zero_based[key];
+        } else {
+            // this is never used
+            // it is added just for completeness
+            return new Intl.NumberFormat(undefined, {
+                // style: 'decimal',
+                // minimumIntegerDigits: 1,
+                // minimumSignificantDigits: 1,
+                // maximumSignificantDigits: 1,
+                useGrouping: true,
+                minimumFractionDigits: min,
+                maximumFractionDigits: max
+            });
+        }
+    },
+
+    // this respects locale
+    getLocaleString: function (min, max) {
+        let key = max;
+        if (min === max) {
+            if (typeof this.formatters_fixed[key] === 'undefined') {
+                this.formatters_fixed[key] = {
+                    format: function (value) {
+                        return value.toLocaleString(undefined, {
+                            // style: 'decimal',
+                            // minimumIntegerDigits: 1,
+                            // minimumSignificantDigits: 1,
+                            // maximumSignificantDigits: 1,
+                            useGrouping: true,
+                            minimumFractionDigits: min,
+                            maximumFractionDigits: max
+                        });
+                    }
+                };
+            }
+
+            return this.formatters_fixed[key];
+        } else if (min === 0) {
+            if (typeof this.formatters_zero_based[key] === 'undefined') {
+                this.formatters_zero_based[key] = {
+                    format: function (value) {
+                        return value.toLocaleString(undefined, {
+                            // style: 'decimal',
+                            // minimumIntegerDigits: 1,
+                            // minimumSignificantDigits: 1,
+                            // maximumSignificantDigits: 1,
+                            useGrouping: true,
+                            minimumFractionDigits: min,
+                            maximumFractionDigits: max
+                        });
+                    }
+                };
+            }
+
+            return this.formatters_zero_based[key];
+        } else {
+            return {
+                format: function (value) {
+                    return value.toLocaleString(undefined, {
+                        // style: 'decimal',
+                        // minimumIntegerDigits: 1,
+                        // minimumSignificantDigits: 1,
+                        // maximumSignificantDigits: 1,
+                        useGrouping: true,
+                        minimumFractionDigits: min,
+                        maximumFractionDigits: max
+                    });
+                }
+            };
+        }
+    },
+
+    // the fallback
+    getFixed: function (min, max) {
+        let key = max;
+        if (min === max) {
+            if (typeof this.formatters_fixed[key] === 'undefined') {
+                this.formatters_fixed[key] = {
+                    format: function (value) {
+                        if (value === 0) {
+                            return "0";
+                        }
+                        return value.toFixed(max);
+                    }
+                };
+            }
+
+            return this.formatters_fixed[key];
+        } else if (min === 0) {
+            if (typeof this.formatters_zero_based[key] === 'undefined') {
+                this.formatters_zero_based[key] = {
+                    format: function (value) {
+                        if (value === 0) {
+                            return "0";
+                        }
+                        return value.toFixed(max);
+                    }
+                };
+            }
+
+            return this.formatters_zero_based[key];
+        } else {
+            return {
+                format: function (value) {
+                    if (value === 0) {
+                        return "0";
+                    }
+                    return value.toFixed(max);
+                }
+            };
+        }
+    },
+
+    testIntlNumberFormat: function () {
+        let value = 1.12345;
+        let e1 = "1.12", e2 = "1,12";
+        let s = "";
+
+        try {
+            let x = new Intl.NumberFormat(undefined, {
+                useGrouping: true,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+
+            s = x.format(value);
+        } catch (e) {
+            s = "";
+        }
+
+        // console.log('NumberFormat: ', s);
+        return (s === e1 || s === e2);
+    },
+
+    testLocaleString: function () {
+        let value = 1.12345;
+        let e1 = "1.12", e2 = "1,12";
+        let s = "";
+
+        try {
+            s = value.toLocaleString(undefined, {
+                useGrouping: true,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        } catch (e) {
+            s = "";
+        }
+
+        // console.log('localeString: ', s);
+        return (s === e1 || s === e2);
+    },
+
+    // on first run we decide which formatter to use
+    get: function (min, max) {
+        if (this.testIntlNumberFormat()) {
+            // console.log('numberformat');
+            this.get = this.getIntlNumberFormat;
+        } else if (this.testLocaleString()) {
+            // console.log('localestring');
+            this.get = this.getLocaleString;
+        } else {
+            // console.log('fixed');
+            this.get = this.getFixed;
+        }
+        return this.get(min, max);
+    }
+};
