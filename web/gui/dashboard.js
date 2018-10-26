@@ -477,6 +477,57 @@ NETDATA.fastNumberFormat = {
         return this.get(min, max);
     }
 };
+
+// ----------------------------------------------------------------------------------------------------------------
+// Detect the netdata server
+
+// http://stackoverflow.com/questions/984510/what-is-my-script-src-url
+// http://stackoverflow.com/questions/6941533/get-protocol-domain-and-port-from-url
+NETDATA._scriptSource = function () {
+    let script = null;
+
+    if (typeof document.currentScript !== 'undefined') {
+        script = document.currentScript;
+    } else {
+        const all_scripts = document.getElementsByTagName('script');
+        script = all_scripts[all_scripts.length - 1];
+    }
+
+    if (typeof script.getAttribute.length !== 'undefined') {
+        script = script.src;
+    } else {
+        script = script.getAttribute('src', -1);
+    }
+
+    return script;
+};
+
+if (typeof netdataServer !== 'undefined') {
+    NETDATA.serverDefault = netdataServer;
+} else {
+    let s = NETDATA._scriptSource();
+    if (s) {
+        NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
+    } else {
+        console.log('WARNING: Cannot detect the URL of the netdata server.');
+        NETDATA.serverDefault = null;
+    }
+}
+
+if (NETDATA.serverDefault === null) {
+    NETDATA.serverDefault = '';
+} else if (NETDATA.serverDefault.slice(-1) !== '/') {
+    NETDATA.serverDefault += '/';
+}
+
+if (typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null && netdataServerStatic !== '') {
+    NETDATA.serverStatic = netdataServerStatic;
+    if (NETDATA.serverStatic.slice(-1) !== '/') {
+        NETDATA.serverStatic += '/';
+    }
+} else {
+    NETDATA.serverStatic = NETDATA.serverDefault;
+}
 // Error Handling
 
 NETDATA.errorCodes = {
