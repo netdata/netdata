@@ -2,6 +2,7 @@
 
 cat src/dashboard.js/prologue.js.inc \
     src/dashboard.js/utils.js \
+    src/dashboard.js/dependencies.js \
     src/dashboard.js/error-handling.js \
     src/dashboard.js/compatibility.js \
     src/dashboard.js/xss.js \
