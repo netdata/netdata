@@ -2,6 +2,7 @@
 
 cat src/prologue.js.inc \
     src/utils.js \
+    src/error-handling.js \
     src/compatibility.js \
     src/xss.js \
     src/colors.js \
