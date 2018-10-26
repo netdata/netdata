@@ -11,6 +11,7 @@ cat src/dashboard.js/prologue.js.inc \
     src/dashboard.js/units-conversion.js \
     src/dashboard.js/options.js \
     src/dashboard.js/localstorage.js \
+    src/dashboard.js/timeout.js \
     src/dashboard.js/themes.js \
     src/dashboard.js/charting/dygraph.js \
     src/dashboard.js/charting/sparkline.js \
