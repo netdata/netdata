@@ -17,6 +17,7 @@ cat src/prologue.js.inc \
     src/charting/d3pie.js \
     src/charting/d3.js \
     src/charting/peity.js \
+    src/charting.js \
     src/main.js \
     src/alarms.js \
     src/registry.js \
