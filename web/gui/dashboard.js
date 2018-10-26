@@ -146,7 +146,6 @@ NETDATA.seconds4human = function (seconds, options) {
     if (typeof options !== 'object') {
         options = default_options;
     } else {
-        let x;
         for (const x in default_options) {
             if (typeof options[x] !== 'string') {
                 options[x] = default_options[x];
@@ -678,9 +677,9 @@ NETDATA.colorLuminance = function (hex, lum) {
     lum = lum || 0;
 
     // convert to decimal and change luminosity
-    let rgb = "#", c, i;
+    let rgb = "#";
     for (let i = 0; i < 3; i++) {
-        c = parseInt(hex.substr(i * 2, 2), 16);
+        let c = parseInt(hex.substr(i * 2, 2), 16);
         c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
         rgb += ("00" + c).substr(c.length);
     }
@@ -921,7 +920,6 @@ NETDATA.unitsConversion = {
 
         let tunits = null;
         let tdivider = 0;
-        let x;
 
         if (typeof this.scalableUnits[units] !== 'undefined') {
             // units that can be scaled
@@ -7476,7 +7474,7 @@ let chartState = function (element) {
     };
 
     this.legendUpdateDOM = function () {
-        let needed = false, dim, keys, len, i;
+        let needed = false, dim, keys, len;
 
         // check that the legend DOM is up to date for the downloaded dimensions
         if (typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {

@@ -232,7 +232,6 @@ NETDATA.unitsConversion = {
 
         let tunits = null;
         let tdivider = 0;
-        let x;
 
         if (typeof this.scalableUnits[units] !== 'undefined') {
             // units that can be scaled
