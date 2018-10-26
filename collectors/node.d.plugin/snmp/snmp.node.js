@@ -171,7 +171,7 @@ netdata.processors.snmp = {
 
                     var oid = this.fixoid(dim.oid);
                     var oidname = this.fixoid(dim.oidname);
-                    
+
                     if(__DEBUG === true)
                         netdata.debug(service.module.name + ': ' + service.name + ': indexing ' + this.name + ' chart: ' + c + ', dimension: ' + d + ', OID: ' + oid + ", OID name: " + oidname);
 
@@ -276,7 +276,7 @@ netdata.processors.snmp = {
 
                         switch(varbinds[i].type) {
                             case net_snmp.ObjectType.OctetString:
-                                if(service.snmp_oids_index[varbinds[i].oid].type !== 'title') {
+                                if (service.snmp_oids_index[varbinds[i].oid].type !== 'title' && service.snmp_oids_index[varbinds[i].oid].type !== 'name') {
                                     // parse floating point values, exposed as strings
                                     value = parseFloat(varbinds[i].value) * 1000;
                                     if (__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as float in string)");
@@ -309,7 +309,7 @@ netdata.processors.snmp = {
                     if(value !== null) {
                         switch(service.snmp_oids_index[varbinds[i].oid].type) {
                             case 'title': service.snmp_oids_index[varbinds[i].oid].link.title += ' ' + value; break;
-                            case 'name' : service.snmp_oids_index[varbinds[i].oid].link.name = value; break;
+                            case 'name' : service.snmp_oids_index[varbinds[i].oid].link.name = value.toString().replace(/\W/g, '_'); break;
                             case 'value': service.snmp_oids_index[varbinds[i].oid].link.value = value; break;
                         }
                     }
@@ -448,7 +448,7 @@ var snmp = {
                     var id = c + from.toString();
                     var chart = extend(true, {}, service_request_chart);
                     chart.title += from.toString();
-                    
+
                     if(typeof chart.titleoid !== 'undefined')
                         chart.titleoid += from.toString();
 
