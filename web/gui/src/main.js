@@ -3146,7 +3146,7 @@ let chartState = function (element) {
     };
 
     this.legendUpdateDOM = function () {
-        let needed = false, dim, keys, len, i;
+        let needed = false, dim, keys, len;
 
         // check that the legend DOM is up to date for the downloaded dimensions
         if (typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {
