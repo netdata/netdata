@@ -261,7 +261,7 @@ NETDATA.unitsConversion = {
                 //         }
                 //     }
                 // }
-                const sunit = this.scalableUnits[units]
+                const sunit = this.scalableUnits[units];
                 for (const x of Object.keys(sunit)) {
                     let m = sunit[x];
                     if (m <= max && m > tdivider) {
@@ -298,7 +298,7 @@ NETDATA.unitsConversion = {
 
                     // find the max divider of all charts
                     let common_units = t[uuid];
-                    for (x in t) {
+                    for (const x in t) {
                         if (t.hasOwnProperty(x) && t[x].divider > common_units.divider) {
                             common_units = t[x];
                         }
@@ -365,7 +365,7 @@ NETDATA.unitsConversion = {
         } else if (typeof this.convertibleUnits[units] !== 'undefined') {
             // units that can be converted
             if (desired_units === 'auto') {
-                for (x in this.convertibleUnits[units]) {
+                for (const x in this.convertibleUnits[units]) {
                     if (this.convertibleUnits[units].hasOwnProperty(x)) {
                         if (this.convertibleUnits[units][x].check(max)) {
                             //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());

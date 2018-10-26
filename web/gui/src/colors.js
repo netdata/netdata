@@ -24,7 +24,7 @@ NETDATA.colorLuminance = function (hex, lum) {
 
     // convert to decimal and change luminosity
     let rgb = "#", c, i;
-    for (i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         c = parseInt(hex.substr(i * 2, 2), 16);
         c = Math.round(Math.min(Math.max(0, c + (c * lum)), 255)).toString(16);
         rgb += ("00" + c).substr(c.length);
