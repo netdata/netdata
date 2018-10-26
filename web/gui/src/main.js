@@ -694,7 +694,7 @@ NETDATA.commonMin = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
         // }
-        for (let ti of Object.values(t)) {
+        for (const ti of Object.values(t)) {
             if (ti < m) {
                 m = ti;
             }
@@ -758,7 +758,7 @@ NETDATA.commonMax = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
         // }
-        for (let ti of Object.values(t)) {
+        for (const ti of Object.values(t)) {
             if (ti > m) {
                 m = ti;
             }
@@ -3453,7 +3453,7 @@ let chartState = function (element) {
                 this.colors = [];
                 keys = Object.keys(this.chart.dimensions);
                 len = keys.length;
-                for (i = 0; i < len; i++) {
+                for (let i = 0; i < len; i++) {
                     NETDATA.commonColors.get(this, this.chart.dimensions[keys[i]].name);
                 }
             }
@@ -3829,13 +3829,13 @@ let chartState = function (element) {
                 this.log('labels from data: "' + this.element_legend_childs.series.labels_key + '"');
             }
 
-            for (i = 0, len = this.data.dimension_names.length; i < len; i++) {
+            for (let i = 0, len = this.data.dimension_names.length; i < len; i++) {
                 genLabel(this, content, this.data.dimension_ids[i], this.data.dimension_names[i], i);
             }
         } else {
             let tmp = [];
             keys = Object.keys(this.chart.dimensions);
-            for (i = 0, len = keys.length; i < len; i++) {
+            for (let i = 0, len = keys.length; i < len; i++) {
                 dim = keys[i];
                 tmp.push(this.chart.dimensions[dim].name);
                 genLabel(this, content, dim, this.chart.dimensions[dim].name, i);
