@@ -602,6 +602,8 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
 
             case PF_INET6: {
                 struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
+                (void)pSadrIn6;
+
                 debug(D_CONNECT_TO,"ai_addr = sin6_family: %d (AF_INET = %d, AF_INET6 = %d), sin6_addr: '%s', sin6_port: '%s', sin6_flowinfo: %u, sin6_scope_id: %u",
                       pSadrIn6->sin6_family,
                       AF_INET,
@@ -1431,6 +1433,8 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     usec_t timer_usec = timer_milliseconds * USEC_PER_MS;
     usec_t now_usec = 0, next_timer_usec = 0, last_timer_usec = 0;
+    (void)last_timer_usec;
+
     if(unlikely(timer_usec)) {
         now_usec = now_boottime_usec();
         next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;

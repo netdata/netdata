@@ -206,6 +206,8 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
 
 inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
+
     RRDDIM *rd;
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
@@ -930,6 +932,8 @@ static inline size_t rrdset_done_interpolate(
     size_t stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
 
     usec_t first_ut = last_stored_ut, last_ut = 0;
+    (void)first_ut;
+
     ssize_t iterations = (ssize_t)((now_collect_ut - last_stored_ut) / (update_every_ut));
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 

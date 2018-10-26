@@ -59,6 +59,7 @@ calculated_number backend_calculate_value_from_stored_data(
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
 
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
@@ -170,6 +171,7 @@ static SIMPLE_PATTERN *hosts_pattern = NULL;
 
 inline int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
