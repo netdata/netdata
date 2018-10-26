@@ -502,6 +502,8 @@ NETDATA._scriptSource = function () {
     return script;
 };
 
+// *** src/dashboard.js/server-detection.js
+
 if (typeof netdataServer !== 'undefined') {
     NETDATA.serverDefault = netdataServer;
 } else {
