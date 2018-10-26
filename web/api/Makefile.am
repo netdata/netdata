@@ -3,9 +3,10 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-SUBDIR = \
+SUBDIRS = \
     badges \
     queries \
+    exporters \
     $(NULL)
 
 dist_noinst_DATA = \
