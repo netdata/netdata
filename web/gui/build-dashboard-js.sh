@@ -22,6 +22,7 @@ cat src/dashboard.js/prologue.js.inc \
     src/dashboard.js/charting/d3.js \
     src/dashboard.js/charting/peity.js \
     src/dashboard.js/charting.js \
+    src/dashboard.js/chart-registry.js \
     src/dashboard.js/common.js \
     src/dashboard.js/main.js \
     src/dashboard.js/alarms.js \
