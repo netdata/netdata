@@ -504,7 +504,7 @@ static inline void do_dimension(
 // ----------------------------------------------------------------------------
 // fill RRDR for the whole chart
 
-
+#ifdef NETDATA_INTERNAL_CHECKS
 static void rrd2rrdr_log_request_response_metdata(RRDR *r
         , RRDR_GROUPING group_method
         , int aligned
@@ -571,6 +571,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , msg
     );
 }
+#endif // NETDATA_INTERNAL_CHECKS
 
 RRDR *rrd2rrdr(
         RRDSET *st

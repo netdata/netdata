@@ -153,6 +153,7 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options) {
     RRDSET *st = rd->rrdset;
+    (void)st;
 
     debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, st->name, rd->id, (prefix)?prefix:"", rd->name, (suffix)?suffix:"");
 
@@ -179,6 +180,8 @@ RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, co
 
 void rrddimvar_rename_all(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
+    (void)st;
+
     debug(D_VARIABLES, "RRDDIMSET rename for chart id '%s' name '%s', dimension id '%s', name '%s'", st->id, st->name, rd->id, rd->name);
 
     RRDDIMVAR *rs, *next = rd->variables;

@@ -316,6 +316,8 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     int ret = rrdvar_callback_for_all_host_variables(host, rrdpush_sender_thread_custom_host_variables_callback, host);
+    (void)ret;
+
     debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
 }
 

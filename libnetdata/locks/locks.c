@@ -84,6 +84,7 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
 
 int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -99,6 +100,7 @@ int netdata_mutex_init_debug( const char *file, const char *function, const unsi
 
 int netdata_mutex_lock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -114,6 +116,7 @@ int netdata_mutex_lock_debug( const char *file, const char *function, const unsi
 
 int netdata_mutex_trylock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -129,6 +132,7 @@ int netdata_mutex_trylock_debug( const char *file, const char *function, const u
 
 int netdata_mutex_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -217,6 +221,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 
 int netdata_rwlock_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -232,6 +237,7 @@ int netdata_rwlock_destroy_debug( const char *file, const char *function, const 
 
 int netdata_rwlock_init_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -247,6 +253,7 @@ int netdata_rwlock_init_debug( const char *file, const char *function, const uns
 
 int netdata_rwlock_rdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -262,6 +269,7 @@ int netdata_rwlock_rdlock_debug( const char *file, const char *function, const u
 
 int netdata_rwlock_wrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -277,6 +285,7 @@ int netdata_rwlock_wrlock_debug( const char *file, const char *function, const u
 
 int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -292,6 +301,7 @@ int netdata_rwlock_unlock_debug( const char *file, const char *function, const u
 
 int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
@@ -307,6 +317,7 @@ int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, cons
 
 int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
+    (void)start;
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();

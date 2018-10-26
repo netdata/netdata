@@ -164,6 +164,8 @@ static void web_server_del_callback(POLLINFO *pi) {
     w->pollinfo_slot = 0;
     if(unlikely(w->pollinfo_filecopy_slot)) {
         POLLINFO *fpi = pollinfo_from_slot(pi->p, w->pollinfo_filecopy_slot);  // POLLINFO of the client socket
+        (void)fpi;
+
         debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
     }
     else {

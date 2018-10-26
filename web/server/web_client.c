@@ -1593,6 +1593,8 @@ ssize_t web_client_read_file(struct web_client *w)
     ssize_t bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t)left);
     if(likely(bytes > 0)) {
         size_t old = w->response.data->len;
+        (void)old;
+
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
 
@@ -1646,6 +1648,8 @@ ssize_t web_client_receive(struct web_client *w)
         w->stats_received_bytes += bytes;
 
         size_t old = w->response.data->len;
+        (void)old;
+
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
 

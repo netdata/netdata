@@ -5,11 +5,13 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     average \
+    des \
     incremental_sum \
     max \
     min \
     sum \
     median \
+    ses \
     stddev \
     $(NULL)
 
