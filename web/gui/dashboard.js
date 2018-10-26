@@ -9334,7 +9334,6 @@ NETDATA.loadRequiredCSS = function (index) {
     NETDATA.loadRequiredCSS(++index);
 };
 
-// ----------------------------------------------------------------------------------------------------------------
 // Registry of netdata hosts
 
 NETDATA.alarms = {
@@ -9756,7 +9755,6 @@ NETDATA.alarms = {
         }
     }
 };
-
 
 // Registry of netdata hosts
 
