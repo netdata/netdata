@@ -63,7 +63,6 @@ NETDATA.seconds4human = function (seconds, options) {
     if (typeof options !== 'object') {
         options = default_options;
     } else {
-        let x;
         for (const x in default_options) {
             if (typeof options[x] !== 'string') {
                 options[x] = default_options[x];
