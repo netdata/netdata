@@ -4468,249 +4468,9 @@ NETDATA.registerChartLibrary = function (library, url) {
     NETDATA.chartLibraries[library].enabled = true;
 };
 
-// default URLs for all the external files we need
-// make them RELATIVE so that the whole thing can also be
-// installed under a web server
-NETDATA.jQuery = NETDATA.serverStatic + 'lib/jquery-2.2.4.min.js';
-NETDATA.peity_js = NETDATA.serverStatic + 'lib/jquery.peity-3.2.0.min.js';
-NETDATA.sparkline_js = NETDATA.serverStatic + 'lib/jquery.sparkline-2.1.2.min.js';
-NETDATA.easypiechart_js = NETDATA.serverStatic + 'lib/jquery.easypiechart-97b5824.min.js';
-NETDATA.gauge_js = NETDATA.serverStatic + 'lib/gauge-1.3.2.min.js';
-NETDATA.dygraph_js = NETDATA.serverStatic + 'lib/dygraph-c91c859.min.js';
-NETDATA.dygraph_smooth_js = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-c91c859.js';
-// NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
-// NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
-// NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
-NETDATA.d3pie_js = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-3.js';
-NETDATA.d3_js = NETDATA.serverStatic + 'lib/d3-4.12.2.min.js';
-// NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
-// NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
-NETDATA.google_js = 'https://www.google.com/jsapi';
+// Compute common (joint) values over multiple charts.
 
 
-// ----------------------------------------------------------------------------------------------------------------
-
-NETDATA.timeout = {
-    // by default, these are just wrappers to setTimeout() / clearTimeout()
-
-    step: function (callback) {
-        return window.setTimeout(callback, 1000 / 60);
-    },
-
-    set: function (callback, delay) {
-        return window.setTimeout(callback, delay);
-    },
-
-    clear: function (id) {
-        return window.clearTimeout(id);
-    },
-
-    init: function () {
-        let custom = true;
-
-        if (window.requestAnimationFrame) {
-            this.step = function (callback) {
-                return window.requestAnimationFrame(callback);
-            };
-
-            this.clear = function (handle) {
-                return window.cancelAnimationFrame(handle.value);
-            };
-        } else if (window.webkitRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.webkitRequestAnimationFrame(callback);
-            };
-
-            if (window.webkitCancelAnimationFrame) {
-                this.clear = function (handle) {
-                    return window.webkitCancelAnimationFrame(handle.value);
-                };
-            } else if (window.webkitCancelRequestAnimationFrame) {
-                this.clear = function (handle) {
-                    return window.webkitCancelRequestAnimationFrame(handle.value);
-                };
-            }
-        } else if (window.mozRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.mozRequestAnimationFrame(callback);
-            };
-
-            this.clear = function (handle) {
-                return window.mozCancelRequestAnimationFrame(handle.value);
-            };
-        } else if (window.oRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.oRequestAnimationFrame(callback);
-            };
-
-            this.clear = function (handle) {
-                return window.oCancelRequestAnimationFrame(handle.value);
-            };
-        } else if (window.msRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.msRequestAnimationFrame(callback);
-            };
-
-            this.clear = function (handle) {
-                return window.msCancelRequestAnimationFrame(handle.value);
-            };
-        } else {
-            custom = false;
-        }
-
-        if (custom) {
-            // we have installed custom .step() / .clear() functions
-            // overwrite the .set() too
-
-            this.set = function (callback, delay) {
-                let that = this;
-
-                let start = Date.now(),
-                    handle = new Object();
-
-                function loop() {
-                    let current = Date.now(),
-                        delta = current - start;
-
-                    if (delta >= delay) {
-                        callback.call();
-                    } else {
-                        handle.value = that.step(loop);
-                    }
-                }
-
-                handle.value = that.step(loop);
-                return handle;
-            };
-        }
-    }
-};
-
-NETDATA.timeout.init();
-
-// ----------------------------------------------------------------------------------------------------------------
-
-if (NETDATA.options.debug.main_loop) {
-    console.log('welcome to NETDATA');
-}
-
-NETDATA.onresizeCallback = null;
-NETDATA.onresize = function () {
-    NETDATA.options.last_page_resize = Date.now();
-    NETDATA.onscroll();
-
-    if (typeof NETDATA.onresizeCallback === 'function') {
-        NETDATA.onresizeCallback();
-    }
-};
-
-NETDATA.abort_all_refreshes = function () {
-    let targets = NETDATA.options.targets;
-    let len = targets.length;
-
-    while (len--) {
-        if (targets[len].fetching_data) {
-            if (typeof targets[len].xhr !== 'undefined') {
-                targets[len].xhr.abort();
-                targets[len].running = false;
-                targets[len].fetching_data = false;
-            }
-        }
-    }
-};
-
-NETDATA.onscroll_start_delay = function () {
-    NETDATA.options.last_page_scroll = Date.now();
-
-    NETDATA.options.on_scroll_refresher_stop_until =
-        NETDATA.options.last_page_scroll
-        + (NETDATA.options.current.async_on_scroll ? 1000 : 0);
-};
-
-NETDATA.onscroll_end_delay = function () {
-    NETDATA.options.on_scroll_refresher_stop_until =
-        Date.now()
-        + (NETDATA.options.current.async_on_scroll ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
-};
-
-NETDATA.onscroll_updater_timeout_id = undefined;
-NETDATA.onscroll_updater = function () {
-    NETDATA.globalSelectionSync.stop();
-
-    if (NETDATA.options.abort_ajax_on_scroll) {
-        NETDATA.abort_all_refreshes();
-    }
-
-    // when the user scrolls he sees that we have
-    // hidden all the not-visible charts
-    // using this little function we try to switch
-    // the charts back to visible quickly
-
-    // if (NETDATA.intersectionObserver.enabled() === false) {
-    if (!NETDATA.intersectionObserver.enabled()) {
-        // if (NETDATA.options.current.parallel_refresher === false) {
-        if (!NETDATA.options.current.parallel_refresher) {
-            let targets = NETDATA.options.targets;
-            let len = targets.length;
-
-            while (len--) {
-                if (!targets[len].running) {
-                    // if (targets[len].running === false) {
-                    targets[len].isVisible();
-                }
-            }
-        }
-    }
-
-    NETDATA.onscroll_end_delay();
-};
-
-NETDATA.scrollUp = false;
-NETDATA.scrollY = window.scrollY;
-NETDATA.onscroll = function () {
-    //console.log('onscroll() begin');
-
-    NETDATA.onscroll_start_delay();
-    NETDATA.chartRefresherReschedule();
-
-    NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
-    NETDATA.scrollY = window.scrollY;
-
-    if (NETDATA.onscroll_updater_timeout_id) {
-        NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
-    }
-
-    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
-    //console.log('onscroll() end');
-};
-
-NETDATA.supportsPassiveEvents = function () {
-    if (NETDATA.options.passive_events === null) {
-        let supportsPassive = false;
-        try {
-            let opts = Object.defineProperty({}, 'passive', {
-                get: function () {
-                    supportsPassive = true;
-                }
-            });
-            window.addEventListener("test", null, opts);
-        } catch (e) {
-            console.log('browser does not support passive events');
-        }
-
-        NETDATA.options.passive_events = supportsPassive;
-    }
-
-    // console.log('passive ' + NETDATA.options.passive_events);
-    return NETDATA.options.passive_events;
-};
-
-window.addEventListener('resize', NETDATA.onresize, NETDATA.supportsPassiveEvents() ? {passive: true} : false);
-window.addEventListener('scroll', NETDATA.onscroll, NETDATA.supportsPassiveEvents() ? {passive: true} : false);
-// window.onresize = NETDATA.onresize;
-// window.onscroll = NETDATA.onscroll;
-
-// ----------------------------------------------------------------------------------------------------------------
 // commonMin & commonMax
 
 NETDATA.commonMin = {
@@ -4956,6 +4716,248 @@ NETDATA.commonColors = {
         return ret;
     }
 };
+
+// default URLs for all the external files we need
+// make them RELATIVE so that the whole thing can also be
+// installed under a web server
+NETDATA.jQuery = NETDATA.serverStatic + 'lib/jquery-2.2.4.min.js';
+NETDATA.peity_js = NETDATA.serverStatic + 'lib/jquery.peity-3.2.0.min.js';
+NETDATA.sparkline_js = NETDATA.serverStatic + 'lib/jquery.sparkline-2.1.2.min.js';
+NETDATA.easypiechart_js = NETDATA.serverStatic + 'lib/jquery.easypiechart-97b5824.min.js';
+NETDATA.gauge_js = NETDATA.serverStatic + 'lib/gauge-1.3.2.min.js';
+NETDATA.dygraph_js = NETDATA.serverStatic + 'lib/dygraph-c91c859.min.js';
+NETDATA.dygraph_smooth_js = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-c91c859.js';
+// NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
+// NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
+// NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
+NETDATA.d3pie_js = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-3.js';
+NETDATA.d3_js = NETDATA.serverStatic + 'lib/d3-4.12.2.min.js';
+// NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
+// NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
+NETDATA.google_js = 'https://www.google.com/jsapi';
+
+
+// ----------------------------------------------------------------------------------------------------------------
+
+NETDATA.timeout = {
+    // by default, these are just wrappers to setTimeout() / clearTimeout()
+
+    step: function (callback) {
+        return window.setTimeout(callback, 1000 / 60);
+    },
+
+    set: function (callback, delay) {
+        return window.setTimeout(callback, delay);
+    },
+
+    clear: function (id) {
+        return window.clearTimeout(id);
+    },
+
+    init: function () {
+        let custom = true;
+
+        if (window.requestAnimationFrame) {
+            this.step = function (callback) {
+                return window.requestAnimationFrame(callback);
+            };
+
+            this.clear = function (handle) {
+                return window.cancelAnimationFrame(handle.value);
+            };
+        } else if (window.webkitRequestAnimationFrame) {
+            this.step = function (callback) {
+                return window.webkitRequestAnimationFrame(callback);
+            };
+
+            if (window.webkitCancelAnimationFrame) {
+                this.clear = function (handle) {
+                    return window.webkitCancelAnimationFrame(handle.value);
+                };
+            } else if (window.webkitCancelRequestAnimationFrame) {
+                this.clear = function (handle) {
+                    return window.webkitCancelRequestAnimationFrame(handle.value);
+                };
+            }
+        } else if (window.mozRequestAnimationFrame) {
+            this.step = function (callback) {
+                return window.mozRequestAnimationFrame(callback);
+            };
+
+            this.clear = function (handle) {
+                return window.mozCancelRequestAnimationFrame(handle.value);
+            };
+        } else if (window.oRequestAnimationFrame) {
+            this.step = function (callback) {
+                return window.oRequestAnimationFrame(callback);
+            };
+
+            this.clear = function (handle) {
+                return window.oCancelRequestAnimationFrame(handle.value);
+            };
+        } else if (window.msRequestAnimationFrame) {
+            this.step = function (callback) {
+                return window.msRequestAnimationFrame(callback);
+            };
+
+            this.clear = function (handle) {
+                return window.msCancelRequestAnimationFrame(handle.value);
+            };
+        } else {
+            custom = false;
+        }
+
+        if (custom) {
+            // we have installed custom .step() / .clear() functions
+            // overwrite the .set() too
+
+            this.set = function (callback, delay) {
+                let that = this;
+
+                let start = Date.now(),
+                    handle = new Object();
+
+                function loop() {
+                    let current = Date.now(),
+                        delta = current - start;
+
+                    if (delta >= delay) {
+                        callback.call();
+                    } else {
+                        handle.value = that.step(loop);
+                    }
+                }
+
+                handle.value = that.step(loop);
+                return handle;
+            };
+        }
+    }
+};
+
+NETDATA.timeout.init();
+
+// ----------------------------------------------------------------------------------------------------------------
+
+if (NETDATA.options.debug.main_loop) {
+    console.log('welcome to NETDATA');
+}
+
+NETDATA.onresizeCallback = null;
+NETDATA.onresize = function () {
+    NETDATA.options.last_page_resize = Date.now();
+    NETDATA.onscroll();
+
+    if (typeof NETDATA.onresizeCallback === 'function') {
+        NETDATA.onresizeCallback();
+    }
+};
+
+NETDATA.abort_all_refreshes = function () {
+    let targets = NETDATA.options.targets;
+    let len = targets.length;
+
+    while (len--) {
+        if (targets[len].fetching_data) {
+            if (typeof targets[len].xhr !== 'undefined') {
+                targets[len].xhr.abort();
+                targets[len].running = false;
+                targets[len].fetching_data = false;
+            }
+        }
+    }
+};
+
+NETDATA.onscroll_start_delay = function () {
+    NETDATA.options.last_page_scroll = Date.now();
+
+    NETDATA.options.on_scroll_refresher_stop_until =
+        NETDATA.options.last_page_scroll
+        + (NETDATA.options.current.async_on_scroll ? 1000 : 0);
+};
+
+NETDATA.onscroll_end_delay = function () {
+    NETDATA.options.on_scroll_refresher_stop_until =
+        Date.now()
+        + (NETDATA.options.current.async_on_scroll ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
+};
+
+NETDATA.onscroll_updater_timeout_id = undefined;
+NETDATA.onscroll_updater = function () {
+    NETDATA.globalSelectionSync.stop();
+
+    if (NETDATA.options.abort_ajax_on_scroll) {
+        NETDATA.abort_all_refreshes();
+    }
+
+    // when the user scrolls he sees that we have
+    // hidden all the not-visible charts
+    // using this little function we try to switch
+    // the charts back to visible quickly
+
+    // if (NETDATA.intersectionObserver.enabled() === false) {
+    if (!NETDATA.intersectionObserver.enabled()) {
+        // if (NETDATA.options.current.parallel_refresher === false) {
+        if (!NETDATA.options.current.parallel_refresher) {
+            let targets = NETDATA.options.targets;
+            let len = targets.length;
+
+            while (len--) {
+                if (!targets[len].running) {
+                    // if (targets[len].running === false) {
+                    targets[len].isVisible();
+                }
+            }
+        }
+    }
+
+    NETDATA.onscroll_end_delay();
+};
+
+NETDATA.scrollUp = false;
+NETDATA.scrollY = window.scrollY;
+NETDATA.onscroll = function () {
+    //console.log('onscroll() begin');
+
+    NETDATA.onscroll_start_delay();
+    NETDATA.chartRefresherReschedule();
+
+    NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
+    NETDATA.scrollY = window.scrollY;
+
+    if (NETDATA.onscroll_updater_timeout_id) {
+        NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
+    }
+
+    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
+    //console.log('onscroll() end');
+};
+
+NETDATA.supportsPassiveEvents = function () {
+    if (NETDATA.options.passive_events === null) {
+        let supportsPassive = false;
+        try {
+            let opts = Object.defineProperty({}, 'passive', {
+                get: function () {
+                    supportsPassive = true;
+                }
+            });
+            window.addEventListener("test", null, opts);
+        } catch (e) {
+            console.log('browser does not support passive events');
+        }
+
+        NETDATA.options.passive_events = supportsPassive;
+    }
+
+    // console.log('passive ' + NETDATA.options.passive_events);
+    return NETDATA.options.passive_events;
+};
+
+window.addEventListener('resize', NETDATA.onresize, NETDATA.supportsPassiveEvents() ? {passive: true} : false);
+window.addEventListener('scroll', NETDATA.onscroll, NETDATA.supportsPassiveEvents() ? {passive: true} : false);
+// window.onresize = NETDATA.onresize;
+// window.onscroll = NETDATA.onscroll;
 
 // ----------------------------------------------------------------------------------------------------------------
 // Chart Registry
