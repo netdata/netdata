@@ -29,7 +29,7 @@ All data queries can be encapsulated to JSON object having metadata about the qu
 This is done by adding the `options=jsonwrap` to the API URL (if there are other `options` append
 `,jsonwrap` to the existing ones).
 
-This is enable such object:
+This is such an object:
 
 ```bash
 # curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=system.cpu&after=-3600&points=6&group=average&format=csv&options=nonzero,jsonwrap'
