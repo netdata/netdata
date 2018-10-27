@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query.h"
-#include "../rrd2json.h"
+#include "web/api/formatters/rrd2json.h"
 #include "rrdr.h"
 
 #include "average/average.h"
