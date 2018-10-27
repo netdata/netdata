@@ -162,6 +162,7 @@
               "datatable",
               "datasource",
               "html",
+              "markdown",
               "array",
               "csvjsonarray"
             ],

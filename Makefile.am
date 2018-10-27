@@ -311,8 +311,22 @@ API_PLUGIN_FILES = \
     web/api/queries/stddev/stddev.h \
     web/api/queries/sum/sum.c \
     web/api/queries/sum/sum.h \
-    web/api/rrd2json.c \
-    web/api/rrd2json.h \
+    web/api/formatters/rrd2json.c \
+    web/api/formatters/rrd2json.h \
+    web/api/formatters/csv/csv.c \
+    web/api/formatters/csv/csv.h \
+    web/api/formatters/json/json.c \
+    web/api/formatters/json/json.h \
+    web/api/formatters/ssv/ssv.c \
+    web/api/formatters/ssv/ssv.h \
+    web/api/formatters/value/value.c \
+    web/api/formatters/value/value.h \
+    web/api/formatters/json_wrapper.c \
+    web/api/formatters/json_wrapper.h \
+    web/api/formatters/charts2json.c \
+    web/api/formatters/charts2json.h \
+    web/api/formatters/rrdset2json.c \
+    web/api/formatters/rrdset2json.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
     $(NULL)
