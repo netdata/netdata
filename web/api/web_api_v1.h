@@ -5,7 +5,7 @@
 
 #include "daemon/common.h"
 #include "web/api/badges/web_buffer_svg.h"
-#include "rrd2json.h"
+#include "web/api/formatters/rrd2json.h"
 
 extern uint32_t web_client_api_request_v1_data_options(char *o);
 extern uint32_t web_client_api_request_v1_data_format(char *name);
