@@ -26,7 +26,7 @@ option|supported|description
 ## Examples
 
 To show the differences between each format, in the following examples we query the same
-chart, changing only the query `format` and its `options`.
+chart (having just one dimension called `active`), changing only the query `format` and its `options`.
 
 > Using `format=json` and `options=`
 
