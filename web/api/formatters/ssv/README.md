@@ -1,7 +1,7 @@
 # SSV formatter
 
-The SSV formatter sums all dimensions to a single value and returns a list of such values
-showing how it changes through time.
+The SSV formatter sums all dimensions in [results of database queries](../../queries)
+to a single value and returns a list of such values showing how it changes through time.
 
 It supports the following formats:
 
@@ -16,9 +16,9 @@ The CSV formatter respects the following API `&options=`:
 option|supported|description
 :---:|:---:|:---
 `nonzero`|yes|to return only the dimensions that have at least a non-zero value
-`flip`|yes|to return the rows older to newer (the default is newer to older)
+`flip`|yes|to return the numbers older to newer (the default is newer to older)
 `percent`|yes|to replace all values with their percentage over the row total
-`abs`|yes|to turn all values positive
+`abs`|yes|to turn all values positive, before using them
 `min2max`|yes|to return the delta from the minimum value to the maximum value (across dimensions)
 
 ## Examples

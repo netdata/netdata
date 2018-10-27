@@ -1,6 +1,6 @@
 # CSV formatter
 
-The CSV formatter presents data query results in the following formats:
+The CSV formatter presents [results of database queries](../../queries) in the following formats:
 
 format|content type|description
 :---:|:---:|:-----
