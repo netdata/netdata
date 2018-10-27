@@ -149,12 +149,25 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
+    // properly set the name for the remote end to parse it
+    char *name = "";
+    if(unlikely(strcmp(st->id, st->name))) {
+        // they differ
+        name = strchr(st->name, '.');
+        if(name)
+            name++;
+        else
+            name = "";
+    }
+
+    // info("CHART '%s' '%s'", st->id, name);
+
     // send the chart
     buffer_sprintf(
             host->rrdpush_sender_buffer
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
-            , st->name
+            , name
             , st->title
             , st->units
             , st->family
