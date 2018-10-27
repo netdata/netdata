@@ -78,6 +78,11 @@ Netdata always returns CPU utilization as `%`.
 </html>
 ```
 
+This is how it looks when rendered by a web browser:
+
+![image](https://user-images.githubusercontent.com/2662304/47597887-bafbf480-d99c-11e8-864a-d880bb8d2e5b.png)
+
+
 ---
 
 Get a JSON array with the average bandwidth rate of the mysql server, over the last hour, in 6 values
@@ -103,7 +108,7 @@ Netdata always returns bandwidth rates in `kilobits/s`.
 Get the number of processes started per minute, for the last 10 minutes, in `markdown` format:
 
 ```bash
-# curl -Ss 'http://localhost:19999/api/v1/data?chart=system.forks&format=markdown&after=-600&points=10&group=sum'
+# curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=system.forks&format=markdown&after=-600&points=10&group=sum'
 time|started
 :---:|:---:
 2018-10-27 03:52:00|245.1706149
