@@ -207,7 +207,7 @@ int rrdset2anything_api_v1(
             rrdr_json_wrapper_end(r, wb, format, options, 0);
         }
         else {
-            wb->contenttype = CT_TEXT_PLAIN;
+            wb->contenttype = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
             rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");

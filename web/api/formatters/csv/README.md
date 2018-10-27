@@ -1,23 +1,23 @@
 # CSV formatter
 
-The CSV formatter format a data query result in the following formats:
+The CSV formatter presents data query results in the following formats:
 
 format|content type|description
 :---:|:---:|:-----
-`csv`|text/plain|a text table, comma separated, with header line and `\r\n` at the end of the lines
-`csvjsonarray`|text/plain|a JSON array, each row is an array, all rows are enclosed in another array
-`tsv`|text/plain|like `csv` but tab is used instead of comma to separate values (MS Excel flavor)
-`html`|text/html|formats an html table
-`markdown`|text/plain|formats a markedown table
+`csv`|text/plain|a text table, comma separated, with a header line (dimension names) and `\r\n` at the end of the lines
+`csvjsonarray`|application/json|a JSON array, with each row as another array (the first row has the dimension names)
+`tsv`|text/plain|like `csv` but TAB is used instead of comma to separate values (MS Excel flavor)
+`html`|text/html|an html table
+`markdown`|text/plain|markdown table
 
-In all the formats the date and time is the first column.
+In all formats the date and time is the first column.
 
 The CSV formatter respects the following API `&options=`:
 
 option|supported|description
 :---:|:---:|:---
 `nonzero`|yes|to return only the dimensions that have at least a non-zero value
-`flip`|yes|to return the rows newer to older
+`flip`|yes|to return the rows older to newer (the default is newer to older)
 `seconds`|yes|to return the date and time in unix timestamp
 `ms`|yes|to return the date and time in unit timestamp as milliseconds
 `percent`|yes|to replace all values with their percentage over the row total
