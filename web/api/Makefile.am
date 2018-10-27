@@ -7,6 +7,7 @@ SUBDIRS = \
     badges \
     queries \
     exporters \
+    formatters \
     $(NULL)
 
 dist_noinst_DATA = \

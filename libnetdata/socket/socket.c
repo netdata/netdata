@@ -591,6 +591,8 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
         switch (ai->ai_addr->sa_family) {
             case PF_INET: {
                 struct sockaddr_in *pSadrIn = (struct sockaddr_in *)ai->ai_addr;
+                (void)pSadrIn;
+
                 debug(D_CONNECT_TO, "ai_addr = sin_family: %d (AF_INET = %d, AF_INET6 = %d), sin_addr: '%s', sin_port: '%s'",
                       pSadrIn->sin_family,
                       AF_INET,
