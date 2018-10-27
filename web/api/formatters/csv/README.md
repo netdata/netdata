@@ -8,6 +8,7 @@ format|content type|description
 `csvjsonarray`|text/plain|a JSON array, each row is an array, all rows are enclosed in another array
 `tsv`|text/plain|like `csv` but tab is used instead of comma to separate values (MS Excel flavor)
 `html`|text/html|formats an html table, with header row
+`markdown`|text/html|formats a markedown table, with header row
 
 In all the formats the date and time is the first column.
 
@@ -29,6 +30,8 @@ option|supported|description
 Get the system total bandwidth for all physical network interfaces, over the last hour,
 in 6 rows (one for every 10 minutes), in `csv` format:
 
+Netdata always returns bandwidth in `kilobits`.
+
 ```bash
 # curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=system.net&format=csv&after=-3600&group=sum&points=6&options=abs'
 time,received,sent
@@ -45,6 +48,8 @@ time,received,sent
 Get the max RAM used by the SQL server and any cron jobs, over the last hour, in 2 rows (one for every 30
 minutes), in `tsv` format, and format the date and time as unix timestamp:
 
+Netdata always returns memory in `MB`.
+
 ```bash
 # curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=apps.mem&format=tsv&after=-3600&group=max&points=2&options=nonzero,seconds&dimensions=sql,cron'
 time	sql	cron
@@ -54,7 +59,9 @@ time	sql	cron
 
 ---
 
-Get an HTML table of the last 4 values of system CPU utilization:
+Get an HTML table of the last 4 values (4 seconds) of system CPU utilization:
+
+Netdata always returns CPU utilization as `%`.
 
 ```bash
 # curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=system.cpu&format=html&after=-4&options=nonzero'
@@ -73,11 +80,13 @@ Get an HTML table of the last 4 values of system CPU utilization:
 
 ---
 
-Get a JSON array with the total bandwidth of the mysql server, over the last hour, in 6 values
-(one every 10 points), and return the date and time in milliseconds:
+Get a JSON array with the average bandwidth rate of the mysql server, over the last hour, in 6 values
+(one every 10 minutes), and return the date and time in milliseconds:
+
+Netdata always returns bandwidth rates in `kilobits/s`.
 
 ```bash
-# curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=mysql_local.net&format=csvjsonarray&after=-3600&points=6&options=abs,ms'
+# curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=mysql_local.net&format=csvjsonarray&after=-3600&points=6&group=average&options=abs,ms'
 [
 ["time","in","out"],
 [1540599600000,0.7499986,120.2810185],
@@ -88,3 +97,38 @@ Get a JSON array with the total bandwidth of the mysql server, over the last hou
 [1540596600000,0.7499988,120.2810527]
 ]
 ``` 
+
+---
+
+Get the number of processes started per minute, for the last 10 minutes, in `markdown` format:
+
+```bash
+# curl -Ss 'http://localhost:19999/api/v1/data?chart=system.forks&format=markdown&after=-600&points=10&group=sum'
+time|started
+:---:|:---:
+2018-10-27 03:52:00|245.1706149
+2018-10-27 03:51:00|152.6654636
+2018-10-27 03:50:00|163.1755789
+2018-10-27 03:49:00|176.1574766
+2018-10-27 03:48:00|178.0137076
+2018-10-27 03:47:00|183.8306543
+2018-10-27 03:46:00|264.1635621
+2018-10-27 03:45:00|205.001551
+2018-10-27 03:44:00|7026.9852167
+2018-10-27 03:43:00|205.9904794
+```
+
+And this is how it looks when formatted:
+
+time|started
+:---:|:---:
+2018-10-27 03:52:00|245.1706149
+2018-10-27 03:51:00|152.6654636
+2018-10-27 03:50:00|163.1755789
+2018-10-27 03:49:00|176.1574766
+2018-10-27 03:48:00|178.0137076
+2018-10-27 03:47:00|183.8306543
+2018-10-27 03:46:00|264.1635621
+2018-10-27 03:45:00|205.001551
+2018-10-27 03:44:00|7026.9852167
+2018-10-27 03:43:00|205.9904794

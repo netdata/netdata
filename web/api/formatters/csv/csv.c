@@ -3,7 +3,7 @@
 #include "libnetdata/libnetdata.h"
 #include "csv.h"
 
-void rrdr2csv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
+void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
     rrdset_check_rdlock(r->st);
 
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
@@ -28,6 +28,27 @@ void rrdr2csv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *startline, 
         i++;
     }
     buffer_strcat(wb, endline);
+
+    if(format == DATASOURCE_CSV_MARKDOWN) {
+        // print the --- line after header
+        for(c = 0, i = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
+            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+
+            if(!i) {
+                buffer_strcat(wb, startline);
+                if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
+                buffer_strcat(wb, ":---:");
+                if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
+            }
+            buffer_strcat(wb, separator);
+            if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
+            buffer_strcat(wb, ":---:");
+            if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
+            i++;
+        }
+        buffer_strcat(wb, endline);
+    }
 
     if(!i) {
         // no dimensions present

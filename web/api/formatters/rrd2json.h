@@ -33,6 +33,7 @@
 #define DATASOURCE_JS_ARRAY 8
 #define DATASOURCE_SSV_COMMA 9
 #define DATASOURCE_CSV_JSON_ARRAY 10
+#define DATASOURCE_CSV_MARKDOWN 11
 
 #define DATASOURCE_FORMAT_JSON "json"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
@@ -45,6 +46,7 @@
 #define DATASOURCE_FORMAT_JS_ARRAY "array"
 #define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
+#define DATASOURCE_FORMAT_CSV_MARKDOWN "markdown"
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
