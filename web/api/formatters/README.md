@@ -26,7 +26,8 @@ For examples of each format, check the relative module documentation.
 
 All data queries can be encapsulated to JSON object having metadata about the query and the results.
 
-This is done by adding the `options=jsonwrap` to the API URL (if there are other `options` append `,json_wrap` to the existing ones).
+This is done by adding the `options=jsonwrap` to the API URL (if there are other `options` append
+`,jsonwrap` to the existing ones).
 
 This is enable such object:
 
