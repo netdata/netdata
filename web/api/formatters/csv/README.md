@@ -7,8 +7,8 @@ format|content type|description
 `csv`|text/plain|a text table, comma separated, with header line and `\r\n` at the end of the lines
 `csvjsonarray`|text/plain|a JSON array, each row is an array, all rows are enclosed in another array
 `tsv`|text/plain|like `csv` but tab is used instead of comma to separate values (MS Excel flavor)
-`html`|text/html|formats an html table, with header row
-`markdown`|text/html|formats a markedown table, with header row
+`html`|text/html|formats an html table
+`markdown`|text/plain|formats a markedown table
 
 In all the formats the date and time is the first column.
 
