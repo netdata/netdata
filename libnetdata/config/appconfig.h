@@ -102,11 +102,13 @@ struct config {
     avl_tree_lock index;
 };
 
-#define CONFIG_BOOLEAN_NO   0
-#define CONFIG_BOOLEAN_YES  1
+#define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
+
+#define CONFIG_BOOLEAN_NO   0       // disabled
+#define CONFIG_BOOLEAN_YES  1       // enabled
 
 #ifndef CONFIG_BOOLEAN_AUTO
-#define CONFIG_BOOLEAN_AUTO 2
+#define CONFIG_BOOLEAN_AUTO 2       // enabled if it has useful info when enabled
 #endif
 
 extern int appconfig_load(struct config *root, char *filename, int overwrite_used);
