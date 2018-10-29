@@ -6269,27 +6269,27 @@ let chartState = function (element) {
      * destroy all (possibly) created state elements
      * create the basic DOM for a chart
      */
-    const init = function (opt) {
-        if (that.enabled === false) {
+    const init = (opt) => {
+        if (this.enabled === false) {
             return;
         }
 
         runtimeInit();
-        that.element.innerHTML = invisibleSearchableText();
+        this.element.innerHTML = invisibleSearchableText();
 
-        that.tm.last_initialized = Date.now();
-        that.setMode('auto');
+        this.tm.last_initialized = Date.now();
+        this.setMode('auto');
 
         if (opt !== 'fast') {
-            if (that.isVisible(true) || opt === 'force') {
+            if (this.isVisible(true) || opt === 'force') {
                 createDOM();
             }
         }
     };
 
-    const maxMessageFontSize = function () {
+    const maxMessageFontSize = () => {
         let screenHeight = screen.height;
-        let el = that.element;
+        let el = this.element;
 
         // normally we want a font size, as tall as the element
         let h = el.clientHeight;
@@ -6317,28 +6317,28 @@ let chartState = function (element) {
         }
 
         // set it
-        that.element_message.style.fontSize = h.toString() + 'px';
-        that.element_message.style.paddingTop = paddingTop.toString() + 'px';
+        this.element_message.style.fontSize = h.toString() + 'px';
+        this.element_message.style.paddingTop = paddingTop.toString() + 'px';
     };
 
-    const showMessageIcon = function (icon) {
-        that.element_message.innerHTML = icon;
+    const showMessageIcon = (icon) => {
+        this.element_message.innerHTML = icon;
         maxMessageFontSize();
-        $(that.element_message).removeClass('hidden');
-        that.tmp.___messageHidden___ = undefined;
+        $(this.element_message).removeClass('hidden');
+        this.tmp.___messageHidden___ = undefined;
     };
 
-    const hideMessage = function () {
-        if (typeof that.tmp.___messageHidden___ === 'undefined') {
-            that.tmp.___messageHidden___ = true;
-            $(that.element_message).addClass('hidden');
+    const hideMessage = () => {
+        if (typeof this.tmp.___messageHidden___ === 'undefined') {
+            this.tmp.___messageHidden___ = true;
+            $(this.element_message).addClass('hidden');
         }
     };
 
-    const showRendering = function () {
+    const showRendering = () => {
         let icon;
-        if (that.chart !== null) {
-            if (that.chart.chart_type === 'line') {
+        if (this.chart !== null) {
+            if (this.chart.chart_type === 'line') {
                 icon = NETDATA.icons.lineChart;
             } else {
                 icon = NETDATA.icons.areaChart;
@@ -6351,16 +6351,16 @@ let chartState = function (element) {
         showMessageIcon(icon + ' netdata' + invisibleSearchableText());
     };
 
-    const showLoading = function () {
-        if (that.chart_created === false) {
+    const showLoading = () => {
+        if (this.chart_created === false) {
             showMessageIcon(NETDATA.icons.loading + ' netdata');
             return true;
         }
         return false;
     };
 
-    const isHidden = function () {
-        return (typeof that.tmp.___chartIsHidden___ !== 'undefined');
+    const isHidden = () => {
+        return (typeof this.tmp.___chartIsHidden___ !== 'undefined');
     };
 
     // hide the chart, when it is not visible - called from isVisible()
@@ -6480,9 +6480,9 @@ let chartState = function (element) {
         }
     };
 
-    const canBeRendered = function (uncached_visibility) {
-        if (that.debug) {
-            that.log('canBeRendered() called');
+    const canBeRendered = (uncached_visibility) => {
+        if (this.debug) {
+            this.log('canBeRendered() called');
         }
 
         // if (NETDATA.options.current.update_only_visible === false)
@@ -6494,20 +6494,20 @@ let chartState = function (element) {
             (
                 NETDATA.options.page_is_visible ||
                 NETDATA.options.current.stop_updates_when_focus_is_lost === false ||
-                that.updates_since_last_unhide === 0
+                this.updates_since_last_unhide === 0
             )
-            && isHidden() === false && that.isVisible(uncached_visibility)
+            && isHidden() === false && this.isVisible(uncached_visibility)
         );
 
-        if (that.debug) {
-            that.log('canBeRendered(): ' + ret);
+        if (this.debug) {
+            this.log('canBeRendered(): ' + ret);
         }
 
         return ret;
     };
 
     // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
-    const callChartLibraryUpdateSafely = function (data) {
+    const callChartLibraryUpdateSafely = (data) => {
         let status;
 
         // we should not do this here
@@ -6521,22 +6521,22 @@ let chartState = function (element) {
             return true;
         }
 
-        that.updates_counter++;
-        that.updates_since_last_unhide++;
-        that.updates_since_last_creation++;
+        this.updates_counter++;
+        this.updates_since_last_unhide++;
+        this.updates_since_last_creation++;
 
         if (NETDATA.options.debug.chart_errors) {
-            status = that.library.update(that, data);
+            status = this.library.update(that, data);
         } else {
             try {
-                status = that.library.update(that, data);
+                status = this.library.update(that, data);
             } catch (err) {
                 status = false;
             }
         }
 
         if (!status) {
-            error('chart failed to be updated as ' + that.library_name);
+            error('chart failed to be updated as ' + this.library_name);
             return false;
         }
 
@@ -6544,7 +6544,7 @@ let chartState = function (element) {
     };
 
     // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
-    const callChartLibraryCreateSafely = function (data) {
+    const callChartLibraryCreateSafely = (data) => {
         let status;
 
         // we should not do this here
@@ -6558,27 +6558,27 @@ let chartState = function (element) {
             return true;
         }
 
-        that.updates_counter++;
-        that.updates_since_last_unhide++;
-        that.updates_since_last_creation++;
+        this.updates_counter++;
+        this.updates_since_last_unhide++;
+        this.updates_since_last_creation++;
 
         if (NETDATA.options.debug.chart_errors) {
-            status = that.library.create(that, data);
+            status = this.library.create(that, data);
         } else {
             try {
-                status = that.library.create(that, data);
+                status = this.library.create(that, data);
             } catch (err) {
                 status = false;
             }
         }
 
         if (!status) {
-            error('chart failed to be created as ' + that.library_name);
+            error('chart failed to be created as ' + this.library_name);
             return false;
         }
 
-        that.chart_created = true;
-        that.updates_since_last_creation = 0;
+        this.chart_created = true;
+        this.updates_since_last_creation = 0;
         return true;
     };
 
@@ -6588,33 +6588,33 @@ let chartState = function (element) {
     // resizeChart() - private
     // to be called just before the chart library to make sure that
     // a properly sized dom is available
-    const resizeChart = function () {
-        if (that.tm.last_resized < NETDATA.options.last_page_resize) {
-            if (!that.chart_created) {
+    const resizeChart = () => {
+        if (this.tm.last_resized < NETDATA.options.last_page_resize) {
+            if (!this.chart_created) {
                 return;
             }
 
-            if (that.needsRecreation()) {
-                if (that.debug) {
-                    that.log('resizeChart(): initializing chart');
+            if (this.needsRecreation()) {
+                if (this.debug) {
+                    this.log('resizeChart(): initializing chart');
                 }
 
                 init('force');
-            } else if (typeof that.library.resize === 'function') {
-                if (that.debug) {
-                    that.log('resizeChart(): resizing chart');
+            } else if (typeof this.library.resize === 'function') {
+                if (this.debug) {
+                    this.log('resizeChart(): resizing chart');
                 }
 
-                that.library.resize(that);
+                this.library.resize(that);
 
-                if (that.element_legend_childs.perfect_scroller !== null) {
-                    Ps.update(that.element_legend_childs.perfect_scroller);
+                if (this.element_legend_childs.perfect_scroller !== null) {
+                    Ps.update(this.element_legend_childs.perfect_scroller);
                 }
 
                 maxMessageFontSize();
             }
 
-            that.tm.last_resized = Date.now();
+            this.tm.last_resized = Date.now();
         }
     };
 
@@ -6624,12 +6624,12 @@ let chartState = function (element) {
     // - update the internal states
     // - resize the chart as the div changes height
     // - update the scrollbar of the legend
-    const resizeChartToHeight = function (h) {
+    const resizeChartToHeight = (h) => {
         // console.log(h);
-        that.element.style.height = h;
+        this.element.style.height = h;
 
-        if (that.settings_id !== null) {
-            NETDATA.localStorageSet('chart_heights.' + that.settings_id, h);
+        if (this.settings_id !== null) {
+            NETDATA.localStorageSet('chart_heights.' + this.settings_id, h);
         }
 
         let now = Date.now();
@@ -6637,7 +6637,7 @@ let chartState = function (element) {
         NETDATA.options.auto_refresher_stop_until = now + NETDATA.options.current.stop_updates_while_resizing;
 
         // force a resize
-        that.tm.last_resized = 0;
+        this.tm.last_resized = 0;
         resizeChart();
     };
 
@@ -6787,14 +6787,14 @@ let chartState = function (element) {
         }
     };
 
-    const noDataToShow = function () {
+    const noDataToShow = () => {
         showMessageIcon(NETDATA.icons.noData + ' empty');
-        that.legendUpdateDOM();
-        that.tm.last_autorefreshed = Date.now();
-        // that.data_update_every = 30 * 1000;
-        //that.element_chart.style.display = 'none';
-        //if (that.element_legend !== null) that.element_legend.style.display = 'none';
-        //that.tmp.___chartIsHidden___ = true;
+        this.legendUpdateDOM();
+        this.tm.last_autorefreshed = Date.now();
+        // this.data_update_every = 30 * 1000;
+        //this.element_chart.style.display = 'none';
+        //if (this.element_legend !== null) this.element_legend.style.display = 'none';
+        //this.tmp.___chartIsHidden___ = true;
     };
 
     // ============================================================================================================
