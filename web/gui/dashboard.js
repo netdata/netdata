@@ -1564,7 +1564,6 @@ NETDATA.resetOptions = function () {
 // *** src/dashboard.js/timeout.js
 
 // TODO: Better name needed
-// TODO: Remove excessive compatibility tests, even use requestAnimationFrame() always.
 
 NETDATA.timeout = {
     // by default, these are just wrappers to setTimeout() / clearTimeout()
@@ -1639,23 +1638,21 @@ NETDATA.timeout = {
             // overwrite the .set() too
 
             this.set = function (callback, delay) {
-                let that = this;
-
                 let start = Date.now(),
                     handle = new Object();
 
-                function loop() {
+                const loop = () => {
                     let current = Date.now(),
                         delta = current - start;
 
                     if (delta >= delay) {
                         callback.call();
                     } else {
-                        handle.value = that.step(loop);
+                        handle.value = this.step(loop);
                     }
                 }
 
-                handle.value = that.step(loop);
+                handle.value = this.step(loop);
                 return handle;
             };
         }
