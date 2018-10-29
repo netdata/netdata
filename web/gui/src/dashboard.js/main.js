@@ -952,6 +952,7 @@ let chartState = function (element) {
 
     // IMPORTANT:
     // all private functions should use 'that', instead of 'this'
+    // Alternatively, you can use arrow functions (related issue #4514)
     let that = this;
 
     // ============================================================================================================
@@ -960,17 +961,17 @@ let chartState = function (element) {
     /* error() - private
      * show an error instead of the chart
      */
-    let error = function (msg) {
+    let error = (msg) => {
         let ret = true;
 
         if (typeof netdataErrorCallback === 'function') {
-            ret = netdataErrorCallback('chart', that.id, msg);
+            ret = netdataErrorCallback('chart', this.id, msg);
         }
 
         if (ret) {
-            that.element.innerHTML = that.id + ': ' + msg;
-            that.enabled = false;
-            that.current = that.pan;
+            this.element.innerHTML = this.id + ': ' + msg;
+            this.enabled = false;
+            this.current = this.pan;
         }
     };
 
@@ -1080,19 +1081,19 @@ let chartState = function (element) {
     // PRIVATE FUNCTIONS
 
     // reset the runtime status variables to their defaults
-    const runtimeInit = function () {
-        that.paused = false;                        // boolean - is the chart paused for any reason?
-        that.selected = false;                      // boolean - is the chart shown a selection?
+    const runtimeInit = () => {
+        this.paused = false;                        // boolean - is the chart paused for any reason?
+        this.selected = false;                      // boolean - is the chart shown a selection?
 
-        that.chart_created = false;                 // boolean - is the library.create() been called?
-        that.dom_created = false;                   // boolean - is the chart DOM been created?
-        that.fetching_data = false;                 // boolean - true while we fetch data via ajax
+        this.chart_created = false;                 // boolean - is the library.create() been called?
+        this.dom_created = false;                   // boolean - is the chart DOM been created?
+        this.fetching_data = false;                 // boolean - true while we fetch data via ajax
 
-        that.updates_counter = 0;                   // numeric - the number of refreshes made so far
-        that.updates_since_last_unhide = 0;         // numeric - the number of refreshes made since the last time the chart was unhidden
-        that.updates_since_last_creation = 0;       // numeric - the number of refreshes made since the last time the chart was created
+        this.updates_counter = 0;                   // numeric - the number of refreshes made so far
+        this.updates_since_last_unhide = 0;         // numeric - the number of refreshes made since the last time the chart was unhidden
+        this.updates_since_last_creation = 0;       // numeric - the number of refreshes made since the last time the chart was created
 
-        that.tm = {
+        this.tm = {
             last_initialized: 0,                    // milliseconds - the timestamp it was last initialized
             last_dom_created: 0,                    // milliseconds - the timestamp its DOM was last created
             last_mode_switch: 0,                    // milliseconds - the timestamp it switched modes
@@ -1109,14 +1110,14 @@ let chartState = function (element) {
             last_autorefreshed: 0                   // the time the chart was last refreshed
         };
 
-        that.data = null;                           // the last data as downloaded from the netdata server
-        that.data_url = 'invalid://';               // string - the last url used to update the chart
-        that.data_points = 0;                       // number - the number of points returned from netdata
-        that.data_after = 0;                        // milliseconds - the first timestamp of the data
-        that.data_before = 0;                       // milliseconds - the last timestamp of the data
-        that.data_update_every = 0;                 // milliseconds - the frequency to update the data
+        this.data = null;                           // the last data as downloaded from the netdata server
+        this.data_url = 'invalid://';               // string - the last url used to update the chart
+        this.data_points = 0;                       // number - the number of points returned from netdata
+        this.data_after = 0;                        // milliseconds - the first timestamp of the data
+        this.data_before = 0;                       // milliseconds - the last timestamp of the data
+        this.data_update_every = 0;                 // milliseconds - the frequency to update the data
 
-        that.tmp = {};                              // members that can be destroyed to save memory
+        this.tmp = {};                              // members that can be destroyed to save memory
     };
 
     // initialize all the variables that are required for the chart to be rendered
