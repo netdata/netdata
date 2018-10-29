@@ -379,7 +379,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 This is a high level overview of netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![netdata-infographic](https://user-images.githubusercontent.com/2662304/47668895-4d291600-dbb2-11e8-8ce4-bb328cd60313.png)](https://my-netdata.io/infographic.html)
+[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)
 
 ---
 
