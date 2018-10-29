@@ -15,7 +15,7 @@ NETDATA.onresize = function () {
     }
 };
 
-NETDATA.abort_all_refreshes = function () {
+NETDATA.abortAllRefreshes = function () {
     let targets = NETDATA.options.targets;
     let len = targets.length;
 
@@ -49,7 +49,7 @@ NETDATA.onscroll_updater = function () {
     NETDATA.globalSelectionSync.stop();
 
     if (NETDATA.options.abort_ajax_on_scroll) {
-        NETDATA.abort_all_refreshes();
+        NETDATA.abortAllRefreshes();
     }
 
     // when the user scrolls he sees that we have

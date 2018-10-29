@@ -4950,7 +4950,7 @@ NETDATA.onresize = function () {
     }
 };
 
-NETDATA.abort_all_refreshes = function () {
+NETDATA.abortAllRefreshes = function () {
     let targets = NETDATA.options.targets;
     let len = targets.length;
 
@@ -4984,7 +4984,7 @@ NETDATA.onscroll_updater = function () {
     NETDATA.globalSelectionSync.stop();
 
     if (NETDATA.options.abort_ajax_on_scroll) {
-        NETDATA.abort_all_refreshes();
+        NETDATA.abortAllRefreshes();
     }
 
     // when the user scrolls he sees that we have
@@ -4992,16 +4992,13 @@ NETDATA.onscroll_updater = function () {
     // using this little function we try to switch
     // the charts back to visible quickly
 
-    // if (NETDATA.intersectionObserver.enabled() === false) {
     if (!NETDATA.intersectionObserver.enabled()) {
-        // if (NETDATA.options.current.parallel_refresher === false) {
         if (!NETDATA.options.current.parallel_refresher) {
             let targets = NETDATA.options.targets;
             let len = targets.length;
 
             while (len--) {
                 if (!targets[len].running) {
-                    // if (targets[len].running === false) {
                     targets[len].isVisible();
                 }
             }
@@ -5100,8 +5097,6 @@ NETDATA.globalPanAndZoom = {
     setMaster: function (state, after, before) {
         this.delay();
 
-        // if (NETDATA.options.current.sync_pan_and_zoom === false)
-        //     return;
         if (!NETDATA.options.current.sync_pan_and_zoom) {
             return;
         }
@@ -5298,7 +5293,6 @@ dimensionStatus.prototype.setOptions = function (name_div, value_div, color) {
         this.name_div = name_div;
         this.name_div.title = this.label;
         this.name_div.style.setProperty('color', this.color, 'important');
-        // if (this.selected === false)
         if (!this.selected) {
             this.name_div.className = 'netdata-legend-name not-selected';
         } else {
@@ -5310,7 +5304,6 @@ dimensionStatus.prototype.setOptions = function (name_div, value_div, color) {
         this.value_div = value_div;
         this.value_div.title = this.label;
         this.value_div.style.setProperty('color', this.color, 'important');
-        // if (this.selected === false) {
         if (!this.selected) {
             this.value_div.className = 'netdata-legend-value not-selected';
         } else {
@@ -5323,7 +5316,6 @@ dimensionStatus.prototype.setOptions = function (name_div, value_div, color) {
 };
 
 dimensionStatus.prototype.setHandler = function () {
-    // if (this.enabled === false) return;
     if (!this.enabled) {
         return;
     }
@@ -5369,7 +5361,6 @@ dimensionStatus.prototype.setHandler = function () {
 };
 
 dimensionStatus.prototype.select = function () {
-    // if (this.enabled === false) return;
     if (!this.enabled) {
         return;
     }
@@ -5380,7 +5371,6 @@ dimensionStatus.prototype.select = function () {
 };
 
 dimensionStatus.prototype.unselect = function () {
-    // if (this.enabled === false) return;
     if (!this.enabled) {
         return;
     }
@@ -5631,7 +5621,6 @@ NETDATA.globalSelectionSync = {
     enabled: function () {
         // console.log('enabled()');
         // can we globally apply selection sync?
-        // if (NETDATA.options.current.sync_selection === false) {
         if (!NETDATA.options.current.sync_selection) {
             return false;
         }
@@ -5641,7 +5630,6 @@ NETDATA.globalSelectionSync = {
 
     // set the global selection sync master
     setMaster: function (state) {
-        // if (this.enabled() === false) {
         if (!this.enabled()) {
             this.stop();
             return;
@@ -5834,7 +5822,6 @@ NETDATA.intersectionObserver = {
 
             state.__visibilityRatio = entry.intersectionRatio;
 
-            // if (NETDATA.options.current.async_on_scroll === false) {
             if (!NETDATA.options.current.async_on_scroll) {
                 if (window.requestIdleCallback) {
                     window.requestIdleCallback(function () {
@@ -6487,7 +6474,6 @@ let chartState = function (element) {
             this.log('canBeRendered() called');
         }
 
-        // if (NETDATA.options.current.update_only_visible === false)
         if (!NETDATA.options.current.update_only_visible) {
             return true;
         }
@@ -8348,7 +8334,6 @@ let chartState = function (element) {
 
         // due to late initialization of charts and libraries
         // we need to check this too
-        // if (this.enabled === false) {
         if (!this.enabled) {
             if (this.debug) {
                 this.log('updateChart(): I am not enabled');
@@ -8361,7 +8346,6 @@ let chartState = function (element) {
             return;
         }
 
-        // if (canBeRendered() === false) {
         if (!canBeRendered()) {
             if (this.debug) {
                 this.log('updateChart(): cannot be rendered');
@@ -8584,7 +8568,6 @@ let chartState = function (element) {
             return false;
         }
 
-        // if (this.isVisible() === false) {
         if (!this.isVisible()) {
             if (NETDATA.options.debug.visibility || this.debug) {
                 this.log('canBeAutoRefreshed() -> not visible');
