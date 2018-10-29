@@ -6170,7 +6170,7 @@ let chartState = function (element) {
             }
 
             return el;
-        }
+        };
 
         this.foreign_element_before = get_foreign_element_by_id('show-before-at');
         this.foreign_element_after = get_foreign_element_by_id('show-after-at');
@@ -6905,20 +6905,20 @@ let chartState = function (element) {
         }
     };
 
-    this.resetChart = function (dont_clear_master, dont_update) {
+    this.resetChart = function (dontClearMaster, dontUpdate) {
         if (this.debug) {
-            this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
+            this.log('resetChart(' + dontClearMaster + ', ' + dontUpdate + ') called');
         }
 
-        if (typeof dont_clear_master === 'undefined') {
-            dont_clear_master = false;
+        if (typeof dontClearMaster === 'undefined') {
+            dontClearMaster = false;
         }
 
-        if (typeof dont_update === 'undefined') {
-            dont_update = false;
+        if (typeof dontUpdate === 'undefined') {
+            dontUpdate = false;
         }
 
-        if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this)) {
+        if (dontClearMaster !== true && NETDATA.globalPanAndZoom.isMaster(this)) {
             if (this.debug) {
                 this.log('resetChart() diverting to clearMaster().');
             }
@@ -6946,7 +6946,7 @@ let chartState = function (element) {
         // of a selection sync and another chart becomes
         // the new master
 
-        if (dont_update !== true && this.isVisible()) {
+        if (dontUpdate !== true && this.isVisible()) {
             this.updateChart();
         }
     };
