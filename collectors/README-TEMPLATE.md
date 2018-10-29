@@ -16,12 +16,12 @@ Alarms config | ALARM_CONFIG_FILE |
 System Requirements | REQUIREMENTS |
 External Dependencies |  DEPENDENCIES |
 
-_The README always starts with the table above after the main header. Any other content in this section will not be present in the documentation._
-_- CATEGORY is one of the following: Web, Cloud, Data Store, Messaging (Queues), Monitoring Tools, Operating System, Application Instrumentation, Other_
-_- SUBCATEGORY could be Application, Metric type (e.g.) _
-_- COLLECTOR_IDENTIFIER is the first part of the directory the plugin is in. e.g. freeipmi, python.d etc._
-_- REQUIREMENTS lists what's needed on the system on which netdata is installed, for the module to run. _
-_- DEPENDENCIES contains a one line description of what is needed on the system monitored by netdata, for the particular plugin to be able to collect metrics_
+The README always starts with the table above after the main header. Any other content in this section will not be present in the documentation.
+- CATEGORY is one of the following: Web, Cloud, Data Store, Messaging (Queues), Monitoring Tools, Operating System, Application Instrumentation, Other
+- SUBCATEGORY could be Application, Metric type (e.g.) 
+- COLLECTOR_IDENTIFIER is the first part of the directory the plugin is in. e.g. freeipmi, python.d etc.
+- REQUIREMENTS lists what's needed on the system on which netdata is installed, for the module to run. 
+- DEPENDENCIES contains a one line description of what is needed on the system monitored by netdata, for the particular plugin to be able to collect metrics
 
 ## Introduction
 
