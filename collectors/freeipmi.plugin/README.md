@@ -11,7 +11,6 @@ Config file | /etc/netdata/netdata.conf |
 Alarms config | health.d/ipmi.conf |
 System Requirements | `libipmimonitoring-dev` or `libipmimonitoring-devel`. Verification that `ipmimonitoring` returns sensors information |
 External Dependencies |  |
-Live Demo | menu_ipmi |
 
 ## Introduction
 
@@ -21,13 +20,13 @@ Live Demo | menu_ipmi |
 
 _For explanation of the columns in the table below, see the [CHART output documentation](../plugins.d/#CHART)_
 
-type.id | name | title | units | family | context | charttype | options |
-:-------|:-----|:------|:------|:-------|:--------|:----------|:------|
-ipmi.temperatures_c | | System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c | line | |
-ipmi.volts | | System Voltages read by IPMI | Volts | voltages | ipmi.voltages | line | |
-ipmi.amps | | System Current read by IPMI | Amps | current | ipmi.amps | line | |
-ipmi.rpm | | System Fans read by IPMI | RPM | fans | ipmi.rpm | line | |
-ipmi.percent | | System Metrics read by IPMI | | other | ipmi.percent | line | |
+title | units | family | context |
+:-----|:------|:-------|:--------|
+System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c |
+ipmi.volts | | System Voltages read by IPMI | Volts | voltages | ipmi.voltages |
+ipmi.amps | | System Current read by IPMI | Amps | current | ipmi.amps |
+ipmi.rpm | | System Fans read by IPMI | RPM | fans | ipmi.rpm |
+ipmi.percent | | System Metrics read by IPMI | | other | ipmi.percent |
 
 ## Alarms
 

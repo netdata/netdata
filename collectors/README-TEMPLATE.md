@@ -15,7 +15,6 @@ Config file | CONFIG_FILE |
 Alarms config | ALARM_CONFIG_FILE |
 System Requirements | REQUIREMENTS |
 External Dependencies |  DEPENDENCIES |
-Live Demo | URL_OR_SUBURL |
 
 _The README always starts with the table above after the main header. Any other content in this section will not be present in the documentation.
 - CATEGORY is one of the following: Web, Cloud, Data Store, Messaging (Queues), Monitoring Tools, Operating System, Application Instrumentation, Other
@@ -23,7 +22,7 @@ _The README always starts with the table above after the main header. Any other 
 - COLLECTOR_IDENTIFIER is the first part of the directory the plugin is in. e.g. freeipmi, python.d etc.
 - REQUIREMENTS lists what's needed on the system on which netdata is installed, for the module to run. 
 - DEPENDENCIES contains a one line description of what is needed on the system monitored by netdata, for the particular plugin to be able to collect metrics
-- URL_OR_SUBURL: If a full URL appears here, we will show it as is and also parse the path after the hash tag. If it's not a link format, we'll assume that we are given the path after the hash tag.
+
 _
 
 ## Introduction
@@ -36,10 +35,10 @@ _Detailed list of metrics collected, one line per type of CHART generated. Notic
 
 _For explanation of the columns in the table below, see the [CHART output documentation](plugins.d/#CHART)_
 
-type.id | name | title | units | family | context | charttype | options |
-:-------|:-----|:------|:------|:-------|:--------|:----------|:------|
-ipmi.temperatures_c | | System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c | line | |
-ipmi.volts | | System Voltages read by IPMI | Volts | voltages | ipmi.voltages | line | |
+title | units | family | context | 
+:-----|:------|:-------|:--------|
+System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c | 
+System Voltages read by IPMI | Volts | voltages | ipmi.voltages | 
 
 ## Alarms
 
