@@ -21,33 +21,33 @@ CHARTS = {
     'lines': [
         ['total_connections', None, 'incremental']
      ]},
-    'bytes_sent': { 
+    'bytes_sent': {
     'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
     'lines': [
-        ['bytes_sent', None, 'incremental']  
+        ['bytes_sent', None, 'incremental']
      ]},
     'operations': {
        'options': [None, 'Operations', 'ops', 'ldap', 'monitorCounter', 'line'],
        'lines': [
-        ['completed_operations', None, 'incremental'], 
-        ['initiated_operations', None, 'incremental']  
+        ['completed_operations', None, 'incremental'],
+        ['initiated_operations', None, 'incremental'] 
      ]},
     'referrals_sent': {
     'options': [None, 'Referrals Statistics', 'referalls_sent', 'ldap', 'monitorCounter', 'line'],
     'lines': [
-        ['referrals_sent', None, 'incremental']  
+        ['referrals_sent', None, 'incremental']
      ]},
     'entries_sent': {
     'options': [None, 'Entries Statistics', 'entries_sent', 'ldap', 'monitorCounter', 'line'],
     'lines': [
-        ['entries_sent', None, 'incremental']  
+        ['entries_sent', None, 'incremental']
      ]},
     'ldap_operations': {
     'options': [None, 'Operations', 'bind_operations', 'ldap', 'monitorCounter', 'line'],
     'lines': [
-        ['bind_operations', None, 'incremental'],  
+        ['bind_operations', None, 'incremental'],
         ['search_operations', None, 'incremental'],
-        ['unbind_operations', None, 'incremental'],  
+        ['unbind_operations', None, 'incremental'],
         ['add_operations', None, 'incremental'],
         ['delete_operations', None, 'incremental'],
         ['modify_operations', None, 'incremental'],
@@ -96,7 +96,7 @@ class Service(SimpleService):
         'write_waiters': ('cn=Write,cn=Waiters,cn=Monitor','monitorCounter'),
         'read_waiters': ('cn=Read,cn=Waiters,cn=Monitor','monitorCounter'),
         }
-        
+
         for key in searchlist.keys():
             bind = searchlist[key][0]
             attr = searchlist[key][1]
