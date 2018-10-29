@@ -66,6 +66,7 @@ static struct netdev {
     kernel_uint_t tcollisions;
     kernel_uint_t tcarrier;
     kernel_uint_t tcompressed;
+    kernel_uint_t speed_max;
 
     // charts
     RRDSET *st_bandwidth;
@@ -435,6 +436,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
     static char *path_to_sys_devices_virtual_net = NULL;
+    static char *path_to_sys_net_speed = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
@@ -502,6 +504,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else
                 d->virtual = 0;
+
+            // set nic speed if present
+            if(likely(!d->virtual)) {
+              snprintfz(buffer, FILENAME_MAX, "%s/sys/class/net/%s/speed", netdata_configured_host_prefix, d->name);
+              path_to_sys_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", buffer);
+              int ret = read_single_number_file(path_to_sys_net_speed, (unsigned long long*)&d->speed_max);
+              if(ret) error("Cannot read '%s'.", path_to_sys_net_speed);
+            }
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
@@ -586,6 +596,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
+
+                RRDSETVAR *nic_speed_max = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "nic_speed_max");
+                if(nic_speed_max) rrdsetvar_custom_chart_variable_set(nic_speed_max, (calculated_number)d->speed_max);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);

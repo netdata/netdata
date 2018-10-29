@@ -4,7 +4,6 @@
 #define NETDATA_QUERIES_RRDR_H
 
 #include "libnetdata/libnetdata.h"
-#include "../web_api_v1.h"
 
 typedef enum rrdr_options {
     RRDR_OPTION_NONZERO      = 0x00000001, // don't output dimensions will just zero values
@@ -44,7 +43,7 @@ typedef enum rrdr_result_flags {
 } RRDR_RESULT_FLAGS;
 
 typedef struct rrdresult {
-    RRDSET *st;         // the chart this result refers to
+    struct rrdset *st;         // the chart this result refers to
 
     RRDR_RESULT_FLAGS result_options; // RRDR_RESULT_OPTION_*
 
@@ -70,35 +69,36 @@ typedef struct rrdresult {
     int has_st_lock;        // if st is read locked by us
 
     // internal rrd2rrdr() members below this point
-    long group_points;
-    calculated_number group_sum_divisor;
+    struct {
+        long points_wanted;
+        long resampling_group;
+        calculated_number resampling_divisor;
 
-    void *(*grouping_init)(struct rrdresult *r);
-    void (*grouping_reset)(struct rrdresult *r);
-    void (*grouping_free)(struct rrdresult *r);
-    void (*grouping_add)(struct rrdresult *r, calculated_number value);
-    calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
-    void *grouping_data;
+        void *(*grouping_create)(struct rrdresult *r);
+        void (*grouping_reset)(struct rrdresult *r);
+        void (*grouping_free)(struct rrdresult *r);
+        void (*grouping_add)(struct rrdresult *r, calculated_number value);
+        calculated_number (*grouping_flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
+        void *grouping_data;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    const char *log;
-#endif
+        #ifdef NETDATA_INTERNAL_CHECKS
+        const char *log;
+        #endif
+
+        size_t db_points_read;
+        size_t result_points_generated;
+    } internal;
 } RRDR;
 
 #define rrdr_rows(r) ((r)->rows)
 
-// formatters
-extern void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable);
-extern void rrdr2csv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines);
-extern calculated_number rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null);
-extern void rrdr2ssv(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, const char *prefix, const char *separator, const char *suffix);
-
 extern void rrdr_free(RRDR *r);
-extern RRDR *rrdr_create(RRDSET *st, long n);
+extern RRDR *rrdr_create(struct rrdset *st, long n);
 
+#include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long group_time_requested, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions);
 
 #include "query.h"
 

@@ -24,22 +24,24 @@ extern const char *global_backend_prefix;
 
 extern void *backends_main(void *ptr);
 
-extern int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st);
 extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options);
 
+#ifdef BACKENDS_INTERNALS
+
+extern int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st);
 extern calculated_number backend_calculate_value_from_stored_data(
         RRDSET *st                  // the chart
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
-        , uint32_t backend_options  // BACKEND_SOURCE_* bitmap
+        , BACKEND_OPTIONS backend_options  // BACKEND_SOURCE_* bitmap
         , time_t *first_timestamp   // the timestamp of the first point used in this response
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 );
 
-#ifdef BACKENDS_INTERNALS
 extern size_t backend_name_copy(char *d, const char *s, size_t usable);
 extern int discard_response(BUFFER *b, const char *backend);
+
 #endif // BACKENDS_INTERNALS
 
 #include "backends/prometheus/backend_prometheus.h"

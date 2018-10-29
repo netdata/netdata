@@ -110,7 +110,7 @@ paths:
           description: 'The format of the data to be returned.'
           required: true
           type: string
-          enum: [ 'json', 'jsonp', 'csv', 'tsv', 'tsv-excel', 'ssv', 'ssvcomma', 'datatable', 'datasource', 'html', 'array', 'csvjsonarray' ]
+          enum: [ 'json', 'jsonp', 'csv', 'tsv', 'tsv-excel', 'ssv', 'ssvcomma', 'datatable', 'datasource', 'html', 'markdown', 'array', 'csvjsonarray' ]
           default: json
           allowEmptyValue: false
         - name: options

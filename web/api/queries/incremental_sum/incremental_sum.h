@@ -6,7 +6,7 @@
 #include "../query.h"
 #include "../rrdr.h"
 
-extern void *grouping_init_incremental_sum(RRDR *r);
+extern void *grouping_create_incremental_sum(RRDR *r);
 extern void grouping_reset_incremental_sum(RRDR *r);
 extern void grouping_free_incremental_sum(RRDR *r);
 extern void grouping_add_incremental_sum(RRDR *r, calculated_number value);

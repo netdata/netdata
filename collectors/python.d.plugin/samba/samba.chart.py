@@ -21,6 +21,9 @@ import re
 from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
+
+disabled_by_default = True
+
 # default module values (can be overridden per job in `config`)
 update_every = 5
 priority = 60000

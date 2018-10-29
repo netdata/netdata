@@ -46,9 +46,9 @@ netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## User base
 *Docker pulls*<br/>
-[![Docker titpetric/netdata Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=docker%20pulls%20titpetric/netdata)](https://hub.docker.com/r/titpetric/netdata/)
-[![Docker firehol/netdata Pulls](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=docker%20pulls%20firehol/netdata)](https://hub.docker.com/r/firehol/netdata/)
-[![Docker netdata/netdata Pulls](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=docker%20pulls%20netdata/netdata)](https://hub.docker.com/r/netdata/netdata/)
+[![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/)
+[![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/)
+[![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
 *Since May 16th 2016 (the date the [global public netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item) was released):*<br/>
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
