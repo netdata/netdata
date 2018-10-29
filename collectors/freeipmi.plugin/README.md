@@ -23,10 +23,10 @@ _For explanation of the columns in the table below, see the [CHART output docume
 title | units | family | context |
 :-----|:------|:-------|:--------|
 System Celcius Temperatures read by IPMI | Celcius | temperatures | ipmi.temperatures_c |
-ipmi.volts | | System Voltages read by IPMI | Volts | voltages | ipmi.voltages |
-ipmi.amps | | System Current read by IPMI | Amps | current | ipmi.amps |
-ipmi.rpm | | System Fans read by IPMI | RPM | fans | ipmi.rpm |
-ipmi.percent | | System Metrics read by IPMI | | other | ipmi.percent |
+System Voltages read by IPMI | Volts | voltages | ipmi.voltages |
+System Current read by IPMI | Amps | current | ipmi.amps |
+System Fans read by IPMI | RPM | fans | ipmi.rpm |
+System Metrics read by IPMI | | other | ipmi.percent |
 
 ## Alarms
 
