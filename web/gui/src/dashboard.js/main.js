@@ -375,7 +375,8 @@ dimensionStatus.prototype.setOptions = function (name_div, value_div, color) {
         this.value_div = value_div;
         this.value_div.title = this.label;
         this.value_div.style.setProperty('color', this.color, 'important');
-        if (this.selected === false) {
+        // if (this.selected === false) {
+        if (!this.selected) {
             this.value_div.className = 'netdata-legend-value not-selected';
         } else {
             this.value_div.className = 'netdata-legend-value selected';
@@ -898,7 +899,8 @@ NETDATA.intersectionObserver = {
 
             state.__visibilityRatio = entry.intersectionRatio;
 
-            if (NETDATA.options.current.async_on_scroll === false) {
+            // if (NETDATA.options.current.async_on_scroll === false) {
+            if (!NETDATA.options.current.async_on_scroll) {
                 if (window.requestIdleCallback) {
                     window.requestIdleCallback(function () {
                         NETDATA.intersectionObserver.switchChartVisibility.call(state);
@@ -917,7 +919,7 @@ NETDATA.intersectionObserver = {
             this.observer.observe(state.element);
 
             state.isVisible = function () {
-                if (NETDATA.options.current.update_only_visible === false) {
+                if (!NETDATA.options.current.update_only_visible) {
                     return true;
                 }
 
@@ -1030,7 +1032,7 @@ let chartState = function (element) {
         NETDATA.error(402, this.library_name);
         error('chart library "' + this.library_name + '" is not found');
         this.enabled = false;
-    } else if (NETDATA.chartLibraries[this.library_name].enabled === false) {
+    } else if (!NETDATA.chartLibraries[this.library_name].enabled) {
         NETDATA.error(403, this.library_name);
         error('chart library "' + this.library_name + '" is not enabled');
         this.enabled = false;
@@ -1256,7 +1258,7 @@ let chartState = function (element) {
     };
 
     const destroyDOM = () => {
-        if (this.enabled === false) {
+        if (!this.enabled) {
             return;
         }
 
@@ -1280,7 +1282,7 @@ let chartState = function (element) {
     };
 
     let createDOM = () => {
-        if (this.enabled === false) {
+        if (!this.enabled) {
             return;
         }
         lateInitialization();
@@ -1335,7 +1337,7 @@ let chartState = function (element) {
      * create the basic DOM for a chart
      */
     const init = (opt) => {
-        if (this.enabled === false) {
+        if (!this.enabled) {
             return;
         }
 
@@ -1417,7 +1419,7 @@ let chartState = function (element) {
     };
 
     const showLoading = () => {
-        if (this.chart_created === false) {
+        if (!this.chart_created) {
             showMessageIcon(NETDATA.icons.loading + ' netdata');
             return true;
         }
@@ -1499,14 +1501,14 @@ let chartState = function (element) {
 
     // unhide the chart, when it is visible - called from isVisible()
     this.unhideChart = function () {
-        if (isHidden() === false) {
+        if (!isHidden()) {
             return;
         }
 
         this.tmp.___chartIsHidden___ = undefined;
         this.updates_since_last_unhide = 0;
 
-        if (this.chart_created === false) {
+        if (!this.chart_created) {
             if (this.debug) {
                 this.log('unhideChart(): initializing chart');
             }
@@ -1954,7 +1956,7 @@ let chartState = function (element) {
     };
 
     this.calculateRowForTime = function (t) {
-        if (this.timeIsVisible(t) === false) {
+        if (!this.timeIsVisible(t)) {
             return -1;
         }
         return Math.floor((t - this.data_after) / this.data_update_every);
@@ -1963,7 +1965,7 @@ let chartState = function (element) {
     // ----------------------------------------------------------------------------------------------------------------
 
     this.pauseChart = function () {
-        if (this.paused === false) {
+        if (!this.paused) {
             if (this.debug) {
                 this.log('pauseChart()');
             }
@@ -2123,7 +2125,7 @@ let chartState = function (element) {
         NETDATA.globalPanAndZoom.delay();
         NETDATA.globalSelectionSync.delay();
 
-        if (NETDATA.globalPanAndZoom.isMaster(this) === false) {
+        if (!NETDATA.globalPanAndZoom.isMaster(this)) {
             this.pauseChart();
             NETDATA.globalPanAndZoom.setMaster(this, after, before);
             // NETDATA.globalSelectionSync.stop();
@@ -2569,7 +2571,7 @@ let chartState = function (element) {
             }
         }
 
-        if (needed === false) {
+        if (!needed) {
             // make sure colors available
             this.chartPrepareColorPalette();
 
@@ -3455,7 +3457,7 @@ let chartState = function (element) {
             });
         }
 
-        if (this.library.initialized === false) {
+        if (!this.library.initialized) {
             if (this.library.enabled) {
                 if (this.debug) {
                     this.log('updateChart(): initializing chart library');
@@ -3622,7 +3624,7 @@ let chartState = function (element) {
     };
 
     this.canBeAutoRefreshed = function () {
-        if (this.enabled === false) {
+        if (!this.enabled) {
             if (this.debug) {
                 this.log('canBeAutoRefreshed() -> not enabled');
             }
@@ -3667,7 +3669,7 @@ let chartState = function (element) {
             return true;
         }
 
-        if (this.isAutoRefreshable() === false) {
+        if (!this.isAutoRefreshable()) {
             if (this.debug) {
                 this.log('canBeAutoRefreshed() -> not auto-refreshable');
             }
@@ -3851,10 +3853,12 @@ NETDATA.resetAllCharts = function (state) {
     // there are 2 possibilities here
     // a. state is the global Pan and Zoom master
     // b. state is not the global Pan and Zoom master
-    let master = true;
-    if (NETDATA.globalPanAndZoom.isMaster(state) === false) {
-        master = false;
-    }
+
+    // let master = true;
+    // if (NETDATA.globalPanAndZoom.isMaster(state) === false) {
+    //     master = false;
+    // }
+    const master = NETDATA.globalPanAndZoom.isMaster(state)
 
     // clear the global Pan and Zoom
     // this will also refresh the master
@@ -4097,7 +4101,7 @@ NETDATA.chartRefresher = function () {
         return;
     }
 
-    if (NETDATA.options.current.parallel_refresher === false) {
+    if (!NETDATA.options.current.parallel_refresher) {
         // console.log('auto-refresher is calling chartRefresherNoParallel(0)');
         NETDATA.chartRefresherNoParallel(0, function () {
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
@@ -4118,7 +4122,7 @@ NETDATA.chartRefresher = function () {
         return;
     }
 
-    if (NETDATA.globalSelectionSync.active() === false) {
+    if (!NETDATA.globalSelectionSync.active()) {
         let parallel = [];
         let targets = NETDATA.intersectionObserver.targets();
         let len = targets.length;
@@ -4129,7 +4133,7 @@ NETDATA.chartRefresher = function () {
                 continue;
             }
 
-            if (state.library.initialized === false) {
+            if (!state.library.initialized) {
                 if (state.library.enabled) {
                     state.library.initialize(NETDATA.chartRefresher);
                     //console.log('chartRefresher() end6 (library init)');
@@ -4153,7 +4157,7 @@ NETDATA.chartRefresher = function () {
             // console.log('auto-refresher executing in parallel for ' + parallel.length.toString() + ' charts');
             // this will execute the jobs in parallel
 
-            if (state.running === false) {
+            if (!state.running) {
                 NETDATA.timeout.set(state.autoRefresh, 0);
             }
         }
