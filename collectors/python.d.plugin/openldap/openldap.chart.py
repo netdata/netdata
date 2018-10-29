@@ -17,47 +17,47 @@ ORDER = ['total_connections', 'bytes_sent', 'operations', 'referrals_sent', 'ent
 
 CHARTS = {
     'total_connections': {
-	'options': [None, 'Total Connections', 'connections', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['total_connections', None, 'incremental']
+    'options': [None, 'Total Connections', 'connections', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['total_connections', None, 'incremental']
      ]},
     'bytes_sent': { 
-	'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['bytes_sent', None, 'incremental']  
+    'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['bytes_sent', None, 'incremental']  
      ]},
     'operations': {
        'options': [None, 'Operations', 'ops', 'ldap', 'monitorCounter', 'line'],
        'lines': [
-		['completed_operations', None, 'incremental'], 
-		['initiated_operations', None, 'incremental']  
+        ['completed_operations', None, 'incremental'], 
+        ['initiated_operations', None, 'incremental']  
      ]},
     'referrals_sent': {
-	'options': [None, 'Referrals Statistics', 'referalls_sent', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['referrals_sent', None, 'incremental']  
+    'options': [None, 'Referrals Statistics', 'referalls_sent', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['referrals_sent', None, 'incremental']  
      ]},
     'entries_sent': {
-	'options': [None, 'Entries Statistics', 'entries_sent', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['entries_sent', None, 'incremental']  
+    'options': [None, 'Entries Statistics', 'entries_sent', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['entries_sent', None, 'incremental']  
      ]},
     'ldap_operations': {
-	'options': [None, 'Operations', 'bind_operations', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['bind_operations', None, 'incremental'],  
-		['search_operations', None, 'incremental'],
-		['unbind_operations', None, 'incremental'],  
-		['add_operations', None, 'incremental'],
-		['delete_operations', None, 'incremental'],
-		['modify_operations', None, 'incremental'],
-		['compare_operations', None, 'incremental']
+    'options': [None, 'Operations', 'bind_operations', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['bind_operations', None, 'incremental'],  
+        ['search_operations', None, 'incremental'],
+        ['unbind_operations', None, 'incremental'],  
+        ['add_operations', None, 'incremental'],
+        ['delete_operations', None, 'incremental'],
+        ['modify_operations', None, 'incremental'],
+        ['compare_operations', None, 'incremental']
      ]},
     'waiters': {
-	'options': [None, 'Waiters', 'amount', 'ldap', 'monitorCounter', 'line'],
-	'lines': [
-		['write_waiters', None, 'incremental'],
-		['read_waiters', None, 'incremental']
+    'options': [None, 'Waiters', 'amount', 'ldap', 'monitorCounter', 'line'],
+    'lines': [
+        ['write_waiters', None, 'incremental'],
+        ['read_waiters', None, 'incremental']
      ]},
 }
 
@@ -98,17 +98,17 @@ class Service(SimpleService):
         }
         
         for key in searchlist.keys():
-            b = searchlist[key][0]
+            bind = searchlist[key][0]
             attr = searchlist[key][1]
-            num = self.conn.search(b,ldap.SCOPE_BASE,'objectClass=*',[attr,])
+            num = self.conn.search(bind,ldap.SCOPE_BASE,'objectClass=*',[attr,])
         
             try:
                 result_type, result_data = self.conn.result(num, 1)
                 if result_type == 101:
                     val = int(result_data[0][1].values()[0][0])
-        	        data[key] = val
+                    data[key] = val
                     
-            except Exception,e:
-        	return repr(e)
+            except Exception as e:
+                return repr(e)
 
         return data
