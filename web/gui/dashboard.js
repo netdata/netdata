@@ -6056,105 +6056,105 @@ let chartState = function (element) {
     };
 
     // initialize all the variables that are required for the chart to be rendered
-    const lateInitialization = function () {
-        if (typeof that.host !== 'undefined') {
+    const lateInitialization = () => {
+        if (typeof this.host !== 'undefined') {
             return;
         }
 
         // string - the netdata server URL, without any path
-        that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.serverDefault);
+        this.host = NETDATA.dataAttribute(this.element, 'host', NETDATA.serverDefault);
 
         // make sure the host does not end with /
         // all netdata API requests use absolute paths
-        while (that.host.slice(-1) === '/') {
-            that.host = that.host.substring(0, that.host.length - 1);
+        while (this.host.slice(-1) === '/') {
+            this.host = this.host.substring(0, this.host.length - 1);
         }
 
         // string - the grouping method requested by the user
-        that.method = NETDATA.dataAttribute(that.element, 'method', NETDATA.chartDefaults.method);
-        that.gtime = NETDATA.dataAttribute(that.element, 'gtime', 0);
+        this.method = NETDATA.dataAttribute(this.element, 'method', NETDATA.chartDefaults.method);
+        this.gtime = NETDATA.dataAttribute(this.element, 'gtime', 0);
 
         // the time-range requested by the user
-        that.after = NETDATA.dataAttribute(that.element, 'after', NETDATA.chartDefaults.after);
-        that.before = NETDATA.dataAttribute(that.element, 'before', NETDATA.chartDefaults.before);
+        this.after = NETDATA.dataAttribute(this.element, 'after', NETDATA.chartDefaults.after);
+        this.before = NETDATA.dataAttribute(this.element, 'before', NETDATA.chartDefaults.before);
 
         // the pixels per point requested by the user
-        that.pixels_per_point = NETDATA.dataAttribute(that.element, 'pixels-per-point', 1);
-        that.points = NETDATA.dataAttribute(that.element, 'points', null);
+        this.pixels_per_point = NETDATA.dataAttribute(this.element, 'pixels-per-point', 1);
+        this.points = NETDATA.dataAttribute(this.element, 'points', null);
 
         // the forced update_every
-        that.force_update_every = NETDATA.dataAttribute(that.element, 'update-every', null);
-        if (typeof that.force_update_every !== 'number' || that.force_update_every <= 1) {
-            if (that.force_update_every !== null) {
-                that.log('ignoring invalid value of property data-update-every');
+        this.force_update_every = NETDATA.dataAttribute(this.element, 'update-every', null);
+        if (typeof this.force_update_every !== 'number' || this.force_update_every <= 1) {
+            if (this.force_update_every !== null) {
+                this.log('ignoring invalid value of property data-update-every');
             }
 
-            that.force_update_every = null;
+            this.force_update_every = null;
         } else {
-            that.force_update_every *= 1000;
+            this.force_update_every *= 1000;
         }
 
         // the dimensions requested by the user
-        that.dimensions = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'dimensions', null));
+        this.dimensions = NETDATA.encodeURIComponent(NETDATA.dataAttribute(this.element, 'dimensions', null));
 
-        that.title = NETDATA.dataAttribute(that.element, 'title', null);    // the title of the chart
-        that.units = NETDATA.dataAttribute(that.element, 'units', null);    // the units of the chart dimensions
-        that.units_desired = NETDATA.dataAttribute(that.element, 'desired-units', NETDATA.options.current.units); // the units of the chart dimensions
-        that.units_current = that.units;
-        that.units_common = NETDATA.dataAttribute(that.element, 'common-units', null);
+        this.title = NETDATA.dataAttribute(this.element, 'title', null);    // the title of the chart
+        this.units = NETDATA.dataAttribute(this.element, 'units', null);    // the units of the chart dimensions
+        this.units_desired = NETDATA.dataAttribute(this.element, 'desired-units', NETDATA.options.current.units); // the units of the chart dimensions
+        this.units_current = this.units;
+        this.units_common = NETDATA.dataAttribute(this.element, 'common-units', null);
 
         // additional options to pass to netdata
-        that.append_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'append-options', null));
+        this.append_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(this.element, 'append-options', null));
 
         // override options to pass to netdata
-        that.override_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(that.element, 'override-options', null));
+        this.override_options = NETDATA.encodeURIComponent(NETDATA.dataAttribute(this.element, 'override-options', null));
 
-        that.debug = NETDATA.dataAttributeBoolean(that.element, 'debug', false);
+        this.debug = NETDATA.dataAttributeBoolean(this.element, 'debug', false);
 
-        that.value_decimal_detail = -1;
-        let d = NETDATA.dataAttribute(that.element, 'decimal-digits', -1);
+        this.value_decimal_detail = -1;
+        let d = NETDATA.dataAttribute(this.element, 'decimal-digits', -1);
         if (typeof d === 'number') {
-            that.value_decimal_detail = d;
+            this.value_decimal_detail = d;
         } else if (typeof d !== 'undefined') {
-            that.log('ignoring decimal-digits value: ' + d.toString());
+            this.log('ignoring decimal-digits value: ' + d.toString());
         }
 
         // if we need to report the rendering speed
         // find the element that needs to be updated
-        let refresh_dt_element_name = NETDATA.dataAttribute(that.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
+        let refresh_dt_element_name = NETDATA.dataAttribute(this.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
 
         if (refresh_dt_element_name !== null) {
-            that.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
+            this.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
         }
         else {
-            that.refresh_dt_element = null;
+            this.refresh_dt_element = null;
         }
 
-        that.dimensions_visibility = new dimensionsVisibility(that);
+        this.dimensions_visibility = new dimensionsVisibility(that);
 
-        that.netdata_first = 0;                     // milliseconds - the first timestamp in netdata
-        that.netdata_last = 0;                      // milliseconds - the last timestamp in netdata
-        that.requested_after = null;                // milliseconds - the timestamp of the request after param
-        that.requested_before = null;               // milliseconds - the timestamp of the request before param
-        that.requested_padding = null;
-        that.view_after = 0;
-        that.view_before = 0;
+        this.netdata_first = 0;                     // milliseconds - the first timestamp in netdata
+        this.netdata_last = 0;                      // milliseconds - the last timestamp in netdata
+        this.requested_after = null;                // milliseconds - the timestamp of the request after param
+        this.requested_before = null;               // milliseconds - the timestamp of the request before param
+        this.requested_padding = null;
+        this.view_after = 0;
+        this.view_before = 0;
 
-        that.refresh_dt_ms = 0;                     // milliseconds - the time the last refresh took
+        this.refresh_dt_ms = 0;                     // milliseconds - the time the last refresh took
 
         // how many retries we have made to load chart data from the server
-        that.retries_on_data_failures = 0;
+        this.retries_on_data_failures = 0;
 
         // color management
-        that.colors = null;
-        that.colors_assigned = null;
-        that.colors_available = null;
-        that.colors_custom = null;
+        this.colors = null;
+        this.colors_assigned = null;
+        this.colors_available = null;
+        this.colors_custom = null;
 
-        that.element_message = null; // the element already created by the user
-        that.element_chart = null; // the element with the chart
-        that.element_legend = null; // the element with the legend of the chart (if created by us)
-        that.element_legend_childs = {
+        this.element_message = null; // the element already created by the user
+        this.element_chart = null; // the element with the chart
+        this.element_legend = null; // the element with the legend of the chart (if created by us)
+        this.element_legend_childs = {
             content: null,
             hidden: null,
             title_date: null,
@@ -6164,105 +6164,104 @@ let chartState = function (element) {
             series: null
         };
 
-        that.chart_url = null;                      // string - the url to download chart info
-        that.chart = null;                          // object - the chart as downloaded from the server
+        this.chart_url = null;                      // string - the url to download chart info
+        this.chart = null;                          // object - the chart as downloaded from the server
 
-        function get_foreign_element_by_id(opt) {
-            let id = NETDATA.dataAttribute(that.element, opt, null);
+        const get_foreign_element_by_id = (opt) => {
+            let id = NETDATA.dataAttribute(this.element, opt, null);
             if (id === null) {
-                //that.log('option "' + opt + '" is undefined');
+                //this.log('option "' + opt + '" is undefined');
                 return null;
             }
 
             let el = document.getElementById(id);
             if (typeof el === 'undefined') {
-                that.log('cannot find an element with name "' + id.toString() + '"');
+                this.log('cannot find an element with name "' + id.toString() + '"');
                 return null;
             }
 
             return el;
         }
 
-        that.foreign_element_before = get_foreign_element_by_id('show-before-at');
-        that.foreign_element_after = get_foreign_element_by_id('show-after-at');
-        that.foreign_element_duration = get_foreign_element_by_id('show-duration-at');
-        that.foreign_element_update_every = get_foreign_element_by_id('show-update-every-at');
-        that.foreign_element_selection = get_foreign_element_by_id('show-selection-at');
+        this.foreign_element_before = get_foreign_element_by_id('show-before-at');
+        this.foreign_element_after = get_foreign_element_by_id('show-after-at');
+        this.foreign_element_duration = get_foreign_element_by_id('show-duration-at');
+        this.foreign_element_update_every = get_foreign_element_by_id('show-update-every-at');
+        this.foreign_element_selection = get_foreign_element_by_id('show-selection-at');
     };
 
-    const destroyDOM = function () {
-        if (that.enabled === false) {
+    const destroyDOM = () => {
+        if (this.enabled === false) {
             return;
         }
 
-        if (that.debug) {
-            that.log('destroyDOM()');
+        if (this.debug) {
+            this.log('destroyDOM()');
         }
 
-        // that.element.className = 'netdata-message icon';
-        // that.element.innerHTML = '<i class="fas fa-sync"></i> netdata';
-        that.element.innerHTML = '';
-        that.element_message = null;
-        that.element_legend = null;
-        that.element_chart = null;
-        that.element_legend_childs.series = null;
+        // this.element.className = 'netdata-message icon';
+        // this.element.innerHTML = '<i class="fas fa-sync"></i> netdata';
+        this.element.innerHTML = '';
+        this.element_message = null;
+        this.element_legend = null;
+        this.element_chart = null;
+        this.element_legend_childs.series = null;
 
-        that.chart_created = false;
-        that.dom_created = false;
+        this.chart_created = false;
+        this.dom_created = false;
 
-        that.tm.last_resized = 0;
-        that.tm.last_dom_created = 0;
+        this.tm.last_resized = 0;
+        this.tm.last_dom_created = 0;
     };
 
-    let createDOM = function () {
-        if (that.enabled === false) {
+    let createDOM = () => {
+        if (this.enabled === false) {
             return;
         }
         lateInitialization();
 
         destroyDOM();
 
-        if (that.debug) {
-            that.log('createDOM()');
+        if (this.debug) {
+            this.log('createDOM()');
         }
 
-        that.element_message = document.createElement('div');
-        that.element_message.className = 'netdata-message icon hidden';
-        that.element.appendChild(that.element_message);
+        this.element_message = document.createElement('div');
+        this.element_message.className = 'netdata-message icon hidden';
+        this.element.appendChild(this.element_message);
 
-        that.dom_created = true;
-        that.chart_created = false;
+        this.dom_created = true;
+        this.chart_created = false;
 
-        that.tm.last_dom_created =
-            that.tm.last_resized = Date.now();
+        this.tm.last_dom_created = this.tm.last_resized = Date.now();
 
         showLoading();
     };
 
-    const initDOM = function () {
-        that.element.className = that.library.container_class(that);
+    const initDOM = () => {
+        this.element.className = this.library.container_class(that);
 
-        if (typeof(that.width) === 'string') {
-            that.element.style.width = that.width;
-        } else if (typeof(that.width) === 'number') {
-            that.element.style.width = that.width.toString() + 'px';
+        if (typeof(this.width) === 'string') {
+            this.element.style.width = this.width;
+        } else if (typeof(this.width) === 'number') {
+            this.element.style.width = this.width.toString() + 'px';
         }
 
-        if (typeof(that.library.aspect_ratio) === 'undefined') {
-            if (typeof(that.height) === 'string') {
-                that.element.style.height = that.height;
-            } else if (typeof(that.height) === 'number') {
-                that.element.style.height = that.height.toString() + 'px';
+        if (typeof(this.library.aspect_ratio) === 'undefined') {
+            if (typeof(this.height) === 'string') {
+                this.element.style.height = this.height;
+            } else if (typeof(this.height) === 'number') {
+                this.element.style.height = this.height.toString() + 'px';
             }
         }
 
         if (NETDATA.chartDefaults.min_width !== null) {
-            that.element.style.min_width = NETDATA.chartDefaults.min_width;
+            this.element.style.min_width = NETDATA.chartDefaults.min_width;
         }
     };
 
-    const invisibleSearchableText = function () {
-        return '<span style="position:absolute; opacity: 0; width: 0px;">' + that.id + '</span>';
+    const invisibleSearchableText = () => {
+        return '<span style="position:absolute; opacity: 0; width: 0px;">' + this.id + '</span>';
     };
 
     /* init() private
