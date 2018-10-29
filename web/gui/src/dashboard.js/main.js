@@ -1420,7 +1420,6 @@ let chartState = function (element) {
     // hide the chart, when it is not visible - called from isVisible()
     this.hideChart = function () {
         // hide it, if it is not already hidden
-        // if (isHidden() === true) return;
         if (isHidden()) {
             return;
         }
