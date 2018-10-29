@@ -7,5 +7,6 @@ exclude_paths:
   - web/css/**
   - web/lib/**
   - web/old/**
+  - web/gui/src/**
   - collectors/node.d.plugin/node_modules/**
   - tests/**
