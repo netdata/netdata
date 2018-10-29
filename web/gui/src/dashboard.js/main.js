@@ -30,7 +30,7 @@ NETDATA.abortAllRefreshes = function () {
     }
 };
 
-NETDATA.onscroll_start_delay = function () {
+NETDATA.onscrollStartDelay = function () {
     NETDATA.options.last_page_scroll = Date.now();
 
     NETDATA.options.on_scroll_refresher_stop_until =
@@ -38,14 +38,14 @@ NETDATA.onscroll_start_delay = function () {
         + (NETDATA.options.current.async_on_scroll ? 1000 : 0);
 };
 
-NETDATA.onscroll_end_delay = function () {
+NETDATA.onscrollEndDelay = function () {
     NETDATA.options.on_scroll_refresher_stop_until =
         Date.now()
         + (NETDATA.options.current.async_on_scroll ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
 };
 
 NETDATA.onscroll_updater_timeout_id = undefined;
-NETDATA.onscroll_updater = function () {
+NETDATA.onscrollUpdater = function () {
     NETDATA.globalSelectionSync.stop();
 
     if (NETDATA.options.abort_ajax_on_scroll) {
@@ -70,7 +70,7 @@ NETDATA.onscroll_updater = function () {
         }
     }
 
-    NETDATA.onscroll_end_delay();
+    NETDATA.onscrollEndDelay();
 };
 
 NETDATA.scrollUp = false;
@@ -78,7 +78,7 @@ NETDATA.scrollY = window.scrollY;
 NETDATA.onscroll = function () {
     //console.log('onscroll() begin');
 
-    NETDATA.onscroll_start_delay();
+    NETDATA.onscrollStartDelay();
     NETDATA.chartRefresherReschedule();
 
     NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
@@ -88,7 +88,7 @@ NETDATA.onscroll = function () {
         NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
     }
 
-    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
+    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscrollUpdater, 0);
     //console.log('onscroll() end');
 };
 
@@ -1235,7 +1235,7 @@ let chartState = function (element) {
             }
 
             return el;
-        }
+        };
 
         this.foreign_element_before = get_foreign_element_by_id('show-before-at');
         this.foreign_element_after = get_foreign_element_by_id('show-after-at');
@@ -1970,20 +1970,20 @@ let chartState = function (element) {
         }
     };
 
-    this.resetChart = function (dont_clear_master, dont_update) {
+    this.resetChart = function (dontClearMaster, dontUpdate) {
         if (this.debug) {
-            this.log('resetChart(' + dont_clear_master + ', ' + dont_update + ') called');
+            this.log('resetChart(' + dontClearMaster + ', ' + dontUpdate + ') called');
         }
 
-        if (typeof dont_clear_master === 'undefined') {
-            dont_clear_master = false;
+        if (typeof dontClearMaster === 'undefined') {
+            dontClearMaster = false;
         }
 
-        if (typeof dont_update === 'undefined') {
-            dont_update = false;
+        if (typeof dontUpdate === 'undefined') {
+            dontUpdate = false;
         }
 
-        if (dont_clear_master !== true && NETDATA.globalPanAndZoom.isMaster(this)) {
+        if (dontClearMaster !== true && NETDATA.globalPanAndZoom.isMaster(this)) {
             if (this.debug) {
                 this.log('resetChart() diverting to clearMaster().');
             }
@@ -2011,7 +2011,7 @@ let chartState = function (element) {
         // of a selection sync and another chart becomes
         // the new master
 
-        if (dont_update !== true && this.isVisible()) {
+        if (dontUpdate !== true && this.isVisible()) {
             this.updateChart();
         }
     };

@@ -4965,7 +4965,7 @@ NETDATA.abortAllRefreshes = function () {
     }
 };
 
-NETDATA.onscroll_start_delay = function () {
+NETDATA.onscrollStartDelay = function () {
     NETDATA.options.last_page_scroll = Date.now();
 
     NETDATA.options.on_scroll_refresher_stop_until =
@@ -4973,14 +4973,14 @@ NETDATA.onscroll_start_delay = function () {
         + (NETDATA.options.current.async_on_scroll ? 1000 : 0);
 };
 
-NETDATA.onscroll_end_delay = function () {
+NETDATA.onscrollEndDelay = function () {
     NETDATA.options.on_scroll_refresher_stop_until =
         Date.now()
         + (NETDATA.options.current.async_on_scroll ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
 };
 
 NETDATA.onscroll_updater_timeout_id = undefined;
-NETDATA.onscroll_updater = function () {
+NETDATA.onscrollUpdater = function () {
     NETDATA.globalSelectionSync.stop();
 
     if (NETDATA.options.abort_ajax_on_scroll) {
@@ -5005,7 +5005,7 @@ NETDATA.onscroll_updater = function () {
         }
     }
 
-    NETDATA.onscroll_end_delay();
+    NETDATA.onscrollEndDelay();
 };
 
 NETDATA.scrollUp = false;
@@ -5013,7 +5013,7 @@ NETDATA.scrollY = window.scrollY;
 NETDATA.onscroll = function () {
     //console.log('onscroll() begin');
 
-    NETDATA.onscroll_start_delay();
+    NETDATA.onscrollStartDelay();
     NETDATA.chartRefresherReschedule();
 
     NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
@@ -5023,7 +5023,7 @@ NETDATA.onscroll = function () {
         NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
     }
 
-    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
+    NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscrollUpdater, 0);
     //console.log('onscroll() end');
 };
 
