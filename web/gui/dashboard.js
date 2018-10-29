@@ -1592,44 +1592,44 @@ NETDATA.timeout = {
             this.clear = function (handle) {
                 return window.cancelAnimationFrame(handle.value);
             };
-        } else if (window.webkitRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.webkitRequestAnimationFrame(callback);
-            };
+        // } else if (window.webkitRequestAnimationFrame) {
+        //     this.step = function (callback) {
+        //         return window.webkitRequestAnimationFrame(callback);
+        //     };
 
-            if (window.webkitCancelAnimationFrame) {
-                this.clear = function (handle) {
-                    return window.webkitCancelAnimationFrame(handle.value);
-                };
-            } else if (window.webkitCancelRequestAnimationFrame) {
-                this.clear = function (handle) {
-                    return window.webkitCancelRequestAnimationFrame(handle.value);
-                };
-            }
-        } else if (window.mozRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.mozRequestAnimationFrame(callback);
-            };
+        //     if (window.webkitCancelAnimationFrame) {
+        //         this.clear = function (handle) {
+        //             return window.webkitCancelAnimationFrame(handle.value);
+        //         };
+        //     } else if (window.webkitCancelRequestAnimationFrame) {
+        //         this.clear = function (handle) {
+        //             return window.webkitCancelRequestAnimationFrame(handle.value);
+        //         };
+        //     }
+        // } else if (window.mozRequestAnimationFrame) {
+        //     this.step = function (callback) {
+        //         return window.mozRequestAnimationFrame(callback);
+        //     };
 
-            this.clear = function (handle) {
-                return window.mozCancelRequestAnimationFrame(handle.value);
-            };
-        } else if (window.oRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.oRequestAnimationFrame(callback);
-            };
+        //     this.clear = function (handle) {
+        //         return window.mozCancelRequestAnimationFrame(handle.value);
+        //     };
+        // } else if (window.oRequestAnimationFrame) {
+        //     this.step = function (callback) {
+        //         return window.oRequestAnimationFrame(callback);
+        //     };
 
-            this.clear = function (handle) {
-                return window.oCancelRequestAnimationFrame(handle.value);
-            };
-        } else if (window.msRequestAnimationFrame) {
-            this.step = function (callback) {
-                return window.msRequestAnimationFrame(callback);
-            };
+        //     this.clear = function (handle) {
+        //         return window.oCancelRequestAnimationFrame(handle.value);
+        //     };
+        // } else if (window.msRequestAnimationFrame) {
+        //     this.step = function (callback) {
+        //         return window.msRequestAnimationFrame(callback);
+        //     };
 
-            this.clear = function (handle) {
-                return window.msCancelRequestAnimationFrame(handle.value);
-            };
+        //     this.clear = function (handle) {
+        //         return window.msCancelRequestAnimationFrame(handle.value);
+        //     };
         } else {
             custom = false;
         }
