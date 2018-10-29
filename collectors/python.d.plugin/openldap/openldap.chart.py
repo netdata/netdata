@@ -29,7 +29,7 @@ CHARTS = {
        'options': [None, 'Operations', 'ops', 'ldap', 'monitorCounter', 'line'],
        'lines': [
         ['completed_operations', None, 'incremental'],
-        ['initiated_operations', None, 'incremental'] 
+        ['initiated_operations', None, 'incremental']
      ]},
     'referrals_sent': {
     'options': [None, 'Referrals Statistics', 'referalls_sent', 'ldap', 'monitorCounter', 'line'],
@@ -100,7 +100,7 @@ class Service(SimpleService):
             bind = searchlist[key][0]
             attr = searchlist[key][1]
             num = self.conn.search(bind, ldap.SCOPE_BASE, 'objectClass=*', [attr,])
-        
+
             try:
                 result_type, result_data = self.conn.result(num, 1)
                 if result_type == 101:
