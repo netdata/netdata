@@ -2127,25 +2127,25 @@ let chartState = function (element) {
         }, 0);
     };
 
-    let __unitsConversionLastUnits = undefined;
-    let __unitsConversionLastUnitsDesired = undefined;
-    let __unitsConversionLastMin = undefined;
-    let __unitsConversionLastMax = undefined;
-    let __unitsConversion = function (value) {
+    let _unitsConversionLastUnits = undefined;
+    let _unitsConversionLastUnitsDesired = undefined;
+    let _unitsConversionLastMin = undefined;
+    let _unitsConversionLastMax = undefined;
+    let _unitsConversion = function (value) {
         return value;
     };
     this.unitsConversionSetup = function (min, max) {
-        if (this.units !== __unitsConversionLastUnits
-            || this.units_desired !== __unitsConversionLastUnitsDesired
-            || min !== __unitsConversionLastMin
-            || max !== __unitsConversionLastMax) {
+        if (this.units !== _unitsConversionLastUnits
+            || this.units_desired !== _unitsConversionLastUnitsDesired
+            || min !== _unitsConversionLastMin
+            || max !== _unitsConversionLastMax) {
 
-            __unitsConversionLastUnits = this.units;
-            __unitsConversionLastUnitsDesired = this.units_desired;
-            __unitsConversionLastMin = min;
-            __unitsConversionLastMax = max;
+            _unitsConversionLastUnits = this.units;
+            _unitsConversionLastUnitsDesired = this.units_desired;
+            _unitsConversionLastMin = min;
+            _unitsConversionLastMax = max;
 
-            __unitsConversion = NETDATA.unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
+            _unitsConversion = NETDATA.unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
                 // console.log('switching units from ' + that.units.toString() + ' to ' + units.toString());
                 that.units_current = units;
                 that.legendSetUnitsString(that.units_current);
@@ -2153,38 +2153,38 @@ let chartState = function (element) {
         }
     };
 
-    let __legendFormatValueChartDecimalsLastMin = undefined;
-    let __legendFormatValueChartDecimalsLastMax = undefined;
-    let __legendFormatValueChartDecimals = -1;
-    let __intlNumberFormat = null;
+    let _legendFormatValueChartDecimalsLastMin = undefined;
+    let _legendFormatValueChartDecimalsLastMax = undefined;
+    let _legendFormatValueChartDecimals = -1;
+    let _intlNumberFormat = null;
     this.legendFormatValueDecimalsFromMinMax = function (min, max) {
-        if (min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax) {
+        if (min === _legendFormatValueChartDecimalsLastMin && max === _legendFormatValueChartDecimalsLastMax) {
             return;
         }
 
         this.unitsConversionSetup(min, max);
-        if (__unitsConversion !== null) {
-            min = __unitsConversion(min);
-            max = __unitsConversion(max);
+        if (_unitsConversion !== null) {
+            min = _unitsConversion(min);
+            max = _unitsConversion(max);
 
             if (typeof min !== 'number' || typeof max !== 'number') {
                 return;
             }
         }
 
-        __legendFormatValueChartDecimalsLastMin = min;
-        __legendFormatValueChartDecimalsLastMax = max;
+        _legendFormatValueChartDecimalsLastMin = min;
+        _legendFormatValueChartDecimalsLastMax = max;
 
-        let old = __legendFormatValueChartDecimals;
+        let old = _legendFormatValueChartDecimals;
 
         if (this.data !== null && this.data.min === this.data.max)
         // it is a fixed number, let the visualizer decide based on the value
         {
-            __legendFormatValueChartDecimals = -1;
+            _legendFormatValueChartDecimals = -1;
         } else if (this.value_decimal_detail !== -1)
         // there is an override
         {
-            __legendFormatValueChartDecimals = this.value_decimal_detail;
+            _legendFormatValueChartDecimals = this.value_decimal_detail;
         } else {
             // ok, let's calculate the proper number of decimal points
             let delta;
@@ -2196,31 +2196,31 @@ let chartState = function (element) {
             }
 
             if (delta > 1000) {
-                __legendFormatValueChartDecimals = 0;
+                _legendFormatValueChartDecimals = 0;
             } else if (delta > 10) {
-                __legendFormatValueChartDecimals = 1;
+                _legendFormatValueChartDecimals = 1;
             } else if (delta > 1) {
-                __legendFormatValueChartDecimals = 2;
+                _legendFormatValueChartDecimals = 2;
             } else if (delta > 0.1) {
-                __legendFormatValueChartDecimals = 2;
+                _legendFormatValueChartDecimals = 2;
             } else if (delta > 0.01) {
-                __legendFormatValueChartDecimals = 4;
+                _legendFormatValueChartDecimals = 4;
             } else if (delta > 0.001) {
-                __legendFormatValueChartDecimals = 5;
+                _legendFormatValueChartDecimals = 5;
             } else if (delta > 0.0001) {
-                __legendFormatValueChartDecimals = 6;
+                _legendFormatValueChartDecimals = 6;
             } else {
-                __legendFormatValueChartDecimals = 7;
+                _legendFormatValueChartDecimals = 7;
             }
         }
 
-        if (__legendFormatValueChartDecimals !== old) {
-            if (__legendFormatValueChartDecimals < 0) {
-                __intlNumberFormat = null;
+        if (_legendFormatValueChartDecimals !== old) {
+            if (_legendFormatValueChartDecimals < 0) {
+                _intlNumberFormat = null;
             } else {
-                __intlNumberFormat = NETDATA.fastNumberFormat.get(
-                    __legendFormatValueChartDecimals,
-                    __legendFormatValueChartDecimals
+                _intlNumberFormat = NETDATA.fastNumberFormat.get(
+                    _legendFormatValueChartDecimals,
+                    _legendFormatValueChartDecimals
                 );
             }
         }
@@ -2231,14 +2231,14 @@ let chartState = function (element) {
             return '-';
         }
 
-        value = __unitsConversion(value);
+        value = _unitsConversion(value);
 
         if (typeof value !== 'number') {
             return value;
         }
 
-        if (__intlNumberFormat !== null) {
-            return __intlNumberFormat.format(value);
+        if (_intlNumberFormat !== null) {
+            return _intlNumberFormat.format(value);
         }
 
         let dmin, dmax;
