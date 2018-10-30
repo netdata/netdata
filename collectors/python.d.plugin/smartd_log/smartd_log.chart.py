@@ -309,10 +309,10 @@ CHARTED_ATTRS = dict((attr, k) for k, v in CHARTS.items() for attr in v['attrs']
 
 
 class BaseAtaSmartAttribute:
-    def __init__(self, name, raw_value, normalized_value):
+    def __init__(self, name, normalized_value, raw_value):
         self.name = name
-        self.raw_value = raw_value
         self.normalized_value = normalized_value
+        self.raw_value = raw_value
 
     def value(self):
         raise NotImplementedError
