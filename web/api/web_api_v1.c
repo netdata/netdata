@@ -233,6 +233,15 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
 
+void fix_google_param(char *s) {
+    if(unlikely(!s)) return;
+
+    for( ; *s ;s++) {
+        if(!isalnum(*s) && *s != '.' && *s != '_' && *s != '-')
+            *s = '_';
+    }
+}
+
 // returns the HTTP code
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
@@ -331,6 +340,14 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             }
         }
     }
+
+    // validate the google parameters given
+    fix_google_param(google_out);
+    fix_google_param(google_sig);
+    fix_google_param(google_reqId);
+    fix_google_param(google_version);
+    fix_google_param(responseHandler);
+    fix_google_param(outFileName);
 
     if(!chart || !*chart) {
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
