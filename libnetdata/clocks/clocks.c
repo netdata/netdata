@@ -156,3 +156,49 @@ inline usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb) {
     if(!hb || !hb->monotonic) return 0ULL;
     return now_monotonic_usec() - hb->monotonic;
 }
+
+int sleep_usec(usec_t usec) {
+
+#ifndef NETDATA_WITH_USLEEP
+    // we expect microseconds (1.000.000 per second)
+    // but timespec is nanoseconds (1.000.000.000 per second)
+    struct timespec rem, req = {
+            .tv_sec = (time_t) (usec / 1000000),
+            .tv_nsec = (suseconds_t) ((usec % 1000000) * 1000)
+    };
+
+    while (nanosleep(&req, &rem) == -1) {
+        if (likely(errno == EINTR)) {
+            debug(D_SYSTEM, "nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
+            req.tv_sec = rem.tv_sec;
+            req.tv_nsec = rem.tv_nsec;
+        } else {
+            error("Cannot nanosleep() for %llu microseconds.", usec);
+            break;
+        }
+    }
+
+    return 0;
+#else
+    int ret = usleep(usec);
+    if(unlikely(ret == -1 && errno == EINVAL)) {
+        // on certain systems, usec has to be up to 999999
+        if(usec > 999999) {
+            int counter = usec / 999999;
+            while(counter--)
+                usleep(999999);
+
+            usleep(usec % 999999);
+        }
+        else {
+            error("Cannot usleep() for %llu microseconds.", usec);
+            return ret;
+        }
+    }
+
+    if(ret != 0)
+        error("usleep() failed for %llu microseconds.", usec);
+
+    return ret;
+#endif
+}

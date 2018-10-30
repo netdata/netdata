@@ -94,8 +94,12 @@ void *proc_main(void *ptr) {
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+    size_t iterations = 0;
 
     while(!netdata_exit) {
+        iterations++;
+        (void)iterations;
+
         usec_t hb_dt = heartbeat_next(&hb, step);
         usec_t duration = 0ULL;
 
@@ -109,9 +113,18 @@ void *proc_main(void *ptr) {
 
             debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
+//#ifdef NETDATA_LOG_ALLOCATIONS
+//            if(pm->func == do_proc_interrupts)
+//                log_thread_memory_allocations = iterations;
+//#endif
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
             pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
+
+//#ifdef NETDATA_LOG_ALLOCATIONS
+//            if(pm->func == do_proc_interrupts)
+//                log_thread_memory_allocations = 0;
+//#endif
 
             if(unlikely(netdata_exit)) break;
         }

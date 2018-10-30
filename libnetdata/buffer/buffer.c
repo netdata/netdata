@@ -381,8 +381,7 @@ void buffer_free(BUFFER *b) {
     freez(b);
 }
 
-void buffer_increase(BUFFER *b, size_t free_size_required)
-{
+void buffer_increase(BUFFER *b, size_t free_size_required) {
     buffer_overflow_check(b);
 
     size_t left = b->size - b->len;
