@@ -616,10 +616,10 @@ RRDSET *rrdset_create_custom(
         st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
-    st->plugin_name = plugin?strdup(plugin):NULL;
-    st->module_name = module?strdup(module):NULL;
+    st->plugin_name = plugin?strdupz(plugin):NULL;
+    st->module_name = module?strdupz(module):NULL;
 
-    st->config_section = strdup(config_section);
+    st->config_section = strdupz(config_section);
     st->rrdhost = host;
     st->memsize = size;
     st->entries = entries;

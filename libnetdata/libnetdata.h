@@ -237,6 +237,7 @@ extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4
 
 // memory allocation functions that handle failures
 #ifdef NETDATA_LOG_ALLOCATIONS
+extern __thread size_t log_thread_memory_allocations;
 #define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
 #define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
 #define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
