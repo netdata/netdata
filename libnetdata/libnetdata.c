@@ -27,182 +27,172 @@ const char *program_version = VERSION;
 // routines.
 
 #ifdef NETDATA_LOG_ALLOCATIONS
-static struct memory_statistics {
-    volatile size_t malloc_calls_made;
-    volatile size_t calloc_calls_made;
-    volatile size_t realloc_calls_made;
-    volatile size_t strdup_calls_made;
-    volatile size_t free_calls_made;
-    volatile size_t memory_calls_made;
-    volatile size_t allocated_memory;
-    volatile size_t mmapped_memory;
-} memory_statistics;
+static __thread struct memory_statistics {
+    volatile ssize_t malloc_calls_made;
+    volatile ssize_t calloc_calls_made;
+    volatile ssize_t realloc_calls_made;
+    volatile ssize_t strdup_calls_made;
+    volatile ssize_t free_calls_made;
+    volatile ssize_t memory_calls_made;
+    volatile ssize_t allocated_memory;
+    volatile ssize_t mmapped_memory;
+} memory_statistics = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-static inline void print_allocations(const char *file, const char *function, const unsigned long line) {
-    static struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
+__thread size_t log_thread_memory_allocations = 0;
 
-    //if(unlikely(!(memory_statistics.memory_calls_made % 5))) {
-        fprintf(stderr, "(%04lu@%-10.10s:%-15.15s): Allocated %zu KB (+%zu B), mmapped %zu KB (+%zu B): malloc %zu (+%zu), calloc %zu (+%zu), realloc %zu (+%zu), strdup %zu (+%zu), free %zu (+%zu)\n",
-                line, file, function,
-                (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
-                (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
-                memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
-                memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
-                memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
-                memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
-                memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
-        );
+static inline void print_allocations(const char *file, const char *function, const unsigned long line, const char *type, size_t size) {
+    static __thread struct memory_statistics old = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-        memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
-    //}
-}
+    fprintf(stderr, "%s iteration %zu MEMORY TRACE: %lu@%s : %s : %s : %zu\n",
+            netdata_thread_tag(),
+            log_thread_memory_allocations,
+            line, file, function,
+            type, size
+    );
 
-static inline void malloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
-#else
-    // this is for debugging - we don't care locking it
-    memory_statistics.memory_calls_made++;
-    memory_statistics.malloc_calls_made++;
-    memory_statistics.allocated_memory += size;
-#endif
-    print_allocations(file, function, line);
+    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KB (%+zd B), mmapped %zd KB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
+            netdata_thread_tag(),
+            log_thread_memory_allocations,
+            line, file, function,
+            (memory_statistics.allocated_memory + 512) / 1024, memory_statistics.allocated_memory - old.allocated_memory,
+            (memory_statistics.mmapped_memory + 512) / 1024, memory_statistics.mmapped_memory - old.mmapped_memory,
+            type,
+            memory_statistics.malloc_calls_made, memory_statistics.malloc_calls_made - old.malloc_calls_made,
+            memory_statistics.calloc_calls_made, memory_statistics.calloc_calls_made - old.calloc_calls_made,
+            memory_statistics.realloc_calls_made, memory_statistics.realloc_calls_made - old.realloc_calls_made,
+            memory_statistics.strdup_calls_made, memory_statistics.strdup_calls_made - old.strdup_calls_made,
+            memory_statistics.free_calls_made, memory_statistics.free_calls_made - old.free_calls_made
+    );
+
+    memcpy(&old, &memory_statistics, sizeof(struct memory_statistics));
 }
 
 static inline void mmap_accounting(size_t size) {
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    __atomic_fetch_add(&memory_statistics.malloc_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.mmapped_memory, size, __ATOMIC_SEQ_CST);
-#else
-    // this is for debugging - we don't care locking it
-    memory_statistics.memory_calls_made++;
-    memory_statistics.mmapped_memory += size;
-#endif
-}
-
-static inline void calloc_accounting(const char *file, const char *function, const unsigned long line, size_t size) {
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.calloc_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
-#else
-    // this is for debugging - we don't care locking it
-    memory_statistics.memory_calls_made++;
-    memory_statistics.calloc_calls_made++;
-    memory_statistics.allocated_memory += size;
-#endif
-    print_allocations(file, function, line);
-}
-
-static inline void realloc_accounting(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
-    (void)ptr;
-
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.realloc_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
-#else
-    // this is for debugging - we don't care locking it
-    memory_statistics.memory_calls_made++;
-    memory_statistics.realloc_calls_made++;
-    memory_statistics.allocated_memory += size;
-#endif
-    print_allocations(file, function, line);
-}
-
-static inline void strdup_accounting(const char *file, const char *function, const unsigned long line, const char *s) {
-    size_t size = strlen(s) + 1;
-
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-    __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.strdup_calls_made, 1, __ATOMIC_SEQ_CST);
-    __atomic_fetch_add(&memory_statistics.allocated_memory, size, __ATOMIC_SEQ_CST);
-#else
-    // this is for debugging - we don't care locking it
-    memory_statistics.memory_calls_made++;
-    memory_statistics.strdup_calls_made++;
-    memory_statistics.allocated_memory += size;
-#endif
-    print_allocations(file, function, line);
-}
-
-static inline void free_accounting(const char *file, const char *function, const unsigned long line, void *ptr) {
-    (void)file;
-    (void)function;
-    (void)line;
-
-    if(likely(ptr)) {
-#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
-        __atomic_fetch_add(&memory_statistics.memory_calls_made, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&memory_statistics.free_calls_made, 1, __ATOMIC_SEQ_CST);
-#else
-        // this is for debugging - we don't care locking it
+    if(log_thread_memory_allocations) {
         memory_statistics.memory_calls_made++;
-        memory_statistics.free_calls_made++;
-#endif
+        memory_statistics.mmapped_memory += size;
     }
 }
-#endif
 
-#ifdef NETDATA_LOG_ALLOCATIONS
+void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
+    if(log_thread_memory_allocations) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.malloc_calls_made++;
+        memory_statistics.allocated_memory += size;
+        print_allocations(file, function, line, "malloc()", size);
+    }
+
+    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
+    if (unlikely(!n)) fatal("mallocz() cannot allocate %zu bytes of memory.", size);
+    *n = size;
+    return (void *)&n[1];
+}
+
+void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
+    size = nmemb * size;
+
+    if(log_thread_memory_allocations) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.calloc_calls_made++;
+        memory_statistics.allocated_memory += size;
+        print_allocations(file, function, line, "calloc()", size);
+    }
+
+    size_t *n = (size_t *)calloc(1, sizeof(size_t) + size);
+    if (unlikely(!n)) fatal("callocz() cannot allocate %zu bytes of memory.", size);
+    *n = size;
+    return (void *)&n[1];
+}
+
+void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
+    if(!ptr) return mallocz_int(file, function, line, size);
+
+    size_t *n = (size_t *)ptr;
+    n--;
+    size_t old_size = *n;
+
+    n = realloc(n, sizeof(size_t) + size);
+    if (unlikely(!n)) fatal("reallocz() cannot allocate %zu bytes of memory (from %zu bytes).", size, old_size);
+
+    if(log_thread_memory_allocations) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.realloc_calls_made++;
+        memory_statistics.allocated_memory += (size - old_size);
+        print_allocations(file, function, line, "realloc()", size - old_size);
+    }
+
+    *n = size;
+    return (void *)&n[1];
+}
+
 char *strdupz_int(const char *file, const char *function, const unsigned long line, const char *s) {
-    strdup_accounting(file, function, line, s);
-#else
-char *strdupz(const char *s) {
-#endif
+    size_t size = strlen(s) + 1;
 
+    if(log_thread_memory_allocations) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.strdup_calls_made++;
+        memory_statistics.allocated_memory += size;
+        print_allocations(file, function, line, "strdup()", size);
+    }
+
+    size_t *n = (size_t *)malloc(sizeof(size_t) + size);
+    if (unlikely(!n)) fatal("strdupz() cannot allocate %zu bytes of memory.", size);
+
+    *n = size;
+    char *t = (char *)&n[1];
+    strcpy(t, s);
+    return t;
+}
+
+void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
+    if(unlikely(!ptr)) return;
+
+    size_t *n = (size_t *)ptr;
+    n--;
+    size_t size = *n;
+
+    if(log_thread_memory_allocations) {
+        memory_statistics.memory_calls_made++;
+        memory_statistics.free_calls_made++;
+        memory_statistics.allocated_memory -= size;
+        print_allocations(file, function, line, "free()", size);
+    }
+
+    free(n);
+}
+#else
+
+char *strdupz(const char *s) {
     char *t = strdup(s);
     if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
     return t;
 }
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size) {
-    malloc_accounting(file, function, line, size);
-#else
-void *mallocz(size_t size) {
-#endif
+void freez(void *ptr) {
+    free(ptr);
+}
 
+void *mallocz(size_t size) {
     void *p = malloc(size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", size);
     return p;
 }
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-void *callocz_int(const char *file, const char *function, const unsigned long line, size_t nmemb, size_t size) {
-    calloc_accounting(file, function, line, nmemb * size);
-#else
 void *callocz(size_t nmemb, size_t size) {
-#endif
-
     void *p = calloc(nmemb, size);
     if (unlikely(!p)) fatal("Cannot allocate %zu bytes of memory.", nmemb * size);
     return p;
 }
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size) {
-    realloc_accounting(file, function, line, ptr, size);
-#else
 void *reallocz(void *ptr, size_t size) {
-#endif
-
     void *p = realloc(ptr, size);
     if (unlikely(!p)) fatal("Cannot re-allocate memory to %zu bytes.", size);
     return p;
 }
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-void freez_int(const char *file, const char *function, const unsigned long line, void *ptr) {
-    free_accounting(file, function, line, ptr);
-#else
-void freez(void *ptr) {
 #endif
 
-    free(ptr);
-}
+// --------------------------------------------------------------------------------------------------------------------
 
 void json_escape_string(char *dst, const char *src, size_t size) {
     const char *t;
@@ -233,52 +223,6 @@ void json_fix_string(char *s) {
         else
             s++;
     }
-}
-
-int sleep_usec(usec_t usec) {
-
-#ifndef NETDATA_WITH_USLEEP
-    // we expect microseconds (1.000.000 per second)
-    // but timespec is nanoseconds (1.000.000.000 per second)
-    struct timespec rem, req = {
-            .tv_sec = (time_t) (usec / 1000000),
-            .tv_nsec = (suseconds_t) ((usec % 1000000) * 1000)
-    };
-
-    while (nanosleep(&req, &rem) == -1) {
-        if (likely(errno == EINTR)) {
-            debug(D_SYSTEM, "nanosleep() interrupted (while sleeping for %llu microseconds).", usec);
-            req.tv_sec = rem.tv_sec;
-            req.tv_nsec = rem.tv_nsec;
-        } else {
-            error("Cannot nanosleep() for %llu microseconds.", usec);
-            break;
-        }
-    }
-
-    return 0;
-#else
-    int ret = usleep(usec);
-    if(unlikely(ret == -1 && errno == EINVAL)) {
-        // on certain systems, usec has to be up to 999999
-        if(usec > 999999) {
-            int counter = usec / 999999;
-            while(counter--)
-                usleep(999999);
-
-            usleep(usec % 999999);
-        }
-        else {
-            error("Cannot usleep() for %llu microseconds.", usec);
-            return ret;
-        }
-    }
-
-    if(ret != 0)
-        error("usleep() failed for %llu microseconds.", usec);
-
-    return ret;
-#endif
 }
 
 unsigned char netdata_map_chart_names[256] = {

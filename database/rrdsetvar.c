@@ -169,7 +169,7 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
     rs = rrdsetvar_create(st, n, RRDVAR_TYPE_CALCULATED, v, RRDVAR_OPTION_ALLOCATED|RRDVAR_OPTION_CUSTOM_CHART_VAR);
     rrdset_unlock(st);
 
-    free(n);
+    freez(n);
     return rs;
 }
 
