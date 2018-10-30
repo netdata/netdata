@@ -6156,7 +6156,7 @@ let chartState = function (element) {
         this.chart_url = null;                      // string - the url to download chart info
         this.chart = null;                          // object - the chart as downloaded from the server
 
-        const get_foreign_element_by_id = (opt) => {
+        const getForeignElementById = (opt) => {
             let id = NETDATA.dataAttribute(this.element, opt, null);
             if (id === null) {
                 //this.log('option "' + opt + '" is undefined');
@@ -6172,11 +6172,11 @@ let chartState = function (element) {
             return el;
         };
 
-        this.foreign_element_before = get_foreign_element_by_id('show-before-at');
-        this.foreign_element_after = get_foreign_element_by_id('show-after-at');
-        this.foreign_element_duration = get_foreign_element_by_id('show-duration-at');
-        this.foreign_element_update_every = get_foreign_element_by_id('show-update-every-at');
-        this.foreign_element_selection = get_foreign_element_by_id('show-selection-at');
+        this.foreign_element_before = getForeignElementById('show-before-at');
+        this.foreign_element_after = getForeignElementById('show-after-at');
+        this.foreign_element_duration = getForeignElementById('show-duration-at');
+        this.foreign_element_update_every = getForeignElementById('show-update-every-at');
+        this.foreign_element_selection = getForeignElementById('show-selection-at');
     };
 
     const destroyDOM = () => {
