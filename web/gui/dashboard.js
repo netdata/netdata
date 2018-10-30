@@ -128,7 +128,7 @@ NETDATA.zeropad = function (x) {
 };
 
 NETDATA.seconds4human = function (seconds, options) {
-    let default_options = {
+    let defaultOptions = {
         now: 'now',
         space: ' ',
         negative_suffix: 'ago',
@@ -144,11 +144,11 @@ NETDATA.seconds4human = function (seconds, options) {
     };
 
     if (typeof options !== 'object') {
-        options = default_options;
+        options = defaultOptions;
     } else {
-        for (const x in default_options) {
+        for (const x in defaultOptions) {
             if (typeof options[x] !== 'string') {
-                options[x] = default_options[x];
+                options[x] = defaultOptions[x];
             }
         }
     }
@@ -276,15 +276,15 @@ NETDATA.dataAttributeBoolean = function (element, attribute, def) {
 // fast numbers formatting
 
 NETDATA.fastNumberFormat = {
-    formatters_fixed: [],
-    formatters_zero_based: [],
+    formattersFixed: [],
+    formattersZeroBased: [],
 
     // this is the fastest and the preferred
     getIntlNumberFormat: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -295,10 +295,10 @@ NETDATA.fastNumberFormat = {
                 });
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -309,7 +309,7 @@ NETDATA.fastNumberFormat = {
                 });
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             // this is never used
             // it is added just for completeness
@@ -329,8 +329,8 @@ NETDATA.fastNumberFormat = {
     getLocaleString: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = {
                     format: function (value) {
                         return value.toLocaleString(undefined, {
                             // style: 'decimal',
@@ -345,10 +345,10 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = {
                     format: function (value) {
                         return value.toLocaleString(undefined, {
                             // style: 'decimal',
@@ -363,7 +363,7 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             return {
                 format: function (value) {
@@ -385,8 +385,8 @@ NETDATA.fastNumberFormat = {
     getFixed: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = {
                     format: function (value) {
                         if (value === 0) {
                             return "0";
@@ -396,10 +396,10 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = {
                     format: function (value) {
                         if (value === 0) {
                             return "0";
@@ -409,7 +409,7 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             return {
                 format: function (value) {
@@ -6355,7 +6355,6 @@ let chartState = function (element) {
     // hide the chart, when it is not visible - called from isVisible()
     this.hideChart = function () {
         // hide it, if it is not already hidden
-        // if (isHidden() === true) return;
         if (isHidden()) {
             return;
         }
@@ -7630,7 +7629,7 @@ let chartState = function (element) {
                 this.element_legend_childs.toolbox_zoomout = document.createElement('div');
                 this.element_legend_childs.toolbox_volume = document.createElement('div');
 
-                const get_pan_and_zoom_step = function (event) {
+                const getPanAndZoomStep = function (event) {
                     if (event.ctrlKey) {
                         return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
                     } else if (event.shiftKey) {
@@ -7651,7 +7650,7 @@ let chartState = function (element) {
                 this.element_legend_childs.toolbox_left.onclick = function (e) {
                     e.preventDefault();
 
-                    let step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+                    let step = (that.view_before - that.view_after) * getPanAndZoomStep(e);
                     let before = that.view_before - step;
                     let after = that.view_after - step;
                     if (after >= that.netdata_first) {
@@ -7702,7 +7701,7 @@ let chartState = function (element) {
                 this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
                 this.element_legend_childs.toolbox_right.onclick = function (e) {
                     e.preventDefault();
-                    let step = (that.view_before - that.view_after) * get_pan_and_zoom_step(e);
+                    let step = (that.view_before - that.view_after) * getPanAndZoomStep(e);
                     let before = that.view_before + step;
                     let after = that.view_after + step;
                     if (before <= that.netdata_last) {
@@ -7730,7 +7729,7 @@ let chartState = function (element) {
                 this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
                 this.element_legend_childs.toolbox_zoomin.onclick = function (e) {
                     e.preventDefault();
-                    let dt = ((that.view_before - that.view_after) * (get_pan_and_zoom_step(e) * 0.8) / 2);
+                    let dt = ((that.view_before - that.view_after) * (getPanAndZoomStep(e) * 0.8) / 2);
                     let before = that.view_before - dt;
                     let after = that.view_after + dt;
                     that.library.toolboxPanAndZoom(that, after, before);
@@ -7756,7 +7755,7 @@ let chartState = function (element) {
                 this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
                 this.element_legend_childs.toolbox_zoomout.onclick = function (e) {
                     e.preventDefault();
-                    let dt = (((that.view_before - that.view_after) / (1.0 - (get_pan_and_zoom_step(e) * 0.8)) - (that.view_before - that.view_after)) / 2);
+                    let dt = (((that.view_before - that.view_after) / (1.0 - (getPanAndZoomStep(e) * 0.8)) - (that.view_before - that.view_after)) / 2);
                     let before = that.view_before + dt;
                     let after = that.view_after - dt;
 
