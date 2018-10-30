@@ -297,7 +297,7 @@ CHARTS = {
 
     },
     'percent_lifetime_used': {
-        'options': [None, 'Percent Lifetime Used', '%', 'wear', 'smartd_log.percent_lifetime_used','line'],
+        'options': [None, 'Percent Lifetime Used', '%', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
         'lines': [],
         'attrs': [ATTR202],
         'algo': ABSOLUTE,
