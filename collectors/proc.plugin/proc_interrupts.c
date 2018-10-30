@@ -56,16 +56,16 @@ static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
 int do_proc_interrupts(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
-    static int cpus = -1, do_per_core = -1;
+    static int cpus = -1, do_per_core = CONFIG_BOOLEAN_INVALID;
     struct interrupt *irrs = NULL;
 
-    if(unlikely(do_per_core == -1))
-        do_per_core = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "interrupts per core", 1);
+    if(unlikely(do_per_core == CONFIG_BOOLEAN_INVALID))
+        do_per_core = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "interrupts per core", CONFIG_BOOLEAN_AUTO);
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/interrupts");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_INTERRUPTS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff))
         return 1;
@@ -113,6 +113,10 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         irr->id = procfile_lineword(ff, l, 0);
         if(unlikely(!irr->id || !irr->id[0])) continue;
 
+        size_t idlen = strlen(irr->id);
+        if(irr->id[idlen - 1] == ':')
+            irr->id[--idlen] = '\0';
+
         int c;
         for(c = 0; c < cpus ;c++) {
             if(likely((c + 1) < (int)words))
@@ -126,7 +130,6 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         if(unlikely(isdigit(irr->id[0]) && (uint32_t)(cpus + 2) < words)) {
             strncpyz(irr->name, procfile_lineword(ff, l, words - 1), MAX_INTERRUPT_NAME);
             size_t nlen = strlen(irr->name);
-            size_t idlen = strlen(irr->id);
             if(likely(nlen + 1 + idlen <= MAX_INTERRUPT_NAME)) {
                 irr->name[nlen] = '_';
                 strncpyz(&irr->name[nlen + 1], irr->id, MAX_INTERRUPT_NAME - nlen - 1);
@@ -166,34 +169,30 @@ int do_proc_interrupts(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
-        if(unlikely(!irr->used)) continue;
-
-        // some interrupt may have changed without changing the total number of lines
-        // if the same number of interrupts have been added and removed between two
-        // calls of this function.
-        if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
-            irr->rd = rrddim_find(st_system_interrupts, irr->id);
-
-            if(unlikely(!irr->rd))
+        if(irr->used && irr->total) {
+            // some interrupt may have changed without changing the total number of lines
+            // if the same number of interrupts have been added and removed between two
+            // calls of this function.
+            if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
                 irr->rd = rrddim_add(st_system_interrupts, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            else
                 rrddim_set_name(st_system_interrupts, irr->rd, irr->name);
 
-            // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
-            if(likely(do_per_core)) {
-                int c;
-                for (c = 0; c < cpus ;c++) irr->cpu[c].rd = NULL;
+                // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
+                if(likely(do_per_core != CONFIG_BOOLEAN_NO)) {
+                    int c;
+                    for(c = 0; c < cpus; c++) irr->cpu[c].rd = NULL;
+                }
             }
-        }
 
-        rrddim_set_by_pointer(st_system_interrupts, irr->rd, irr->total);
+            rrddim_set_by_pointer(st_system_interrupts, irr->rd, irr->total);
+        }
     }
 
     rrdset_done(st_system_interrupts);
 
     // --------------------------------------------------------------------
 
-    if(likely(do_per_core)) {
+    if(likely(do_per_core != CONFIG_BOOLEAN_NO)) {
         static RRDSET **core_st = NULL;
         static int old_cpus = 0;
 
@@ -231,19 +230,14 @@ int do_proc_interrupts(int update_every, usec_t dt) {
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);
-
-                if(unlikely(!irr->used)) continue;
-
-                if(unlikely(!irr->cpu[c].rd)) {
-                    irr->cpu[c].rd = rrddim_find(core_st[c], irr->id);
-
-                    if(unlikely(!irr->cpu[c].rd))
+                if(irr->used && (do_per_core == CONFIG_BOOLEAN_YES || irr->cpu[c].value)) {
+                    if(unlikely(!irr->cpu[c].rd)) {
                         irr->cpu[c].rd = rrddim_add(core_st[c], irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    else
                         rrddim_set_name(core_st[c], irr->cpu[c].rd, irr->name);
-                }
+                    }
 
-                rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);
+                    rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);
+                }
             }
 
             rrdset_done(core_st[c]);
