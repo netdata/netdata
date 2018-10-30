@@ -128,4 +128,6 @@ extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
 /* Returns elapsed time in microseconds since last heartbeat */
 extern usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb);
 
+extern int sleep_usec(usec_t usec);
+
 #endif /* NETDATA_CLOCKS_H */

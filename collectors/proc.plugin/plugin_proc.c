@@ -113,18 +113,18 @@ void *proc_main(void *ptr) {
 
             debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-            if(pm->func == do_proc_interrupts)
-                log_thread_memory_allocations = iterations;
-#endif
+//#ifdef NETDATA_LOG_ALLOCATIONS
+//            if(pm->func == do_proc_interrupts)
+//                log_thread_memory_allocations = iterations;
+//#endif
             pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
             pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
 
-#ifdef NETDATA_LOG_ALLOCATIONS
-            if(pm->func == do_proc_interrupts)
-                log_thread_memory_allocations = 0;
-#endif
+//#ifdef NETDATA_LOG_ALLOCATIONS
+//            if(pm->func == do_proc_interrupts)
+//                log_thread_memory_allocations = 0;
+//#endif
 
             if(unlikely(netdata_exit)) break;
         }
