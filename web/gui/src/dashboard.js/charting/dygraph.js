@@ -875,7 +875,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
 
                 // if it didn't move, it is a selection
                 if (state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
-                    NETDATA.globalSelectionSync.dont_sync_before = 0;
+                    NETDATA.globalSelectionSync.dontSyncBefore = 0;
                     NETDATA.globalSelectionSync.setMaster(state);
 
                     // internal api of dygraph
