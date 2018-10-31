@@ -114,6 +114,7 @@
 
 **Merged pull requests:**
 
+- fixed wrong annotations given to google charts [\#4535](https://github.com/netdata/netdata/pull/4535) ([ktsaou](https://github.com/ktsaou))
 - Added @gmosx to CONTRIBUTORS.md [\#4531](https://github.com/netdata/netdata/pull/4531) ([gmosx](https://github.com/gmosx))
 - fixed broken links [\#4530](https://github.com/netdata/netdata/pull/4530) ([ktsaou](https://github.com/ktsaou))
 - new releaser script [\#4526](https://github.com/netdata/netdata/pull/4526) ([paulfantom](https://github.com/paulfantom))
@@ -318,8 +319,6 @@
 - updated configs.signatures [\#4138](https://github.com/netdata/netdata/pull/4138) ([ktsaou](https://github.com/ktsaou))
 - \[project management\] add github CODEOWNERS [\#4137](https://github.com/netdata/netdata/pull/4137) ([paulfantom](https://github.com/paulfantom))
 - \[cleanup crusade\] cleanup licenses [\#4136](https://github.com/netdata/netdata/pull/4136) ([paulfantom](https://github.com/paulfantom))
-- \[cleanup crusade\] make clearer what hooks are [\#4135](https://github.com/netdata/netdata/pull/4135) ([paulfantom](https://github.com/paulfantom))
-- added how to enable status in ovpn [\#4113](https://github.com/netdata/netdata/pull/4113) ([ntalekt](https://github.com/ntalekt))
 - Add ProxySQL python plugin [\#4112](https://github.com/netdata/netdata/pull/4112) ([alibo](https://github.com/alibo))
 - Optimize counting of recusive pins [\#4095](https://github.com/netdata/netdata/pull/4095) ([pjz](https://github.com/pjz))
 - \[nginx\_plus\] fix handling of non-contiguous peer IDs [\#4093](https://github.com/netdata/netdata/pull/4093) ([illes](https://github.com/illes))
