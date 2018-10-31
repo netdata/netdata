@@ -25,21 +25,22 @@ typedef enum rrdr_options {
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {
-    RRDR_VALUE_NOTHING      = 0x00, // no flag set
-    RRDR_VALUE_EMPTY        = 0x01, // the value is empty
-    RRDR_VALUE_RESET        = 0x02, // the value has been reset
+    RRDR_VALUE_NOTHING      = 0x00, // no flag set (a good default)
+    RRDR_VALUE_EMPTY        = 0x01, // the database value is empty
+    RRDR_VALUE_RESET        = 0x02, // the database value is marked as reset (overflown)
 } RRDR_VALUE_FLAGS;
 
 typedef enum rrdr_dimension_flag {
-    RRDR_DIMENSION_HIDDEN   = 0x04, // the dimension is hidden
-    RRDR_DIMENSION_NONZERO  = 0x08, // the dimension non zero
-    RRDR_DIMENSION_SELECTED = 0x10, // the dimension is selected
+    RRDR_DIMENSION_DEFAULT  = 0x00,
+    RRDR_DIMENSION_HIDDEN   = 0x04, // the dimension is hidden (not to be presented to callers)
+    RRDR_DIMENSION_NONZERO  = 0x08, // the dimension is non zero (contains non-zero values)
+    RRDR_DIMENSION_SELECTED = 0x10, // the dimension is selected for evaluation in this RRDR
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options
 typedef enum rrdr_result_flags {
-    RRDR_RESULT_OPTION_ABSOLUTE = 0x00000001,
-    RRDR_RESULT_OPTION_RELATIVE = 0x00000002,
+    RRDR_RESULT_OPTION_ABSOLUTE = 0x00000001, // the query uses absolute time-frames (can be cached by browsers and proxies)
+    RRDR_RESULT_OPTION_RELATIVE = 0x00000002, // the query uses relative time-frames (should not to be cached by browsers and proxies)
 } RRDR_RESULT_FLAGS;
 
 typedef struct rrdresult {
