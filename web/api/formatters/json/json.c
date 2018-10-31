@@ -155,6 +155,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 // google supports one annotation per row
                 int annotation_found = 0;
                 for(c = 0, rd = r->st->dimensions; rd ;c++, rd = rd->next) {
+                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
+
                     if(co[c] & RRDR_VALUE_RESET) {
                         buffer_strcat(wb, overflow_annotation);
                         annotation_found = 1;

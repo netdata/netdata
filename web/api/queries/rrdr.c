@@ -126,7 +126,7 @@ RRDR *rrdr_create(RRDSET *st, long n)
         if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
             r->od[c] = RRDR_DIMENSION_HIDDEN;
         else
-            r->od[c] = 0;
+            r->od[c] = RRDR_DIMENSION_DEFAULT;
     }
 
     r->group = 1;
