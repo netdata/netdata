@@ -30,6 +30,7 @@ ltmain.sh
 missing
 stamp-h1
 netdata.spec
+sha256sums.txt
 
 # netdata binaries
 netdata
