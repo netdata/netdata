@@ -24,7 +24,9 @@ markdown_extensions:
  - nl2br
  - sane_lists
  - smarty
- - toc
+ - toc:
+    permalink: True
+    separator: "-"
  - wikilinks
 nav:
 - General:
@@ -74,7 +76,7 @@ nav:
     - 'health-configuration-reference.md'
     - 'health-configuration-examples.md'
     - Alarm Notifications:
-        - 'alarm-notifications.md'
+        - 'health/notifications/README.md'
         - 'web-browser-notifications.md'
         - 'Alerta-monitoring-system.md'
         - 'discord-notifications.md'

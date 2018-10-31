@@ -145,5 +145,5 @@ sitespeed-result/
 python.d/python-modules-installer.sh
 
 # documentation directories for generated files
-doc/src/git
-doc/build
+htmldoc/src
+htmldoc/build
