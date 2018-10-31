@@ -55,7 +55,10 @@ long get_system_cpus(void) {
         if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
     }
     processors--;
-    if(processors < 1) processors = 1;
+    if(processors < 1) {
+        error("Found no cpu entry in procfile. Assuming single processor.");
+        processors = 1;
+    }
 
     procfile_close(ff);
 
