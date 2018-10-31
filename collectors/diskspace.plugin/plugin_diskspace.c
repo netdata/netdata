@@ -367,7 +367,7 @@ void *diskspace_main(void *ptr) {
         duration = heartbeat_monotonic_dt_to_now_usec(&hb);
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        yield();
 
 
         // --------------------------------------------------------------------------
@@ -386,10 +386,10 @@ void *diskspace_main(void *ptr) {
                 continue;
 
             do_disk_space_stats(mi, update_every);
-            if(unlikely(netdata_exit)) break;
+            yield();
         }
 
-        if(unlikely(netdata_exit)) break;
+        yield();
 
         if(dict_mountpoints)
             dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
@@ -456,7 +456,7 @@ void *diskspace_main(void *ptr) {
 
             // ----------------------------------------------------------------
 
-            if(unlikely(netdata_exit)) break;
+            yield();
         }
     }
 

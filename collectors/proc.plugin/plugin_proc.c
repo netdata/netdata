@@ -103,7 +103,7 @@ void *proc_main(void *ptr) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         usec_t duration = 0ULL;
 
-        if(unlikely(netdata_exit)) break;
+        yield();
 
         // BEGIN -- the job to be done
 
@@ -126,7 +126,7 @@ void *proc_main(void *ptr) {
 //                log_thread_memory_allocations = 0;
 //#endif
 
-            if(unlikely(netdata_exit)) break;
+            yield();
         }
 
         // END -- the job is done

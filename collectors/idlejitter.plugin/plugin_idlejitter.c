@@ -51,7 +51,7 @@ void *cpuidlejitter_main(void *ptr) {
                 error_max = 0,
                 elapsed = 0;
 
-        if(netdata_exit) break;
+        yield();
 
         while(elapsed < update_every_ut) {
             now_monotonic_timeval(&before);
@@ -75,7 +75,7 @@ void *cpuidlejitter_main(void *ptr) {
             iterations++;
         }
 
-        if(netdata_exit) break;
+        yield();
 
         if(iterations) {
             if (likely(counter)) rrdset_next(st);

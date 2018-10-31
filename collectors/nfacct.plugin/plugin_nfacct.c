@@ -794,7 +794,7 @@ void *nfacct_main(void *ptr) {
     for(;;) {
         heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        yield();
 
 #ifdef DO_NFACCT
         if(likely(nfacct)) {

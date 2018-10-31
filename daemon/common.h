@@ -26,6 +26,11 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
+// ----------------------------------------------------------------------------
+// shortcuts for common patterns
+#define yield() if(unlikely(netdata_exit)) break
+
+
 
 // ----------------------------------------------------------------------------
 // netdata include files
