@@ -61,26 +61,13 @@ jobs:
 
     - stage: "release"
       name: "Create release"
+      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: .travis/releaser.sh
 
     - stage: "package"
       name: "Archive and self-extractor"
       install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
       script: .travis/create_artifacts.sh
-      deploy:
-        - provider: releases
-          draft: true
-          api_key:
-            secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
-          skip_cleanup: true
-          file_glob: true
-          file:
-            - "netdata*.tar.gz*"
-            - "netdata*.gz.run*"
-            - "sha256sums.txt"
-          on:
-            repo: netdata/netdata
-            tags: true
     - name: "Docker images"
       install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
       script: docker/build.sh
