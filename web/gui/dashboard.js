@@ -2627,7 +2627,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
 
                 // if it didn't move, it is a selection
                 if (state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
-                    NETDATA.globalSelectionSync.dont_sync_before = 0;
+                    NETDATA.globalSelectionSync.dontSyncBefore = 0;
                     NETDATA.globalSelectionSync.setMaster(state);
 
                     // internal api of dygraph
@@ -5599,18 +5599,18 @@ NETDATA.dateTime.init(NETDATA.options.current.timezone);
 
 NETDATA.globalSelectionSync = {
     state: null,
-    dont_sync_before: 0,
+    dontSyncBefore: 0,
     last_t: 0,
     slaves: [],
-    timeout_id: undefined,
+    timeoutId: undefined,
 
     globalReset: function () {
         this.stop();
         this.state = null;
-        this.dont_sync_before = 0;
+        this.dontSyncBefore = 0;
         this.last_t = 0;
         this.slaves = [];
-        this.timeout_id = undefined;
+        this.timeoutId = undefined;
     },
 
     active: function () {
@@ -5625,7 +5625,7 @@ NETDATA.globalSelectionSync = {
             return false;
         }
 
-        return (this.dont_sync_before <= Date.now());
+        return (this.dontSyncBefore <= Date.now());
     },
 
     // set the global selection sync master
@@ -5694,9 +5694,9 @@ NETDATA.globalSelectionSync = {
             }
 
             if (typeof ms === 'number') {
-                this.dont_sync_before = Date.now() + ms;
+                this.dontSyncBefore = Date.now() + ms;
             } else {
-                this.dont_sync_before = Date.now() + NETDATA.options.current.sync_selection_delay;
+                this.dontSyncBefore = Date.now() + NETDATA.options.current.sync_selection_delay;
             }
         }
     },
@@ -5715,7 +5715,7 @@ NETDATA.globalSelectionSync = {
                 NETDATA.globalSelectionSync.slaves[len].setSelection(t);
             }
 
-            this.timeout_id = undefined;
+            this.timeoutId = undefined;
         }
     },
 
@@ -5737,15 +5737,15 @@ NETDATA.globalSelectionSync = {
 
             this.last_t = t;
 
-            if (state.foreign_element_selection !== null) {
-                state.foreign_element_selection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
+            if (state.foreignElementSelection !== null) {
+                state.foreignElementSelection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
             }
 
-            if (this.timeout_id) {
-                NETDATA.timeout.clear(this.timeout_id);
+            if (this.timeoutId) {
+                NETDATA.timeout.clear(this.timeoutId);
             }
 
-            this.timeout_id = NETDATA.timeout.set(this.__syncSlaves, 0);
+            this.timeoutId = NETDATA.timeout.set(this.__syncSlaves, 0);
         }
     }
 };
@@ -5995,11 +5995,11 @@ let chartState = function (element) {
 
     this.tmp = {};
 
-    this.foreign_element_before = null;
-    this.foreign_element_after = null;
-    this.foreign_element_duration = null;
-    this.foreign_element_update_every = null;
-    this.foreign_element_selection = null;
+    this.foreignElementBefore = null;
+    this.foreignElementAfter = null;
+    this.foreignElementDuration = null;
+    this.foreignElementUpdateEvery = null;
+    this.foreignElementSelection = null;
 
     // ============================================================================================================
     // PRIVATE FUNCTIONS
@@ -6172,11 +6172,11 @@ let chartState = function (element) {
             return el;
         };
 
-        this.foreign_element_before = getForeignElementById('show-before-at');
-        this.foreign_element_after = getForeignElementById('show-after-at');
-        this.foreign_element_duration = getForeignElementById('show-duration-at');
-        this.foreign_element_update_every = getForeignElementById('show-update-every-at');
-        this.foreign_element_selection = getForeignElementById('show-selection-at');
+        this.foreignElementBefore = getForeignElementById('show-before-at');
+        this.foreignElementAfter = getForeignElementById('show-after-at');
+        this.foreignElementDuration = getForeignElementById('show-duration-at');
+        this.foreignElementUpdateEvery = getForeignElementById('show-update-every-at');
+        this.foreignElementSelection = getForeignElementById('show-selection-at');
     };
 
     const destroyDOM = () => {
@@ -6839,8 +6839,8 @@ let chartState = function (element) {
             this.log('selection set to ' + t.toString());
         }
 
-        if (this.foreign_element_selection !== null) {
-            this.foreign_element_selection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
+        if (this.foreignElementSelection !== null) {
+            this.foreignElementSelection.innerText = NETDATA.dateTime.localeDateString(t) + ' ' + NETDATA.dateTime.localeTimeString(t);
         }
 
         return this.selected;
@@ -6858,8 +6858,8 @@ let chartState = function (element) {
                 this.log('selection cleared');
             }
 
-            if (this.foreign_element_selection !== null) {
-                this.foreign_element_selection.innerText = '';
+            if (this.foreignElementSelection !== null) {
+                this.foreignElementSelection.innerText = '';
             }
 
             this.legendReset();
@@ -8246,20 +8246,20 @@ let chartState = function (element) {
             this.refresh_dt_element.innerText = this.refresh_dt_ms.toString();
         }
 
-        if (this.foreign_element_before !== null) {
-            this.foreign_element_before.innerText = NETDATA.dateTime.localeDateString(this.view_before) + ' ' + NETDATA.dateTime.localeTimeString(this.view_before);
+        if (this.foreignElementBefore !== null) {
+            this.foreignElementBefore.innerText = NETDATA.dateTime.localeDateString(this.view_before) + ' ' + NETDATA.dateTime.localeTimeString(this.view_before);
         }
 
-        if (this.foreign_element_after !== null) {
-            this.foreign_element_after.innerText = NETDATA.dateTime.localeDateString(this.view_after) + ' ' + NETDATA.dateTime.localeTimeString(this.view_after);
+        if (this.foreignElementAfter !== null) {
+            this.foreignElementAfter.innerText = NETDATA.dateTime.localeDateString(this.view_after) + ' ' + NETDATA.dateTime.localeTimeString(this.view_after);
         }
 
-        if (this.foreign_element_duration !== null) {
-            this.foreign_element_duration.innerText = NETDATA.seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
+        if (this.foreignElementDuration !== null) {
+            this.foreignElementDuration.innerText = NETDATA.seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
         }
 
-        if (this.foreign_element_update_every !== null) {
-            this.foreign_element_update_every.innerText = NETDATA.seconds4human(Math.floor(this.data_update_every / 1000));
+        if (this.foreignElementUpdateEvery !== null) {
+            this.foreignElementUpdateEvery.innerText = NETDATA.seconds4human(Math.floor(this.data_update_every / 1000));
         }
     };
 
