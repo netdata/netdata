@@ -31,6 +31,7 @@ typedef enum rrdr_value_flag {
 } RRDR_VALUE_FLAGS;
 
 typedef enum rrdr_dimension_flag {
+    RRDR_DIMENSION_DEFAULT  = 0x00,
     RRDR_DIMENSION_HIDDEN   = 0x04, // the dimension is hidden (not to be presented to callers)
     RRDR_DIMENSION_NONZERO  = 0x08, // the dimension is non zero (contains non-zero values)
     RRDR_DIMENSION_SELECTED = 0x10, // the dimension is selected for evaluation in this RRDR
