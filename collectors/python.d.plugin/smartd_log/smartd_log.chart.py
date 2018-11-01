@@ -304,6 +304,94 @@ CHARTS = {
     }
 }
 
+# NOTE: 'parse_temp' decodes ATA 194 raw value. Not heavily tested. Written by @Ferroin
+# C code:
+# https://github.com/smartmontools/smartmontools/blob/master/smartmontools/atacmds.cpp#L2051
+#
+# Calling 'parse_temp' on the raw value will return a 4-tuple, containing
+#  * temperature
+#  * minimum
+#  * maximum
+#  * over-temperature count
+# substituting None for values it can't decode.
+#
+# Example:
+# >>> parse_temp(42952491042)
+# >>> (34, 10, 43, None)
+#
+#
+# def check_temp_word(i):
+#     if i <= 0x7F:
+#         return 0x11
+#     elif i <= 0xFF:
+#         return 0x01
+#     elif 0xFF80 <= i:
+#         return 0x10
+#     return 0x00
+#
+#
+# def check_temp_range(t, b0, b1):
+#     if b0 > b1:
+#         t0, t1 = b1, b0
+#     else:
+#         t0, t1 = b0, b1
+#
+#     if all([
+#         -60 <= t0,
+#         t0 <= t,
+#         t <= t1,
+#         t1 <= 120,
+#         not (t0 == -1 and t1 <= 0)
+#     ]):
+#         return t0, t1
+#     return None, None
+#
+#
+# def parse_temp(raw):
+#     byte = list()
+#     word = list()
+#     for i in range(0, 6):
+#         byte.append(0xFF & (raw >> (i * 8)))
+#     for i in range(0, 3):
+#         word.append(0xFFFF & (raw >> (i * 16)))
+#
+#     ctwd = check_temp_word(word[0])
+#
+#     if not word[2]:
+#         if ctwd and not word[1]:
+#             # byte[0] is temp, no other data
+#             return byte[0], None, None, None
+#
+#         if ctwd and all(check_temp_range(byte[0], byte[2], byte[3])):
+#             # byte[0] is temp, byte[2] is max or min, byte[3] is min or max
+#             trange = check_temp_range(byte[0], byte[2], byte[3])
+#             return byte[0], trange[0], trange[1], None
+#
+#         if ctwd and all(check_temp_range(byte[0], byte[1], byte[2])):
+#             # byte[0] is temp, byte[1] is max or min, byte[2] is min or max
+#             trange = check_temp_range(byte[0], byte[1], byte[2])
+#             return byte[0], trange[0], trange[1], None
+#
+#         return None, None, None, None
+#
+#     if ctwd:
+#         if all(
+#                 [
+#                     ctwd & check_temp_word(word[1]) & check_temp_word(word[2]) != 0x00,
+#                     all(check_temp_range(byte[0], byte[2], byte[4])),
+#                 ]
+#         ):
+#             # byte[0] is temp, byte[2] is max or min, byte[4] is min or max
+#             trange = check_temp_range(byte[0], byte[2], byte[4])
+#             return byte[0], trange[0], trange[1], None
+#         else:
+#             trange = check_temp_range(byte[0], byte[2], byte[3])
+#             if word[2] < 0x7FFF and all(trange) and trange[1] >= 40:
+#                 # byte[0] is temp, byte[2] is max or min, byte[3] is min or max, word[2] is overtemp count
+#                 return byte[0], trange[0], trange[1], word[2]
+#     # no data
+#     return None, None, None, None
+
 
 CHARTED_ATTRS = dict((attr, k) for k, v in CHARTS.items() for attr in v['attrs'])
 
