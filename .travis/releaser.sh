@@ -43,17 +43,22 @@ git config user.name "${GIT_USER}"
 GIT_URL=$(git config --get remote.origin.url)
 GIT_URL=${GIT_URL#*//}
 
-echo "---- FIGURING OUT TAGS-----"
+
+echo "---- GENERATING CHANGELOG -----"
+./.travis/generate_changelog.sh
+
+echo "---- FIGURING OUT TAGS ----"
 # Check if current commit is tagged or not
 GIT_TAG=$(git tag --points-at)
 if [ -z "${GIT_TAG}" ]; then
+  git semver || exit 1
   # Figure out next tag based on commit message
   GIT_TAG=HEAD
   echo "Last commit message: $TRAVIS_COMMIT_MESSAGE"
   case "${TRAVIS_COMMIT_MESSAGE}" in
-    *"[patch]"*|*"[fix]"* )                GIT_TAG="v$(git semver --next-patch)" ;;
-    *"[minor]"*|*"[feat]"*|*"[feature]"* ) GIT_TAG="v$(git semver --next-minor)" ;;
-    *"[major]"*|*"[breaking change]"* )    GIT_TAG="v$(git semver --next-major)" ;;
+    *"[netdata patch release]"* ) GIT_TAG="v$(git semver --next-patch)" ;;
+    *"[netdata minor release]"* ) GIT_TAG="v$(git semver --next-minor)" ;;
+    *"[netdata major release]"* ) GIT_TAG="v$(git semver --next-major)" ;;
     *) echo "Keyword not detected. Doing nothing" ;;
   esac
 
@@ -64,28 +69,6 @@ if [ -z "${GIT_TAG}" ]; then
       git push "https://${GITHUB_TOKEN}:@${GIT_URL}" --tags || exit 0 # exits if tag exists
   fi
 fi
-
-# If GIT_TAG is still having value "HEAD" then script entered a state where there was no keyword in commit msg and commit wasn't tagged.
-# This condition can be triggered by a cron job and it shouldn't create a release but might be still useful for changelog generation.
-
-echo "---- CREATING CHANGELOG -----"
-#PREV_TAG=$(git describe --abbrev=0 "${GIT_TAG}"^)
-git checkout master
-git pull
-#docker run -it --rm -v "$(pwd)":/usr/local/src/your-app ferrarimarco/github-changelog-generator:1.14.3 \
-docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest \
-                                                        --user "${ORGANIZATION}" \
-                                                        --project "${PROJECT}" \
-                                                        --token "${GITHUB_TOKEN}" \
-                                                        --since-tag "v1.10.0" \
-                                                        --unreleased-label "**Next release**" \
-                                                        --no-compare-link \
-                                                        --exclude-labels duplicate,question,invalid,wontfix,discussion,documentation
-
-echo "---- UPLOADING CHANGELOG -----"
-git add CHANGELOG.md
-git commit -m '[ci skip] Automatic changelog update'
-git push "https://${GITHUB_TOKEN}:@${GIT_URL}" || exit 0 # Exit if changlog was already uploaded
 
 if [ "${GIT_TAG}" == "HEAD" ]; then
     echo "Not creating a release since neither of two conditions was met:"
