@@ -2473,7 +2473,7 @@ void *statsd_main(void *ptr) {
 
         getrusage(RUSAGE_THREAD, &thread);
 
-        yield();
+        allow_exit();
 
         if(likely(hb_dt)) {
             rrdset_next(st_metrics);

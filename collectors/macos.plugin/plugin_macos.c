@@ -32,7 +32,7 @@ void *macos_main(void *ptr) {
     while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        yield();
+        allow_exit();
 
         // BEGIN -- the job to be done
 
@@ -40,19 +40,19 @@ void *macos_main(void *ptr) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_sysctl().");
             vdo_macos_sysctl = do_macos_sysctl(localhost->rrd_update_every, hb_dt);
         }
-        yield();
+        allow_exit();
 
         if(!vdo_macos_mach_smi) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_mach_smi().");
             vdo_macos_mach_smi = do_macos_mach_smi(localhost->rrd_update_every, hb_dt);
         }
-        yield();
+        allow_exit();
 
         if(!vdo_macos_iokit) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_iokit().");
             vdo_macos_iokit = do_macos_iokit(localhost->rrd_update_every, hb_dt);
         }
-        yield();
+        allow_exit();
 
         // END -- the job is done
 

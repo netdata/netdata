@@ -104,7 +104,7 @@ void *freebsd_main(void *ptr) {
         usec_t hb_dt = heartbeat_next(&hb, step);
         usec_t duration = 0ULL;
 
-        yield();
+        allow_exit();
 
         // BEGIN -- the job to be done
 
@@ -118,7 +118,7 @@ void *freebsd_main(void *ptr) {
             pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
 
-            yield();
+            allow_exit();
         }
 
         // END -- the job is done

@@ -138,7 +138,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     }
 
     while(!ferror(fp)) {
-        yield();
+        allow_exit();
 
         char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
         if(unlikely(!r)) {
@@ -146,7 +146,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             break;
         }
 
-        yield();
+        allow_exit();
 
         line[PLUGINSD_LINE_MAX] = '\0';
 
@@ -606,7 +606,7 @@ void *pluginsd_main(void *ptr) {
         const char *directory_name;
 
         for( idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && (directory_name = plugin_directories[idx]) ; idx++ ) {
-            yield();
+            allow_exit();
 
             errno = 0;
             DIR *dir = opendir(directory_name);
@@ -620,7 +620,7 @@ void *pluginsd_main(void *ptr) {
 
             struct dirent *file = NULL;
             while(likely((file = readdir(dir)))) {
-                yield();
+                allow_exit();
 
                 debug(D_PLUGINSD, "examining file '%s'", file->d_name);
 
