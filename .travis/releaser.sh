@@ -94,14 +94,11 @@ if [ "${GIT_TAG}" == "HEAD" ]; then
     exit 0
 fi
 
-echo "---- CREATING RELEASE ARTIFACTS  -----"
-python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
+echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
+./docker/build.sh
 
-./makeself/build-x86_64-static.sh
-make dist
-ln -s netdata-latest.gz.run "netdata-${GIT_TAG}.gz.run"
-ln -s netdata-*.tar.gz "netdata-${GIT_TAG}.tar.gz"
-sha256sum -b "netdata-${GIT_TAG}.gz.run" "netdata-${GIT_TAG}.tar.gz" > "sha256sums.txt"
+echo "---- CREATING RELEASE ARTIFACTS -----"
+./.travis/create_artifacts.sh
 
 echo "---- CREATING RELEASE DRAFT WITH ASSETS -----"
 # Download hub
