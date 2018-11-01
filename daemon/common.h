@@ -28,7 +28,10 @@
 
 // ----------------------------------------------------------------------------
 // shortcuts for common patterns
-#define yield() if(unlikely(netdata_exit)) break
+#define yield() if(unlikely(netdata_exit))  \
+                    break;                  \
+                else                        \
+                    ((void)0)                          
 
 
 
