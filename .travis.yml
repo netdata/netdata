@@ -41,8 +41,9 @@ jobs:
     script: ".travis/containerized_build.sh alpine"
 
   - stage: packaging
-    name: Update Changelog/Create release
-    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+    name: Create release
+    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
+    before_script: sudo pip install git-semver
     script: ".travis/releaser.sh"
   - name: Nightly tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
@@ -53,6 +54,10 @@ jobs:
     script: "docker/build.sh"
     env: REPOSITORY="netdata/netdata"
     if: type = cron
+  - name: Nightly changelog generation
+    script: ".travis/generate_changelog.sh"
+    if: type = cron
+
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
