@@ -23,52 +23,57 @@ It produces following charts for SCSI devices:
 
 
 For ATA devices:
+1. **Read Error Rate**
 
-1. **Soft Read Error Rate**
+2. **Seek Error Rate**
 
-2. **SATA Interface Downshift**
+3. **Soft Read Error Rate**
 
-3. **UDMA CRC Error Count**
+4. **Write Error Rate**
 
-4. **Throughput Performance**
+5. **SATA Interface Downshift**
 
-5. **Seek Time Performance**
+6. **UDMA CRC Error Count**
 
-6. **Start/Stop Count**
+7. **Throughput Performance**
 
-7. **Power-On Hours Count**
+8. **Seek Time Performance**
 
-8. **Power Cycle Count**
+9. **Start/Stop Count**
 
-9. **Unexpected Power Loss**
+10. **Power-On Hours Count**
 
-10. **Spin-Up Time**
+11. **Power Cycle Count**
 
-11. **Spin-up Retries**
+12. **Unexpected Power Loss**
 
-12. **Calibration Retries**
+13. **Spin-Up Time**
 
-13. **Temperature**
+14. **Spin-up Retries**
 
-14. **Reallocated Sectors Count**
+15. **Calibration Retries**
 
-15. **Reserved Block Count**
+16. **Temperature**
 
-16. **Program Fail Count**
+17. **Reallocated Sectors Count**
 
-17. **Erase Fail Count**
+18. **Reserved Block Count**
 
-18. **Wear Leveller Worst Case Erase Count**
+19. **Program Fail Count**
 
-19. **Unused Reserved NAND Blocks**
+20. **Erase Fail Count**
 
-20. **Reallocation Event Count**
+21. **Wear Leveller Worst Case Erase Count**
 
-21. **Current Pending Sector Count**
+22. **Unused Reserved NAND Blocks**
 
-22. **Offline Uncorrectable Sector Count**
+23. **Reallocation Event Count**
 
-23. **Percent Lifetime Used**
+24. **Current Pending Sector Count**
+
+25. **Offline Uncorrectable Sector Count**
+
+26. **Percent Lifetime Used**
 
 ### prerequisite
 `smartd` must be running with `-A` option to write smartd attribute information to files.
