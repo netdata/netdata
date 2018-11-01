@@ -42,15 +42,18 @@ jobs:
 
   - stage: packaging
     name: Create release
-    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
+    install: sudo apt update -y && sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip && sudo apt install -y --only-upgrade docker-ce && docker info
     before_script: sudo pip install git-semver
     script: ".travis/releaser.sh"
+    git:
+      depth: false
+    if: type != cron
   - name: Nightly tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/firehol_create_artifacts.sh"
     if: type = cron
   - name: Nightly docker images
-    install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce &&  docker info
+    install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
     script: "docker/build.sh"
     env: REPOSITORY="netdata/netdata"
     if: type = cron
@@ -63,5 +66,3 @@ notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
     secure: Ntl1GNjgGDdmMQsudDi/4+co6zRV8znJXOB0joLVHNV1icHvUSMKShgpY08AoWoxNYMDVHXOUzEGwiZd6MI4MleNu9gwtACwgXe+sDjgBIDvQYC6JQS7XlANJfzBlZnrGnaiVVlBmI/LajgABCsrTAYV8gVrq2zA3u56UrNwS3qRJnbaqGgH64SnHbdllHQ7l7Qcc/27voy6Op32oJhDZ5bVY5CRZUR42oPvlDx9PSD0yqSkLwFrIE0Qg+mTVDZ4Watrv8iv91ghc6GwwPvNGShcYI04P8hn08FZ4eGH47K4AZf97IDargmxPsEwkOhgcl3w4J5KHZzmVb7hsEs6+iZz4KulD2u4D/xy5BGUcRZKMuyiO99dmZO61wP0Ra0Wzfe0exG+LFxAmC0jiYS67xL0YWs2SKkO7iftthI8NX1Lus1PGleBpJ28LKQdZjaKz3w2xIRlJ45eEdwBgtnNkW68NsmJCflrNkAlaVW6+zCPMpT4rT41rpkh0Fl+YbvOhH/S3VfiTY7OqTU5B9ttgJuN/m8PWi8g5MKO2C1TWkK3cV4O2PnpugtioHuTuj2X/AKOrh7hlefedDxPZPIxFmLi3OKtgHBzwzQk79p6V9ffbbVfsO+p8kiKJuc8s0v6d++Rt2FLXwUquJGDKC0hz8cAMSUiFaP5t1TlhTk7LJ4=
-    on_success: change
-    on_pull_requests: false

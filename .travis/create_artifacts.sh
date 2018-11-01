@@ -11,6 +11,8 @@ fi
 # See https://github.com/travis-ci/travis-ci/issues/4704#issuecomment-348435959 for details.
 python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
 echo "--- Create tarball ---"
+autoreconf -ivf
+./configure
 make dist
 echo "--- Create self-extractor ---"
 ./makeself/build-x86_64-static.sh
