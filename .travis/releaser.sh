@@ -23,26 +23,13 @@
 #   - docker
 #   - git-semver python package (pip install git-semver)
 
+set -e
+
 if [ ! -f .gitignore ]
 then
   echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
   exit 1
 fi
-
-echo "---- INITIALIZING CONFIGURATION -----"
-# Some basic variables
-GIT_MAIL="pawel+bot@netdata.cloud"
-GIT_USER="netdatabot"
-ORGANIZATION=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $1}')
-PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
-HUB_VERSION=${HUB_VERSION:-"2.5.1"}
-
-# Git config
-git config user.email "${GIT_MAIL}"
-git config user.name "${GIT_USER}"
-GIT_URL=$(git config --get remote.origin.url)
-GIT_URL=${GIT_URL#*//}
-
 
 echo "---- GENERATING CHANGELOG -----"
 ./.travis/generate_changelog.sh
@@ -51,7 +38,7 @@ echo "---- FIGURING OUT TAGS ----"
 # Check if current commit is tagged or not
 GIT_TAG=$(git tag --points-at)
 if [ -z "${GIT_TAG}" ]; then
-  git semver || exit 1
+  git semver
   # Figure out next tag based on commit message
   GIT_TAG=HEAD
   echo "Last commit message: $TRAVIS_COMMIT_MESSAGE"
@@ -66,7 +53,8 @@ if [ -z "${GIT_TAG}" ]; then
   if [ "$GIT_TAG" != "HEAD" ]; then
       echo "Assigning a new tag: $GIT_TAG"
       git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
-      git push "https://${GITHUB_TOKEN}:@${GIT_URL}" --tags || exit 0 # exits if tag exists
+      # git is able to push due to configuration already being initialized in `generate_changelog.sh` script
+      git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
   fi
 fi
 
@@ -78,6 +66,7 @@ if [ "${GIT_TAG}" == "HEAD" ]; then
 fi
 
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
+export REPOSITORY="netdata/netdata"
 ./docker/build.sh
 
 echo "---- CREATING RELEASE ARTIFACTS -----"
@@ -85,6 +74,7 @@ echo "---- CREATING RELEASE ARTIFACTS -----"
 
 echo "---- CREATING RELEASE DRAFT WITH ASSETS -----"
 # Download hub
+HUB_VERSION=${HUB_VERSION:-"2.5.1"}
 wget "https://github.com/github/hub/releases/download/v${HUB_VERSION}/hub-linux-amd64-${HUB_VERSION}.tgz" -O "/tmp/hub-linux-amd64-${HUB_VERSION}.tgz"
 tar -C /tmp -xvf "/tmp/hub-linux-amd64-${HUB_VERSION}.tgz"
 export PATH=$PATH:"/tmp/hub-linux-amd64-${HUB_VERSION}/bin"
