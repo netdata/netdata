@@ -106,7 +106,9 @@
 - web\_log: response time should support summary or histgram [\#3102](https://github.com/netdata/netdata/issues/3102)
 - Alarm for big system load [\#3003](https://github.com/netdata/netdata/issues/3003)
 - Illegal instruction - Debian Stretch i586 [\#2909](https://github.com/netdata/netdata/issues/2909)
+- web\_log: support squid logs [\#2235](https://github.com/netdata/netdata/issues/2235)
 - Monitoring PHP APCu [\#2199](https://github.com/netdata/netdata/issues/2199)
+- MySQLService \(or DatabaseService\) for python.d [\#1906](https://github.com/netdata/netdata/issues/1906)
 - RocketChat notifications [\#1811](https://github.com/netdata/netdata/issues/1811)
 - SCTP Information [\#1218](https://github.com/netdata/netdata/issues/1218)
 - python.d enhancements [\#692](https://github.com/netdata/netdata/issues/692)
@@ -114,6 +116,7 @@
 
 **Merged pull requests:**
 
+- Changed swagger editor url to the correct one [\#4539](https://github.com/netdata/netdata/pull/4539) ([infeeeee](https://github.com/infeeeee))
 - fixed wrong annotations given to google charts [\#4535](https://github.com/netdata/netdata/pull/4535) ([ktsaou](https://github.com/ktsaou))
 - Added @gmosx to CONTRIBUTORS.md [\#4531](https://github.com/netdata/netdata/pull/4531) ([gmosx](https://github.com/gmosx))
 - fixed broken links [\#4530](https://github.com/netdata/netdata/pull/4530) ([ktsaou](https://github.com/ktsaou))
@@ -323,7 +326,6 @@
 - Optimize counting of recusive pins [\#4095](https://github.com/netdata/netdata/pull/4095) ([pjz](https://github.com/pjz))
 - \[nginx\_plus\] fix handling of non-contiguous peer IDs [\#4093](https://github.com/netdata/netdata/pull/4093) ([illes](https://github.com/illes))
 - web\_log Virtual host enhancement and http/https [\#4076](https://github.com/netdata/netdata/pull/4076) ([jgrossiord](https://github.com/jgrossiord))
-- Add node to apps\_groups [\#4064](https://github.com/netdata/netdata/pull/4064) ([jonfairbanks](https://github.com/jonfairbanks))
 - Major docker build refactor [\#3995](https://github.com/netdata/netdata/pull/3995) ([paulfantom](https://github.com/paulfantom))
 - push host tags for graphite;  [\#3992](https://github.com/netdata/netdata/pull/3992) ([ktsaou](https://github.com/ktsaou))
 - rethinkdb python plugin [\#3955](https://github.com/netdata/netdata/pull/3955) ([l2isbad](https://github.com/l2isbad))
