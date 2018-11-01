@@ -1,78 +1,62 @@
----
 dist: trusty
 sudo: true
-
-# C includes autotools and make by default
 language: c
 services:
-  - docker
+- docker
 
 stages:
-  - lint
-  - test
-  - build
-  - name: release
-    if: branch = master AND type != pull_request
-  - name: package
-    if: branch = master AND type != pull_request
+- test
+- build
+- name: packaging
+  if: branch = master AND type != pull_request
 
 jobs:
   include:
-    - stage: "lint"
-      name: "python"
-      install: skip
-      script: docker run -ti --rm -v $(pwd):/code alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 /code/collectors/python.d.plugin/python.d.plugin.in /code/
-    - name: "css"
-      install: skip
-      script: docker run --rm -v $(pwd):/code eeacms/csslint sh -c "csslint /code/web/gui/*.css" || echo "OK"
-    - name: "bash"
-      install: skip
-      script: docker run --rm --volume "$(pwd)":/code:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /code/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi'
-    - stage: "test"
-      name: "C"
-      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
-      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
-#      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
-#    - name: "Node.js"
-#      script: tests/run_nodejs.sh
-    - name: "coverity"
-      install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-      script: ./coverity-scan.sh || echo "Coverity failed :("
-      env: INSTALL_COVERITY="true"
-      if: type = cron
+  - stage: test
+    name: C
+    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
+    env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+  - name: coverity
+    install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+    script: ./coverity-scan.sh || echo "Coverity failed :("
+    env: INSTALL_COVERITY="true"
+    if: type = cron
 
-    - stage: "build"
-      name: "OSX"
-      install: brew install fakeroot ossp-uuid
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-      os: osx
-    - name: "ubuntu 14.04 (not containerized)"
-      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
-    - name: "ubuntu 18.04"
-      script: ./.travis/containerized_build.sh ubuntu1804
-    - name: "CentOS 7"
-      script: ./.travis/containerized_build.sh centos7
-    - name: "CentOS 6"
-      script: ./.travis/containerized_build.sh centos6
-    - name: "alpine"
-      script: ./.travis/containerized_build.sh alpine
+  - stage: build
+    name: OSX
+    install: brew install fakeroot ossp-uuid
+    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+    os: osx
+  - name: ubuntu 14.04 (not containerized)
+    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
+    script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
+  - name: ubuntu 18.04
+    script: ".travis/containerized_build.sh ubuntu1804"
+  - name: CentOS 7
+    script: ".travis/containerized_build.sh centos7"
+  - name: CentOS 6
+    script: ".travis/containerized_build.sh centos6"
+  - name: alpine
+    script: ".travis/containerized_build.sh alpine"
 
-    - stage: "release"
-      name: "Create release"
-      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: .travis/releaser.sh
-
-    - stage: "package"
-      name: "Archive and self-extractor"
-      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: .travis/create_artifacts.sh
-    - name: "Docker images"
-      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
-      script: docker/build.sh
-      env: REPOSITORY="netdata/netdata"
-      if: type = cron OR tag =~ ^v
+  - stage: packaging
+    name: Update Changelog/Create release
+    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+    script: ".travis/releaser.sh"
+  - name: Nightly tarball and self-extractor build
+    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+    script: ".travis/firehol_create_artifacts.sh"
+    if: type = cron
+  - name: Nightly docker images
+    install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce &&  docker info
+    script: "docker/build.sh"
+    env: REPOSITORY="netdata/netdata"
+    if: type = cron
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
+  slack:
+    secure: Ntl1GNjgGDdmMQsudDi/4+co6zRV8znJXOB0joLVHNV1icHvUSMKShgpY08AoWoxNYMDVHXOUzEGwiZd6MI4MleNu9gwtACwgXe+sDjgBIDvQYC6JQS7XlANJfzBlZnrGnaiVVlBmI/LajgABCsrTAYV8gVrq2zA3u56UrNwS3qRJnbaqGgH64SnHbdllHQ7l7Qcc/27voy6Op32oJhDZ5bVY5CRZUR42oPvlDx9PSD0yqSkLwFrIE0Qg+mTVDZ4Watrv8iv91ghc6GwwPvNGShcYI04P8hn08FZ4eGH47K4AZf97IDargmxPsEwkOhgcl3w4J5KHZzmVb7hsEs6+iZz4KulD2u4D/xy5BGUcRZKMuyiO99dmZO61wP0Ra0Wzfe0exG+LFxAmC0jiYS67xL0YWs2SKkO7iftthI8NX1Lus1PGleBpJ28LKQdZjaKz3w2xIRlJ45eEdwBgtnNkW68NsmJCflrNkAlaVW6+zCPMpT4rT41rpkh0Fl+YbvOhH/S3VfiTY7OqTU5B9ttgJuN/m8PWi8g5MKO2C1TWkK3cV4O2PnpugtioHuTuj2X/AKOrh7hlefedDxPZPIxFmLi3OKtgHBzwzQk79p6V9ffbbVfsO+p8kiKJuc8s0v6d++Rt2FLXwUquJGDKC0hz8cAMSUiFaP5t1TlhTk7LJ4=
+    on_success: change
+    on_pull_requests: false
