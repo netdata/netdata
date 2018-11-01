@@ -76,7 +76,7 @@ RE_SCSI = re.compile(
 ORDER = [
     # errors
     'read_error_rate',
-    'seek_read_error_rate',
+    'seek_error_rate',
     'soft_read_error_rate',
     'write_error_rate',
     'read_total_err_corrected',
@@ -123,8 +123,8 @@ CHARTS = {
         'attrs': [ATTR1],
         'algo': ABSOLUTE,
     },
-    'seek_read_error_rate': {
-        'options': [None, 'Seek Read Error Rate', 'value', 'errors', 'smartd_log.seek_read_error_rate', 'line'],
+    'seek_error_rate': {
+        'options': [None, 'Seek Error Rate', 'value', 'errors', 'smartd_log.seek_error_rate', 'line'],
         'lines': [],
         'attrs': [ATTR7],
         'algo': ABSOLUTE,
@@ -135,7 +135,7 @@ CHARTS = {
         'attrs': [ATTR13],
         'algo': INCREMENTAL,
     },
-    'write_read_error_rate': {
+    'write_error_rate': {
         'options': [None, 'Write Error Rate', 'value', 'errors', 'smartd_log.write_error_rate', 'line'],
         'lines': [],
         'attrs': [ATTR206],
