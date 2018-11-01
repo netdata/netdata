@@ -586,7 +586,7 @@ class Service(SimpleService):
                 disk.alive = False
                 continue
 
-            if changed and not disk.populate_attrs():
+            if changed and disk.populate_attrs() is None:
                 disk.alive = False
                 continue
 
