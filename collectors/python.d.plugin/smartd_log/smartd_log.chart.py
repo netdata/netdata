@@ -24,10 +24,12 @@ DEF_RESCAN_INTERVAL = 60
 DEF_AGE = 30
 DEF_PATH = '/var/log/smartd'
 
+ATTR1 = '1'
 ATTR2 = '2'
 ATTR3 = '3'
 ATTR4 = '4'
 ATTR5 = '5'
+ATTR7 = '7'
 ATTR8 = '8'
 ATTR9 = '9'
 ATTR10 = '10'
@@ -48,6 +50,7 @@ ATTR197 = '197'
 ATTR198 = '198'
 ATTR199 = '199'
 ATTR202 = '202'
+ATTR206 = '206'
 ATTR_READ_ERR_COR = 'read-total-err-corrected'
 ATTR_READ_ERR_UNC = 'read-total-unc-errors'
 ATTR_WRITE_ERR_COR = 'write-total-err-corrected'
@@ -72,7 +75,10 @@ RE_SCSI = re.compile(
 
 ORDER = [
     # errors
+    'read_error_rate',
+    'seek_read_error_rate',
     'soft_read_error_rate',
+    'write_error_rate',
     'read_total_err_corrected',
     'read_total_unc_errors',
     'write_total_err_corrected',
@@ -111,11 +117,29 @@ ORDER = [
 ]
 
 CHARTS = {
+    'read_error_rate': {
+        'options': [None, 'Read Error Rate', 'value', 'errors', 'smartd_log.read_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR1],
+        'algo': ABSOLUTE,
+    },
+    'seek_read_error_rate': {
+        'options': [None, 'Seek Read Error Rate', 'value', 'errors', 'smartd_log.seek_read_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR7],
+        'algo': ABSOLUTE,
+    },
     'soft_read_error_rate': {
         'options': [None, 'Soft Read Error Rate', 'errors', 'errors', 'smartd_log.soft_read_error_rate', 'line'],
         'lines': [],
         'attrs': [ATTR13],
         'algo': INCREMENTAL,
+    },
+    'write_read_error_rate': {
+        'options': [None, 'Write Error Rate', 'value', 'errors', 'smartd_log.write_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR206],
+        'algo': ABSOLUTE,
     },
     'read_total_err_corrected': {
         'options': [None, 'Read Error Corrected', 'errors', 'errors', 'smartd_log.read_total_err_corrected', 'line'],
@@ -451,8 +475,11 @@ def ata_attribute_factory(value):
     elif name == ATTR190:
         return Ata190(*value)
     elif name in [
+        ATTR1,
+        ATTR7,
         ATTR194,
         ATTR202,
+        ATTR206,
     ]:
         return AtaNormalized(*value)
 
