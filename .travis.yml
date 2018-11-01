@@ -60,7 +60,9 @@ jobs:
   - name: Nightly changelog generation
     script: ".travis/generate_changelog.sh"
     if: type = cron
-
+  - name: labeler # This job should be replaced with GitHub Actions when they hit GA
+    script: ".travis/labeler.sh"
+    if: type = cron
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
