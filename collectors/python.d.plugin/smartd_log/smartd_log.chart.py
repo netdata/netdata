@@ -231,7 +231,7 @@ CHARTS = {
         'algo': ABSOLUTE,
     },
     'temperature_celsius': {
-        'options': [None, 'Temperature Celsius', 'celsius', 'temperature', 'smartd_log.temperature_celsius', 'line'],
+        'options': [None, 'Temperature', 'celsius', 'temperature', 'smartd_log.temperature_celsius', 'line'],
         'lines': [],
         'attrs': [ATTR194, ATTR_TEMPERATURE],
         'algo': ABSOLUTE,
