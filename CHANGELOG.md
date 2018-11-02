@@ -1,6 +1,6 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.11.0](https://github.com/netdata/netdata/tree/v1.11.0) (2018-11-02)
 
 **Fixed bugs:**
 
