@@ -76,17 +76,17 @@ The static binary files are kept in repo [binary-packages](https://github.com/ne
 
 ## Other installation methods
 
-- *Linux manual installation from source*
+- **Linux manual installation from source**
 
-Semi-automatic, with more details about the steps involved and actions taken [here](#install-netdata-on-linux-manually)
+    Semi-automatic, with more details about the steps involved and actions taken [here](#install-netdata-on-linux-manually)
 
-- *Non-Linux installation*
+- **Non-Linux installation**
     - [Install from package or source, on FreeBSD](#freebsd)
     - [Install from package, on pfSense](#pfsense)
     - [Enable netdata on FreeNAS Corral](#freenas)
     - [Install from package or source, on macOS (OS X)](#macos)
 
-See also the list of netdata [package maintainers](https://github.com/netdata/netdata/blob/master/MAINTAINERS.md) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
+    See also the list of netdata [package maintainers](https://github.com/netdata/netdata/blob/master/MAINTAINERS.md) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
  
 ## Install netdata on Linux manually
 
