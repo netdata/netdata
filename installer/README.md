@@ -52,6 +52,8 @@ To install netdata with a binary package on any Linux distro, any kernel version
 
 (do not `sudo` this command, it will do it by itself as needed; the target system does not need `bash` installed, check below for instructions to run it without `bash`)
 
+*Note: The static builds install netdata at `/opt/netdata`*
+
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting netdata. Example:
 
 ```sh
@@ -71,15 +73,7 @@ wget -O /tmp/kickstart-static64.sh https://my-netdata.io/kickstart-static64.sh
 sh /tmp/kickstart-static64.sh
 ```
 
-> **The static builds install netdata at `/opt/netdata`**.
-
-The static binary files are kept in this repo: https://github.com/firehol/binary-packages
-
-Download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself).
-
-The target system does **not** need to have bash installed.
-
-The same files can be used for updates too.
+The static binary files are kept in repo [binary-packages](https://github.com/netdata/binary-packages). You can download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself). The target system does **not** need to have bash installed. The same files can be used for updates too.
 
 - [Linux, install from source, by hand](#linux-by-hand)<br/>semi-automatic, with more details about the steps involved and actions taken.
 
