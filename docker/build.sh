@@ -30,7 +30,9 @@ fi
 
 # Build images using multi-arch Dockerfile.
 for ARCH in i386 armhf aarch64 amd64; do
-     docker build --build-arg ARCH="${ARCH}-v3.8" --tag "${REPOSITORY}:${VERSION}-${ARCH}" --file docker/Dockerfile ./ &
+     docker build --build-arg ARCH="${ARCH}-v3.8" \
+                  --tag "${REPOSITORY}:${VERSION}-${ARCH}" \
+                  --file docker/Dockerfile ./ &
 done
 wait
 
@@ -70,14 +72,3 @@ docker --config /tmp/docker manifest push -p "${REPOSITORY}:${VERSION}"
 # Show current manifest (debugging purpose only)
 docker --config /tmp/docker manifest inspect "${REPOSITORY}:${VERSION}"
 
-# Push netdata images to firehol organization
-# TODO: Remove it after we decide to deprecate firehol/netdata docker repo
-if [ "$REPOSITORY" != "netdata" ]; then
-    echo "$OLD_DOCKER_PASSWORD" | docker login -u "$OLD_DOCKER_USERNAME" --password-stdin   
-    for ARCH in amd64 i386 armhf aarch64; do
-        docker tag "${REPOSITORY}:${VERSION}-${ARCH}" "firehol/netdata:${ARCH}"
-        docker push "firehol/netdata:${ARCH}"
-    done
-    docker tag "${REPOSITORY}:${VERSION}-amd64" "firehol/netdata:${VERSION}"
-    docker push "firehol/netdata:${VERSION}"
-fi
