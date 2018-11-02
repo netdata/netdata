@@ -4,7 +4,12 @@
 
 file="${1}"
 
-EDITOR="${EDITOR-vi}"
+if [ "$(command -v editor)" ] ; then
+    EDITOR="${EDITOR-editor}"
+else
+    EDITOR="${EDITOR-vi}"
+fi
+
 [ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
