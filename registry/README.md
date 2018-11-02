@@ -1,32 +1,32 @@
-# netdata registry
+# Netdata registry
 
 Netdata registry implements the `my-netdata` menu on netdata dashboards.
 The `my-netdata` menu lists the netdata servers you have visited.
 
 ## Why?
 
-netdata provides distributed monitoring.
+Netdata provides distributed monitoring.
 
 Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before netdata, this was the standard practice. However it has a few issues:
 
 1. due to the resources required, the number of metrics collected is limited.
-2. for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
-2. the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole ecosystem. It also requires maintenance, administration, etc.
-3. most centralized monitoring solutions are usually only good for presenting *statistics of past performance* (i.e. cannot be used for real-time performance troubleshooting).
+1. for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
+1. the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole ecosystem. It also requires maintenance, administration, etc.
+1. most centralized monitoring solutions are usually only good for presenting *statistics of past performance* (i.e. cannot be used for real-time performance troubleshooting).
 
-Netdata has a different approach:
+Netdata follows a different approach:
 
 1. data collection happens per second
-2. thousands of metrics per server are collected
-3. data do not leave the server where they are collected
-4. netdata servers do not talk to each other
-5. your browser connects all the netdata servers
+1. thousands of metrics per server are collected
+1. data do not leave the server where they are collected
+1. netdata servers do not talk to each other
+1. your browser connects all the netdata servers
 
-Using netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure. 
+Using netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure.
 
 However, the netdata approach introduces a few new issues that need to be addressed, one being **the list of netdata we have installed**, i.e. the URLs our netdata servers are listening.
 
-To solve this, netdata utilizes a **central registry**. This registry, together with certain browser features, allow netdata to provide unified cross server dashboards. For example, when you jump from server to server using the `my-netdata` menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts, etc) are propagated to the new server, so that the new dashboard will come with exactly the same view.
+To solve this, netdata utilizes a **central registry**. This registry, together with certain browser features, allow netdata to provide unified cross-server dashboards. For example, when you jump from server to server using the `my-netdata` menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts, etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view.
 
 ## What is the registry?
 
@@ -66,7 +66,7 @@ For *persons* and *machines*, the registry keeps links to *URLs*, each link with
 
 `https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to both HTTP and HTTPS requests but the default is HTTPS.
 
-#### Can this registry handle the global load of netdata installations?
+### Can this registry handle the global load of netdata installations?
 
 Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** (depending on the type of CPU, the computer's memory bandwidth, etc). 50.000 is on J1900 (celeron 2Ghz).
 
@@ -107,7 +107,7 @@ You may also want to give your server different names under the **my-netdata** m
 
 So this server will appear in **my-netdata** as `Group1 - Master DB`. The max name length is 50 characters.
 
-#### limiting access to the registry
+### Limiting access to the registry
 
 netdata v1.9+ support limiting access to the registry from given IPs, like this:
 ```
@@ -119,7 +119,7 @@ netdata v1.9+ support limiting access to the registry from given IPs, like this:
 
 Keep in mind that connections to netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[registry].allow from` should also be allowed by `[web].allow connection from`.
 
-#### Where is the registry database stored?
+### Where is the registry database stored?
 
 `/var/lib/netdata/registry/*.db`
 
@@ -149,4 +149,4 @@ To use the registry, your web browser needs to support **third party cookies**, 
 ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io responded with: {"status":"redirect","registry":"https://registry.my-netdata.io"}
 ```
 
-This error is printed on your web browser console (press F12 on your browser to show it).
+This error is printed on your web browser console (press F12 on your browser to see it).

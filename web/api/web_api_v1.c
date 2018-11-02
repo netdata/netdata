@@ -429,6 +429,20 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     return ret;
 }
 
+// Pings a netdata server:
+// /api/v1/registry?action=hello
+//
+// Access to a netdata registry:
+// /api/v1/registry?action=access&machine=${machine_guid}&name=${hostname}&url=${url}
+//
+// Delete from a netdata registry:
+// /api/v1/registry?action=delete&machine=${machine_guid}&name=${hostname}&url=${url}&delete_url=${delete_url}
+//
+// Search for the URLs of a machine:
+// /api/v1/registry?action=search&machine=${machine_guid}&name=${hostname}&url=${url}&for=${machine_guid}
+//
+// Impersonate:
+// /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
 inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
             hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
