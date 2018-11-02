@@ -1,5 +1,19 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- edit-config uses vi, even if it isn't the system editor [\#4549](https://github.com/netdata/netdata/issues/4549)
+
+**Merged pull requests:**
+
+- first tag then generate changelog [\#4553](https://github.com/netdata/netdata/pull/4553) ([paulfantom](https://github.com/paulfantom))
+- after release cleanup [\#4552](https://github.com/netdata/netdata/pull/4552) ([paulfantom](https://github.com/paulfantom))
+- edit-config: Better support for custom editors. [\#4551](https://github.com/netdata/netdata/pull/4551) ([Ferroin](https://github.com/Ferroin))
+- Minor README file updates [\#4548](https://github.com/netdata/netdata/pull/4548) ([gmosx](https://github.com/gmosx))
+- Switch e-mail threading to be enabled by default. [\#3780](https://github.com/netdata/netdata/pull/3780) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.11.0](https://github.com/netdata/netdata/tree/v1.11.0) (2018-11-02)
 
 **Fixed bugs:**
