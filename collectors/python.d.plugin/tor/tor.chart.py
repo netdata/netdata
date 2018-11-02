@@ -15,10 +15,6 @@ try:
 except ImportError:
     STEM_AVAILABLE = False
 
-import stem
-import stem.connection
-import stem.control
-
 
 DEF_PORT = 'default'
 
