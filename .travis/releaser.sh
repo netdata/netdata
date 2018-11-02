@@ -31,9 +31,6 @@ then
   exit 1
 fi
 
-echo "---- GENERATING CHANGELOG -----"
-./.travis/generate_changelog.sh
-
 echo "---- FIGURING OUT TAGS ----"
 # Check if current commit is tagged or not
 GIT_TAG=$(git tag --points-at)
@@ -64,6 +61,9 @@ if [ "${GIT_TAG}" == "HEAD" ]; then
     echo "  - commit is tagged"
     exit 0
 fi
+
+echo "---- GENERATING CHANGELOG -----"
+./.travis/generate_changelog.sh
 
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
