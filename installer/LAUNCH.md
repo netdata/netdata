@@ -1,6 +1,4 @@
-# Getting started
-
-## Working with netdata
+# Starting netdata
 
 - You can start netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
@@ -16,7 +14,7 @@ Access to the web site, for all graphs, is by default on port `19999`, so go to:
 
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
 
-## starting netdata at boot
+## Starting netdata at boot
 
 In the `system` directory you can find scripts and configurations for the various distros.
 

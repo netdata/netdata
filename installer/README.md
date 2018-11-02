@@ -1,8 +1,7 @@
 # Installation
 ![image10](https://cloud.githubusercontent.com/assets/2662304/14253729/534c6f9c-fa95-11e5-8243-93eb0df719aa.gif)
 
-
-## Linux Package Managers
+### Linux package managers
 
 You can install the latest release of netdata, using your package manager in
 
@@ -40,7 +39,7 @@ For automated installs, append a space + `--dont-wait` to the command line. You 
 ```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) all --dont-wait --dont-start-it
 ```
-## Pre-built static binary for Linux 64bit
+## Linux 64bit pre-built static binary 
 
 You can install a pre-compiled static binary of netdata for any Intel/AMD 64bit Linux system (even those that don't have a package manager, like CoreOS, CirrOS, busybox systems, etc). You can also use these packages on systems with broken or unsupported package managers.
 
@@ -75,32 +74,36 @@ sh /tmp/kickstart-static64.sh
 
 The static binary files are kept in repo [binary-packages](https://github.com/netdata/binary-packages). You can download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself). The target system does **not** need to have bash installed. The same files can be used for updates too.
 
-- [Linux, install from source, by hand](#linux-by-hand)<br/>semi-automatic, with more details about the steps involved and actions taken.
+## Other installation methods
 
-Non-Linux:
+ - *Linux manual installation from source*
+
+Semi-automatic, with more details about the steps involved and actions taken [here](#install-netdata-on-linux-manually)
+
+ - *Non-Linux installation*
 
 - [Install from package or source, on FreeBSD](#freebsd)
 - [Install from package, on pfSense](#pfsense)
 - [Enable netdata on FreeNAS Corral](#freenas)
 - [Install from package or source, on macOS (OS X)](#macos)
 
-
-
-### Linux by hand
+See also the list of netdata [package maintainers](https://github.com/netdata/netdata/blob/master/MAINTAINERS.md) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
+ 
+## Install netdata on Linux manually
 
 To install the latest git version of netdata, please follow these 2 steps:
 
-1. [Prepare your system](#1-prepare-your-system)
+1. [Prepare your system](#prepare-your-system)
 
    Install the required packages on your system.
 
-2. [Install netdata](#2-install-netdata)
+2. [Install netdata](#install-netdata)
 
    Download and install netdata. You can also update it the same way.
 
 ---
 
-### 1. Prepare your system
+### Prepare your system
 
 Try our experimental automatic requirements installer (no need to be root). This will try to find the packages that should be installed on your system to build and run netdata. It supports most major Linux distributions released after 2010:
 
@@ -177,7 +180,7 @@ package|description
 
 ---
 
-# 2. Install netdata
+### Install netdata
 
 Do this to install and run netdata:
 
@@ -202,190 +205,11 @@ You can edit this file to set options. One common option to tweak is `history`, 
 
 To apply the changes you made, you have to restart netdata.
 
-## starting netdata at boot
-
-In the `system` directory you can find scripts and configurations for the various distros.
-
-#### systemd
-
-The installer already installs `netdata.service` if it detects a systemd system.
-
-To install `netdata.service` by hand, run:
-
-```sh
-# stop netdata
-killall netdata
-
-# copy netdata.service to systemd
-cp system/netdata.service /etc/systemd/system/
-
-# let systemd know there is a new service
-systemctl daemon-reload
-
-# enable netdata at boot
-systemctl enable netdata
-
-# start netdata
-systemctl start netdata
-```
-
-#### init.d
-
-In the system directory you can find `netdata-lsb`. Copy it to the proper place according to your distribution documentation. For Ubuntu, this can be done via running the following commands as root.
-
-```sh
-# copy the netdata startup file to /etc/init.d
-cp system/netdata-lsb /etc/init.d/netdata
-
-# make sure it is executable
-chmod +x /etc/init.d/netdata
-
-# enable it
-update-rc.d netdata defaults
-```
-
-#### openrc (gentoo)
-
-In the `system` directory you can find `netdata-openrc`. Copy it to the proper place according to your distribution documentation.
-
-#### CentOS / Red Hat Enterprise Linux
-
-For older versions of RHEL/CentOS that don't have systemd, an init script is included in the system directory. This can be installed by running the following commands as root.
-
-```sh
-# copy the netdata startup file to /etc/init.d
-cp system/netdata-init-d /etc/init.d/netdata
-
-# make sure it is executable
-chmod +x /etc/init.d/netdata
-
-# enable it
-chkconfig --add netdata
-```
-
-_There have been some recent work on the init script, see PR https://github.com/netdata/netdata/pull/403_
-
-#### other systems
-
-You can start netdata by running it from `/etc/rc.local` or equivalent.
-
-## log-rotation
-
-The installer, when run as `root`, will install `/etc/logrotate.d/netdata`.
-
-## Updating netdata after its installation
-
-### Manual update
-
-#### Method 1: netdata-updater.sh
-
-`netdata-installer.sh` generates `netdata-updater.sh` upon any successful installation  
-You can use this script to update your netdata installation with the same options you used to install it in the first place.
-
-```sh
-# go to the git downloaded directory
-cd /path/to/git/downloaded/netdata
-
-# run the updater
-./netdata-updater.sh
-```
-
-_Netdata will be restarted with the new version._
-
-#### Method 2: git pull
-
-You can also update netdata to the latest version by hand, using this:
-
-```sh
-# go to the git downloaded directory
-cd /path/to/git/downloaded/netdata
-
-# download the latest version
-git pull
-
-# rebuild it, install it, run it
-./netdata-installer.sh
-```
-
-_Netdata will be restarted with the new version._
-
-### Auto-update
-
-_Please, consider the risks of running an auto-update. Something can always go wrong. Keep an eye on your installation, and run a manual update if something ever fails._
-
-You can call `netdata-updater.sh` from a cron-job. A successful update will not trigger an email from cron. 
-
-```sh
-# Edit your cron-jobs
-crontab -e
-
-# add a cron-job at the bottom. This one will update netdata every day at 6:00AM:
-# update netdata
-0 6 * * * /path/to/git/downloaded/netdata/netdata-updater.sh
-```
-
----
-
-## Working with netdata
-
-- You can start netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
-
-- You can stop netdata by killing it with `killall netdata`.
-    You can stop and start netdata at any point. Netdata saves on exit its round robbin
-    database to `/var/cache/netdata` so that it will continue from where it stopped the last time.
-
-Access to the web site, for all graphs, is by default on port `19999`, so go to:
-
- ```
- http://127.0.0.1:19999/
- ```
-
-You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
-
----
-
-## Uninstalling netdata
-
-#### netdata was installed from source (or `kickstart.sh`)
-
-The script `netdata-installer.sh` generates another script called `netdata-uninstaller.sh`.
-
-To uninstall netdata, run:
-
-```
-cd /path/to/netdata.git
-./netdata-uninstaller.sh --force
-```
-
-The uninstaller will ask you to confirm all deletions.
-
-#### netdata was installed with `kickstart-static64.sh` package
-
-Stop netdata with one of the following:
-
-- `service netdata stop` (non-systemd systems)
-- `systemctl stop netdata` (systemd systems)
-
-Disable running netdata at startup, with one of the following (based on your distro):
-
-- `rc-update del netdata`
-- `update-rc.d netdata disable`
-- `chkconfig netdata off`
-- `systemctl disable netdata`
-
-Delete the netdata files:
-
-1. `rm -rf /opt/netdata`
-2. `groupdel netdata`
-3. `userdel netdata`
-4. `rm /etc/logrotate.d/netdata`
-5. `rm /lib/systemd/system/netdata.service` or `rm /etc/init.d/netdata`, depending on the distro.
-
 ---
 
 ## Other Systems
 
-We are trying to collect all the information about netdata package maintainers at [issue 651](https://github.com/netdata/netdata/issues/651). So, please have a look there for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
+
 
 ##### FreeBSD
 
