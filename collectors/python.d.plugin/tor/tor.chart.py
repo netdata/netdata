@@ -36,7 +36,7 @@ CHARTS = {
 class Service(SimpleService):
     """Provide netdata service for Tor"""
     def __init__(self, configuration=None, name=None):
-        SimpleService.__init__(self, configuration=configuration, name=name)
+        super(Service, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
 
