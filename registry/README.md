@@ -107,7 +107,7 @@ You may also want to give your server different names under the **my-netdata** m
 
 So this server will appear in **my-netdata** as `Group1 - Master DB`. The max name length is 50 characters.
 
-### limiting access to the registry
+### Limiting access to the registry
 
 netdata v1.9+ support limiting access to the registry from given IPs, like this:
 ```
