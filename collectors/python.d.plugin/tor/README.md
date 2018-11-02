@@ -14,7 +14,7 @@ It produces only one chart:
 
 ### configuration
 
-Needs `control_port` and `password`
+Needs only `control_port`
 
 Here is an example for local server:
 
@@ -25,12 +25,10 @@ priority     : 60000
 local_tcp:
  name: 'local'
  control_port: 9051
- password: 'password'
 
 local_socket:
  name: 'local'
  control_port: '/var/run/tor/control'
- password: 'password'
 ```
 
 ### prerequisite
