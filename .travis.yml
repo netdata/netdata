@@ -60,9 +60,12 @@ jobs:
   - name: Nightly changelog generation
     script: ".travis/generate_changelog.sh"
     if: type = cron
-
+  - name: labeler # This job should be replaced with GitHub Actions when they hit GA
+    script: ".travis/labeler.sh"
+    if: type = cron
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
-    secure: Ntl1GNjgGDdmMQsudDi/4+co6zRV8znJXOB0joLVHNV1icHvUSMKShgpY08AoWoxNYMDVHXOUzEGwiZd6MI4MleNu9gwtACwgXe+sDjgBIDvQYC6JQS7XlANJfzBlZnrGnaiVVlBmI/LajgABCsrTAYV8gVrq2zA3u56UrNwS3qRJnbaqGgH64SnHbdllHQ7l7Qcc/27voy6Op32oJhDZ5bVY5CRZUR42oPvlDx9PSD0yqSkLwFrIE0Qg+mTVDZ4Watrv8iv91ghc6GwwPvNGShcYI04P8hn08FZ4eGH47K4AZf97IDargmxPsEwkOhgcl3w4J5KHZzmVb7hsEs6+iZz4KulD2u4D/xy5BGUcRZKMuyiO99dmZO61wP0Ra0Wzfe0exG+LFxAmC0jiYS67xL0YWs2SKkO7iftthI8NX1Lus1PGleBpJ28LKQdZjaKz3w2xIRlJ45eEdwBgtnNkW68NsmJCflrNkAlaVW6+zCPMpT4rT41rpkh0Fl+YbvOhH/S3VfiTY7OqTU5B9ttgJuN/m8PWi8g5MKO2C1TWkK3cV4O2PnpugtioHuTuj2X/AKOrh7hlefedDxPZPIxFmLi3OKtgHBzwzQk79p6V9ffbbVfsO+p8kiKJuc8s0v6d++Rt2FLXwUquJGDKC0hz8cAMSUiFaP5t1TlhTk7LJ4=
+    rooms:
+      - secure: "NuW1p7s+WGLcyhEceeiLRSV1JgAc6N47zgdSsYoxrjSFRQHDfc8jensypDcEJwgs1K2Hcve9iKRaAddEHEw7AkS6rie9gFR5HmmbKXfW2GFMqOr6maYTFsvaECPqiWk1n9/XnRLsAi5kZ8HxH+a8ldb/eaVoFQesY1jPXgh11BM5DwvpXjEtwg0WGASsKiymvnXFS3KcC+sR7Lln2GX1a8vfCX2I3TEmOedKMlSHUy5JilGGC3AWA0SWS8tR8PUH0u3dHL5j0RNIr1RO3Yx24QgUpg/YpvKymnW/iIIEOq2vb2mBhhiKEQjJ1djUL4VSPzjIDpUzThVpKaHk3syOp6W9qZEHKhR/sqjc5Yk2XRjsw1cM0nS60gaCgxtKhEMKWcjtvWf04oJAVrmcUwcYXj0eA+jgRCZl5VhyufK/fUJavjOfsQGjwhdjxQfwDCw33W17ypJUt4GZngdb6jbIhEOcKHSLQDu1vuHTw82hJJkthkmR59PX30qJdl/MEGcfVLdN/fkCokjR/qwfmkNwQm+wYSKsK/Jq4RgBT0/oZwY3e8nkCq2ov7lBbDO3/0rzQKWZ9Uy//tnoCM3vGhDwGHQxsHshv7g6KwdhYTcmm7WWWIucfLupcjFUO1HbRuJ+7ZnvxRRwKiV+MGkFT2SNJkS8q1/jCu9KGbmktd0WUSE="
