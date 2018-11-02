@@ -4,7 +4,7 @@
 
 file="${1}"
 
-if [ $(command -v editor) ] ; then
+if [ "$(command -v editor)" ] ; then
     EDITOR="${EDITOR-editor}"
 else
     EDITOR="${EDITOR-vi}"
