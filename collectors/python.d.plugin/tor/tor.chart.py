@@ -13,7 +13,6 @@ try:
     import stem.control
     STEM_AVAILABLE = True
 except ImportError:
-    ControllerError = Exception
     STEM_AVAILABLE = False
 
 import stem
