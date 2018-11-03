@@ -1197,7 +1197,23 @@ update() {
         last_commit="\$(get_latest_commit_id)"
         [ \${force} -eq 0 -a -z "\${last_commit}" ] && failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
 
-        git pull >&3 2>&3 || failed "CANNOT FETCH LATEST SOURCE (use -f for force re-install)"
+        local fetched pulled
+        fetched=1
+        pulled=1
+
+        # make sure we have the latest tags of the repo (including tags)
+        git fetch --tags  >&3 2>&3 || fetched=0
+
+        # pull any updates
+        git pull >&3 2>&3 || pulled=0
+
+        if [ \$fetched -eq 1 ] && [ \$pulled -eq 0 ]
+        then
+            # we fetched the repo, but we failed to pull changes
+            # so, reset the local clone to match the origin
+            git reset --hard || failed "CANNOT FETCH LATEST SOURCE (use -f for force re-install)"
+            pulled=1
+        fi
 
         new_commit="\$(get_latest_commit_id)"
         if [ \${force} -eq 0 ]
