@@ -10,17 +10,17 @@ Netdata provides distributed monitoring.
 Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before netdata, this was the standard practice. However it has a few issues:
 
 1. due to the resources required, the number of metrics collected is limited.
-1. for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
-1. the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole ecosystem. It also requires maintenance, administration, etc.
-1. most centralized monitoring solutions are usually only good for presenting *statistics of past performance* (i.e. cannot be used for real-time performance troubleshooting).
+2. for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
+3. the central monitoring solution needs dedicated resources, thus becoming "another bottleneck" in the whole ecosystem. It also requires maintenance, administration, etc.
+4. most centralized monitoring solutions are usually only good for presenting *statistics of past performance* (i.e. cannot be used for real-time performance troubleshooting).
 
 Netdata follows a different approach:
 
 1. data collection happens per second
-1. thousands of metrics per server are collected
-1. data do not leave the server where they are collected
-1. netdata servers do not talk to each other
-1. your browser connects all the netdata servers
+2. thousands of metrics per server are collected
+3. data do not leave the server where they are collected
+4. netdata servers do not talk to each other
+5. your browser connects all the netdata servers
 
 Using netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure.
 
