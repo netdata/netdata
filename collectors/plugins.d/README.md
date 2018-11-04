@@ -374,15 +374,15 @@ or do not output the line at all.
 
 ## Modular Plugins
 
-1. **python**, use `python.d.plugin`, there are many examples in the [python.d directory](../python.d.plugin)
+1. **python**, use `python.d.plugin`, there are many examples in the [python.d directory](../python.d.plugin/)
 
    python is ideal for netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
-2. **node.js**, use `node.d.plugin`, there are a few examples in the [node.d directory](../node.d.plugin)
+2. **node.js**, use `node.d.plugin`, there are a few examples in the [node.d directory](../node.d.plugin/)
 
    node.js is the fastest scripting language for collecting data. If your plugin needs to do a lot of work, compute values, etc, node.js is probably the best choice before moving to compiled code. Keep in mind though that node.js is not memory efficient; it will probably need more RAM compared to python.
 
-3. **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d directory](../charts.d.plugin)
+3. **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d directory](../charts.d.plugin/)
 
    BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 

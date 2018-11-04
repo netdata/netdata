@@ -88,7 +88,14 @@ echo -ne "    - 'doc/Why-netdata.md'
 "
 echo -ne "- Using NetData:
 "
-# Configuration
+navpart 2 web "README" "Web Dashboards"
+navpart 3 web "CUSTOM-DASHBOARDS" ""
+navpart 3 web "CONFLUENCE-DASHBOARDS" ""
+navpart 2 web/gui
+navpart 2 web/server "" "Web Server"
+navpart 3 web/server "" "" 2 excludefirstlevel
+navpart 2 web/api "" "Web API"
+navpart 3 web/api "" "" 4 excludefirstlevel
 navpart 2 system
 navpart 2 registry
 navpart 2 streaming "" "" 4
@@ -106,8 +113,14 @@ echo -ne "    - 'doc/Performance.md'
 navpart 2 health README "Health Monitoring"
 navpart 3 health/notifications "" "" 1
 navpart 3 health/notifications "" "Supported Notifications" 2 excludefirstlevel
-navpart 3 doc "health-API-calls"
-navpart 3 doc "troubleshooting-alarms"
+
+echo -ne "    - Running-behind-another-web-server:
+        - 'doc/Running-behind-nginx.md'
+        - 'doc/Running-behind-apache.md'
+        - 'doc/Running-behind-lighttpd.md'
+        - 'doc/Running-behind-caddy.md'
+"
+
 
 navpart 1 collectors "" "Data Collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
@@ -134,36 +147,22 @@ navpart 3 collectors/freeipmi.plugin
 
 echo -ne "    - Third Party Plugins:
         - 'doc/Third-Party-Plugins.md'
-- Web-Dashboards:
-    - 'doc/Overview.md'
-    - 'doc/Custom-Dashboards.md'
-    - 'doc/Custom-Dashboard-with-Confluence.md'
-    - Chart-Libraries:
-        - 'doc/Dygraph.md'
-        - 'doc/EasyPieChart.md'
-        - 'doc/Gauge.js.md'
-        - 'doc/jQuery-Sparkline.md'
-        - 'doc/Peity.md'
 "
-navpart 2 web "" "Web"
-navpart 3 web/gui "" "Web GUI" 4
-navpart 3 web/server "" "Web Server" 4
-navpart 3 web/api "" "Web API" 4
 
-echo -ne "- Running-behind-another-web-server:
-    - 'doc/Running-behind-nginx.md'
-    - 'doc/Running-behind-apache.md'
-    - 'doc/Running-behind-lighttpd.md'
-    - 'doc/Running-behind-caddy.md'
-- Blog:
-    - 'doc/Donations-netdata-has-received.md'
-    - 'doc/a-github-star-is-important.md'
-    - 'doc/Release-Notes.md'
-    - 'doc/CPU-Usage.md'
-    - 'doc/DDOS.md'
-"
 echo -ne "- Hacking netdata:
 "
 navpart 2 makeself "" "" 4
 navpart 2 packaging "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
+navpart 2 contrib
+navpart 2 tests
+
+
+echo -ne "- About:
+    - 'doc/Donations-netdata-has-received.md'
+    - 'doc/a-github-star-is-important.md'
+"
+navpart 2 . "HISTORICAL_CHANGELOG"
+
+
+
