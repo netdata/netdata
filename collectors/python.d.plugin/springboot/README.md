@@ -1,39 +1,9 @@
 # springboot
 
 This module will monitor one or more Java Spring-boot applications depending on configuration.
-
-It produces following charts:
-
-1. **Response Codes** in requests/s
- * 1xx
- * 2xx
- * 3xx
- * 4xx
- * 5xx
- * others
-
-2. **Threads**
- * daemon
- * total
-
-3. **GC Time** in milliseconds and **GC Operations** in operations/s
- * Copy
- * MarkSweep
- * ...
-
-4. **Heap Mmeory Usage** in KB
- * used
- * committed
-
-### configuration
-
-Please see the [Monitoring Java Spring Boot Applications](https://github.com/netdata/netdata/wiki/Monitoring-Java-Spring-Boot-Applications) page for detailed info about module configuration.
-
----
-
-# Monitoring Java Spring Boot Applications
-
 Netdata can be used to monitor running Java [Spring Boot](https://spring.io/) applications that expose their metrics with the use of the **Spring Boot Actuator** included in Spring Boot library.
+
+## Configuration
 
 The Spring Boot Actuator exposes these metrics over HTTP and is very easy to use:
 * add `org.springframework.boot:spring-boot-starter-actuator` to your application dependencies
@@ -93,7 +63,30 @@ public class HeapPoolMetrics implements PublicMetrics {
 
 Please refer [Spring Boot Actuator: Production-ready features](https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready.html) and [81. Actuator - Part IX. ‘How-to’ guides](https://docs.spring.io/spring-boot/docs/current/reference/html/howto-actuator.html) for more information.
 
-## Using netdata springboot module
+## Charts
+
+1. **Response Codes** in requests/s
+ * 1xx
+ * 2xx
+ * 3xx
+ * 4xx
+ * 5xx
+ * others
+
+2. **Threads**
+ * daemon
+ * total
+
+3. **GC Time** in milliseconds and **GC Operations** in operations/s
+ * Copy
+ * MarkSweep
+ * ...
+
+4. **Heap Mmeory Usage** in KB
+ * used
+ * committed
+
+## Usage
 
 The springboot module is enabled by default. It looks up `http://localhost:8080/metrics` and `http://127.0.0.1:8080/metrics` to detect Spring Boot application by default. You can change it by editing `/etc/netdata/python.d/springboot.conf` (to edit it on your system run `/etc/netdata/edit-config python.d/springboot.conf`).
 
@@ -126,4 +119,4 @@ You can disable the default charts by set `defaults.<chart-id>: false`.
 
 The dimension name of extras charts should replace `.` to `_`.
 
-Please check [springboot.conf](springboot.conf) for more examples.
+Please check [springboot.conf](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/springboot/springboot.conf) for more examples.

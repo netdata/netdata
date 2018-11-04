@@ -72,7 +72,7 @@ java.d.plugin|`java 8`|`/etc/netdata/`<br/>`java.d.conf`|a file for each module 
 
 ## writing netdata plugins
 
-You can add custom plugins following the [External Plugins](External-Plugins.md) guide.
+You can add custom plugins following the [External Plugins](Netdata External Plugins) guide.
 
 ---
 
