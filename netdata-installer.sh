@@ -1207,11 +1207,15 @@ update() {
         # pull any updates
         git pull >&3 2>&3 || pulled=0
 
-        if [ \$fetched -eq 1 ] && [ \$pulled -eq 0 ]
+        if [ \$pulled -eq 0 ]
         then
-            # we fetched the repo, but we failed to pull changes
-            # so, reset the local clone to match the origin
-            git reset --hard || failed "CANNOT FETCH LATEST SOURCE (use -f for force re-install)"
+            error "git pull failed, trying a full repo sync..."
+
+            # make sure we have the latest info
+            git fetch --all  >&3 2>&3 || failed "FAILED TO FETCH THE LATEST SOURCE FROM GITHUB"
+
+            # reset the local clone to match the origin
+            git reset --hard  >&3 2>&3 || failed "CANNOT GET THE LATEST SOURCE FROM GITHUB"
             pulled=1
         fi
 
