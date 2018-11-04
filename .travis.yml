@@ -8,7 +8,9 @@ stages:
 - test
 - build
 - name: packaging
-  if: branch = master AND type != pull_request
+  if: branch = master AND type != pull_request AND type != cron
+- name: nightlies
+  if: branch = master AND type = cron
 
 jobs:
   include:
@@ -47,22 +49,19 @@ jobs:
     script: ".travis/releaser.sh"
     git:
       depth: false
-    if: type != cron
-  - name: Nightly tarball and self-extractor build
+
+  - stage: nightlies
+    name: tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/firehol_create_artifacts.sh"
-    if: type = cron
-  - name: Nightly docker images
+  - name: docker images
     install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
     script: "docker/build.sh"
     env: REPOSITORY="netdata/netdata"
-    if: type = cron
-  - name: Nightly changelog generation
+  - name: changelog generation
     script: ".travis/generate_changelog.sh"
-    if: type = cron
   - name: labeler # This job should be replaced with GitHub Actions when they hit GA
     script: ".travis/labeler.sh"
-    if: type = cron
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
