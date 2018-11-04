@@ -1215,7 +1215,7 @@ update() {
             git fetch --all >&3 2>&3 || failed "FAILED TO FETCH THE LATEST SOURCE FROM GITHUB"
 
             info "checking out master branch..."
-            git checkout master >&3 2>&3 || error "FAILED TO CHECKOUT master BRANCH"
+            git checkout -f master >&3 2>&3 || error "FAILED TO CHECKOUT master BRANCH"
 
             info "resetting local master to origin/master..."
             git reset --hard origin/master >&3 2>&3 || failed "FAILED TO RESET LOCAL master TO origin/master"
