@@ -1,21 +1,23 @@
 #!/bin/bash
 
 cd htmldoc/src
-YML=../mkdocs.yml
 
 # create yaml nav subtree with all the files directly under a specific directory
 # arguments:
-# directory - to get mds from to add them to the yaml
-# file - can be * to include all files
 # tabs - how deep do we show it in the hierarchy. Level 1 is the top level, max should probably be 3
-# name - what do we call the main link on the navbar
-# maxdepth - how many levels of subdirectories do I include in the yaml in this section. 1 means just the top level
+# directory - to get mds from to add them to the yaml
+# file - can be left empty to include all files
+# name - what do we call the relevant section on the navbar. Empty if no new section is required
+# maxdepth - how many levels of subdirectories do I include in the yaml in this section. 1 means just the top level and is the default if left empty
+# excludefirstlevel - Optional param. If passed, mindepth is set to 2, to exclude the READMEs in the first directory level
+
 navpart () {
- dir=$1
- file=$2
- tabs=$3
- name=$4
+ tabs=$1
+ dir=$2
+ file=$3
+ section=$4
  maxdepth=$5
+ excludefirstlevel=$6
  spc=""
  
  i=1
@@ -24,12 +26,23 @@ navpart () {
 	i=$[$i + 1]
  done
  
- echo "$spc- $name:"
- for f in `find $dir -maxdepth $maxdepth -name "${file}.md"`; do 
-	echo "$spc    - '$f'"
+ if [ -z "$file" ] ; then file='*' ; fi
+ if [[ ! -z "$section" ]] ; then echo "$spc- ${section}:" ; fi
+ if [ -z "$maxdepth" ] ; then maxdepth=1; fi
+ if [[ ! -z "$excludefirstlevel" ]] ; then mindepth=2 ; else mindepth=1; fi
+ 
+ for f in `find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}'`; do 
+	# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
+	if [ -z "$section" ] ; then 
+		echo "$spc- '$f'"
+	else
+		echo "$spc    - '$f'"
+	fi
  done
 }
-echo 'site_name: NetData Documentation
+
+
+echo -e 'site_name: NetData Documentation
 repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/htmldoc
@@ -61,17 +74,18 @@ markdown_extensions:
  - wikilinks
 nav:'
 
-navpart . README 1 "Getting Started" 1
+navpart 1 . README "Getting Started"
 
-echo "    - 'doc/Introducing-netdata.md'
+echo -ne "    - 'doc/Introducing-netdata.md'
     - 'doc/Why-netdata.md'
     - 'doc/Performance-monitoring,-scaled-properly.md'
     - 'doc/netdata-for-IoT.md'
-    - 'doc/Demo-Sites.md'"
+    - 'doc/Demo-Sites.md'
+"
 
-navpart installer * 1 "Installation" 1
+navpart 1 installer '*' "Installation"
 
-echo"- Using NetData"
+echo -ne "- Using NetData:
     - 'doc/Getting-Started.md'
     - 'doc/Command-Line-Options.md'
     - 'doc/Log-Files.md'
@@ -92,58 +106,43 @@ echo"- Using NetData"
     - 'doc/Replication-Overview.md'
     - 'doc/Monitoring-ephemeral-nodes.md'
     - 'doc/netdata-proxies.md'
-- Backends-:
-    - 'doc/netdata-backends.md'
-    - 'doc/Using-Netdata-with-Prometheus.md'
-    - 'doc/Netdata,-Prometheus,-and-Grafana-Stack.md'
 "
-navpart netdata/health README 1 "Health Monitoring" 1
-navpart netdata/health/notifications * 2 "Supported Notifications" 2
 
-echo "- Netdata-Registry:
-    - 'doc/mynetdata-menu-item.md'
-- Netdata-Badges:
-    - 'doc/Generating-Badges.md'
-- Data-Collection:
-    - 'doc/Add-more-charts-to-netdata.md'
-    - 'doc/Collectors-README.md'
+navpart 1 backends "" "Backends" 3
+
+navpart 1 health README "Health Monitoring"
+navpart 2 health/notifications "" "" 1
+navpart 2 health/notifications "" "Supported Notifications" 2 excludefirstlevel
+navpart 2 doc "health-API-calls"
+navpart 2 doc "troubleshooting-alarms"
+
+navpart 1 collectors "" "Data Collection" 1
+echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
     - Internal Plugins:
-        - 'doc/Internal-Plugins.md'
-        - 'doc/statsd.md'
-        - 'doc/monitoring-cgroups.md'
-        - 'doc/QoS.md'
-        - 'doc/monitoring-systemd-services.md'
-        - 'doc/Monitoring-disks.md'
-    - External Plugins:
-        - 'doc/External-Plugins.md'
-        - 'doc/The-spectacles-of-a-web-server-log-file.md'
-        - 'doc/monitoring-IPMI.md'
-        - Binary-Modules:
-            - 'doc/Apps-Plugin.md'
-            - 'doc/fping-Plugin.md'
-        - Python-Modules:
-            - 'doc/Netdata-Python-Modules.md'
-            - 'doc/Monitoring-Go-Applications.md'
-            - 'doc/Monitoring-Java-Spring-Boot-Applications.md'
-        - Nodejs-Modules:
-            - 'doc/General-Info-node.d.md'
-        - BASH-Modules:
-            - 'doc/General-Info-charts.d.md'
-        - Active-BASH-Modules:
-            - 'doc/ap.chart.sh.md'
-            - 'doc/apcupsd.chart.sh.md'
-            - 'doc/example.chart.sh.md'
-            - 'doc/charts.d.md'
-            - 'doc/opensips.chart.sh.md'
-        - Obsolete-BASH-Modules:
-            - 'doc/Obsolete-BASH-Modules.md'
-            - 'doc/apache.chart.sh.md'
-            - 'doc/cpufreq.chart.sh.md'
-            - 'doc/mysql.chart.sh.md'
-            - 'doc/phpfpm.chart.sh.md'
-            - 'doc/tomcat.chart.sh.md'
-    - Third Party Plugins:
+"
+navpart 3 collectors/proc.plugin
+navpart 3 collectors/statsd.plugin
+navpart 3 collectors/cgroups.plugin
+navpart 3 collectors/idlejitter.plugin
+navpart 3 collectors/tc.plugin
+navpart 3 collectors/nfacct.plugin
+navpart 3 collectors/checks.plugin
+navpart 3 collectors/diskspace.plugin
+navpart 3 collectors/freebsd.plugin
+navpart 3 collectors/macos.plugin
+
+navpart 2 collectors/plugins.d "" "External Plugins"
+navpart 3 collectors/python.d.plugin "" "Python Plugins" 3
+navpart 3 collectors/node.d.plugin "" "Node.js Plugins" 3
+navpart 3 collectors/charts.d.plugin "" "BASH Plugins" 3
+navpart 3 collectors/apps.plugin
+navpart 3 collectors/fping.plugin
+navpart 3 collectors/freeipmi.plugin
+
+echo -ne "    - Third Party Plugins:
         - 'doc/Third-Party-Plugins.md'
+- Netdata-Registry:
+    - 'doc/mynetdata-menu-item.md'
 - API-Documentation:
     - 'doc/REST-API-v1.md'
     - 'doc/receiving-netdata-metrics-from-shell-scripts.md'
@@ -151,13 +150,19 @@ echo "- Netdata-Registry:
     - 'doc/Overview.md'
     - 'doc/Custom-Dashboards.md'
     - 'doc/Custom-Dashboard-with-Confluence.md'
-- Chart-Libraries:
-    - 'doc/Dygraph.md'
-    - 'doc/EasyPieChart.md'
-    - 'doc/Gauge.js.md'
-    - 'doc/jQuery-Sparkline.md'
-    - 'doc/Peity.md'
-- Running-behind-another-web-server:
+    - Chart-Libraries:
+        - 'doc/Dygraph.md'
+        - 'doc/EasyPieChart.md'
+        - 'doc/Gauge.js.md'
+        - 'doc/jQuery-Sparkline.md'
+        - 'doc/Peity.md'
+"
+navpart 2 web "" "Web"
+navpart 3 web/gui "" "Web GUI" 4
+navpart 3 web/server "" "Web Server" 4
+navpart 3 web/api "" "Web API" 4
+
+echo -ne "- Running-behind-another-web-server:
     - 'doc/Running-behind-nginx.md'
     - 'doc/Running-behind-apache.md'
     - 'doc/Running-behind-lighttpd.md'

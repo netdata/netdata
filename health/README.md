@@ -1,4 +1,3 @@
-
 # Health monitoring
 
 Each netdata node runs an independent thread evaluating health monitoring checks.
