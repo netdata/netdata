@@ -130,13 +130,17 @@ int check_storage_number(calculated_number n, int debug) {
             p, pdiff, pcdiff
         );
         if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
-        if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, dcdiff);
-        if(pcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, pcdiff);
+
+        if(dcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
+            fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, dcdiff);
+
+        if(pcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT)
+            fprintf(stderr, "WARNING: re-parsing the packed, unpacked and printed number " CALCULATED_NUMBER_FORMAT " has accuracy loss " CALCULATED_NUMBER_FORMAT " %%\n", n, pcdiff);
     }
 
     if(len != strlen(buffer)) return 1;
-    if(dcdiff > ACCURACY_LOSS) return 3;
-    if(pcdiff > ACCURACY_LOSS) return 4;
+    if(dcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT) return 3;
+    if(pcdiff > ACCURACY_LOSS_ACCEPTED_PERCENT) return 4;
     return 0;
 }
 
@@ -158,6 +162,9 @@ void benchmark_storage_number(int loop, int multiplier) {
     calculated_number n, d;
     storage_number s;
     unsigned long long user, system, total, mine, their;
+
+    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    calculated_number storage_number_positive_max = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW);
 
     char buffer[100];
 
@@ -181,11 +188,11 @@ void benchmark_storage_number(int loop, int multiplier) {
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
-    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", storage_number_min(1));
-    fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_POSITIVE_MAX);
-    fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_NEGATIVE_MIN);
-    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", -storage_number_min(1));
-    fprintf(stderr, "Maximum accuracy loss: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS);
+    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW));
+    fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_POSITIVE_MAX_RAW));
+    fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MIN_RAW));
+    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW));
+    fprintf(stderr, "Maximum accuracy loss accepted: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS_ACCEPTED_PERCENT);
 
     // ------------------------------------------------------------------------
 
@@ -194,11 +201,11 @@ void benchmark_storage_number(int loop, int multiplier) {
 
     // do the job
     for(j = 1; j < 11 ;j++) {
-        n = STORAGE_NUMBER_POSITIVE_MIN * j;
+        n = storage_number_positive_min * j;
 
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
-            if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+            if(n > storage_number_positive_max) n = storage_number_positive_min;
 
             print_calculated_number(buffer, n);
         }
@@ -219,11 +226,11 @@ void benchmark_storage_number(int loop, int multiplier) {
 
     // do the job
     for(j = 1; j < 11 ;j++) {
-        n = STORAGE_NUMBER_POSITIVE_MIN * j;
+        n = storage_number_positive_min * j;
 
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
-            if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+            if(n > storage_number_positive_max) n = storage_number_positive_min;
             snprintfz(buffer, 100, CALCULATED_NUMBER_FORMAT, n);
         }
     }
@@ -250,13 +257,13 @@ void benchmark_storage_number(int loop, int multiplier) {
 
     // do the job
     for(j = 1; j < 11 ;j++) {
-        n = STORAGE_NUMBER_POSITIVE_MIN * j;
+        n = storage_number_positive_min * j;
 
         for(i = 0; i < loop ;i++) {
             n *= multiplier;
-            if(n > STORAGE_NUMBER_POSITIVE_MAX) n = STORAGE_NUMBER_POSITIVE_MIN;
+            if(n > storage_number_positive_max) n = storage_number_positive_min;
 
-            s = pack_storage_number(n, 1);
+            s = pack_storage_number(n, SN_EXISTS);
             d = unpack_storage_number(s);
             print_calculated_number(buffer, d);
         }
@@ -282,7 +289,7 @@ void benchmark_storage_number(int loop, int multiplier) {
 }
 
 static int check_storage_number_exists() {
-    uint32_t flags = SN_EXISTS;
+    uint32_t flags;
 
 
     for(flags = 0; flags < 7 ; flags++) {
@@ -309,9 +316,11 @@ static int check_storage_number_exists() {
     return 0;
 }
 
-int unit_test_storage()
-{
+int unit_test_storage() {
     if(check_storage_number_exists()) return 0;
+
+    calculated_number storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
+    calculated_number storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);
 
     calculated_number c, a = 0;
     int i, j, g, r = 0;
@@ -325,14 +334,15 @@ int unit_test_storage()
             a += 0.0000001;
             c = a * g;
             for(i = 0; i < 21 ;i++, c *= 10) {
-                if(c > 0 && c < STORAGE_NUMBER_POSITIVE_MIN) continue;
-                if(c < 0 && c > STORAGE_NUMBER_NEGATIVE_MAX) continue;
+                if(c > 0 && c < storage_number_positive_min) continue;
+                if(c < 0 && c > storage_number_negative_max) continue;
 
                 if(check_storage_number(c, 1)) return 1;
             }
         }
     }
 
+    // if(check_storage_number(858993459.1234567, 1)) return 1;
     benchmark_storage_number(1000000, 2);
     return r;
 }
@@ -575,28 +585,36 @@ struct test test4 = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
-// test5
+// test5 - 32 bit overflows
 
 struct feed_values test5_feed[] = {
-        { 500000, 1000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
-        { 1000000, 3000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
-        { 1000000, 2000 },
+        { 0,       0x00000000FFFFFFFFULL / 3 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
+        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
 };
 
 calculated_number test5_results[] = {
-        1000, 500, 0, 500, 500, 0, 0, 0, 0
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 3,
 };
 
 struct test test5 = {
         "test5",            // name
-        "test incremental values ups and downs",
+        "test 32-bit incremental values overflow",
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
@@ -605,6 +623,135 @@ struct test test5 = {
         9,                  // result entries
         test5_feed,         // feed
         test5_results,      // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test5b - 16 bit overflows
+
+struct feed_values test5b_feed[] = {
+        { 0,       0x000000000000FFFFULL / 3 * 0 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
+        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
+};
+
+calculated_number test5b_results[] = {
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+        0x000000000000FFFFULL / 3,
+};
+
+struct test test5b = {
+        "test5b",            // name
+        "test 16-bit incremental values overflow",
+        1,                  // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        9,                  // result entries
+        test5b_feed,        // feed
+        test5b_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test5c - 8 bit overflows
+
+struct feed_values test5c_feed[] = {
+        { 0,       0x00000000000000FFULL / 3 * 0 },
+        { 1000000, 0x00000000000000FFULL / 3 * 1 },
+        { 1000000, 0x00000000000000FFULL / 3 * 2 },
+        { 1000000, 0x00000000000000FFULL / 3 * 0 },
+        { 1000000, 0x00000000000000FFULL / 3 * 1 },
+        { 1000000, 0x00000000000000FFULL / 3 * 2 },
+        { 1000000, 0x00000000000000FFULL / 3 * 0 },
+        { 1000000, 0x00000000000000FFULL / 3 * 1 },
+        { 1000000, 0x00000000000000FFULL / 3 * 2 },
+        { 1000000, 0x00000000000000FFULL / 3 * 0 },
+};
+
+calculated_number test5c_results[] = {
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+        0x00000000000000FFULL / 3,
+};
+
+struct test test5c = {
+        "test5c",            // name
+        "test 8-bit incremental values overflow",
+        1,                  // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        9,                  // result entries
+        test5c_feed,        // feed
+        test5c_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
+// test5d - 64 bit overflows
+
+struct feed_values test5d_feed[] = {
+        { 0,       0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+};
+
+calculated_number test5d_results[] = {
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+};
+
+struct test test5d = {
+        "test5d",            // name
+        "test 64-bit incremental values overflow",
+        1,                  // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        9,                  // result entries
+        test5d_feed,        // feed
+        test5d_results,     // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -1131,7 +1278,7 @@ int run_test(struct test *test)
     unsigned long max = (st->counter < test->result_entries)?st->counter:test->result_entries;
     for(c = 0 ; c < max ; c++) {
         calculated_number v = unpack_storage_number(rd->values[c]);
-        calculated_number n = test->results[c];
+        calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_EXISTS));
         int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
             test->name, rd->name, c+1,
@@ -1265,6 +1412,15 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(run_test(&test5))
+        return 1;
+
+    if(run_test(&test5b))
+        return 1;
+
+    if(run_test(&test5c))
+        return 1;
+
+    if(run_test(&test5d))
         return 1;
 
     if(run_test(&test6))

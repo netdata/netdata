@@ -1080,7 +1080,7 @@ static inline size_t rrdset_done_interpolate(
                       , get_storage_number_flags(rd->values[current_entry])
                       , t1
                       , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
                 );
 
                 rd->collected_volume += t1;
@@ -1093,7 +1093,7 @@ static inline size_t rrdset_done_interpolate(
                       , rd->stored_volume
                       , rd->collected_volume
                       , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
                 );
             }
             #endif
@@ -1381,13 +1381,29 @@ void rrdset_done(RRDSET *st) {
                     if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         storage_flags = SN_EXISTS_RESET;
 
-                    rd->last_collected_value = rd->collected_value;
-                }
+                    uint64_t last = (uint64_t)rd->last_collected_value;
+                    uint64_t new = (uint64_t)rd->collected_value;
+                    uint64_t max = (uint64_t)rd->collected_value_max;
+                    uint64_t cap = 0;
 
-                rd->calculated_value +=
-                        (calculated_number)(rd->collected_value - rd->last_collected_value)
-                        * (calculated_number)rd->multiplier
-                        / (calculated_number)rd->divisor;
+                         if(max > 0x00000000FFFFFFFFULL) cap = 0xFFFFFFFFFFFFFFFFULL;
+                    else if(max > 0x000000000000FFFFULL) cap = 0x00000000FFFFFFFFULL;
+                    else if(max > 0x00000000000000FFULL) cap = 0x000000000000FFFFULL;
+                    else                                 cap = 0x00000000000000FFULL;
+
+                    uint64_t delta = cap - last + new;
+
+                    rd->calculated_value +=
+                            (calculated_number) delta
+                            * (calculated_number) rd->multiplier
+                            / (calculated_number) rd->divisor;
+                }
+                else {
+                    rd->calculated_value +=
+                            (calculated_number) (rd->collected_value - rd->last_collected_value)
+                            * (calculated_number) rd->multiplier
+                            / (calculated_number) rd->divisor;
+                }
 
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: CALC INC PRE "

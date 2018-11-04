@@ -176,7 +176,9 @@ struct rrddim {
     char *cache_filename;                           // the filename we load/save from/to this set
 
     size_t collections_counter;                     // the number of times we added values to this rrdim
-    size_t unused[10];
+    size_t unused[9];
+
+    collected_number collected_value_max;           // the absolute maximum of the collected value
 
     unsigned int updated:1;                         // 1 when the dimension has been updated since the last processing
     unsigned int exposed:1;                         // 1 when set what have sent this dimension to the central netdata

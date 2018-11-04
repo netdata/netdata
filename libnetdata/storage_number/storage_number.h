@@ -23,7 +23,7 @@ typedef double calculated_number;
 #define LONG_DOUBLE_MODIFIER "f"
 typedef double LONG_DOUBLE;
 
-#else
+#else // NETDATA_WITHOUT_LONG_DOUBLE
 
 typedef long double calculated_number;
 #define CALCULATED_NUMBER_FORMAT "%0.7Lf"
@@ -33,7 +33,7 @@ typedef long double calculated_number;
 #define LONG_DOUBLE_MODIFIER "Lf"
 typedef long double LONG_DOUBLE;
 
-#endif
+#endif // NETDATA_WITHOUT_LONG_DOUBLE
 
 //typedef long long calculated_number;
 //#define CALCULATED_NUMBER_FORMAT "%lld"
@@ -50,6 +50,7 @@ typedef long double collected_number;
 #define calculated_number_llrint(x) llrintl(x)
 #define calculated_number_round(x) roundl(x)
 #define calculated_number_fabs(x) fabsl(x)
+#define calculated_number_pow(x, y) powl(x, y)
 #define calculated_number_epsilon (calculated_number)0.0000001
 
 #define calculated_number_equal(a, b) (calculated_number_fabs((a) - (b)) < calculated_number_epsilon)
@@ -57,18 +58,12 @@ typedef long double collected_number;
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
-#define SN_NOT_EXISTS       (0x0 << 24)
-#define SN_EXISTS           (0x1 << 24)
-#define SN_EXISTS_RESET     (0x2 << 24)
-#define SN_EXISTS_UNDEF1    (0x3 << 24)
-#define SN_EXISTS_UNDEF2    (0x4 << 24)
-#define SN_EXISTS_UNDEF3    (0x5 << 24)
-#define SN_EXISTS_UNDEF4    (0x6 << 24)
-
-#define SN_FLAGS_MASK       (~(0x6 << 24))
+#define SN_EXISTS           (1 << 24) // the value exists
+#define SN_EXISTS_RESET     (1 << 25) // the value has been overflown
+#define SN_EXISTS_100       (1 << 26) // very large value (multipler is 100 instead of 10)
 
 // extract the flags
-#define get_storage_number_flags(value) ((((storage_number)(value)) & (1 << 24)) | (((storage_number)(value)) & (2 << 24)) | (((storage_number)(value)) & (4 << 24)))
+#define get_storage_number_flags(value) ((((storage_number)(value)) & (1 << 24)) | (((storage_number)(value)) & (1 << 25)) | (((storage_number)(value)) & (1 << 26)))
 #define SN_EMPTY_SLOT 0x00000000
 
 // checks
@@ -80,13 +75,14 @@ calculated_number unpack_storage_number(storage_number value);
 
 int print_calculated_number(char *str, calculated_number value);
 
-#define STORAGE_NUMBER_POSITIVE_MAX (167772150000000.0)
-#define STORAGE_NUMBER_POSITIVE_MIN (0.0000001)
-#define STORAGE_NUMBER_NEGATIVE_MAX (-0.0000001)
-#define STORAGE_NUMBER_NEGATIVE_MIN (-167772150000000.0)
+//                                          sign       div/mul    <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
+#define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
+#define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MAX_RAW (storage_number)( (1 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MIN_RAW (storage_number)( (1 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1<<27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
 
 // accepted accuracy loss
-#define ACCURACY_LOSS 0.0001
+#define ACCURACY_LOSS_ACCEPTED_PERCENT 0.0001
 #define accuracy_loss(t1, t2) (((t1) == (t2) || (t1) == 0.0 || (t2) == 0.0) ? 0.0 : (100.0 - (((t1) > (t2)) ? ((t2) * 100.0 / (t1) ) : ((t1) * 100.0 / (t2)))))
 
 #endif /* NETDATA_STORAGE_NUMBER_H */
