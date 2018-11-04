@@ -81,11 +81,11 @@ echo -ne "    - 'doc/Why-netdata.md'
     - Installation:
         - 'installer/README.md'
         - 'installer/DOCKER.md'
-        - 'installer/LAUNCH.md'
         - 'installer/UNINSTALL.md'
         - 'installer/UPDATE.md'
         - 'installer/MAINTAINERS.md'
-    "
+	- 'installer/LAUNCH.md'
+"
 
 # Configuration
 navpart 2 system
