@@ -26,17 +26,17 @@ Currently netdata supports 5 memory modes:
 
 1. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and
    supports [KSM](#ksm).
-   
+
 2. `save`, (the default) data are only in RAM while netdata runs and are saved to / loaded from
    disk on netdata restart. It also uses `mmap()` and supports [KSM](#ksm).
-   
+
 3. `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this
    will have a constant write on your disk. When netdata writes data on its memory, the Linux kernel
    marks the related memory pages as dirty and automatically starts updating them on disk.
    Unfortunately we cannot control how frequently this works. The Linux kernel uses exactly the
    same algorithm it uses for its swap memory. Check below for additional information on running a
    dedicated central netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
-   
+
 4. `none`, without a database (collected metrics can only be streamed to another netdata).
 
 5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the

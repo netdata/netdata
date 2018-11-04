@@ -1,4 +1,3 @@
-
 # Health monitoring
 
 Each netdata node runs an independent thread evaluating health monitoring checks.
@@ -40,16 +39,16 @@ killall -USR2 netdata
 
 There are 2 entities:
 
-1. **alarms**, which are attached to specific charts, and 
+1. **alarms**, which are attached to specific charts, and
 
-2. **templates**, which define rules that should be applied to all charts having a
+1. **templates**, which define rules that should be applied to all charts having a
    specific `context`. You can use this feature to apply **alarms** to all disks,
    all network interfaces, all mysql databases, all nginx web servers, etc.
 
 Both of these entities have exactly the same format and feature set.
 The only difference is the label `alarm` or `template`.
 
-netdata supports overriding **templates** with **alarms**.
+Netdata supports overriding **templates** with **alarms**.
 For example, when a template is defined for a set of charts, an alarm with exactly the
 same name attached to the same chart the template matches, will have higher precedence
 (i.e. netdata will use the alarm on this chart and prevent the template from being applied
@@ -59,7 +58,7 @@ to it).
 
 The following lines are parsed.
 
-#### alarm line `alarm` or `template`
+#### Alarm line `alarm` or `template`
 
 This line starts an alarm or alarm template.
 
@@ -78,7 +77,7 @@ This line has to be first on each alarm or template.
 
 ---
 
-#### alarm line `on`
+#### Alarm line `on`
 
 This line defines the data the alarm should be attached to.
 
@@ -112,7 +111,7 @@ So, `plugin = proc`, `module = /proc/net/dev` and `context = net.net`.
 
 ---
 
-#### alarm line `os`
+#### Alarm line `os`
 
 This alarm or template will be used only if the O/S of the host loading it, matches this
 pattern list. The value is a space separated list of simple patterns (use `*` as wildcard,
@@ -124,7 +123,7 @@ os: linux freebsd macos
 
 ---
 
-#### alarm line `hosts`
+#### Alarm line `hosts`
 
 This alarm or template will be used only if the hostname of the host loading it, matches
 this pattern list. The value is a space separated list of simple patterns (use `*` as wildcard,
@@ -141,7 +140,7 @@ This is useful when you centralize metrics from multiple hosts, to one netdata.
 
 ---
 
-#### alarm line `families`
+#### Alarm line `families`
 
 This line is only used in alarm templates. It filters the charts. So, if you need to create
 an alarm template for a few of a kind of chart (a few of your disks, or a few of your network
@@ -165,7 +164,7 @@ The family of a chart is usually the submenu of the netdata dashboard it appears
 
 ---
 
-#### alarm line `lookup`
+#### Alarm line `lookup`
 
 This lines makes a database lookup to find a value. This result of this lookup is available as `$this`.
 
@@ -205,7 +204,7 @@ The timestamps of the timeframe evaluated by the database lookup is available as
 
 ---
 
-#### alarm line `calc`
+#### Alarm line `calc`
 
 This expression is evaluated just after the `lookup` (if any). Its purpose is to apply some
 calculation before using the value looked up from the db.
@@ -225,7 +224,7 @@ Check [Expressions](#expressions) for more information.
 
 ---
 
-#### alarm line `every`
+#### Alarm line `every`
 
 Sets the update frequency of this alarm.  This is the same to the `every DURATION` given
 in the `lookup` lines.
@@ -240,7 +239,7 @@ every: DURATION
 
 ---
 
-#### alarm lines `green` and `red`
+#### Alarm lines `green` and `red`
 
 Set the green and red thresholds of a chart. Both are available as `$green` and `$red` in
 expressions. If multiple alarms define different thresholds, the ones defined by the first
@@ -257,7 +256,7 @@ red: NUMBER
 
 ---
 
-#### alarm lines `warn` and `crit`
+#### Alarm lines `warn` and `crit`
 
 These expressions should evaluate to true or false (alternatively non-zero or zero).
 They trigger the alarm. Both are optional.
@@ -272,7 +271,7 @@ Check [Expressions](#expressions) for more information.
 
 ---
 
-#### alarm line `to`
+#### Alarm line `to`
 
 This will be the first parameter of the script to be executed when the alarm switches status.
 Its meaning is left up to the `exec` script.
@@ -288,7 +287,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 
 ---
 
-#### alarm line `exec`
+#### Alarm line `exec`
 
 The script that will be executed when the alarm changes status.
 
@@ -303,7 +302,7 @@ methods netdata supports, including custom hooks.
 
 ---
 
-#### alarm line `delay`
+#### Alarm line `delay`
 
 This is used to provide optional hysteresis settings for the notifications, to defend
 against notification floods. These settings do not affect the actual alarm - only the time
@@ -374,13 +373,9 @@ Expressions can have variables. Variables start with `$`. Check below for more i
 
 There are two special values you can use:
 
-  - `nan`, for example `$this != nan` will check if the variable `this` is available.
-     A variable can be `nan` if the database lookup failed. All calculations (i.e. addition,
-     multiplication, etc) with a `nan` result in a `nan`.
+- `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
 
-  - `inf`, for example `$this != inf` will check if `this` is not infinite. A value or
-     variable can be infinite if divided by zero. All calculations (i.e. addition,
-     multiplication, etc) with a `inf` result in a `inf`.
+- `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be infinite if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
 
 ---
 
@@ -412,10 +407,10 @@ Which in turn, results in the following behavior:
   
 * While the value is falling, it will return to a warning state when it goes below 85,
    and a normal state when it goes below 75.
-   
+
 * If the value is constantly varying between 80 and 90, then it will trigger a warning the
    first time it goes above 85, but will remain a warning until it goes below 75 (or goes above 85).
-   
+
 * If the value is constantly varying between 90 and 100, then it will trigger a critical alert
    the first time it goes above 95, but will remain a critical alert goes below 85 (at which
    point it will return to being a warning).
@@ -653,5 +648,4 @@ You can find the context of charts by looking up the chart in either
 You can find how netdata interpreted the expressions by examining the alarm at
 `http://your.netdata:19999/api/v1/alarms?all`. For each expression, netdata will return the
 expression as given in its config file, and the same expression with additional parentheses
-added to indicate the evaluation flow of the expression. 
-
+added to indicate the evaluation flow of the expression.
