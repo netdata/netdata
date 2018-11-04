@@ -1209,13 +1209,16 @@ update() {
 
         if [ \$pulled -eq 0 ]
         then
-            error "git pull failed, trying a full repo sync..."
+            error "FAILED TO PULL REPO FROM GITHUB... trying full re-sync..."
 
-            # make sure we have the latest info
-            git fetch --all  >&3 2>&3 || failed "FAILED TO FETCH THE LATEST SOURCE FROM GITHUB"
+            info "fetching latest repo data from github..."
+            git fetch --all >&3 2>&3 || failed "FAILED TO FETCH THE LATEST SOURCE FROM GITHUB"
 
-            # reset the local clone to match the origin
-            git reset --hard  >&3 2>&3 || failed "CANNOT GET THE LATEST SOURCE FROM GITHUB"
+            info "checking out master branch..."
+            git checkout master >&3 2>&3 || error "FAILED TO CHECKOUT master BRANCH"
+
+            info "resetting local master to origin/master..."
+            git reset --hard origin/master >&3 2>&3 || failed "FAILED TO RESET LOCAL master TO origin/master"
             pulled=1
         fi
 
