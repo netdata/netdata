@@ -1,4 +1,4 @@
-# netdata database
+# Netdata database
 
 Although `netdata` does all its calculations using `long double`, it stores all values using
 a [custom-made 32-bit number](../libnetdata/storage_number/).
@@ -73,9 +73,9 @@ by netdata. Of course experiment a bit. On very weak devices you might have to u
 You can also disable [data collection plugins](../collectors) you don't need.
 Disabling such plugins will also free both CPU and RAM resources.
 
-## running a dedicated central netdata server
+## Running a dedicated central netdata server
 
-netdata allows streaming data between netdata nodes. This allows us to have a central netdata
+Netdata allows streaming data between netdata nodes. This allows us to have a central netdata
 server that will maintain the entire database for all nodes, and will also run health checks/alarms
 for all nodes.
 
@@ -166,7 +166,7 @@ netdata, each byte at the in-memory database will be updated just once per day).
 
 KSM is a solution that will provide 60+% memory savings to netdata.
 
-#### Enable KSM in kernel
+### Enable KSM in kernel
 
 You need to run a kernel compiled with:
 
@@ -186,7 +186,7 @@ The files that `CONFIG_KSM=y` offers include:
 
 So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
 
-#### Run `ksmd` kernel daemon
+### Run `ksmd` kernel daemon
 
 To activate / run `ksmd` you need to run:
 
