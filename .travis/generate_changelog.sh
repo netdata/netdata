@@ -32,5 +32,5 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 
 echo "--- Uploading changelog ---"
 git add CHANGELOG.md
-git commit -m '[ci skip] Automatic changelog update'
+git commit -m '[ci skip] Automatic changelog update' || exit 0
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
