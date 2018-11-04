@@ -81,41 +81,33 @@ echo -ne "    - 'doc/Why-netdata.md'
     - Installation:
         - 'installer/README.md'
         - 'installer/DOCKER.md'
-        - 'installer/UNINSTALL.md'
         - 'installer/UPDATE.md'
+        - 'installer/UNINSTALL.md'
         - 'installer/MAINTAINERS.md'
-	- 'installer/LAUNCH.md'
+    - 'installer/LAUNCH.md'
 "
-
+echo -ne "- Using NetData:
+"
 # Configuration
 navpart 2 system
-
 navpart 2 registry
 navpart 2 streaming "" "" 4
 navpart 2 backends "" "Backends" 3
+navpart 2 daemon
+navpart 2 database
 
-echo -ne "- Using NetData:
-    - 'doc/Getting-Started.md'
-    - 'doc/Command-Line-Options.md'
-    - 'doc/Log-Files.md'
-    - 'doc/Tracing-Options.md'
-    - 'doc/Performance.md'
+echo -ne "    - 'doc/Performance.md'
     - 'doc/netdata-for-IoT.md'
-    - 'doc/Memory-Requirements.md'
+    - 'doc/high-performance-netdata.md'
     - 'doc/netdata-security.md'
     - 'doc/Netdata-Security-and-Disclosure-Information.md'
-    - 'doc/netdata-OOMScore.md'
-    - 'doc/netdata-process-priority.md'
-    - 'doc/high-performance-netdata.md'
-    - 'doc/Memory-Deduplication---Kernel-Same-Page-Merging---KSM.md'
-    - 'doc/netdata-virtual-memory-size.md'
 "
 
-navpart 1 health README "Health Monitoring"
-navpart 2 health/notifications "" "" 1
-navpart 2 health/notifications "" "Supported Notifications" 2 excludefirstlevel
-navpart 2 doc "health-API-calls"
-navpart 2 doc "troubleshooting-alarms"
+navpart 2 health README "Health Monitoring"
+navpart 3 health/notifications "" "" 1
+navpart 3 health/notifications "" "Supported Notifications" 2 excludefirstlevel
+navpart 3 doc "health-API-calls"
+navpart 3 doc "troubleshooting-alarms"
 
 navpart 1 collectors "" "Data Collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
