@@ -76,14 +76,23 @@ nav:'
 
 navpart 1 . README "Getting Started"
 
-echo -ne "    - 'doc/Introducing-netdata.md'
-    - 'doc/Why-netdata.md'
-    - 'doc/Performance-monitoring,-scaled-properly.md'
-    - 'doc/netdata-for-IoT.md'
+echo -ne "    - 'doc/Why-netdata.md'
     - 'doc/Demo-Sites.md'
-"
+    - Installation:
+        - 'installer/README.md'
+        - 'installer/DOCKER.md'
+        - 'installer/LAUNCH.md'
+        - 'installer/UNINSTALL.md'
+        - 'installer/UPDATE.md'
+        - 'installer/MAINTAINERS.md'
+    "
 
-navpart 1 installer '*' "Installation"
+# Configuration
+navpart 2 system
+
+navpart 2 registry
+navpart 2 streaming "" "" 4
+navpart 2 backends "" "Backends" 3
 
 echo -ne "- Using NetData:
     - 'doc/Getting-Started.md'
@@ -91,24 +100,16 @@ echo -ne "- Using NetData:
     - 'doc/Log-Files.md'
     - 'doc/Tracing-Options.md'
     - 'doc/Performance.md'
+    - 'doc/netdata-for-IoT.md'
     - 'doc/Memory-Requirements.md'
     - 'doc/netdata-security.md'
     - 'doc/Netdata-Security-and-Disclosure-Information.md'
     - 'doc/netdata-OOMScore.md'
     - 'doc/netdata-process-priority.md'
-- Configuration:
-    - 'doc/Configuration.md'
-- Optimization:
     - 'doc/high-performance-netdata.md'
     - 'doc/Memory-Deduplication---Kernel-Same-Page-Merging---KSM.md'
     - 'doc/netdata-virtual-memory-size.md'
-- Database-Replication-and-Mirroring:
-    - 'doc/Replication-Overview.md'
-    - 'doc/Monitoring-ephemeral-nodes.md'
-    - 'doc/netdata-proxies.md'
 "
-
-navpart 1 backends "" "Backends" 3
 
 navpart 1 health README "Health Monitoring"
 navpart 2 health/notifications "" "" 1
@@ -141,11 +142,6 @@ navpart 3 collectors/freeipmi.plugin
 
 echo -ne "    - Third Party Plugins:
         - 'doc/Third-Party-Plugins.md'
-- Netdata-Registry:
-    - 'doc/mynetdata-menu-item.md'
-- API-Documentation:
-    - 'doc/REST-API-v1.md'
-    - 'doc/receiving-netdata-metrics-from-shell-scripts.md'
 - Web-Dashboards:
     - 'doc/Overview.md'
     - 'doc/Custom-Dashboards.md'
@@ -174,3 +170,8 @@ echo -ne "- Running-behind-another-web-server:
     - 'doc/CPU-Usage.md'
     - 'doc/DDOS.md'
 "
+echo -ne "- Hacking netdata:
+"
+navpart 2 makeself "" "" 4
+navpart 2 packaging "" "" 4
+navpart 2 libnetdata "" "libnetdata" 4
