@@ -1383,7 +1383,7 @@ void rrdset_done(RRDSET *st) {
 
                     uint64_t last = (uint64_t)rd->last_collected_value;
                     uint64_t new = (uint64_t)rd->collected_value;
-                    uint64_t max = (new > last) ? new : last;
+                    uint64_t max = (uint64_t)rd->collected_value_max;
                     uint64_t cap = 0;
 
                          if(max > 0x00000000FFFFFFFFULL) cap = 0xFFFFFFFFFFFFFFFFULL;
