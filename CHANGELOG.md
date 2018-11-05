@@ -14,6 +14,7 @@
 - after release cleanup [\#4552](https://github.com/netdata/netdata/pull/4552) ([paulfantom](https://github.com/paulfantom))
 - edit-config: Better support for custom editors. [\#4551](https://github.com/netdata/netdata/pull/4551) ([Ferroin](https://github.com/Ferroin))
 - Minor README file updates [\#4548](https://github.com/netdata/netdata/pull/4548) ([gmosx](https://github.com/gmosx))
+- add tor python module [\#4546](https://github.com/netdata/netdata/pull/4546) ([l2isbad](https://github.com/l2isbad))
 - incremental overflows should not show zeros values [\#4538](https://github.com/netdata/netdata/pull/4538) ([ktsaou](https://github.com/ktsaou))
 - Switch e-mail threading to be enabled by default. [\#3780](https://github.com/netdata/netdata/pull/3780) ([Ferroin](https://github.com/Ferroin))
 
