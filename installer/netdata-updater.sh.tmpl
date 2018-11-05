@@ -11,10 +11,9 @@ export NETDATA_CONFIGURE_OPTIONS="{{NETDATA_CONFIGURE_OPTIONS}}"
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
 INSTALL_UID="${UID}"
-if [ "${INSTALL_UID}" != "\${UID}" ]
-    then
-    echo >&2 "This script should be run as user with uid ${INSTALL_UID} but it now runs with uid ${UID}"
-    exit 1
+if [ "${INSTALL_UID}" != '${UID}' ]; then
+	echo >&2 "This script should be run as user with uid ${INSTALL_UID} but it now runs with uid ${UID}"
+	exit 1
 fi
 
 # make sure we cd to the working directory
@@ -27,50 +26,47 @@ cd "{{REINSTALL_PWD}}" || exit 1
 # this is handy if your database is big
 pids=$(pidof netdata)
 do_not_start=
-if [ ! -z "${pids}" ]
-    then
-    kill -USR1 ${pids}
+if [ ! -z "${pids}" ]; then
+	kill -USR1 ${pids}
 else
-    # netdata is currently not running, so do not start it after updating
-    do_not_start="--dont-start-it"
+	# netdata is currently not running, so do not start it after updating
+	do_not_start="--dont-start-it"
 fi
 
 tmp=
-if [ -t 2 ]
-    then
-    # we are running on a terminal
-    # open fd 3 and send it to stderr
-    exec 3>&2
+if [ -t 2 ]; then
+	# we are running on a terminal
+	# open fd 3 and send it to stderr
+	exec 3>&2
 else
-    # we are headless
-    # create a temporary file for the log
-    tmp=$(mktemp /tmp/netdata-updater.log.XXXXXX)
-    # open fd 3 and send it to tmp
-    exec 3>${tmp}
+	# we are headless
+	# create a temporary file for the log
+	tmp=$(mktemp /tmp/netdata-updater.log.XXXXXX)
+	# open fd 3 and send it to tmp
+	exec 3>${tmp}
 fi
 
 info() {
-    echo >&3 "$(date) : INFO: " "${@}"
+	echo >&3 "$(date) : INFO: " "${@}"
 }
 
 emptyline() {
-    echo >&3
+	echo >&3
 }
 
 error() {
-    echo >&3 "$(date) : ERROR: " "${@}"
+	echo >&3 "$(date) : ERROR: " "${@}"
 }
 
 # this is what we will do if it fails (head-less only)
 failed() {
-    error "FAILED TO UPDATE NETDATA : ${1}"
+	error "FAILED TO UPDATE NETDATA : ${1}"
 
-    if [ ! -z "${tmp}" ]
-    then
-        cat >&2 "${tmp}"
-        rm "${tmp}"
-    fi
-    exit 1
+	if [ ! -z "${tmp}" ]; then
+		cat >&2 "${tmp}"
+		rm "${tmp}"
+	fi
+	exit 1
 }
 
 get_latest_commit_id() {
@@ -78,41 +74,38 @@ get_latest_commit_id() {
 }
 
 update() {
-    [ -z "${tmp}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
+	[ -z "${tmp}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-    emptyline
+	emptyline
 
-    if [ -d .git ]
-        then
-        info "Updating netdata source from github..."
+	if [ -d .git ]; then
+		info "Updating netdata source from github..."
 
-        last_commit="$(get_latest_commit_id)"
-        [ ${force} -eq 0 -a -z "\${last_commit}" ] && failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
+		last_commit="$(get_latest_commit_id)"
+		[ ${force} -eq 0 -a -z '${last_commit}' ] && failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
 
-        info "Stashing local git changes. You can use `git stash pop` to reapply your changes."
-        git stash >&3
-        git fetch --all >&3
-        git fetch --tags >&3
-        git checkout origin/master >&3
-        git reset --hard origin/master >&3
+		info "Stashing local git changes. You can use $(git stash pop) to reapply your changes."
+		git stash >&3
+		git fetch --all >&3
+		git fetch --tags >&3
+		git checkout origin/master >&3
+		git reset --hard origin/master >&3
 
-        new_commit="$(get_latest_commit_id)"
-        if [ ${force} -eq 0 ]
-            then
-            [ -z "${new_commit}" ] && failed "CANNOT GET NEW LAST COMMIT ID (use -f for force re-install)"
-            [ "${new_commit}" = "${last_commit}" ] && info "Nothing to be done! (use -f to force re-install)" && exit 0
-        fi
-    elif [ ${force} -eq 0 ]
-        then
-        failed "CANNOT FIND GIT STRUCTURES IN $(pwd) (use -f for force re-install)"
-    fi
+		new_commit="$(get_latest_commit_id)"
+		if [ ${force} -eq 0 ]; then
+			[ -z "${new_commit}" ] && failed "CANNOT GET NEW LAST COMMIT ID (use -f for force re-install)"
+			[ "${new_commit}" = "${last_commit}" ] && info "Nothing to be done! (use -f to force re-install)" && exit 0
+		fi
+	elif [ ${force} -eq 0 ]; then
+		failed "CANNOT FIND GIT STRUCTURES IN $(pwd) (use -f for force re-install)"
+	fi
 
-    emptyline
-    info "Re-installing netdata..."
-    {{REINSTALL_COMMAND}} --dont-wait ${do_not_start} >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+	emptyline
+	info "Re-installing netdata..."
+	{{REINSTALL_COMMAND}} --dont-wait ${do_not_start} >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
 
-    [ ! -z "${tmp}" ] && rm "${tmp}" && tmp=
-    return 0
+	[ ! -z "${tmp}" ] && rm "${tmp}" && tmp=
+	return 0
 }
 
 # the installer updates this script - so we run and exit in a single line
