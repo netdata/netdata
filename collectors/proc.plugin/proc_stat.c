@@ -8,13 +8,14 @@ struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
     int fd;
+    procfile *ff;
     collected_number value;
     RRDDIM *rd;
 };
 
 #define CORE_THROTTLE_COUNT_INDEX    0
 #define PACKAGE_THROTTLE_COUNT_INDEX 1
-#define SCALING_CUR_FREQ_INDEX       2
+#define CPU_FREQ_INDEX               2
 #define PER_CORE_FILES               3
 
 struct cpu_chart {
@@ -101,6 +102,77 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
     return (int)files_nonzero;
 }
 
+static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, size_t len, size_t index) {
+    size_t x, files_read = 0, files_nonzero = 0;
+
+    for(x = 0; x < len ; x++) {
+        struct per_core_single_number_file *f = &all_cpu_charts[x].files[index];
+        unsigned long long value = 0;
+
+        f->found = 0;
+
+        if(unlikely(!f->filename))
+            continue;
+
+        if(unlikely(!f->ff)) {
+            f->ff = procfile_open(f->filename, " \t:", PROCFILE_FLAG_DEFAULT);
+            if(unlikely(!f->ff))
+            {
+                error("Cannot open file '%s'", f->filename);
+                continue;
+            }
+        }
+
+        f->ff = procfile_readall(f->ff);
+        if(unlikely(!f->ff)) {
+            error("Cannot read file '%s'", f->filename);
+            procfile_close(f->ff);
+            f->ff = NULL;
+            continue;
+        }
+        else {
+            // successful read
+
+            size_t lines = procfile_lines(f->ff), l;
+            size_t words;
+
+            for(l = 0; l < lines ;l++) {
+                unsigned long long frequency = 0, ticks = 0;
+
+                words = procfile_linewords(f->ff, l);
+                if(unlikely(words < 2)) {
+                    error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
+                    continue;
+                }
+                frequency = str2ull(procfile_lineword(f->ff, l, 0));
+                ticks     = str2ull(procfile_lineword(f->ff, l, 1));
+
+                //TODO: add last value, calculate value
+            }
+
+            if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+                procfile_close(f->ff);
+                f->ff = NULL;
+            }
+        }
+
+        files_read++;
+        f->found = 1;
+
+        f->value = value;
+        if(likely(f->value != 0))
+            files_nonzero++;
+    }
+
+    if(files_read == 0)
+        return -1;
+
+    if(files_nonzero == 0)
+        return 0;
+
+    return (int)files_nonzero;
+}
+
 static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, size_t index, RRDSET *st, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm) {
     size_t x;
     for(x = 0; x < len ; x++) {
@@ -122,10 +194,11 @@ int do_proc_stat(int update_every, usec_t dt) {
     static struct cpu_chart *all_cpu_charts = NULL;
     static size_t all_cpu_charts_size = 0;
     static procfile *ff = NULL;
-    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, do_core_throttle_count = -1, do_package_throttle_count = -1, do_scaling_cur_freq = -1;
+    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
-    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL;
+    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, *time_in_state_filename = NULL;
     static RRDVAR *cpus_var = NULL;
+    static accurate_freq = 0;
     size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
@@ -142,20 +215,20 @@ int do_proc_stat(int update_every, usec_t dt) {
             keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
-            do_scaling_cur_freq = CONFIG_BOOLEAN_NO;
+            do_cpu_freq = CONFIG_BOOLEAN_NO;
         }
         else {
             // the system has a reasonable number of processors
             keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
             do_core_throttle_count = CONFIG_BOOLEAN_AUTO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
-            do_scaling_cur_freq = CONFIG_BOOLEAN_NO;
+            do_cpu_freq = CONFIG_BOOLEAN_YES;
         }
 
         keep_per_core_fds_open    = config_get_boolean("plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
         do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
         do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
-        do_scaling_cur_freq       = config_get_boolean_ondemand("plugin:proc:/proc/stat", "scaling_cur_freq", do_scaling_cur_freq);
+        do_cpu_freq               = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
 
         hash_intr = simple_hash("intr");
         hash_ctxt = simple_hash("ctxt");
@@ -172,6 +245,9 @@ int do_proc_stat(int update_every, usec_t dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/scaling_cur_freq");
         scaling_cur_freq_filename = config_get("plugin:proc:/proc/stat", "scaling_cur_freq filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/stats/time_in_state");
+        time_in_state_filename = config_get("plugin:proc:/proc/stat", "time_in_state filename to monitor", filename);
     }
 
     if(unlikely(!ff)) {
@@ -252,9 +328,6 @@ int do_proc_stat(int update_every, usec_t dt) {
                         family = "utilization";
                         priority = NETDATA_CHART_PRIO_CPU_PER_CORE;
 
-                        // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
-                        // TODO: check for /sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state
-
                         char filename[FILENAME_MAX + 1];
                         struct stat stbuf;
 
@@ -276,13 +349,26 @@ int do_proc_stat(int update_every, usec_t dt) {
                             }
                         }
 
-                        if(do_scaling_cur_freq != CONFIG_BOOLEAN_NO) {
-                            snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, id);
+                        if(do_cpu_freq != CONFIG_BOOLEAN_NO) {
+                            snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
+
                             if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->files[SCALING_CUR_FREQ_INDEX].filename = strdupz(filename);
-                                cpu_chart->files[SCALING_CUR_FREQ_INDEX].fd = -1;
-                                do_scaling_cur_freq = CONFIG_BOOLEAN_YES;
+                                cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
+                                cpu_chart->files[CPU_FREQ_INDEX].ff = NULL;
+                                do_cpu_freq = CONFIG_BOOLEAN_YES;
+                                accurate_freq = 1;
                             }
+                            else {
+                                snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, id);
+
+                                if (stat(filename, &stbuf) == 0) {
+                                    cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
+                                    cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
+                                    do_cpu_freq = CONFIG_BOOLEAN_YES;
+                                    accurate_freq = 0;
+                                }
+                            }
+
                         }
                     }
 
@@ -532,10 +618,14 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
 
-        if(likely(do_scaling_cur_freq != CONFIG_BOOLEAN_NO)) {
-            int r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, SCALING_CUR_FREQ_INDEX);
-            if(likely(r != -1 && (do_scaling_cur_freq == CONFIG_BOOLEAN_YES || r > 0))) {
-                do_scaling_cur_freq = CONFIG_BOOLEAN_YES;
+        if(likely(do_cpu_freq != CONFIG_BOOLEAN_NO)) {
+            int r;
+            if (accurate_freq)
+                r = read_per_core_time_in_state_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
+            else
+                r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
+            if(likely(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
+                do_cpu_freq = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_scaling_cur_freq = NULL;
 
@@ -557,7 +647,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 else
                     rrdset_next(st_scaling_cur_freq);
 
-                chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, SCALING_CUR_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rrdset_done(st_scaling_cur_freq);
             }
         }
