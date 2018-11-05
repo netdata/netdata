@@ -95,6 +95,7 @@ include spigotmc/Makefile.inc
 include springboot/Makefile.inc
 include squid/Makefile.inc
 include tomcat/Makefile.inc
+include tor/Makefile.inc
 include traefik/Makefile.inc
 include unbound/Makefile.inc
 include uwsgi/Makefile.inc
