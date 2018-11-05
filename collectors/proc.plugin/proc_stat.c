@@ -8,8 +8,9 @@ struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
     int fd;
-    procfile *ff;
+    procfile *ff; //TODO: Separate structure for time_in_state?
     collected_number value;
+    //TODO: last_ticks for every frequency. Separate structure for time_in_state?
     RRDDIM *rd;
 };
 
@@ -135,9 +136,10 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
             size_t lines = procfile_lines(f->ff), l;
             size_t words;
+            unsigned long long total_tickets_since_last = 0, avg_freq = 0;
 
             for(l = 0; l < lines ;l++) {
-                unsigned long long frequency = 0, ticks = 0;
+                unsigned long long frequency = 0, ticks = 0, ticks_since_last = 0;
 
                 words = procfile_linewords(f->ff, l);
                 if(unlikely(words < 2)) {
@@ -147,8 +149,20 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                 frequency = str2ull(procfile_lineword(f->ff, l, 0));
                 ticks     = str2ull(procfile_lineword(f->ff, l, 1));
 
-                //TODO: add last value, calculate value
+                //TODO: calculate value
+                //ticks_since_last = ticks - map.last_ticks[frequency]
+                //map.last_ticks[frequency] = ticks
+
+                total_tickets_since_last += ticks_since_last;
+                avg_freq += frequency * ticks_since_last;
+
             }
+
+            //TODO: fall back to less accurate reading
+
+            if (total_tickets_since_last)
+                avg_freq /= total_tickets_since_last;
+            f->value = avg_freq;
 
             if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
                 procfile_close(f->ff);
@@ -198,7 +212,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, *time_in_state_filename = NULL;
     static RRDVAR *cpus_var = NULL;
-    static accurate_freq = 0;
+    static accurate_freq = 0; //TODO: fall back to less accurate reading
     size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
