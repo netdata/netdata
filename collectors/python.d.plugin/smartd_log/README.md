@@ -2,29 +2,92 @@
 
 Module monitor `smartd` log files to collect HDD/SSD S.M.A.R.T attributes.
 
-It produces following charts (you can add additional attributes in the module configuration file):
+**Requirements:**
+* `smartmontools`
 
-1. **Read Error Rate** attribute 1
+It produces following charts for SCSI devices:
 
-2. **Start/Stop Count** attribute 4
+1. **Read Error Corrected**
 
-3. **Reallocated Sectors Count** attribute 5
+2. **Read Error Uncorrected**
 
-4. **Seek Error Rate** attribute 7
+3. **Write Error Corrected**
 
-5. **Power-On Hours Count** attribute 9
+4. **Write Error Uncorrected**
 
-6. **Power Cycle Count** attribute 12
+5. **Verify Error Corrected**
 
-7. **Load/Unload Cycles** attribute 193
+6. **Verify Error Uncorrected**
 
-8. **Temperature** attribute 194
+7. **Temperature**
 
-9. **Current Pending Sectors** attribute 197
 
-10. **Off-Line Uncorrectable** attribute 198
+For ATA devices:
+1. **Read Error Rate**
 
-11. **Write Error Rate** attribute 200
+2. **Seek Error Rate**
+
+3. **Soft Read Error Rate**
+
+4. **Write Error Rate**
+
+5. **SATA Interface Downshift**
+
+6. **UDMA CRC Error Count**
+
+7. **Throughput Performance**
+
+8. **Seek Time Performance**
+
+9. **Start/Stop Count**
+
+10. **Power-On Hours Count**
+
+11. **Power Cycle Count**
+
+12. **Unexpected Power Loss**
+
+13. **Spin-Up Time**
+
+14. **Spin-up Retries**
+
+15. **Calibration Retries**
+
+16. **Temperature**
+
+17. **Reallocated Sectors Count**
+
+18. **Reserved Block Count**
+
+19. **Program Fail Count**
+
+20. **Erase Fail Count**
+
+21. **Wear Leveller Worst Case Erase Count**
+
+22. **Unused Reserved NAND Blocks**
+
+23. **Reallocation Event Count**
+
+24. **Current Pending Sector Count**
+
+25. **Offline Uncorrectable Sector Count**
+
+26. **Percent Lifetime Used**
+
+### prerequisite
+`smartd` must be running with `-A` option to write smartd attribute information to files.
+
+For this you need to set `smartd_opts` (or `SMARTD_ARGS`, check _smartd.service_ content) in `/etc/default/smartmontools`:
+
+
+```
+# dump smartd attrs info every 600 seconds
+smartd_opts="-A /var/log/smartd/ -i 600"
+```
+
+
+`smartd` appends logs at every run. It's strongly recommended to use `logrotate` for smartd files.
 
 ### configuration
 
@@ -33,6 +96,6 @@ local:
   log_path : '/var/log/smartd/'
 ```
 
-If no configuration is given, module will attempt to read log files in /var/log/smartd/ directory.
+If no configuration is given, module will attempt to read log files in `/var/log/smartd/` directory.
 
 ---
