@@ -8,6 +8,10 @@
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
 
+**Closed issues:**
+
+- Hdd temperature monitoring on FreeBSD [\#4463](https://github.com/netdata/netdata/issues/4463)
+
 **Merged pull requests:**
 
 - first tag then generate changelog [\#4553](https://github.com/netdata/netdata/pull/4553) ([paulfantom](https://github.com/paulfantom))
@@ -16,6 +20,7 @@
 - Minor README file updates [\#4548](https://github.com/netdata/netdata/pull/4548) ([gmosx](https://github.com/gmosx))
 - add tor python module [\#4546](https://github.com/netdata/netdata/pull/4546) ([l2isbad](https://github.com/l2isbad))
 - incremental overflows should not show zeros values [\#4538](https://github.com/netdata/netdata/pull/4538) ([ktsaou](https://github.com/ktsaou))
+- smartd\_log refactor plus SCSI support [\#4523](https://github.com/netdata/netdata/pull/4523) ([l2isbad](https://github.com/l2isbad))
 - Switch e-mail threading to be enabled by default. [\#3780](https://github.com/netdata/netdata/pull/3780) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.11.0](https://github.com/netdata/netdata/tree/v1.11.0) (2018-11-02)
