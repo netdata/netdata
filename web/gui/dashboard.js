@@ -4934,7 +4934,7 @@ NETDATA.commonColors = {
     }
 };
 
-// ----------------------------------------------------------------------------------------------------------------
+// *** src/dashboard.js/main.js
 
 if (NETDATA.options.debug.main_loop) {
     console.log('welcome to NETDATA');
@@ -9788,6 +9788,7 @@ NETDATA.registry = {
                     }
 
                     if (typeof callback === 'function') {
+                        console.log("***", data.urls);
                         return callback(data.urls);
                     }
                 }
