@@ -217,7 +217,7 @@ class SocketService(SimpleService):
 
             self.debug('received data')
             data += buf.decode('utf-8', 'ignore') if not raw else buf
-            if self._check_raw_data(data):
+            if len(buf) < 4096:
                 break
 
         self.debug('final response: {0}'.format(data))
