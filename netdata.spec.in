@@ -129,6 +129,7 @@ happened, on your systems and applications.
 %setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
 
 %build
+autoreconf -i
 %configure \
 	--with-zlib \
 	--with-math \
