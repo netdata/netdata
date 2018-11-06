@@ -6,182 +6,537 @@
 import os
 import re
 
-from collections import namedtuple
+from copy import deepcopy
 from time import time
 
 from bases.collection import read_last_line
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['1', '4', '5', '7', '9', '12', '193', '194', '197', '198', '200']
 
-SMART_ATTR = {
-    '1': 'Read Error Rate',
-    '2': 'Throughput Performance',
-    '3': 'Spin-Up Time',
-    '4': 'Start/Stop Count',
-    '5': 'Reallocated Sectors Count',
-    '6': 'Read Channel Margin',
-    '7': 'Seek Error Rate',
-    '8': 'Seek Time Performance',
-    '9': 'Power-On Hours Count',
-    '10': 'Spin-up Retries',
-    '11': 'Calibration Retries',
-    '12': 'Power Cycle Count',
-    '13': 'Soft Read Error Rate',
-    '100': 'Erase/Program Cycles',
-    '103': 'Translation Table Rebuild',
-    '108': 'Unknown (108)',
-    '170': 'Reserved Block Count',
-    '171': 'Program Fail Count',
-    '172': 'Erase Fail Count',
-    '173': 'Wear Leveller Worst Case Erase Count',
-    '174': 'Unexpected Power Loss',
-    '175': 'Program Fail Count',
-    '176': 'Erase Fail Count',
-    '177': 'Wear Leveling Count',
-    '178': 'Used Reserved Block Count',
-    '179': 'Used Reserved Block Count',
-    '180': 'Unused Reserved Block Count',
-    '181': 'Program Fail Count',
-    '182': 'Erase Fail Count',
-    '183': 'SATA Downshifts',
-    '184': 'End-to-End error',
-    '185': 'Head Stability',
-    '186': 'Induced Op-Vibration Detection',
-    '187': 'Reported Uncorrectable Errors',
-    '188': 'Command Timeout',
-    '189': 'High Fly Writes',
-    '190': 'Temperature',
-    '191': 'G-Sense Errors',
-    '192': 'Power-Off Retract Cycles',
-    '193': 'Load/Unload Cycles',
-    '194': 'Temperature',
-    '195': 'Hardware ECC Recovered',
-    '196': 'Reallocation Events',
-    '197': 'Current Pending Sectors',
-    '198': 'Off-line Uncorrectable',
-    '199': 'UDMA CRC Error Rate',
-    '200': 'Write Error Rate',
-    '201': 'Soft Read Errors',
-    '202': 'Data Address Mark Errors',
-    '203': 'Run Out Cancel',
-    '204': 'Soft ECC Corrections',
-    '205': 'Thermal Asperity Rate',
-    '206': 'Flying Height',
-    '207': 'Spin High Current',
-    '209': 'Offline Seek Performance',
-    '220': 'Disk Shift',
-    '221': 'G-Sense Error Rate',
-    '222': 'Loaded Hours',
-    '223': 'Load/Unload Retries',
-    '224': 'Load Friction',
-    '225': 'Load/Unload Cycles',
-    '226': 'Load-in Time',
-    '227': 'Torque Amplification Count',
-    '228': 'Power-Off Retracts',
-    '230': 'GMR Head Amplitude',
-    '231': 'Temperature',
-    '232': 'Available Reserved Space',
-    '233': 'Media Wearout Indicator',
-    '240': 'Head Flying Hours',
-    '241': 'Total LBAs Written',
-    '242': 'Total LBAs Read',
-    '250': 'Read Error Retry Rate'
-}
+INCREMENTAL = 'incremental'
+ABSOLUTE = 'absolute'
 
-LIMIT = namedtuple('LIMIT', ['min', 'max'])
+ATA = 'ata'
+SCSI = 'scsi'
+CSV = '.csv'
 
-LIMITS = {
-    '194': LIMIT(0, 200)
-}
+DEF_RESCAN_INTERVAL = 60
+DEF_AGE = 30
+DEF_PATH = '/var/log/smartd'
 
-RESCAN_INTERVAL = 60
+ATTR1 = '1'
+ATTR2 = '2'
+ATTR3 = '3'
+ATTR4 = '4'
+ATTR5 = '5'
+ATTR7 = '7'
+ATTR8 = '8'
+ATTR9 = '9'
+ATTR10 = '10'
+ATTR11 = '11'
+ATTR12 = '12'
+ATTR13 = '13'
+ATTR170 = '170'
+ATTR171 = '171'
+ATTR172 = '172'
+ATTR173 = '173'
+ATTR174 = '174'
+ATTR180 = '180'
+ATTR183 = '183'
+ATTR190 = '190'
+ATTR194 = '194'
+ATTR196 = '196'
+ATTR197 = '197'
+ATTR198 = '198'
+ATTR199 = '199'
+ATTR202 = '202'
+ATTR206 = '206'
+ATTR_READ_ERR_COR = 'read-total-err-corrected'
+ATTR_READ_ERR_UNC = 'read-total-unc-errors'
+ATTR_WRITE_ERR_COR = 'write-total-err-corrected'
+ATTR_WRITE_ERR_UNC = 'write-total-unc-errors'
+ATTR_VERIFY_ERR_COR = 'verify-total-err-corrected'
+ATTR_VERIFY_ERR_UNC = 'verify-total-unc-errors'
+ATTR_TEMPERATURE = 'temperature'
 
-REGEX = re.compile(
+
+RE_ATA = re.compile(
     '(\d+);'  # attribute
     '(\d+);'  # normalized value
     '(\d+)',  # raw value
     re.X
 )
 
+RE_SCSI = re.compile(
+    '([a-z-]+);'  # attribute
+    '([0-9.]+)',  # raw value
+    re.X
+)
 
-def chart_template(chart_name):
-    units, attr_id = chart_name.split('_')[-2:]
-    title = '{value_type} {description}'.format(value_type=units.capitalize(),
-                                                description=SMART_ATTR[attr_id])
-    family = SMART_ATTR[attr_id].lower()
+ORDER = [
+    # errors
+    'read_error_rate',
+    'seek_error_rate',
+    'soft_read_error_rate',
+    'write_error_rate',
+    'read_total_err_corrected',
+    'read_total_unc_errors',
+    'write_total_err_corrected',
+    'write_total_unc_errors',
+    'verify_total_err_corrected',
+    'verify_total_unc_errors',
+    # external failure
+    'sata_interface_downshift',
+    'udma_crc_error_count',
+    # performance
+    'throughput_performance',
+    'seek_time_performance',
+    # power
+    'start_stop_count',
+    'power_on_hours_count',
+    'power_cycle_count',
+    'unexpected_power_loss',
+    # spin
+    'spin_up_time',
+    'spin_up_retries',
+    'calibration_retries',
+    # temperature
+    'airflow_temperature_celsius',
+    'temperature_celsius',
+    # wear
+    'reallocated_sectors_count',
+    'reserved_block_count',
+    'program_fail_count',
+    'erase_fail_count',
+    'wear_leveller_worst_case_erase_count',
+    'unused_reserved_nand_blocks',
+    'reallocation_event_count',
+    'current_pending_sector_count',
+    'offline_uncorrectable_sector_count',
+    'percent_lifetime_used',
+]
 
-    return {
-        chart_name: {
-            'options': [None, title, units, family, 'smartd_log.' + chart_name, 'line'],
-            'lines': []
-        }
+CHARTS = {
+    'read_error_rate': {
+        'options': [None, 'Read Error Rate', 'value', 'errors', 'smartd_log.read_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR1],
+        'algo': ABSOLUTE,
+    },
+    'seek_error_rate': {
+        'options': [None, 'Seek Error Rate', 'value', 'errors', 'smartd_log.seek_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR7],
+        'algo': ABSOLUTE,
+    },
+    'soft_read_error_rate': {
+        'options': [None, 'Soft Read Error Rate', 'errors', 'errors', 'smartd_log.soft_read_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR13],
+        'algo': INCREMENTAL,
+    },
+    'write_error_rate': {
+        'options': [None, 'Write Error Rate', 'value', 'errors', 'smartd_log.write_error_rate', 'line'],
+        'lines': [],
+        'attrs': [ATTR206],
+        'algo': ABSOLUTE,
+    },
+    'read_total_err_corrected': {
+        'options': [None, 'Read Error Corrected', 'errors', 'errors', 'smartd_log.read_total_err_corrected', 'line'],
+        'lines': [],
+        'attrs': [ATTR_READ_ERR_COR],
+        'algo': INCREMENTAL,
+    },
+    'read_total_unc_errors': {
+        'options': [None, 'Read Error Uncorrected', 'errors', 'errors', 'smartd_log.read_total_unc_errors', 'line'],
+        'lines': [],
+        'attrs': [ATTR_READ_ERR_UNC],
+        'algo': INCREMENTAL,
+    },
+    'write_total_err_corrected': {
+        'options': [None, 'Write Error Corrected', 'errors', 'errors', 'smartd_log.read_total_err_corrected', 'line'],
+        'lines': [],
+        'attrs': [ATTR_WRITE_ERR_COR],
+        'algo': INCREMENTAL,
+    },
+    'write_total_unc_errors': {
+        'options': [None, 'Write Error Uncorrected', 'errors', 'errors', 'smartd_log.write_total_unc_errors', 'line'],
+        'lines': [],
+        'attrs': [ATTR_WRITE_ERR_UNC],
+        'algo': INCREMENTAL,
+    },
+    'verify_total_err_corrected': {
+        'options': [None, 'Verify Error Corrected', 'errors', 'errors', 'smartd_log.verify_total_err_corrected',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR_VERIFY_ERR_COR],
+        'algo': INCREMENTAL,
+    },
+    'verify_total_unc_errors': {
+        'options': [None, 'Verify Error Uncorrected', 'errors', 'errors', 'smartd_log.verify_total_unc_errors', 'line'],
+        'lines': [],
+        'attrs': [ATTR_VERIFY_ERR_UNC],
+        'algo': INCREMENTAL,
+    },
+    'sata_interface_downshift': {
+        'options': [None, 'SATA Interface Downshift', 'events', 'external failure',
+                    'smartd_log.sata_interface_downshift', 'line'],
+        'lines': [],
+        'attrs': [ATTR183],
+        'algo': INCREMENTAL,
+    },
+    'udma_crc_error_count': {
+        'options': [None, 'UDMA CRC Error Count', 'errors', 'external failure', 'smartd_log.udma_crc_error_count',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR199],
+        'algo': INCREMENTAL,
+    },
+    'throughput_performance': {
+        'options': [None, 'Throughput Performance', 'value', 'performance', 'smartd_log.throughput_performance',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR2],
+        'algo': ABSOLUTE,
+    },
+    'seek_time_performance': {
+        'options': [None, 'Seek Time Performance', 'value', 'performance', 'smartd_log.seek_time_performance', 'line'],
+        'lines': [],
+        'attrs': [ATTR8],
+        'algo': ABSOLUTE,
+    },
+    'start_stop_count': {
+        'options': [None, 'Start/Stop Count', 'events', 'power', 'smartd_log.start_stop_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR4],
+        'algo': ABSOLUTE,
+    },
+    'power_on_hours_count': {
+        'options': [None, 'Power-On Hours Count', 'hours', 'power', 'smartd_log.power_on_hours_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR9],
+        'algo': ABSOLUTE,
+    },
+    'power_cycle_count': {
+        'options': [None, 'Power Cycle Count', 'events', 'power', 'smartd_log.power_cycle_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR12],
+        'algo': ABSOLUTE,
+    },
+    'unexpected_power_loss': {
+        'options': [None, 'Unexpected Power Loss', 'events', 'power', 'smartd_log.unexpected_power_loss', 'line'],
+        'lines': [],
+        'attrs': [ATTR174],
+        'algo': ABSOLUTE,
+    },
+    'spin_up_time': {
+        'options': [None, 'Spin-Up Time', 'ms', 'spin', 'smartd_log.spin_up_time', 'line'],
+        'lines': [],
+        'attrs': [ATTR3],
+        'algo': ABSOLUTE,
+    },
+    'spin_up_retries': {
+        'options': [None, 'Spin-up Retries', 'retries', 'spin', 'smartd_log.spin_up_retries', 'line'],
+        'lines': [],
+        'attrs': [ATTR10],
+        'algo': INCREMENTAL,
+    },
+    'calibration_retries': {
+        'options': [None, 'Calibration Retries', 'retries', 'spin', 'smartd_log.calibration_retries', 'line'],
+        'lines': [],
+        'attrs': [ATTR11],
+        'algo': INCREMENTAL,
+    },
+    'airflow_temperature_celsius': {
+        'options': [None, 'Airflow Temperature Celsius', 'celsius', 'temperature',
+                    'smartd_log.airflow_temperature_celsius', 'line'],
+        'lines': [],
+        'attrs': [ATTR190],
+        'algo': ABSOLUTE,
+    },
+    'temperature_celsius': {
+        'options': [None, 'Temperature', 'celsius', 'temperature', 'smartd_log.temperature_celsius', 'line'],
+        'lines': [],
+        'attrs': [ATTR194, ATTR_TEMPERATURE],
+        'algo': ABSOLUTE,
+    },
+    'reallocated_sectors_count': {
+        'options': [None, 'Reallocated Sectors Count', 'sectors', 'wear', 'smartd_log.reallocated_sectors_count',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR5],
+        'algo': INCREMENTAL,
+    },
+    'reserved_block_count': {
+        'options': [None, 'Reserved Block Count', '%', 'wear', 'smartd_log.reserved_block_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR170],
+        'algo': ABSOLUTE,
+    },
+    'program_fail_count': {
+        'options': [None, 'Program Fail Count', 'errors', 'wear', 'smartd_log.program_fail_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR171],
+        'algo': INCREMENTAL,
+    },
+    'erase_fail_count': {
+        'options': [None, 'Erase Fail Count', 'failures', 'wear', 'smartd_log.erase_fail_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR172],
+        'algo': INCREMENTAL,
+    },
+    'wear_leveller_worst_case_erase_count': {
+        'options': [None, 'Wear Leveller Worst Case Erase Count', 'erases', 'wear',
+                    'smartd_log.wear_leveller_worst_case_erase_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR173],
+        'algo': ABSOLUTE,
+    },
+    'unused_reserved_nand_blocks': {
+        'options': [None, 'Unused Reserved NAND Blocks', 'blocks', 'wear', 'smartd_log.unused_reserved_nand_blocks',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR180],
+        'algo': ABSOLUTE,
+    },
+    'reallocation_event_count': {
+        'options': [None, 'Reallocation Event Count', 'events', 'wear', 'smartd_log.reallocation_event_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR196],
+        'algo': INCREMENTAL,
+    },
+    'current_pending_sector_count': {
+        'options': [None, 'Current Pending Sector Count', 'sectors', 'wear', 'smartd_log.current_pending_sector_count',
+                    'line'],
+        'lines': [],
+        'attrs': [ATTR197],
+        'algo': ABSOLUTE,
+    },
+    'offline_uncorrectable_sector_count': {
+        'options': [None, 'Offline Uncorrectable Sector Count', 'sectors', 'wear',
+                    'smartd_log.offline_uncorrectable_sector_count', 'line'],
+        'lines': [],
+        'attrs': [ATTR198],
+        'algo': ABSOLUTE,
+
+    },
+    'percent_lifetime_used': {
+        'options': [None, 'Percent Lifetime Used', '%', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
+        'lines': [],
+        'attrs': [ATTR202],
+        'algo': ABSOLUTE,
     }
+}
+
+# NOTE: 'parse_temp' decodes ATA 194 raw value. Not heavily tested. Written by @Ferroin
+# C code:
+# https://github.com/smartmontools/smartmontools/blob/master/smartmontools/atacmds.cpp#L2051
+#
+# Calling 'parse_temp' on the raw value will return a 4-tuple, containing
+#  * temperature
+#  * minimum
+#  * maximum
+#  * over-temperature count
+# substituting None for values it can't decode.
+#
+# Example:
+# >>> parse_temp(42952491042)
+# >>> (34, 10, 43, None)
+#
+#
+# def check_temp_word(i):
+#     if i <= 0x7F:
+#         return 0x11
+#     elif i <= 0xFF:
+#         return 0x01
+#     elif 0xFF80 <= i:
+#         return 0x10
+#     return 0x00
+#
+#
+# def check_temp_range(t, b0, b1):
+#     if b0 > b1:
+#         t0, t1 = b1, b0
+#     else:
+#         t0, t1 = b0, b1
+#
+#     if all([
+#         -60 <= t0,
+#         t0 <= t,
+#         t <= t1,
+#         t1 <= 120,
+#         not (t0 == -1 and t1 <= 0)
+#     ]):
+#         return t0, t1
+#     return None, None
+#
+#
+# def parse_temp(raw):
+#     byte = list()
+#     word = list()
+#     for i in range(0, 6):
+#         byte.append(0xFF & (raw >> (i * 8)))
+#     for i in range(0, 3):
+#         word.append(0xFFFF & (raw >> (i * 16)))
+#
+#     ctwd = check_temp_word(word[0])
+#
+#     if not word[2]:
+#         if ctwd and not word[1]:
+#             # byte[0] is temp, no other data
+#             return byte[0], None, None, None
+#
+#         if ctwd and all(check_temp_range(byte[0], byte[2], byte[3])):
+#             # byte[0] is temp, byte[2] is max or min, byte[3] is min or max
+#             trange = check_temp_range(byte[0], byte[2], byte[3])
+#             return byte[0], trange[0], trange[1], None
+#
+#         if ctwd and all(check_temp_range(byte[0], byte[1], byte[2])):
+#             # byte[0] is temp, byte[1] is max or min, byte[2] is min or max
+#             trange = check_temp_range(byte[0], byte[1], byte[2])
+#             return byte[0], trange[0], trange[1], None
+#
+#         return None, None, None, None
+#
+#     if ctwd:
+#         if all(
+#                 [
+#                     ctwd & check_temp_word(word[1]) & check_temp_word(word[2]) != 0x00,
+#                     all(check_temp_range(byte[0], byte[2], byte[4])),
+#                 ]
+#         ):
+#             # byte[0] is temp, byte[2] is max or min, byte[4] is min or max
+#             trange = check_temp_range(byte[0], byte[2], byte[4])
+#             return byte[0], trange[0], trange[1], None
+#         else:
+#             trange = check_temp_range(byte[0], byte[2], byte[3])
+#             if word[2] < 0x7FFF and all(trange) and trange[1] >= 40:
+#                 # byte[0] is temp, byte[2] is max or min, byte[3] is min or max, word[2] is overtemp count
+#                 return byte[0], trange[0], trange[1], word[2]
+#     # no data
+#     return None, None, None, None
 
 
-def handle_os_error(method):
-    def on_call(*args):
-        try:
-            return method(*args)
-        except OSError:
-            return None
-    return on_call
+CHARTED_ATTRS = dict((attr, k) for k, v in CHARTS.items() for attr in v['attrs'])
 
 
-class SmartAttribute(object):
-    def __init__(self, idx, normalized, raw):
-        self.id = idx
-        self.normalized = normalized
-        self._raw = raw
+class BaseAtaSmartAttribute:
+    def __init__(self, name, normalized_value, raw_value):
+        self.name = name
+        self.normalized_value = normalized_value
+        self.raw_value = raw_value
 
-    @property
-    def raw(self):
-        if self.id in LIMITS:
-            limit = LIMITS[self.id]
-            if limit.min <= int(self._raw) <= limit.max:
-                return self._raw
-            return None
-        return self._raw
+    def value(self):
+        raise NotImplementedError
 
-    @raw.setter
-    def raw(self, value):
-        self._raw = value
+
+class AtaRaw(BaseAtaSmartAttribute):
+    def value(self):
+        return self.raw_value
+
+
+class AtaNormalized(BaseAtaSmartAttribute):
+    def value(self):
+        return self.normalized_value
+
+
+class Ata9(BaseAtaSmartAttribute):
+    def value(self):
+        value = int(self.raw_value)
+        if value > 1e6:
+            return value & 0xFFFF
+        return value
+
+
+class Ata190(BaseAtaSmartAttribute):
+    def value(self):
+        return 100 - int(self.normalized_value)
+
+
+class BaseSCSISmartAttribute:
+    def __init__(self, name, raw_value):
+        self.name = name
+        self.raw_value = raw_value
+
+    def value(self):
+        raise NotImplementedError
+
+
+class SCSIRaw(BaseSCSISmartAttribute):
+    def value(self):
+        return self.raw_value
+
+
+def ata_attribute_factory(value):
+    name = value[0]
+
+    if name == ATTR9:
+        return Ata9(*value)
+    elif name == ATTR190:
+        return Ata190(*value)
+    elif name in [
+        ATTR1,
+        ATTR7,
+        ATTR194,
+        ATTR202,
+        ATTR206,
+    ]:
+        return AtaNormalized(*value)
+
+    return AtaRaw(*value)
+
+
+def scsi_attribute_factory(value):
+    return SCSIRaw(*value)
+
+
+def attribute_factory(value):
+    name = value[0]
+    if name.isdigit():
+        return ata_attribute_factory(value)
+    return scsi_attribute_factory(value)
+
+
+def handle_error(*errors):
+    def on_method(method):
+        def on_call(*args):
+            try:
+                return method(*args)
+            except errors:
+                return None
+        return on_call
+    return on_method
 
 
 class DiskLogFile:
-    def __init__(self, path):
-        self.path = path
-        self.size = os.path.getsize(path)
+    def __init__(self, full_path):
+        self.path = full_path
+        self.size = os.path.getsize(full_path)
 
-    @handle_os_error
+    @handle_error(OSError)
     def is_changed(self):
-        new_size = os.path.getsize(self.path)
-        old_size, self.size = self.size, new_size
+        return self.size != os.path.getsize(self.path)
 
-        return new_size != old_size and new_size
+    @handle_error(OSError)
+    def is_active(self, current_time, limit):
+        return (current_time - os.path.getmtime(self.path)) / 60 < limit
 
-    @staticmethod
-    @handle_os_error
-    def is_valid(log_file, exclude):
-        return all([log_file.endswith('.csv'),
-                    not [p for p in exclude if p in log_file],
-                    os.access(log_file, os.R_OK),
-                    os.path.getsize(log_file)])
+    @handle_error(OSError)
+    def read(self):
+        self.size = os.path.getsize(self.path)
+        return read_last_line(self.path)
 
 
-class Disk:
-    def __init__(self, full_path, age):
-        self.log_file = DiskLogFile(full_path)
-        self.name = os.path.basename(full_path).split('.')[-3]
-        self.age = int(age)
-        self.status = True
-        self.attributes = dict()
-
-        self.get_attributes()
+class BaseDisk:
+    def __init__(self, name, log_file):
+        self.name = re.sub(r'_+', '_', name)
+        self.log_file = log_file
+        self.attrs = list()
+        self.alive = True
+        self.charted = False
 
     def __eq__(self, other):
-        if isinstance(other, Disk):
+        if isinstance(other, BaseDisk):
             return self.name == other.name
         return self.name == other
 
@@ -191,163 +546,179 @@ class Disk:
     def __hash__(self):
         return hash(repr(self))
 
-    @handle_os_error
-    def is_active(self):
-        return (time() - os.path.getmtime(self.log_file.path)) / 60 < self.age
+    def parser(self, data):
+        raise NotImplementedError
 
-    @handle_os_error
-    def get_attributes(self):
-        last_line = read_last_line(self.log_file.path)
-        self.attributes = dict((attr, SmartAttribute(attr, normalized, raw)) for attr, normalized, raw
-                               in REGEX.findall(last_line))
-        return True
+    @handle_error(TypeError)
+    def populate_attrs(self):
+        self.attrs.clear()
+        line = self.log_file.read()
+        for value in self.parser(line):
+            self.attrs.append(attribute_factory(value))
+
+        return len(self.attrs)
 
     def data(self):
         data = dict()
-        for attr in self.attributes.values():
-            data['_'.join([self.name, 'normalized', attr.id])] = attr.normalized
-            if attr.raw is not None:
-                data['_'.join([self.name, 'raw', attr.id])] = attr.raw
+        for attr in self.attrs:
+            data['{0}_{1}'.format(self.name, attr.name)] = attr.value()
         return data
+
+
+class ATADisk(BaseDisk):
+    def parser(self, data):
+        return RE_ATA.findall(data)
+
+
+class SCSIDisk(BaseDisk):
+    def parser(self, data):
+        return RE_SCSI.findall(data)
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.log_path = self.configuration.get('log_path', '/var/log/smartd')
-        self.raw = self.configuration.get('raw_values', True)
-        self.exclude = self.configuration.get('exclude_disks', str()).split()
-        self.age = self.configuration.get('age', 30)
+        self.order = ORDER
+        self.definitions = deepcopy(CHARTS)
 
-        self.runs = 0
+        self.log_path = configuration.get('log_path', DEF_PATH)
+        self.age = configuration.get('age', DEF_AGE)
+        self.exclude = configuration.get('exclude_disks', str()).split()
+
         self.disks = list()
-        self.order = list()
-        self.definitions = dict()
+        self.runs = 0
 
     def check(self):
-        self.disks = self.scan()
-
-        if not self.disks:
-            return None
-
-        user_defined_sa = self.configuration.get('smart_attributes')
-
-        if user_defined_sa:
-            order = user_defined_sa.split() or ORDER
-        else:
-            order = ORDER
-
-        self.create_charts(order)
-
-        return True
+        return self.scan() > 0
 
     def get_data(self):
         self.runs += 1
 
-        if self.runs % RESCAN_INTERVAL == 0:
-            self.cleanup_and_rescan()
+        if self.runs % DEF_RESCAN_INTERVAL == 0:
+            self.cleanup()
+            self.scan()
 
         data = dict()
 
         for disk in self.disks:
-
-            if not disk.status:
+            if not disk.alive:
                 continue
+
+            if not disk.charted:
+                self.add_disk_to_charts(disk)
 
             changed = disk.log_file.is_changed()
 
-            # True = changed, False = unchanged, None = Exception
             if changed is None:
-                disk.status = False
+                disk.alive = False
                 continue
 
-            if changed:
-                success = disk.get_attributes()
-                if not success:
-                    disk.status = False
-                    continue
+            if changed and disk.populate_attrs() is None:
+                disk.alive = False
+                continue
 
             data.update(disk.data())
 
-        return data or None
-
-    def create_charts(self, order):
-        for attr in order:
-            raw_name, normalized_name = 'attr_id_raw_' + attr, 'attr_id_normalized_' + attr
-            raw, normalized = chart_template(raw_name), chart_template(normalized_name)
-            self.order.extend([normalized_name, raw_name])
-            self.definitions.update(raw)
-            self.definitions.update(normalized)
-
-            for disk in self.disks:
-                if attr not in disk.attributes:
-                    self.debug("'{disk}' has no attribute '{attr_id}'".format(disk=disk.name,
-                                                                              attr_id=attr))
-                    continue
-                normalized[normalized_name]['lines'].append(['_'.join([disk.name, 'normalized', attr]), disk.name])
-
-                if not self.raw:
-                    continue
-
-                if disk.attributes[attr].raw is not None:
-                    raw[raw_name]['lines'].append(['_'.join([disk.name, 'raw', attr]), disk.name])
-                    continue
-                self.debug("'{disk}' attribute '{attr_id}' value not in {limits}".format(disk=disk.name,
-                                                                                         attr_id=attr,
-                                                                                         limits=LIMITS[attr]))
-
-    def cleanup_and_rescan(self):
-        self.cleanup()
-        new_disks = self.scan(only_new=True)
-
-        for disk in new_disks:
-            valid = False
-
-            for chart in self.charts:
-                value_type, idx = chart.id.split('_')[2:]
-
-                if idx in disk.attributes:
-                    valid = True
-                    dimension_id = '_'.join([disk.name, value_type, idx])
-
-                    if dimension_id in chart:
-                        chart.hide_dimension(dimension_id=dimension_id, reverse=True)
-                    else:
-                        chart.add_dimension([dimension_id, disk.name])
-            if valid:
-                self.disks.append(disk)
+        return data
 
     def cleanup(self):
-        for disk in self.disks:
+        current_time = time()
+        for disk in self.disks[:]:
+            if any(
+                [
+                    not disk.alive,
+                    not disk.log_file.is_active(current_time, self.age),
+                ]
+            ):
+                self.disks.remove(disk.name)
+                self.remove_disk_from_charts(disk)
 
-            if not disk.is_active():
-                disk.status = False
-            if not disk.status:
-                for chart in self.charts:
-                    dimension_id = '_'.join([disk.name, chart.id[8:]])
-                    chart.hide_dimension(dimension_id=dimension_id)
+    def scan(self):
+        self.debug('scanning {0}'.format(self.log_path))
+        current_time = time()
 
-        self.disks = [disk for disk in self.disks if disk.status]
+        for full_name in os.listdir(self.log_path):
+            disk = self.create_disk_from_file(full_name, current_time)
+            if not disk:
+                continue
+            self.disks.append(disk)
 
-    def scan(self, only_new=None):
-        new_disks = list()
-        for f in os.listdir(self.log_path):
-            full_path = os.path.join(self.log_path, f)
+        return len(self.disks)
 
-            if DiskLogFile.is_valid(full_path, self.exclude):
-                disk = Disk(full_path, self.age)
+    def create_disk_from_file(self, full_name,  current_time):
+        name = os.path.basename(full_name).split('.')[-3]
+        path = os.path.join(self.log_path, full_name)
 
-                active = disk.is_active()
-                if active is None:
-                    continue
-                if active:
-                    if not only_new:
-                        new_disks.append(disk)
-                    else:
-                        if disk not in self.disks:
-                            new_disks.append(disk)
-                else:
-                    if not only_new:
-                        self.debug("'{disk}' not updated in the last {age} minutes, "
-                                   "skipping it.".format(disk=disk.name, age=self.age))
-        return new_disks
+        if name in self.disks:
+            return None
+
+        if [p for p in self.exclude if p in name]:
+            return None
+
+        if not full_name.endswith(CSV):
+            self.debug('skipping {0}: not a csv file'.format(full_name))
+            return None
+
+        if not os.access(path, os.R_OK):
+            self.debug('skipping {0}: not readable'.format(full_name))
+            return None
+
+        if os.path.getsize(path) == 0:
+            self.debug('skipping {0}: zero size'.format(full_name))
+            return None
+
+        if (current_time - os.path.getmtime(path)) / 60 > self.age:
+            self.debug('skipping {0}: haven\'t been updated for last {1} minutes'.format(full_name, self.age))
+            return None
+
+        if ATA in full_name:
+            disk = ATADisk(name, DiskLogFile(path))
+        elif SCSI in full_name:
+            disk = SCSIDisk(name, DiskLogFile(path))
+        else:
+            self.debug('skipping {0}: unknown type'.format(full_name))
+            return None
+
+        disk.populate_attrs()
+        if not disk.attrs:
+            self.error('skipping {0}: parsing failed'.format(full_name))
+            return None
+
+        self.debug('added {0}'.format(full_name))
+        return disk
+
+    def add_disk_to_charts(self, disk):
+        if len(self.charts) == 0 or disk.charted:
+            return
+        disk.charted = True
+
+        for attr in disk.attrs:
+            chart_id = CHARTED_ATTRS.get(attr.name)
+
+            if not chart_id or chart_id not in self.charts:
+                continue
+
+            chart = self.charts[chart_id]
+            dim = [
+                '{0}_{1}'.format(disk.name, attr.name),
+                disk.name,
+                CHARTS[chart_id]['algo'],
+            ]
+
+            if dim[0] in self.charts[chart_id].dimensions:
+                chart.hide_dimension(dim[0], reverse=True)
+            else:
+                chart.add_dimension(dim)
+
+    def remove_disk_from_charts(self, disk):
+        if len(self.charts) == 0 or not disk.charted:
+            return
+
+        for attr in disk.attrs:
+            chart_id = CHARTED_ATTRS.get(attr.name)
+
+            if not chart_id or chart_id not in self.charts:
+                continue
+
+            # TODO: can't delete dimension
+            self.charts[chart_id].hide_dimension('{0}_{1}'.format(disk.name, attr.name))
