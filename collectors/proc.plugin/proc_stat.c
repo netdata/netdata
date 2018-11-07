@@ -8,10 +8,20 @@ struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
     int fd;
-    procfile *ff; //TODO: Separate structure for time_in_state?
     collected_number value;
-    //TODO: last_ticks for every frequency. Separate structure for time_in_state?
     RRDDIM *rd;
+};
+
+struct last_ticks {
+    collected_number frequency; // TODO: Do we need to check frequency?
+    collected_number ticks;
+};
+
+struct per_core_time_in_state_file {
+    const char *filename;
+    procfile *ff;
+    size_t last_ticks_len;
+    struct last_ticks *last_ticks;
 };
 
 #define CORE_THROTTLE_COUNT_INDEX    0
@@ -35,6 +45,8 @@ struct cpu_chart {
     RRDDIM *rd_guest_nice;
 
     struct per_core_single_number_file files[PER_CORE_FILES];
+
+    struct per_core_time_in_state_file time_in_state_files[PER_CORE_FILES]; // TODO: Make it a separate structure?
 };
 
 static int keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
@@ -89,7 +101,6 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
         f->found = 1;
 
         f->value = str2ll(buf, NULL);
-        // info("read '%s', parsed as " COLLECTED_NUMBER_FORMAT, buf, f->value);
         if(likely(f->value != 0))
             files_nonzero++;
     }
@@ -108,72 +119,92 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
     for(x = 0; x < len ; x++) {
         struct per_core_single_number_file *f = &all_cpu_charts[x].files[index];
-        unsigned long long value = 0;
+        struct per_core_time_in_state_file *tsf = &all_cpu_charts[x].time_in_state_files[index];
 
         f->found = 0;
 
-        if(unlikely(!f->filename))
+        if(unlikely(!tsf->filename))
             continue;
 
-        if(unlikely(!f->ff)) {
-            f->ff = procfile_open(f->filename, " \t:", PROCFILE_FLAG_DEFAULT);
-            if(unlikely(!f->ff))
+        if(unlikely(!tsf->ff)) {
+            tsf->ff = procfile_open(tsf->filename, " \t:", PROCFILE_FLAG_DEFAULT);
+            if(unlikely(!tsf->ff))
             {
-                error("Cannot open file '%s'", f->filename);
+                error("Cannot open file '%s'", tsf->filename);
                 continue;
             }
         }
 
-        f->ff = procfile_readall(f->ff);
-        if(unlikely(!f->ff)) {
-            error("Cannot read file '%s'", f->filename);
-            procfile_close(f->ff);
-            f->ff = NULL;
+        tsf->ff = procfile_readall(tsf->ff);
+        if(unlikely(!tsf->ff)) {
+            error("Cannot read file '%s'", tsf->filename);
+            procfile_close(tsf->ff);
+            tsf->ff = NULL;
             continue;
         }
         else {
             // successful read
 
-            size_t lines = procfile_lines(f->ff), l;
+            size_t lines = procfile_lines(tsf->ff), l;
             size_t words;
-            unsigned long long total_tickets_since_last = 0, avg_freq = 0;
+            unsigned long long total_ticks_since_last = 0, avg_freq = 0;
 
-            for(l = 0; l < lines ;l++) {
+            f->value = 0;
+
+            if (lines <= 1) {
+                if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+                    procfile_close(tsf->ff);
+                    tsf->ff = NULL;
+                }
+                // TODO: Is there a better way to avoid spikes than calculating the average?
+                // freez(tsf->last_ticks);
+                // tsf->last_ticks = NULL;
+                // tsf->last_ticks_len = 0;                    
+                continue;
+            }
+
+            if (unlikely(tsf->last_ticks_len < lines || tsf->last_ticks == NULL)) {
+                tsf->last_ticks = reallocz(tsf->last_ticks, sizeof(struct last_ticks) * lines);
+                // TODO: Is there a better way to avoid spikes than calculating the average?
+                // memset(tsf->last_ticks, 0, lines);
+                tsf->last_ticks_len = lines;
+            }
+            for(l = 0; l < lines - 1 ;l++) {
                 unsigned long long frequency = 0, ticks = 0, ticks_since_last = 0;
 
-                words = procfile_linewords(f->ff, l);
+                words = procfile_linewords(tsf->ff, l);
                 if(unlikely(words < 2)) {
                     error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
                     continue;
                 }
-                frequency = str2ull(procfile_lineword(f->ff, l, 0));
-                ticks     = str2ull(procfile_lineword(f->ff, l, 1));
+                frequency = str2ull(procfile_lineword(tsf->ff, l, 0));
+                ticks     = str2ull(procfile_lineword(tsf->ff, l, 1));
 
-                //TODO: calculate value
-                //ticks_since_last = ticks - map.last_ticks[frequency]
-                //map.last_ticks[frequency] = ticks
+                //TODO: Do we need to check frequency?
+                ticks_since_last = ticks - tsf->last_ticks[l].ticks;
+                tsf->last_ticks[l].frequency = frequency;
+                tsf->last_ticks[l].ticks = ticks;
 
-                total_tickets_since_last += ticks_since_last;
+                total_ticks_since_last += ticks_since_last;
                 avg_freq += frequency * ticks_since_last;
 
             }
 
-            //TODO: fall back to less accurate reading
-
-            if (total_tickets_since_last)
-                avg_freq /= total_tickets_since_last;
-            f->value = avg_freq;
+            if (total_ticks_since_last) {
+                avg_freq /= total_ticks_since_last;
+                f->value = avg_freq;
+            }
 
             if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
-                procfile_close(f->ff);
-                f->ff = NULL;
+                procfile_close(tsf->ff);
+                tsf->ff = NULL;
             }
         }
 
         files_read++;
+
         f->found = 1;
 
-        f->value = value;
         if(likely(f->value != 0))
             files_nonzero++;
     }
@@ -212,7 +243,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, *time_in_state_filename = NULL;
     static RRDVAR *cpus_var = NULL;
-    static accurate_freq = 0; //TODO: fall back to less accurate reading
+    static int accurate_freq = 0;
     size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
@@ -364,25 +395,23 @@ int do_proc_stat(int update_every, usec_t dt) {
                         }
 
                         if(do_cpu_freq != CONFIG_BOOLEAN_NO) {
-                            snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
+
+                            snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, id);
 
                             if (stat(filename, &stbuf) == 0) {
                                 cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
-                                cpu_chart->files[CPU_FREQ_INDEX].ff = NULL;
+                                cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
+                                do_cpu_freq = CONFIG_BOOLEAN_YES;
+                            }
+                            
+                            snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
+
+                            if (stat(filename, &stbuf) == 0) {
+                                cpu_chart->time_in_state_files[CPU_FREQ_INDEX].filename = strdupz(filename);
+                                cpu_chart->time_in_state_files[CPU_FREQ_INDEX].ff = NULL;
                                 do_cpu_freq = CONFIG_BOOLEAN_YES;
                                 accurate_freq = 1;
                             }
-                            else {
-                                snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, id);
-
-                                if (stat(filename, &stbuf) == 0) {
-                                    cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
-                                    cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
-                                    do_cpu_freq = CONFIG_BOOLEAN_YES;
-                                    accurate_freq = 0;
-                                }
-                            }
-
                         }
                     }
 
@@ -633,10 +662,10 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
 
         if(likely(do_cpu_freq != CONFIG_BOOLEAN_NO)) {
-            int r;
+            int r = 0;
             if (accurate_freq)
                 r = read_per_core_time_in_state_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
-            else
+            if (r < 1)
                 r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
             if(likely(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
                 do_cpu_freq = CONFIG_BOOLEAN_YES;
