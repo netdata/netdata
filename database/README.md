@@ -1,4 +1,4 @@
-# netdata database
+# Netdata database
 
 Although `netdata` does all its calculations using `long double`, it stores all values using
 a [custom-made 32-bit number](../libnetdata/storage_number/).
@@ -26,17 +26,17 @@ Currently netdata supports 5 memory modes:
 
 1. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and
    supports [KSM](#ksm).
-   
+
 2. `save`, (the default) data are only in RAM while netdata runs and are saved to / loaded from
    disk on netdata restart. It also uses `mmap()` and supports [KSM](#ksm).
-   
+
 3. `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this
    will have a constant write on your disk. When netdata writes data on its memory, the Linux kernel
    marks the related memory pages as dirty and automatically starts updating them on disk.
    Unfortunately we cannot control how frequently this works. The Linux kernel uses exactly the
    same algorithm it uses for its swap memory. Check below for additional information on running a
    dedicated central netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
-   
+
 4. `none`, without a database (collected metrics can only be streamed to another netdata).
 
 5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the
@@ -73,9 +73,9 @@ by netdata. Of course experiment a bit. On very weak devices you might have to u
 You can also disable [data collection plugins](../collectors) you don't need.
 Disabling such plugins will also free both CPU and RAM resources.
 
-## running a dedicated central netdata server
+## Running a dedicated central netdata server
 
-netdata allows streaming data between netdata nodes. This allows us to have a central netdata
+Netdata allows streaming data between netdata nodes. This allows us to have a central netdata
 server that will maintain the entire database for all nodes, and will also run health checks/alarms
 for all nodes.
 
@@ -166,7 +166,7 @@ netdata, each byte at the in-memory database will be updated just once per day).
 
 KSM is a solution that will provide 60+% memory savings to netdata.
 
-#### Enable KSM in kernel
+### Enable KSM in kernel
 
 You need to run a kernel compiled with:
 
@@ -186,7 +186,7 @@ The files that `CONFIG_KSM=y` offers include:
 
 So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
 
-#### Run `ksmd` kernel daemon
+### Run `ksmd` kernel daemon
 
 To activate / run `ksmd` you need to run:
 
