@@ -35,7 +35,9 @@ depend() {
     use logger
     need net
     after ${NETDATA_START_AFTER_SERVICES}
+}
 
+start_pre() {
     checkpath -o ${NETDATA_OWNER} -d @localstatedir_POST@/cache/netdata @localstatedir_POST@/run/netdata
 }
 
