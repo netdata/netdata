@@ -1,18 +1,20 @@
-> IMPORTANT: the format netdata sends metrics to prometheus has changed since netdata v1.7. The new prometheus backend for netdata supports a lot more features and is aligned to the development of the rest of the netdata backends.
-
 # Using netdata with Prometheus
+
+> IMPORTANT: the format netdata sends metrics to prometheus has changed since netdata v1.7. The new prometheus backend for netdata supports a lot more features and is aligned to the development of the rest of the netdata backends.
 
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently netdata added support for Prometheus. I'm going to quickly show you how to install both netdata and prometheus on the same server. We can then use grafana pointed at Prometheus to obtain long term metrics netdata offers. I'm assuming we are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM or a cloud instance is up to you).
 
 ## Installing netdata and prometheus
 
 ### Installing netdata
+
 There are number of ways to install netdata according to [Installation](https://github.com/netdata/netdata/wiki/Installation)  
 The suggested way of installing the latest netdata and keep it upgrade automatically. Using one line installation:
 
 ```
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
+
 At this point we should have netdata listening on port 19999. Attempt to take your browser here:
 
 ```
@@ -22,15 +24,16 @@ http://your.netdata.ip:19999
 *(replace `your.netdata.ip` with the IP or hostname of the server running netdata)*
 
 ### Installing Prometheus
+
 In order to install prometheus we are going to introduce our own systemd startup script along with an example of prometheus.yaml configuration. Prometheus needs to be pointed to your server at a specific target url for it to scrape netdata's api. Prometheus is always a pull model meaning netdata is the passive client within this architecture. Prometheus always initiates the connection with netdata.
 
-##### Download Prometheus
+#### Download Prometheus
 
 ```sh
 wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.3.2/prometheus-2.3.2.linux-amd64.tar.gz
 ```
 
-##### Create prometheus system user
+#### Create prometheus system user
 
 ```sh
 sudo useradd -r prometheus
@@ -104,6 +107,7 @@ scrape_configs:
     static_configs:
       - targets: ['{your.netdata.ip}:19999']
 ```
+
 #### Install nodes.yml
 
 The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a *- "nodes.yml"* entry under the *rule_files:* section in the example prometheus.yml file above.
@@ -166,7 +170,6 @@ ExecStop=/bin/kill -SIGINT $MAINPID
 [Install]
 WantedBy=multi-user.target
 ```
-
 ##### Start Prometheus
 
 ```
@@ -180,7 +183,7 @@ If everything is working correctly when you fetch `http://your.prometheus.ip:909
 
 ---
 
-## netdata support for prometheus
+## Netdata support for prometheus
 
 > IMPORTANT: the format netdata sends metrics to prometheus has changed since netdata v1.6. The new format allows easier queries for metrics and supports both `as collected` and normalized metrics.
 
@@ -208,7 +211,7 @@ Then each netdata chart contains metrics called `dimensions`. All the dimensions
 
 ### netdata data source
 
-netdata can send metrics to prometheus from 3 data sources:
+Netdata can send metrics to prometheus from 3 data sources:
 
 - `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is done by netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how to get meaningful values out of them.
 
@@ -230,7 +233,6 @@ netdata can send metrics to prometheus from 3 data sources:
    All the other operations are the same with `average`. 
 
 Keep in mind that early versions of netdata were sending the metrics as: `CHART_DIMENSION{}`.
-
 
 ### Querying Metrics
 
@@ -298,6 +300,7 @@ netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="iowait"} 233
 # COMMENT netdata_system_cpu_total: chart "system.cpu", context "system.cpu", family "cpu", dimension "idle", value * 1 / 1 delta gives percentage (counter)
 netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="idle"} 918470 1500066716438
 ```
+
 *(netdata response for `system.cpu` with source=`as-collected`)*
 
 For more information check prometheus documentation.
@@ -315,11 +318,11 @@ The `format=prometheus` parameter only exports the host's netdata metrics.  If y
 
 This will report all upstream host data, and `honor_labels` will make Prometheus take note of the instance names provided.
 
-### timestamps
+### Timestamps
 
 To pass the metrics through prometheus pushgateway, netdata supports the option `&timestamps=no` to send the metrics without timestamps.
 
-## netdata host variables
+## Netdata host variables
 
 netdata collects various system configuration metrics, like the max number of TCP sockets supported, the max number of files allowed system-wide, various IPC sizes, etc. These metrics are not exposed to prometheus by default.
 
@@ -369,7 +372,7 @@ netdata sends all metrics prefixed with `netdata_`. You can change this in `netd
 
 It can also be changed from the URL, by appending `&prefix=netdata`.
 
-### accuracy of `average` and `sum` data sources
+### Accuracy of `average` and `sum` data sources
 
 When the data source is set to `average` or `sum`, netdata remembers the last access of each client accessing prometheus metrics and uses this last access time to respond with the `average` or `sum` of all the entries in the database since that. This means that prometheus servers are not losing data when they access netdata with data source = `average` or `sum`.
 

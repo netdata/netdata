@@ -13,7 +13,7 @@ a netdata performs:
 
 The following configurations are supported:
 
-#### netdata without a database or web API (headless collector)
+#### Netdata without a database or web API (headless collector)
 
 Local netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another netdata (`master`).
@@ -28,7 +28,7 @@ of maintaining a local database and accepting dashboard requests, it streams all
 
 The same `master` can collect data for any number of `slaves`.
 
-#### database replication
+#### Database replication
 
 Local netdata (`slave`), **with a local database (and possibly alarms)**, collects metrics and
 sends them to another netdata (`master`).
@@ -306,10 +306,10 @@ On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your syste
 [stream]
     # stream metrics to another netdata
     enabled = yes
-    
+
     # the IP and PORT of the master
     destination = 10.11.12.13:19999
-	
+
 	# the API key to use
     api key = 11111111-2222-3333-4444-555555555555
 ```
@@ -339,7 +339,6 @@ The file `/var/lib/netdata/registry/netdata.public.unique.id` contains a random 
 #### Troubleshooting metrics streaming
 
 Both the sender and the receiver of metrics log information at `/var/log/netdata/error.log`.
-
 
 On both master and slave do this:
 
@@ -394,7 +393,6 @@ This means a setup like the following is also possible:
 <img src="https://cloud.githubusercontent.com/assets/2662304/23629551/bb1fd9c2-02c0-11e7-90f5-cab5a3ed4c53.png"/>
 </p>
 
-
 ## proxies
 
 A proxy is a netdata that is receiving metrics from a netdata, and streams them to another netdata.
@@ -410,4 +408,3 @@ The sending side of a netdata proxy, connects and disconnects to the final desti
 metrics, following the same pattern of the receiving side.
 
 For a practical example see [Monitoring ephemeral nodes](#monitoring-ephemeral-nodes).
-
