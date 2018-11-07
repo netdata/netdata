@@ -14,6 +14,7 @@
 
 **Merged pull requests:**
 
+- Clarify application configuration and fix broken link [\#4554](https://github.com/netdata/netdata/pull/4554) ([JBaczuk](https://github.com/JBaczuk))
 - first tag then generate changelog [\#4553](https://github.com/netdata/netdata/pull/4553) ([paulfantom](https://github.com/paulfantom))
 - after release cleanup [\#4552](https://github.com/netdata/netdata/pull/4552) ([paulfantom](https://github.com/paulfantom))
 - edit-config: Better support for custom editors. [\#4551](https://github.com/netdata/netdata/pull/4551) ([Ferroin](https://github.com/Ferroin))
