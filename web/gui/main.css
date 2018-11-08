@@ -1,0 +1,533 @@
+/* force the vertical window scrollbar */
+html {
+    overflow-y: scroll;
+}
+
+/* prevent body from hiding under the navbar */
+body {
+    padding-top: 50px;
+}
+
+.loadOverlay {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+    font-size: 10vh;
+    font-family: sans-serif;
+    padding: 40vh 0 40vh 0;
+    font-weight: bold;
+    text-align: center;
+}
+
+.navbar-highlight {
+    display: none;
+    position: fixed;
+    margin-top: 5px;
+    height: 26px;
+    width: 100%;
+    text-align: center;
+    overflow: hidden;
+    z-index: 30;
+    pointer-events: none !important;
+}
+
+.navbar-highlight-content {
+    position: relative;
+    display: inline-block;
+    margin: 0 auto;
+    height: 26px;
+    min-width: 500px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-left: 15px;
+    padding-right: 15px;
+    border-radius: 10px;
+    color: lightgrey;
+    pointer-events: auto !important;
+}
+
+.navbar-highlight-bar {
+    cursor: pointer;
+}
+
+.navbar-highlight-button-right {
+    cursor: pointer;
+    padding-left: 10px;
+}
+
+.modal-wide .modal-dialog {
+    width: 80%;
+}
+
+/* fix # anchors scrolling under the navbar
+    https://github.com/twbs/bootstrap/issues/1768#issuecomment-46519033
+    */
+h1 {
+    position: relative;
+    z-index: -1;
+}
+
+h2 {
+    position: relative;
+    z-index: -2;
+}
+
+h1:before, h2:before {
+    display: block;
+    content: " ";
+    margin-top: -70px;
+    height: 70px;
+    visibility: hidden;
+}
+
+.p {
+    display: block;
+    margin-top: 15px;
+}
+
+.option-row,
+.option-control {
+    vertical-align: top;
+    padding: 10px;
+    padding-top: 30px;
+    padding-left: 30px;
+}
+
+.option-info {
+    padding: 10px;
+}
+
+.dashboard-submenu-info {
+    display: block;
+    margin-top: 10px;
+}
+
+.dashboard-context-info {
+    display: block;
+    margin-top: 10px;
+}
+
+#masthead h1 {
+    /*font-size: 30px;*/
+    line-height: 1;
+    padding-top: 30px;
+}
+
+#masthead .well {
+    margin-top: 4%;
+}
+
+/* fix the navbar shifting when a modal is open */
+/* https://github.com/twbs/bootstrap/issues/14040#issuecomment-159891033 */
+body.modal-open {
+    width: 100% !important;
+    padding-right: 0 !important;
+    /*      overflow-y: scroll !important; */
+    /*      position: fixed !important;*/
+    overflow: visible;
+}
+
+/* make accordion use the whole header bar for expand/collapse */
+.panel-title a {
+    display: block;
+    padding: 10px 15px;
+    margin: -10px -15px;
+}
+
+/*
+    * Side navigation
+    *
+    * Scrollspy and affixed enhanced navigation to highlight sections and secondary
+    * sections of docs content.
+    */
+
+.affix {
+    position: static;
+    top: 70px !important;
+    /*width: 220px;*/
+}
+
+/*
+.affix-top {
+    width: 220px;
+}
+*/
+
+.dashboard-sidebar {
+    max-height: calc(100% - 70px) !important;
+    overflow-y: auto;
+    /*width: 220px !important;*/
+}
+
+/* By default it's not affixed in mobile views, so undo that */
+.dashboard-sidebar.affix {
+    position: static;
+}
+
+@media (min-width: 768px) {
+    .dashboard-sidebar {
+        padding-left: 20px;
+    }
+}
+
+/* First level of nav */
+.dashboard-sidenav {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+/* All levels of nav */
+.dashboard-sidebar .nav > li > a {
+    display: block;
+    padding: 4px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #767676;
+}
+
+.dashboard-sidebar .nav > li > a > .svg-inline--fa {
+    width: 20px;
+    text-align: center;
+}
+
+.dashboard-sidebar .nav > li > a:hover,
+.dashboard-sidebar .nav > li > a:focus {
+    padding-left: 19px;
+    color: #563d7c;
+    text-decoration: none;
+    background-color: transparent;
+    border-left: 1px solid #563d7c;
+}
+
+.dashboard-sidebar .nav > .active > a,
+.dashboard-sidebar .nav > .active:hover > a,
+.dashboard-sidebar .nav > .active:focus > a {
+    padding-left: 18px;
+    font-weight: bold;
+    color: #563d7c;
+    background-color: transparent;
+    border-left: 2px solid #563d7c;
+}
+
+/* Nav: second level (shown on .active) */
+.dashboard-sidebar .nav .nav {
+    display: none; /* Hide by default, but at >768px, show it */
+    padding-bottom: 10px;
+}
+
+.dashboard-sidebar .nav .nav > li > a {
+    padding-top: 1px;
+    padding-bottom: 1px;
+    padding-left: 30px;
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.dashboard-sidebar .nav .nav > li > a:hover,
+.dashboard-sidebar .nav .nav > li > a:focus {
+    padding-left: 29px;
+}
+
+.dashboard-sidebar .nav .nav > .active > a,
+.dashboard-sidebar .nav .nav > .active:hover > a,
+.dashboard-sidebar .nav .nav > .active:focus > a {
+    padding-left: 28px;
+    font-weight: 500;
+}
+
+.dropdown-menu {
+    min-width: 200px;
+}
+
+.dropdown-menu.columns-2 {
+    margin: 0;
+    padding: 0;
+    width: 400px;
+}
+
+.dropdown-menu li a {
+    padding: 5px 15px;
+    font-weight: 300;
+}
+
+.dropdown-menu.multi-column {
+    overflow-x: hidden;
+}
+
+.multi-column-dropdown {
+    list-style: none;
+    padding: 0;
+}
+
+.multi-column-dropdown li a {
+    display: block;
+    clear: both;
+    line-height: 1.428571429;
+    white-space: normal;
+}
+
+.multi-column-dropdown li a:hover {
+    text-decoration: none;
+    color: #f5f5f5;
+    background-color: #262626;
+}
+
+.scrollable-menu {
+    height: auto;
+    max-height: 80vh;
+    overflow-x: hidden;
+}
+
+.scrollable-menu-50 {
+    height: auto;
+    max-height: 50vh;
+    overflow-x: hidden;
+}
+
+/* Back to top (hidden on mobile) */
+.back-to-top,
+.dashboard-theme-toggle {
+    display: none;
+    padding: 4px 10px;
+    margin-top: 10px;
+    margin-left: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #999;
+}
+
+.back-to-top:hover,
+.dashboard-theme-toggle:hover {
+    color: #563d7c;
+    text-decoration: none;
+}
+
+.dashboard-theme-toggle {
+    margin-top: 0;
+}
+
+.container {
+    width: calc(100% - 20px) !important;
+}
+
+.charts-body {
+    display: inline-block;
+    width: 100%;
+}
+
+.sidebar-body {
+    position: absolute;
+    display: none;
+}
+
+.dashboard-section-container {
+    display: block;
+    width: 100%;
+    page-break-before: auto;
+    page-break-after: auto;
+    page-break-inside: auto;
+}
+
+.dashboard-print-row {
+    display: block;
+    width: 100%;
+    page-break-before: auto;
+    page-break-after: auto;
+    page-break-inside: avoid;
+}
+
+.netdata-chartblock-container {
+    display: inline-block;
+}
+
+/* https://github.com/seiyria/bootstrap-slider/issues/746 */
+.tooltip {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+@media print {
+    body {
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact;
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .dashboard-section {
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .dashboard-subsection {
+        page-break-before: avoid;
+        page-break-after: auto;
+        page-break-inside: auto;
+    }
+
+    .charts-body {
+        padding-left: 0%;
+        padding-right: 0%;
+        display: block;
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .back-to-top,
+    .dashboard-theme-toggle {
+        display: block;
+    }
+}
+
+@media (min-width: 768px) {
+    .charts-body {
+        padding-left: 0%;
+        padding-right: 0%;
+    }
+
+    .back-to-top,
+    .dashboard-theme-toggle {
+        display: block;
+    }
+}
+
+/* Show and affix the side nav when space allows it */
+@media (min-width: 992px) {
+    .container {
+        padding-left: 0% !important;
+    }
+
+    .charts-body {
+        width: calc(100% - 213px) !important;
+        padding-left: 1% !important;
+        padding-right: 0% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 213px !important;
+    }
+
+    .dashboard-sidebar .nav > .active > ul {
+        display: block;
+    }
+
+    /* Widen the fixed sidebar */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 213px !important;
+    }
+
+    .dashboard-sidebar.affix {
+        position: fixed; /* Undo the static from mobile first approach */
+        top: 20px;
+    }
+
+    .dashboard-sidebar.affix-bottom {
+        position: absolute; /* Undo the static from mobile first approach */
+    }
+
+    .dashboard-sidebar.affix-bottom .dashboard-sidenav,
+    .dashboard-sidebar.affix .dashboard-sidenav {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+}
+
+@media (min-width: 1200px) {
+    .container {
+        padding-left: 2% !important;
+    }
+
+    .charts-body {
+        width: calc(100% - 233px) !important;
+        padding-left: 1% !important;
+        padding-right: 1% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 233px !important;
+    }
+
+    /* Widen the fixed sidebar again */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 233px !important;
+    }
+}
+
+@media (min-width: 1360px) {
+    .container {
+        padding-left: 3% !important;
+    }
+
+    .charts-body {
+        width: calc(100% - 263px) !important;
+        padding-left: 1% !important;
+        padding-right: 2% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 263px !important;
+    }
+
+    /* Widen the fixed sidebar again */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 263px !important;
+    }
+}
+
+.action-button {
+    position: relative;
+    display: inline-block;
+    color: gray;
+    cursor: pointer;
+    margin: 0 auto;
+    width: 30px;
+    height: 30px;
+    font-size: 25px;
+}
+
+.ripple {
+    position: relative;
+    /*overflow: hidden;*/
+    transform: translate3d(0, 0, 0)
+}
+
+.ripple:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(18, 18); /* the size of the ripple */
+    opacity: 0;
+    transition: transform .5s, opacity 1s
+}
+
+.ripple:active:after {
+    transform: scale(0, 0);
+    opacity: .2;
+    transition: 0s
+}
