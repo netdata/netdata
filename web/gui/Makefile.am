@@ -62,7 +62,6 @@ dist_web_DATA = \
 	infographic.html \
 	robots.txt \
 	refresh-badges.js \
-	registry.html \
 	sitemap.xml \
 	tv.html \
 	version.txt \
