@@ -10,10 +10,25 @@
 
 **Closed issues:**
 
+- Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
+- smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
+- Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
+- Remove excessive requestAnimationFrame\(\) compatibility checks [\#4501](https://github.com/netdata/netdata/issues/4501)
+- Remove obsolete chart renderers [\#4492](https://github.com/netdata/netdata/issues/4492)
+- Split dashboard.js into multiple files [\#4479](https://github.com/netdata/netdata/issues/4479)
 - Hdd temperature monitoring on FreeBSD [\#4463](https://github.com/netdata/netdata/issues/4463)
+- Modernize dashboard.js [\#4461](https://github.com/netdata/netdata/issues/4461)
 
 **Merged pull requests:**
 
+- Update links to badges documentation. [\#4588](https://github.com/netdata/netdata/pull/4588) ([nekkabcire](https://github.com/nekkabcire))
+- Cleanup index.html [\#4587](https://github.com/netdata/netdata/pull/4587) ([gmosx](https://github.com/gmosx))
+- smartd\_log: py2 compatibility fix [\#4584](https://github.com/netdata/netdata/pull/4584) ([l2isbad](https://github.com/l2isbad))
+- Split js 2 [\#4581](https://github.com/netdata/netdata/pull/4581) ([gmosx](https://github.com/gmosx))
+- netdata-openrc: Move check from depends\(\) to start\_pre\(\) [\#4575](https://github.com/netdata/netdata/pull/4575) ([aadityabagga](https://github.com/aadityabagga))
+- Fix badges link that leads to 404. [\#4569](https://github.com/netdata/netdata/pull/4569) ([nekkabcire](https://github.com/nekkabcire))
+- Add diagrams for internal data structures of netdata [\#4567](https://github.com/netdata/netdata/pull/4567) ([vlvkobal](https://github.com/vlvkobal))
+- Minor documentation improvements [\#4566](https://github.com/netdata/netdata/pull/4566) ([gmosx](https://github.com/gmosx))
 - Clarify application configuration and fix broken link [\#4554](https://github.com/netdata/netdata/pull/4554) ([JBaczuk](https://github.com/JBaczuk))
 - first tag then generate changelog [\#4553](https://github.com/netdata/netdata/pull/4553) ([paulfantom](https://github.com/paulfantom))
 - after release cleanup [\#4552](https://github.com/netdata/netdata/pull/4552) ([paulfantom](https://github.com/paulfantom))
@@ -22,6 +37,7 @@
 - add tor python module [\#4546](https://github.com/netdata/netdata/pull/4546) ([l2isbad](https://github.com/l2isbad))
 - incremental overflows should not show zeros values [\#4538](https://github.com/netdata/netdata/pull/4538) ([ktsaou](https://github.com/ktsaou))
 - smartd\_log refactor plus SCSI support [\#4523](https://github.com/netdata/netdata/pull/4523) ([l2isbad](https://github.com/l2isbad))
+- Refactoring dashboard.js, splitting monolithic file into multiple source files. [\#4496](https://github.com/netdata/netdata/pull/4496) ([gmosx](https://github.com/gmosx))
 - Switch e-mail threading to be enabled by default. [\#3780](https://github.com/netdata/netdata/pull/3780) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.11.0](https://github.com/netdata/netdata/tree/v1.11.0) (2018-11-02)
