@@ -1025,6 +1025,9 @@ let chartState = function (element) {
         this.enabled = false;
     } else {
         this.library = NETDATA.chartLibraries[this.library_name];
+        if (!this.library) {
+            NETDATA.error(402, this.library_name);
+        }
     }
 
     this.auto = {
