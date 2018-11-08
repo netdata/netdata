@@ -56,7 +56,7 @@ This is a template for building custom dashboards. To build a dashboard you just
     <li>You can host your dashboard anywhere.</li>
     <li>You can add as many charts as you like.</li>
     <li>You can have charts from many different netdata servers (add <pre>data-host="http://another.netdata.server:19999/"</pre> to each chart).</li>
-    <li>You can use different chart libraries on the same page: <b>peity</b>, <b>sparkline</b>, <b>dygraph</b>, <b>google</b>, <b>morris</b></li>
+    <li>You can use different chart libraries on the same page: <b>peity</b>, <b>sparkline</b>, <b>dygraph</b>, <b>google</b></li>
     <li>You can customize each chart to your preferences. For each chart library most of their attributes can be given in <b>data-</b> attributes.</li>
     <li>Each chart can have each own duration - it is controlled with the <b>data-after</b> attribute to give that many seconds of data.</li>
     <li>Depending on the width of the chart and <b>data-after</b> attribute, netdata will automatically refresh the chart when it needs to be updated. For example giving 600 pixels for width for -600 seconds of data, using a chart library that needs 3 pixels per point, will yeld in a chart updated once every 3 seconds.</li>
@@ -555,11 +555,8 @@ NetData is a complete Google Visualization API provider.
     <small>rendered in <span id="time303">X</span> ms</small>
 </div>
 
-
-
-
-
-
+<!--
+    
 <hr>
 <h1>Morris Charts</h1>
 Unfortunatelly, Morris Charts are very slow. Here we force them to lower their detail to get acceptable results.
@@ -644,6 +641,7 @@ So, to avoid flashing the charts, we destroy and re-create the charts on each up
     <small>rendered in <span id="time803">X</span> ms</small>
 </div>
 
+-->
 
     <hr>
     <h1>d3pie Charts</h1>

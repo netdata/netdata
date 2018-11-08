@@ -4,9 +4,9 @@ exclude_paths:
   - collectors/python.d.plugin/python_modules/pyyaml3/**
   - collectors/python.d.plugin/python_modules/urllib3/**
   - collectors/python.d.plugin/python_modules/third_party/**
-  - web/css/**
-  - web/lib/**
-  - web/old/**
-  - web/gui/src/**
   - collectors/node.d.plugin/node_modules/**
+  - web/gui/css/**
+  - web/gui/lib/**
+  - web/gui/old/**
+  - web/gui/src/**
   - tests/**
