@@ -59,6 +59,7 @@ dist_web_DATA = \
 	favicon.ico \
 	goto-host-from-alarm.html \
 	index.html \
+	main.js \
 	infographic.html \
 	robots.txt \
 	refresh-badges.js \
