@@ -467,7 +467,7 @@ netdata (1.3.0) - 2016-08-28
    collected metrics.
    Please check the wiki page:
 
-   https://github.com/netdata/netdata/wiki/Generating-Badges
+   https://github.com/netdata/netdata/tree/master/web/api/badges
 
  * netdata plugins are now written in Python!
 
