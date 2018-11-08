@@ -4934,7 +4934,7 @@ NETDATA.commonColors = {
     }
 };
 
-// ----------------------------------------------------------------------------------------------------------------
+// *** src/dashboard.js/main.js
 
 if (NETDATA.options.debug.main_loop) {
     console.log('welcome to NETDATA');
