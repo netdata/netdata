@@ -13,7 +13,7 @@ body {
     top: 0px;
     left: 0px;
     width: 100%;
-    height:100%;
+    height: 100%;
     z-index: 2000;
     font-size: 10vh;
     font-family: sans-serif;
@@ -40,12 +40,12 @@ body {
     margin: 0 auto;
     height: 26px;
     min-width: 500px;
-    background-color:rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.7);
     padding-top: 2px;
     padding-bottom: 2px;
     padding-left: 15px;
     padding-right: 15px;
-    border-radius:10px;
+    border-radius: 10px;
     color: lightgrey;
     pointer-events: auto !important;
 }
@@ -53,6 +53,7 @@ body {
 .navbar-highlight-bar {
     cursor: pointer;
 }
+
 .navbar-highlight-button-right {
     cursor: pointer;
     padding-left: 10px;
@@ -69,10 +70,12 @@ h1 {
     position: relative;
     z-index: -1;
 }
+
 h2 {
     position: relative;
     z-index: -2;
 }
+
 h1:before, h2:before {
     display: block;
     content: " ";
@@ -115,16 +118,16 @@ h1:before, h2:before {
 }
 
 #masthead .well {
-    margin-top:4%;
+    margin-top: 4%;
 }
 
 /* fix the navbar shifting when a modal is open */
 /* https://github.com/twbs/bootstrap/issues/14040#issuecomment-159891033 */
-body.modal-open{
+body.modal-open {
     width: 100% !important;
     padding-right: 0 !important;
-/*      overflow-y: scroll !important; */
-/*      position: fixed !important;*/
+    /*      overflow-y: scroll !important; */
+    /*      position: fixed !important;*/
     overflow: visible;
 }
 
@@ -185,10 +188,12 @@ body.modal-open{
     font-weight: 500;
     color: #767676;
 }
+
 .dashboard-sidebar .nav > li > a > .svg-inline--fa {
     width: 20px;
     text-align: center;
 }
+
 .dashboard-sidebar .nav > li > a:hover,
 .dashboard-sidebar .nav > li > a:focus {
     padding-left: 19px;
@@ -197,6 +202,7 @@ body.modal-open{
     background-color: transparent;
     border-left: 1px solid #563d7c;
 }
+
 .dashboard-sidebar .nav > .active > a,
 .dashboard-sidebar .nav > .active:hover > a,
 .dashboard-sidebar .nav > .active:focus > a {
@@ -212,6 +218,7 @@ body.modal-open{
     display: none; /* Hide by default, but at >768px, show it */
     padding-bottom: 10px;
 }
+
 .dashboard-sidebar .nav .nav > li > a {
     padding-top: 1px;
     padding-bottom: 1px;
@@ -219,10 +226,12 @@ body.modal-open{
     font-size: 12px;
     font-weight: normal;
 }
+
 .dashboard-sidebar .nav .nav > li > a:hover,
 .dashboard-sidebar .nav .nav > li > a:focus {
     padding-left: 29px;
 }
+
 .dashboard-sidebar .nav .nav > .active > a,
 .dashboard-sidebar .nav .nav > .active:hover > a,
 .dashboard-sidebar .nav .nav > .active:focus > a {
@@ -233,38 +242,46 @@ body.modal-open{
 .dropdown-menu {
     min-width: 200px;
 }
+
 .dropdown-menu.columns-2 {
     margin: 0;
     padding: 0;
     width: 400px;
 }
+
 .dropdown-menu li a {
     padding: 5px 15px;
     font-weight: 300;
 }
+
 .dropdown-menu.multi-column {
     overflow-x: hidden;
 }
+
 .multi-column-dropdown {
     list-style: none;
     padding: 0;
 }
+
 .multi-column-dropdown li a {
     display: block;
     clear: both;
     line-height: 1.428571429;
     white-space: normal;
 }
+
 .multi-column-dropdown li a:hover {
     text-decoration: none;
     color: #f5f5f5;
     background-color: #262626;
 }
+
 .scrollable-menu {
     height: auto;
     max-height: 80vh;
     overflow-x: hidden;
 }
+
 .scrollable-menu-50 {
     height: auto;
     max-height: 50vh;
@@ -282,11 +299,13 @@ body.modal-open{
     font-weight: 500;
     color: #999;
 }
+
 .back-to-top:hover,
 .dashboard-theme-toggle:hover {
     color: #563d7c;
     text-decoration: none;
 }
+
 .dashboard-theme-toggle {
     margin-top: 0;
 }
@@ -408,13 +427,16 @@ body.modal-open{
     .dashboard-sidebar.affix-bottom {
         width: 213px !important;
     }
+
     .dashboard-sidebar.affix {
         position: fixed; /* Undo the static from mobile first approach */
         top: 20px;
     }
+
     .dashboard-sidebar.affix-bottom {
         position: absolute; /* Undo the static from mobile first approach */
     }
+
     .dashboard-sidebar.affix-bottom .dashboard-sidenav,
     .dashboard-sidebar.affix .dashboard-sidenav {
         margin-top: 0;
