@@ -57,6 +57,11 @@
     <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
         netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>
     </div>
+    <script type="text/javascript">
+        // change the loadOverlay colors ASAP to match the theme
+        const theme = localStorage.getItem("netdataTheme") || 'slate';
+        document.getElementById('loadOverlay').style = theme == 'slate' ? "background-color: #272b30; color: #373b40;" : "background-color: #fff; color: #ddd;";
+    </script>
     <nav class="navbar navbar-default navbar-fixed-top" role="banner">
         <div class="container">
             <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left hidden-sm hidden-xs" role="navigation" style="padding-right: 20px;">

@@ -4291,8 +4291,3 @@ var selected_server_timezone = function (timezone, status) {
 // var netdataStarted = performance.now();
 
 var netdataCallback = initializeDynamicDashboard;
-
-window.onload = function (e) {
-    // change the loadOverlay colors ASAP to match the theme
-    document.getElementById('loadOverlay').style = (urlOptions.theme === 'slate') ? "background-color:#272b30; color: #373b40;" : "background-color:#fff; color: #ddd;";
-}
