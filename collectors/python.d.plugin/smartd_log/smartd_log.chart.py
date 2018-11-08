@@ -551,7 +551,7 @@ class BaseDisk:
 
     @handle_error(TypeError)
     def populate_attrs(self):
-        self.attrs.clear()
+        self.attrs = list()
         line = self.log_file.read()
         for value in self.parser(line):
             self.attrs.append(attribute_factory(value))
