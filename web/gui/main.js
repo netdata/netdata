@@ -31,12 +31,13 @@ function escapeUserInputHTML(s) {
 }
 
 function verifyURL(s) {
-    if (typeof (s) === 'string' && (s.startsWith('http://') || s.startsWith('https://')))
+    if (typeof (s) === 'string' && (s.startsWith('http://') || s.startsWith('https://'))) {
         return s
             .replace(/'/g, '%22')
             .replace(/"/g, '%27')
             .replace(/\)/g, '%28')
             .replace(/\(/g, '%29');
+    }
 
     console.log('invalid URL detected:');
     console.log(s);
@@ -86,20 +87,25 @@ var urlOptions = {
                 ';highlight_before=' + urlOptions.highlight_before.toString();
         }
 
-        if (urlOptions.theme !== null)
+        if (urlOptions.theme !== null) {
             hash += ';theme=' + urlOptions.theme.toString();
+        }
 
-        if (urlOptions.help !== null)
+        if (urlOptions.help !== null) {
             hash += ';help=' + urlOptions.help.toString();
+        }
 
-        if (urlOptions.update_always === true)
+        if (urlOptions.update_always === true) {
             hash += ';update_always=true';
+        }
 
-        if (forReload === true && urlOptions.server !== null)
+        if (forReload === true && urlOptions.server !== null) {
             hash += ';server=' + urlOptions.server.toString();
+        }
 
-        if (urlOptions.mode !== 'live')
+        if (urlOptions.mode !== 'live') {
             hash += ';mode=' + urlOptions.mode;
+        }
 
         return hash;
     },
@@ -110,22 +116,25 @@ var urlOptions = {
         while (len--) {
             if (len !== 0) {
                 var p = variables[len].split('=');
-                if (urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
+                if (urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined') {
                     urlOptions[p[0]] = decodeURIComponent(p[1]);
+                }
             }
             else {
-                if (variables[len].length > 0)
+                if (variables[len].length > 0) {
                     urlOptions.hash = variables[len];
+                }
             }
         }
 
         var booleans = ['nowelcome', 'show_alarms', 'update_always'];
         len = booleans.length;
         while (len--) {
-            if (urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
+            if (urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1) {
                 urlOptions[booleans[len]] = true;
-            else
+            } else {
                 urlOptions[booleans[len]] = false;
+            }
         }
 
         var numeric = ['after', 'before', 'highlight_after', 'highlight_before'];
@@ -147,21 +156,24 @@ var urlOptions = {
             netdataServer = urlOptions.server;
             netdataCheckXSS = true;
         }
-        else
+        else {
             urlOptions.server = null;
+        }
 
         if (urlOptions.before > 0 && urlOptions.after > 0) {
             urlOptions.pan_and_zoom = true;
             urlOptions.nowelcome = true;
         }
-        else
+        else {
             urlOptions.pan_and_zoom = false;
+        }
 
         if (urlOptions.highlight_before > 0 && urlOptions.highlight_after > 0) {
             urlOptions.highlight = true;
         }
-        else
+        else {
             urlOptions.highlight = false;
+        }
 
         switch (urlOptions.mode) {
             case 'print':
@@ -216,10 +228,11 @@ var urlOptions = {
             before = 0;
         }
 
-        if (netdataSnapshotData === null)
+        if (netdataSnapshotData === null) {
             urlOptions.highlight = status;
-        else
+        } else {
             urlOptions.highlight = false;
+        }
 
         urlOptions.highlight_after = Math.round(after);
         urlOptions.highlight_before = Math.round(before);
@@ -230,7 +243,9 @@ var urlOptions = {
         if (status === true && after > 0 && before > 0 && after < before) {
             var d1 = NETDATA.dateTime.localeDateString(after);
             var d2 = NETDATA.dateTime.localeDateString(before);
-            if (d1 === d2) d2 = '';
+            if (d1 === d2) {
+                d2 = '';
+            }
             document.getElementById('navbar-highlight-content').innerHTML =
                 ((show_eye === true) ? '<span class="navbar-highlight-bar highlight-tooltip" onclick="urlOptions.showHighlight();" title="restore the highlighted view" data-toggle="tooltip" data-placement="bottom">' : '<span>').toString()
                 + 'highlighted time-frame'
@@ -244,19 +259,21 @@ var urlOptions = {
 
             $('.highlight-tooltip').tooltip({
                 html: true,
-                delay: { show: 500, hide: 0 },
+                delay: {show: 500, hide: 0},
                 container: 'body'
             });
         }
-        else
+        else {
             $('.navbar-highlight').hide();
+        }
     },
 
     clearHighlight: function () {
         NETDATA.globalChartUnderlay.clear();
 
-        if (NETDATA.globalPanAndZoom.isActive() === true)
+        if (NETDATA.globalPanAndZoom.isActive() === true) {
             NETDATA.globalPanAndZoom.clearMaster();
+        }
     },
 
     showHighlight: function () {
@@ -270,9 +287,11 @@ urlOptions.parseHash();
 // check options that should be processed before loading netdata.js
 
 var localStorageTested = -1;
+
 function localStorageTest() {
-    if (localStorageTested !== -1)
+    if (localStorageTested !== -1) {
         return localStorageTested;
+    }
 
     if (typeof Storage !== "undefined" && typeof localStorage === 'object') {
         var test = 'test';
@@ -286,8 +305,9 @@ function localStorageTest() {
             localStorageTested = false;
         }
     }
-    else
+    else {
         localStorageTested = false;
+    }
 
     return localStorageTested;
 }
@@ -296,18 +316,20 @@ function loadLocalStorage(name) {
     var ret = null;
 
     try {
-        if (localStorageTest() === true)
+        if (localStorageTest() === true) {
             ret = localStorage.getItem(name);
-        else
+        } else {
             console.log('localStorage is not available');
+        }
     }
     catch (error) {
         console.log(error);
         return null;
     }
 
-    if (typeof ret === 'undefined' || ret === null)
+    if (typeof ret === 'undefined' || ret === null) {
         return null;
+    }
 
     // console.log('loaded: ' + name.toString() + ' = ' + ret.toString());
 
@@ -330,20 +352,26 @@ function saveLocalStorage(name, value) {
 }
 
 function getTheme(def) {
-    if (urlOptions.mode === 'print')
+    if (urlOptions.mode === 'print') {
         return 'white';
+    }
 
     var ret = loadLocalStorage('netdataTheme');
-    if (typeof ret === 'undefined' || ret === null || ret === 'undefined')
+    if (typeof ret === 'undefined' || ret === null || ret === 'undefined') {
         return def;
-    else
+    } else {
         return ret;
+    }
 }
 
 function setTheme(theme) {
-    if (urlOptions.mode === 'print') return false;
+    if (urlOptions.mode === 'print') {
+        return false;
+    }
 
-    if (theme === netdataTheme) return false;
+    if (theme === netdataTheme) {
+        return false;
+    }
     return saveLocalStorage('netdataTheme', theme);
 }
 
@@ -354,8 +382,9 @@ if (urlOptions.theme !== null) {
     setTheme(urlOptions.theme);
     netdataTheme = urlOptions.theme;
 }
-else
+else {
     urlOptions.theme = netdataTheme;
+}
 
 if (urlOptions.help !== null) {
     saveLocalStorage('options.show_help', urlOptions.help);
@@ -392,10 +421,11 @@ function naturalSortCompare(a, b) {
     for (var x = 0; aa[x] && bb[x]; x++) {
         if (aa[x] !== bb[x]) {
             var c = Number(aa[x]), d = Number(bb[x]);
-            if (c.toString() === aa[x] && d.toString() === bb[x])
+            if (c.toString() === aa[x] && d.toString() === bb[x]) {
                 return c - d;
-            else
+            } else {
                 return (aa[x] > bb[x]) ? 1 : -1;
+            }
         }
     }
 
@@ -447,15 +477,19 @@ var netdataRegistryCallback = function (machines_array) {
         a1 += '<li><a href="#" onClick="return false;"><i class="fas fa-info-circle" style="color: #666;"></i></a></li>';
 
         var base = document.location.origin.toString() + document.location.pathname.toString();
-        if (base.endsWith("/host/" + options.hostname + "/"))
+        if (base.endsWith("/host/" + options.hostname + "/")) {
             base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
+        }
 
-        if (base.endsWith("/"))
+        if (base.endsWith("/")) {
             base = base.substring(0, base.length - 1);
+        }
 
         var master = options.hosts[0].hostname;
         var sorted = options.hosts.sort(function (a, b) {
-            if (a.hostname === master) return -1;
+            if (a.hostname === master) {
+                return -1;
+            }
             return naturalSortCompare(a.hostname, b.hostname);
         });
 
@@ -508,10 +542,11 @@ var netdataRegistryCallback = function (machines_array) {
     }
 
     if (!found) {
-        if (machines)
+        if (machines) {
             el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
-        else
+        } else {
             el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+        }
 
         a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
@@ -549,7 +584,9 @@ var netdataRegistryCallback = function (machines_array) {
 };
 
 function isdemo() {
-    if (this_is_demo !== null) return this_is_demo;
+    if (this_is_demo !== null) {
+        return this_is_demo;
+    }
     this_is_demo = false;
 
     try {
@@ -561,21 +598,26 @@ function isdemo() {
                 document.location.hostname.endsWith('.netdata.live') ||
                 document.location.hostname.endsWith('.firehol.org') ||
                 document.location.hostname.endsWith('.netdata.online') ||
-                document.location.hostname.endsWith('.netdata.cloud'))
+                document.location.hostname.endsWith('.netdata.cloud')) {
                 this_is_demo = true;
+            }
         }
     }
-    catch (error) { }
+    catch (error) {
+    }
     return this_is_demo;
 }
 
 function netdataURL(url, forReload) {
     if (typeof url === 'undefined')
-        // url = document.location.toString();
+    // url = document.location.toString();
+    {
         url = '';
+    }
 
-    if (url.indexOf('#') !== -1)
+    if (url.indexOf('#') !== -1) {
         url = url.substring(0, url.indexOf('#'));
+    }
 
     var hash = urlOptions.genHash(forReload);
 
@@ -600,17 +642,19 @@ function gotoHostedModalHandler(url) {
 var gotoServerValidateRemaining = 0;
 var gotoServerMiddleClick = false;
 var gotoServerStop = false;
+
 function gotoServerValidateUrl(id, guid, url) {
     var penalty = 0;
     var error = 'failed';
 
     if (document.location.toString().startsWith('http://') && url.toString().startsWith('https://'))
-        // we penalize https only if the current url is http
-        // to allow the user walk through all its servers.
+    // we penalize https only if the current url is http
+    // to allow the user walk through all its servers.
+    {
         penalty = 500;
-
-    else if (document.location.toString().startsWith('https://') && url.toString().startsWith('http://'))
+    } else if (document.location.toString().startsWith('https://') && url.toString().startsWith('http://')) {
         error = 'can\'t check';
+    }
 
     var finalURL = netdataURL(url);
 
@@ -637,8 +681,9 @@ function gotoServerValidateUrl(id, guid, url) {
                 }
             }
             else {
-                if (typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid)
+                if (typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid) {
                     error = 'wrong machine';
+                }
 
                 document.getElementById(guid + '-' + id + '-status').innerHTML = error;
                 gotoServerValidateRemaining--;
@@ -727,11 +772,13 @@ function notifyForSwitchRegistry() {
             }
         });
     }
-    else
+    else {
         document.getElementById('switchRegistryResponse').innerHTML = "<b>The ID you have entered is not a GUID.</b>";
+    }
 }
 
 var deleteRegistryUrl = null;
+
 function deleteRegistryModalHandler(guid, name, url) {
     void (guid);
 
@@ -783,12 +830,18 @@ function chartsPerRow(total) {
         //if(width === 0) width = 1;
         //return width;
     }
-    else return options.chartsPerRow;
+    else {
+        return options.chartsPerRow;
+    }
 }
 
 function prioritySort(a, b) {
-    if (a.priority < b.priority) return -1;
-    if (a.priority > b.priority) return 1;
+    if (a.priority < b.priority) {
+        return -1;
+    }
+    if (a.priority > b.priority) {
+        return 1;
+    }
     return naturalSortCompare(a.name, b.name);
 }
 
@@ -797,7 +850,9 @@ function sortObjectByPriority(object) {
     var sorted = [];
 
     for (var i in object) {
-        if (!object.hasOwnProperty(i)) continue;
+        if (!object.hasOwnProperty(i)) {
+            continue;
+        }
 
         if (typeof idx[i] === 'undefined') {
             idx[i] = object[i];
@@ -806,14 +861,17 @@ function sortObjectByPriority(object) {
     }
 
     sorted.sort(function (a, b) {
-        if (idx[a].priority < idx[b].priority) return -1;
-        if (idx[a].priority > idx[b].priority) return 1;
+        if (idx[a].priority < idx[b].priority) {
+            return -1;
+        }
+        if (idx[a].priority > idx[b].priority) {
+            return 1;
+        }
         return naturalSortCompare(a, b);
     });
 
     return sorted;
 }
-
 
 // ----------------------------------------------------------------------------
 // scroll to a section, without changing the browser history
@@ -823,7 +881,7 @@ function scrollToId(hash) {
         var offset = $('#' + hash).offset();
         if (typeof offset !== 'undefined') {
             //console.log('scrolling to ' + hash + ' at ' + offset.top.toString());
-            $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
+            $('html, body').animate({scrollTop: offset.top - 30}, 0);
         }
     }
 
@@ -852,27 +910,33 @@ var netdataDashboard = {
     // generate a sparkline
     // used in the documentation
     sparkline: function (prefix, chart, dimension, units, suffix) {
-        if (options.data === null || typeof options.data.charts === 'undefined')
+        if (options.data === null || typeof options.data.charts === 'undefined') {
             return '';
+        }
 
-        if (typeof options.data.charts[chart] === 'undefined')
+        if (typeof options.data.charts[chart] === 'undefined') {
             return '';
+        }
 
-        if (typeof options.data.charts[chart].dimensions === 'undefined')
+        if (typeof options.data.charts[chart].dimensions === 'undefined') {
             return '';
+        }
 
-        if (typeof options.data.charts[chart].dimensions[dimension] === 'undefined')
+        if (typeof options.data.charts[chart].dimensions[dimension] === 'undefined') {
             return '';
+        }
 
         var key = chart + '.' + dimension;
 
-        if (typeof units === 'undefined')
+        if (typeof units === 'undefined') {
             units = '';
+        }
 
-        if (typeof this.sparklines_registry[key] === 'undefined')
-            this.sparklines_registry[key] = { count: 1 };
-        else
+        if (typeof this.sparklines_registry[key] === 'undefined') {
+            this.sparklines_registry[key] = {count: 1};
+        } else {
             this.sparklines_registry[key].count++;
+        }
 
         key = key + '.' + this.sparklines_registry[key].count;
 
@@ -880,11 +944,13 @@ var netdataDashboard = {
     },
 
     gaugeChart: function (title, width, dimensions, colors) {
-        if (typeof colors === 'undefined')
+        if (typeof colors === 'undefined') {
             colors = '';
+        }
 
-        if (typeof dimensions === 'undefined')
+        if (typeof dimensions === 'undefined') {
             dimensions = '';
+        }
 
         return '<div class="netdata-container" data-netdata="CHART_UNIQUE_ID"'
             + ' data-dimensions="' + dimensions + '"'
@@ -903,8 +969,9 @@ var netdataDashboard = {
         if (typeof (obj[key]) !== 'undefined') {
             var x = obj[key][attr];
 
-            if (typeof (x) === 'undefined')
+            if (typeof (x) === 'undefined') {
                 return def;
+            }
 
             if (typeof (x) === 'function') {
                 return x(netdataDashboard.os);
@@ -926,22 +993,25 @@ var netdataDashboard = {
     },
 
     menuIcon: function (chart) {
-        if (typeof chart.menu_pattern !== 'undefined')
+        if (typeof chart.menu_pattern !== 'undefined') {
             return this.anyAttribute(this.menu, 'icon', chart.menu_pattern, '<i class="fas fa-puzzle-piece"></i>').toString();
+        }
 
         return this.anyAttribute(this.menu, 'icon', chart.menu, '<i class="fas fa-puzzle-piece"></i>');
     },
 
     menuInfo: function (chart) {
-        if (typeof chart.menu_pattern !== 'undefined')
+        if (typeof chart.menu_pattern !== 'undefined') {
             return this.anyAttribute(this.menu, 'info', chart.menu_pattern, null);
+        }
 
         return this.anyAttribute(this.menu, 'info', chart.menu, null);
     },
 
     menuHeight: function (chart) {
-        if (typeof chart.menu_pattern !== 'undefined')
+        if (typeof chart.menu_pattern !== 'undefined') {
             return this.anyAttribute(this.menu, 'height', chart.menu_pattern, 1.0);
+        }
 
         return this.anyAttribute(this.menu, 'height', chart.menu, 1.0);
     },
@@ -971,31 +1041,35 @@ var netdataDashboard = {
     contextInfo: function (id) {
         var x = this.anyAttribute(this.context, 'info', id, null);
 
-        if (x !== null)
+        if (x !== null) {
             return '<div class="shorten dashboard-context-info netdata-chart-alignment" role="document">' + x + '</div>';
-        else
+        } else {
             return '';
+        }
     },
 
     contextValueRange: function (id) {
-        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].valueRange !== 'undefined')
+        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].valueRange !== 'undefined') {
             return this.context[id].valueRange;
-        else
+        } else {
             return '[null, null]';
+        }
     },
 
     contextHeight: function (id, def) {
-        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].height !== 'undefined')
+        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].height !== 'undefined') {
             return def * this.context[id].height;
-        else
+        } else {
             return def;
+        }
     },
 
     contextDecimalDigits: function (id, def) {
-        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].decimalDigits !== 'undefined')
+        if (typeof this.context[id] !== 'undefined' && typeof this.context[id].decimalDigits !== 'undefined') {
             return this.context[id].decimalDigits;
-        else
+        } else {
             return def;
+        }
     }
 };
 
@@ -1018,59 +1092,66 @@ function enrichChartData(chart) {
 
         case 'apache':
             chart.menu = chart.type;
-            if (parts.length > 2 && parts[1] === 'cache')
+            if (parts.length > 2 && parts[1] === 'cache') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'bind':
             chart.menu = chart.type;
-            if (parts.length > 2 && parts[1] === 'rndc')
+            if (parts.length > 2 && parts[1] === 'rndc') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'cgroup':
             chart.menu = chart.type;
-            if (chart.id.match(/.*[\._\/-:]qemu[\._\/-:]*/) || chart.id.match(/.*[\._\/-:]kvm[\._\/-:]*/))
+            if (chart.id.match(/.*[\._\/-:]qemu[\._\/-:]*/) || chart.id.match(/.*[\._\/-:]kvm[\._\/-:]*/)) {
                 chart.menu_pattern = 'cgqemu';
-            else
+            } else {
                 chart.menu_pattern = 'cgroup';
+            }
             break;
 
         case 'go':
             chart.menu = chart.type;
-            if (parts.length > 2 && parts[1] === 'expvar')
+            if (parts.length > 2 && parts[1] === 'expvar') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'isc':
             chart.menu = chart.type;
-            if (parts.length > 2 && parts[1] === 'dhcpd')
+            if (parts.length > 2 && parts[1] === 'dhcpd') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'ovpn':
             chart.menu = chart.type;
-            if (parts.length > 3 && parts[1] === 'status' && parts[2] === 'log')
+            if (parts.length > 3 && parts[1] === 'status' && parts[2] === 'log') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'smartd':
         case 'web':
             chart.menu = chart.type;
-            if (parts.length > 2 && parts[1] === 'log')
+            if (parts.length > 2 && parts[1] === 'log') {
                 chart.menu_pattern = tmp + '_' + parts[1];
-            else if (parts.length > 1)
+            } else if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
 
         case 'tc':
@@ -1080,29 +1161,32 @@ function enrichChartData(chart) {
             // we strip '_(in|out)' or '(in|out)_'
             if (chart.context === 'tc.qos' && (typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family)) {
                 var n = chart.name.split('.')[1];
-                if (n.endsWith('_in'))
+                if (n.endsWith('_in')) {
                     options.submenu_names[chart.family] = n.slice(0, n.lastIndexOf('_in'));
-                else if (n.endsWith('_out'))
+                } else if (n.endsWith('_out')) {
                     options.submenu_names[chart.family] = n.slice(0, n.lastIndexOf('_out'));
-                else if (n.startsWith('in_'))
+                } else if (n.startsWith('in_')) {
                     options.submenu_names[chart.family] = n.slice(3, n.length);
-                else if (n.startsWith('out_'))
+                } else if (n.startsWith('out_')) {
                     options.submenu_names[chart.family] = n.slice(4, n.length);
-                else
+                } else {
                     options.submenu_names[chart.family] = n;
+                }
             }
 
             // increase the priority of IFB devices
             // to have inbound appear before outbound
-            if (chart.id.match(/.*-ifb$/))
+            if (chart.id.match(/.*-ifb$/)) {
                 chart.priority--;
+            }
 
             break;
 
         default:
             chart.menu = chart.type;
-            if (parts.length > 1)
+            if (parts.length > 1) {
                 chart.menu_pattern = tmp;
+            }
             break;
     }
 
@@ -1114,12 +1198,13 @@ function enrichChartData(chart) {
 function headMain(os, charts, duration) {
     void (os);
 
-    if (urlOptions.mode === 'print')
+    if (urlOptions.mode === 'print') {
         return '';
+    }
 
     var head = '';
 
-    if (typeof charts['system.swap'] !== 'undefined')
+    if (typeof charts['system.swap'] !== 'undefined') {
         head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.swap"'
             + ' data-dimensions="used"'
             + ' data-append-options="percentage"'
@@ -1133,6 +1218,7 @@ function headMain(os, charts, duration) {
             + ' data-points="' + duration.toString() + '"'
             + ' data-colors="#DD4400"'
             + ' role="application"></div>';
+    }
 
     if (typeof charts['system.io'] !== 'undefined') {
         head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.io"'
@@ -1181,7 +1267,7 @@ function headMain(os, charts, duration) {
             + ' role="application"></div>';
     }
 
-    if (typeof charts['system.cpu'] !== 'undefined')
+    if (typeof charts['system.cpu'] !== 'undefined') {
         head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.cpu"'
             + ' data-chart-library="gauge"'
             + ' data-title="CPU"'
@@ -1192,6 +1278,7 @@ function headMain(os, charts, duration) {
             + ' data-points="' + duration.toString() + '"'
             + ' data-colors="' + NETDATA.colors[12] + '"'
             + ' role="application"></div>';
+    }
 
     if (typeof charts['system.net'] !== 'undefined') {
         head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.net"'
@@ -1288,7 +1375,7 @@ function headMain(os, charts, duration) {
             + ' role="application"></div>';
     }
 
-    if (typeof charts['system.ram'] !== 'undefined')
+    if (typeof charts['system.ram'] !== 'undefined') {
         head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ram"'
             + ' data-dimensions="used|buffers|active|wired"' // active and wired are FreeBSD stats
             + ' data-append-options="percentage"'
@@ -1301,23 +1388,26 @@ function headMain(os, charts, duration) {
             + ' data-points="' + duration.toString() + '"'
             + ' data-colors="' + NETDATA.colors[7] + '"'
             + ' role="application"></div>';
+    }
 
     return head;
 }
 
 function generateHeadCharts(type, chart, duration) {
-    if (urlOptions.mode === 'print')
+    if (urlOptions.mode === 'print') {
         return '';
+    }
 
     var head = '';
     var hcharts = netdataDashboard.anyAttribute(netdataDashboard.context, type, chart.context, []);
     if (hcharts.length > 0) {
         var hi = 0, hlen = hcharts.length;
         while (hi < hlen) {
-            if (typeof hcharts[hi] === 'function')
+            if (typeof hcharts[hi] === 'function') {
                 head += hcharts[hi](netdataDashboard.os, chart.id).replace(/CHART_DURATION/g, duration.toString()).replace(/CHART_UNIQUE_ID/g, chart.id);
-            else
+            } else {
                 head += hcharts[hi].replace(/CHART_DURATION/g, duration.toString()).replace(/CHART_UNIQUE_ID/g, chart.id);
+            }
             hi++;
         }
     }
@@ -1349,8 +1439,9 @@ function renderPage(menus, data) {
         sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
         html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].icon + ' ' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
 
-        if (menus[menu].info !== null)
+        if (menus[menu].info !== null) {
             html += menus[menu].info;
+        }
 
         // console.log(' >> ' + menu + ' (' + menus[menu].priority + '): ' + menus[menu].title);
 
@@ -1369,8 +1460,9 @@ function renderPage(menus, data) {
             sidebar += '<li class><a href="#' + submenuid + '" onClick="return scrollToId(\'' + submenuid + '\');">' + menus[menu].submenus[submenu].title + '</a></li>';
             shtml += '<div role="section" class="dashboard-section-container" id="' + submenuid + '"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
-            if (menus[menu].submenus[submenu].info !== null)
+            if (menus[menu].submenus[submenu].info !== null) {
                 shtml += '<div class="dashboard-submenu-info netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
+            }
 
             var head = '<div class="netdata-chart-row">';
             var chtml = '';
@@ -1389,23 +1481,26 @@ function renderPage(menus, data) {
 
                 function chartCommonMin(family, context, units) {
                     var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMin', context, undefined);
-                    if (typeof x !== 'undefined')
+                    if (typeof x !== 'undefined') {
                         return ' data-common-min="' + family + '/' + context + '/' + units + '"';
-                    else
+                    } else {
                         return '';
+                    }
                 }
 
                 function chartCommonMax(family, context, units) {
                     var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMax', context, undefined);
-                    if (typeof x !== 'undefined')
+                    if (typeof x !== 'undefined') {
                         return ' data-common-max="' + family + '/' + context + '/' + units + '"';
-                    else
+                    } else {
                         return '';
+                    }
                 }
 
                 // generate the chart
-                if (urlOptions.mode === 'print')
+                if (urlOptions.mode === 'print') {
                     chtml += '<div role="row" class="dashboard-print-row">';
+                }
 
                 chtml += '<div class="netdata-chartblock-container" style="width: ' + pcent_width.toString() + '%;">' + netdataDashboard.contextInfo(chart.context) + '<div class="netdata-container" id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                     + ' data-width="100%"'
@@ -1420,8 +1515,9 @@ function renderPage(menus, data) {
                     + chartCommonMax(chart.family, chart.context, chart.units)
                     + ' role="application"></div></div>';
 
-                if (urlOptions.mode === 'print')
+                if (urlOptions.mode === 'print') {
                     chtml += '</div>';
+                }
 
                 // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
             }
@@ -1437,25 +1533,27 @@ function renderPage(menus, data) {
 
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
-    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
+    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
 
-    if (urlOptions.highlight === true)
+    if (urlOptions.highlight === true) {
         NETDATA.globalChartUnderlay.init(null
             , urlOptions.highlight_after
             , urlOptions.highlight_before
             , (urlOptions.after > 0) ? urlOptions.after : null
             , (urlOptions.before > 0) ? urlOptions.before : null
         );
-    else
+    } else {
         NETDATA.globalChartUnderlay.clear();
+    }
 
-    if (urlOptions.mode === 'print')
+    if (urlOptions.mode === 'print') {
         printPage();
-    else
+    } else {
         finalizePage();
+    }
 }
 
 function renderChartsAndMenu(data) {
@@ -1467,7 +1565,9 @@ function renderChartsAndMenu(data) {
     var m, menu_key;
 
     for (var c in charts) {
-        if (!charts.hasOwnProperty(c)) continue;
+        if (!charts.hasOwnProperty(c)) {
+            continue;
+        }
 
         var chart = charts[c];
         enrichChartData(chart);
@@ -1486,11 +1586,13 @@ function renderChartsAndMenu(data) {
             };
         }
         else {
-            if (typeof (menus[m].menu_pattern) === 'undefined')
+            if (typeof (menus[m].menu_pattern) === 'undefined') {
                 menus[m].menu_pattern = chart.menu_pattern;
+            }
 
-            if (chart.priority < menus[m].priority)
+            if (chart.priority < menus[m].priority) {
                 menus[m].priority = chart.priority;
+            }
         }
 
         menu_key = (typeof (menus[m].menu_pattern) !== 'undefined') ? menus[m].menu_pattern : m;
@@ -1506,8 +1608,9 @@ function renderChartsAndMenu(data) {
             };
         }
         else {
-            if (chart.priority < menus[m].submenus[chart.submenu].priority)
+            if (chart.priority < menus[m].submenus[chart.submenu].priority) {
                 menus[m].submenus[chart.submenu].priority = chart.priority;
+            }
         }
 
         // index the chart in the menu/submenu
@@ -1517,10 +1620,14 @@ function renderChartsAndMenu(data) {
     // propagate the descriptive subname given to QoS
     // to all the other submenus with the same name
     for (m in menus) {
-        if (!menus.hasOwnProperty(m)) continue;
+        if (!menus.hasOwnProperty(m)) {
+            continue;
+        }
 
         for (var s in menus[m].submenus) {
-            if (!menus[m].submenus.hasOwnProperty(s)) continue;
+            if (!menus[m].submenus.hasOwnProperty(s)) {
+                continue;
+            }
 
             // set the family using a name
             if (typeof options.submenu_names[s] !== 'undefined') {
@@ -1543,27 +1650,32 @@ function loadJs(url, callback) {
         url: url,
         cache: true,
         dataType: "script",
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .fail(function () {
             alert('Cannot load required JS library: ' + url);
         })
         .always(function () {
-            if (typeof callback === 'function')
+            if (typeof callback === 'function') {
                 callback();
+            }
         })
 }
 
 var clipboardLoaded = false;
+
 function loadClipboard(callback) {
     if (clipboardLoaded === false) {
         clipboardLoaded = true;
         loadJs('lib/clipboard-polyfill-be05dad.js', callback);
     }
-    else callback();
+    else {
+        callback();
+    }
 }
 
 var bootstrapTableLoaded = false;
+
 function loadBootstrapTable(callback) {
     if (bootstrapTableLoaded === false) {
         bootstrapTableLoaded = true;
@@ -1573,10 +1685,13 @@ function loadBootstrapTable(callback) {
             })
         });
     }
-    else callback();
+    else {
+        callback();
+    }
 }
 
 var bootstrapSliderLoaded = false;
+
 function loadBootstrapSlider(callback) {
     if (bootstrapSliderLoaded === false) {
         bootstrapSliderLoaded = true;
@@ -1585,25 +1700,33 @@ function loadBootstrapSlider(callback) {
             callback();
         });
     }
-    else callback();
+    else {
+        callback();
+    }
 }
 
 var lzStringLoaded = false;
+
 function loadLzString(callback) {
     if (lzStringLoaded === false) {
         lzStringLoaded = true;
         loadJs('lib/lz-string-1.4.4.min.js', callback);
     }
-    else callback();
+    else {
+        callback();
+    }
 }
 
 var pakoLoaded = false;
+
 function loadPako(callback) {
     if (pakoLoaded === false) {
         pakoLoaded = true;
         loadJs('lib/pako-1.0.6.min.js', callback);
     }
-    else callback();
+    else {
+        callback();
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -1611,10 +1734,10 @@ function loadPako(callback) {
 function clipboardCopy(text) {
     clipboard.writeText(text);
 }
+
 function clipboardCopyBadgeEmbed(url) {
     clipboard.writeText('<embed src="' + url + '" type="image/svg+xml" height="20"/>');
 }
-
 
 // ----------------------------------------------------------------------------
 
@@ -1623,7 +1746,8 @@ function alarmsUpdateModal() {
     var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
     var footer = '<hr/><a href="https://github.com/netdata/netdata/tree/master/web/api/badges#netdata-badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/health/notifications/health_alarm_notify.conf">this configuration file</a> for more information.';
 
-    loadClipboard(function () { });
+    loadClipboard(function () {
+    });
 
     NETDATA.alarms.get('all', function (data) {
         options.alarm_families = [];
@@ -1633,30 +1757,34 @@ function alarmsUpdateModal() {
         if (data === null) {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'failed to load alarm data!';
+                    document.getElementById('alarms_log').innerHTML =
+                        'failed to load alarm data!';
             return;
         }
 
         function alarmid4human(id) {
-            if (id === 0)
+            if (id === 0) {
                 return '-';
+            }
 
             return id.toString();
         }
 
         function timestamp4human(timestamp, space) {
-            if (timestamp === 0)
+            if (timestamp === 0) {
                 return '-';
+            }
 
-            if (typeof space === 'undefined')
+            if (typeof space === 'undefined') {
                 space = '&nbsp;';
+            }
 
             var t = new Date(timestamp * 1000);
             var now = new Date();
 
-            if (t.toDateString() === now.toDateString())
+            if (t.toDateString() === now.toDateString()) {
                 return t.toLocaleTimeString();
+            }
 
             return t.toLocaleDateString() + space + t.toLocaleTimeString();
         }
@@ -1664,21 +1792,23 @@ function alarmsUpdateModal() {
         function alarm_lookup_explain(alarm, chart) {
             var dimensions = ' of all values ';
 
-            if (chart.dimensions.length > 1)
+            if (chart.dimensions.length > 1) {
                 dimensions = ' of the sum of all dimensions ';
+            }
 
             if (typeof alarm.lookup_dimensions !== 'undefined') {
                 var d = alarm.lookup_dimensions.replace(/|/g, ',');
                 var x = d.split(',');
-                if (x.length > 1)
+                if (x.length > 1) {
                     dimensions = 'of the sum of dimensions <code>' + alarm.lookup_dimensions + '</code> ';
-                else
+                } else {
                     dimensions = 'of all values of dimension <code>' + alarm.lookup_dimensions + '</code> ';
+                }
             }
 
             return '<code>' + alarm.lookup_method + '</code> '
                 + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, { space: '&nbsp;' }) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, { space: '&nbsp;' }) + '</code>'
+                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, {space: '&nbsp;'}) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, {space: '&nbsp;'}) + '</code>'
                 + ((alarm.lookup_options) ? (', with options <code>' + alarm.lookup_options.replace(/ /g, ',&nbsp;') + '</code>') : '')
                 + '.';
         }
@@ -1711,7 +1841,9 @@ function alarmsUpdateModal() {
 
             if (full === true) {
                 var units = chart.units;
-                if (units === '%') units = '&#37;';
+                if (units === '%') {
+                    units = '&#37;';
+                }
 
                 html += ((typeof alarm.lookup_after !== 'undefined') ? ('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>') : '')
                     + ((typeof alarm.calc !== 'undefined') ? ('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>') : '')
@@ -1722,25 +1854,40 @@ function alarmsUpdateModal() {
             var delay = '';
             if ((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier !== 0 && alarm.delay_max_duration > 0) {
                 if (alarm.delay_up_duration === alarm.delay_down_duration) {
-                    delay += '<small><br/>hysteresis ' + NETDATA.seconds4human(alarm.delay_up_duration, { space: '&nbsp;', negative_suffix: '' });
+                    delay += '<small><br/>hysteresis ' + NETDATA.seconds4human(alarm.delay_up_duration, {
+                        space: '&nbsp;',
+                        negative_suffix: ''
+                    });
                 }
                 else {
                     delay = '<small><br/>hysteresis ';
                     if (alarm.delay_up_duration > 0) {
-                        delay += 'on&nbsp;escalation&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_up_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>, ';
+                        delay += 'on&nbsp;escalation&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_up_duration, {
+                            space: '&nbsp;',
+                            negative_suffix: ''
+                        }) + '</code>, ';
                     }
                     if (alarm.delay_down_duration > 0) {
-                        delay += 'on&nbsp;recovery&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_down_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>, ';
+                        delay += 'on&nbsp;recovery&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_down_duration, {
+                            space: '&nbsp;',
+                            negative_suffix: ''
+                        }) + '</code>, ';
                     }
                 }
                 if (alarm.delay_multiplier !== 1.0) {
                     delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
-                    delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_max_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>';
+                    delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_max_duration, {
+                        space: '&nbsp;',
+                        negative_suffix: ''
+                    }) + '</code>';
                 }
                 delay += '</small>';
             }
 
-            html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + NETDATA.seconds4human(alarm.update_every, { space: '&nbsp;', negative_suffix: '' }) + '</td></tr>'
+            html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + NETDATA.seconds4human(alarm.update_every, {
+                    space: '&nbsp;',
+                    negative_suffix: ''
+                }) + '</td></tr>'
                 + ((has_alarm === true) ? ('<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>') : '')
                 + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                 + '</table></td></tr>';
@@ -1769,24 +1916,29 @@ function alarmsUpdateModal() {
         var families = {};
         var families_sort = [];
         for (x in data.alarms) {
-            if (!data.alarms.hasOwnProperty(x)) continue;
+            if (!data.alarms.hasOwnProperty(x)) {
+                continue;
+            }
 
             alarm = data.alarms[x];
             family = alarm.family;
 
             // find the chart
             var chart = options.data.charts[alarm.chart];
-            if (typeof chart === 'undefined')
+            if (typeof chart === 'undefined') {
                 chart = options.data.charts_by_name[alarm.chart];
+            }
 
             // not found - this should never happen!
             if (typeof chart === 'undefined') {
                 console.log('WARNING: alarm ' + x + ' is linked to chart ' + alarm.chart + ', which is not found in the list of chart got from the server.');
-                chart = { priority: 9999999 };
+                chart = {priority: 9999999};
             }
             else if (typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
-                // the family based on the chart
+            // the family based on the chart
+            {
                 family = chart.menu + ' - ' + chart.submenu;
+            }
 
             if (typeof families[family] === 'undefined') {
                 families[family] = {
@@ -1798,16 +1950,21 @@ function alarmsUpdateModal() {
                 families_sort.push(families[family]);
             }
 
-            if (chart.priority < families[family].priority)
+            if (chart.priority < families[family].priority) {
                 families[family].priority = chart.priority;
+            }
 
             families[family].arr.unshift(alarm);
         }
 
         // sort the families, like the dashboard menu does
         var families_sorted = families_sort.sort(function (a, b) {
-            if (a.priority < b.priority) return -1;
-            if (a.priority > b.priority) return 1;
+            if (a.priority < b.priority) {
+                return -1;
+            }
+            if (a.priority > b.priority) {
+                return 1;
+            }
             return naturalSortCompare(a.name, b.name);
         });
 
@@ -1851,24 +2008,30 @@ function alarmsUpdateModal() {
             }
         }
         active += "</table>";
-        if (families_sorted.length > 0) all += "</div></div></div>";
+        if (families_sorted.length > 0) {
+            all += "</div></div></div>";
+        }
         all += "</div>";
 
-        if (!count_active)
+        if (!count_active) {
             active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fas fa-thumbs-up"></i></span><br/>Everything is normal. No raised alarms.</div>';
-        else
+        } else {
             active += footer;
+        }
 
-        if (!count_all)
+        if (!count_all) {
             all += "<h4>No alarms are running in this system.</h4>";
-        else
+        } else {
             all += footer;
+        }
 
         document.getElementById('alarms_active').innerHTML = active;
         document.getElementById('alarms_all').innerHTML = all;
         enableTooltipsAndPopovers();
 
-        if (families_sorted.length > 0) alarm_family_show(0);
+        if (families_sorted.length > 0) {
+            alarm_family_show(0);
+        }
 
         // register bootstrap events
         var $accordion = $('#alarms_all_accordion');
@@ -1905,10 +2068,18 @@ function alarmsUpdateModal() {
                     void (index);
 
                     switch (row.status) {
-                        case 'CRITICAL': return { classes: 'danger' }; break;
-                        case 'WARNING': return { classes: 'warning' }; break;
-                        case 'UNDEFINED': return { classes: 'info' }; break;
-                        case 'CLEAR': return { classes: 'success' }; break;
+                        case 'CRITICAL':
+                            return {classes: 'danger'};
+                            break;
+                        case 'WARNING':
+                            return {classes: 'warning'};
+                            break;
+                        case 'UNDEFINED':
+                            return {classes: 'info'};
+                            break;
+                        case 'CLEAR':
+                            return {classes: 'success'};
+                            break;
                     }
                     return {};
                 },
@@ -1924,7 +2095,11 @@ function alarmsUpdateModal() {
                         title: 'Event Date',
                         valign: 'middle',
                         titleTooltip: 'The date and time the even took place',
-                        formatter: function (value, row, index) { void (row); void (index); return timestamp4human(value, ' '); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return timestamp4human(value, ' ');
+                        },
                         align: 'center',
                         switchable: false,
                         sortable: true
@@ -1942,7 +2117,11 @@ function alarmsUpdateModal() {
                         field: 'unique_id',
                         title: 'Unique ID',
                         titleTooltip: 'The host unique ID for this event',
-                        formatter: function (value, row, index) { void (row); void (index); return alarmid4human(value); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return alarmid4human(value);
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -1952,7 +2131,11 @@ function alarmsUpdateModal() {
                         field: 'alarm_id',
                         title: 'Alarm ID',
                         titleTooltip: 'The ID of the alarm that generated this event',
-                        formatter: function (value, row, index) { void (row); void (index); return alarmid4human(value); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return alarmid4human(value);
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -1962,7 +2145,11 @@ function alarmsUpdateModal() {
                         field: 'alarm_event_id',
                         title: 'Alarm Event ID',
                         titleTooltip: 'The incremental ID of this event for the given alarm',
-                        formatter: function (value, row, index) { void (row); void (index); return alarmid4human(value); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return alarmid4human(value);
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -2079,7 +2266,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2093,7 +2280,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2117,10 +2304,11 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            if (value === true)
+                            if (value === true) {
                                 return 'DONE';
-                            else
+                            } else {
                                 return 'PENDING';
+                            }
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2135,10 +2323,11 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            if (value === true)
+                            if (value === true) {
                                 return 'UPDATED';
-                            else
+                            } else {
                                 return 'CURRENT';
+                            }
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2149,7 +2338,11 @@ function alarmsUpdateModal() {
                         field: 'updated_by_id',
                         title: 'Updated By ID',
                         titleTooltip: 'The unique ID of the event that obsoleted this one',
-                        formatter: function (value, row, index) { void (row); void (index); return alarmid4human(value); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return alarmid4human(value);
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -2159,7 +2352,11 @@ function alarmsUpdateModal() {
                         field: 'updates_id',
                         title: 'Updates ID',
                         titleTooltip: 'The unique ID of the event obsoleted because of this event',
-                        formatter: function (value, row, index) { void (row); void (index); return alarmid4human(value); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return alarmid4human(value);
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -2178,7 +2375,11 @@ function alarmsUpdateModal() {
                         field: 'exec_run',
                         title: 'Script Run At',
                         titleTooltip: 'The date and time the script has been ran',
-                        formatter: function (value, row, index) { void (row); void (index); return timestamp4human(value, ' '); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return timestamp4human(value, ' ');
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -2192,10 +2393,11 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            if (value === 0)
+                            if (value === 0) {
                                 return 'OK (returned 0)';
-                            else
+                            } else {
                                 return 'FAILED (with code ' + value.toString() + ')';
+                            }
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2210,7 +2412,7 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2221,7 +2423,11 @@ function alarmsUpdateModal() {
                         field: 'delay_up_to_timestamp',
                         title: 'Script Delay Run At',
                         titleTooltip: 'The date and time the script should be run, after hysteresis',
-                        formatter: function (value, row, index) { void (row); void (index); return timestamp4human(value, ' '); },
+                        formatter: function (value, row, index) {
+                            void (row);
+                            void (index);
+                            return timestamp4human(value, ' ');
+                        },
                         align: 'center',
                         valign: 'middle',
                         visible: false,
@@ -2255,17 +2461,21 @@ function alarmsUpdateModal() {
 function alarmsCallback(data) {
     var count = 0, x;
     for (x in data.alarms) {
-        if (!data.alarms.hasOwnProperty(x)) continue;
+        if (!data.alarms.hasOwnProperty(x)) {
+            continue;
+        }
 
         var alarm = data.alarms[x];
-        if (alarm.status === 'WARNING' || alarm.status === 'CRITICAL')
+        if (alarm.status === 'WARNING' || alarm.status === 'CRITICAL') {
             count++;
+        }
     }
 
-    if (count > 0)
+    if (count > 0) {
         document.getElementById('alarms_count_badge').innerHTML = count.toString();
-    else
+    } else {
         document.getElementById('alarms_count_badge').innerHTML = '';
+    }
 }
 
 function initializeDynamicDashboardWithData(data) {
@@ -2275,8 +2485,9 @@ function initializeDynamicDashboardWithData(data) {
         options.version = data.version;
         netdataDashboard.os = data.os;
 
-        if (typeof data.hosts !== 'undefined')
+        if (typeof data.hosts !== 'undefined') {
             options.hosts = data.hosts;
+        }
 
         // update the dashboard hostname
         document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString();
@@ -2302,7 +2513,9 @@ function initializeDynamicDashboardWithData(data) {
         var charts = data.charts;
         var x;
         for (x in charts) {
-            if (!charts.hasOwnProperty(x)) continue;
+            if (!charts.hasOwnProperty(x)) {
+                continue;
+            }
 
             var chart = charts[x];
             data.charts_by_name[chart.name] = chart;
@@ -2366,8 +2579,9 @@ function xssModalKeepXss() {
 }
 
 function initializeDynamicDashboard(netdata_url) {
-    if (typeof netdata_url === 'undefined' || netdata_url === null)
+    if (typeof netdata_url === 'undefined' || netdata_url === null) {
         netdata_url = NETDATA.serverDefault;
+    }
 
     initializeConfig.url = netdata_url;
 
@@ -2397,7 +2611,9 @@ function versionLog(msg) {
 function getNetdataCommitIdFromVersion() {
     var s = options.version.split('-');
 
-    if (s.length !== 3) return null;
+    if (s.length !== 3) {
+        return null;
+    }
     if (s[2][0] === 'g') {
         var v = s[2].split('_')[0].substring(1, 8);
         if (v.length === 7) {
@@ -2416,7 +2632,7 @@ function getNetdataCommitId(force, callback) {
         url: 'version.txt',
         async: true,
         cache: false,
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .done(function (data) {
             data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
@@ -2438,11 +2654,14 @@ function getNetdataCommitId(force, callback) {
 
             if (force === true) {
                 var c = getNetdataCommitIdFromVersion();
-                if (c === null) versionLog('Cannot find the git commit id of netdata.');
+                if (c === null) {
+                    versionLog('Cannot find the git commit id of netdata.');
+                }
                 callback(c);
             }
-            else
+            else {
                 callback(null);
+            }
         });
 }
 
@@ -2466,7 +2685,9 @@ function getGithubLatestCommit(callback) {
 
 function checkForUpdate(force, callback) {
     getNetdataCommitId(force, function (sha1) {
-        if (sha1 === null) callback(null, null);
+        if (sha1 === null) {
+            callback(null, null);
+        }
 
         getGithubLatestCommit(function (sha2) {
             callback(sha1, sha2);
@@ -2484,10 +2705,11 @@ function notifyForUpdate(force) {
     if (typeof force === 'undefined' || force !== true) {
         var last = loadLocalStorage('last_update_check');
 
-        if (typeof last === 'string')
+        if (typeof last === 'string') {
             last = parseInt(last);
-        else
+        } else {
             last = 0;
+        }
 
         if (now - last < 3600000 * 8) {
             // no need to check it - too soon
@@ -2519,8 +2741,9 @@ function notifyForUpdate(force) {
             document.getElementById('update_badge').innerHTML = '!';
         }
 
-        if (save)
+        if (save) {
             saveLocalStorage('last_update_check', now.toString());
+        }
     });
 }
 
@@ -2530,7 +2753,6 @@ function notifyForUpdate(force) {
 function showPageFooter() {
     document.getElementById('footer').style.display = 'block';
 }
-
 
 function printPreflight() {
     var url = document.location.origin.toString() + document.location.pathname.toString() + document.location.search.toString() + urlOptions.genHash() + ';mode=print';
@@ -2569,8 +2791,9 @@ function printPage() {
 
         var x;
         for (x in print_options) {
-            if (print_options.hasOwnProperty(x))
+            if (print_options.hasOwnProperty(x)) {
                 NETDATA.options.current[x] = print_options[x];
+            }
         }
 
         NETDATA.parseDom();
@@ -2624,7 +2847,9 @@ function jsonStringifyFn(obj) {
 
 function jsonParseFn(str) {
     return JSON.parse(str, function (key, value) {
-        if (typeof value != 'string') return value;
+        if (typeof value != 'string') {
+            return value;
+        }
         return (value.substring(0, 8) == 'function') ? eval('(' + value + ')') : value;
     });
 }
@@ -2658,7 +2883,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 1.9,
 
             compress: function (s) {
-                return btoa(pako.deflate(s, { to: 'string' }));
+                return btoa(pako.deflate(s, {to: 'string'}));
             },
 
             compressed_length: function (s) {
@@ -2666,7 +2891,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(atob(s), { to: 'string' });
+                return pako.inflate(atob(s), {to: 'string'});
             }
         },
 
@@ -2675,7 +2900,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 3.2,
 
             compress: function (s) {
-                return pako.deflate(s, { to: 'string' });
+                return pako.deflate(s, {to: 'string'});
             },
 
             compressed_length: function (s) {
@@ -2683,7 +2908,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(s, { to: 'string' });
+                return pako.inflate(s, {to: 'string'});
             }
         },
 
@@ -2749,6 +2974,7 @@ function loadSnapshotModalLog(priority, msg) {
 }
 
 var tmpSnapshotData = null;
+
 function loadSnapshot() {
     $('#loadSnapshotImport').addClass('disabled');
 
@@ -2772,25 +2998,30 @@ function loadSnapshot() {
             document.getElementById('sidebar').innerHTML = '';
             NETDATA.globalReset();
 
-            if (typeof tmpSnapshotData.hash !== 'undefined')
+            if (typeof tmpSnapshotData.hash !== 'undefined') {
                 urlOptions.hash = tmpSnapshotData.hash;
-            else
+            } else {
                 urlOptions.hash = '#';
+            }
 
             if (typeof tmpSnapshotData.info !== 'undefined') {
                 var info = jsonParseFn(tmpSnapshotData.info);
-                if (typeof info.menu !== 'undefined')
+                if (typeof info.menu !== 'undefined') {
                     netdataDashboard.menu = info.menu;
+                }
 
-                if (typeof info.submenu !== 'undefined')
+                if (typeof info.submenu !== 'undefined') {
                     netdataDashboard.submenu = info.submenu;
+                }
 
-                if (typeof info.context !== 'undefined')
+                if (typeof info.context !== 'undefined') {
                     netdataDashboard.context = info.context;
+                }
             }
 
-            if (typeof tmpSnapshotData.compression !== 'string')
+            if (typeof tmpSnapshotData.compression !== 'string') {
                 tmpSnapshotData.compression = 'none';
+            }
 
             if (typeof snapshotOptions.compressions[tmpSnapshotData.compression] === 'undefined') {
                 alert('unknown compression method: ' + tmpSnapshotData.compression);
@@ -2829,7 +3060,6 @@ function loadSnapshot() {
     });
 };
 
-
 function loadSnapshotPreflightFile(file) {
     var filename = NETDATA.xss.string(file.name);
     var fr = new FileReader();
@@ -2843,17 +3073,21 @@ function loadSnapshotPreflightFile(file) {
             var date_after = new Date(result.after_ms);
             var date_before = new Date(result.before_ms);
 
-            if (typeof result.charts_ok === 'undefined')
+            if (typeof result.charts_ok === 'undefined') {
                 result.charts_ok = 'unknown';
+            }
 
-            if (typeof result.charts_failed === 'undefined')
+            if (typeof result.charts_failed === 'undefined') {
                 result.charts_failed = 0;
+            }
 
-            if (typeof result.compression === 'undefined')
+            if (typeof result.compression === 'undefined') {
                 result.compression = 'none';
+            }
 
-            if (typeof result.data_size === 'undefined')
+            if (typeof result.data_size === 'undefined') {
                 result.data_size = 0;
+            }
 
             document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + filename + '</code>';
             document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
@@ -2892,6 +3126,7 @@ function loadSnapshotPreflightEmpty() {
 };
 
 var loadSnapshotDragAndDropInitialized = false;
+
 function loadSnapshotDragAndDropSetup() {
     if (loadSnapshotDragAndDropInitialized === false) {
         loadSnapshotDragAndDropInitialized = true;
@@ -2929,11 +3164,13 @@ function loadSnapshotPreflight() {
 // saving snapshots
 
 var saveSnapshotStop = false;
+
 function saveSnapshotCancel() {
     saveSnapshotStop = true;
 }
 
 var saveSnapshotModalInitialized = false;
+
 function saveSnapshotModalSetup() {
     if (saveSnapshotModalInitialized === false) {
         saveSnapshotModalInitialized = true;
@@ -2984,6 +3221,7 @@ function saveSnapshotModalShowExpectedSize() {
 }
 
 var saveSnapshotCompression = snapshotOptions.compressionDefault;
+
 function saveSnapshotSetCompression(name) {
     saveSnapshotCompression = name;
     document.getElementById('saveSnapshotCompressionName').innerHTML = saveSnapshotCompression;
@@ -2993,6 +3231,7 @@ function saveSnapshotSetCompression(name) {
 var saveSnapshotSlider = null;
 var saveSnapshotSelectedSecondsPerPoint = 1;
 var saveSnapshotViewDuration = 1;
+
 function saveSnapshotModalInit() {
     $('#saveSnapshotModalProgressSection').hide();
     $('#saveSnapshotResolutionRadio').show();
@@ -3017,20 +3256,30 @@ function saveSnapshotModalInit() {
         var min = options.update_every;
         var max = Math.round(saveSnapshotViewDuration / 100);
 
-        if (NETDATA.globalPanAndZoom.isActive() === false)
+        if (NETDATA.globalPanAndZoom.isActive() === false) {
             max = Math.round(saveSnapshotViewDuration / 50);
+        }
 
         var view = Math.round(saveSnapshotViewDuration / Math.round($(document.getElementById('charts_div')).width() / 2));
 
         // console.log('view duration: ' + saveSnapshotViewDuration + ', min: ' + min + ', max: ' + max + ', view: ' + view);
 
-        if (max < 10) max = 10;
-        if (max < min) max = min;
-        if (view < min) view = min;
-        if (view > max) view = max;
+        if (max < 10) {
+            max = 10;
+        }
+        if (max < min) {
+            max = min;
+        }
+        if (view < min) {
+            view = min;
+        }
+        if (view > max) {
+            view = max;
+        }
 
-        if (saveSnapshotSlider !== null)
+        if (saveSnapshotSlider !== null) {
             saveSnapshotSlider.destroy();
+        }
 
         saveSnapshotSlider = new Slider('#saveSnapshotResolutionSlider', {
             ticks: [min, view, max],
@@ -3041,18 +3290,21 @@ function saveSnapshotModalInit() {
             scale: (max > 100) ? 'logarithmic' : 'linear',
             tooltip: 'always',
             formatter: function (value) {
-                if (value < 1)
+                if (value < 1) {
                     value = 1;
+                }
 
-                if (value < options.data.update_every)
+                if (value < options.data.update_every) {
                     value = options.data.update_every;
+                }
 
                 saveSnapshotSelectedSecondsPerPoint = value;
                 saveSnapshotModalShowExpectedSize();
 
                 var seconds = ' seconds ';
-                if (value === 1)
+                if (value === 1) {
                     seconds = ' second ';
+                }
 
                 return value + seconds + 'per point' + ((value === options.data.update_every) ? ', server default' : '').toString();
             }
@@ -3135,8 +3387,9 @@ function saveSnapshot() {
             var compressed_length = snapshotOptions.compressions[saveData.compression].compressed_length;
 
             function pack_api1_v1_chart_data(state) {
-                if (state.library_name === null || state.data === null)
+                if (state.library_name === null || state.data === null) {
                     return;
+                }
 
                 var data = state.data;
                 state.data = null;
@@ -3148,8 +3401,9 @@ function saveSnapshot() {
                     saveData.data[state.chartDataUniqueID()] = cstr;
                     return compressed_length(cstr);
                 }
-                else
+                else {
                     return 0;
+                }
             }
 
             var clearPanAndZoom = false;
@@ -3174,15 +3428,17 @@ function saveSnapshot() {
                 // restore the options
                 var x;
                 for (x in backedup_options) {
-                    if (backedup_options.hasOwnProperty(x))
+                    if (backedup_options.hasOwnProperty(x)) {
                         NETDATA.options.current[x] = backedup_options[x];
+                    }
                 }
 
                 $(el).css('width', '0%').attr('aria-valuenow', 0);
                 eltxt.innerText = '0%';
 
-                if (clearPanAndZoom)
+                if (clearPanAndZoom) {
                     NETDATA.globalPanAndZoom.clearMaster();
+                }
 
                 NETDATA.options.force_data_points = 0;
                 NETDATA.options.fake_chart_rendering = false;
@@ -3250,8 +3506,9 @@ function saveSnapshot() {
                             // console.log(saveData);
                             saveObjectToClient(saveData, filename);
 
-                            if (charts_failed > 0)
+                            if (charts_failed > 0) {
                                 alert(charts_failed.toString() + ' failed to be downloaded');
+                            }
 
                             saveSnapshotRestore();
                             saveData = null;
@@ -3348,29 +3605,49 @@ function dashboardSettingsSetup() {
     NETDATA.setOption('setOptionCallback', update_options_modal);
 
     // handle options changes
-    $('#eliminate_zero_dimensions').change(function () { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
-    $('#destroy_on_hide').change(function () { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
-    $('#async_on_scroll').change(function () { NETDATA.setOption('async_on_scroll', $(this).prop('checked')); });
-    $('#parallel_refresher').change(function () { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
-    $('#concurrent_refreshes').change(function () { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
-    $('#sync_selection').change(function () { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
-    $('#sync_pan_and_zoom').change(function () { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
+    $('#eliminate_zero_dimensions').change(function () {
+        NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked'));
+    });
+    $('#destroy_on_hide').change(function () {
+        NETDATA.setOption('destroy_on_hide', $(this).prop('checked'));
+    });
+    $('#async_on_scroll').change(function () {
+        NETDATA.setOption('async_on_scroll', $(this).prop('checked'));
+    });
+    $('#parallel_refresher').change(function () {
+        NETDATA.setOption('parallel_refresher', $(this).prop('checked'));
+    });
+    $('#concurrent_refreshes').change(function () {
+        NETDATA.setOption('concurrent_refreshes', $(this).prop('checked'));
+    });
+    $('#sync_selection').change(function () {
+        NETDATA.setOption('sync_selection', $(this).prop('checked'));
+    });
+    $('#sync_pan_and_zoom').change(function () {
+        NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked'));
+    });
     $('#stop_updates_when_focus_is_lost').change(function () {
         urlOptions.update_always = !$(this).prop('checked');
         urlOptions.hashUpdate();
 
         NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
     });
-    $('#smooth_plot').change(function () { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
-    $('#pan_and_zoom_data_padding').change(function () { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
-    $('#seconds_as_time').change(function () { NETDATA.setOption('seconds_as_time', $(this).prop('checked')); });
-    $('#local_timezone').change(function () {
-        if ($(this).prop('checked'))
-            selected_server_timezone('default', true);
-        else
-            selected_server_timezone('default', false);
+    $('#smooth_plot').change(function () {
+        NETDATA.setOption('smooth_plot', $(this).prop('checked'));
     });
-
+    $('#pan_and_zoom_data_padding').change(function () {
+        NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked'));
+    });
+    $('#seconds_as_time').change(function () {
+        NETDATA.setOption('seconds_as_time', $(this).prop('checked'));
+    });
+    $('#local_timezone').change(function () {
+        if ($(this).prop('checked')) {
+            selected_server_timezone('default', true);
+        } else {
+            selected_server_timezone('default', false);
+        }
+    });
 
     $('#units_conversion').change(function () {
         NETDATA.setOption('units', $(this).prop('checked') ? 'auto' : 'original');
@@ -3393,8 +3670,9 @@ function dashboardSettingsSetup() {
         urlOptions.theme = $(this).prop('checked') ? 'slate' : 'white';
         urlOptions.hashUpdate();
 
-        if (setTheme(urlOptions.theme))
+        if (setTheme(urlOptions.theme)) {
             netdataReload();
+        }
     });
 }
 
@@ -3417,6 +3695,7 @@ function scrollDashboardTo() {
 }
 
 var modalHiddenCallback = null;
+
 function scrollToChartAfterHidingModal(chart) {
     modalHiddenCallback = function () {
         NETDATA.alarms.scrollToChart(chart);
@@ -3430,7 +3709,7 @@ function enableTooltipsAndPopovers() {
         animated: 'fade',
         trigger: 'hover',
         html: true,
-        delay: { show: 500, hide: 0 },
+        delay: {show: 500, hide: 0},
         container: 'body'
     });
     $('[data-toggle="popover"]').popover();
@@ -3439,6 +3718,7 @@ function enableTooltipsAndPopovers() {
 // ----------------------------------------------------------------------------
 
 var runOnceOnDashboardLastRun = 0;
+
 function runOnceOnDashboardWithjQuery() {
     if (runOnceOnDashboardLastRun !== 0) {
         scrollDashboardTo();
@@ -3479,11 +3759,13 @@ function runOnceOnDashboardWithjQuery() {
                 modal_shown = true;
 
                 if (NETDATA.options.pauseCallback === null) {
-                    NETDATA.pause(function () { });
+                    NETDATA.pause(function () {
+                    });
                     netdata_paused_on_modal = true;
                 }
-                else
+                else {
                     netdata_paused_on_modal = false;
+                }
             }
 
             modal_depth++;
@@ -3506,7 +3788,7 @@ function runOnceOnDashboardWithjQuery() {
 
                 // scroll to the position we had open before the modal
                 $('html, body')
-                    .animate({ scrollTop: scrollPos }, 0);
+                    .animate({scrollTop: scrollPos}, 0);
 
                 // unpause netdata, if we paused it
                 if (netdata_paused_on_modal === true) {
@@ -3520,11 +3802,13 @@ function runOnceOnDashboardWithjQuery() {
             //console.log(urlOptions.after);
         })
         .on('hidden.bs.modal', function () {
-            if (modal_depth === 0)
+            if (modal_depth === 0) {
                 modal_shown = false;
+            }
 
-            if (typeof modalHiddenCallback === 'function')
+            if (typeof modalHiddenCallback === 'function') {
                 modalHiddenCallback();
+            }
 
             modalHiddenCallback = null;
             //console.log(urlOptions.after);
@@ -3550,7 +3834,9 @@ function runOnceOnDashboardWithjQuery() {
             // fix bootstrap affix click bug
             // https://stackoverflow.com/a/37847981/4525767
 
-            if (modal_shown) return false;
+            if (modal_shown) {
+                return false;
+            }
         })
         .on('activate.bs.scrollspy', function (e) {
             // change the URL based on the current position of the screen
@@ -3579,12 +3865,15 @@ function runOnceOnDashboardWithjQuery() {
         theme: 'default'
     });
 
-
     // ------------------------------------------------------------------------
     // scrollspy
 
-    if (scrollspyOffset > 250) scrollspyOffset = 250;
-    if (scrollspyOffset < 75) scrollspyOffset = 75;
+    if (scrollspyOffset > 250) {
+        scrollspyOffset = 250;
+    }
+    if (scrollspyOffset < 75) {
+        scrollspyOffset = 75;
+    }
     document.body.setAttribute('data-offset', scrollspyOffset);
 
     // scroll the dashboard, before activating the scrollspy, so that our
@@ -3595,7 +3884,6 @@ function runOnceOnDashboardWithjQuery() {
         target: '#sidebar',
         offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
     });
-
 
     // ------------------------------------------------------------------------
     // my-netdata menu
@@ -3621,7 +3909,8 @@ function runOnceOnDashboardWithjQuery() {
                 this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
             });
 
-            NETDATA.pause(function () { });
+            NETDATA.pause(function () {
+            });
         })
         .on('shown.bs.dropdown', function () {
             Ps.update(document.getElementById('myNetdataDropdownUL'));
@@ -3630,12 +3919,10 @@ function runOnceOnDashboardWithjQuery() {
             NETDATA.unpause();
         });
 
-
     $('#deleteRegistryModal')
         .on('hidden.bs.modal', function () {
             deleteRegistryGuid = null;
         });
-
 
     // ------------------------------------------------------------------------
     // update modal
@@ -3648,7 +3935,6 @@ function runOnceOnDashboardWithjQuery() {
             notifyForUpdate(true);
         });
 
-
     // ------------------------------------------------------------------------
     // alarms modal
 
@@ -3659,10 +3945,9 @@ function runOnceOnDashboardWithjQuery() {
         .on('hidden.bs.modal', function () {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'loading...';
+                    document.getElementById('alarms_log').innerHTML =
+                        'loading...';
         });
-
 
     // ------------------------------------------------------------------------
 
@@ -3670,7 +3955,6 @@ function runOnceOnDashboardWithjQuery() {
     loadSnapshotDragAndDropSetup();
     saveSnapshotModalSetup();
     showPageFooter();
-
 
     // ------------------------------------------------------------------------
     // https://github.com/viralpatel/jquery.shorten/blob/master/src/jquery.shorten.js
@@ -3684,8 +3968,12 @@ function runOnceOnDashboardWithjQuery() {
             ellipsesText: "...",
             moreText: '<i class="fas fa-expand"></i> show more information',
             lessText: '<i class="fas fa-compress"></i> show less information',
-            onLess: function () { NETDATA.onscroll(); },
-            onMore: function () { NETDATA.onscroll(); },
+            onLess: function () {
+                NETDATA.onscroll();
+            },
+            onMore: function () {
+                NETDATA.onscroll();
+            },
             errMsg: null,
             force: false
         };
@@ -3708,14 +3996,18 @@ function runOnceOnDashboardWithjQuery() {
                 if ($this.hasClass('less')) {
                     $this.removeClass('less');
                     $this.html(config.moreText);
-                    $this.parent().prev().animate({ 'height': '0' + '%' }, 0, function () { $this.parent().prev().prev().show(); }).hide(0, function () {
+                    $this.parent().prev().animate({'height': '0' + '%'}, 0, function () {
+                        $this.parent().prev().prev().show();
+                    }).hide(0, function () {
                         config.onLess();
                     });
 
                 } else {
                     $this.addClass('less');
                     $this.html(config.lessText);
-                    $this.parent().prev().animate({ 'height': '100' + '%' }, 0, function () { $this.parent().prev().prev().hide(); }).show(0, function () {
+                    $this.parent().prev().animate({'height': '100' + '%'}, 0, function () {
+                        $this.parent().prev().prev().hide();
+                    }).show(0, function () {
                         config.onMore();
                     });
                 }
@@ -3748,7 +4040,6 @@ function runOnceOnDashboardWithjQuery() {
                             // If its a closing tag
                             if (tagName[0] === '/') {
 
-
                                 if (tagName !== ('/' + openTags[0])) {
                                     config.errMsg = 'ERROR en HTML: the top of the stack should be the tag that closes';
                                 } else {
@@ -3766,7 +4057,9 @@ function runOnceOnDashboardWithjQuery() {
                             inTag = false;
                         }
 
-                        if (inTag) { bag += content.charAt(i); } // Add tag name chars to the result
+                        if (inTag) {
+                            bag += content.charAt(i);
+                        } // Add tag name chars to the result
                         else {
                             r++;
                             if (countChars <= config.showChars) {
@@ -3818,8 +4111,9 @@ function finalizePage() {
     NETDATA.globalPanAndZoom.callback = null;
     NETDATA.globalChartUnderlay.callback = null;
 
-    if (urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
+    if (urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0) {
         NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
+    }
 
     // callback for us to track PanAndZoom operations
     NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
@@ -3848,20 +4142,30 @@ function finalizePage() {
         // this does not run on user's installations
         setTimeout(function () {
             (function (i, s, o, g, r, a, m) {
-            i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
-                (i[r].q = i[r].q || []).push(arguments)
-            }, i[r].l = 1 * new Date(); a = s.createElement(o),
-                m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+                i['GoogleAnalyticsObject'] = r;
+                i[r] = i[r] || function () {
+                    (i[r].q = i[r].q || []).push(arguments)
+                }, i[r].l = 1 * new Date();
+                a = s.createElement(o),
+                    m = s.getElementsByTagName(o)[0];
+                a.async = 1;
+                a.src = g;
+                m.parentNode.insertBefore(a, m)
             })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
             ga('create', 'UA-64295674-3', 'auto');
             ga('send', 'pageview');
         }, 2000);
     }
-    else notifyForUpdate();
+    else {
+        notifyForUpdate();
+    }
 
-    if (urlOptions.show_alarms === true)
-        setTimeout(function () { $('#alarmsModal').modal('show'); }, 1000);
+    if (urlOptions.show_alarms === true) {
+        setTimeout(function () {
+            $('#alarmsModal').modal('show');
+        }, 1000);
+    }
 
     NETDATA.onresizeCallback = function () {
         Ps.update(document.getElementById('sidebar'));
@@ -3881,11 +4185,13 @@ function resetDashboardOptions() {
     var help = NETDATA.options.current.show_help;
 
     NETDATA.resetOptions();
-    if (setTheme('slate'))
+    if (setTheme('slate')) {
         netdataReload();
+    }
 
-    if (help !== NETDATA.options.current.show_help)
+    if (help !== NETDATA.options.current.show_help) {
         netdataReload();
+    }
 }
 
 // callback to add the dashboard info to the
@@ -3893,26 +4199,33 @@ function resetDashboardOptions() {
 var netdataPrepCallback = function () {
     NETDATA.requiredCSS.push({
         url: NETDATA.serverStatic + 'css/bootstrap-toggle-2.2.2.min.css',
-        isAlreadyLoaded: function () { return false; }
+        isAlreadyLoaded: function () {
+            return false;
+        }
     });
 
     NETDATA.requiredJs.push({
         url: NETDATA.serverStatic + 'lib/bootstrap-toggle-2.2.2.min.js',
-        isAlreadyLoaded: function () { return false; }
+        isAlreadyLoaded: function () {
+            return false;
+        }
     });
 
     NETDATA.requiredJs.push({
         url: NETDATA.serverStatic + 'dashboard_info.js?v20181019-1',
         async: false,
-        isAlreadyLoaded: function () { return false; }
+        isAlreadyLoaded: function () {
+            return false;
+        }
     });
 
     if (isdemo()) {
         document.getElementById('masthead').style.display = 'block';
     }
     else {
-        if (urlOptions.update_always === true)
+        if (urlOptions.update_always === true) {
             NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
+        }
     }
 };
 
@@ -3930,15 +4243,17 @@ var selected_server_timezone = function (timezone, status) {
         if (NETDATA.dateTime.init(timezone) === false) {
             NETDATA.dateTime.init();
 
-            if (!$('#local_timezone').prop('checked'))
+            if (!$('#local_timezone').prop('checked')) {
                 $('#local_timezone').bootstrapToggle('on');
+            }
 
             document.getElementById('timezone_error_message').innerHTML = 'Ooops! That timezone was not accepted by your browser. Please open a github issue to help us fix it.';
             NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
         }
         else {
-            if ($('#local_timezone').prop('checked'))
+            if ($('#local_timezone').prop('checked')) {
                 $('#local_timezone').bootstrapToggle('off');
+            }
         }
     }
     else if (status === true) {
@@ -3950,16 +4265,18 @@ var selected_server_timezone = function (timezone, status) {
         // the user wants the server default timezone to be activated
         //console.log('found ' + NETDATA.options.current.user_set_server_timezone);
 
-        if (NETDATA.options.current.user_set_server_timezone === 'default')
+        if (NETDATA.options.current.user_set_server_timezone === 'default') {
             NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
+        }
 
         timezone = NETDATA.options.current.user_set_server_timezone;
 
         if (NETDATA.dateTime.init(timezone) === false) {
             NETDATA.dateTime.init();
 
-            if (!$('#local_timezone').prop('checked'))
+            if (!$('#local_timezone').prop('checked')) {
                 $('#local_timezone').bootstrapToggle('on');
+            }
 
             document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
             NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
@@ -3975,7 +4292,7 @@ var selected_server_timezone = function (timezone, status) {
 
 var netdataCallback = initializeDynamicDashboard;
 
-window.onload = function(e){ 
+window.onload = function (e) {
     // change the loadOverlay colors ASAP to match the theme
-    document.getElementById('loadOverlay').style = (urlOptions.theme === 'slate')?"background-color:#272b30; color: #373b40;":"background-color:#fff; color: #ddd;";
+    document.getElementById('loadOverlay').style = (urlOptions.theme === 'slate') ? "background-color:#272b30; color: #373b40;" : "background-color:#fff; color: #ddd;";
 }
