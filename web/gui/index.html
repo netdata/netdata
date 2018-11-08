@@ -58,8 +58,16 @@
         netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>
     </div>
     <script type="text/javascript">
-        // change the loadOverlay colors ASAP to match the theme
-        const theme = localStorage.getItem("netdataTheme") || 'slate';
+        // Change the loadOverlay colors ASAP to match the theme.
+        let theme;
+        const hash = document.location.hash;
+        if (hash.includes('theme=slate')) {
+            theme = 'slate';
+        } else if (hash.includes('theme=white')) {
+            theme = 'white';
+        } else {
+            theme = localStorage.getItem('netdataTheme') || 'slate';
+        }
         document.getElementById('loadOverlay').style = theme == 'slate' ? "background-color: #272b30; color: #373b40;" : "background-color: #fff; color: #ddd;";
     </script>
     <nav class="navbar navbar-default navbar-fixed-top" role="banner">
