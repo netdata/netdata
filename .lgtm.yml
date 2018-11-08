@@ -18,6 +18,7 @@ path_classifiers:
     - collectors/node.d.plugin/node_modules/net-snmp.js
     - collectors/node.d.plugin/node_modules/pixl-xml.js
     - web/gui/lib/
+    - web/gui/src/
     - web/gui/css/
   test:
     - tests/
