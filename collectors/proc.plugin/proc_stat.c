@@ -13,10 +13,12 @@ struct per_core_single_number_file {
 };
 
 struct last_ticks {
-    collected_number frequency; // TODO: Do we need to check frequency?
+    collected_number frequency;
     collected_number ticks;
 };
 
+// This is an extension of struct per_core_single_number_file at CPU_FREQ_INDEX.
+// Either scaling_cur_freq or time_in_state file is used at one time.
 struct per_core_time_in_state_file {
     const char *filename;
     procfile *ff;
@@ -46,7 +48,7 @@ struct cpu_chart {
 
     struct per_core_single_number_file files[PER_CORE_FILES];
 
-    struct per_core_time_in_state_file time_in_state_files[PER_CORE_FILES]; // TODO: Make it a separate structure?
+    struct per_core_time_in_state_file time_in_state_files[PER_CORE_FILES];
 };
 
 static int keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
@@ -149,14 +151,14 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
             size_t words;
             unsigned long long total_ticks_since_last = 0, avg_freq = 0;
 
-            f->value = 0;
-
-            if (lines <= 1) {
+            // Check if there is at least one frequency in time_in_state
+            if (procfile_word(tsf->ff, 0)[0] == '\0') {
                 if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
                     procfile_close(tsf->ff);
                     tsf->ff = NULL;
                 }
-                // TODO: Is there a better way to avoid spikes than calculating the average?
+                // TODO: Is there a better way to avoid spikes than calculating the average over
+                // the whole period under schedutil governor?
                 // freez(tsf->last_ticks);
                 // tsf->last_ticks = NULL;
                 // tsf->last_ticks_len = 0;                    
@@ -165,10 +167,12 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
             if (unlikely(tsf->last_ticks_len < lines || tsf->last_ticks == NULL)) {
                 tsf->last_ticks = reallocz(tsf->last_ticks, sizeof(struct last_ticks) * lines);
-                // TODO: Is there a better way to avoid spikes than calculating the average?
-                // memset(tsf->last_ticks, 0, lines);
+                memset(tsf->last_ticks, 0, sizeof(struct last_ticks) * lines);
                 tsf->last_ticks_len = lines;
             }
+
+            f->value = 0;
+
             for(l = 0; l < lines - 1 ;l++) {
                 unsigned long long frequency = 0, ticks = 0, ticks_since_last = 0;
 
@@ -180,7 +184,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                 frequency = str2ull(procfile_lineword(tsf->ff, l, 0));
                 ticks     = str2ull(procfile_lineword(tsf->ff, l, 1));
 
-                //TODO: Do we need to check frequency?
+                // It is assumed that frequencies are static and sorted
                 ticks_since_last = ticks - tsf->last_ticks[l].ticks;
                 tsf->last_ticks[l].frequency = frequency;
                 tsf->last_ticks[l].ticks = ticks;
@@ -190,7 +194,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
             }
 
-            if (total_ticks_since_last) {
+            if (likely(total_ticks_since_last)) {
                 avg_freq /= total_ticks_since_last;
                 f->value = avg_freq;
             }
@@ -209,10 +213,10 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
             files_nonzero++;
     }
 
-    if(files_read == 0)
+    if(unlikely(files_read == 0))
         return -1;
 
-    if(files_nonzero == 0)
+    if(unlikely(files_nonzero == 0))
         return 0;
 
     return (int)files_nonzero;
@@ -255,7 +259,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
 
         // give sane defaults based on the number of processors
-        if(processors > 50) {
+        if(unlikely(processors > 50)) {
             // the system has too many processors
             keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
@@ -323,7 +327,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
 
             size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
-            if(core > 0) cores_found = core;
+            if(likely(core > 0)) cores_found = core;
 
             if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
                 char *id;
@@ -348,7 +352,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 char *title, *type, *context, *family;
                 long priority;
 
-                if(core >= all_cpu_charts_size) {
+                if(unlikely(core >= all_cpu_charts_size)) {
                     size_t old_cpu_charts_size = all_cpu_charts_size;
                     all_cpu_charts_size = core + 1;
                     all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
@@ -359,7 +363,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(unlikely(!cpu_chart->st)) {
                     cpu_chart->id = strdupz(id);
 
-                    if(core == 0) {
+                    if(unlikely(core == 0)) {
                         title = "Total CPU utilization";
                         type = "system";
                         context = "system.cpu";
@@ -675,10 +679,10 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(unlikely(!st_scaling_cur_freq))
                     st_scaling_cur_freq = rrdset_create_localhost(
                             "cpu"
-                            , "scaling_cur_freq"
+                            , "scaling_cur_freq" // TODO: disable python module and rename chart
                             , NULL
                             , "cpufreq"
-                            , "cpu.scaling_cur_freq"
+                            , "cpu.scaling_cur_freq" // TODO: disable python module and rename chart
                             , "Per CPU Core, Current CPU Scaling Frequency"
                             , "MHz"
                             , PLUGIN_PROC_NAME
