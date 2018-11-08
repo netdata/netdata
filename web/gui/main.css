@@ -148,9 +148,11 @@ body.modal-open{
     /*width: 220px;*/
 }
 
+/*
 .affix-top {
-    /*width: 220px;*/
+    width: 220px;
 }
+*/
 
 .dashboard-sidebar {
     max-height: calc(100% - 70px) !important;
