@@ -1072,9 +1072,9 @@
 
             if(!found) {
                 if(machines)
-                    el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+                    el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
                 else
-                    el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+                    el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
 
                 a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
@@ -1101,7 +1101,7 @@
             el += '<li role="separator" class="divider"></li>';
             a1 += '<li role="separator" class="divider"></li>';
 
-            el += '<li><a href="https://github.com/netdata/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
+            el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a></li>';
             a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
 
             document.getElementById('mynetdata_servers').innerHTML = el;
@@ -2184,7 +2184,7 @@
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
-            var footer = '<hr/><a href="https://github.com/netdata/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/health/notifications/health_alarm_notify.conf">this configuration file</a> for more information.';
+            var footer = '<hr/><a href="https://github.com/netdata/netdata/tree/master/web/api/badges#netdata-badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/health/notifications/health_alarm_notify.conf">this configuration file</a> for more information.';
 
             loadClipboard(function() {});
 
