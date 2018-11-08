@@ -59,10 +59,11 @@ dist_web_DATA = \
 	favicon.ico \
 	goto-host-from-alarm.html \
 	index.html \
+	main.css \
+	main.js \
 	infographic.html \
 	robots.txt \
 	refresh-badges.js \
-	registry.html \
 	sitemap.xml \
 	tv.html \
 	version.txt \
