@@ -2,10 +2,10 @@
 
 var netdataDashboard = window.netdataDashboard || {};
 
-// ----------------------------------------------------------------------------
-// menus
+// Informational content for the various sections of the GUI (menus, sections, charts, etc.)
 
-// information about the main menus
+// ----------------------------------------------------------------------------
+// Menus
 
 netdataDashboard.menu = {
     'system': {
