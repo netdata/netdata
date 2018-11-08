@@ -45,7 +45,7 @@ NETDATA.zeropad = function (x) {
 };
 
 NETDATA.seconds4human = function (seconds, options) {
-    let default_options = {
+    let defaultOptions = {
         now: 'now',
         space: ' ',
         negative_suffix: 'ago',
@@ -61,11 +61,11 @@ NETDATA.seconds4human = function (seconds, options) {
     };
 
     if (typeof options !== 'object') {
-        options = default_options;
+        options = defaultOptions;
     } else {
-        for (const x in default_options) {
+        for (const x in defaultOptions) {
             if (typeof options[x] !== 'string') {
-                options[x] = default_options[x];
+                options[x] = defaultOptions[x];
             }
         }
     }
@@ -193,15 +193,15 @@ NETDATA.dataAttributeBoolean = function (element, attribute, def) {
 // fast numbers formatting
 
 NETDATA.fastNumberFormat = {
-    formatters_fixed: [],
-    formatters_zero_based: [],
+    formattersFixed: [],
+    formattersZeroBased: [],
 
     // this is the fastest and the preferred
     getIntlNumberFormat: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -212,10 +212,10 @@ NETDATA.fastNumberFormat = {
                 });
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -226,7 +226,7 @@ NETDATA.fastNumberFormat = {
                 });
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             // this is never used
             // it is added just for completeness
@@ -246,8 +246,8 @@ NETDATA.fastNumberFormat = {
     getLocaleString: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = {
                     format: function (value) {
                         return value.toLocaleString(undefined, {
                             // style: 'decimal',
@@ -262,10 +262,10 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = {
                     format: function (value) {
                         return value.toLocaleString(undefined, {
                             // style: 'decimal',
@@ -280,7 +280,7 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             return {
                 format: function (value) {
@@ -302,8 +302,8 @@ NETDATA.fastNumberFormat = {
     getFixed: function (min, max) {
         let key = max;
         if (min === max) {
-            if (typeof this.formatters_fixed[key] === 'undefined') {
-                this.formatters_fixed[key] = {
+            if (typeof this.formattersFixed[key] === 'undefined') {
+                this.formattersFixed[key] = {
                     format: function (value) {
                         if (value === 0) {
                             return "0";
@@ -313,10 +313,10 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_fixed[key];
+            return this.formattersFixed[key];
         } else if (min === 0) {
-            if (typeof this.formatters_zero_based[key] === 'undefined') {
-                this.formatters_zero_based[key] = {
+            if (typeof this.formattersZeroBased[key] === 'undefined') {
+                this.formattersZeroBased[key] = {
                     format: function (value) {
                         if (value === 0) {
                             return "0";
@@ -326,7 +326,7 @@ NETDATA.fastNumberFormat = {
                 };
             }
 
-            return this.formatters_zero_based[key];
+            return this.formattersZeroBased[key];
         } else {
             return {
                 format: function (value) {
@@ -393,4 +393,28 @@ NETDATA.fastNumberFormat = {
         }
         return this.get(min, max);
     }
+};
+
+// ----------------------------------------------------------------------------------------------------------------
+// Detect the netdata server
+
+// http://stackoverflow.com/questions/984510/what-is-my-script-src-url
+// http://stackoverflow.com/questions/6941533/get-protocol-domain-and-port-from-url
+NETDATA._scriptSource = function () {
+    let script = null;
+
+    if (typeof document.currentScript !== 'undefined') {
+        script = document.currentScript;
+    } else {
+        const all_scripts = document.getElementsByTagName('script');
+        script = all_scripts[all_scripts.length - 1];
+    }
+
+    if (typeof script.getAttribute.length !== 'undefined') {
+        script = script.src;
+    } else {
+        script = script.getAttribute('src', -1);
+    }
+
+    return script;
 };

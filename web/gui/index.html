@@ -3760,7 +3760,7 @@
                     NETDATA.options.force_data_points = saveData.data_points;
                     NETDATA.options.fake_chart_rendering = true;
                     NETDATA.onscroll_updater_enabled = false;
-                    NETDATA.abort_all_refreshes();
+                    NETDATA.abortAllRefreshes();
 
                     var size = 0;
                     var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
