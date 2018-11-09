@@ -264,7 +264,7 @@ body.modal-open {
 }
 
 .multi-column-dropdown li a {
-    display: block;
+    display: inline-block;
     clear: both;
     line-height: 1.428571429;
     white-space: normal;
