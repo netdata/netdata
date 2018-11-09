@@ -528,7 +528,7 @@ function renderHosts(options) {
         }
 
         html += (
-            `<div class="agent-item agent-${machine.guid}">
+            `<div class="agent-item">
                 <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                     <i class="fas fa-${icon}" style="color: #999;"></i>
                 </a>                    
