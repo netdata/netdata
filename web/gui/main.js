@@ -469,6 +469,8 @@ var netdataRegistryCallback = function (machines_array) {
     var a1 = '';
     var found = 0, hosted = 0;
     var len, i, url, hostname, icon;
+    
+    let html = ''
 
     if (options.hosts.length > 1) {
         // there are mirrored hosts here
@@ -558,6 +560,16 @@ var netdataRegistryCallback = function (machines_array) {
                     </a>
                 </li>`
             );
+
+            html += (
+                `<div class="agent-item">
+                    <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}"></i>
+                    <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+                    <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
+                        <i class="fas fa-trash" style="color: #999;"></i>
+                    </a>
+                </div>`
+            )
         }
     }
 
@@ -599,6 +611,8 @@ var netdataRegistryCallback = function (machines_array) {
     document.getElementById('mynetdata_servers').innerHTML = el;
     document.getElementById('mynetdata_servers2').innerHTML = el;
     document.getElementById('mynetdata_actions1').innerHTML = a1;
+
+    document.getElementById('my-netdata-agents').innerHTML = html;
 
     gotoServerInit();
 };

@@ -531,3 +531,33 @@ body.modal-open {
     opacity: .2;
     transition: 0s
 }
+
+/* --- */
+
+#my-netdata-agents i {
+    color: #999;
+}
+
+#my-netdata-agents .agent-item {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    font-weight: 300;
+}
+
+#my-netdata-agents .agent-item:hover {
+    background-color: #262626;
+}
+
+#my-netdata-agents .agent-item a:hover {
+    text-decoration: none;
+}
+
+#my-netdata-agents .agent-item :first-child, #my-netdata-agents .agent-item :last-child {
+    width: 32px;
+    text-align: center;
+}
+
+#my-netdata-agents .agent-item :nth-child(2) {
+    min-width: 200px;
+}
