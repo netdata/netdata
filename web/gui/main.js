@@ -490,15 +490,10 @@ function netdataRegistryCallback(machines_array) {
     let html = ''
 
     if (options.hosts.length > 1) {
-        // there are mirrored hosts here
-
-        // el += '<li><a href="#" onClick="return false;" style="color: #666;" target="_blank">databases available on this host</a></li>';
-        // a1 += '<li><a href="#" onClick="return false;"><i class="fas fa-info-circle" style="color: #666;"></i></a></li>';
-
         html += (
             `<div class="info-item">
                 <i class="fas fa-info-circle"></i>
-                Databases available on this host.
+                <span>Databases available on this host.</span>
             </div>`
         );
 
