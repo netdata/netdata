@@ -593,40 +593,82 @@ const netdataRegistryCallback = function (machines_array) {
         }
     }
 
+    found = 0;
+
+    // if (!found) {
+    //     if (machines) {
+    //         el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+    //     } else {
+    //         el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+    //     }
+
+    //     a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
+
+    //     el += '<li role="separator" class="divider"></li>' +
+    //         '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//sanfrancisco.netdata.rocks/default.html">US - San Francisco (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
+    //         '<li><a href="//frankfurt.netdata.rocks/default.html">Germany - Frankfurt (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//toronto.netdata.rocks/default.html">Canada - Toronto (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//singapore.netdata.rocks/default.html">Japan - Singapore (DigitalOcean.com)</a></li>' +
+    //         '<li><a href="//bangalore.netdata.rocks/default.html">India - Bangalore (DigitalOcean.com)</a></li>';
+    //     a1 += '<li role="separator" class="divider"></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>' +
+    //         '<li><a href="#">&nbsp;</a></li>';
+    // }
+
+    found = 0;
+
     if (!found) {
         if (machines) {
-            el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
+            html += (
+                `<div class="info-item">
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty!</a>
+                </div>`
+            )
         } else {
-            el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
+            el += '<li></li>';
+            html += (
+                `<div class="info-item">
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry!</a>
+                </div>`
+            )
         }
 
-        a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
+        // a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
-        el += '<li role="separator" class="divider"></li>' +
-            '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
-            '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
-            '<li><a href="//sanfrancisco.netdata.rocks/default.html">US - San Francisco (DigitalOcean.com)</a></li>' +
-            '<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
-            '<li><a href="//frankfurt.netdata.rocks/default.html">Germany - Frankfurt (DigitalOcean.com)</a></li>' +
-            '<li><a href="//toronto.netdata.rocks/default.html">Canada - Toronto (DigitalOcean.com)</a></li>' +
-            '<li><a href="//singapore.netdata.rocks/default.html">Japan - Singapore (DigitalOcean.com)</a></li>' +
-            '<li><a href="//bangalore.netdata.rocks/default.html">India - Bangalore (DigitalOcean.com)</a></li>';
-        a1 += '<li role="separator" class="divider"></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>' +
-            '<li><a href="#">&nbsp;</a></li>';
+        // el += '<li role="separator" class="divider"></li>' +
+        //     '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//sanfrancisco.netdata.rocks/default.html">US - San Francisco (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
+        //     '<li><a href="//frankfurt.netdata.rocks/default.html">Germany - Frankfurt (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//toronto.netdata.rocks/default.html">Canada - Toronto (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//singapore.netdata.rocks/default.html">Japan - Singapore (DigitalOcean.com)</a></li>' +
+        //     '<li><a href="//bangalore.netdata.rocks/default.html">India - Bangalore (DigitalOcean.com)</a></li>';
+        // a1 += '<li role="separator" class="divider"></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>' +
+        //     '<li><a href="#">&nbsp;</a></li>';
     }
 
-    el += '<li role="separator" class="divider"></li>';
-    a1 += '<li role="separator" class="divider"></li>';
+    // el += '<li role="separator" class="divider"></li>';
+    // a1 += '<li role="separator" class="divider"></li>';
 
-    el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a></li>';
-    a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
+    // el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a></li>';
+    // a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
 
     // document.getElementById('mynetdata_servers').innerHTML = el;
     // document.getElementById('mynetdata_servers2').innerHTML = el;
