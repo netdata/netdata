@@ -538,6 +538,10 @@ body.modal-open {
     color: #999;
 }
 
+#my-netdata-agents a:hover {
+    color: #fff;
+}
+
 #my-netdata-agents .agent-item {
     display: flex;
     align-items: center;
@@ -571,7 +575,7 @@ body.modal-open {
 }
 
 .agent-item--alternate a {
-    color: #888;
+    color: #999;
 }
 
 #my-netdata-agents .agent-alternate-urls.collapsed {

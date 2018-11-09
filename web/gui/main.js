@@ -579,7 +579,7 @@ const netdataRegistryCallback = function (machines_array) {
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <a href="#" onClick="toggleAgentItem('${machine.guid}'); return false;">
-                        <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}"></i>
+                        <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}; color: #999"></i>
                     </a>
                     <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
                     <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
