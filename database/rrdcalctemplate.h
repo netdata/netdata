@@ -58,7 +58,7 @@ struct rrdcalctemplate {
     struct rrdcalctemplate *next;
 };
 
-#define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
+#define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 
 extern void rrdcalctemplate_link_matching(RRDSET *st);
 

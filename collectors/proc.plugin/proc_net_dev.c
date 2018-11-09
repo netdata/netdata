@@ -66,7 +66,7 @@ static struct netdev {
     kernel_uint_t tcollisions;
     kernel_uint_t tcarrier;
     kernel_uint_t tcompressed;
-    kernel_uint_t speed_max;
+    kernel_uint_t speed;
 
     // charts
     RRDSET *st_bandwidth;
@@ -95,6 +95,10 @@ static struct netdev {
     RRDDIM *rd_tcollisions;
     RRDDIM *rd_tcarrier;
     RRDDIM *rd_tcompressed;
+
+    usec_t speed_last_collected_usec;
+    char *filename_speed;
+    RRDSETVAR *chart_var_speed;
 
     struct netdev *next;
 } *netdev_root = NULL, *netdev_last_used = NULL;
@@ -139,7 +143,7 @@ static void netdev_charts_release(struct netdev *d) {
     d->rd_tcompressed = NULL;
 }
 
-static void netdev_free_strings(struct netdev *d) {
+static void netdev_free_chart_strings(struct netdev *d) {
     freez((void *)d->chart_type_net_bytes);
     freez((void *)d->chart_type_net_compressed);
     freez((void *)d->chart_type_net_drops);
@@ -161,9 +165,10 @@ static void netdev_free_strings(struct netdev *d) {
 
 static void netdev_free(struct netdev *d) {
     netdev_charts_release(d);
-    netdev_free_strings(d);
+    netdev_free_chart_strings(d);
 
     freez((void *)d->name);
+    freez((void *)d->filename_speed);
     freez((void *)d);
     netdev_added--;
 }
@@ -265,7 +270,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     info("CGROUP: renaming network interface '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
 
     netdev_charts_release(d);
-    netdev_free_strings(d);
+    netdev_free_chart_strings(d);
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
@@ -435,14 +440,17 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
-    static char *path_to_sys_devices_virtual_net = NULL;
-    static char *path_to_sys_net_speed = NULL;
+    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL;
+    static long long int dt_to_refresh_speed = 0;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
         path_to_sys_devices_virtual_net = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get virtual interfaces", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
+        path_to_sys_class_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", filename);
 
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
@@ -455,6 +463,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_events       = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
 
         disabled_list = simple_pattern_create(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching", "lo fireqos* *-ifb"), NULL, SIMPLE_PATTERN_EXACT);
+
+        dt_to_refresh_speed = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "refresh interface speed every seconds", 10) * USEC_PER_SEC;
+        if(dt_to_refresh_speed < 0) dt_to_refresh_speed = 0;
     }
 
     if(unlikely(!ff)) {
@@ -505,12 +516,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             else
                 d->virtual = 0;
 
-            // set nic speed if present
             if(likely(!d->virtual)) {
-              snprintfz(buffer, FILENAME_MAX, "%s/sys/class/net/%s/speed", netdata_configured_host_prefix, d->name);
-              path_to_sys_net_speed = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get net device speed", buffer);
-              int ret = read_single_number_file(path_to_sys_net_speed, (unsigned long long*)&d->speed_max);
-              if(ret) error("Cannot read '%s'.", path_to_sys_net_speed);
+                // set the filename to get the interface speed
+                snprintfz(buffer, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
+                d->filename_speed = strdupz(buffer);
             }
 
             snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
@@ -597,9 +606,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                RRDSETVAR *nic_speed_max = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "nic_speed_max");
-                if(nic_speed_max) rrdsetvar_custom_chart_variable_set(nic_speed_max, (calculated_number)d->speed_max);
-
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
 
@@ -616,6 +622,35 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_bandwidth, d->rd_rbytes, (collected_number)d->rbytes);
             rrddim_set_by_pointer(d->st_bandwidth, d->rd_tbytes, (collected_number)d->tbytes);
             rrdset_done(d->st_bandwidth);
+
+            // update the interface speed
+            if(d->filename_speed) {
+                d->speed_last_collected_usec += dt;
+
+                if(unlikely(d->speed_last_collected_usec >= (usec_t)dt_to_refresh_speed)) {
+
+                    if(unlikely(!d->chart_var_speed)) {
+                        d->chart_var_speed = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "nic_speed_max");
+                        if(!d->chart_var_speed) {
+                            error("Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.", d->name);
+                            freez(d->filename_speed);
+                            d->filename_speed = NULL;
+                        }
+                    }
+
+                    if(d->filename_speed && d->chart_var_speed) {
+                        if(read_single_number_file(d->filename_speed, (unsigned long long *) &d->speed)) {
+                            error("Cannot refresh interface %s speed by reading '%s'. Will not update its speed anymore.", d->name, d->filename_speed);
+                            freez(d->filename_speed);
+                            d->filename_speed = NULL;
+                        }
+                        else {
+                            rrdsetvar_custom_chart_variable_set(d->chart_var_speed, (calculated_number) d->speed);
+                            d->speed_last_collected_usec = 0;
+                        }
+                    }
+                }
+            }
         }
 
         // --------------------------------------------------------------------
