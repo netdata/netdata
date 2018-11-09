@@ -465,7 +465,10 @@ function saveObjectToClient(data, filename) {
 // registry call back to render my-netdata menu
 
 function toggleAgentItem(guid) {
-    console.log("-- toggle --", guid);
+    const el = document.querySelector(`.agent-alternate-urls.agent-${guid}`)
+    if (el) {
+        el.classList.toggle('collapsed');
+    }
 }
 
 const netdataRegistryCallback = function (machines_array) {
@@ -543,9 +546,9 @@ const netdataRegistryCallback = function (machines_array) {
             const hasAlternateUrls = machine.alternate_urls.length > 1;
 
             let alternateUrlItems = hasAlternateUrls
-                ? machine.alternate_urls.slice(1).reduce(
+                ? `<div class="agent-alternate-urls agent-${machine.guid} collapsed">` + machine.alternate_urls.slice(1).reduce(
                     (str, url) => str + (
-                        `<div class="agent-item agent-item--alternate collapsed">
+                        `<div class="agent-item agent-item--alternate">
                             <div></div>
                             <a href="${url}">${url}</a>
                             <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
@@ -554,7 +557,7 @@ const netdataRegistryCallback = function (machines_array) {
                         </div>`
                     ),
                     ''
-                )
+                ) + `</div>`
                 : '';
 
             el += (
@@ -574,8 +577,8 @@ const netdataRegistryCallback = function (machines_array) {
             );
 
             html += (
-                `<div class="agent-item">
-                    <a href="#" onClick="toggleAgentItem('${machine.guid}')">
+                `<div class="agent-item agent-${machine.guid}">
+                    <a href="#" onClick="toggleAgentItem('${machine.guid}'); return false;">
                         <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}"></i>
                     </a>
                     <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>

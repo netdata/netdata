@@ -574,6 +574,6 @@ body.modal-open {
     color: #888;
 }
 
-.collapsed {
-    display: none !important;
+#my-netdata-agents .agent-alternate-urls.collapsed {
+    display: none;
 }
