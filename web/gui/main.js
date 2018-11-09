@@ -531,13 +531,33 @@ var netdataRegistryCallback = function (machines_array) {
             return naturalSortCompare(a.name, b.name);
         });
 
-        i = 0;
-        len = machines.length;
-        while (len--) {
-            var u = machines[i++];
+        for (const machine of machines) {
             found++;
-            el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
-            a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fas fa-trash" style="color: #999;"></i></a></li>';
+
+            const hasAlternateUrls = machine.alternate_urls.length > 1;
+
+            let alternateUrlItems = hasAlternateUrls
+                ? '<br />' + machine.alternate_urls.slice(1).reduce(
+                    (str, url) => str += `<a href="${url}">${url}</a>`,
+                    ''
+                )
+                : '';
+
+            el += (
+                `<li id="registry_server_${machine.guid}">
+                    <span style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}">+</span>
+                    <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+                    ${alternateUrlItems}
+                </li>`
+            );
+
+            a1 += (
+                `<li id="registry_action_${machine.guid}">
+                    <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
+                        <i class="fas fa-trash" style="color: #999;" />
+                    </a>
+                </li>`
+            );
         }
     }
 
