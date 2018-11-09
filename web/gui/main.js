@@ -514,25 +514,6 @@ function netdataRegistryCallback(machines_array) {
             return naturalSortCompare(a.hostname, b.hostname);
         });
 
-        // i = 0;
-        // len = sorted.length;
-        // while (len--) {
-        //     hostname = sorted[i].hostname;
-        //     if (hostname === master) {
-        //         url = base + "/";
-        //         icon = "home";
-        //     }
-        //     else {
-        //         url = base + "/host/" + hostname + "/";
-        //         icon = "window-restore";
-        //     }
-
-        //     el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
-        //     a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fas fa-' + icon + '" style="color: #999;"></i></a></li>';
-        //     hosted++;
-        //     i++;
-        // }
-
         for (const s of sorted) {
             let url, icon;
             const hostname = s.hostname;
@@ -557,9 +538,6 @@ function netdataRegistryCallback(machines_array) {
 
             hosted++;
         }
-
-        // el += '<li role="separator" class="divider"></li>';
-        // a1 += '<li role="separator" class="divider"></li>';
 
         html += `<hr />`
     }
@@ -609,22 +587,6 @@ function netdataRegistryCallback(machines_array) {
                 alternateUrlItems = '';
             }
 
-            // el += (
-            //     `<li id="registry_server_${machine.guid}">
-            //         <span style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}">+</span>
-            //         <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
-            //         ${alternateUrlItems}
-            //     </li>`
-            // );
-
-            // a1 += (
-            //     `<li id="registry_action_${machine.guid}">
-            //         <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
-            //             <i class="fas fa-trash" style="color: #999;" />
-            //         </a>
-            //     </li>`
-            // );
-
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
@@ -639,35 +601,6 @@ function netdataRegistryCallback(machines_array) {
             )
         }
     }
-
-    // if (!found) {
-    //     if (machines) {
-    //         el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">your netdata server list is empty...</a></li>';
-    //     } else {
-    //         el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #666;" target="_blank">failed to contact the registry...</a></li>';
-    //     }
-
-    //     a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
-
-    //     el += '<li role="separator" class="divider"></li>' +
-    //         '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//sanfrancisco.netdata.rocks/default.html">US - San Francisco (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
-    //         '<li><a href="//frankfurt.netdata.rocks/default.html">Germany - Frankfurt (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//toronto.netdata.rocks/default.html">Canada - Toronto (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//singapore.netdata.rocks/default.html">Japan - Singapore (DigitalOcean.com)</a></li>' +
-    //         '<li><a href="//bangalore.netdata.rocks/default.html">India - Bangalore (DigitalOcean.com)</a></li>';
-    //     a1 += '<li role="separator" class="divider"></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>' +
-    //         '<li><a href="#">&nbsp;</a></li>';
-    // }
 
     if (!found) {
         if (machines) {
@@ -686,8 +619,6 @@ function netdataRegistryCallback(machines_array) {
                 </div>`
             )
         }
-
-        // a1 += '<li><a href="#" onClick="return false;">&nbsp;</a></li>';
 
         // el += '<li role="separator" class="divider"></li>' +
         //     '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
@@ -708,16 +639,6 @@ function netdataRegistryCallback(machines_array) {
         //     '<li><a href="#">&nbsp;</a></li>' +
         //     '<li><a href="#">&nbsp;</a></li>';
     }
-
-    // el += '<li role="separator" class="divider"></li>';
-    // a1 += '<li role="separator" class="divider"></li>';
-
-    // el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a></li>';
-    // a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
-
-    // document.getElementById('mynetdata_servers').innerHTML = el;
-    // document.getElementById('mynetdata_servers2').innerHTML = el;
-    // document.getElementById('mynetdata_actions1').innerHTML = a1;
 
     html += (
         `<hr />
