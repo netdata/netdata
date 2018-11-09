@@ -465,7 +465,7 @@ function saveObjectToClient(data, filename) {
 // registry call back to render my-netdata menu
 
 function toggleExpandIcon(svgEl) {
-    if (svgEl.getAttribute('data-icon') == 'plus-square') {
+    if (svgEl.getAttribute('data-icon') === 'plus-square') {
         svgEl.setAttribute('data-icon', 'minus-square');
     } else {
         svgEl.setAttribute('data-icon', 'plus-square');
@@ -482,80 +482,82 @@ function toggleAgentItem(e, guid) {
     if (el) {
         el.classList.toggle('collapsed');
     }
-
 }
 
-// Populates the my-netdata menu.
-function netdataRegistryCallback(machines_array) {
-    let html = ''
 
-    if (options.hosts.length > 1) {
-        html += (
-            `<div class="info-item">
-                <i class="fas fa-info-circle"></i>
-                <span>Databases available on this host.</span>
-            </div>`
-        );
+// When you stream metrics from netdata to netdata, the recieving netdata now 
+// has multiple host databases. It's own, and multiple mirrored. Mirrored databases 
+// can be accessed with <http://localhost:19999/host/NAME/>
+function renderHosts(options) {
+    let html = '';
 
-        var base = document.location.origin.toString() + document.location.pathname.toString();
-        if (base.endsWith("/host/" + options.hostname + "/")) {
-            base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
-        }
+    html += (
+        `<div class="info-item">
+            <i class="fas fa-info-circle"></i>
+            <span>Databases available on this host.</span>
+        </div>`
+    );
 
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length - 1);
-        }
-
-        var master = options.hosts[0].hostname;
-        var sorted = options.hosts.sort(function (a, b) {
-            if (a.hostname === master) {
-                return -1;
-            }
-            return naturalSortCompare(a.hostname, b.hostname);
-        });
-
-        for (const s of sorted) {
-            let url, icon;
-            const hostname = s.hostname;
-
-            if (hostname == master) {
-                url = `base${'/'}`;
-                icon = 'home';
-            } else {
-                url = `${base}/host/${hostname}/`;
-                icon = 'window-restore';
-            }
-
-            html += (
-                `<div class="agent-item agent-${machine.guid}">
-                    <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
-                        <i class="fas fa-${icon}" style="color: #999;"></i>
-                    </a>                    
-                    <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
-                    <div></div>
-                </div>`
-            )
-
-            hosted++;
-        }
-
-        html += `<hr />`
+    var base = document.location.origin.toString() + document.location.pathname.toString();
+    if (base.endsWith("/host/" + options.hostname + "/")) {
+        base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
     }
 
-    if (machines_array === null) {
+    if (base.endsWith("/")) {
+        base = base.substring(0, base.length - 1);
+    }
+
+    var master = options.hosts[0].hostname;
+    var sorted = options.hosts.sort(function (a, b) {
+        if (a.hostname === master) {
+            return -1;
+        }
+        return naturalSortCompare(a.hostname, b.hostname);
+    });
+
+    for (const s of sorted) {
+        let url, icon;
+        const hostname = s.hostname;
+
+        if (hostname == master) {
+            url = `base${'/'}`;
+            icon = 'home';
+        } else {
+            url = `${base}/host/${hostname}/`;
+            icon = 'window-restore';
+        }
+
+        html += (
+            `<div class="agent-item agent-${machine.guid}">
+                <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
+                    <i class="fas fa-${icon}" style="color: #999;"></i>
+                </a>                    
+                <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
+                <div></div>
+            </div>`
+        )
+    }
+
+    return html;
+}
+
+function renderMachines(machinesArray) {
+    let html = '';
+
+    if (machinesArray === null) {
         var ret = loadLocalStorage("registryCallback");
         if (typeof ret !== 'undefined' && ret !== null) {
-            machines_array = JSON.parse(ret);
+            machinesArray = JSON.parse(ret);
             console.log("failed to contact the registry - loaded registry data from browser local storage");
         }
     }
 
     let found = 0;
 
-    if (machines_array) {
-        saveLocalStorage("registryCallback", JSON.stringify(machines_array));
+    if (machinesArray) {
+        saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
 
-        var machines = machines_array.sort(function (a, b) {
+        var machines = machinesArray.sort(function (a, b) {
             return naturalSortCompare(a.name, b.name);
         });
 
@@ -639,6 +641,19 @@ function netdataRegistryCallback(machines_array) {
         //     '<li><a href="#">&nbsp;</a></li>' +
         //     '<li><a href="#">&nbsp;</a></li>';
     }
+
+    return html;
+}
+
+// Populates the my-netdata menu.
+function netdataRegistryCallback(machinesArray) {
+    let html = '';
+
+    if (options.hosts.length > 1) {
+        html += renderHosts(options) + `<hr />`;
+    }
+
+    html += renderMachines(machinesArray);
 
     html += (
         `<hr />
