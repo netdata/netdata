@@ -587,3 +587,11 @@ body.modal-open {
 #my-netdata-dropdown-content .agent-alternate-urls.collapsed {
     display: none;
 }
+
+#my-netdata-dropdown-content hr {
+    display: block;
+    margin-top: 5px;
+    margin-bottom: 0;
+    border-top: 1px solid #333;
+    height: 4px;
+}

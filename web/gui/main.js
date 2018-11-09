@@ -552,11 +552,11 @@ function netdataRegistryCallback(machines_array) {
 
             html += (
                 `<div class="agent-item agent-${machine.guid}">
-                    <div></div>
-                    <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
                     <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                         <i class="fas fa-${icon}" style="color: #999;"></i>
                     </a>                    
+                    <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
+                    <div></div>
                 </div>`
             )
 
@@ -565,6 +565,8 @@ function netdataRegistryCallback(machines_array) {
 
         // el += '<li role="separator" class="divider"></li>';
         // a1 += '<li role="separator" class="divider"></li>';
+
+        html += `<hr />`
     }
 
     if (machines_array === null) {
@@ -723,7 +725,8 @@ function netdataRegistryCallback(machines_array) {
     // document.getElementById('mynetdata_actions1').innerHTML = a1;
 
     html += (
-        `<div class="agent-item agent-item--separated">
+        `<hr />
+        <div class="agent-item">
             <i class="fas fa-cog""></i>
             <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
             <div></div>
