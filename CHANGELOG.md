@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
 - edit-config uses vi, even if it isn't the system editor [\#4549](https://github.com/netdata/netdata/issues/4549)
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
@@ -11,7 +12,6 @@
 **Closed issues:**
 
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
-- smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
 - Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
 - Remove excessive requestAnimationFrame\(\) compatibility checks [\#4501](https://github.com/netdata/netdata/issues/4501)
 - Remove obsolete chart renderers [\#4492](https://github.com/netdata/netdata/issues/4492)
