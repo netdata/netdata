@@ -485,7 +485,8 @@ function toggleAgentItem(e, guid) {
     
 }
 
-const netdataRegistryCallback = function (machines_array) {
+// Populates the my-netdata menu.
+function netdataRegistryCallback(machines_array) {
     var el = '';
     var a1 = '';
     var found = 0, hosted = 0;
