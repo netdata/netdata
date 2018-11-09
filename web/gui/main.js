@@ -464,7 +464,11 @@ function saveObjectToClient(data, filename) {
 // --------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
-var netdataRegistryCallback = function (machines_array) {
+function toggleAgentItem(guid) {
+    console.log("-- toggle --", guid);
+}
+
+const netdataRegistryCallback = function (machines_array) {
     var el = '';
     var a1 = '';
     var found = 0, hosted = 0;
@@ -539,8 +543,16 @@ var netdataRegistryCallback = function (machines_array) {
             const hasAlternateUrls = machine.alternate_urls.length > 1;
 
             let alternateUrlItems = hasAlternateUrls
-                ? '<br />' + machine.alternate_urls.slice(1).reduce(
-                    (str, url) => str += `<a href="${url}">${url}</a>`,
+                ? machine.alternate_urls.slice(1).reduce(
+                    (str, url) => str + (
+                        `<div class="agent-item agent-item--alternate collapsed">
+                            <div></div>
+                            <a href="${url}">${url}</a>
+                            <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
+                                <i class="fas fa-trash" style="color: #999;"></i>
+                            </a>
+                        </div>`
+                    ),
                     ''
                 )
                 : '';
@@ -563,12 +575,15 @@ var netdataRegistryCallback = function (machines_array) {
 
             html += (
                 `<div class="agent-item">
-                    <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}"></i>
+                    <a href="#" onClick="toggleAgentItem('${machine.guid}')">
+                        <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}"></i>
+                    </a>
                     <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
                     <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
                         <i class="fas fa-trash" style="color: #999;"></i>
                     </a>
-                </div>`
+                </div>
+                ${alternateUrlItems}`
             )
         }
     }
@@ -611,6 +626,19 @@ var netdataRegistryCallback = function (machines_array) {
     document.getElementById('mynetdata_servers').innerHTML = el;
     document.getElementById('mynetdata_servers2').innerHTML = el;
     document.getElementById('mynetdata_actions1').innerHTML = a1;
+
+    html += (
+        `<div class="agent-item agent-item--separated">
+            <i class="fas fa-cog""></i>
+            <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
+            <div></div>
+        </div>
+        <div class="agent-item">
+            <i class="fas fa-question-circle""></i>
+            <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a>
+            <div></div>
+        </div>`
+    )
 
     document.getElementById('my-netdata-agents').innerHTML = html;
 

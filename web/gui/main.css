@@ -561,3 +561,19 @@ body.modal-open {
 #my-netdata-agents .agent-item :nth-child(2) {
     min-width: 200px;
 }
+
+.agent-item__expand-button {
+    cursor: pointer;
+}
+
+.agent-item--separated {
+    border-top: 1px solid #333;
+}
+
+.agent-item--alternate a {
+    color: #888;
+}
+
+.collapsed {
+    display: none !important;
+}
