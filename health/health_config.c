@@ -84,7 +84,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
-    if(unlikely(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical)) {
+    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
         error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
         return 0;
     }
