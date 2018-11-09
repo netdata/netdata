@@ -240,7 +240,7 @@ body.modal-open {
 }
 
 .dropdown-menu {
-    min-width: 260px;
+    min-width: 200px;
 }
 
 .dropdown-menu.columns-2 {
@@ -569,7 +569,7 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content .agent-item :nth-child(2) {
-    min-width: 200px;
+    min-width: 320px;
 }
 
 .agent-item__expand-button {
