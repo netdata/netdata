@@ -543,7 +543,7 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content .info-item {
-    height: 32px;
+    min-height: 32px;
     font-weight: 300;
     text-align: center;
 }
@@ -551,7 +551,7 @@ body.modal-open {
 #my-netdata-dropdown-content .agent-item {
     display: flex;
     align-items: center;
-    height: 32px;
+    min-height: 32px;
     font-weight: 300;
 }
 
@@ -570,6 +570,7 @@ body.modal-open {
 
 #my-netdata-dropdown-content .agent-item :nth-child(2) {
     min-width: 320px;
+    line-height: 14px;
 }
 
 .agent-item__expand-button {
