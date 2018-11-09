@@ -548,7 +548,7 @@ const netdataRegistryCallback = function (machines_array) {
             const hasAlternateUrls = machine.alternate_urls.length > 1;
 
             let alternateUrlItems = hasAlternateUrls
-                ? `<div class="agent-alternate-urls agent-${machine.guid} collapsed">` + machine.alternate_urls.slice(1).reduce(
+                ? `<div class="agent-alternate-urls agent-${machine.guid} collapsed">` + machine.alternate_urls.reduce(
                     (str, url) => str + (
                         `<div class="agent-item agent-item--alternate">
                             <div></div>
@@ -562,21 +562,21 @@ const netdataRegistryCallback = function (machines_array) {
                 ) + `</div>`
                 : '';
 
-            el += (
-                `<li id="registry_server_${machine.guid}">
-                    <span style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}">+</span>
-                    <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
-                    ${alternateUrlItems}
-                </li>`
-            );
+            // el += (
+            //     `<li id="registry_server_${machine.guid}">
+            //         <span style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}">+</span>
+            //         <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+            //         ${alternateUrlItems}
+            //     </li>`
+            // );
 
-            a1 += (
-                `<li id="registry_action_${machine.guid}">
-                    <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
-                        <i class="fas fa-trash" style="color: #999;" />
-                    </a>
-                </li>`
-            );
+            // a1 += (
+            //     `<li id="registry_action_${machine.guid}">
+            //         <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
+            //             <i class="fas fa-trash" style="color: #999;" />
+            //         </a>
+            //     </li>`
+            // );
 
             html += (
                 `<div class="agent-item agent-${machine.guid}">
