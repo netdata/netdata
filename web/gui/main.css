@@ -534,35 +534,35 @@ body.modal-open {
 
 /* --- */
 
-#my-netdata-agents i {
+#my-netdata-dropdown-content i {
     color: #999;
 }
 
-#my-netdata-agents a:hover {
+#my-netdata-dropdown-content a:hover {
     color: #fff;
 }
 
-#my-netdata-agents .agent-item {
+#my-netdata-dropdown-content .agent-item {
     display: flex;
     align-items: center;
     height: 32px;
     font-weight: 300;
 }
 
-#my-netdata-agents .agent-item:hover {
+#my-netdata-dropdown-content .agent-item:hover {
     background-color: #262626;
 }
 
-#my-netdata-agents .agent-item a:hover {
+#my-netdata-dropdown-content .agent-item a:hover {
     text-decoration: none;
 }
 
-#my-netdata-agents .agent-item :first-child, #my-netdata-agents .agent-item :last-child {
+#my-netdata-dropdown-content .agent-item :first-child, #my-netdata-dropdown-content .agent-item :last-child {
     width: 32px;
     text-align: center;
 }
 
-#my-netdata-agents .agent-item :nth-child(2) {
+#my-netdata-dropdown-content .agent-item :nth-child(2) {
     min-width: 200px;
 }
 
@@ -578,6 +578,6 @@ body.modal-open {
     color: #999;
 }
 
-#my-netdata-agents .agent-alternate-urls.collapsed {
+#my-netdata-dropdown-content .agent-alternate-urls.collapsed {
     display: none;
 }

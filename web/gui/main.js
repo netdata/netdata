@@ -464,7 +464,9 @@ function saveObjectToClient(data, filename) {
 // --------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
-function toggleAgentItem(guid) {
+function toggleAgentItem(e, guid) {
+    e.stopPropagation();
+    e.preventDefault();
     const el = document.querySelector(`.agent-alternate-urls.agent-${guid}`)
     if (el) {
         el.classList.toggle('collapsed');
@@ -578,7 +580,7 @@ const netdataRegistryCallback = function (machines_array) {
 
             html += (
                 `<div class="agent-item agent-${machine.guid}">
-                    <a href="#" onClick="toggleAgentItem('${machine.guid}'); return false;">
+                    <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
                         <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}; color: #999"></i>
                     </a>
                     <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
@@ -626,9 +628,9 @@ const netdataRegistryCallback = function (machines_array) {
     el += '<li><a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a></li>';
     a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>';
 
-    document.getElementById('mynetdata_servers').innerHTML = el;
-    document.getElementById('mynetdata_servers2').innerHTML = el;
-    document.getElementById('mynetdata_actions1').innerHTML = a1;
+    // document.getElementById('mynetdata_servers').innerHTML = el;
+    // document.getElementById('mynetdata_servers2').innerHTML = el;
+    // document.getElementById('mynetdata_actions1').innerHTML = a1;
 
     html += (
         `<div class="agent-item agent-item--separated">
@@ -643,7 +645,7 @@ const netdataRegistryCallback = function (machines_array) {
         </div>`
     )
 
-    document.getElementById('my-netdata-agents').innerHTML = html;
+    document.getElementById('my-netdata-dropdown-content').innerHTML = html;
 
     gotoServerInit();
 };
@@ -3953,7 +3955,7 @@ function runOnceOnDashboardWithjQuery() {
     // ------------------------------------------------------------------------
     // my-netdata menu
 
-    Ps.initialize(document.getElementById('myNetdataDropdownUL'), {
+    Ps.initialize(document.getElementById('my-netdata-dropdown-content'), {
         wheelSpeed: 1,
         wheelPropagation: false,
         swipePropagation: false,
@@ -3978,7 +3980,7 @@ function runOnceOnDashboardWithjQuery() {
             });
         })
         .on('shown.bs.dropdown', function () {
-            Ps.update(document.getElementById('myNetdataDropdownUL'));
+            Ps.update(document.getElementById('my-netdata-dropdown-content'));
         })
         .on('hidden.bs.dropdown', function () {
             NETDATA.unpause();
@@ -4234,7 +4236,7 @@ function finalizePage() {
 
     NETDATA.onresizeCallback = function () {
         Ps.update(document.getElementById('sidebar'));
-        Ps.update(document.getElementById('myNetdataDropdownUL'));
+        Ps.update(document.getElementById('my-netdata-dropdown-content'));
     };
     NETDATA.onresizeCallback();
 
