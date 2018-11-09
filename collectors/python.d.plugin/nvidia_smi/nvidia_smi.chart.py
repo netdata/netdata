@@ -294,7 +294,7 @@ class GPU:
             'power_draw': self.power_draw(),
         }
 
-        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v)
+        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None)
 
 
 class Service(SimpleService):
