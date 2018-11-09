@@ -464,13 +464,25 @@ function saveObjectToClient(data, filename) {
 // --------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
+function toggleExpandIcon(svgEl) {
+    if (svgEl.getAttribute('data-icon') == 'plus-square') {
+        svgEl.setAttribute('data-icon', 'minus-square');
+    } else {
+        svgEl.setAttribute('data-icon', 'plus-square');
+    }
+}
+
 function toggleAgentItem(e, guid) {
     e.stopPropagation();
     e.preventDefault();
+
+    toggleExpandIcon(e.currentTarget.children[0]);
+
     const el = document.querySelector(`.agent-alternate-urls.agent-${guid}`)
     if (el) {
         el.classList.toggle('collapsed');
     }
+    
 }
 
 const netdataRegistryCallback = function (machines_array) {
@@ -581,19 +593,17 @@ const netdataRegistryCallback = function (machines_array) {
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
-                        <i class="fas fa-plus" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}; color: #999"></i>
+                        <i class="fas fa-plus-square" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}; color: #999"></i>
                     </a>
                     <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
                     <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
-                        <i class="fas fa-trash" style="color: #999;"></i>
+                        <i class="fas fa-trash" style="color: #999"></i>
                     </a>
                 </div>
                 ${alternateUrlItems}`
             )
         }
     }
-
-    found = 0;
 
     // if (!found) {
     //     if (machines) {
@@ -624,12 +634,11 @@ const netdataRegistryCallback = function (machines_array) {
     //         '<li><a href="#">&nbsp;</a></li>';
     // }
 
-    found = 0;
-
     if (!found) {
         if (machines) {
             html += (
                 `<div class="info-item">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty!</a>
                 </div>`
             )
@@ -637,6 +646,7 @@ const netdataRegistryCallback = function (machines_array) {
             el += '<li></li>';
             html += (
                 `<div class="info-item">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry!</a>
                 </div>`
             )
