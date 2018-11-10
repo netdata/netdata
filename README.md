@@ -88,8 +88,7 @@ More installation methods can be found at the [installation page](https://github
 
 ## User base
 
-Check the watchers list on github. You will find users working for:
-**Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
+Check the [watchers list on GitHub](https://github.com/netdata/netdata/watchers). You will find users working for: **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
 **Elastic**, **EPAM Systems**, **Ericsson**, **Google**, **Groupon**, **Hortonworks**, **HP**, **Huawei**,
 **IBM**, **Microsoft**, **NewRelic**, **Nvidia**, **Red Hat**, **SAP**, **Selectel**, **TicketMaster**,
 **Vimeo**, and many more!
