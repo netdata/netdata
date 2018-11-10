@@ -150,7 +150,7 @@ Click it to to interact with it (it has direct links to documentation).
 
 This is what you should expect from Netdata:
 
-### General Operation
+### General
 - **1s granularity** - the highest possible resolution for all metrics.
 - **Unlimited metrics** - collects all the available metrics, the more the better.
 - **1% CPU utilization of a single core** - it is super fast, unbelievably optimized.
@@ -176,7 +176,9 @@ This is what you should expect from Netdata:
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
 
-### Data Collection
+---
+
+## Data Collection
 - **Extensible** - you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
 - **statsd** - [netdata is a fully featured statsd server](https://github.com/netdata/netdata/wiki/statsd) for collecting your custom application's APM metrics.
 
@@ -231,15 +233,15 @@ This is what you should expect from Netdata:
 #### Proxy and Balancing Servers
 - **Squid proxy servers** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
 - **HAproxy** - bandwidth, sessions, backends, etc.
-- **varnish** - threads, sessions, hits, objects, backends, etc.
+- **Varnish** - threads, sessions, hits, objects, backends, etc.
 
 #### Database Servers
-- **mySQL and mariadb databases** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
-- **Postgres databases** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
-- **Redis databases** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
-- **couchdb** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
-- **mongodb** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
-- **memcached databases** - multiple servers, each showing: bandwidth, connections, items, etc.
+- **mySQL and mariadb** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
+- **PostgreSQL** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
+- **Redis** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
+- **CouchDB** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
+- **MongoDB** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
+- **MemCached** - multiple servers, each showing: bandwidth, connections, items, etc.
 
 #### DNS Servers
 - **ISC Bind name servers** - multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics.
