@@ -89,11 +89,12 @@ More installation methods can be found at the [installation page](https://github
 ## User base
 
 ![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
-  
+
 Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
 Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
 
-Netdata has hundreds of thousands of users, all over the world. Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
+Netdata is a **robust** application. It has hundreds of thousands of users, all over the world.
+Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
 You will find users working for: **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
 **Elastic**, **EPAM Systems**, **Ericsson**, **Google**, **Groupon**, **Hortonworks**, **HP**, **Huawei**,
 **IBM**, **Microsoft**, **NewRelic**, **Nvidia**, **Red Hat**, **SAP**, **Selectel**, **TicketMaster**,
@@ -147,55 +148,25 @@ Click it to to interact with it (it has direct links to documentation).
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>  
 </p>  
 
- - **Stunning interactive bootstrap dashboards**<br/>  
-  mouse and touch friendly, in 2 themes: dark, light  
-  
- - **Amazingly fast**<br/>  
-  responds to all queries in less than 0.5 ms per metric,  
-   even on low-end hardware  
-  
- - **Highly efficient**<br/>  
-  collects thousands of metrics per server per second,  
-   with just 1% CPU utilization of a single core, a few MB of RAM and no disk I/O at all  
-  
- - **Sophisticated alerting**<br/>  
-  hundreds of alarms, **out of the box**!<br/>  
-  supports dynamic thresholds, hysteresis, alarm templates,  
-   multiple role-based notification methods (such as email, slack.com, flock.com,  
-   pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com, kavenegar.com)  
-  
- - **Extensible**<br/>  
-  you can monitor anything you can get a metric for,  
-   using its Plugin API (anything can be a netdata plugin,  
-   BASH, python, perl, node.js, java, Go, ruby, etc)  
-  
- - **Embeddable**<br/>  
-  it can run anywhere a Linux kernel runs (even IoT)  
-   and its charts can be embedded on your web pages too  
-  
- - **Customizable**<br/>  
-  custom dashboards can be built using simple HTML (no javascript necessary)  
-  
- - **Zero configuration**<br/>  
-  auto-detects everything, it can collect up to 5000 metrics  
-   per server out of the box  
-  
- - **Zero dependencies**<br/>  
-  it is even its own web server, for its static web files and its web API  
-  
- - **Zero maintenance**<br/>  
-  you just run it, it does the rest  
-  
- - **scales to infinity**<br/>  
-  requiring minimal central resources  
-  
- - **several operating modes**<br/>  
-  autonomous host monitoring, headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations.  
-   Each node may have different metrics retention policy and run with or without health monitoring.  
-  
- - **time-series back-ends supported**<br/>  
-  can archive its metrics on `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower detail  
-   (lower: to prevent it from congesting these servers due to the amount of data collected)  
+This is what you should expect while using Netdata:
+
+Feature|Notes
+:---:|:---
+**1s granularity**|Collects all metrics, every single second.
+**Thousands of metrics**|Collects all the available metrics, the more the better.
+**1% CPU utilization**|Collects thousands of metrics per server per second, with just **1% CPU utilization of a single core**.
+**Stunning interactive bootstrap dashboards**|Mouse, touchpad and touch-screen friendly, in 2 themes: `slate` (dark) and `white` (light).
+**Amazingly fast visualization**|Responds to all queries in less than 1 ms per metric, even on low-end hardware.
+**Zero configuration**|Auto-detects everything, it can collect up to 10000 metrics per server out of the box.
+**Zero maintenance**|You just run it, it does the rest.
+**Zero dependencies**|It is even its own web server, for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).  
+**Scales to infinity**|You can install it on all your servers, containers, VMs, IoTs. Metrics are not centralized by default, so there is no limit to the scale supported.
+**Sophisticated alerting**|Hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods (such as email, slack.com, flock.com, pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com, etc)
+**Extensible**|You can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc)
+**Embeddable**|It can run anywhere a Linux kernel runs (even IoT) and its charts can be embedded on your web pages too
+**Customizable**|Custom dashboards can be built using simple HTML (no javascript necessary)
+**several operating modes**|Autonomous host monitoring, headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different metrics retention policy and run with or without health monitoring.
+**time-series back-ends supported**|Can archive its metrics on `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower detail (lower: to prevent it from congesting these servers due to the amount of data collected)
   
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)  
   
