@@ -70,8 +70,7 @@ not just visualize metrics.
 
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
-You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:<br/>
-![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
  
 ```sh
 # make sure you run `bash` for your shell
@@ -80,6 +79,7 @@ bash
 # install netdata, directly from github sources
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
+![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 More installation methods can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
