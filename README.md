@@ -68,7 +68,7 @@ not just visualize metrics.
 > People get adicted to **netdata**!<br/>
 > Once you install it and use it for some time, **there is no going back**! *You have been warned...*
 
-![image](https://user-images.githubusercontent.com/2662304/48305639-2d410d00-e537-11e8-9bab-677bd7087f9a.png)
+![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
 You can quickly install netdata on a Linux server with the following:<br/>
 ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
