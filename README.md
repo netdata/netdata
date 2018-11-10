@@ -152,11 +152,11 @@ This is what you should expect while using Netdata:
 
 Feature|Notes
 :----:|:---
-**1s&nbsp;granularity**|Collects all metrics, every single second.
-**Thousands&nbsp;of&nbsp;metrics**|Collects all the available metrics, the more the better.
+**1s granularity**|Collects all metrics, every single second.
+**Thousands of metrics**|Collects all the available metrics, the more the better.
 **1% CPU utilization**|Collects thousands of metrics per server per second, with just **1% CPU utilization of a single core**.
 **Stunning interactive bootstrap dashboards**|Mouse, touchpad and touch-screen friendly, in 2 themes: `slate` (dark) and `white` (light).
-**Amazingly fast visualization**|Responds to all queries in less than 1 ms per metric, even on low-end hardware.
+**Amazingly&nbsp;fast&nbsp;visualization**|Responds to all queries in less than 1 ms per metric, even on low-end hardware.
 **Zero configuration**|Auto-detects everything, it can collect up to 10000 metrics per server out of the box.
 **Zero maintenance**|You just run it, it does the rest.
 **Zero dependencies**|It is even its own web server, for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).  
