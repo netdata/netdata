@@ -108,7 +108,16 @@ Netdata now has its own github organization `netdata`, so all github URLs are no
 Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).  
   
 Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.  
+
   
+## netdata infographic  
+  
+This is a high level overview of netdata feature set and architecture.  
+Click it to to interact with it (it has direct links to documentation).  
+  
+[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)  
+
+
 ## Features  
   
 <p align="center">  
@@ -354,15 +363,6 @@ This is a list of what it currently monitors:
   OSD usage, Pool usage, number of objects, etc.  
   
 And you can extend it, by writing plugins that collect data from any source, using any computer language.  
-  
-## netdata infographic  
-  
-This is a high level overview of netdata feature set and architecture.  
-Click it to to interact with it (it has direct links to documentation).  
-  
-[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)  
-  
----  
   
 ## Installation  
   
