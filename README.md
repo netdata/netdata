@@ -13,8 +13,23 @@ _Netdata is **fast** and **efficient**, designed to permanently run on all syste
 Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.  
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata) [![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()  
- 
-## Why use Netdata?
+
+
+## Contents
+
+1. [Why Netdata](#why-netdata) - why Netdata is different / better
+2. [Quick Start](#quick-start) - try Netdata on your systems now
+3. [User Base](#user-base) - check Netdata community
+4. [News](#news) - Netdata latest news
+5. [infographic](#infographic) - everything about Netdata, in a page
+6. [Features](#features) - the features of Netdata
+7. [What does it monitor](#what-does-it-monitor) - a full list of everything monitored
+8. [Installation](#installation) - all installation options
+9. [Documentation](#documentation) - read more about Netdata
+10. [License](#license) - check the Netdata license
+
+
+## Why Netdata
 
 Netdata is a monitoring agent you install on all your systems.
 
@@ -40,15 +55,17 @@ Use it to **troubleshooting** performance problems|Use them to get statistics of
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
 Requires **zero dedicated resources**|Require dedicated resources
 
-Netdata is **free**, super **fast**, very **easy**, completely **open**, **flexible** and integrate-able.
+Netdata is **open-source**, **free**, super **fast**, very **easy**, completely **open**, **flexible** and integrate-able.
+
 It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems, not just
-visualizing metrics. 
+visualize metrics.
+
 
 ## Quick Start
 
 > **WARNING**:<br/>
 > People get adicted to **netdata**!<br/>
-> Once you install it and use it for a few minutes, **there is no going back**! You have been warned...
+> Once you install it and use it for some time, **there is no going back**! *You have been warned...*
 
 ![image](https://user-images.githubusercontent.com/2662304/48300888-9a2fb500-e4ed-11e8-89a6-33eb3f32d42e.png)
 
@@ -59,7 +76,7 @@ You can quickly install netdata on a Linux server with the following:<br/>
 # make sure you run `bash` for your shell
 bash
 
-# install netdata, directly from github source
+# install netdata, directly from github sources
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
@@ -68,13 +85,22 @@ More installation methods can be found at the [installation page](https://github
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
 
-## User base  
+## User base
+
+Netdata is used by almost all companies, in almost all industries.
+Check the watchers list on github. You will find users working for:
+**Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
+**Elastic**, **EPAM Systems**, **Ericsson**, **Google**, **Groupon**, **Hortonworks**, **HP**, **Huawei**,
+**IBM**, **Microsoft**. **NewRelic**, **Nvidia**, **Red Hat**, **SAP**, **Selectel**, **TicketMaster**,
+**Vimeo**, and many more!
+
 *Docker pulls*<br/> [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
 *Since May 16th 2016 (the date the [global public netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item) was released):*<br/>[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
   
 *in the last 24 hours:*<br/> [![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
-  
+
+
 ## News  
   
 `Nov 6th, 2018` - **[netdata v1.11.0 released!](https://github.com/netdata/netdata/releases)**  
@@ -110,7 +136,7 @@ Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https
 Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.  
 
   
-## netdata infographic  
+## Infographic  
   
 This is a high level overview of netdata feature set and architecture.  
 Click it to to interact with it (it has direct links to documentation).  
@@ -178,7 +204,7 @@ Click it to to interact with it (it has direct links to documentation).
   
 ---  
   
-## What does it monitor?  
+## What does it monitor  
   
 netdata collects several thousands of metrics per device.  
 All these metrics are collected and visualized in real-time.  
