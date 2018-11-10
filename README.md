@@ -50,7 +50,7 @@ visualizing metrics.
 > People get adicted to **netdata**!
 > Once you install it and use it for a few minutes, **there is no going back**!
 
-You can quickly install netdata on a Linux server with the following:
+You can quickly install netdata on a Linux server with the following:<br/>
 ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=green&precision=0)
  
 ```sh
