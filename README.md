@@ -50,10 +50,10 @@ netdata|others (open-source and commercial)
 Monitors everything, **thousands of metrics per node**|Monitor just a few metrics
 UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view
 **Meaningful presentation**, to help you understand the metrics|You have to know the metrics before you start
-Install and get results **immediately**|A long preparation is required to get any useful results
-Use it to **troubleshooting** performance problems|Use them to get statistics of past performance
-**Kills the console** for tracing performance issues|The console is required for troubleshooting
-Requires **zero dedicated resources**|Require dedicated resources
+Install and get results **immediately**|Long preparation is required to get any useful results
+Use it for **troubleshooting** performance problems|Use them to get *statistics of past performance*
+**Kills the console** for tracing performance issues|The console is always required for troubleshooting
+Requires **zero dedicated resources**|Require large dedicated resources
 
 Netdata is **open-source**, **free**, super **fast**, very **easy**, completely **open**, extremely **efficient**,
 **flexible** and integrate-able.
