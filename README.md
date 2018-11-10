@@ -47,7 +47,7 @@ visualizing metrics.
 ## Quick Start
 
 > **WARNING**:<br/>
-> People get adicted to **netdata**!
+> People get adicted to **netdata**!<br/>
 > Once you install it and use it for a few minutes, **there is no going back**! You have been warned!
 
 ![image](https://user-images.githubusercontent.com/2662304/48297427-2d49fa00-e4b0-11e8-816d-9ef37581a79c.png)
