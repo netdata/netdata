@@ -5,6 +5,7 @@
 **Fixed bugs:**
 
 - smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
+- 1m\_received\_traffic\_overflow alarm is faulty on 10G or 40G network interfaces [\#4577](https://github.com/netdata/netdata/issues/4577)
 - edit-config uses vi, even if it isn't the system editor [\#4549](https://github.com/netdata/netdata/issues/4549)
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
@@ -21,10 +22,16 @@
 
 **Merged pull requests:**
 
+- Updated readme [\#4600](https://github.com/netdata/netdata/pull/4600) ([ktsaou](https://github.com/ktsaou))
+- Updated readme [\#4599](https://github.com/netdata/netdata/pull/4599) ([ktsaou](https://github.com/ktsaou))
+- New readme [\#4596](https://github.com/netdata/netdata/pull/4596) ([ktsaou](https://github.com/ktsaou))
+- bug fix: conntrack\_max alarm was accessing invalid variable [\#4595](https://github.com/netdata/netdata/pull/4595) ([ktsaou](https://github.com/ktsaou))
+- fixed max interface speed calculation [\#4594](https://github.com/netdata/netdata/pull/4594) ([ktsaou](https://github.com/ktsaou))
 - Update links to badges documentation. [\#4588](https://github.com/netdata/netdata/pull/4588) ([nekkabcire](https://github.com/nekkabcire))
 - Cleanup index.html [\#4587](https://github.com/netdata/netdata/pull/4587) ([gmosx](https://github.com/gmosx))
 - smartd\_log: py2 compatibility fix [\#4584](https://github.com/netdata/netdata/pull/4584) ([l2isbad](https://github.com/l2isbad))
 - Split js 2 [\#4581](https://github.com/netdata/netdata/pull/4581) ([gmosx](https://github.com/gmosx))
+- Alerta.io notification improvements [\#4576](https://github.com/netdata/netdata/pull/4576) ([satterly](https://github.com/satterly))
 - netdata-openrc: Move check from depends\(\) to start\_pre\(\) [\#4575](https://github.com/netdata/netdata/pull/4575) ([aadityabagga](https://github.com/aadityabagga))
 - Fix badges link that leads to 404. [\#4569](https://github.com/netdata/netdata/pull/4569) ([nekkabcire](https://github.com/nekkabcire))
 - Add diagrams for internal data structures of netdata [\#4567](https://github.com/netdata/netdata/pull/4567) ([vlvkobal](https://github.com/vlvkobal))
