@@ -65,7 +65,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
 More installation methods can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
-![image](https://user-images.githubusercontent.com/2662304/48304019-20162500-e51b-11e8-8a36-9f37ff70a870.png)
+![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
 
 ## User base  
