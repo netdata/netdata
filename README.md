@@ -65,7 +65,7 @@ More installation methods can be found at the [installation page](https://github
 
 Once the installation is complete, use your web browser to navigate to: `http://IP:19999/`, where `IP` is the IP of the server you installed Netdata.
 
-> **IMPORTANT:**
+> **IMPORTANT:**<br/>
 > There is no need to bookmark your servers. Check the `my-netdata` menu at the top left of the dashboard. **It learns your servers**!
 
 ## User base  
