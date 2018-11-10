@@ -65,7 +65,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
 More installation methods can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
-![image](https://user-images.githubusercontent.com/2662304/48301523-23e48000-e4f8-11e8-831c-c6a83bc4ec4a.png)
+![image](https://user-images.githubusercontent.com/2662304/48301567-b127d480-e4f8-11e8-91db-9b416af5486c.png)
+
 
 ## User base  
 *Docker pulls*<br/> [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
