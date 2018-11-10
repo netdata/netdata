@@ -25,7 +25,7 @@ It is:
 - a **metrics visualizer** - super fast, interactive, modern, optimized for anomaly detection
 - an **alarms notification engine** - an advanced watchdog for detecting performance and availability issues
 
-All packaged together in a very flexible, extremely modular, open and integrate-able distributed application.
+All packaged together in a very flexible, extremely modular, distributed application.
 
 This is how netdata compares to other monitoring solutions:
 
@@ -33,16 +33,22 @@ netdata|others (open-source and commercial)
 :---:|:---:
 **High resolution metrics** (1s granularity)|Low resolution metrics (10s granularity at best)
 Monitors everything, **thousands of metrics per node**|Monitor just a few metrics
-UI is super fast, optimized for **anomaly detection**|UI is good for just a abstract view
+UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view
 **Meaningful presentation** for all metrics (educational)|You have to know the metrics before you start
 Install and get results **immediately**|A long preparation is required to get any useful results
 Use it to **troubleshooting** performance problems|Use them for an illusion of monitoring
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
 Requires **zero dedicated resources**|Require dedicated resources
 
-Netdata is free, fast, easy, open, flexible and integrate-able.
+Netdata is **free**, super **fast**, very **easy**, completely **open**, **flexible** and integrate-able.
+It has been designed by SysAdmins, DevOps and Developers for troubleshooting performance problems, not just
+visualizing metrics. 
 
 ## Quick Start
+
+> **WARNING**:<br/>
+> People get adicted to **netdata**!
+> Once you install it and use it for a few minutes, **there is no going back**!
 
 You can quickly install netdata on a Linux server with the following:
 ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=green&precision=0)
