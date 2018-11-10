@@ -155,7 +155,7 @@ Feature|Notes
 **1s granularity**|Collects all metrics, every single second.
 **Thousands of metrics**|Collects all the available metrics, the more the better.
 **1% CPU utilization**|It is super fast, uses just **1% CPU utilization of a single core**.
-**Stunning interactive bootstrap dashboards**|Mouse, touchpad and touch-screen friendly, in 2 themes: `slate` (dark) and `white` (light).
+**Stunning&nbsp;interactive&nbsp;dashboards**|Mouse, touchpad and touch-screen friendly, in 2 themes: `slate` (dark) and `white` (light).
 **Amazingly&nbsp;fast&nbsp;visualization**|Responds to all queries in less than 1 ms per metric, even on low-end hardware.
 **Zero configuration**|Auto-detects everything, it can collect up to 10000 metrics per server out of the box.
 **Zero maintenance**|You just run it, it does the rest.
