@@ -40,7 +40,7 @@ It is:
 - a **metrics visualizer** - super fast, interactive, modern, optimized for anomaly detection
 - an **alarms notification engine** - an advanced watchdog for detecting performance and availability issues
 
-All packaged together in a very flexible, extremely modular, distributed application.
+All the above, packaged together in a very flexible, extremely modular, distributed application.
 
 This is how netdata compares to other monitoring solutions:
 
@@ -55,10 +55,11 @@ Use it to **troubleshooting** performance problems|Use them to get statistics of
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
 Requires **zero dedicated resources**|Require dedicated resources
 
-Netdata is **open-source**, **free**, super **fast**, very **easy**, completely **open**, **flexible** and integrate-able.
+Netdata is **open-source**, **free**, super **fast**, very **easy**, completely **open**, extremely **efficient**,
+**flexible** and integrate-able.
 
-It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems, not just
-visualize metrics.
+It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems,
+not just visualize metrics.
 
 
 ## Quick Start
