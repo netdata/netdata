@@ -484,6 +484,16 @@ function toggleAgentItem(e, guid) {
     }
 }
 
+/// Enforces a maximum string length while retaining the prefix and the postfix of
+/// the string.
+function clipString(str, maxLength) {
+    if (str.length <= maxLength) {
+        return str;
+    }
+
+    const spanLength = Math.floor((maxLength - 3) / 2);
+    return `${str.substring(0, spanLength)}...${str.substring(str.length - spanLength)}`;
+}
 
 // When you stream metrics from netdata to netdata, the recieving netdata now 
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases 
@@ -575,7 +585,7 @@ function renderMachines(machinesArray) {
                         (str, url) => str + (
                             `<div class="agent-item agent-item--alternate">
                                 <div></div>
-                                <a href="${url}">${url}</a>
+                                <a href="${url}" title="${url}">${clipString(url, 64)}</a>
                                 <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
                                     <i class="fas fa-trash" style="color: #777;"></i>
                                 </a>
