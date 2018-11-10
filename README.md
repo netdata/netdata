@@ -36,7 +36,7 @@ Monitors everything, **thousands of metrics per node**|Monitor just a few metric
 UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view
 **Meaningful presentation** for all metrics (educational)|You have to know the metrics before you start
 Install and get results **immediately**|A long preparation is required to get any useful results
-Use it to **troubleshooting** performance problems|Use them for an illusion of monitoring
+Use it to **troubleshooting** performance problems|Use them to get statistics of past performance
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
 Requires **zero dedicated resources**|Require dedicated resources
 
