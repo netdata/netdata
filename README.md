@@ -90,8 +90,8 @@ More installation methods can be found at the [installation page](https://github
 
 ![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
   
-Netdata is at the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
-Check the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC.  
+Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
+Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
 
 Netdata has hundreds of thousands of users, all over the world. Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
 You will find users working for: **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
