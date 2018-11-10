@@ -49,7 +49,7 @@ netdata|others (open-source and commercial)
 **High resolution metrics** (1s granularity)|Low resolution metrics (10s granularity at best)
 Monitors everything, **thousands of metrics per node**|Monitor just a few metrics
 UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view
-**Meaningful presentation** for all metrics (to help you understand them)|You have to know the metrics before you start
+**Meaningful presentation**, to help you understand the metrics|You have to know the metrics before you start
 Install and get results **immediately**|A long preparation is required to get any useful results
 Use it to **troubleshooting** performance problems|Use them to get statistics of past performance
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
