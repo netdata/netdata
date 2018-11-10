@@ -150,8 +150,8 @@ Click it to to interact with it (it has direct links to documentation).
 
 This is what you should expect while using Netdata:
 
-Feature|Notes
-:---:|:---
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feature&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|Notes
+:----:|:---
 **1s granularity**|Collects all metrics, every single second.
 **Thousands of metrics**|Collects all the available metrics, the more the better.
 **1% CPU utilization**|Collects thousands of metrics per server per second, with just **1% CPU utilization of a single core**.
