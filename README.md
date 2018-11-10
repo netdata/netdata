@@ -99,6 +99,13 @@ Check the [watchers list on GitHub](https://github.com/netdata/netdata/watchers)
   
 *in the last 24 hours:*<br/> [![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
 
+---
+
+![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
+  
+Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).  
+  
+Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.  
 
 ## News  
   
@@ -123,16 +130,7 @@ Check the [watchers list on GitHub](https://github.com/netdata/netdata/watchers)
 Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.  
   
 Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.    
-  
----  
-  
-<img align="right" width="270" height="75" src="https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png"/>
 
-Netdata is now at the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
-
-Read the [netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing) we gave at CNCF TOC on Sep 18, 2018.  
-
----
   
 ## Infographic  
   
