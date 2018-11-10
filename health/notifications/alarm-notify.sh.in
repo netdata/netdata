@@ -1592,39 +1592,68 @@ EOF
 # alerta sender
 
 send_alerta() {
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel severity content
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel severity resource event payload auth
 
     [ "${SEND_ALERTA}" != "YES" ] && return 1
 
     case "${status}" in
-        WARNING)  severity="warning" ;;
         CRITICAL) severity="critical" ;;
+        WARNING)  severity="warning" ;;
         CLEAR)    severity="cleared" ;;
-        *)        severity="unknown" ;;
+        *)        severity="indeterminate" ;;
     esac
 
-    info=$( echo -n ${info})
+    if [[ "${chart}" == httpcheck* ]]
+    then
+        resource=$chart
+        event=$name
+    else
+        resource="${host}:${family}"
+        event="${chart}.${name}"
+    fi
 
-    # the "event" property must be unique and repetible between states to let alerta do automatic correlation using severity value
     for channel in ${channels}
     do
-        content="{"
-        content="$content \"environment\": \"${channel}\","
-        content="$content \"service\": [\"${host}\"],"
-        content="$content \"resource\": \"${host}\","
-        content="$content \"event\": \"${name}.${chart} (${family})\","
-        content="$content \"severity\": \"${severity}\","
-        content="$content \"value\": \"${alarm}\","
-        content="$content \"text\": \"${info}\""
-        content="$content }"
+        payload="$(cat <<EOF
+        {
+            "resource": "${resource}",
+            "event": "${event}",
+            "environment": "${channel}",
+            "severity": "${severity}",
+            "service": ["Netdata"],
+            "group": "Performance",
+            "value": "${value_string}",
+            "text": "${info}",
+            "tags": ["alarm_id:${alarm_id}"],
+            "attributes": {
+                "roles": "${roles}",
+                "name": "${name}",
+                "chart": "${chart}",
+                "family": "${family}",
+                "source": "${src}",
+                "moreInfo": "<a href=\"${goto_url}\">View Netdata</a>"
+            },
+            "origin": "netdata/${this_host}",
+            "type": "netdataAlarm",
+            "rawData": "${BASH_ARGV[@]}"
+        }
+EOF
+        )"
 
+        if [[ -n "${ALERTA_API_KEY}" ]]
+        then
+            auth="Key ${ALERTA_API_KEY}"
+        fi
 
-        httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: Key $ALERTA_API_KEY" -d "$content" )
+        httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: $auth" --data "${payload}")
 
         if [[ "${httpcode}" = "200" || "${httpcode}" = "201" ]]
         then
             info "sent alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
             sent=$((sent + 1))
+        elif [[ "${httpcode}" = "202" ]]
+        then
+            info "suppressed alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
         else
             error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
         fi
