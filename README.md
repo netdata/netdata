@@ -17,16 +17,16 @@ Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## Contents
 
-1. [Why Netdata](#why-netdata) - why Netdata is different / better
-2. [Quick Start](#quick-start) - try Netdata on your systems now
-3. [User Base](#user-base) - check Netdata community
-4. [News](#news) - Netdata latest news
-5. [infographic](#infographic) - everything about Netdata, in a page
-6. [Features](#features) - the features of Netdata
-7. [What does it monitor](#what-does-it-monitor) - a full list of everything monitored
-8. [Installation](#installation) - all installation options
-9. [Documentation](#documentation) - read more about Netdata
-10. [License](#license) - check the Netdata license
+1. [Why Netdata](#why-netdata)
+2. [Quick Start](#quick-start)
+3. [User Base](#user-base)
+4. [News](#news)
+5. [infographic](#infographic)
+6. [Features](#features)
+7. [What does it monitor](#what-does-it-monitor)
+8. [Installation](#installation)
+9. [Documentation](#documentation)
+10. [License](#license)
 
 
 ## Why Netdata
@@ -49,7 +49,7 @@ netdata|others (open-source and commercial)
 **High resolution metrics** (1s granularity)|Low resolution metrics (10s granularity at best)
 Monitors everything, **thousands of metrics per node**|Monitor just a few metrics
 UI is super fast, optimized for **anomaly detection**|UI is good for just an abstract view
-**Meaningful presentation** for all metrics (educational)|You have to know the metrics before you start
+**Meaningful presentation** for all metrics (to help you understand them)|You have to know the metrics before you start
 Install and get results **immediately**|A long preparation is required to get any useful results
 Use it to **troubleshooting** performance problems|Use them to get statistics of past performance
 **Kills the console** for tracing performance issues|The console is required for troubleshooting
@@ -145,11 +145,10 @@ Click it to to interact with it (it has direct links to documentation).
 
 
 ## Features  
-  
 <p align="center">  
 <img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>  
 </p>  
-  
+
  - **Stunning interactive bootstrap dashboards**<br/>  
   mouse and touch friendly, in 2 themes: dark, light  
   
