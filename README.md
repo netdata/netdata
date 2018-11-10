@@ -65,6 +65,9 @@ More installation methods can be found at the [installation page](https://github
 
 Once the installation is complete, use your web browser to navigate to: `http://IP:19999/`, where `IP` is the IP of the server you installed Netdata.
 
+> **IMPORTANT:**
+> There is no need to bookmark your servers. Check the `my-netdata` menu at the top left of the dashboard. **It learns your servers**!
+
 ## User base  
 *Docker pulls*<br/> [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
