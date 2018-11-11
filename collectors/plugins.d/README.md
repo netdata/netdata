@@ -389,8 +389,8 @@ or do not output the line at all.
 4. **C**
 
    Of course, C is the most efficient way of collecting data. This is why netdata itself is written in C.
-
----
+   
+## Properly Writing Plugins
 
 ## Writing Plugins Properly
 
@@ -470,3 +470,4 @@ There are a few rules for writing plugins properly:
 3. If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
 
 4. If possible, try to autodetect if your plugin should be enabled, without any configuration.
+
