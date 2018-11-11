@@ -34,7 +34,7 @@ CHARTS = {
             ['total_connections', 'connections', 'incremental']
         ]
     },
-  
+
     'bytes_sent': {
         'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
         'lines': [
@@ -150,7 +150,7 @@ class Service(SimpleService):
             self.conn.unbind()
             self.conn = None
             self.alive = False
-        
+
 
     def connect(self):
         try:
@@ -198,6 +198,6 @@ class Service(SimpleService):
                 val = 'NaN'
 
             data[key] = val
-        
+
         return data
 
