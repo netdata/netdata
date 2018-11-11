@@ -615,8 +615,6 @@ function renderMachines(machinesArray) {
         }
     }
 
-    // found = 0;
-
     if (!found) {
         if (machines) {
             html += (
@@ -658,25 +656,6 @@ function renderMachines(machinesArray) {
                 `
             );    
         }
-        
-        // el += '<li role="separator" class="divider"></li>' +
-        //     '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//sanfrancisco.netdata.rocks/default.html">US - San Francisco (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//atlanta.netdata.rocks/default.html">US - Atlanta (CDN77.com)</a></li>' +
-        //     '<li><a href="//frankfurt.netdata.rocks/default.html">Germany - Frankfurt (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//toronto.netdata.rocks/default.html">Canada - Toronto (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//singapore.netdata.rocks/default.html">Japan - Singapore (DigitalOcean.com)</a></li>' +
-        //     '<li><a href="//bangalore.netdata.rocks/default.html">India - Bangalore (DigitalOcean.com)</a></li>';
-        // a1 += '<li role="separator" class="divider"></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>' +
-        //     '<li><a href="#">&nbsp;</a></li>';
     }
 
     return html;
@@ -685,11 +664,6 @@ function renderMachines(machinesArray) {
 // Populates the my-netdata menu.
 function netdataRegistryCallback(machinesArray) {
     let html = '';
-
-    // options.hosts = [
-    //     {hostname: "http://www.test1.com"},
-    //     {hostname: "http://www.test2.com"}
-    // ]
 
     if (options.hosts.length > 1) {
         html += renderStreamedHosts(options) + `<hr />`;
