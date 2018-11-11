@@ -68,7 +68,7 @@ The following animated image, shows the top of a typical netdata dashboard:
 
 ![peek 2018-11-11 02-40](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
-*Typical netdata dashboard. Charts can be panned by dragging them, zoom in/out with `SHIFT` + mouse wheel.*, an area can be selected for zoom in with `SHIFT` + mouse selection.
+*A typical netdata dashboard, in 1:1 timings. Charts can be panned by dragging them, zoom in/out with `SHIFT` + mouse wheel, an area can be selected for zoom in with `SHIFT` + mouse selection.*
 
 ## Quick Start
 
