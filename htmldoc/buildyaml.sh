@@ -76,8 +76,7 @@ nav:'
 
 navpart 1 . README "Getting Started"
 
-echo -ne "    - 'doc/Why-netdata.md'
-    - 'doc/Demo-Sites.md'
+echo -ne "    - 'doc/Demo-Sites.md'
     - Installation:
         - 'installer/README.md'
         - 'installer/DOCKER.md'
@@ -150,6 +149,7 @@ echo -ne "    - Third Party Plugins:
 "
 
 echo -ne "- Hacking netdata:
+    - CONTRIBUTING.md
 "
 navpart 2 makeself "" "" 4
 navpart 2 packaging "" "" 4
