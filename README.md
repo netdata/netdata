@@ -116,9 +116,7 @@ The above command will:
 
 1. install any required packages on your system (it will ask you to confirm before doing so),
 2. download netdata source to `/usr/src/netdata.git`
-3. compile it
-4. install it
-5. start it
+3. compile it, install it and start it
 
 More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
