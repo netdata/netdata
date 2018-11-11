@@ -4,14 +4,6 @@
 
 ---
 
-### **WARNING**
-People get adicted to **netdata**!<br/>
-Once you use it on your systems, **there is no going back**! *You have been warned...*
-
-![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
-
----
-
 **Netdata** is a system for **distributed real-time performance and health monitoring**.  
   
 It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.  
@@ -22,6 +14,11 @@ Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata) [![analytics](http://www.google-analytics.com/collect?v=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()  
 
+## Warning!
+People get **adicted to netdata**.<br/>
+Once you use it on your systems, **there is no going back**! *You have been warned...*
+
+![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
 ## Contents
 
