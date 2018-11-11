@@ -3,10 +3,10 @@
 # Author: Manolis Kartsonakis (ekartsonakis)
 # SPDX-License-Identifier: GPL-3.0+
 
-try: 
-     import ldap 
-     HAS_LDAP = True 
-except ImportError: 
+try:
+     import ldap
+     HAS_LDAP = True
+except ImportError:
      HAS_LDAP = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -27,7 +27,7 @@ ORDER = [
 ]
 
 CHARTS = {
-  
+
      'total_connections': {
         'options': [None, 'Total Connections', 'connections', 'ldap', 'monitorCounter', 'line'],
         'lines': [
@@ -170,8 +170,8 @@ class Service(SimpleService):
 
 
     def check(self):
-        if not HAS_LDAP: 
-            self.error("'python-ldap' package is needed") 
+        if not HAS_LDAP:
+            self.error("'python-ldap' package is needed")
             return None
 
         return self.connect() and self.get_data()
