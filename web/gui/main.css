@@ -543,9 +543,8 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content .info-item {
-    min-height: 32px;
-    font-weight: 300;
-    text-align: center;
+    height: 24px;
+    padding-left: 10px;
 }
 
 #my-netdata-dropdown-content .agent-item {

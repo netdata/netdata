@@ -478,7 +478,7 @@ function toggleAgentItem(e, guid) {
 
     toggleExpandIcon(e.currentTarget.children[0]);
 
-    const el = document.querySelector(`.agent-alternate-urls.agent-${guid}`)
+    const el = document.querySelector(`.agent-alternate-urls.agent-${guid}`);
     if (el) {
         el.classList.toggle('collapsed');
     }
@@ -498,15 +498,8 @@ function clipString(str, maxLength) {
 // When you stream metrics from netdata to netdata, the recieving netdata now 
 // has multiple host databases. It's own, and multiple mirrored. Mirrored databases 
 // can be accessed with <http://localhost:19999/host/NAME/>
-function renderHosts(options) {
-    let html = '';
-
-    html += (
-        `<div class="info-item">
-            <i class="fas fa-info-circle"></i>
-            <span>Databases available on this host.</span>
-        </div>`
-    );
+function renderStreamedHosts(options) {
+    let html = `<div class="info-item">Databases streamed to this agent</div>`;
 
     var base = document.location.origin.toString() + document.location.pathname.toString();
     if (base.endsWith("/host/" + options.hostname + "/")) {
@@ -552,7 +545,7 @@ function renderHosts(options) {
 }
 
 function renderMachines(machinesArray) {
-    let html = '';
+    let html = `<div class="info-item">My netdata agents</div>`;
 
     if (machinesArray === null) {
         var ret = loadLocalStorage("registryCallback");
@@ -632,6 +625,8 @@ function renderMachines(machinesArray) {
             )
         }
 
+        // html += `<hr />`;
+        
         // el += '<li role="separator" class="divider"></li>' +
         //     '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
         //     '<li><a href="//newyork.netdata.rocks/default.html">US - New York (DigitalOcean.com)</a></li>' +
@@ -659,8 +654,13 @@ function renderMachines(machinesArray) {
 function netdataRegistryCallback(machinesArray) {
     let html = '';
 
+    // options.hosts = [
+    //     {hostname: "http://www.test1.com"},
+    //     {hostname: "http://www.test2.com"}
+    // ]
+
     if (options.hosts.length > 1) {
-        html += renderHosts(options) + `<hr />`;
+        html += renderStreamedHosts(options) + `<hr />`;
     }
 
     html += renderMachines(machinesArray);
