@@ -27,11 +27,12 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 5. [News](#news) - latest news about netdata
 6. [infographic](#infographic) - everything about netdata, in a page
 7. [Features](#features) - what features does it have
-8. [What does it monitor](#what-does-it-monitor) - which metrics it collects
-9. [Installation](#installation) - install it on all your systems
-10. [Documentation](#documentation) - read the docs
-11. [Community](#community) - disucss with others and get support
-12. [License](#license) - check the license of netdata
+8. [Visualization](#visualization) - unique visualization features
+9. [What does it monitor](#what-does-it-monitor) - which metrics it collects
+10. [Installation](#installation) - install it on all your systems
+11. [Documentation](#documentation) - read the docs
+12. [Community](#community) - disucss with others and get support
+13. [License](#license) - check the license of netdata
 
 
 ## How it looks
@@ -187,6 +188,13 @@ This is what you should expect from Netdata:
 
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
+
+## Visualization
+
+#### Charts are synchronized
+Charts on netdata dashboards are always synchronized with each other. There is no master chart. Any charts can be panned or zoomed at any time, and all other charts will follow.
+
+![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
 
 ## What does it monitor  
