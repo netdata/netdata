@@ -207,6 +207,7 @@ Netdata charts automatically zoom vertically, to visualize the variation of each
 *A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
 ### Charts are synchronized
+
 Charts on netdata dashboards are synchronized to each other. There is no master chart. Any chart can be panned or zoomed at any time, and all other charts will follow.
 
 ![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
@@ -438,20 +439,5 @@ Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.
 ## License  
   
 netdata is [GPLv3+](LICENSE).  
-  
+
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
-
-
-![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)  
-
-   ![sda](https://cloud.githubusercontent.com/assets/2662304/14093195/c882bbf4-f554-11e5-8863-1788d643d2c0.gif)  
-  
-   ![dsl0](https://cloud.githubusercontent.com/assets/2662304/14093128/4d566494-f554-11e5-8ee4-5392e0ac51f0.gif)  
-  
-![image](https://cloud.githubusercontent.com/assets/2662304/20464811/9517d2b4-af57-11e6-8361-f6cc57541cd7.png)  
-
-  
-  
-   ![qos-tc-classes](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)  
-  
-   ![apps](https://cloud.githubusercontent.com/assets/2662304/14093565/67c4002c-f557-11e5-86bd-0154f5135def.gif)  
