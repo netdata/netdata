@@ -196,6 +196,7 @@ Charts on netdata dashboards are always synchronized with each other. There is n
 
 ![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
+*Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the mouse pointer is over a chart.*
 
 ## What does it monitor  
 
