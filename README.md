@@ -192,7 +192,7 @@ This is what you should expect from Netdata:
 
 ### Positive and negative values
 
-To improve the clarity on charts, netdata dashboards present **positive** values for `read`, `input`, `inbound`, `received` and **negative** values for `write`, `output`, `outbound`, `sent`.
+To improve clarity on charts, netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
 
@@ -200,7 +200,7 @@ To improve the clarity on charts, netdata dashboards present **positive** values
 
 ### Non zero-based y-axis
 
-Charts on netdata dashboards automatically zoom vertically, to enhance the visualization for the variation of each metric, within the visible time-frame.
+Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
 
 ![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
 
