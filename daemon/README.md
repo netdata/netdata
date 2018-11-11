@@ -1,7 +1,5 @@
 # Netdata daemon
 
-
-
 ## Command line options
 
 Normally you don't need to supply any command line arguments to netdata.

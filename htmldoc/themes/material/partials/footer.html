@@ -1,0 +1,57 @@
+{% import "partials/language.html" as lang with context %}
+<footer class="md-footer">
+  {% if page.previous_page or page.next_page %}
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid">
+        {% if page.previous_page %}
+          <a href="{{ page.previous_page.url | url }}" title="{{ page.previous_page.title }}" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+            <div class="md-flex__cell md-flex__cell--shrink">
+              <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
+            </div>
+            <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+              <span class="md-flex__ellipsis">
+                <span class="md-footer-nav__direction">
+                  {{ lang.t("footer.previous") }}
+                </span>
+                {{ page.previous_page.title }}
+              </span>
+            </div>
+          </a>
+        {% endif %}
+        {% if page.next_page %}
+          <a href="{{ page.next_page.url | url }}" title="{{ page.next_page.title }}" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+            <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+              <span class="md-flex__ellipsis">
+                <span class="md-footer-nav__direction">
+                  {{ lang.t("footer.next") }}
+                </span>
+                {{ page.next_page.title }}
+              </span>
+            </div>
+            <div class="md-flex__cell md-flex__cell--shrink">
+              <i class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>
+            </div>
+          </a>
+        {% endif %}
+      </nav>
+    </div>
+  {% endif %}
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-footer-copyright">
+        {% if config.copyright %}
+          <div class="md-footer-copyright__highlight">
+            {{ config.copyright }}
+          </div>
+        {% endif %}
+		<a href="https://twitter.com/linuxnetdata" rel="nofollow"><img src="https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&amp;label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter"></a>
+		<img src="https://www.google-analytics.com/collect?v=1&amp;t=pageview&amp;_s=1&amp;ds=github&amp;dr=https%3A%2F%2Fgithub.com%2Ffirehol%2Fnetdata%2Fwiki&amp;dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fwiki&amp;_u=MAC%7E&amp;cid=8c51788e-8721-45e3-ae8c-e7c63ba8236b&amp;tid=UA-64295674-3">
+
+
+      </div>
+      {% block social %}
+        {% include "partials/social.html" %}
+      {% endblock %}
+    </div>
+  </div>
+</footer>

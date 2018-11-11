@@ -1,7 +1,6 @@
-Packaging Tools
-===============
+# Packaging Tools
 
-The programs in this folder are used when packaging from within git
+The programs in folder `packaging` are used when packaging from within git
 and are not included in source or binary packages.
 
 For the most part they are used from the git commit hooks (copy

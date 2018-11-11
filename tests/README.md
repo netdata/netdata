@@ -1,8 +1,9 @@
+# Testing
 This readme is a manual on how to get started with unit testing on javascript and nodejs
 
 Original author: BrainDoctor (github), July 2017
 
-# Installation
+## Installation
 
 Tested on Linux Mint 18.2 Sara (Ubuntu/debian derivative)
 
@@ -19,7 +20,7 @@ That should install the necessary node modules.
 
 Other browsers work too (Chrome, Firefox). However, only the Chromium Browser 59 has been tested for headless unit testing.
 
-## Versions
+### Versions
 
 The commands above leave me with the following versions (July 2017):
 
@@ -28,21 +29,21 @@ The commands above leave me with the following versions (July 2017):
  - chromium-browser: 59.0.3071.109
  - WebStorm (optional): 2017.1.4
 
-# Configuration
+## Configuration
 
-## NPM
+### NPM
 
 The dependencies are installed in `netdata/package.json`. If you install a new NPM module, it gets added here. Future developers just need to execute `npm install` and every dep gets added automatically.
 
-## Karma
+### Karma
 
 Karma configuration is in `tests/web/karma.conf.js`. Documentation is provided via comments.
 
-## WebStorm
+### WebStorm
 
 If you use the JetBrains WebStorm IDE, you can integrate the karma runtime.
 
-### for Karma (Client side testing)
+#### for Karma (Client side testing)
 
 Headless Chromium:
 1. Run > Edit Configurations
@@ -66,7 +67,7 @@ You may add other browsers too (comma separated). With the "Browsers to start" f
 
 Also it is recommended to install WebStorm IDE Extension/Addon to Chrome/Chromium for awesome debugging.
 
-### for node.d plugins (nodejs)
+#### for node.d plugins (nodejs)
 
 1. Run > Edit Configurations
 2. "+" > Node.js
@@ -75,23 +76,23 @@ Also it is recommended to install WebStorm IDE Extension/Addon to Chrome/Chromiu
    - JavaScript file: node_modules/jasmine-node/bin/jasmine-node
    - Application parameters: --captureExceptions tests/node.d
 
-# Running
+## Running
 
-## In WebStorm
+### In WebStorm
 
-### Karma
+#### Karma
 Just run the configured run configurations and they produce nice test trees:
 
 ![karma_run_2](https://user-images.githubusercontent.com/12159026/28277789-559149f6-6b1b-11e7-9cc7-a81d81d12c35.png)
 
-### node.js
+#### node.js
 
 Debugging is awesome too!
 ![node_debug](https://user-images.githubusercontent.com/12159026/28277879-8beee5ee-6b1b-11e7-9356-3156956f2282.png)
 
-## From CLI
+### From CLI
 
-### Karma
+#### Karma
 
 ```sh
 cd /path/to/your/netdata
@@ -103,7 +104,7 @@ will start the karma server, start chromium in headless mode and exit.
 If a test fails, it produces even a stack trace:
 ![karma_run_1](https://user-images.githubusercontent.com/12159026/28277754-3682bebe-6b1b-11e7-8b7e-66b23d87177d.png)
 
-### Node.d plugins
+#### Node.d plugins
 
 ```sh
 cd /path/to/your/netdata
@@ -114,9 +115,9 @@ nodejs node_modules/jasmine-node/bin/jasmine-node --captureExceptions tests/node
 will run the tests in `tests/node.d` and produce a stacktrace too on error:
 ![node_run](https://user-images.githubusercontent.com/12159026/28277812-65bb69b0-6b1b-11e7-8500-bcdbb3436574.png)
 
-## Coverage
+### Coverage
 
-### Karma
+#### Karma
 
 A nice HTML is produced from Karma which shows which code paths were executed. It is located somewhere in `/path/to/your/netdata/coverage/`
 
@@ -124,11 +125,11 @@ A nice HTML is produced from Karma which shows which code paths were executed. I
 and
 ![coverage_1](https://user-images.githubusercontent.com/12159026/28277687-fa93e360-6b1a-11e7-995f-cbb4c5d012a7.png)
 
-### Node.d
+#### Node.d
 
 Apparently, jasmine-node can produce a junit report with the `--junitreport` flag. But that output was not very useful. Maybe it's configurable?
 
-## CI
+### CI
 
 The karma and node.d runners can be integrated in Travis (AFAIK), but that is outside my ability.
 
