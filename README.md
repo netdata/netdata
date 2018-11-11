@@ -30,10 +30,9 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 7. [Features](#features) - what features does it have
 8. [Visualization](#visualization) - unique visualization features
 9. [What does it monitor](#what-does-it-monitor) - which metrics it collects
-10. [Installation](#installation) - install it on all your systems
-11. [Documentation](#documentation) - read the docs
-12. [Community](#community) - disucss with others and get support
-13. [License](#license) - check the license of netdata
+10. [Documentation](#documentation) - read the docs
+11. [Community](#community) - disucss with others and get support
+12. [License](#license) - check the license of netdata
 
 
 ## How it looks
@@ -474,26 +473,6 @@ Its [Plugin API](collectors/plugins.d) supports all programing languages (anythi
 - **BOINC** - monitors task states for local and remote BOINC client software using the remote GUI RPC interface. Also provides alarms for a handful of error conditions.
 
 And you can extend it, by writing plugins that collect data from any source, using any computer language.  
-  
----
-
-## Installation  
-  
-Use our **[automatic installer](https://github.com/netdata/netdata/wiki/Installation)** to build and install it on your system.  
-  
-It should run on **any Linux** system (including IoT). It has been tested on:  
-  
-- Alpine  
-- Arch Linux  
-- CentOS  
-- Debian  
-- Fedora  
-- Gentoo  
-- openSUSE  
-- PLD Linux  
-- RedHat Enterprise Linux  
-- SUSE  
-- Ubuntu  
   
 ---  
   
