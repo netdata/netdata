@@ -110,6 +110,7 @@ bash
 # install netdata, directly from github sources
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
+![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 The above command will:
 
@@ -118,8 +119,6 @@ The above command will:
 3. compile netdata on your system
 4. install netdata to your system
 5. start netdata
-
-![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
