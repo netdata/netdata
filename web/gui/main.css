@@ -562,7 +562,7 @@ body.modal-open {
     text-decoration: none;
 }
 
-#my-netdata-dropdown-content .agent-item :first-child, #my-netdata-dropdown-content .agent-item :last-child {
+#my-netdata-dropdown-content .agent-item > :first-child, #my-netdata-dropdown-content .agent-item > :last-child {
     width: 32px;
     text-align: center;
 }
@@ -573,6 +573,7 @@ body.modal-open {
 }
 
 .agent-item__expand-button {
+    margin-left: 5px;
     cursor: pointer;
 }
 

@@ -596,10 +596,10 @@ function renderMachines(machinesArray) {
                 `<div class="agent-item agent-${machine.guid}">
                     <i class="fas fa-chart-bar" color: #fff"></i>
                     <span>
-                        <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a> 
+                        <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
                         ${hasAlternateUrls 
                             ? (
-                                `<a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
+                                `<a href="#" class="agent-item__expand-button" onClick="toggleAgentItem(event, '${machine.guid}');">
                                     <i class="fas fa-plus-square" style="color: #999"></i>
                                 </a>`
                             ) 
@@ -615,25 +615,49 @@ function renderMachines(machinesArray) {
         }
     }
 
+    // found = 0;
+
     if (!found) {
         if (machines) {
             html += (
                 `<div class="info-item">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty!</a>
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty</a> 
                 </div>`
             )
         } else {
             el += '<li></li>';
             html += (
                 `<div class="info-item">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry!</a>
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a> 
                 </div>`
             )
         }
 
-        // html += `<hr />`;
+        html += `<hr />`;
+        html += `<div class="info-item">Demo netdata agents</div>`;
+
+        const demoServers = [
+            {url: "//london.netdata.rocks/default.html", title: "UK - London (DigitalOcean.com)"},
+            {url: "//newyork.netdata.rocks/default.html", title: "US - New York (DigitalOcean.com)"},
+            {url: "//sanfrancisco.netdata.rocks/default.html", title: "US - San Francisco (DigitalOcean.com)"},
+            {url: "//atlanta.netdata.rocks/default.html", title: "US - Atlanta (CDN77.com)"},
+            {url: "//frankfurt.netdata.rocks/default.html", title: "Germany - Frankfurt (DigitalOcean.com)"},
+            {url: "//toronto.netdata.rocks/default.html", title: "Canada - Toronto (DigitalOcean.com)"},
+            {url: "//singapore.netdata.rocks/default.html", title: "Japan - Singapore (DigitalOcean.com)"},
+            {url: "//bangalore.netdata.rocks/default.html", title: "India - Bangalore (DigitalOcean.com)"},
+
+        ]
+
+        for (const server of demoServers) {
+            html += (
+                `<div class="agent-item">
+                    <i class="fas fa-chart-bar" color: #fff"></i>
+                    <a href="${server.url}">${server.title}</a>
+                    <div></div>
+                </div>
+                `
+            );    
+        }
         
         // el += '<li role="separator" class="divider"></li>' +
         //     '<li><a href="//london.netdata.rocks/default.html">UK - London (DigitalOcean.com)</a></li>' +
