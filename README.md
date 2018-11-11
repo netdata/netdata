@@ -207,7 +207,7 @@ Netdata charts automatically zoom vertically, to visualize the variation of each
 *A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
 ### Charts are synchronized
-Charts on netdata dashboards are always synchronized with each other. There is no master chart. Any charts can be panned or zoomed at any time, and all other charts will follow.
+Charts on netdata dashboards are synchronized with each other. There is no master chart. Any chart can be panned or zoomed at any time, and all other charts will follow.
 
 ![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
