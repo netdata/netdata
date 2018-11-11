@@ -175,13 +175,6 @@ This is what you should expect from Netdata:
 - **Scales to infinity** - you can install it on all your servers, containers, VMs and IoTs. Metrics are not centralized by default, so there is no limit.
 - **Several operating modes** - Autonomous host monitoring (the default), headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different metrics retention policy and run with or without health monitoring.
 
-### Visualization
-- **Stunning interactive dashboards** - mouse, touchpad and touch-screen friendly in 2 themes: `slate` (dark) and `white`.
-- **Amazingly fast visualization** - responds to all queries in less than 1 ms per metric, even on low-end hardware.
-- **Visual anomaly detection** - the dashboards are optimized for detecting anomalies visually.
-- **Embeddable** - its charts can be embedded on your web pages, wikis and blogs. You can even use [Atlassian's Confluence as a monitoring dashboard](https://github.com/netdata/netdata/wiki/Custom-Dashboard-with-Confluence).
-- **Customizable** - custom dashboards can be built using simple HTML (no javascript necessary).
-
 ### Health Monitoring & Alarms
 - **Sophisticated alerting** - comes with hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods.
 - **Notifications**: email, slack.com, flock.com, pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com.
@@ -191,14 +184,21 @@ This is what you should expect from Netdata:
 
 ## Visualization
 
-#### Positive and negative values
+- **Stunning interactive dashboards** - mouse, touchpad and touch-screen friendly in 2 themes: `slate` (dark) and `white`.
+- **Amazingly fast visualization** - responds to all queries in less than 1 ms per metric, even on low-end hardware.
+- **Visual anomaly detection** - the dashboards are optimized for detecting anomalies visually.
+- **Embeddable** - its charts can be embedded on your web pages, wikis and blogs. You can even use [Atlassian's Confluence as a monitoring dashboard](https://github.com/netdata/netdata/wiki/Custom-Dashboard-with-Confluence).
+- **Customizable** - custom dashboards can be built using simple HTML (no javascript necessary).
 
-Charts on netdata dashboards have **positive** values for `read`, `input`, `received` and **negative** values for `write`, `output`, `sent`.
+### Positive and negative values
+
+To improve the clarity on charts, netdata dashboards present **positive** values for `read`, `input`, `inbound`, `received` and **negative** values for `write`, `output`, `outbound`, `sent`.
 
 ![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
-*Netdata charts showing the bandwidth and packets of a network interface. `received` is positive, `sent` is negative.*
 
-#### Non zero-based y-axis
+*Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is negative.*
+
+### Non zero-based y-axis
 
 Charts on netdata dashboards automatically zoom vertically, to enhance the visualization for the variation of each metric, within the visible time-frame.
 
@@ -206,12 +206,21 @@ Charts on netdata dashboards automatically zoom vertically, to enhance the visua
 
 *A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
-#### Charts are synchronized
+### Charts are synchronized
 Charts on netdata dashboards are always synchronized with each other. There is no master chart. Any charts can be panned or zoomed at any time, and all other charts will follow.
 
 ![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
 *Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the mouse pointer is over a chart.*
+
+### Highlighted time-frame
+
+To improve visual anomaly detection across charts, the user can highlight a time-frame (by pressing `ALT` + `mouse selection`) on all charts.
+
+![highlighted-timeframe](https://user-images.githubusercontent.com/2662304/48311876-f9093300-e5ae-11e8-9c74-e3e291741990.gif)
+
+*A highlighted time-frame can be given by pressing `ALT` + `mouse selection` on any chart. Netdata will highlight the same range on all charts. Highlighted ranges are propagated from netdata server to netdata server, via the `my-netdata` menu.*
+
 
 ## What does it monitor  
 
@@ -260,7 +269,7 @@ Its [Plugin API](collectors/plugins.d) supports all programing languages (anythi
 - **device mapper** - naming disks.
 - **Veritas Volume Manager** - naming disks.
 - **megacli** - adapter, physical drives and battery stats.
-- **adaptec_raid** - 
+- **adaptec_raid** -  logical and physical devices health metrics.
 
 #### Filesystems
 - **BTRFS** - detailed disk space allocation and usage.
