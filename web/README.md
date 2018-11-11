@@ -2,11 +2,11 @@
 
 The default port is 19999; for example, to access the dashboard on localhost, use: http://localhost:19999
 
-To view netdata collected data you access its **[[REST API v1]]**.
+To view netdata collected data you access its **[REST API v1](api/)**.
 
 For our convenience, netdata provides 2 more layers:
 
-1. The `dashboard.js` javascript library that allows us to design custom dashboards using plain HTML. For more information on creating custom dashboards, see **[[Custom Dashboards]]** and **[[Atlassian Confluence Dashboards]]**
+1. The `dashboard.js` javascript library that allows us to design custom dashboards using plain HTML. For information on creating custom dashboards, see **[Custom Dashboards](gui/custom/)** and **[Atlassian Confluence Dashboards](gui/confluence/)**
 
 2. Ready to be used web dashboards that render all the charts a netdata server maintains.
 

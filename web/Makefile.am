@@ -11,6 +11,6 @@ SUBDIRS = \
 
 dist_noinst_DATA = \
 	README.md \
-	CONFLUENCE-DASHBOARDS.md \
-	CUSTOM-DASHBOARDS.md \
+	gui/confluence/README.md \
+	gui/custom/README.md \
 	$(NULL)

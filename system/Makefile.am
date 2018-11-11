@@ -41,5 +41,4 @@ dist_noinst_DATA = \
 	netdata-freebsd.in \
 	netdata.plist.in \
 	netdata.conf \
-	README.md \
 	$(NULL)

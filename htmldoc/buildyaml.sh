@@ -79,27 +79,24 @@ navpart 1 . README "Getting Started"
 echo -ne "    - 'doc/Demo-Sites.md'
     - Installation:
         - 'installer/README.md'
-        - 'installer/DOCKER.md'
+        - 'docker/README.md.md'
         - 'installer/UPDATE.md'
         - 'installer/UNINSTALL.md'
-        - 'installer/MAINTAINERS.md'
-    - 'installer/LAUNCH.md'
 "
 echo -ne "- Using NetData:
 "
+navpart 2 daemon
 navpart 2 web "README" "Web Dashboards"
-navpart 3 web "CUSTOM-DASHBOARDS" ""
-navpart 3 web "CONFLUENCE-DASHBOARDS" ""
-navpart 2 web/gui
+navpart 3 web/gui "" "" 3
 navpart 2 web/server "" "Web Server"
 navpart 3 web/server "" "" 2 excludefirstlevel
 navpart 2 web/api "" "Web API"
 navpart 3 web/api "" "" 4 excludefirstlevel
-navpart 2 system
+navpart 2 daemon/config
+#navpart 2 system
 navpart 2 registry
 navpart 2 streaming "" "" 4
 navpart 2 backends "" "Backends" 3
-navpart 2 daemon
 navpart 2 database
 
 echo -ne "    - 'doc/Performance.md'

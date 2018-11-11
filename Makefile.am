@@ -77,9 +77,6 @@ dist_noinst_DATA= \
 	doc/netdata-for-IoT.md \
 	doc/netdata-security.md \
 	htmldoc/themes/material/partials/footer.html \
-	installer/DOCKER.md \
-	installer/LAUNCH.md \
-	installer/MAINTAINERS.md \
 	installer/README.md \
 	installer/UNINSTALL.md \
 	installer/UPDATE.md \
