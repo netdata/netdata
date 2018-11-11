@@ -26,7 +26,7 @@ Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 ## Contents
 
 1. [How it looks](#how-it-looks) - have a quick look at it
-2. [User Base](#user-base) - who uses netdata?
+2. [User base](#user-base) - who uses netdata?
 3. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
 4. [Quick Start](#quick-start) - try it now on your systems
 5. [News](#news) - latest news about netdata
