@@ -307,13 +307,13 @@ To improve visual anomaly detection across charts, the user can highlight a time
 ## What does it monitor  
 
 Netdata data collection is **extensible** - you can monitor anything you can get a metric for.
-Its [Plugin API](collectors/plugins.d) supports all programing languages (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
+Its [Plugin API](collectors/plugins.d/) supports all programing languages (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
 
 - For better performance, most system related plugins (cpu, memory, disks, filesystems, networking, etc) have been written in `C`.
 - For faster development and easier contributions, most application related plugins (databases, web servers, etc) have been written in `python`.
 
 #### APM (Application Performance Monitoring)
-- **statsd** - [netdata is a fully featured statsd server](collectors/statsd.plugin).
+- **statsd** - [netdata is a fully featured statsd server](collectors/statsd.plugin/).
 - **go_expvar** - collects metrics exposed by applications written in the Go programming language using the expvar package.
 - **Spring Boot** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
 

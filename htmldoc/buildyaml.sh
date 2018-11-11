@@ -79,7 +79,7 @@ navpart 1 . README "Getting Started"
 echo -ne "    - 'doc/Demo-Sites.md'
     - Installation:
         - 'installer/README.md'
-        - 'docker/README.md.md'
+        - 'docker/README.md'
         - 'installer/UPDATE.md'
         - 'installer/UNINSTALL.md'
 "
@@ -147,19 +147,24 @@ echo -ne "    - Third Party Plugins:
 
 echo -ne "- Hacking netdata:
     - CONTRIBUTING.md
+    - CODE_OF_CONDUCT.md
+    - CONTRIBUTORS.md
 "
 navpart 2 makeself "" "" 4
 navpart 2 packaging "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests
-
+navpart 2 diagrams/data_structures
 
 echo -ne "- About:
     - 'doc/Donations-netdata-has-received.md'
     - 'doc/a-github-star-is-important.md'
+    - CHANGELOG.md
+    - HISTORICAL_CHANGELOG.md
+    - REDISTRIBUTED.md
 "
-navpart 2 . "HISTORICAL_CHANGELOG"
+
 
 
 
