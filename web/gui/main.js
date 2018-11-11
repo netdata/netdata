@@ -522,7 +522,7 @@ function renderStreamedHosts(options) {
         let url, icon;
         const hostname = s.hostname;
 
-        if (hostname == master) {
+        if (hostname === master) {
             url = `base${'/'}`;
             icon = 'home';
         } else {
@@ -548,8 +548,8 @@ function renderMachines(machinesArray) {
     let html = `<div class="info-item">My netdata agents</div>`;
 
     if (machinesArray === null) {
-        var ret = loadLocalStorage("registryCallback");
-        if (typeof ret !== 'undefined' && ret !== null) {
+        let ret = loadLocalStorage("registryCallback");
+        if (ret) {
             machinesArray = JSON.parse(ret);
             console.log("failed to contact the registry - loaded registry data from browser local storage");
         }
