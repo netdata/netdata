@@ -12,8 +12,6 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 ---
 
-> *New to Netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*  
-
 **Netdata** is a system for **distributed real-time performance and health monitoring**.  
   
 It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.  
@@ -48,6 +46,8 @@ The following animated image, shows the top part of a typical netdata dashboard.
 ![peek 2018-11-11 02-40](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
 *A typical netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
+
+> *We have a few online demos to check: [http://my-netdata.io](http://my-netdata.io)*  
 
 ## User base
 
