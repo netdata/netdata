@@ -19,7 +19,7 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
-Addicted to netdata? [![Tweet about it!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Tweet%20about%20it)](https://twitter.com/intent/tweet?text=Netdata,%20real-time%20performance%20and%20health%20monitoring,%20done%20right!&url=https://my-netdata.io/&via=linuxnetdata&hashtags=netdata,monitoring)
+[![Tweet about netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Tweet%20about%20netdata)](https://twitter.com/intent/tweet?text=Netdata,%20real-time%20performance%20and%20health%20monitoring,%20done%20right!&url=https://my-netdata.io/&via=linuxnetdata&hashtags=netdata,monitoring)
 
 ## Contents
 
