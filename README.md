@@ -102,6 +102,8 @@ not just visualize metrics.
 
 ### Performance monitoring
 
+According to reports, performance issues are 10x more common compared to outages.
+
 > Take any performance monitoring solution and try to troubleshoot a performance problem.
 > At the end of the day you will have to `ssh` to the server(s) to understand what exactly is happening.
 > You will have to use `iostat`, `iotop`, `vmstat`, `top`, `ethtool` and probably a few dozen more console tools to figure
@@ -109,18 +111,17 @@ not just visualize metrics.
 
 With netdata, this need is eliminated significantly. Of course you will ssh. Just not for monitoring performance.
 
-One key parameter to effectively troubleshooting performance issues, is that the root cause is most probably unknown.
+One key parameter to effectively troubleshoot performance issues, is that the root cause is most probably unknown.
 If you were aware of the element that affected performance, most probably you would have fixed it already.
 
 The approach of most monitoring solutions (including commercial SaaS providers) that instruct their users and customers
-to collect only the metrics they understand, is contradictory to the nature performance monitoring. If we knew the metrics
-before hand, most probably we wouldn't have performance issues. 
+to collect only the metrics they understand, is contradictory to the nature of performance monitoring. If we knew the metrics
+before hand, most probably we would have a lot less performance issues. 
 
 So, Netdata collects everything. The more metrics collected, the more insights we will have when we need them.
 
-Netdata is also better than most console tools. Netdata visualizes the data, while the console tools just show their values.
-The detail is the same - we have spent a lot of time reading the source code of the console tools, to figure out what needs to
-do done in netdata, so that the data, the values, are the same. Actually, netdata is more precise than most console tools,
+Netdata is better than most console tools. Netdata visualizes the data, while the console tools just show their values.
+The detail is the same. Actually, netdata is more precise than most console tools,
 it will interpolate all collected values to second boundary, so that even if something took a few microseconds more to be
 collected, netdata will correctly estimate the per second rate.
 
@@ -129,7 +130,7 @@ collected, netdata will correctly estimate the per second rate.
 > Most monitoring solutions require endless configuration of whatever imaginable.
 
 Well... this is a linux box. Why do we need to configure every single metric we need to monitor.
-Of course it has a CPU and RAM and a few disks, and ethernet ports, it might run a firewall, a web server, or a database server and so on.
+Of course it has a CPU and RAM and a few disks, and ethernet ports, it may run a firewall, a web server, or a database server and so on.
 Why do we need to configure all these metrics?
 
 Netdata metrics collection is designed to support **configuration-less** operation. So, you just install and run netdata.
@@ -137,8 +138,9 @@ You will need to configure something only if it cannot be auto-detected.
 
 Of course you can enable, tweak or disable things.
 But by default, if netdata can connect to a web server you run on your systems, it will automatically
-collect all performance metrics. This happens for all plugins. It will also automatically collect all
-available system values for CPU, memory, disks, network interfaces, QoS (with labels if you also use [FireQOS](http://firehol.org/)), etc.
+collect all performance metrics. This happens for all data collection plugins when technically possible.
+It will also automatically collect all available system values for CPU, memory, disks, network interfaces,
+QoS (with labels if you also use [FireQOS](http://firehol.org/)), etc.
 Even for processes that do not offer performance metrics, it will automatically group the whole process
 tree and provide metrics like CPU usage, memory allocated, opened files, sockets, disk activity, swap
 activity, etc per application group.
