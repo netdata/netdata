@@ -4,9 +4,9 @@
 
 ---
 
-> **WARNING**:<br/>
-> People get adicted to **netdata**!<br/>
-> Once you install it and use it for some time, **there is no going back**! *You have been warned...*
+## **WARNING**
+People get adicted to **netdata**!<br/>
+Once you use it, **there is no going back**! *You have been warned...*
 
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
