@@ -193,10 +193,18 @@ This is what you should expect from Netdata:
 
 #### Positive and negative values
 
-To enhance visualization, charts on netdata dashboards have **positive** values for `read`, `input`, `received` and **negative** values for `write`, `output`, `sent`.
+Charts on netdata dashboards have **positive** values for `read`, `input`, `received` and **negative** values for `write`, `output`, `sent`.
 
 ![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
 *Netdata charts showing the bandwidth and packets of a network interface. `received` is positive, `sent` is negative.*
+
+#### Non zero-based y-axis
+
+Charts on netdata dashboards automatically zoom vertically, to enhance the visualization for the variation of each metric, within the visible time-frame.
+
+![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+
+*A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
 #### Charts are synchronized
 Charts on netdata dashboards are always synchronized with each other. There is no master chart. Any charts can be panned or zoomed at any time, and all other charts will follow.
