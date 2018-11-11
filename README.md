@@ -17,17 +17,18 @@ Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## Contents
 
-1. [How it looks](#how-it-looks)
-2. [User Base](#user-base)
-3. [Why Netdata](#why-netdata)
-4. [Quick Start](#quick-start)
-5. [News](#news)
-6. [infographic](#infographic)
-7. [Features](#features)
-8. [What does it monitor](#what-does-it-monitor)
-9. [Installation](#installation)
-10. [Documentation](#documentation)
-11. [License](#license)
+1. [How it looks](#how-it-looks) - have a quick look at it
+2. [User Base](#user-base) - who uses netdata?
+3. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
+4. [Quick Start](#quick-start) - try it now on your systems
+5. [News](#news) - latest news about netdata
+6. [infographic](#infographic) - everything about netdata, in a page
+7. [Features](#features) - what features does it have
+8. [What does it monitor](#what-does-it-monitor) - which metrics it collects
+9. [Installation](#installation) - install it on all your systems
+10. [Documentation](#documentation) - read the docs
+11. [Community](#community) - disucss with others and get support
+12. [License](#license) - check the license of netdata
 
 
 ## How it looks
@@ -109,9 +110,18 @@ bash
 # install netdata, directly from github sources
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
+
+The above command will:
+
+1. install any required packages on your system (it will ask you to confirm before doing so),
+2. download netdata source to `/usr/src/netdata.git`
+3. compile netdata on your system
+4. install netdata to your system
+5. start netdata
+
 ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-More installation methods can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
+More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -380,7 +390,17 @@ It should run on **any Linux** system (including IoT). It has been tested on:
 ## Documentation  
   
 Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.  
-  
+
+
+## Community
+
+1. To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
+2. Netdata has a [Facebook page](https://www.facebook.com/linuxnetdata/).
+3. Netdata has a [Twitter account](https://twitter.com/linuxnetdata).
+4. Netdata on [OpenHub](https://www.openhub.net/p/netdata).
+5. Netdata on [Repology](https://repology.org/metapackage/netdata/versions).
+6. Netdata on [StackShare](https://stackshare.io/netdata).
+
 ## License  
   
 netdata is [GPLv3+](LICENSE).  
