@@ -11,7 +11,7 @@ make
 
 After every change in the `src` directory, the `dashboard.js` file should be regenerated and commited to the repository.
 
-Supported chart libraries
+## Supported chart libraries
 
 - Dygraph
 - jQuery Sparkline

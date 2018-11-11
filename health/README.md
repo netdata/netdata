@@ -689,4 +689,4 @@ The above returns all the events in the alarm log that occurred after UNIQUEID (
 The following will return an SVG badge of the alarm named `NAME`, attached to the chart named `CHART`.
 
 `http://your.netdata.ip:19999/api/v1/badge.svg?alarm=NAME&chart=CHART`
->>>>>>> Final cleanup/deduplication
+
