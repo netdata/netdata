@@ -12,6 +12,7 @@
 
 **Closed issues:**
 
+- The cgroup-name.sh doesn't seem to work [\#4603](https://github.com/netdata/netdata/issues/4603)
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
 - Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
 - Remove excessive requestAnimationFrame\(\) compatibility checks [\#4501](https://github.com/netdata/netdata/issues/4501)
@@ -22,6 +23,9 @@
 
 **Merged pull requests:**
 
+- updated readme [\#4606](https://github.com/netdata/netdata/pull/4606) ([ktsaou](https://github.com/ktsaou))
+- Update readme [\#4605](https://github.com/netdata/netdata/pull/4605) ([ktsaou](https://github.com/ktsaou))
+- Updated readme [\#4604](https://github.com/netdata/netdata/pull/4604) ([ktsaou](https://github.com/ktsaou))
 - Updated readme [\#4600](https://github.com/netdata/netdata/pull/4600) ([ktsaou](https://github.com/ktsaou))
 - Updated readme [\#4599](https://github.com/netdata/netdata/pull/4599) ([ktsaou](https://github.com/ktsaou))
 - New readme [\#4596](https://github.com/netdata/netdata/pull/4596) ([ktsaou](https://github.com/ktsaou))
