@@ -2,6 +2,16 @@
   
 [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:cpp) [![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:javascript) [![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:python)
 
+---
+
+> **WARNING**:<br/>
+> People get adicted to **netdata**!<br/>
+> Once you install it and use it for some time, **there is no going back**! *You have been warned...*
+
+![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
+
+---
+
 > *New to Netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*  
 
 **Netdata** is a system for **distributed real-time performance and health monitoring**.  
@@ -94,12 +104,6 @@ It has been designed by **SysAdmins**, **DevOps** and **Developers** for trouble
 not just visualize metrics.
 
 ## Quick Start
-
-> **WARNING**:<br/>
-> People get adicted to **netdata**!<br/>
-> Once you install it and use it for some time, **there is no going back**! *You have been warned...*
-
-![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
 You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
  
