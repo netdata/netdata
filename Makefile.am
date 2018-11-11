@@ -96,7 +96,7 @@ dist_noinst_SCRIPTS= \
 	netdata-installer.sh \
 	installer/functions.sh \
 	htmldoc/buildhtml.sh \
-	htmldoc/buildyaml.sh
+	htmldoc/buildyaml.sh \
 	$(NULL)
 
 # -----------------------------------------------------------------------------
