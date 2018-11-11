@@ -61,6 +61,10 @@ Netdata is **open-source**, **free**, super **fast**, very **easy**, completely 
 It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems,
 not just visualize metrics.
 
+## How it looks
+
+![peek 2018-11-11 02-40](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
+*Typical netdata dashboard. Charts can be panned by dragging them, zoom in/out with `SHIFT` + mouse wheel.*
 
 ## Quick Start
 
