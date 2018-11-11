@@ -18,6 +18,7 @@ Netdata currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 ## Contents
 
 1. [Why Netdata](#why-netdata)
+2. [How it looks](#how-it-looks)
 2. [Quick Start](#quick-start)
 3. [User Base](#user-base)
 4. [News](#news)
@@ -180,39 +181,76 @@ This is what you should expect from Netdata:
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
 
----
 
-## Data Collection
-- **Extensible** - you can monitor anything you can get a metric for, using its Plugin API (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
-- **statsd** - [netdata is a fully featured statsd server](https://github.com/netdata/netdata/wiki/statsd) for collecting your custom application's APM metrics.
+## What does it monitor  
+
+Netdata data collection is **extensible** - you can monitor anything you can get a metric for.
+Its [Plugin API](collectors/plugins.d) supports all programing languages (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
+
+- For better performance, most system related plugins (cpu, memory, disks, filesystems, networking, etc) have been written in `C`.
+- For faster development and easier contributions, most application related plugins (databases, web servers, etc) have been written in `python`.
+
+#### APM (Application Performance Monitoring)
+- **statsd** - [netdata is a fully featured statsd server](collectors/statsd.plugin).
+- **go_expvar** - collects metrics exposed by applications written in the Go programming language using the expvar package.
+- **Spring Boot** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
 
 #### System Resources
-- **CPU Utilization** - detailed usage, interrupts, softirqs, frequency, total and per core, CPU states, etc.
-- **Memory Usage** - RAM, swap and kernel memory usage, KSM (Kernel Samepage Merging), NUMA, etc.
+- **CPU Utilization** - total and per core CPU usage.
+- **Interrupts** - total and per core CPU interrupts.
+- **SoftIRQs** - total and per core SoftIRQs.
+- **SoftNet** - total and per core SoftIRQs related to network activity.
+- **CPU Throttling** - collects per core CPU throttling.
+- **CPU Frequency** - collects the current CPU frequency.
+- **CPU Idle** - collects the time spent per processor state.
+- **IdleJitter** - measures CPU latency.
 - **Entropy** - random numbers pool, using in cryptography.
 - **Interprocess Communication - IPC** - such as semaphores and semaphores arrays.
+
+#### Memory
+- **ram** - collects info about RAM usage.
+- **swap** - collects info about swap memory usage.
+- **available memory** - collects the amount of RAM available for userspace processes.
+- **committed memory** - collects the amount of RAM committed to userspace processes.
+- **Page Faults** - collects the system page faults (major and minor).
+- **writeback memory** - collects the system dirty memory and writeback activity.
+- **huge pages** - collects the amount of RAM used for huge pages.
+- **KSM** - collects info about Kernel Same Merging (memory dedupper).
+- **Numa** - collects Numa info on systems that support it.
+- **slab** - collects info about the Linux kernel memory usage.
 
 #### Disks
 - **block devices** - per disk: I/O, operations, backlog, utilization, space, etc.  
 - **BCACHE** - detailed performance of SSD caching devices.
+- **DiskSpace** - monitors disk space usage.
 - **mdstat** - software RAID.
 - **hddtemp** - disk temperatures.
 - **smartd** - disk S.M.A.R.T. values.
 - **device mapper** - naming disks.
 - **Veritas Volume Manager** - naming disks.
+- **megacli** - adapter, physical drives and battery stats.
+- **adaptec_raid** - 
 
 #### Filesystems
 - **BTRFS** - detailed disk space allocation and usage.
-- **ZFS** - detailed performance and resource usage.
+- **Ceph** - OSD usage, Pool usage, number of objects, etc.
 - **NFS file servers and clients** - NFS v2, v3, v4: I/O, cache, read ahead, RPC calls  
-- **IPFS** - bandwidth, peers.
-- **ceph** - OSD usage, Pool usage, number of objects, etc.
+- **Samba** - performance metrics of Samba SMB2 file sharing.
+- **ZFS** - detailed performance and resource usage.
 
 #### Networking
 - **Network Stack** - everything about the networking stack (both IPv4 and IPv6 for all protocols: TCP, UDP, SCTP, UDPLite, ICMP, Multicast, Broadcast, etc), and all network interfaces (per interface: bandwidth, packets, errors, drops).
-- **Firewall** - everything about the netfilter connection tracker, including SYNPROXY.
+- **Netfilter** - everything about the netfilter connection tracker.
+- **SynProxy** - collects performance data about the linux SYNPROXY (DDoS).
+- **NFacct** - collects accounting data from iptables.
 - **Network QoS** - the only tool that visualizes network `tc` classes in real-time  
-- **fping** - to measure latency and packet loss between any number of hosts.
+- **FPing** - to measure latency and packet loss between any number of hosts.
+- **OpenVPN** - status per tunnel.
+- **ISC dhcpd** - pools utilization, leases, etc.
+- **AP** - collects Linux access point performance data (`hostapd`).
+- **SNMP** - SNMP devices can be monitored too (although you will need to configure these).
+- **port_check** - checks TCP ports for availability and response time.
+- **IPVS** - collects metrics from the Linux IPVS load balancer.
 
 #### Processes
 - **System Processes** - running, blocked, forks, active.
@@ -221,85 +259,103 @@ This is what you should expect from Netdata:
 
 #### Users
 - **Users and User Groups resource usage** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets
+- **logind** - collects sessions, users and seats connected.
 
 #### Containers and VMs
 - **Containers** - all kinds of containers, using CGROUPS (systemd-nspawn, lxc, lxd, docker, kubernetes, etc).
 - **libvirt VMs** - all kinds of VMs, using CGROUPS.
 
 #### Web Servers
-- **Apache and lighttpd** - `mod-status` (v2.2, v2.4) and cache log statistics, etc. for multiple servers.
+- **Apache and lighttpd** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
+- **IPFS** - bandwidth, peers.
+- **LiteSpeed** - reads the litespeed rtreport files to collect metrics.
 - **Nginx** - `stub-status`, for multiple servers.
-- **Nginx+** - for multiple servers.
-- **Tomcat** - accesses, threads, free memory, volume, etc.
-- **web server log files** - extracting in real-time, web server performance metrics and applying several health checks, etc.
+- **Nginx+** - connects to multiple nginx_plus servers (local or remote) to collect real-time performance metrics.
 - **PHP-FPM** - multiple instances, each reporting connections, requests, performance, etc.
+- **Tomcat** - accesses, threads, free memory, volume, etc.
+- **web server `access.log` files** - extracting in real-time, web server and proxy performance metrics and applying several health checks, etc.
+- **http_check** - checks one or more web servers for HTTP status code and returned content.
 
-#### Proxy and Balancing Servers
-- **Squid proxy servers** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
+#### Proxies, Balancers, Accelerators
 - **HAproxy** - bandwidth, sessions, backends, etc.
+- **Squid** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
+- **Traefik** - connects to multiple traefik instances (local or remote) to collect API metrics (response status code, response time, average response time and server uptime).
 - **Varnish** - threads, sessions, hits, objects, backends, etc.
 
 #### Database Servers
-- **mySQL and mariadb** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
+- **CouchDB** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
+- **MemCached** - multiple servers, each showing: bandwidth, connections, items, etc.
+- **MongoDB** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
+- **MySQL and mariadb** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
 - **PostgreSQL** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
 - **Redis** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
-- **CouchDB** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
-- **MongoDB** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
-- **MemCached** - multiple servers, each showing: bandwidth, connections, items, etc.
+- **RethinkDB** - connects to multiple rethinkdb servers (local or remote) to collect real-time metrics.
+
+#### Message Brokers
+- **beanstalkd** - global and per tube monitoring.
+- **rabbitmq** - performance and health metrics.
+
+#### Search and Indexing
+- **elasticsearch** - search and index performance, latency, timings, cluster statistics, threads statistics, etc.
 
 #### DNS Servers
-- **ISC Bind name servers** - multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics.
-- **NSD name servers** - queries, zones, protocols, query types, transfers, etc.
+- **bind_rndc** - parses `named.stats` dump file to collect real-time performance metrics. All versions of bind after 9.6 are supported.
+- **dnsdist** - performance and health metrics.
+- **ISC Bind (named)** - multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics. All versions of bind after 9.9.10 are supported.
+- **NSD** - queries, zones, protocols, query types, transfers, etc.
 - **PowerDNS** - queries, answers, cache, latency, etc.
+- **unbound** - performance and resource usage metrics.
+- **dns_query_time** - DNS query time statistics.
 
 #### Time Servers
-
+- **chrony** - uses the `chronyc` command to collect chrony statistics (Frequency, Last offset, RMS offset, Residual freq, Root delay, Root dispersion, Skew, System time).  
+- **ntpd** - connects to multiple ntpd servers (local or remote) to provide statistics of system variables and optional also peer variables.
 
 #### Mail Servers
-- **Postfix** - message queue (entries, size).
-- **Exim** - message queue (emails queued).
 - **Dovecot** - POP3/IMAP servers.
+- **Exim** - message queue (emails queued).
+- **Postfix** - message queue (entries, size).
 
+#### Hardware Sensors
+- **IPMI** - enterprise hardware sensors and events.
+- **lm-sensors** - temperature, voltage, fans, power, humidity, etc.
+- **RPi** - Raspberry Pi temperature sensors.
+- **w1sensor** - collects data from connected 1-Wire sensors.
 
+#### UPSes
+- **apcupsd** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **NUT** - load, charge, battery voltage, temperature, utility metrics, output metrics
 
----
+#### Social Sharing Servers
+- **RetroShare** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
 
-## What does it monitor  
-  
-netdata collects several thousands of metrics per device.  
-All these metrics are collected and visualized in real-time.  
-  
-> _Almost all metrics are auto-detected, without any configuration._  
-  
-This is a list of what it currently monitors:  
-  
-  
-- **elasticsearch**<br/>  
-  search and index performance, latency, timings, cluster statistics, threads statistics, etc  
-  
-- **ISC dhcpd**<br/>  
-  pools utilization, leases, etc.  
-  
-- **OpenVPN**<br/>  
-  status per tunnel  
-  
-- **Hardware sensors**<br/>  
-  `lm_sensors` and `IPMI`: temperature, voltage, fans, power, humidity  
-  
-- **NUT and APC UPSes**<br/>  
-  load, charge, battery voltage, temperature, utility metrics, output metrics  
-  
-- **SNMP devices**<br/>  
-  can be monitored too (although you will need to configure these)  
-  
-- **chrony**</br>  
-  frequencies, offsets, delays, etc.  
-  
-- **beanstalkd**</br>  
-  global and per tube monitoring  
-  
+#### Security
+- **Fail2Ban** - monitors the fail2ban log file to check all bans for all active jails.
+
+#### Authentication, Authorization, Accounting (AAA, RADIUS, LDAP) Servers
+- **FreeRadius** - uses the `radclient` command to provide freeradius statistics (authentication, accounting, proxy-authentication, proxy-accounting).
+
+#### Telephony Servers
+- **opensips** - connects to an opensips server (localhost only) to collect real-time performance metrics.
+
+#### Provisioning Systems
+- **Puppet** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
+
+#### Household Appliances
+- **SMA webbox** - connects to multiple remote SMA webboxes to collect real-time performance metrics of the photovoltaic (solar) power generation.
+- **Fronius** - connects to multiple remote Fronius Symo servers to collect real-time performance metrics of the photovoltaic (solar) power generation.
+- **StiebelEltron** - collects the temperatures and other metrics from your Stiebel Eltron heating system using their Internet Service Gateway (ISG web).
+
+#### Game Servers
+- **SpigotMC** - monitors Spigot Minecraft server ticks per second and number of online players using the Minecraft remote console.
+
+#### Distributed Computing
+- **BOINC** - monitors task states for local and remote BOINC client software using the remote GUI RPC interface. Also provides alarms for a handful of error conditions.
+
 And you can extend it, by writing plugins that collect data from any source, using any computer language.  
   
+---
+
 ## Installation  
   
 Use our **[automatic installer](https://github.com/netdata/netdata/wiki/Installation)** to build and install it on your system.  
