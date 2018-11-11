@@ -25,8 +25,8 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 1. [How it looks](#how-it-looks) - have a quick look at it
 2. [User base](#user-base) - who uses netdata?
-3. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
-4. [Quick Start](#quick-start) - try it now on your systems
+3. [Quick Start](#quick-start) - try it now on your systems
+4. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
 5. [News](#news) - latest news about netdata
 6. [infographic](#infographic) - everything about netdata, in a page
 7. [Features](#features) - what features does it have
@@ -68,6 +68,29 @@ Docker pulls as reported by docker hub:<br/>[![netdata/netdata (official)](https
 *Since May 16th 2016 (the date the [global public netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item) was released):*<br/>[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
   
 *in the last 24 hours:*<br/> [![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
+
+## Quick Start
+
+You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
+ 
+```sh
+# make sure you run `bash` for your shell
+bash
+
+# install netdata, directly from github sources
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+```
+![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+
+The above command will:
+
+1. install any required packages on your system (it will ask you to confirm before doing so),
+2. download netdata source to `/usr/src/netdata.git`
+3. compile it, install it and start it
+
+More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
+
+![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
 ## Why Netdata
 
@@ -175,29 +198,6 @@ Of course, real-time monitoring requires resources. So netdata is extremely opti
 
 Netdata will use some CPU and memory, but it will not produce any disk I/O at all, apart its logs (which you can disable if you like).
 
-
-## Quick Start
-
-You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
- 
-```sh
-# make sure you run `bash` for your shell
-bash
-
-# install netdata, directly from github sources
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
-![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](http://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
-
-The above command will:
-
-1. install any required packages on your system (it will ask you to confirm before doing so),
-2. download netdata source to `/usr/src/netdata.git`
-3. compile it, install it and start it
-
-More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
-
-![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
 ## News  
   
