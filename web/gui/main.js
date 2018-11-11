@@ -594,10 +594,18 @@ function renderMachines(machinesArray) {
 
             html += (
                 `<div class="agent-item agent-${machine.guid}">
-                    <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
-                        <i class="fas fa-plus-square" style="visibility: ${hasAlternateUrls ? 'visible' : 'hidden'}; color: #999"></i>
-                    </a>
-                    <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+                    <i class="fas fa-chart-bar" color: #fff"></i>
+                    <span>
+                        <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a> 
+                        ${hasAlternateUrls 
+                            ? (
+                                `<a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
+                                    <i class="fas fa-plus-square" style="color: #999"></i>
+                                </a>`
+                            ) 
+                            : ''
+                        }
+                    </span>
                     <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
                         <i class="fas fa-trash" style="color: #999"></i>
                     </a>
