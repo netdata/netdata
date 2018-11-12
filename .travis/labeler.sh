@@ -24,8 +24,8 @@ for STATE in "open" "closed"; do
     URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE"
     BODY="$(curl "${URL}" | jq .body 2>/dev/null)"
     case "${BODY}" in
-      *"##### Question summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question"]}' -X PATCH "${URL}" ;;
-      *"##### Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["bug"]}' -X PATCH "${URL}" ;;
+      *"# Question summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question"]}' -X PATCH "${URL}" ;;
+      *"# Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["bug"]}' -X PATCH "${URL}" ;;
       * ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage"]}' -X PATCH "${URL}" ;;
     esac
   done

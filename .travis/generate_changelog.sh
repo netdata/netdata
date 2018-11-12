@@ -10,8 +10,8 @@ fi
 
 ORGANIZATION=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $1}')
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
-GIT_MAIL="pawel+bot@netdata.cloud"
-GIT_USER="netdatabot"
+GIT_MAIL=${GIT_MAIL:-"pawel+bot@netdata.cloud"}
+GIT_USER=${GIT_USER:-"netdatabot"}
 
 echo "--- Initialize git configuration ---"
 git config user.email "${GIT_MAIL}"
