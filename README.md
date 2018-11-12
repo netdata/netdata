@@ -163,7 +163,7 @@ Netdata is a highly efficient, highly modular, metrics management engine. Its lo
 
 This is how it works:
 
-ID|Function|Description|Documentation
+Function|Description|Documentation
 :---:|:---|:---:
 **Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[Collectors](https://github.com/netdata/netdata/tree/master/collectors#data-collection-plugins)
 **Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[Database](https://github.com/netdata/netdata/tree/master/database#netdata-database)
