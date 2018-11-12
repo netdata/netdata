@@ -539,7 +539,8 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content .info-item {
-    height: 24px;
+    height: 32px;
+    line-height: 32px;
     padding-left: 14px;
 }
 
