@@ -55,7 +55,7 @@ The following animated image, shows the top part of a typical netdata dashboard.
 
 ## User base
 
-Netdata is a **robust** application. It is used by hundreds of thousands of users all over the world.
+Netdata is used by hundreds of thousands of users all over the world.
 Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
 You will find people working for: **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
 **Elastic**, **EPAM Systems**, **Ericsson**, **Google**, **Groupon**, **Hortonworks**, **HP**, **Huawei**,
