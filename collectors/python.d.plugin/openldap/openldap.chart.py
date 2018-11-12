@@ -28,38 +28,38 @@ ORDER = [
 
 CHARTS = {
     'total_connections': {
-        'options': [None, 'Total Connections', 'connections', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Total Connections', 'connections/s', 'ldap', 'openldap.total_connections', 'line'],
         'lines': [
             ['total_connections', 'connections', 'incremental']
         ]
     },
     'bytes_sent': {
-        'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Traffic', 'KB/s', 'ldap', 'openldap.traffic_stats', 'line'],
         'lines': [
             ['bytes_sent', 'sent', 'incremental', 1, 1024]
         ]
     },
     'operations': {
-        'options': [None, 'Operations', 'ops', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Operations Status', 'ops/s', 'ldap', 'openldap.operations_status', 'line'],
         'lines': [
             ['completed_operations', 'completed', 'incremental'],
             ['initiated_operations', 'initiated', 'incremental']
         ]
     },
     'referrals_sent': {
-        'options': [None, 'Referrals Statistics', 'referalls_sent', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Referrals', 'referals/s', 'ldap', 'openldap.referrals', 'line'],
         'lines': [
             ['referrals_sent', 'sent', 'incremental']
         ]
     },
     'entries_sent': {
-        'options': [None, 'Entries Statistics', 'entries_sent', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Entries', 'entries/s', 'ldap', 'openldap.entries', 'line'],
         'lines': [
             ['entries_sent', 'sent', 'incremental']
         ]
     },
     'ldap_operations': {
-        'options': [None, 'Operations', 'bind_operations', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Operations', 'ops/s', 'ldap', 'openldap.ldap_operations', 'line'],
         'lines': [
             ['bind_operations', 'bind', 'incremental'],
             ['search_operations', 'search', 'incremental'],
@@ -71,7 +71,7 @@ CHARTS = {
         ]
     },
     'waiters': {
-        'options': [None, 'Waiters', 'amount', 'ldap', 'monitorCounter', 'line'],
+        'options': [None, 'Waiters', 'waiters/s', 'ldap', 'openldap.waiters', 'line'],
         'lines': [
             ['write_waiters', 'write', 'incremental'],
             ['read_waiters', 'read', 'incremental']
