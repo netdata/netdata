@@ -172,7 +172,7 @@ Function|Description|Documentation
 **Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[Backends](https://github.com/netdata/netdata/tree/master/backends)
 **Query**|Multiple independent workers are attached to the [internal web server](https://github.com/netdata/netdata/tree/master/web/server#netdata-web-server), servicing API requests, including [data queries](https://github.com/netdata/netdata/tree/master/web/api/queries#database-queries).|[API](https://github.com/netdata/netdata/tree/master/web/api#api)
 
-The result is a highly efficient system, supporting multiple readers and one writer for each metric.
+The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
 ## Infographic  
   
