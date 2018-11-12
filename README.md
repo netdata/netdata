@@ -165,12 +165,14 @@ This is how it works:
 
 Function|Description
 :---:|:---
-**Collect**|Multiple independent data collection workers are pushing metrics to the database.
+**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.
 **Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.
-**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms and sends alarm notifications.
-**Stream**|An lockless independent worker is streaming metrics to remote netdata servers, in full detail and in real-time, as soon as they are collected.
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a notification queue and dispatches alarm notifications.
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.
 **Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.
 **Query**|Multiple independent workers are attached to the internal web server, servicing API requests.
+
+The result is a highly efficient system, supporting multiple readers and one writer for each metric.
 
 ## Infographic  
   
