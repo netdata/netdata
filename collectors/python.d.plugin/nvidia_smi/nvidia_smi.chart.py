@@ -314,7 +314,7 @@ class Service(SimpleService):
         last_data = self.poller.data()
 
         parsed = self.parse_xml(last_data)
-        if not parsed:
+        if parsed is None:
             return None
 
         data = dict()
@@ -334,7 +334,7 @@ class Service(SimpleService):
             return False
 
         parsed = self.parse_xml(raw_data)
-        if not parsed:
+        if parsed is None:
             return False
 
         gpus = parsed.findall('gpu')
