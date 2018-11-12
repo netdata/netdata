@@ -465,10 +465,10 @@ function saveObjectToClient(data, filename) {
 // registry call back to render my-netdata menu
 
 function toggleExpandIcon(svgEl) {
-    if (svgEl.getAttribute('data-icon') === 'plus-square') {
-        svgEl.setAttribute('data-icon', 'minus-square');
+    if (svgEl.getAttribute('data-icon') === 'caret-down') {
+        svgEl.setAttribute('data-icon', 'caret-up');
     } else {
-        svgEl.setAttribute('data-icon', 'plus-square');
+        svgEl.setAttribute('data-icon', 'caret-down');
     }
 }
 
@@ -483,6 +483,8 @@ function toggleAgentItem(e, guid) {
         el.classList.toggle('collapsed');
     }
 }
+
+// TODO: consider renaming to `truncateString`
 
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
@@ -555,7 +557,7 @@ function renderMachines(machinesArray) {
         }
     }
 
-    let found = 0;
+    let found = false;
 
     if (machinesArray) {
         saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
@@ -565,49 +567,33 @@ function renderMachines(machinesArray) {
         });
 
         for (const machine of machines) {
-            found++;
+            found = true;
 
-            const hasAlternateUrls = machine.alternate_urls.length > 1;
-
-            let alternateUrlItems;
-
-            if (hasAlternateUrls) {
-                alternateUrlItems = (
-                    `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
-                    ${machine.alternate_urls.reduce(
-                        (str, url) => str + (
-                            `<div class="agent-item agent-item--alternate">
-                                <div></div>
-                                <a href="${url}" title="${url}">${clipString(url, 64)}</a>
-                                <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
-                                    <i class="fas fa-trash" style="color: #777;"></i>
-                                </a>
-                            </div>`
-                        ),
-                        ''
-                    )}
-                    </div>`
-                )
-            } else {
-                alternateUrlItems = '';
-            }
+            const alternateUrlItems = (
+                `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
+                ${machine.alternate_urls.reduce(
+                    (str, url) => str + (
+                        `<div class="agent-item agent-item--alternate">
+                            <div></div>
+                            <a href="${url}" title="${url}">${clipString(url, 64)}</a>
+                            <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
+                                <i class="fas fa-trash" style="color: #777;"></i>
+                            </a>
+                        </div>`
+                    ),
+                    ''
+                )}
+                </div>`
+            )
 
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <i class="fas fa-chart-bar" color: #fff"></i>
                     <span>
                         <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
-                        ${hasAlternateUrls 
-                            ? (
-                                `<a href="#" class="agent-item__expand-button" onClick="toggleAgentItem(event, '${machine.guid}');">
-                                    <i class="fas fa-plus-square" style="color: #999"></i>
-                                </a>`
-                            ) 
-                            : ''
-                        }
                     </span>
-                    <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${machine.url}'); return false;">
-                        <i class="fas fa-trash" style="color: #999"></i>
+                    <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
+                        <i class="fas fa-caret-down" style="color: #999"></i>
                     </a>
                 </div>
                 ${alternateUrlItems}`
