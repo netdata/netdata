@@ -52,7 +52,7 @@ The following animated image, shows the top part of a typical netdata dashboard.
 
 *A typical netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
-> *We have a few online demos to check: [https://my-netdata.io](https://my-netdata.io)*  
+> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*  
 
 ## User base
 
@@ -78,7 +78,7 @@ When you install multiple netdata, they are integrated into **one distributed ap
 ## Quick Start
 
 You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
- 
+
 ```sh
 # make sure you run `bash` for your shell
 bash
@@ -94,7 +94,22 @@ The above command will:
 2. download netdata source to `/usr/src/netdata.git`
 3. compile it, install it and start it
 
-More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
+More installation methods and additional options can be found at the [installation page](installer/#installation).
+
+To try netdata in a docker container, run this:
+
+```
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
+
+For more information about running netdata in docker, check the [docker installation page](docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -427,19 +442,41 @@ And you can extend it, by writing plugins that collect data from any source, usi
   
 ---  
   
-## Documentation  
-  
-Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.  
+## Documentation
 
+The netdata documentation is inside the repo, so by just navigating the repo on github you can find all the documentation.
+
+Here is a quick list:
+
+Function|Description
+:---:|:---
+[Installation](installer/)|Install netdata on your systems.
+[Docker installation](docker/)|Install netdata using docker.
+[Netdata daemon](daemon/)|Information about the netdata daemon and its configuration.
+[Data collection plugins](collectors/)|All the data collection plugins of netdata. Be sure to check [python.d](collectors/python.d.plugin/) which is responsible for collecting metrics from most of the third party applications, the [statsd.plugin](collectors/statsd.plugin/) that collects APM metrics, etc.
+[Health monitoring and alarms](health/)|Learn about netdata health monitoring functions, how to create your own alarms and how to configure alarm notification methods.
+[Streaming](streaming/)|Build hierarchies of netdata servers, by streaming metrics between them.
+[Backends](backends/)|Long term archiving of metrics to industry standard time-series databases, like prometheus, graphite, opentsdb.
+[API](web/api/)|Learn how to query the netdata API and the query types it supports.
+[Badges](web/api/badges/)|Learn how to generate badges from live data.
+[Custom dashboards](web/gui/custom/)|Learn how to create custom netdata dashboards.
+[Confluence dashboards](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
+
+But you can also check all the other directories. Most of them have plenty of documentation.
 
 ## Community
 
-1. To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
-2. Netdata has a [Facebook page](https://www.facebook.com/linuxnetdata/).
-3. Netdata has a [Twitter account](https://twitter.com/linuxnetdata).
-4. Netdata on [OpenHub](https://www.openhub.net/p/netdata).
-5. Netdata on [Repology](https://repology.org/metapackage/netdata/versions).
-6. Netdata on [StackShare](https://stackshare.io/netdata).
+We welcome contributions. So, feel free to join the team.
+
+To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
+
+You can also find netdata on:
+
+- [Facebook](https://www.facebook.com/linuxnetdata/).
+- [Twitter](https://twitter.com/linuxnetdata).
+- [OpenHub](https://www.openhub.net/p/netdata).
+- [Repology](https://repology.org/metapackage/netdata/versions).
+- [StackShare](https://stackshare.io/netdata).
 
 ## License  
   

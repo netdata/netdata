@@ -26,7 +26,7 @@ docker run -d --name=netdata \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  firehol/netdata
+  netdata/netdata
 ```
 
 above can be converted to docker-compose file for ease of management:
