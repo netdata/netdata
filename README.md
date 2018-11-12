@@ -4,13 +4,18 @@
 
 ---
 
-**Netdata** is a system for **distributed real-time performance and health monitoring**.  
-  
-It provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications such as web and database servers), using **modern interactive web dashboards**.  
+**Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is based on a powerful monitoring agent you install on all your systems and containers.
+
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including containers and applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring toolchains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
-  
+
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.  
+
+![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
+
+Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
+Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
 
 ---
 
@@ -20,6 +25,7 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
 [![Tweet about netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Tweet%20about%20netdata)](https://twitter.com/intent/tweet?text=Netdata,%20real-time%20performance%20and%20health%20monitoring,%20done%20right!&url=https://my-netdata.io/&via=linuxnetdata&hashtags=netdata,monitoring)
+
 
 ## Contents
 
@@ -48,11 +54,6 @@ The following animated image, shows the top part of a typical netdata dashboard.
 > *We have a few online demos to check: [http://my-netdata.io](http://my-netdata.io)*  
 
 ## User base
-
-![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
-
-Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
-Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
 
 Netdata is a **robust** application. It has hundreds of thousands of users, all over the world.
 Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
@@ -372,7 +373,6 @@ Its [Plugin API](collectors/plugins.d) supports all programing languages (anythi
 - **AP** - collects Linux access point performance data (`hostapd`).
 - **SNMP** - SNMP devices can be monitored too (although you will need to configure these).
 - **port_check** - checks TCP ports for availability and response time.
-- **IPVS** - collects metrics from the Linux IPVS load balancer.
 - **LibreSwan** - collects metrics per IPSEC tunnel.
 
 #### Processes
@@ -404,6 +404,7 @@ Its [Plugin API](collectors/plugins.d) supports all programing languages (anythi
 - **Squid** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
 - **Traefik** - connects to multiple traefik instances (local or remote) to collect API metrics (response status code, response time, average response time and server uptime).
 - **Varnish** - threads, sessions, hits, objects, backends, etc.
+- **IPVS** - collects metrics from the Linux IPVS load balancer.
 
 #### Database Servers
 - **CouchDB** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
