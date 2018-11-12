@@ -76,6 +76,7 @@ dist_noinst_DATA= \
 	doc/high-performance-netdata.md \
 	doc/netdata-for-IoT.md \
 	doc/netdata-security.md \
+	doc/Why-Netdata.md \
 	htmldoc/themes/material/partials/footer.html \
 	installer/README.md \
 	installer/UNINSTALL.md \

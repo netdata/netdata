@@ -76,7 +76,8 @@ nav:'
 
 navpart 1 . README "Getting Started"
 
-echo -ne "    - 'doc/Demo-Sites.md'
+echo -ne "    - 'doc/Why-Netdata.md'
+    - 'doc/Demo-Sites.md'
     - Installation:
         - 'installer/README.md'
         - 'docker/README.md'
