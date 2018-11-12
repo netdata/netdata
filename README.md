@@ -34,13 +34,14 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 3. [Quick Start](#quick-start) - try it now on your systems
 4. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
 5. [News](#news) - latest news about netdata
-6. [infographic](#infographic) - everything about netdata, in a page
-7. [Features](#features) - what features does it have
-8. [Visualization](#visualization) - unique visualization features
-9. [What does it monitor](#what-does-it-monitor) - which metrics it collects
-10. [Documentation](#documentation) - read the docs
-11. [Community](#community) - disucss with others and get support
-12. [License](#license) - check the license of netdata
+6. [How it works](#how-it-works) - high level diagram of how netdata works
+7. [infographic](#infographic) - everything about netdata, in a page
+8. [Features](#features) - what features does it have
+9. [Visualization](#visualization) - unique visualization features
+10. [What does it monitor](#what-does-it-monitor) - which metrics it collects
+11. [Documentation](#documentation) - read the docs
+12. [Community](#community) - disucss with others and get support
+13. [License](#license) - check the license of netdata
 
 
 ## How it looks
@@ -228,7 +229,11 @@ Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `
   
 Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.    
 
-  
+## How it works
+
+![image](https://user-images.githubusercontent.com/2662304/48321480-7bcfd380-e62b-11e8-91bd-ceacc9131caa.png)
+
+
 ## Infographic  
   
 This is a high level overview of netdata feature set and architecture.  
