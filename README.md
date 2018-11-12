@@ -231,7 +231,7 @@ Netdata now has its own github organization `netdata`, so all github URLs are no
 
 ## How it works
 
-![image](https://user-images.githubusercontent.com/2662304/48321894-7c696980-e62d-11e8-804d-a4b40d2803aa.png)
+![image](https://user-images.githubusercontent.com/2662304/48322388-f864b100-e62f-11e8-9741-6b240e567457.png)
 
 
 ## Infographic  
