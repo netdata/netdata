@@ -4,16 +4,19 @@
 
 **Fixed bugs:**
 
+- The cgroup-name.sh doesn't seem to work [\#4603](https://github.com/netdata/netdata/issues/4603)
 - smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
 - 1m\_received\_traffic\_overflow alarm is faulty on 10G or 40G network interfaces [\#4577](https://github.com/netdata/netdata/issues/4577)
+- 1.11 release reports as 1.10.0\_rolling [\#4572](https://github.com/netdata/netdata/issues/4572)
 - edit-config uses vi, even if it isn't the system editor [\#4549](https://github.com/netdata/netdata/issues/4549)
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
 
 **Closed issues:**
 
-- The cgroup-name.sh doesn't seem to work [\#4603](https://github.com/netdata/netdata/issues/4603)
+- How to create an alarm for one/some process in app.processes chart from apps.plugin [\#4614](https://github.com/netdata/netdata/issues/4614)
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
+- Improved management of netdata urls in the `my-netdata` menu [\#4582](https://github.com/netdata/netdata/issues/4582)
 - Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
 - Remove excessive requestAnimationFrame\(\) compatibility checks [\#4501](https://github.com/netdata/netdata/issues/4501)
 - Remove obsolete chart renderers [\#4492](https://github.com/netdata/netdata/issues/4492)
@@ -23,14 +26,24 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#4629](https://github.com/netdata/netdata/pull/4629) ([cakrit](https://github.com/cakrit))
+- Fixes and cleanup in release pipeline [\#4625](https://github.com/netdata/netdata/pull/4625) ([paulfantom](https://github.com/paulfantom))
+- updated video [\#4620](https://github.com/netdata/netdata/pull/4620) ([ktsaou](https://github.com/ktsaou))
+- Bad text in example config [\#4618](https://github.com/netdata/netdata/pull/4618) ([LordMike](https://github.com/LordMike))
+- Fixed tc-helper plugin broken link [\#4617](https://github.com/netdata/netdata/pull/4617) ([ofirule](https://github.com/ofirule))
+- Another Readme Update [\#4612](https://github.com/netdata/netdata/pull/4612) ([ktsaou](https://github.com/ktsaou))
+- Htmldoc [\#4607](https://github.com/netdata/netdata/pull/4607) ([cakrit](https://github.com/cakrit))
 - updated readme [\#4606](https://github.com/netdata/netdata/pull/4606) ([ktsaou](https://github.com/ktsaou))
 - Update readme [\#4605](https://github.com/netdata/netdata/pull/4605) ([ktsaou](https://github.com/ktsaou))
 - Updated readme [\#4604](https://github.com/netdata/netdata/pull/4604) ([ktsaou](https://github.com/ktsaou))
+- Fix spelling mistake in dashboard\_info.js [\#4601](https://github.com/netdata/netdata/pull/4601) ([hotio](https://github.com/hotio))
 - Updated readme [\#4600](https://github.com/netdata/netdata/pull/4600) ([ktsaou](https://github.com/ktsaou))
 - Updated readme [\#4599](https://github.com/netdata/netdata/pull/4599) ([ktsaou](https://github.com/ktsaou))
 - New readme [\#4596](https://github.com/netdata/netdata/pull/4596) ([ktsaou](https://github.com/ktsaou))
 - bug fix: conntrack\_max alarm was accessing invalid variable [\#4595](https://github.com/netdata/netdata/pull/4595) ([ktsaou](https://github.com/ktsaou))
 - fixed max interface speed calculation [\#4594](https://github.com/netdata/netdata/pull/4594) ([ktsaou](https://github.com/ktsaou))
+- Issue 4582 \(Show alternate urls in my-netdata menu\) [\#4590](https://github.com/netdata/netdata/pull/4590) ([gmosx](https://github.com/gmosx))
+- nvidia\_smi: init version added [\#4589](https://github.com/netdata/netdata/pull/4589) ([l2isbad](https://github.com/l2isbad))
 - Update links to badges documentation. [\#4588](https://github.com/netdata/netdata/pull/4588) ([nekkabcire](https://github.com/nekkabcire))
 - Cleanup index.html [\#4587](https://github.com/netdata/netdata/pull/4587) ([gmosx](https://github.com/gmosx))
 - smartd\_log: py2 compatibility fix [\#4584](https://github.com/netdata/netdata/pull/4584) ([l2isbad](https://github.com/l2isbad))
