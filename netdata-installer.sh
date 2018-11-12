@@ -883,9 +883,9 @@ SETUID_WARNING
 fi
 
 # -----------------------------------------------------------------------------
-progress "Generate netdata-uninstaller.sh"
+progress "Create netdata-uninstaller.sh"
 
-./installer/mo ./installer/netdata-uninstaller.sh.tmpl >netdata-uninstaller.sh
+cp ./installer/netdata-uninstaller.sh netdata-uninstaller.sh
 chmod 750 netdata-uninstaller.sh
 
 # -----------------------------------------------------------------------------
@@ -908,13 +908,12 @@ To start netdata run:
 
 
 END
-echo >&2 "Uninstall script generated: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
+echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ -d .git ]; then
-	./installer/mo ./installer/netdata-updater.sh.tmpl >netdata-updater.sh
-	chmod 755 netdata-updater.sh.new
-	mv -f netdata-updater.sh.new netdata-updater.sh
-	echo >&2 "Update script generated   : ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
+	cp ./installer/netdata-updater.sh netdata-updater.sh
+	chmod 755 netdata-updater.sh
+	echo >&2 "Update script is located at: ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
 	echo >&2
 	echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} can work from cron. It will trigger an email from cron"
 	echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
@@ -954,6 +953,17 @@ else
 	[ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"
 	[ "${AUTOUPDATE}" = "1" ] && echo >&2 "Your installation method does not support daily auto-updating via cron."
 fi
+
+# Save environment variables
+cat <<EOF > installer/.environment.sh
+PATH=${PATH}
+CFLAGS=${CFLAGS}
+NETDATA_PREFIX=${NETDATA_PREFIX}
+NETDATA_CONFIGURE_OPTIONS=${NETDATA_CONFIGURE_OPTIONS}
+NETDATA_ADDED_TO_GROUPS=${NETDATA_ADDED_TO_GROUPS}
+REINSTALL_PWD=${REINSTALL_PWD}
+REINSTALL_COMMAND=${REINSTALL_COMMAND}
+EOF
 
 # -----------------------------------------------------------------------------
 echo >&2

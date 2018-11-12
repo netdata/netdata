@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# :set syntax=sh
+
+# this script will uninstall netdata
+
+# Variables needed by script:
+#  - PATH
+#  - CFLAGS
+#  - NETDATA_CONFIGURE_OPTIONS
+#  - REINSTALL_PWD
+#  - REINSTALL_COMMAND
 
 force=0
 [ "${1}" = "-f" ] && force=1
 
-export PATH="${PATH}:{{PATH}}"
-export CFLAGS="{{CFLAGS}}"
-export NETDATA_CONFIGURE_OPTIONS="{{NETDATA_CONFIGURE_OPTIONS}}"
+source installer/.environment.sh || exit 1
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -17,16 +23,17 @@ if [ "${INSTALL_UID}" != '${UID}' ]; then
 fi
 
 # make sure we cd to the working directory
-cd "{{REINSTALL_PWD}}" || exit 1
+cd "${REINSTALL_PWD}" || exit 1
 
 # make sure there is .git here
-[ ${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: {{REINSTALL_PWD}} (use -f for force re-install)" && exit 1
+[ ${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: ${REINSTALL_PWD} (use -f for force re-install)" && exit 1
 
 # signal netdata to start saving its database
 # this is handy if your database is big
 pids=$(pidof netdata)
 do_not_start=
 if [ ! -z "${pids}" ]; then
+	#shellcheck disable=SC2086
 	kill -USR1 ${pids}
 else
 	# netdata is currently not running, so do not start it after updating
@@ -43,7 +50,7 @@ else
 	# create a temporary file for the log
 	tmp=$(mktemp /tmp/netdata-updater.log.XXXXXX)
 	# open fd 3 and send it to tmp
-	exec 3>${tmp}
+	exec 3>"${tmp}"
 fi
 
 info() {
@@ -82,7 +89,9 @@ update() {
 		info "Updating netdata source from github..."
 
 		last_commit="$(get_latest_commit_id)"
-		[ ${force} -eq 0 -a -z '${last_commit}' ] && failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
+		if [ ${force} -eq 0 ] && [ -z "${last_commit}" ]; then
+			failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
+		fi
 
 		info "Stashing local git changes. You can use $(git stash pop) to reapply your changes."
 		git stash >&3
@@ -102,7 +111,7 @@ update() {
 
 	emptyline
 	info "Re-installing netdata..."
-	{{REINSTALL_COMMAND}} --dont-wait ${do_not_start} >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+	${REINSTALL_COMMAND} --dont-wait ${do_not_start} >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
 
 	[ ! -z "${tmp}" ] && rm "${tmp}" && tmp=
 	return 0
@@ -110,5 +119,3 @@ update() {
 
 # the installer updates this script - so we run and exit in a single line
 update && exit 0
-###############################################################################
-###############################################################################
