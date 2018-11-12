@@ -568,11 +568,6 @@ body.modal-open {
     line-height: 14px;
 }
 
-.agent-item__expand-button {
-    margin-left: 5px;
-    cursor: pointer;
-}
-
 .agent-item--separated {
     border-top: 1px solid #333;
 }
