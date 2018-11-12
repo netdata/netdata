@@ -163,13 +163,14 @@ Netdata is a highly efficient, highly modular, metrics management engine. Its lo
 
 This is how it works:
 
-1. **Collect**: data collection is the exclusive writer to the metrics database.
-2. **Store**: in RAM storage, using a custom made floating point number.
-3. **Check**: an independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms and sends alarm notifications.
-4. **Stream**: an independent worker is responsible for streaming the metrics, in full detail and in real-time, as soon as they are collected.
-5. **Archieve**: an independent worker is responsible for down-sampling the metrics and pushing them to **backend** time-series databases.
-6. **Query**: multiple independent workers attached to the internal web server, as servicing web requests.
-
+Function|Description
+:---:|:---
+**Collect**|Multiple independent data collection workers are pushing metrics to the database.
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms and sends alarm notifications.
+**Stream**|An lockless independent worker is streaming metrics to remote netdata servers, in full detail and in real-time, as soon as they are collected.
+**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.
+**Query**|Multiple independent workers are attached to the internal web server, servicing API requests.
 
 ## Infographic  
   
