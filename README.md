@@ -224,7 +224,7 @@ To improve clarity on charts, netdata dashboards present **positive** values for
 
 *Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is negative.*
 
-### Non zero-based y-axis
+### Autoscaled y-axis
 
 Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
 
