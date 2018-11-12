@@ -592,3 +592,21 @@ body.modal-open {
     border-top: 1px solid #333;
     height: 4px;
 }
+
+/* white theme overrides */
+
+#my-netdata-dropdown-content.theme-white hr {
+    border-top: 1px solid #ddd;
+}
+
+#my-netdata-dropdown-content.theme-white .agent-item:hover {
+    background-color: #e6e6e6;
+}
+
+#my-netdata-dropdown-content.theme-white a {
+    color: #555;
+}
+
+#my-netdata-dropdown-content.theme-white a:hover {
+    color: #000;
+}

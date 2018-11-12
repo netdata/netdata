@@ -666,12 +666,14 @@ function netdataRegistryCallback(machinesArray) {
         </div>
         <div class="agent-item">
             <i class="fas fa-question-circle""></i>
-            <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" style="color: #999;" target="_blank">What is this?</a>
+            <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">What is this?</a>
             <div></div>
         </div>`
     )
 
-    document.getElementById('my-netdata-dropdown-content').innerHTML = html;
+    const el = document.getElementById('my-netdata-dropdown-content')
+    el.classList.add(`theme-${netdataTheme}`);
+    el.innerHTML = html;
 
     gotoServerInit();
 };
