@@ -53,7 +53,7 @@ jobs:
   - stage: nightlies
     name: tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-    script: ".travis/firehol_create_artifacts.sh"
+    script: ".travis/create_artifacts.sh"
   - name: docker images
     install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
     script: "docker/build.sh"
