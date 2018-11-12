@@ -49,8 +49,8 @@ Sample:
 
 ```yaml
 local:
-  host               :  'ipaddress'   # Server ip address or hostname
-  port               : 'password'     # Port on which elasticsearch listed
+  host               : 'ipaddress'    # Elasticsearch server ip address or hostname
+  port               : 'port'         # Port on which elasticsearch listens
   cluster_health     :  True/False    # Calls to cluster health elasticsearch API. Enabled by default.
   cluster_stats      :  True/False    # Calls to cluster stats elasticsearch API. Enabled by default.
 ```

@@ -264,7 +264,7 @@ body.modal-open {
 }
 
 .multi-column-dropdown li a {
-    display: block;
+    display: inline-block;
     clear: both;
     line-height: 1.428571429;
     white-space: normal;
@@ -530,4 +530,84 @@ body.modal-open {
     transform: scale(0, 0);
     opacity: .2;
     transition: 0s
+}
+
+/* --- */
+
+#my-netdata-dropdown-content a:hover {
+    color: #fff;
+}
+
+#my-netdata-dropdown-content .info-item {
+    height: 32px;
+    line-height: 32px;
+    padding-left: 14px;
+}
+
+#my-netdata-dropdown-content .agent-item {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    font-weight: 300;
+}
+
+#my-netdata-dropdown-content .agent-item:hover {
+    background-color: #262626;
+}
+
+#my-netdata-dropdown-content .agent-item a:hover {
+    text-decoration: none;
+}
+
+#my-netdata-dropdown-content .agent-item > :first-child {
+    width: 40px;
+    text-align: center;
+}
+
+#my-netdata-dropdown-content .agent-item > :last-child {
+    width: 40px;
+    text-align: center;
+}
+
+#my-netdata-dropdown-content .agent-item :nth-child(2) {
+    min-width: 420px;
+    line-height: 14px;
+}
+
+.agent-item--separated {
+    border-top: 1px solid #333;
+}
+
+.agent-item--alternate a {
+    color: #999;
+}
+
+#my-netdata-dropdown-content .agent-alternate-urls.collapsed {
+    display: none;
+}
+
+#my-netdata-dropdown-content hr {
+    display: block;
+    margin-top: 5px;
+    margin-bottom: 0;
+    border-top: 1px solid #333;
+    height: 4px;
+}
+
+/* white theme overrides */
+
+#my-netdata-dropdown-content.theme-white hr {
+    border-top: 1px solid #ddd;
+}
+
+#my-netdata-dropdown-content.theme-white .agent-item:hover {
+    background-color: #e6e6e6;
+}
+
+#my-netdata-dropdown-content.theme-white a {
+    color: #555;
+}
+
+#my-netdata-dropdown-content.theme-white a:hover {
+    color: #000;
 }

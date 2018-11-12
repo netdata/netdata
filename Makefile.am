@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-AUTOMAKE_OPTIONS=foreign subdir-objects 1.10
+AUTOMAKE_OPTIONS=foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
 MAINTAINERCLEANFILES= \
