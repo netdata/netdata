@@ -86,8 +86,8 @@ Netdata supports access lists in `netdata.conf`:
 - `allow badges from` checks if the API request is for a badge. Badges are not matched by `allow dashboard from`.
 
 - `allow streaming from` checks if the slave willing to stream metrics to this netdata is allowed.
-   This can be controlled per API KEY and MACHINE GUID in [stream.conf](../../streaming/stream.conf).
-   The setting in `netdata.conf` is checked before the ones in [stream.conf](../../streaming/stream.conf).
+   This can be controlled per API KEY and MACHINE GUID in [stream.conf](https://github.com/netdata/netdata/tree/master/streaming/stream.conf).
+   The setting in `netdata.conf` is checked before the ones in [stream.conf](https://github.com/netdata/netdata/tree/master/streaming/stream.conf).
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
    By default it allows only private lans.

@@ -6,7 +6,7 @@ Charts are created dynamically.
 
 ### configuration
 
-For detailed configuration information please read [`sensors.conf`](sensors.conf) file.
+For detailed configuration information please read [`sensors.conf`](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/sensors/sensors.conf) file.
 
 ### possible issues
 

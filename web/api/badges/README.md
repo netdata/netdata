@@ -56,14 +56,14 @@ Here is what you can put for `options` (these are standard netdata API options):
 
 ```html
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
   </a>
 ```
 
   Which produces this:
 
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
   </a>
 
 - `alarm=NAME`
@@ -84,14 +84,14 @@ Here is what you can put for `options` (these are standard netdata API options):
 
 ```html
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
   </a>
 ```
 
   Which produces this:
 
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
   </a>
 
 - `before=SECONDS` and `after=SECONDS`
@@ -106,28 +106,28 @@ Here is what you can put for `options` (these are standard netdata API options):
 
 ```html
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
   </a>
 ```
 
   Which produces the average of last complete minute (XX:XX:00 - XX:XX:59):
 
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
   </a>
 
   While this is the previous minute (one minute before the last one, again aligned XX:XX:00 - XX:XX:59):
 
 ```html
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
   </a>
 ```
 
   It produces this:
   
   <a href="#">
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
   </a>
 
 - `group=min` or `group=max` or `group=average` (the default) or `group=sum` or `group=incremental-sum`
@@ -208,11 +208,11 @@ These are options dedicated to badges:
 
   This option scales the svg image. It accepts values above or equal to 100 (100% is the default scale). For example, lets get a few different sizes:
 
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=100"></img> original<br/>
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=125"></img> `scale=125`<br/>
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=150"></img> `scale=150`<br/>
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=175"></img> `scale=175`<br/>
-     <img src="http://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=200"></img> `scale=200`
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=100"></img> original<br/>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=125"></img> `scale=125`<br/>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=150"></img> `scale=150`<br/>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=175"></img> `scale=175`<br/>
+     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=200"></img> `scale=200`
 
 
 - `refresh=auto` or `refresh=SECONDS`

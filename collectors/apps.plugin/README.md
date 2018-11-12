@@ -7,7 +7,7 @@ for every process found running.
 
 Since netdata needs to present this information in charts and track them through time,
 instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
-to which it assigns all running processes. This list is [customizable](apps_groups.conf) and netdata
+to which it assigns all running processes. This list is [customizable](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf) and netdata
 ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 
 So, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
@@ -15,7 +15,7 @@ processes together (evaluating both child and parent processes) so that the resu
 a predefined set of members (of course, only process groups found running are reported).
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
-> glad to accept pull requests improving the [defaults](apps_groups.conf) shipped with netdata.
+> glad to accept pull requests improving the [defaults](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf) shipped with netdata.
 
 Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
 utilization of exit processes. Their utilization is accounted at their currently running parents.
@@ -55,7 +55,7 @@ Each of these sections provides the same number of charts:
 
 The above are reported:
 
-- For **Applications** per [target configured](apps_groups.conf).
+- For **Applications** per [target configured](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf).
 - For **Users** per username or UID (when the username is not available).
 - For **User Groups** per groupname or GID (when groupname is not available).
 
@@ -85,7 +85,7 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](apps_groups.conf)).
+The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf)).
 To edit it on your system run `/etc/netdata/edit-config apps_groups.conf`.
 
 The configuration file works accepts multiple lines, each having this format:
@@ -188,21 +188,21 @@ Here is an example for the process group `sql` at `https://registry.my-netdata.i
 Netdata is able give you a lot more badges for your app.
 Examples below for process group `sql`:
 
-- CPU usage: ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
-- Disk Physical Reads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Physical Writes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Logical Reads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Logical Writes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Open Files ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
-- Real Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
-- Virtual Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Swap Memory ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
-- Minor Page Faults ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Processes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
-- Threads ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
-- Major Faults (swap activity) ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
-- Open Pipes ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
-- Open Sockets ![image](http://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
+- CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
+- Disk Physical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
+- Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
+- Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
+- Minor Page Faults ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+- Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
+- Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
+- Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
+- Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
+- Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
 
 For more information about badges check [Generating Badges](../../web/api/badges)
@@ -341,7 +341,7 @@ So, the `ssh` session is using 95% CPU time.
 Why `ssh`?
 
 `apps.plugin` groups all processes based on its configuration file
-[`/etc/netdata/apps_groups.conf`](apps_groups.conf)
+[`/etc/netdata/apps_groups.conf`](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf)
 (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 The default configuration has nothing for `bash`, but it has for `sshd`, so netdata accumulates
 all ssh sessions to a dimension on the charts, called `ssh`. This includes all the processes in

@@ -44,6 +44,7 @@ EXTRA_DIST = \
 	CODE_OF_CONDUCT.md \
 	LICENSE \
 	REDISTRIBUTED.md \
+	CONTRIBUTING.md \
 	$(NULL)
 
 SUBDIRS = \
@@ -61,6 +62,27 @@ dist_noinst_DATA= \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
+	doc/Add-more-charts-to-netdata.md \
+	doc/Demo-Sites.md \
+	doc/Donations-netdata-has-received.md \
+	doc/Netdata-Security-and-Disclosure-Information.md \
+	doc/Performance.md \
+	doc/Running-behind-apache.md \
+	doc/Running-behind-caddy.md \
+	doc/Running-behind-lighttpd.md \
+	doc/Running-behind-nginx.md \
+	doc/Third-Party-Plugins.md \
+	doc/a-github-star-is-important.md \
+	doc/high-performance-netdata.md \
+	doc/netdata-for-IoT.md \
+	doc/netdata-security.md \
+	doc/Why-Netdata.md \
+	htmldoc/themes/material/partials/footer.html \
+	installer/README.md \
+	installer/UNINSTALL.md \
+	installer/UPDATE.md \
+	requirements.txt \
+	runtime.txt \
 	$(NULL)
 
 # until integrated within build
@@ -71,6 +93,8 @@ dist_noinst_SCRIPTS= \
 	kickstart-static64.sh \
 	netdata-installer.sh \
 	installer/functions.sh \
+	htmldoc/buildhtml.sh \
+	htmldoc/buildyaml.sh \
 	$(NULL)
 
 # -----------------------------------------------------------------------------

@@ -9,7 +9,21 @@
 5. Allows each **module** to have one or more data collection **jobs**
 6. Each **job** is collecting one or more metrics from a single data source
 
-# Motivation
+## Pull Request Checklist for Node.js Plugins
+
+This is a generic checklist for submitting a new Node.js plugin for Netdata.  It is by no means comprehensive.
+
+At minimum, to be buildable and testable, the PR needs to include:
+
+* The module itself, following proper naming conventions: `node.d/<module_dir>/<module_name>.node.js`
+* A README.md file for the plugin. 
+* The configuration file for the module
+* A basic configuration for the plugin in the appropriate global config file: `conf.d/node.d.conf`, which is also in JSON format.  If the module should be enabled by default, add a section for it in the `modules` dictionary.
+* A line for the plugin in the appropriate `Makefile.am` file: `node.d/Makefile.am` under `dist_node_DATA`.
+* A line for the plugin configuration file in `conf.d/Makefile.am`: under `dist_nodeconfig_DATA`
+* Optionally, chart information in `web/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+
+## Motivation
 
 Node.js is perfect for asynchronous operations. It is very fast and quite common (actually the whole web is based on it).
 Since data collection is not a CPU intensive task, node.js is an ideal solution for it.
@@ -31,7 +45,7 @@ For more information check the **[[Installation]]** guide.
 ## configuring `node.d.plugin`
 
 `node.d.plugin` can work even without any configuration. Its default configuration file is
-[/etc/netdata/node.d.conf](node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
+[/etc/netdata/node.d.conf](https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
 
 ## configuring `node.d.plugin` modules
 
@@ -215,4 +229,4 @@ The `service` object defines a set of functions to allow you send information to
 ---
 
 *FIXME: document an operational node.d.plugin data collector - the best example is the
-[snmp collector](snmp/snmp.node.js)*
+[snmp collector](https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/snmp/snmp.node.js)*

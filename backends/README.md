@@ -1,4 +1,3 @@
-
 # Metrics Long Term Archiving
 
 netdata supports backends for archiving the metrics, or providing long term dashboards,
@@ -111,7 +110,7 @@ of `netdata.conf` from your netdata):
    When multiple servers are defined, netdata will try the next one when the first one fails. This allows
    you to load-balance different servers: give your backend servers in different order on each netdata.
 
-   netdata also ships [`nc-backend.sh`](nc-backend.sh),
+   netdata also ships [`nc-backend.sh`](https://github.com/netdata/netdata/tree/master/backends/nc-backend.sh),
    a script that can be used as a fallback backend to save the metrics to disk and push them to the
    time-series database when it becomes available again. It can also be used to monitor / trace / debug
    the metrics netdata generates.
@@ -186,7 +185,7 @@ netdata provides 5 charts:
 
 ## alarms
 
-The latest version of the alarms configuration for monitoring the backend is [here](../health/health.d/backend.conf)
+The latest version of the alarms configuration for monitoring the backend is [here](https://github.com/netdata/netdata/tree/master/health/health.d/backend.conf)
 
 netdata adds 4 alarms:
 

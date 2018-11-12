@@ -15,9 +15,9 @@ To minimize the number of processes spawn for data collection, netdata also supp
    data collection modules with the minimum of code.
    
    Currently netdata provides plugin orchestrators
-   BASH v4+ [charts.d.plugin](charts.d.plugin),
-   node.js [node.d.plugin](node.d.plugin) and
-   python v2+ (including v3) [python.d.plugin](python.d.plugin).
+   BASH v4+ [charts.d.plugin](charts.d.plugin/),
+   node.js [node.d.plugin](node.d.plugin/) and
+   python v2+ (including v3) [python.d.plugin](python.d.plugin/).
 
 ## Netdata Plugins
 
