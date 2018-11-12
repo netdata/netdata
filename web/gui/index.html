@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="author" content="costa@tsaousis.gr">
 
-    <link rel="stylesheet" type="text/css" href="main.css">
+    <link rel="stylesheet" type="text/css" href="main.css?v=2">
 
     <!-- <link rel="shortcut icon" href="images/seo-performance-multi-size.ico"> -->
 
@@ -50,7 +50,7 @@
     <meta name="twitter:description"       content="Unparalleled insights, in real-time, of everything happening on your Linux systems and applications, with stunning, interactive web dashboards and powerful performance and health alarms." />
     <meta name="twitter:image"             content="https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif" />
 
-    <script src="main.js"></script>
+    <script src="main.js?v=2"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar" data-offset="100">
@@ -76,20 +76,8 @@
                 <ul class="nav navbar-nav">
                     <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
-                        <ul class="dropdown-menu scrollable-menu inpagemenu multi-column columns-2" role="menu" id="myNetdataDropdownUL">
-                            <div class="row">
-                                <div class="col-sm-6" style="width: 85%; padding-right: 0;">
-                                    <ul id="mynetdata_servers" class="multi-column-dropdown">
-                                        <li><a href="#" onclick="return false;" style="color: #999;">loading...</a></li>
-                                    </ul>
-                                </div>
-                                <div class="col-sm-3 hidden-xs" style="width: 15%; padding-left: 0;">
-                                    <ul id="mynetdata_actions1" class="multi-column-dropdown">
-                                    <li style="color: #999;">&nbsp;</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </ul>
+                        <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
+                        </div>
                     </li>
                 </ul>
             </nav>
