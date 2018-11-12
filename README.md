@@ -130,80 +130,6 @@ Netdata is **open-source**, **free**, super **fast**, very **easy**, completely 
 It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems,
 not just visualize metrics.
 
-### Simplicity
-
-> Most monitoring solutions require endless configuration of whatever imaginable.
-
-Well... this is a linux box. Why do we need to configure every single metric we need to monitor.
-Of course it has a CPU and RAM and a few disks, and ethernet ports, it may run a firewall, a web server, or a database server and so on.
-Why do we need to configure all these metrics?
-
-Netdata metrics collection is designed to support **configuration-less** operation. So, you just install and run netdata.
-You will need to configure something only if it cannot be auto-detected.
-
-Of course you can enable, tweak or disable things.
-But by default, if netdata can connect to a web server you run on your systems, it will automatically
-collect all performance metrics. This happens for all data collection plugins when technically possible.
-It will also automatically collect all available system values for CPU, memory, disks, network interfaces,
-QoS (with labels if you also use [FireQOS](http://firehol.org/)), etc.
-Even for processes that do not offer performance metrics, it will automatically group the whole process
-tree and provide metrics like CPU usage, memory allocated, opened files, sockets, disk activity, swap
-activity, etc per application group.
-
-### Performance monitoring
-
-According to reports, performance issues are 10x more common compared to outages.
-
-> Take any performance monitoring solution and try to troubleshoot a performance problem.
-> At the end of the day you will have to `ssh` to the server(s) to understand what exactly is happening.
-> You will have to use `iostat`, `iotop`, `vmstat`, `top`, `ethtool` and probably a few dozen more console tools to figure
-> out the problem.
-
-With netdata, this need is eliminated significantly. Of course you will ssh. Just not for monitoring performance.
-
-One key parameter to effectively troubleshoot performance issues, is that the root cause is most probably unknown.
-If you were aware of the element that affected performance, most probably you would have fixed it already.
-
-The approach of most monitoring solutions (including commercial SaaS providers) that instruct their users and customers
-to collect only the metrics they understand, is contradictory to the nature of performance monitoring. If we knew the metrics
-before hand, most probably we would have a lot less performance issues. 
-
-So, Netdata collects everything. The more metrics collected, the more insights we will have when we need them.
-
-Netdata is better than most console tools. Netdata visualizes the data, while the console tools just show their values.
-The detail is the same. Actually, netdata is more precise than most console tools,
-it will interpolate all collected values to second boundary, so that even if something took a few microseconds more to be
-collected, netdata will correctly estimate the per second rate.
-
-### Realtime monitoring
-
-> Any performance monitoring solution that does not go down to per second collection and visualization of the data,
-> is useless. It will make you happy to have it, but it will not help you more than that.
-
-Visualizing the present in **real-time and in great detail**, is the most important value a performance monitoring
-solution should provide. The next most important is the last hour, again per second. The next is the last 8 hours
-and so on, up to a week. In my 20+ years in IT, I needed just once or twice to look a year back. And this was mainly
-out of curiosity.
-
-Of course, real-time monitoring requires resources. So netdata is extremely optimized to be very efficient:
-
-- collecting performance data is a repeating process - you do the same thing again and again.
-   Netdata has been designed to learn from each iteration, so that the next one will be faster.
-   It learns the sizes of files (it even keeps them open when it can), the number of lines and
-   words per line they contain, the sizes of the buffers it needs to process them, etc.
-   It adapts, so that everything will be as ready as possible for the next iteration.
-
-- internally, it uses hashes and indexes (b-trees), to speed up lookups of metrics, charts, dimensions, settings.
-
-- it has an in-memory round robin database based on a custom floating point number that allows it to pack values
-  and flags together, in 32 bits, to lower its memory footprint.
-
-- its internal web server is capable of generating JSON responses from live performance data with speeds comparable
-  to static content delivery (it does not use printf, it is actually 11 times faster than in generating JSON compared
-  to printf).
-
-Netdata will use some CPU and memory, but it will not produce any disk I/O at all, apart its logs (which you can disable if you like).
-
 
 ## News  
   
@@ -231,7 +157,18 @@ Netdata now has its own github organization `netdata`, so all github URLs are no
 
 ## How it works
 
+Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for concurrent operations on the metrics.
+
 ![image](https://user-images.githubusercontent.com/2662304/48322388-f864b100-e62f-11e8-9741-6b240e567457.png)
+
+This is how it works:
+
+1. **Collect**: data collection is the exclusive writer to the metrics database.
+2. **Store**: in RAM storage, using a custom made floating point number.
+3. **Check**: an independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms and sends alarm notifications.
+4. **Stream**: an independent worker is responsible for streaming the metrics, in full detail and in real-time, as soon as they are collected.
+5. **Archieve**: an independent worker is responsible for down-sampling the metrics and pushing them to **backend** time-series databases.
+6. **Query**: multiple independent workers attached to the internal web server, as servicing web requests.
 
 
 ## Infographic  
