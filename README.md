@@ -166,11 +166,11 @@ This is how it works:
 Function|Description
 :---:|:---
 **Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.
-**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.
-**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a notification queue and dispatches alarm notifications.
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.
-**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.
-**Query**|Multiple independent workers are attached to the internal web server, servicing API requests.
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint. For more information check the [database](https://github.com/netdata/netdata/tree/master/database#netdata-database) section.
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a notification queue and dispatches alarm notifications. For more information check the [health](https://github.com/netdata/netdata/tree/master/health#health-monitoring) section.
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected. For more information check the [streaming](https://github.com/netdata/netdata/tree/master/streaming#metrics-streaming) section.
+**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases. For more information check the [backends](https://github.com/netdata/netdata/tree/master/backends) section.
+**Query**|Multiple independent workers are attached to the internal web server, servicing API requests. For more information check the [API](https://github.com/netdata/netdata/tree/master/web/api#api) section.
 
 The result is a highly efficient system, supporting multiple readers and one writer for each metric.
 
