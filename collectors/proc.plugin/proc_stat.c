@@ -237,15 +237,111 @@ static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, s
     }
 }
 
+struct cpuidle_state {
+    unsigned char found:1;
+
+    const char *name;
+    const char *name_filename;
+    int name_fd;
+
+    const char *time;
+    const char *time_filename;
+    int time_fd;
+
+    collected_number value;
+
+    RRDDIM *rd;
+};
+
+struct per_core_cpuidle_chart {
+    RRDSET *st;
+
+    collected_number active_time;
+    RRDDIM *active_time_rd;
+
+    collected_number last_active_time;
+    unsigned char wake_cpu:1;
+
+    struct cpuidle_state *cpuidle_state;
+    size_t cpuidle_state_len;
+};
+
+static int wake_cpu(size_t core) {
+    (void) core;
+    // TODO: run in another thread
+    // TODO: wait for the end of the job
+
+    return 0;
+}
+
+static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_chart **cpuidle_charts_address, size_t cores_found) {
+    static size_t cpuidle_charts_len = 0;
+    static procfile *ff = NULL;
+    struct per_core_cpuidle_chart *cpuidle_charts = *cpuidle_charts_address;
+
+    if(unlikely(!ff)) {
+        ff = procfile_open(schedstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) return 1;
+    }
+
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 1;
+
+    size_t lines = procfile_lines(ff), l;
+    size_t words;
+
+    if(unlikely(cpuidle_charts_len < cores_found)) {
+        cpuidle_charts = reallocz(cpuidle_charts, sizeof(struct per_core_cpuidle_chart) * cores_found);
+        *cpuidle_charts_address = cpuidle_charts;
+        cpuidle_charts_len = cores_found;
+        memset(cpuidle_charts, 0, sizeof(struct per_core_cpuidle_chart) * cores_found);
+    }
+
+    for(l = 0; l < lines ;l++) {
+        char *row_key = procfile_lineword(ff, l, 0);
+
+        // faster strncmp(row_key, "cpu", 3) == 0
+        if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
+            words = procfile_linewords(ff, l);
+            if(unlikely(words < 10)) {
+                error("Cannot read /proc/schedstat cpu line. Expected 9 params, read %zu.", words);
+                return 1;
+            }
+
+            size_t core = str2ul(&row_key[3]);
+            if(unlikely(core >= cores_found)) {
+                error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
+                return 1;
+            }
+            cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7));
+        }
+    }
+
+    return 0;
+}
+
+static int read_cpuidle_states(struct per_core_cpuidle_chart *cpuidle_charts, size_t core) {
+    (void) cpuidle_charts;
+    (void) core;
+    // TODO: read all states for the given core
+    return 0;
+}
+
+static void chart_cpuidle_states(struct per_core_cpuidle_chart *cpuidle_charts, size_t core, RRDSET *st, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm) {
+}
+
 int do_proc_stat(int update_every, usec_t dt) {
     (void)dt;
 
     static struct cpu_chart *all_cpu_charts = NULL;
     static size_t all_cpu_charts_size = 0;
     static procfile *ff = NULL;
-    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1;
+    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, \
+           do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1, do_cpuidle = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
-    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, *time_in_state_filename = NULL;
+    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, \
+           *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
     static RRDVAR *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)processors;
@@ -265,6 +361,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
             do_cpu_freq = CONFIG_BOOLEAN_NO;
+            do_cpuidle = CONFIG_BOOLEAN_NO;
         }
         else {
             // the system has a reasonable number of processors
@@ -272,12 +369,14 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_core_throttle_count = CONFIG_BOOLEAN_AUTO;
             do_package_throttle_count = CONFIG_BOOLEAN_NO;
             do_cpu_freq = CONFIG_BOOLEAN_YES;
+            do_cpuidle = CONFIG_BOOLEAN_YES;
         }
 
         keep_per_core_fds_open    = config_get_boolean("plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
         do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
         do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
         do_cpu_freq               = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
+        do_cpuidle                = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu idle states", do_cpuidle);
 
         hash_intr = simple_hash("intr");
         hash_ctxt = simple_hash("ctxt");
@@ -297,6 +396,15 @@ int do_proc_stat(int update_every, usec_t dt) {
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpufreq/stats/time_in_state");
         time_in_state_filename = config_get("plugin:proc:/proc/stat", "time_in_state filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/schedstat");
+        schedstat_filename = config_get("plugin:proc:/proc/stat", "schedstat filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpuidle/name");
+        cpuidle_name_filename = config_get("plugin:proc:/proc/stat", "cpuidle name filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpuidle/time");
+        cpuidle_time_filename = config_get("plugin:proc:/proc/stat", "cpuidle time filename to monitor", filename);
     }
 
     if(unlikely(!ff)) {
@@ -702,7 +810,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "MHz"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_STAT_NAME
-                            , 5003
+                            , NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -711,6 +819,53 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 chart_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX, st_scaling_cur_freq, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 rrdset_done(st_scaling_cur_freq);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    static struct per_core_cpuidle_chart *cpuidle_charts = NULL;
+
+    if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
+        for(size_t core = 0; core < cores_found; core++)
+            if(unlikely(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time)) wake_cpu(core);
+        if(unlikely(!read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
+            for(size_t core = 0; core < cores_found; core++) {
+                cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
+
+                int r = read_cpuidle_states(cpuidle_charts, core);
+                if(likely(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0))) {
+                    do_cpuidle = CONFIG_BOOLEAN_YES;
+
+                    char cpuidle_chart_id[RRD_ID_LENGTH_MAX + 1]; 
+                    snprintfz(cpuidle_chart_id, RRD_ID_LENGTH_MAX, "new_cpu%zu_cpuidle", core);
+
+                    if(unlikely(!cpuidle_charts[core].st)) {
+                        cpuidle_charts[core].st = rrdset_create_localhost(
+                                "cpu"
+                                , cpuidle_chart_id
+                                , NULL
+                                , "cpuidle"
+                                , "cpuidle.cpuidle"
+                                , "C-state residency"
+                                , "time%"
+                                , PLUGIN_PROC_NAME
+                                , PLUGIN_PROC_MODULE_STAT_NAME
+                                , NETDATA_CHART_PRIO_CPUIDLE + core
+                                , update_every
+                                , RRDSET_TYPE_LINE
+                        );
+
+                        cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, "C0 (active)", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    }
+                    else
+                        rrdset_next(cpuidle_charts[core].st);
+
+                    rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].active_time_rd, cpuidle_charts[core].active_time);
+                    chart_cpuidle_states(cpuidle_charts, cores_found, cpuidle_charts[core].st, 1, 1000, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrdset_done(cpuidle_charts[core].st);
+                }
             }
         }
     }
