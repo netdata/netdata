@@ -159,7 +159,7 @@ Netdata now has its own github organization `netdata`, so all github URLs are no
 
 Netdata is a highly efficient, highly modular, metrics management engine. Its lockless design makes it ideal for concurrent operations on the metrics.
 
-![image](https://user-images.githubusercontent.com/2662304/48322388-f864b100-e62f-11e8-9741-6b240e567457.png)
+![image](https://user-images.githubusercontent.com/2662304/48323827-b4c17580-e636-11e8-842c-0ee72fcb4115.png)
 
 This is how it works:
 
