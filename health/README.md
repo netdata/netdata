@@ -486,7 +486,7 @@ The external script will be called for all status changes.
 ## Examples
 
 
-Check the **[health.d directory](health.d)** for all alarms shipped with netdata.
+Check the **[health.d directory](health.d/)** for all alarms shipped with netdata.
 
 Here are a few examples:
 
@@ -645,7 +645,5 @@ Important: this will generate a lot of output in debug.log.
 You can find the context of charts by looking up the chart in either
 `http://your.netdata:19999/netdata.conf` or `http://your.netdata:19999/api/v1/charts`.
 
-You can find how netdata interpreted the expressions by examining the alarm at
-`http://your.netdata:19999/api/v1/alarms?all`. For each expression, netdata will return the
-expression as given in its config file, and the same expression with additional parentheses
-added to indicate the evaluation flow of the expression.
+You can find how netdata interpreted the expressions by examining the alarm at `http://your.netdata:19999/api/v1/alarms?all`. For each expression, netdata will return the expression as given in its config file, and the same expression with additional parentheses added to indicate the evaluation flow of the expression.
+

@@ -1,4 +1,3 @@
-
 # proc.plugin
 
  - `/proc/net/dev` (all network interfaces for all their values)
@@ -25,7 +24,7 @@
 
 ---
 
-# Monitoring Disks
+## Monitoring Disks
 
 > Live demo of disk monitoring at: **[http://london.netdata.rocks](https://registry.my-netdata.io/#menu_disk)**
 
@@ -33,75 +32,45 @@ Performance monitoring for Linux disks is quite complicated. The main reason is 
 
 Hopefully, the Linux kernel provides many metrics that can provide deep insights of what our disks our doing. The kernel measures all these metrics on all layers of storage: **virtual disks**, **physical disks** and **partitions of disks**.
 
-Let's see the list of metrics provided by netdata for each of the above:
+### Monitored disk metrics
 
-### I/O bandwidth/s (kb/s)
+- I/O bandwidth/s (kb/s)
+  The amount of data transferred from and to the disk.
+- I/O operations/s
+  The number of I/O operations completed.
+- Queued I/O operations
+  The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
+- Backlog size (time in ms)
+  The expected duration of the currently queued I/O operations.
+- Utilization (time percentage)
+  The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
+  Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
+- Average I/O operation time (ms)
+  The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+- Average I/O operation size (kb)
+  The average amount of data of the completed I/O operations.
+- Average Service Time (ms)
+  The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
+- Merged I/O operations/s
+  The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
+- Total I/O time
+  The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
+- Space usage
+  For mounted disks, netdata will provide a chart for their space, with 3 dimensions:
+  1. free
+  2. used
+  3. reserved for root
+- inode usage
+  For mounted disks, netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
+  1. free
+  2. used
+  3. reserved for root
 
-The amount of data transferred from and to the disk.
-
-### I/O operations/s
-
-The number of I/O operations completed.
-
-### Queued I/O operations
-
-The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
-
-### Backlog size (time in ms)
-
-The expected duration of the currently queued I/O operations.
-
-### Utilization (time percentage)
-
-The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
-
-Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
-
-### Average I/O operation time (ms)
-
-The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
-
-### Average I/O operation size (kb)
-
-The average amount of data of the completed I/O operations.
-
-### Average Service Time (ms)
-
-The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
-
-### Merged I/O operations/s
-
-The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
-
-### Total I/O time
-
-The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
-
-### Space usage
-
-For mounted disks, netdata will provide a chart for their space, with 3 dimensions:
-
-1. free
-2. used
-3. reserved for root
-
-### inode usage
-
-For mounted disks, netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
-
-1. free
-2. used
-3. reserved for root
-
----
-
-## disk names
+### disk names
 
 netdata will automatically set the name of disks on the dashboard, from the mount point they are mounted, of course only when they are mounted. Changes in mount points are not currently detected (you will have to restart netdata to change the name of the disk).
 
----
-
-## performance metrics
+### performance metrics
 
 By default netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
 
@@ -198,3 +167,35 @@ So, to disable performance metrics for all loop devices you could add `performan
        performance metrics for disks with major 7 = no
 ```
 
+## Linux Anti-DDoS
+
+![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)
+
+---
+SYNPROXY is a TCP SYN packets proxy. It can be used to protect any TCP server (like a web server) from SYN floods and similar DDos attacks.
+
+SYNPROXY is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections.
+
+The net effect of this, is that the real servers will not notice any change during the attack. The valid TCP connections will pass through and served, while the attack will be stopped at the firewall.
+
+To use SYNPROXY on your firewall, please follow our setup guides:
+
+ - **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
+ - **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
+
+### Real-time monitoring of Linux Anti-DDoS
+
+netdata is able to monitor in real-time (per second updates) the operation of the Linux Anti-DDoS protection.
+
+It visualizes 4 charts:
+
+1. TCP SYN Packets received on ports operated by SYNPROXY
+2. TCP Cookies (valid, invalid, retransmits)
+3. Connections Reopened
+4. Entries used
+
+Example image:
+
+![ddos](https://cloud.githubusercontent.com/assets/2662304/14398891/6016e3fc-fdf0-11e5-942b-55de6a52cb66.gif)
+
+See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](http://london.my-netdata.io/#netfilter_synproxy)** 

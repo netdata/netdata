@@ -10,3 +10,19 @@ make
 ```
 
 After every change in the `src` directory, the `dashboard.js` file should be regenerated and commited to the repository.
+
+## Custom Dashboards
+
+For information on creating custom dashboards, see **[Custom Dashboards](custom/)** and **[Atlassian Confluence Dashboards](confluence/)**
+
+## Supported chart libraries
+
+- Dygraph
+- jQuery Sparkline
+- Peity
+- Google Charts
+- Morris
+- EasyPieChart
+- Gauge.js
+- D3
+- C3

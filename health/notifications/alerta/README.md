@@ -5,7 +5,7 @@ consolidate and de-duplicate alerts from multiple sources for quick
 ‘at-a-glance’ visualisation. With just one system you can monitor
 alerts from many other monitoring tools on a single screen.
 
-![](http://docs.alerta.io/en/latest/_images/alerta-screen-shot-3.png)
+![](https://docs.alerta.io/en/latest/_images/alerta-screen-shot-3.png)
 
 Netadata alarms can be sent to Alerta so you can see in one place
 alerts coming from many Netdata hosts or also from a multi-host
