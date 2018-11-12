@@ -182,10 +182,9 @@ Click it to to interact with it (it has direct links to documentation).
 [![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)  
 
 
-## Features  
-<p align="center">  
-<img src="https://cloud.githubusercontent.com/assets/2662304/19168687/f6a567be-8c19-11e6-8561-ce8d589e8346.gif"/>  
-</p>  
+## Features
+
+![finger-video](https://user-images.githubusercontent.com/2662304/48346998-96cf3180-e685-11e8-9f4e-059d23aa3aa5.gif)
 
 This is what you should expect from Netdata:
 
