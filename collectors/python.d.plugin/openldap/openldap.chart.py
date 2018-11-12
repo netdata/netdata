@@ -4,17 +4,17 @@
 # SPDX-License-Identifier: GPL-3.0+
 
 try:
-     import ldap
-     HAS_LDAP = True
+    import ldap
+    HAS_LDAP = True
 except ImportError:
-     HAS_LDAP = False
+    HAS_LDAP = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
-update_every = 1
+disabled_by_default = True
 priority = 60000
-retries = 60
+
 
 ORDER = [
     'total_connections',
@@ -27,14 +27,12 @@ ORDER = [
 ]
 
 CHARTS = {
-
-     'total_connections': {
+    'total_connections': {
         'options': [None, 'Total Connections', 'connections', 'ldap', 'monitorCounter', 'line'],
         'lines': [
             ['total_connections', 'connections', 'incremental']
         ]
     },
-
     'bytes_sent': {
         'options': [None, 'Bytes Statistics', 'Bytes', 'ldap', 'monitorCounter', 'line'],
         'lines': [
@@ -130,6 +128,7 @@ SEARCH_LIST = {
     ),
 }
 
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -144,17 +143,15 @@ class Service(SimpleService):
         self.alive = False
         self.conn = None
 
-
     def disconnect(self):
         if self.conn:
             self.conn.unbind()
             self.conn = None
             self.alive = False
 
-
     def connect(self):
         try:
-            self.conn = ldap.initialize('ldap://%s:%s' % ( self.server, self.port))
+            self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:
             self.error(error)
@@ -163,11 +160,9 @@ class Service(SimpleService):
         self.alive = True
         return True
 
-
     def reconnect(self):
         self.disconnect()
         return self.connect()
-
 
     def check(self):
         if not HAS_LDAP:
@@ -175,7 +170,6 @@ class Service(SimpleService):
             return None
 
         return self.connect() and self.get_data()
-
 
     def get_data(self):
         if not self.alive and not self.reconnect():
@@ -186,18 +180,18 @@ class Service(SimpleService):
             bind = SEARCH_LIST[key][0]
             attr = SEARCH_LIST[key][1]
             try:
-                num = self.conn.search(bind, ldap.SCOPE_BASE, 'objectClass=*', [attr,])
+                num = self.conn.search(bind, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
                 result_type, result_data = self.conn.result(num, 1)
             except ldap.LDAPError as error:
-                self.error(error)
+                self.alive = False
+                return None
 
             try:
                 if result_type == 101:
                     val = int(result_data[0][1].values()[0][0])
             except ValueError:
-                val = 'NaN'
+                continue
 
             data[key] = val
 
         return data
-
