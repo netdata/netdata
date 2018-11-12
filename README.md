@@ -163,14 +163,14 @@ Netdata is a highly efficient, highly modular, metrics management engine. Its lo
 
 This is how it works:
 
-Function|Description
-:---:|:---
-**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects. For more information check the [collectors](https://github.com/netdata/netdata/tree/master/collectors#data-collection-plugins) section.
-**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint. For more information check the [database](https://github.com/netdata/netdata/tree/master/database#netdata-database) section.
-**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications. For more information check the [health](https://github.com/netdata/netdata/tree/master/health#health-monitoring) section.
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected. For more information check the [streaming](https://github.com/netdata/netdata/tree/master/streaming#metrics-streaming) section.
-**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases. For more information check the [backends](https://github.com/netdata/netdata/tree/master/backends) section.
-**Query**|Multiple independent workers are attached to the [internal web server](https://github.com/netdata/netdata/tree/master/web/server#netdata-web-server), servicing API requests, including [data queries](https://github.com/netdata/netdata/tree/master/web/api/queries#database-queries). For more information check the [API](https://github.com/netdata/netdata/tree/master/web/api#api) section.
+Function|Description|Documentation
+:---:|:---|:---:
+**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[collectors](https://github.com/netdata/netdata/tree/master/collectors#data-collection-plugins)
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[database](https://github.com/netdata/netdata/tree/master/database#netdata-database)
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[health](https://github.com/netdata/netdata/tree/master/health#health-monitoring)
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[streaming](https://github.com/netdata/netdata/tree/master/streaming#metrics-streaming)
+**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[backends](https://github.com/netdata/netdata/tree/master/backends)
+**Query**|Multiple independent workers are attached to the [internal web server](https://github.com/netdata/netdata/tree/master/web/server#netdata-web-server), servicing API requests, including [data queries](https://github.com/netdata/netdata/tree/master/web/api/queries#database-queries).|[API](https://github.com/netdata/netdata/tree/master/web/api#api)
 
 The result is a highly efficient system, supporting multiple readers and one writer for each metric.
 
