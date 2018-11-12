@@ -25,42 +25,19 @@
 
 set -e
 
-if [ ! -f .gitignore ]
-then
-  echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
-  exit 1
+if [ ! -f .gitignore ]; then
+	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
+	exit 1
 fi
+
+export GIT_MAIL="pawel+bot@netdata.cloud"
+export GIT_USER="netdatabot"
+echo "--- Initialize git configuration ---"
+git config user.email "${GIT_MAIL}"
+git config user.name "${GIT_USER}"
 
 echo "---- FIGURING OUT TAGS ----"
-# Check if current commit is tagged or not
-GIT_TAG=$(git tag --points-at)
-if [ -z "${GIT_TAG}" ]; then
-  git semver
-  # Figure out next tag based on commit message
-  GIT_TAG=HEAD
-  echo "Last commit message: $TRAVIS_COMMIT_MESSAGE"
-  case "${TRAVIS_COMMIT_MESSAGE}" in
-    *"[netdata patch release]"* ) GIT_TAG="v$(git semver --next-patch)" ;;
-    *"[netdata minor release]"* ) GIT_TAG="v$(git semver --next-minor)" ;;
-    *"[netdata major release]"* ) GIT_TAG="v$(git semver --next-major)" ;;
-    *) echo "Keyword not detected. Doing nothing" ;;
-  esac
-
-  # Tag it!
-  if [ "$GIT_TAG" != "HEAD" ]; then
-      echo "Assigning a new tag: $GIT_TAG"
-      git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
-      # git is able to push due to configuration already being initialized in `generate_changelog.sh` script
-      git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
-  fi
-fi
-
-if [ "${GIT_TAG}" == "HEAD" ]; then
-    echo "Not creating a release since neither of two conditions was met:"
-    echo "  - keyword in commit message"
-    echo "  - commit is tagged"
-    exit 0
-fi
+./.travis/tagger.sh || exit 0
 
 echo "---- GENERATING CHANGELOG -----"
 ./.travis/generate_changelog.sh
