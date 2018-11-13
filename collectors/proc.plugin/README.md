@@ -198,4 +198,4 @@ Example image:
 
 ![ddos](https://cloud.githubusercontent.com/assets/2662304/14398891/6016e3fc-fdf0-11e5-942b-55de6a52cb66.gif)
 
-See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](http://london.my-netdata.io/#netfilter_synproxy)** 
+See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](https://registry.my-netdata.io/#menu_netfilter_submenu_synproxy)** 
