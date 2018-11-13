@@ -276,9 +276,9 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - For faster development and easier contributions, most application related plugins (databases, web servers, etc) have been written in `python`.
 
 #### APM (Application Performance Monitoring)
-- **statsd** - [netdata is a fully featured statsd server](collectors/statsd.plugin/).
-- **go_expvar** - collects metrics exposed by applications written in the Go programming language using the expvar package.
-- **Spring Boot** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
+- **[statsd](collectors/statsd.plugin/)** - netdata is a fully featured statsd server.
+- **[go_expvar](collectors/python.d.plugin/go_expvar/)** - collects metrics exposed by applications written in the Go programming language using the expvar package.
+- **[Spring Boot](collectors/python.d.plugin/springboot/)** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
 
 #### System Resources
 - **CPU Utilization** - total and per core CPU usage.
@@ -314,7 +314,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **device mapper** - naming disks.
 - **Veritas Volume Manager** - naming disks.
 - **megacli** - adapter, physical drives and battery stats.
-- **adaptec_raid** -  logical and physical devices health metrics.
+- **[adaptec_raid](collectors/python.d.plugin/adaptec_raid/)** -  logical and physical devices health metrics.
 
 #### Filesystems
 - **BTRFS** - detailed disk space allocation and usage.
@@ -379,10 +379,10 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### Message Brokers
 - **beanstalkd** - global and per tube monitoring.
-- **rabbitmq** - performance and health metrics.
+- **RabbitMQ** - performance and health metrics.
 
 #### Search and Indexing
-- **elasticsearch** - search and index performance, latency, timings, cluster statistics, threads statistics, etc.
+- **ElasticSearch** - search and index performance, latency, timings, cluster statistics, threads statistics, etc.
 
 #### DNS Servers
 - **bind_rndc** - parses `named.stats` dump file to collect real-time performance metrics. All versions of bind after 9.6 are supported.
