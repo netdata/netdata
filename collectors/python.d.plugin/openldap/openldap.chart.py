@@ -17,6 +17,8 @@ priority = 60000
 DEFAULT_SERVER = 'localhost'
 DEFAULT_PORT = '389'
 DEFAULT_TIMEOUT = 1
+DEFAULT_USERNAME = ''
+DEFAULT_PASSWORD = ''
 
 ORDER = [
     'total_connections',
@@ -139,8 +141,8 @@ class Service(SimpleService):
 
         self.server = configuration.get('server', DEFAULT_SERVER)
         self.port = configuration.get('port', DEFAULT_PORT)
-        self.username = configuration.get('username')
-        self.password = configuration.get('password')
+        self.username = configuration.get('username', DEFAULT_USERNAME)
+        self.password = configuration.get('password', DEFAULT_PASSWORD)
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
 
         self.alive = False
@@ -181,20 +183,21 @@ class Service(SimpleService):
 
         data = dict()
         for key in SEARCH_LIST:
-            bind = SEARCH_LIST[key][0]
+            dn = SEARCH_LIST[key][0]
             attr = SEARCH_LIST[key][1]
             try:
-                num = self.conn.search(bind, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
+                num = self.conn.search(dn, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
                 result_type, result_data = self.conn.result(num, 1)
-            except ldap.LDAPError as error:
-                self.error(error)
+            except Exception as error:
+                self.error("Empty result. Check bind username/password. Message: ",error)
                 self.alive = False
                 return None
 
             try:
                 if result_type == 101:
                     val = int(result_data[0][1].values()[0][0])
-            except ValueError:
+            except ( ValueError, IndexError) as error:
+                self.debug(error)
                 continue
 
             data[key] = val
