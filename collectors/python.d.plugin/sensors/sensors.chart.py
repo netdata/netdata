@@ -108,6 +108,7 @@ class Service(SimpleService):
                         try:
                             val = sensors.get_value(chip, sf.number)
                             break
+                        # TODO: use specific error after upstream is fixed
                         except Exception:
                             continue
                     if val is None:
@@ -136,6 +137,7 @@ class Service(SimpleService):
                     for sf in sfi:
                         try:
                             vals.append(sensors.get_value(chip, sf.number))
+                        # TODO: use specific error after upstream is fixed
                         except Exception as error:
                             self.error('{0}: {1}'.format(sf.name, error))
                             continue
