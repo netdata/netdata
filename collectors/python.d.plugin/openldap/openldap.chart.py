@@ -139,6 +139,7 @@ class Service(SimpleService):
         self.port = configuration.get('port')
         self.username = configuration.get('username')
         self.password = configuration.get('password')
+        self.timeout = configuration.get('timeout')
 
         self.alive = False
         self.conn = None
@@ -153,6 +154,7 @@ class Service(SimpleService):
         try:
             self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.simple_bind(self.username, self.password)
+            self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
         except ldap.LDAPError as error:
             self.error(error)
             return False
@@ -176,13 +178,14 @@ class Service(SimpleService):
             return None
 
         data = dict()
-        for key in SEARCH_LIST.keys():
+        for key in SEARCH_LIST:
             bind = SEARCH_LIST[key][0]
             attr = SEARCH_LIST[key][1]
             try:
                 num = self.conn.search(bind, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
                 result_type, result_data = self.conn.result(num, 1)
             except ldap.LDAPError as error:
+                self.error(error)
                 self.alive = False
                 return None
 
