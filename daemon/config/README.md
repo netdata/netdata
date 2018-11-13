@@ -23,20 +23,20 @@ The configuration file is a `name = value` dictionary. Netdata will not complain
 setting | default | info
 :------:|:-------:|:----
 hostname|auto-detected|The hostname of the computer running netdata.
-history|3600|The number of entries the netdata daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](Memory-Requirements) for more information.
+history|3600|The number of entries the netdata daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](../../database/#netdata-database) for more information.
 config directory|`/etc/netdata`|The directory configuration files are kept.
 plugins directory|`/usr/libexec/netdata/plugins.d`|The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes.
 web files directory|`/usr/share/netdata/web`|The directory the web static files are kept.
 cache directory|`/var/cache/netdata`|The directory the memory database will be stored if and when netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.
-log directory|`/var/log/netdata`|The directory in which the log files are kept.
+log directory|`/var/log/netdata`|The directory in which the [log files](../#log-files) are kept.
 host access prefix|*empty*|This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).
-debug flags|0x00000000|Bitmap of debug options to enable. For more information check [Tracing Options](Tracing-Options).
+debug flags|0x00000000|Bitmap of debug options to enable. For more information check [Tracing Options](../#debugging).
 memory deduplication (ksm)|yes|When set to `yes`, netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [[Memory Deduplication - Kernel Same Page Merging - KSM]]
-debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created is debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](Tracing-Options).
+debug log|`/var/log/netdata/debug.log`|The filename to save debug information. This file will not be created is debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](../#debugging).
 error log|`/var/log/netdata/error.log`|The filename to save error messages for netdata daemon and all plugins (`stderr` is sent here for all netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.
 access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.
 memory mode|save|When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits.
-update every|1|The frequency in seconds, for data collection. For more information see [Performance](Performance).
+update every|1|The frequency in seconds, for data collection. For more information see [Performance](../../doc/Performance.md#netdata-performance).
 run as user|`netdata`|The user netdata will run as.
 web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`.
 http port listen backlog|100|The port backlog. Check `man 2 listen`.
@@ -98,7 +98,7 @@ The configuration options for plugins appear in sections following the pattern `
 
 ### Internal Plugins
 
-Most internal plugins will provide additional options. Check [Internal Plugins](Internal-Plugins) for more information.
+Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
 
 
 ### External Plugins
@@ -107,7 +107,7 @@ External plugins will have only 2 options at `netdata.conf`:
 
 setting | default | info
 :------:|:-------:|:----
-update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](Performance).
+update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](../../doc/Performance.md#netdata-performance).
 command options|*empty*|Additional command line options to pass to the plugin. 
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
@@ -156,27 +156,7 @@ The IPs listed are all the private IPv4 addresses, including link local IPv6 add
 
 Unix prefers regular expressions. But they are just too hard, too cryptic to use, write and understand.
 
-So, netdata supports simple patterns. Simple patterns are a space separated list of words, that can have `*` as a wildcard. Each world may use any number of `*`. Simple patterns allow negative matches by prefixing a word with `!`.
-
-So, `pattern = !*bad* *` will match anything, except all those that contain the word `bad`. 
-
-Simple patterns are quite powerful: `pattern = *foobar* !foo* !*bar *` matches everything containing `foobar` and except from strings that start with `foo` or end with `bar`, everything else.
-
-You can use the netdata command line to check simple patterns, like this:
-
-```sh
-# netdata -W simple-pattern '*foobar* !foo* !*bar *' 'hello world'
-RESULT: MATCHED - pattern '*foobar* !foo* !*bar *' matches 'hello world'
-
-# netdata -W simple-pattern '*foobar* !foo* !*bar *' 'hello world bar'
-RESULT: NOT MATCHED - pattern '*foobar* !foo* !*bar *' does not match 'hello world bar'
-
-# netdata -W simple-pattern '*foobar* !foo* !*bar *' 'hello world foobar'
-RESULT: MATCHED - pattern '*foobar* !foo* !*bar *' matches 'hello world foobar'
-```
-
-netdata stops processing to the first positive or negative match (left to right). If it is not matched by either positive or negative patterns, it is denied at the end.
-
+So, netdata supports [simple patterns](../../libnetdata/simple_pattern/). 
 
 ## Applying changes
 
