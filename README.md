@@ -52,7 +52,7 @@ The following animated image, shows the top part of a typical netdata dashboard.
 
 *A typical netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
-> *We have a few online demos to check: [https://my-netdata.io](https://my-netdata.io)*  
+> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*  
 
 ## User base
 
@@ -69,7 +69,7 @@ We provide docker images for the most common architectures. These are statistics
 [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
 ### Registry
-When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
+When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](registry/#netdata-registry). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
 
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
   
@@ -78,7 +78,7 @@ When you install multiple netdata, they are integrated into **one distributed ap
 ## Quick Start
 
 You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
- 
+
 ```sh
 # make sure you run `bash` for your shell
 bash
@@ -94,7 +94,22 @@ The above command will:
 2. download netdata source to `/usr/src/netdata.git`
 3. compile it, install it and start it
 
-More installation methods and additional options can be found at the [installation page](https://github.com/netdata/netdata/wiki/Installation).
+More installation methods and additional options can be found at the [installation page](installer/#installation).
+
+To try netdata in a docker container, run this:
+
+```
+docker run -d --name=netdata \
+  -p 19999:19999 \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --cap-add SYS_PTRACE \
+  --security-opt apparmor=unconfined \
+  netdata/netdata
+```
+
+For more information about running netdata in docker, check the [docker installation page](docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -164,12 +179,12 @@ This is how it works:
 
 Function|Description|Documentation
 :---:|:---|:---:
-**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[Collectors](https://github.com/netdata/netdata/tree/master/collectors#data-collection-plugins)
-**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[Database](https://github.com/netdata/netdata/tree/master/database#netdata-database)
-**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[Health](https://github.com/netdata/netdata/tree/master/health#health-monitoring)
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[Streaming](https://github.com/netdata/netdata/tree/master/streaming#metrics-streaming)
-**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[Backends](https://github.com/netdata/netdata/tree/master/backends)
-**Query**|Multiple independent workers are attached to the [internal web server](https://github.com/netdata/netdata/tree/master/web/server#netdata-web-server), servicing API requests, including [data queries](https://github.com/netdata/netdata/tree/master/web/api/queries#database-queries).|[API](https://github.com/netdata/netdata/tree/master/web/api#api)
+**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#netdata-database)
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#metrics-streaming)
+**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
+**Query**|Multiple independent workers are attached to the [internal web server](server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
 
 The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
@@ -211,7 +226,7 @@ This is what you should expect from Netdata:
 - **Stunning interactive dashboards** - mouse, touchpad and touch-screen friendly in 2 themes: `slate` (dark) and `white`.
 - **Amazingly fast visualization** - responds to all queries in less than 1 ms per metric, even on low-end hardware.
 - **Visual anomaly detection** - the dashboards are optimized for detecting anomalies visually.
-- **Embeddable** - its charts can be embedded on your web pages, wikis and blogs. You can even use [Atlassian's Confluence as a monitoring dashboard](https://github.com/netdata/netdata/wiki/Custom-Dashboard-with-Confluence).
+- **Embeddable** - its charts can be embedded on your web pages, wikis and blogs. You can even use [Atlassian's Confluence as a monitoring dashboard](web/gui/confluence/).
 - **Customizable** - custom dashboards can be built using simple HTML (no javascript necessary).
 
 ### Positive and negative values
@@ -427,22 +442,44 @@ And you can extend it, by writing plugins that collect data from any source, usi
   
 ---  
   
-## Documentation  
-  
-Check the **[netdata wiki](https://github.com/netdata/netdata/wiki)**.  
+## Documentation
 
+The netdata documentation is inside the repo, so by just navigating the repo on github you can find all the documentation.
+
+Here is a quick list:
+
+Directory|Description
+:---|:---
+[`installer`](installer/)|Instructions to install netdata on your systems.
+[`docker`](docker/)|Instructions to install netdata using docker.
+[`daemon`](daemon/)|Information about the netdata daemon and its configuration.
+[`collectors`](collectors/)|Information about data collection plugins.
+[`health`](health/)|How netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.
+[`streaming`](streaming/)|How to build hierarchies of netdata servers, by streaming metrics between them.
+[`backends`](backends/)|Long term archiving of metrics to industry standard time-series databases, like `prometheus`, `graphite`, `opentsdb`.
+[`web/api`](web/api/)|Learn how to query the netdata API and the queries it supports.
+[`web/api/badges`](web/api/badges/)|Learn how to generate badges (SVG images) from live data.
+[`web/gui/custom`](web/gui/custom/)|Learn how to create custom netdata dashboards.
+[`web/gui/confluence`](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
+
+But you can also check all the other directories. Most of them have plenty of documentation.
 
 ## Community
 
-1. To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
-2. Netdata has a [Facebook page](https://www.facebook.com/linuxnetdata/).
-3. Netdata has a [Twitter account](https://twitter.com/linuxnetdata).
-4. Netdata on [OpenHub](https://www.openhub.net/p/netdata).
-5. Netdata on [Repology](https://repology.org/metapackage/netdata/versions).
-6. Netdata on [StackShare](https://stackshare.io/netdata).
+We welcome contributions. So, feel free to join the team.
+
+To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
+
+You can also find netdata on:
+
+- [Facebook](https://www.facebook.com/linuxnetdata/)
+- [Twitter](https://twitter.com/linuxnetdata)
+- [OpenHub](https://www.openhub.net/p/netdata)
+- [Repology](https://repology.org/metapackage/netdata/versions)
+- [StackShare](https://stackshare.io/netdata)
 
 ## License  
   
 netdata is [GPLv3+](LICENSE).  
 
-Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
+Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](REDISTRIBUTED.md).
