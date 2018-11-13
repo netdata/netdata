@@ -265,7 +265,6 @@ static int wake_cpu(size_t core) {
     (void) core;
     // TODO: run in another thread
     // TODO: wait for the end of the job
-info("CPUIDLE wake_cpu(%zu)", core);
 
     return 0;
 }
@@ -279,7 +278,6 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
         ff = procfile_open(schedstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
-
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 1;
@@ -317,7 +315,7 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
     return 0;
 }
 
-static int read_one_state(char *buf, const char *filename, int *fd, int keep_per_core_fds_open) {
+static int read_one_state(char *buf, const char *filename, int *fd) {
     ssize_t ret = read(*fd, buf, 50);
 
     if(unlikely(ret <= 0)) {
@@ -329,6 +327,7 @@ static int read_one_state(char *buf, const char *filename, int *fd, int keep_per
     }
     else {
         // successful read
+
         // terminate the buffer
         buf[ret - 1] = '\0';
 
@@ -357,9 +356,8 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
 
         while(likely(stat_file_found)) {
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
-            if (stat(filename, &stbuf) == 0) {
+            if (stat(filename, &stbuf) == 0)
                 cc->cpuidle_state_len++;
-            }
             else
                 stat_file_found = 0;
         }
@@ -394,8 +392,8 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
 
         char name_buf[50 + 1], time_buf[50 + 1];
-        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd, keep_per_core_fds_open) \
-           && read_one_state(time_buf, cs->time_filename, &cs->time_fd, keep_per_core_fds_open))) {
+        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd) \
+           && read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
             cs->name = strdupz(name_buf);
             cs->value = str2ll(time_buf, NULL);
         }
