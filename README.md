@@ -448,19 +448,19 @@ The netdata documentation is inside the repo, so by just navigating the repo on 
 
 Here is a quick list:
 
-Directory|Function|Description
-:---:|:---:|:---
-`installer`|[Installation](installer/)|Install netdata on your systems.
-`docker`|[Docker installation](docker/)|Install netdata using docker.
-`daemon`|[Netdata daemon](daemon/)|Information about the netdata daemon and its configuration.
-`collectors`|[Data collection plugins](collectors/)|All the data collection plugins of netdata. Be sure to check [python.d](collectors/python.d.plugin/) which is responsible for collecting metrics from most of the third party applications, the [statsd.plugin](collectors/statsd.plugin/) that collects APM metrics, etc.
-`health`|[Health monitoring and alarms](health/)|Learn about netdata health monitoring functions, how to create your own alarms and how to configure alarm notification methods.
-`streaming`|[Streaming](streaming/)|Build hierarchies of netdata servers, by streaming metrics between them.
-`backends`|[Backends](backends/)|Long term archiving of metrics to industry standard time-series databases, like prometheus, graphite, opentsdb.
-`web/api`|[API](web/api/)|Learn how to query the netdata API and the query types it supports.
-`web/api/badges`|[Badges](web/api/badges/)|Learn how to generate badges from live data.
-`web/gui/custom`|[Custom dashboards](web/gui/custom/)|Learn how to create custom netdata dashboards.
-`web/gui/confluence`|[Confluence dashboards](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
+Directory|Description
+:---|:---
+[`installer`](installer/)|Instructions to install netdata on your systems.
+[`docker`](docker/)|Instructions to install netdata using docker.
+[`daemon`](daemon/)|Information about the netdata daemon and its configuration.
+[`collectors`](collectors/)|Information about data collection plugins.
+[`health`](health/)|How netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.
+[`streaming`](streaming/)|How to build hierarchies of netdata servers, by streaming metrics between them.
+[`backends`](backends/)|Long term archiving of metrics to industry standard time-series databases, like `prometheus`, `graphite`, `opentsdb`.
+[`web/api`](web/api/)|Learn how to query the netdata API and the queries it supports.
+[`web/api/badges`](web/api/badges/)|Learn how to generate badges (SVG images) from live data.
+[`web/gui/custom`](web/gui/custom/)|Learn how to create custom netdata dashboards.
+[`web/gui/confluence`](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
 
 But you can also check all the other directories. Most of them have plenty of documentation.
 
