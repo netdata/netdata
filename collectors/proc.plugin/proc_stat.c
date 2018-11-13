@@ -247,7 +247,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, *time_in_state_filename = NULL;
     static RRDVAR *cpus_var = NULL;
-    static int accurate_freq = 0;
+    static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
     size_t cores_found = (size_t)processors;
 
     if(unlikely(do_cpu == -1)) {
@@ -414,7 +414,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 cpu_chart->time_in_state_files[CPU_FREQ_INDEX].filename = strdupz(filename);
                                 cpu_chart->time_in_state_files[CPU_FREQ_INDEX].ff = NULL;
                                 do_cpu_freq = CONFIG_BOOLEAN_YES;
-                                accurate_freq = 1;
+                                accurate_freq_avail = 1;
                             }
                         }
                     }
@@ -666,11 +666,26 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
 
         if(likely(do_cpu_freq != CONFIG_BOOLEAN_NO)) {
+            char filename[FILENAME_MAX + 1];
             int r = 0;
-            if (accurate_freq)
+
+            if (accurate_freq_avail) {
                 r = read_per_core_time_in_state_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
-            if (r < 1)
+                if(r > 0 && !accurate_freq_is_used) {
+                    accurate_freq_is_used = 1;
+                    snprintfz(filename, FILENAME_MAX, time_in_state_filename, "cpu*");
+                    info("cpufreq is using %s", filename);
+                }
+            }
+            if (r < 1) {
                 r = read_per_core_files(&all_cpu_charts[1], all_cpu_charts_size - 1, CPU_FREQ_INDEX);
+                if(accurate_freq_is_used) {
+                    accurate_freq_is_used = 0;
+                    snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, "cpu*");
+                    info("cpufreq fell back to %s", filename);
+                }
+            }
+
             if(likely(r != -1 && (do_cpu_freq == CONFIG_BOOLEAN_YES || r > 0))) {
                 do_cpu_freq = CONFIG_BOOLEAN_YES;
 
