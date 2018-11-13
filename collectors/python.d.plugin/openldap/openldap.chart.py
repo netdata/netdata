@@ -14,6 +14,10 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # default module values (can be overridden per job in `config`)
 priority = 60000
 
+DEFAULT_SERVER = 'localhost'
+DEFAULT_PORT = '389'
+DEFAULT_TIMEOUT = 1
+
 ORDER = [
     'total_connections',
     'bytes_sent',
@@ -133,11 +137,11 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
 
-        self.server = configuration.get('server')
-        self.port = configuration.get('port')
+        self.server = configuration.get('server', DEFAULT_SERVER)
+        self.port = configuration.get('port', DEFAULT_PORT)
         self.username = configuration.get('username')
         self.password = configuration.get('password')
-        self.timeout = configuration.get('timeout', 1)
+        self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
 
         self.alive = False
         self.conn = None
