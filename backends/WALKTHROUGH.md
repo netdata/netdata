@@ -67,8 +67,7 @@ chooses the base container images (centos:latest). After running this you should
 be sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not
-be easier. If you take a look at this link:
-https://github.com/netdata/netdata/wiki/Installation the Netdata devs give us
+be easier. If you take a look at [this link](../installer/#installation), the Netdata devs give us
 several one-liners to install netdata. I have not had any issues with these one
 liners and their bootstrapping scripts so far (If you guys run into anything do
 share). Run the following command in your container.
@@ -244,8 +243,7 @@ charts. Let’s give this a try:
 `netdata_system_cpu_percentage_average{chart="system.cpu", instance="netdata:19999"}`
 
 This is the basics of using Prometheus to query NetData. I’d advise everyone at
-this point to read this page
-https://github.com/netdata/netdata/wiki/Using-Netdata-with-Prometheus#netdata-support-for-prometheus.
+this point to read [this page](../backends/prometheus/#using-netdata-with-prometheus).
 The key point here is that NetData can export metrics from its internal DB or
 can send metrics “as-collected” by specifying the ‘source=as-collected’ url
 parameter like so.
