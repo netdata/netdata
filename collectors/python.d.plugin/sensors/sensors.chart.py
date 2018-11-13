@@ -3,13 +3,22 @@
 # Author: Pawel Krupa (paulfantom)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from bases.FrameworkServices.SimpleService import SimpleService
 from third_party import lm_sensors as sensors
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 
-ORDER = ['temperature', 'fan', 'voltage', 'current', 'power', 'energy', 'humidity']
+ORDER = [
+    'temperature',
+    'fan',
+    'voltage',
+    'current',
+    'power',
+    'energy',
+    'humidity',
+]
 
 # This is a prototype of chart definition which is used to dynamically create self.definitions
 CHARTS = {
@@ -94,9 +103,16 @@ class Service(SimpleService):
                 prefix = sensors.chip_snprintf_name(chip)
                 for feature in sensors.FeatureIterator(chip):
                     sfi = sensors.SubFeatureIterator(chip, feature)
+                    val = None
                     for sf in sfi:
-                        val = sensors.get_value(chip, sf.number)
-                        break
+                        try:
+                            val = sensors.get_value(chip, sf.number)
+                            break
+                        # TODO: use specific error after upstream is fixed
+                        except Exception:
+                            continue
+                    if val is None:
+                        continue
                     type_name = TYPE_MAP[feature.type]
                     if type_name in LIMITS:
                         limit = LIMITS[type_name]
@@ -117,8 +133,15 @@ class Service(SimpleService):
                     continue
                 for feature in sensors.FeatureIterator(chip):
                     sfi = sensors.SubFeatureIterator(chip, feature)
-                    vals = [sensors.get_value(chip, sf.number) for sf in sfi]
-                    if vals[0] == 0:
+                    vals = list()
+                    for sf in sfi:
+                        try:
+                            vals.append(sensors.get_value(chip, sf.number))
+                        # TODO: use specific error after upstream is fixed
+                        except Exception as error:
+                            self.error('{0}: {1}'.format(sf.name, error))
+                            continue
+                    if not vals or vals[0] == 0:
                         continue
                     if TYPE_MAP[feature.type] == sensor:
                         # create chart
