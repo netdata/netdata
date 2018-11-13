@@ -35,7 +35,7 @@ above can be converted to docker-compose file for ease of management:
 version: '3'
 services:
   netdata:
-    image: firehol/netdata
+    image: netdata/netdata
     hostname: example.com # set to fqdn of host
     ports:
       - 19999:19999
@@ -101,7 +101,7 @@ services:
   netdata:
     restart: always
     hostname: netdata.example.org
-    image: firehol/netdata
+    image: netdata/netdata
     cap_add:
       - SYS_PTRACE
     security_opt:
