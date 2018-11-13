@@ -12,7 +12,6 @@ except ImportError:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
-disabled_by_default = True
 priority = 60000
 
 
