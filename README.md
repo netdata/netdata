@@ -448,19 +448,19 @@ The netdata documentation is inside the repo, so by just navigating the repo on 
 
 Here is a quick list:
 
-Function|Description
-:---:|:---
-[Installation](installer/)|Install netdata on your systems.
-[Docker installation](docker/)|Install netdata using docker.
-[Netdata daemon](daemon/)|Information about the netdata daemon and its configuration.
-[Data collection plugins](collectors/)|All the data collection plugins of netdata. Be sure to check [python.d](collectors/python.d.plugin/) which is responsible for collecting metrics from most of the third party applications, the [statsd.plugin](collectors/statsd.plugin/) that collects APM metrics, etc.
-[Health monitoring and alarms](health/)|Learn about netdata health monitoring functions, how to create your own alarms and how to configure alarm notification methods.
-[Streaming](streaming/)|Build hierarchies of netdata servers, by streaming metrics between them.
-[Backends](backends/)|Long term archiving of metrics to industry standard time-series databases, like prometheus, graphite, opentsdb.
-[API](web/api/)|Learn how to query the netdata API and the query types it supports.
-[Badges](web/api/badges/)|Learn how to generate badges from live data.
-[Custom dashboards](web/gui/custom/)|Learn how to create custom netdata dashboards.
-[Confluence dashboards](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
+Directory|Function|Description
+:---:|:---:|:---
+`installer`|[Installation](installer/)|Install netdata on your systems.
+`docker`|[Docker installation](docker/)|Install netdata using docker.
+`daemon`|[Netdata daemon](daemon/)|Information about the netdata daemon and its configuration.
+`collectors`|[Data collection plugins](collectors/)|All the data collection plugins of netdata. Be sure to check [python.d](collectors/python.d.plugin/) which is responsible for collecting metrics from most of the third party applications, the [statsd.plugin](collectors/statsd.plugin/) that collects APM metrics, etc.
+`health`|[Health monitoring and alarms](health/)|Learn about netdata health monitoring functions, how to create your own alarms and how to configure alarm notification methods.
+`streaming`|[Streaming](streaming/)|Build hierarchies of netdata servers, by streaming metrics between them.
+`backends`|[Backends](backends/)|Long term archiving of metrics to industry standard time-series databases, like prometheus, graphite, opentsdb.
+`web/api`|[API](web/api/)|Learn how to query the netdata API and the query types it supports.
+`web/api/badges`|[Badges](web/api/badges/)|Learn how to generate badges from live data.
+`web/gui/custom`|[Custom dashboards](web/gui/custom/)|Learn how to create custom netdata dashboards.
+`web/gui/confluence`|[Confluence dashboards](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
 
 But you can also check all the other directories. Most of them have plenty of documentation.
 
@@ -472,11 +472,11 @@ To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netd
 
 You can also find netdata on:
 
-- [Facebook](https://www.facebook.com/linuxnetdata/).
-- [Twitter](https://twitter.com/linuxnetdata).
-- [OpenHub](https://www.openhub.net/p/netdata).
-- [Repology](https://repology.org/metapackage/netdata/versions).
-- [StackShare](https://stackshare.io/netdata).
+- [Facebook](https://www.facebook.com/linuxnetdata/)
+- [Twitter](https://twitter.com/linuxnetdata)
+- [OpenHub](https://www.openhub.net/p/netdata)
+- [Repology](https://repology.org/metapackage/netdata/versions)
+- [StackShare](https://stackshare.io/netdata)
 
 ## License  
   
