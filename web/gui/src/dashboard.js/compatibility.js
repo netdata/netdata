@@ -32,6 +32,7 @@ if (typeof String.prototype.startsWith !== 'function') {
 NETDATA.name2id = function (s) {
     return s
         .replace(/ /g, '_')
+        .replace(/:/g, '_')
         .replace(/\(/g, '_')
         .replace(/\)/g, '_')
         .replace(/\./g, '_')
