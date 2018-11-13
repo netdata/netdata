@@ -440,11 +440,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
-    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL;
+    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL, *proc_net_dev_filename = NULL;
     static long long int dt_to_refresh_speed = 0;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
+        proc_net_dev_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "filename to monitor", filename);
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
         path_to_sys_devices_virtual_net = config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "path to get virtual interfaces", filename);
@@ -469,9 +472,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     }
 
     if(unlikely(!ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "filename to monitor", filename), " \t,:|", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(proc_net_dev_filename, " \t,|", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -492,7 +493,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         // require 17 words on each line
         if(unlikely(procfile_linewords(ff, l) < 17)) continue;
 
-        struct netdev *d = get_netdev(procfile_lineword(ff, l, 0));
+        char *name = procfile_lineword(ff, l, 0);
+        size_t len = strlen(name);
+        if(name[len - 1] == ':') name[len - 1] = '\0';
+
+        struct netdev *d = get_netdev(name);
         d->updated = 1;
         netdev_found++;
 
@@ -582,6 +587,17 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->tcollisions = str2kernel_uint_t(procfile_lineword(ff, l, 14));
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
+
+        //info("PROC_NET_DEV: %s speed %zu, bytes %zu/%zu, packets %zu/%zu/%zu, errors %zu/%zu, drops %zu/%zu, fifo %zu/%zu, compressed %zu/%zu, rframe %zu, tcollisions %zu, tcarrier %zu"
+        //        , d->name, d->speed
+        //        , d->rbytes, d->tbytes
+        //        , d->rpackets, d->tpackets, d->rmulticast
+        //        , d->rerrors, d->terrors
+        //        , d->rdrops, d->tdrops
+        //        , d->rfifo, d->tfifo
+        //        , d->rcompressed, d->tcompressed
+        //        , d->rframe, d->tcollisions, d->tcarrier
+        //        );
 
         // --------------------------------------------------------------------
 
