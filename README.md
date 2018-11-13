@@ -179,12 +179,12 @@ This is how it works:
 
 Function|Description|Documentation
 :---:|:---|:---:
-**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[Collectors](collectors/#data-collection-plugins)
-**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[Database](database/#netdata-database)
-**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[Health](health/#health-monitoring)
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[Streaming](streaming/#metrics-streaming)
-**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[Backends](backends/)
-**Query**|Multiple independent workers are attached to the [internal web server](server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[API](web/api/#api)
+**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#netdata-database)
+**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#metrics-streaming)
+**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
+**Query**|Multiple independent workers are attached to the [internal web server](server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web//api`](web/api/#api)
 
 The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
