@@ -259,7 +259,7 @@ var urlOptions = {
 
             $('.highlight-tooltip').tooltip({
                 html: true,
-                delay: { show: 500, hide: 0 },
+                delay: {show: 500, hide: 0},
                 container: 'body'
             });
         }
@@ -640,7 +640,7 @@ function renderMachines(machinesArray) {
                     <div></div>
                 </div>
                 `
-            );    
+            );
         }
     }
 
@@ -976,7 +976,7 @@ function scrollToId(hash) {
         var offset = $('#' + hash).offset();
         if (typeof offset !== 'undefined') {
             //console.log('scrolling to ' + hash + ' at ' + offset.top.toString());
-            $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
+            $('html, body').animate({scrollTop: offset.top - 30}, 0);
         }
     }
 
@@ -1028,7 +1028,7 @@ var netdataDashboard = {
         }
 
         if (typeof this.sparklines_registry[key] === 'undefined') {
-            this.sparklines_registry[key] = { count: 1 };
+            this.sparklines_registry[key] = {count: 1};
         } else {
             this.sparklines_registry[key].count++;
         }
@@ -1628,7 +1628,7 @@ function renderPage(menus, data) {
 
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
-    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
+    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
@@ -1745,7 +1745,7 @@ function loadJs(url, callback) {
         url: url,
         cache: true,
         dataType: "script",
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .fail(function () {
             alert('Cannot load required JS library: ' + url);
@@ -1852,8 +1852,8 @@ function alarmsUpdateModal() {
         if (data === null) {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'failed to load alarm data!';
+                    document.getElementById('alarms_log').innerHTML =
+                        'failed to load alarm data!';
             return;
         }
 
@@ -1903,7 +1903,7 @@ function alarmsUpdateModal() {
 
             return '<code>' + alarm.lookup_method + '</code> '
                 + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, { space: '&nbsp;' }) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, { space: '&nbsp;' }) + '</code>'
+                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, {space: '&nbsp;'}) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, {space: '&nbsp;'}) + '</code>'
                 + ((alarm.lookup_options) ? (', with options <code>' + alarm.lookup_options.replace(/ /g, ',&nbsp;') + '</code>') : '')
                 + '.';
         }
@@ -1980,9 +1980,9 @@ function alarmsUpdateModal() {
             }
 
             html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + NETDATA.seconds4human(alarm.update_every, {
-                space: '&nbsp;',
-                negative_suffix: ''
-            }) + '</td></tr>'
+                    space: '&nbsp;',
+                    negative_suffix: ''
+                }) + '</td></tr>'
                 + ((has_alarm === true) ? ('<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>') : '')
                 + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                 + '</table></td></tr>';
@@ -2027,7 +2027,7 @@ function alarmsUpdateModal() {
             // not found - this should never happen!
             if (typeof chart === 'undefined') {
                 console.log('WARNING: alarm ' + x + ' is linked to chart ' + alarm.chart + ', which is not found in the list of chart got from the server.');
-                chart = { priority: 9999999 };
+                chart = {priority: 9999999};
             }
             else if (typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
             // the family based on the chart
@@ -2164,16 +2164,16 @@ function alarmsUpdateModal() {
 
                     switch (row.status) {
                         case 'CRITICAL':
-                            return { classes: 'danger' };
+                            return {classes: 'danger'};
                             break;
                         case 'WARNING':
-                            return { classes: 'warning' };
+                            return {classes: 'warning'};
                             break;
                         case 'UNDEFINED':
-                            return { classes: 'info' };
+                            return {classes: 'info'};
                             break;
                         case 'CLEAR':
-                            return { classes: 'success' };
+                            return {classes: 'success'};
                             break;
                     }
                     return {};
@@ -2361,7 +2361,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2375,7 +2375,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2507,7 +2507,7 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2727,7 +2727,7 @@ function getNetdataCommitId(force, callback) {
         url: 'version.txt',
         async: true,
         cache: false,
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .done(function (data) {
             data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
@@ -2978,7 +2978,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 1.9,
 
             compress: function (s) {
-                return btoa(pako.deflate(s, { to: 'string' }));
+                return btoa(pako.deflate(s, {to: 'string'}));
             },
 
             compressed_length: function (s) {
@@ -2986,7 +2986,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(atob(s), { to: 'string' });
+                return pako.inflate(atob(s), {to: 'string'});
             }
         },
 
@@ -2995,7 +2995,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 3.2,
 
             compress: function (s) {
-                return pako.deflate(s, { to: 'string' });
+                return pako.deflate(s, {to: 'string'});
             },
 
             compressed_length: function (s) {
@@ -3003,7 +3003,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(s, { to: 'string' });
+                return pako.inflate(s, {to: 'string'});
             }
         },
 
@@ -3804,7 +3804,7 @@ function enableTooltipsAndPopovers() {
         animated: 'fade',
         trigger: 'hover',
         html: true,
-        delay: { show: 500, hide: 0 },
+        delay: {show: 500, hide: 0},
         container: 'body'
     });
     $('[data-toggle="popover"]').popover();
@@ -3883,7 +3883,7 @@ function runOnceOnDashboardWithjQuery() {
 
                 // scroll to the position we had open before the modal
                 $('html, body')
-                    .animate({ scrollTop: scrollPos }, 0);
+                    .animate({scrollTop: scrollPos}, 0);
 
                 // unpause netdata, if we paused it
                 if (netdata_paused_on_modal === true) {
@@ -4040,8 +4040,8 @@ function runOnceOnDashboardWithjQuery() {
         .on('hidden.bs.modal', function () {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'loading...';
+                    document.getElementById('alarms_log').innerHTML =
+                        'loading...';
         });
 
     // ------------------------------------------------------------------------
@@ -4091,7 +4091,7 @@ function runOnceOnDashboardWithjQuery() {
                 if ($this.hasClass('less')) {
                     $this.removeClass('less');
                     $this.html(config.moreText);
-                    $this.parent().prev().animate({ 'height': '0' + '%' }, 0, function () {
+                    $this.parent().prev().animate({'height': '0' + '%'}, 0, function () {
                         $this.parent().prev().prev().show();
                     }).hide(0, function () {
                         config.onLess();
@@ -4100,7 +4100,7 @@ function runOnceOnDashboardWithjQuery() {
                 } else {
                     $this.addClass('less');
                     $this.html(config.lessText);
-                    $this.parent().prev().animate({ 'height': '100' + '%' }, 0, function () {
+                    $this.parent().prev().animate({'height': '100' + '%'}, 0, function () {
                         $this.parent().prev().prev().hide();
                     }).show(0, function () {
                         config.onMore();
