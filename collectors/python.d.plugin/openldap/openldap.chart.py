@@ -188,7 +188,7 @@ class Service(SimpleService):
             try:
                 num = self.conn.search(dn, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
                 result_type, result_data = self.conn.result(num, 1)
-            except Exception as error:
+            except ldap.LDAPError as error:
                 self.error("Empty result. Check bind username/password. Message: ",error)
                 self.alive = False
                 return None
