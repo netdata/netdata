@@ -238,13 +238,10 @@ static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, s
 }
 
 struct cpuidle_state {
-    unsigned char found:1;
-
     const char *name;
     const char *name_filename;
     int name_fd;
 
-    const char *time;
     const char *time_filename;
     int time_fd;
 
@@ -256,11 +253,9 @@ struct cpuidle_state {
 struct per_core_cpuidle_chart {
     RRDSET *st;
 
-    collected_number active_time;
     RRDDIM *active_time_rd;
-
+    collected_number active_time;
     collected_number last_active_time;
-    unsigned char wake_cpu:1;
 
     struct cpuidle_state *cpuidle_state;
     size_t cpuidle_state_len;
@@ -270,6 +265,7 @@ static int wake_cpu(size_t core) {
     (void) core;
     // TODO: run in another thread
     // TODO: wait for the end of the job
+info("CPUIDLE wake_cpu(%zu)", core);
 
     return 0;
 }
@@ -314,21 +310,108 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
                 error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
                 return 1;
             }
-            cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7));
+            cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7)) / 1000;
         }
     }
 
     return 0;
 }
 
-static int read_cpuidle_states(struct per_core_cpuidle_chart *cpuidle_charts, size_t core) {
-    (void) cpuidle_charts;
-    (void) core;
-    // TODO: read all states for the given core
-    return 0;
+static int read_one_state(char *buf, const char *filename, int *fd, int keep_per_core_fds_open) {
+    ssize_t ret = read(*fd, buf, 50);
+
+    if(unlikely(ret <= 0)) {
+        // cannot read that file
+        error("Cannot read file '%s'", filename);
+        close(*fd);
+        *fd = -1;
+        return 0;
+    }
+    else {
+        // successful read
+        // terminate the buffer
+        buf[ret - 1] = '\0';
+
+        if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+            close(*fd);
+            *fd = -1;
+        }
+        else if(lseek(*fd, 0, SEEK_SET) == -1) {
+            error("Cannot seek in file '%s'", filename);
+            close(*fd);
+            *fd = -1;
+        }
+    }
+
+    return 1;
 }
 
-static void chart_cpuidle_states(struct per_core_cpuidle_chart *cpuidle_charts, size_t core, RRDSET *st, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm) {
+static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_filename, struct per_core_cpuidle_chart *cpuidle_charts, size_t core) {
+    char filename[FILENAME_MAX + 1];
+    static char next_state_filename[FILENAME_MAX + 1];
+    struct stat stbuf;
+    struct per_core_cpuidle_chart *cc = &cpuidle_charts[core];
+
+    if(unlikely(!cc->cpuidle_state_len)) {
+        int stat_file_found = 1; // check at least one state
+
+        while(likely(stat_file_found)) {
+            snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
+            if (stat(filename, &stbuf) == 0) {
+                cc->cpuidle_state_len++;
+            }
+            else
+                stat_file_found = 0;
+        }
+        snprintfz(next_state_filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
+
+        cc->cpuidle_state = reallocz(cc->cpuidle_state, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
+        memset(cc->cpuidle_state, 0, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
+
+        for(size_t state = 0; state < cc->cpuidle_state_len; state++) {
+            snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, state);
+            cc->cpuidle_state[state].name_filename = strdupz(filename);
+            cc->cpuidle_state[state].name_fd = -1;
+
+            snprintfz(filename, FILENAME_MAX, cpuidle_time_filename, core, state);
+            cc->cpuidle_state[state].time_filename = strdupz(filename);
+            cc->cpuidle_state[state].time_fd = -1;
+        }
+    }
+
+    for(size_t state = 0; state < cc->cpuidle_state_len; state++) {
+
+        struct cpuidle_state *cs = &cc->cpuidle_state[state];
+
+        if(unlikely(cs->name_fd == -1 || cs->time_fd == -1)) {
+            cs->name_fd = open(cs->name_filename, O_RDONLY);
+            cs->time_fd = open(cs->time_filename, O_RDONLY);
+            if (unlikely(cs->name_fd == -1 || cs->time_fd == -1)) {
+                error("Cannot open files '%s' and '%s'", cs->name_filename, cs->time_filename);
+                cc->cpuidle_state_len = 0;
+                return 1;
+            }
+        }
+
+        char name_buf[50 + 1], time_buf[50 + 1];
+        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd, keep_per_core_fds_open) \
+           && read_one_state(time_buf, cs->time_filename, &cs->time_fd, keep_per_core_fds_open))) {
+            cs->name = strdupz(name_buf);
+            cs->value = str2ll(time_buf, NULL);
+        }
+        else {
+            cc->cpuidle_state_len = 0;
+            return 1;
+        }
+    }
+
+    // check if the number of states was increased
+    if(unlikely(stat(next_state_filename, &stbuf) == 0)) {
+        cc->cpuidle_state_len = 0;
+        return 1;
+    }
+
+    return 0;
 }
 
 int do_proc_stat(int update_every, usec_t dt) {
@@ -400,10 +483,10 @@ int do_proc_stat(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/schedstat");
         schedstat_filename = config_get("plugin:proc:/proc/stat", "schedstat filename to monitor", filename);
 
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpuidle/name");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/cpu%zu/cpuidle/state%zu/name");
         cpuidle_name_filename = config_get("plugin:proc:/proc/stat", "cpuidle name filename to monitor", filename);
 
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/%s/cpuidle/time");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/cpu%zu/cpuidle/state%zu/time");
         cpuidle_time_filename = config_get("plugin:proc:/proc/stat", "cpuidle time filename to monitor", filename);
     }
 
@@ -828,13 +911,20 @@ int do_proc_stat(int update_every, usec_t dt) {
     static struct per_core_cpuidle_chart *cpuidle_charts = NULL;
 
     if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
-        for(size_t core = 0; core < cores_found; core++)
-            if(unlikely(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time)) wake_cpu(core);
-        if(unlikely(!read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
+        int cpu_states_updated = 0;
+
+        for(size_t core = 0; core < cores_found; core++) {
+            if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
+                cpu_states_updated = 1;
+                wake_cpu(core);
+            }
+        }
+
+        if(unlikely(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
             for(size_t core = 0; core < cores_found; core++) {
                 cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
 
-                int r = read_cpuidle_states(cpuidle_charts, core);
+                int r = read_cpuidle_states(cpuidle_name_filename, cpuidle_time_filename, cpuidle_charts, core);
                 if(likely(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0))) {
                     do_cpuidle = CONFIG_BOOLEAN_YES;
 
@@ -854,16 +944,22 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , PLUGIN_PROC_MODULE_STAT_NAME
                                 , NETDATA_CHART_PRIO_CPUIDLE + core
                                 , update_every
-                                , RRDSET_TYPE_LINE
+                                , RRDSET_TYPE_STACKED
                         );
 
                         cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, "C0 (active)", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                        for (size_t i = 0; i < cpuidle_charts[core].cpuidle_state_len; i++) {
+                            cpuidle_charts[core].cpuidle_state[i].rd = rrddim_add(cpuidle_charts[core].st, cpuidle_charts[core].cpuidle_state[i].name, \
+                                                                                  NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                        }
                     }
                     else
                         rrdset_next(cpuidle_charts[core].st);
 
                     rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].active_time_rd, cpuidle_charts[core].active_time);
-                    chart_cpuidle_states(cpuidle_charts, cores_found, cpuidle_charts[core].st, 1, 1000, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    for (size_t i = 0; i < cpuidle_charts[core].cpuidle_state_len; i++) {
+                        rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].cpuidle_state[i].rd, cpuidle_charts[core].cpuidle_state[i].value);
+                    }
                     rrdset_done(cpuidle_charts[core].st);
                 }
             }
