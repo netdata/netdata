@@ -1,3 +1,5 @@
+# Add more charts to netdata
+
 netdata collects system metrics by itself. It has many [internal plugins](https://github.com/netdata/netdata/tree/master/collectors) for collecting most of the metrics presented by default when it starts, collecting data from `/proc`, `/sys` and other Linux kernel sources.
 
 To collect non-system metrics, netdata supports a plugin architecture. The following are the currently available external plugins:
