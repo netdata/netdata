@@ -441,8 +441,8 @@ iscontainer() {
 issystemd() {
     local pids p myns ns systemctl
 
-    # if the directory /lib/systemd/system does not exit, it is not systemd
-    [ ! -d /lib/systemd/system ] && return 1
+    # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+    [ ! -d /lib/systemd/system -a ! -d /usr/lib/systemd/system ] && return 1
 
     # if there is no systemctl command, it is not systemd
     # shellcheck disable=SC2230
@@ -563,15 +563,25 @@ install_netdata_service() {
             NETDATA_START_CMD="systemctl start netdata"
             NETDATA_STOP_CMD="systemctl stop netdata"
 
+            SYSTEMD_DIRECTORY=""
+
             if [ -d "/lib/systemd/system" ]
             then
+                SYSTEMD_DIRECTORY="/lib/systemd/system"
+            elif [ -d "/usr/lib/systemd/system" ]
+            then
+                SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+            fi
+
+            if [ "${SYSTEMD_DIRECTORY}x" != "x" ]
+            then
                 echo >&2 "Installing systemd service..."
-                run cp system/netdata.service /lib/systemd/system/netdata.service && \
+                run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" && \
                     run systemctl daemon-reload && \
                     run systemctl enable netdata && \
                     return 0
             else
-                echo >&2 "no '/lib/systemd/system' directory; cannot install netdata.service"
+                echo >&2 "no systemd directory; cannot install netdata.service"
             fi
         else
             install_non_systemd_init
