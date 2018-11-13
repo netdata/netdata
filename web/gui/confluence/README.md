@@ -78,7 +78,7 @@ Hit **update** and you will get this:
 
 This badge is now auto-refreshing. It will update itself based on the update frequency of the alarm.
 
-> Keep in mind you can add badges with custom netdata queries too. netdata automatically creates badges for all the alarms, but every chart, every dimension on every chart, can be used for a badge. And netdata badges are quite powerful! Check [Creating Badges](https://github.com/netdata/netdata/wiki/Generating-Badges) for more information on badges.
+> Keep in mind you can add badges with custom netdata queries too. netdata automatically creates badges for all the alarms, but every chart, every dimension on every chart, can be used for a badge. And netdata badges are quite powerful! Check [Creating Badges](../../api/badges/) for more information on badges.
 
 So, let's create a table and add this badge for both our web servers:
 
