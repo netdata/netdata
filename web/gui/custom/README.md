@@ -9,9 +9,9 @@ You can:
 
 netdata charts can also be added to existing web pages.
 
-Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its **[html source](https://github.com/netdata/netdata/blob/master/web/demo.html)**.
+Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its **[html source](https://github.com/netdata/netdata/blob/master/web/gui/demo.html)**.
 
-If you plan to put it on TV, check **[tv.html](https://github.com/netdata/netdata/blob/master/web/tv.html)**. This is a screenshot of it, monitoring 2 servers on the same page:
+If you plan to put it on TV, check **[tv.html](https://github.com/netdata/netdata/blob/master/web/gui/tv.html)**. This is a screenshot of it, monitoring 2 servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 -- 
@@ -187,7 +187,7 @@ Each chart can get data from a different netdata server. You can give per chart 
      ></div>
 ```
 
-If you have ephemeral monitoring setup ([More info here](https://github.com/netdata/netdata/wiki/Monitoring-ephemeral-nodes)) and have no direct access to the nodes dashboards, you can use the following:
+If you have ephemeral monitoring setup ([More info here](../../../streaming/#monitoring-ephemeral-nodes)) and have no direct access to the nodes dashboards, you can use the following:
 
 ```html
 <div data-netdata="unique.id"
