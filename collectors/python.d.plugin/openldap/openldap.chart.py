@@ -153,8 +153,8 @@ class Service(SimpleService):
     def connect(self):
         try:
             self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
-            self.conn.simple_bind(self.username, self.password)
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
+            self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:
             self.error(error)
             return False
