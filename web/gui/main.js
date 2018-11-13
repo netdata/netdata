@@ -119,8 +119,7 @@ var urlOptions = {
                 if (urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined') {
                     urlOptions[p[0]] = decodeURIComponent(p[1]);
                 }
-            }
-            else {
+            } else {
                 if (variables[len].length > 0) {
                     urlOptions.hash = variables[len];
                 }
@@ -155,23 +154,20 @@ var urlOptions = {
             netdataServerStatic = document.location.origin.toString() + document.location.pathname.toString();
             netdataServer = urlOptions.server;
             netdataCheckXSS = true;
-        }
-        else {
+        } else {
             urlOptions.server = null;
         }
 
         if (urlOptions.before > 0 && urlOptions.after > 0) {
             urlOptions.pan_and_zoom = true;
             urlOptions.nowelcome = true;
-        }
-        else {
+        } else {
             urlOptions.pan_and_zoom = false;
         }
 
         if (urlOptions.highlight_before > 0 && urlOptions.highlight_after > 0) {
             urlOptions.highlight = true;
-        }
-        else {
+        } else {
             urlOptions.highlight = false;
         }
 
@@ -259,11 +255,10 @@ var urlOptions = {
 
             $('.highlight-tooltip').tooltip({
                 html: true,
-                delay: { show: 500, hide: 0 },
+                delay: {show: 500, hide: 0},
                 container: 'body'
             });
-        }
-        else {
+        } else {
             $('.navbar-highlight').hide();
         }
     },
@@ -304,8 +299,7 @@ function localStorageTest() {
             console.log(e);
             localStorageTested = false;
         }
-    }
-    else {
+    } else {
         localStorageTested = false;
     }
 
@@ -381,16 +375,14 @@ var netdataShowHelp = true;
 if (urlOptions.theme !== null) {
     setTheme(urlOptions.theme);
     netdataTheme = urlOptions.theme;
-}
-else {
+} else {
     urlOptions.theme = netdataTheme;
 }
 
 if (urlOptions.help !== null) {
     saveLocalStorage('options.show_help', urlOptions.help);
     netdataShowHelp = urlOptions.help;
-}
-else {
+} else {
     urlOptions.help = loadLocalStorage('options.show_help');
 }
 
@@ -640,7 +632,7 @@ function renderMachines(machinesArray) {
                     <div></div>
                 </div>
                 `
-            );    
+            );
         }
     }
 
@@ -768,14 +760,12 @@ function gotoServerValidateUrl(id, guid, url) {
                         window.open(verifyURL(finalURL), '_blank');
                         gotoServerMiddleClick = false;
                         document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + verifyURL(finalURL) + '">' + escapeUserInputHTML(url) + '</a></b><br/>(check your pop-up blocker if it fails)';
-                    }
-                    else {
+                    } else {
                         document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
                         document.location = verifyURL(finalURL);
                     }
                 }
-            }
-            else {
+            } else {
                 if (typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid) {
                     error = 'wrong machine';
                 }
@@ -837,8 +827,7 @@ function gotoServerInit() {
         if (e.which === 2) {
             e.preventDefault();
             gotoServerMiddleClick = true;
-        }
-        else {
+        } else {
             gotoServerMiddleClick = false;
         }
 
@@ -861,13 +850,11 @@ function notifyForSwitchRegistry() {
             if (result !== null) {
                 $('#switchRegistryModal').modal('hide');
                 NETDATA.registry.init();
-            }
-            else {
+            } else {
                 document.getElementById('switchRegistryResponse').innerHTML = "<b>Sorry! The registry rejected your request.</b>";
             }
         });
-    }
-    else {
+    } else {
         document.getElementById('switchRegistryResponse').innerHTML = "<b>The ID you have entered is not a GUID.</b>";
     }
 }
@@ -892,8 +879,7 @@ function notifyForDeleteRegistry() {
                 deleteRegistryUrl = null;
                 $('#deleteRegistryModal').modal('hide');
                 NETDATA.registry.init();
-            }
-            else {
+            } else {
                 document.getElementById('deleteRegistryResponse').innerHTML = "<b>Sorry! this command was rejected by the registry server.</b>";
             }
         });
@@ -924,8 +910,7 @@ function chartsPerRow(total) {
         //var width = Math.floor(total / options.chartsMinWidth);
         //if(width === 0) width = 1;
         //return width;
-    }
-    else {
+    } else {
         return options.chartsPerRow;
     }
 }
@@ -976,7 +961,7 @@ function scrollToId(hash) {
         var offset = $('#' + hash).offset();
         if (typeof offset !== 'undefined') {
             //console.log('scrolling to ' + hash + ' at ' + offset.top.toString());
-            $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
+            $('html, body').animate({scrollTop: offset.top - 30}, 0);
         }
     }
 
@@ -1028,7 +1013,7 @@ var netdataDashboard = {
         }
 
         if (typeof this.sparklines_registry[key] === 'undefined') {
-            this.sparklines_registry[key] = { count: 1 };
+            this.sparklines_registry[key] = {count: 1};
         } else {
             this.sparklines_registry[key].count++;
         }
@@ -1628,7 +1613,7 @@ function renderPage(menus, data) {
 
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
-    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
+    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
@@ -1679,8 +1664,7 @@ function renderChartsAndMenu(data) {
                 info: netdataDashboard.menuInfo(chart),
                 height: netdataDashboard.menuHeight(chart) * options.chartsHeight
             };
-        }
-        else {
+        } else {
             if (typeof (menus[m].menu_pattern) === 'undefined') {
                 menus[m].menu_pattern = chart.menu_pattern;
             }
@@ -1701,8 +1685,7 @@ function renderChartsAndMenu(data) {
                 info: netdataDashboard.submenuInfo(menu_key, chart.submenu),
                 height: netdataDashboard.submenuHeight(menu_key, chart.submenu, menus[m].height)
             };
-        }
-        else {
+        } else {
             if (chart.priority < menus[m].submenus[chart.submenu].priority) {
                 menus[m].submenus[chart.submenu].priority = chart.priority;
             }
@@ -1727,8 +1710,7 @@ function renderChartsAndMenu(data) {
             // set the family using a name
             if (typeof options.submenu_names[s] !== 'undefined') {
                 menus[m].submenus[s].title = s + ' (' + options.submenu_names[s] + ')';
-            }
-            else {
+            } else {
                 menu_key = (typeof (menus[m].menu_pattern) !== 'undefined') ? menus[m].menu_pattern : m;
                 menus[m].submenus[s].title = netdataDashboard.submenuTitle(menu_key, s);
             }
@@ -1745,7 +1727,7 @@ function loadJs(url, callback) {
         url: url,
         cache: true,
         dataType: "script",
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .fail(function () {
             alert('Cannot load required JS library: ' + url);
@@ -1763,8 +1745,7 @@ function loadClipboard(callback) {
     if (clipboardLoaded === false) {
         clipboardLoaded = true;
         loadJs('lib/clipboard-polyfill-be05dad.js', callback);
-    }
-    else {
+    } else {
         callback();
     }
 }
@@ -1779,8 +1760,7 @@ function loadBootstrapTable(callback) {
                 loadJs('lib/tableExport-1.6.0.min.js', callback);
             })
         });
-    }
-    else {
+    } else {
         callback();
     }
 }
@@ -1794,8 +1774,7 @@ function loadBootstrapSlider(callback) {
             NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
             callback();
         });
-    }
-    else {
+    } else {
         callback();
     }
 }
@@ -1806,8 +1785,7 @@ function loadLzString(callback) {
     if (lzStringLoaded === false) {
         lzStringLoaded = true;
         loadJs('lib/lz-string-1.4.4.min.js', callback);
-    }
-    else {
+    } else {
         callback();
     }
 }
@@ -1818,8 +1796,7 @@ function loadPako(callback) {
     if (pakoLoaded === false) {
         pakoLoaded = true;
         loadJs('lib/pako-1.0.6.min.js', callback);
-    }
-    else {
+    } else {
         callback();
     }
 }
@@ -1852,8 +1829,8 @@ function alarmsUpdateModal() {
         if (data === null) {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'failed to load alarm data!';
+                    document.getElementById('alarms_log').innerHTML =
+                        'failed to load alarm data!';
             return;
         }
 
@@ -1903,7 +1880,7 @@ function alarmsUpdateModal() {
 
             return '<code>' + alarm.lookup_method + '</code> '
                 + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, { space: '&nbsp;' }) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, { space: '&nbsp;' }) + '</code>'
+                + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, {space: '&nbsp;'}) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, {space: '&nbsp;'}) + '</code>'
                 + ((alarm.lookup_options) ? (', with options <code>' + alarm.lookup_options.replace(/ /g, ',&nbsp;') + '</code>') : '')
                 + '.';
         }
@@ -1953,8 +1930,7 @@ function alarmsUpdateModal() {
                         space: '&nbsp;',
                         negative_suffix: ''
                     });
-                }
-                else {
+                } else {
                     delay = '<small><br/>hysteresis ';
                     if (alarm.delay_up_duration > 0) {
                         delay += 'on&nbsp;escalation&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_up_duration, {
@@ -1980,9 +1956,9 @@ function alarmsUpdateModal() {
             }
 
             html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + NETDATA.seconds4human(alarm.update_every, {
-                space: '&nbsp;',
-                negative_suffix: ''
-            }) + '</td></tr>'
+                    space: '&nbsp;',
+                    negative_suffix: ''
+                }) + '</td></tr>'
                 + ((has_alarm === true) ? ('<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>') : '')
                 + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                 + '</table></td></tr>';
@@ -2027,7 +2003,7 @@ function alarmsUpdateModal() {
             // not found - this should never happen!
             if (typeof chart === 'undefined') {
                 console.log('WARNING: alarm ' + x + ' is linked to chart ' + alarm.chart + ', which is not found in the list of chart got from the server.');
-                chart = { priority: 9999999 };
+                chart = {priority: 9999999};
             }
             else if (typeof chart.menu !== 'undefined' && typeof chart.submenu !== 'undefined')
             // the family based on the chart
@@ -2164,16 +2140,16 @@ function alarmsUpdateModal() {
 
                     switch (row.status) {
                         case 'CRITICAL':
-                            return { classes: 'danger' };
+                            return {classes: 'danger'};
                             break;
                         case 'WARNING':
-                            return { classes: 'warning' };
+                            return {classes: 'warning'};
                             break;
                         case 'UNDEFINED':
-                            return { classes: 'info' };
+                            return {classes: 'info'};
                             break;
                         case 'CLEAR':
-                            return { classes: 'success' };
+                            return {classes: 'success'};
                             break;
                     }
                     return {};
@@ -2361,7 +2337,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2375,7 +2351,7 @@ function alarmsUpdateModal() {
                         formatter: function (value, row, index) {
                             void (row);
                             void (index);
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2507,7 +2483,7 @@ function alarmsUpdateModal() {
                             void (row);
                             void (index);
 
-                            return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                            return NETDATA.seconds4human(value, {negative_suffix: '', space: ' ', now: 'no time'});
                         },
                         align: 'center',
                         valign: 'middle',
@@ -2646,8 +2622,7 @@ function initializeChartsAndCustomInfo() {
                 loadCustomDashboardInfo(NETDATA.serverDefault + data.custom_info, function () {
                     initializeDynamicDashboardWithData(data);
                 });
-            }
-            else {
+            } else {
                 //console.log('not loading custom dashboard decorations from server ' + initializeConfig.url);
                 initializeDynamicDashboardWithData(data);
             }
@@ -2690,8 +2665,7 @@ function initializeDynamicDashboard(netdata_url) {
             //$("#loadOverlay").css("display","none");
             document.getElementById('netdataXssModalServer').innerText = initializeConfig.url;
             $('#xssModal').modal('show');
-        }
-        else {
+        } else {
             initializeChartsAndCustomInfo();
         }
     });
@@ -2727,7 +2701,7 @@ function getNetdataCommitId(force, callback) {
         url: 'version.txt',
         async: true,
         cache: false,
-        xhrFields: { withCredentials: true } // required for the cookie
+        xhrFields: {withCredentials: true} // required for the cookie
     })
         .done(function (data) {
             data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
@@ -2753,8 +2727,7 @@ function getNetdataCommitId(force, callback) {
                     versionLog('Cannot find the git commit id of netdata.');
                 }
                 callback(c);
-            }
-            else {
+            } else {
                 callback(null);
             }
         });
@@ -2818,16 +2791,13 @@ function notifyForUpdate(force) {
         if (sha1 === null) {
             save = false;
             versionLog('<p><big>Failed to get your netdata git commit id!</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
-        }
-        else if (sha2 === null) {
+        } else if (sha2 === null) {
             save = false;
             versionLog('<p><big>Failed to get the latest git commit id from github.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
-        }
-        else if (sha1 === sha2) {
+        } else if (sha1 === sha2) {
             save = true;
             versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
-        }
-        else {
+        } else {
             save = true;
             var compare = 'https://github.com/netdata/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
 
@@ -2914,8 +2884,7 @@ function printPage() {
 
                     if (idx > 0) {
                         update_chart(idx);
-                    }
-                    else {
+                    } else {
                         print_is_rendering = false;
                         $('#printModal').modal('hide');
                         window.print();
@@ -2978,7 +2947,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 1.9,
 
             compress: function (s) {
-                return btoa(pako.deflate(s, { to: 'string' }));
+                return btoa(pako.deflate(s, {to: 'string'}));
             },
 
             compressed_length: function (s) {
@@ -2986,7 +2955,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(atob(s), { to: 'string' });
+                return pako.inflate(atob(s), {to: 'string'});
             }
         },
 
@@ -2995,7 +2964,7 @@ var snapshotOptions = {
             bytes_per_point_disk: 3.2,
 
             compress: function (s) {
-                return pako.deflate(s, { to: 'string' });
+                return pako.deflate(s, {to: 'string'});
             },
 
             compressed_length: function (s) {
@@ -3003,7 +2972,7 @@ var snapshotOptions = {
             },
 
             uncompress: function (s) {
-                return pako.inflate(s, { to: 'string' });
+                return pako.inflate(s, {to: 'string'});
             }
         },
 
@@ -3139,8 +3108,7 @@ function loadSnapshot() {
                 urlOptions.highlight_after = tmpSnapshotData.highlight_after_ms;
                 urlOptions.highlight_before = tmpSnapshotData.highlight_before_ms;
                 urlOptions.highlight = true;
-            }
-            else {
+            } else {
                 urlOptions.highlight_after = 0;
                 urlOptions.highlight_before = 0;
                 urlOptions.highlight = false;
@@ -3233,8 +3201,7 @@ function loadSnapshotDragAndDropSetup() {
             .on('drop', function (e) {
                 if (e.originalEvent.dataTransfer.files.length) {
                     loadSnapshotPreflightFile(e.originalEvent.dataTransfer.files.item(0));
-                }
-                else {
+                } else {
                     loadSnapshotPreflightEmpty();
                     loadSnapshotModalLog('danger', 'No file selected');
                 }
@@ -3495,8 +3462,7 @@ function saveSnapshot() {
                     var cstr = compress(str);
                     saveData.data[state.chartDataUniqueID()] = cstr;
                     return compressed_length(cstr);
-                }
-                else {
+                } else {
                     return 0;
                 }
             }
@@ -3580,8 +3546,7 @@ function saveSnapshot() {
                             charts_ok++;
                             // state.log('ok');
                             size += pack_api1_v1_chart_data(state);
-                        }
-                        else {
+                        } else {
                             charts_failed++;
                             state.log('failed to be updated: ' + reason);
                         }
@@ -3590,8 +3555,7 @@ function saveSnapshot() {
 
                         if (idx > 0) {
                             update_chart(idx);
-                        }
-                        else {
+                        } else {
                             saveData.charts_ok = charts_ok;
                             saveData.charts_failed = charts_failed;
                             saveData.data_size = size;
@@ -3648,8 +3612,7 @@ function dashboardSettingsSetup() {
             if (self.prop('checked') === true) {
                 $('#settingsLocaleTempRow').show();
                 $('#settingsLocaleTimeRow').show();
-            }
-            else {
+            } else {
                 $('#settingsLocaleTempRow').hide();
                 $('#settingsLocaleTimeRow').hide();
             }
@@ -3692,8 +3655,7 @@ function dashboardSettingsSetup() {
 
         if (NETDATA.getOption('parallel_refresher') === false) {
             $('#concurrent_refreshes_row').hide();
-        }
-        else {
+        } else {
             $('#concurrent_refreshes_row').show();
         }
     };
@@ -3775,8 +3737,7 @@ function scrollDashboardTo() {
     if (netdataSnapshotData !== null && typeof netdataSnapshotData.hash !== 'undefined') {
         //console.log(netdataSnapshotData.hash);
         scrollToId(netdataSnapshotData.hash.replace('#', ''));
-    }
-    else {
+    } else {
         // check if we have to jump to a specific section
         scrollToId(urlOptions.hash.replace('#', ''));
 
@@ -3804,7 +3765,7 @@ function enableTooltipsAndPopovers() {
         animated: 'fade',
         trigger: 'hover',
         html: true,
-        delay: { show: 500, hide: 0 },
+        delay: {show: 500, hide: 0},
         container: 'body'
     });
     $('[data-toggle="popover"]').popover();
@@ -3857,8 +3818,7 @@ function runOnceOnDashboardWithjQuery() {
                     NETDATA.pause(function () {
                     });
                     netdata_paused_on_modal = true;
-                }
-                else {
+                } else {
                     netdata_paused_on_modal = false;
                 }
             }
@@ -3883,7 +3843,7 @@ function runOnceOnDashboardWithjQuery() {
 
                 // scroll to the position we had open before the modal
                 $('html, body')
-                    .animate({ scrollTop: scrollPos }, 0);
+                    .animate({scrollTop: scrollPos}, 0);
 
                 // unpause netdata, if we paused it
                 if (netdata_paused_on_modal === true) {
@@ -4040,8 +4000,8 @@ function runOnceOnDashboardWithjQuery() {
         .on('hidden.bs.modal', function () {
             document.getElementById('alarms_active').innerHTML =
                 document.getElementById('alarms_all').innerHTML =
-                document.getElementById('alarms_log').innerHTML =
-                'loading...';
+                    document.getElementById('alarms_log').innerHTML =
+                        'loading...';
         });
 
     // ------------------------------------------------------------------------
@@ -4091,16 +4051,15 @@ function runOnceOnDashboardWithjQuery() {
                 if ($this.hasClass('less')) {
                     $this.removeClass('less');
                     $this.html(config.moreText);
-                    $this.parent().prev().animate({ 'height': '0' + '%' }, 0, function () {
+                    $this.parent().prev().animate({'height': '0' + '%'}, 0, function () {
                         $this.parent().prev().prev().show();
                     }).hide(0, function () {
                         config.onLess();
                     });
-
                 } else {
                     $this.addClass('less');
                     $this.html(config.lessText);
-                    $this.parent().prev().animate({ 'height': '100' + '%' }, 0, function () {
+                    $this.parent().prev().animate({'height': '100' + '%'}, 0, function () {
                         $this.parent().prev().prev().hide();
                     }).show(0, function () {
                         config.onMore();
@@ -4148,22 +4107,24 @@ function runOnceOnDashboardWithjQuery() {
                                 }
                             }
                         }
+                        
                         if (inTag && content[i] === '>') {
                             inTag = false;
                         }
 
                         if (inTag) {
                             bag += content.charAt(i);
-                        } // Add tag name chars to the result
-                        else {
+                        } else {
+                            // Add tag name chars to the result
                             r++;
                             if (countChars <= config.showChars) {
                                 bag += content.charAt(i); // Fix to ie 7 not allowing you to reference string characters using the []
                                 countChars++;
-                            } else // Now I have the characters needed
-                            {
-                                if (openTags.length > 0) // I have unclosed tags
-                                {
+                            } else {
+                                // Now I have the characters needed
+                                if (openTags.length > 0) {
+                                    // I have unclosed tags
+
                                     //console.log('They were open tags');
                                     //console.log(openTags);
                                     for (var j = 0; j < openTags.length; j++) {
@@ -4251,8 +4212,7 @@ function finalizePage() {
             ga('create', 'UA-64295674-3', 'auto');
             ga('send', 'pageview');
         }, 2000);
-    }
-    else {
+    } else {
         notifyForUpdate();
     }
 
@@ -4316,8 +4276,7 @@ var netdataPrepCallback = function () {
 
     if (isdemo()) {
         document.getElementById('masthead').style.display = 'block';
-    }
-    else {
+    } else {
         if (urlOptions.update_always === true) {
             NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
         }
@@ -4344,19 +4303,16 @@ var selected_server_timezone = function (timezone, status) {
 
             document.getElementById('timezone_error_message').innerHTML = 'Ooops! That timezone was not accepted by your browser. Please open a github issue to help us fix it.';
             NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
-        }
-        else {
+        } else {
             if ($('#local_timezone').prop('checked')) {
                 $('#local_timezone').bootstrapToggle('off');
             }
         }
-    }
-    else if (status === true) {
+    } else if (status === true) {
         // the user wants the browser default timezone to be activated
 
         NETDATA.dateTime.init();
-    }
-    else {
+    } else {
         // the user wants the server default timezone to be activated
         //console.log('found ' + NETDATA.options.current.user_set_server_timezone);
 
