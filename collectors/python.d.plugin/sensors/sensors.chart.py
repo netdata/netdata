@@ -136,7 +136,8 @@ class Service(SimpleService):
                     for sf in sfi:
                         try:
                             vals.append(sensors.get_value(chip, sf.number))
-                        except Exception:
+                        except Exception as error:
+                            self.error('{0}: {1}'.format(sf.name, error))
                             continue
                     if not vals or vals[0] == 0:
                         continue
