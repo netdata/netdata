@@ -14,7 +14,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # default module values (can be overridden per job in `config`)
 priority = 60000
 
-
 ORDER = [
     'total_connections',
     'bytes_sent',
@@ -138,7 +137,7 @@ class Service(SimpleService):
         self.port = configuration.get('port')
         self.username = configuration.get('username')
         self.password = configuration.get('password')
-        self.timeout = configuration.get('timeout')
+        self.timeout = configuration.get('timeout', 1)
 
         self.alive = False
         self.conn = None
