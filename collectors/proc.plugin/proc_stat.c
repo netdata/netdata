@@ -261,10 +261,20 @@ struct per_core_cpuidle_chart {
     size_t cpuidle_state_len;
 };
 
-static int wake_cpu(size_t core) {
-    (void) core;
-    // TODO: run in another thread
-    // TODO: wait for the end of the job
+static void* wake_cpu_thread(void* core) {
+    pthread_t thread;
+    cpu_set_t cpu_set;
+    static size_t cpu_wakeups = 0;
+
+    CPU_ZERO(&cpu_set);
+    CPU_SET(*(int*)core, &cpu_set);
+
+    thread = pthread_self();
+    if(unlikely(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set)))
+        error("Cannot set CPU affinity");
+
+    // Make the CPU core do something
+    cpu_wakeups++;
 
     return 0;
 }
@@ -911,10 +921,17 @@ int do_proc_stat(int update_every, usec_t dt) {
     if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
         int cpu_states_updated = 0;
 
+        // proc.plugin runs on Linux systems only. Multi-platform compatibility is not needed here,
+        // so bare pthread functions are used to avoid unneeded overheads.
         for(size_t core = 0; core < cores_found; core++) {
             if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
+                pthread_t thread;
+
+                if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
+                    error("Cannot create wake_cpu_thread");
+                else if(unlikely(pthread_join(thread, NULL)))
+                    error("Cannot join wake_cpu_thread");
                 cpu_states_updated = 1;
-                wake_cpu(core);
             }
         }
 
