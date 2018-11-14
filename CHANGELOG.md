@@ -4,17 +4,18 @@
 
 **Fixed bugs:**
 
-- The cgroup-name.sh doesn't seem to work [\#4603](https://github.com/netdata/netdata/issues/4603)
+- Errors after uninstalling netdata [\#4616](https://github.com/netdata/netdata/issues/4616)
+- Sensors don`t work [\#4602](https://github.com/netdata/netdata/issues/4602)
 - smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
 - 1m\_received\_traffic\_overflow alarm is faulty on 10G or 40G network interfaces [\#4577](https://github.com/netdata/netdata/issues/4577)
 - 1.11 release reports as 1.10.0\_rolling [\#4572](https://github.com/netdata/netdata/issues/4572)
 - edit-config uses vi, even if it isn't the system editor [\#4549](https://github.com/netdata/netdata/issues/4549)
+- inbound packets dropped inbound  [\#4536](https://github.com/netdata/netdata/issues/4536)
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
 
 **Closed issues:**
 
-- How to create an alarm for one/some process in app.processes chart from apps.plugin [\#4614](https://github.com/netdata/netdata/issues/4614)
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
 - Improved management of netdata urls in the `my-netdata` menu [\#4582](https://github.com/netdata/netdata/issues/4582)
 - Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
@@ -26,6 +27,26 @@
 
 **Merged pull requests:**
 
+- Added new branding material \#4598 [\#4656](https://github.com/netdata/netdata/pull/4656) ([gmosx](https://github.com/gmosx))
+- Update README.md [\#4655](https://github.com/netdata/netdata/pull/4655) ([ktsaou](https://github.com/ktsaou))
+- Update README.md [\#4654](https://github.com/netdata/netdata/pull/4654) ([taniaab](https://github.com/taniaab))
+- properly parse network interface names with colon on them [\#4653](https://github.com/netdata/netdata/pull/4653) ([ktsaou](https://github.com/ktsaou))
+- Update README.md [\#4652](https://github.com/netdata/netdata/pull/4652) ([ktsaou](https://github.com/ktsaou))
+- sensors module fix [\#4651](https://github.com/netdata/netdata/pull/4651) ([l2isbad](https://github.com/l2isbad))
+- Add Nim back to Third-Party-Plugins.md [\#4649](https://github.com/netdata/netdata/pull/4649) ([cakrit](https://github.com/cakrit))
+- Replace wiki links in backends WALKTHROUGH.md [\#4648](https://github.com/netdata/netdata/pull/4648) ([cakrit](https://github.com/cakrit))
+- Replace Anti-DDoS demo site in proc plugin README [\#4647](https://github.com/netdata/netdata/pull/4647) ([cakrit](https://github.com/cakrit))
+- Fix custom charts links [\#4646](https://github.com/netdata/netdata/pull/4646) ([cakrit](https://github.com/cakrit))
+- Replace link to creating badges [\#4644](https://github.com/netdata/netdata/pull/4644) ([cakrit](https://github.com/cakrit))
+- Update installer/functions.sh [\#4643](https://github.com/netdata/netdata/pull/4643) ([tsingletonacic](https://github.com/tsingletonacic))
+- Configuration readme links [\#4642](https://github.com/netdata/netdata/pull/4642) ([cakrit](https://github.com/cakrit))
+- Add more charts [\#4640](https://github.com/netdata/netdata/pull/4640) ([cakrit](https://github.com/cakrit))
+- Fix documentation in beanstalk.conf. [\#4639](https://github.com/netdata/netdata/pull/4639) ([Ferroin](https://github.com/Ferroin))
+- revert to wiki version with fixed links [\#4638](https://github.com/netdata/netdata/pull/4638) ([ktsaou](https://github.com/ktsaou))
+- Minor cleanup of main.js [\#4634](https://github.com/netdata/netdata/pull/4634) ([gmosx](https://github.com/gmosx))
+- docker README: firehol -\> netdata [\#4632](https://github.com/netdata/netdata/pull/4632) ([ktsaou](https://github.com/ktsaou))
+- Fix readme [\#4631](https://github.com/netdata/netdata/pull/4631) ([ktsaou](https://github.com/ktsaou))
+- Added Dygraph and EasyPieChart info to README.md [\#4630](https://github.com/netdata/netdata/pull/4630) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#4629](https://github.com/netdata/netdata/pull/4629) ([cakrit](https://github.com/cakrit))
 - Fixes and cleanup in release pipeline [\#4625](https://github.com/netdata/netdata/pull/4625) ([paulfantom](https://github.com/paulfantom))
 - updated video [\#4620](https://github.com/netdata/netdata/pull/4620) ([ktsaou](https://github.com/ktsaou))
