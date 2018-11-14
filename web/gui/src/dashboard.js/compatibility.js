@@ -1,5 +1,6 @@
-// ------------------------------------------------------------------------
-// compatibility fixes
+// *** src/dashboard.js/compatibility.js
+
+// Compatibility fixes.
 
 // fix IE issue with console
 if (!window.console) {
@@ -28,13 +29,3 @@ if (typeof String.prototype.startsWith !== 'function') {
         return this.slice(s.length) === s;
     };
 }
-
-NETDATA.name2id = function (s) {
-    return s
-        .replace(/ /g, '_')
-        .replace(/:/g, '_')
-        .replace(/\(/g, '_')
-        .replace(/\)/g, '_')
-        .replace(/\./g, '_')
-        .replace(/\//g, '_');
-};
