@@ -281,162 +281,162 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[Spring Boot](collectors/python.d.plugin/springboot/)** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
 
 #### System Resources
-- **CPU Utilization** - total and per core CPU usage.
-- **Interrupts** - total and per core CPU interrupts.
-- **SoftIRQs** - total and per core SoftIRQs.
-- **SoftNet** - total and per core SoftIRQs related to network activity.
-- **CPU Throttling** - collects per core CPU throttling.
-- **CPU Frequency** - collects the current CPU frequency.
-- **CPU Idle** - collects the time spent per processor state.
-- **IdleJitter** - measures CPU latency.
-- **Entropy** - random numbers pool, using in cryptography.
-- **Interprocess Communication - IPC** - such as semaphores and semaphores arrays.
+- **[CPU Utilization](collectors/proc.plugin/)** - total and per core CPU usage.
+- **[Interrupts](collectors/proc.plugin/)** - total and per core CPU interrupts.
+- **[SoftIRQs](collectors/proc.plugin/)** - total and per core SoftIRQs.
+- **[SoftNet](collectors/proc.plugin/)** - total and per core SoftIRQs related to network activity.
+- **[CPU Throttling](collectors/proc.plugin/)** - collects per core CPU throttling.
+- **[CPU Frequency](collectors/python.d.plugin/couchdb/)** - collects the current CPU frequency.
+- **[CPU Idle](collectors/python.d.plugin/cpuidle/)** - collects the time spent per processor state.
+- **[IdleJitter](collectors/idlejitter.plugin/)** - measures CPU latency.
+- **[Entropy](collectors/proc.plugin/)** - random numbers pool, using in cryptography.
+- **[Interprocess Communication - IPC](collectors/proc.plugin/)** - such as semaphores and semaphores arrays.
 
 #### Memory
-- **ram** - collects info about RAM usage.
-- **swap** - collects info about swap memory usage.
-- **available memory** - collects the amount of RAM available for userspace processes.
-- **committed memory** - collects the amount of RAM committed to userspace processes.
-- **Page Faults** - collects the system page faults (major and minor).
-- **writeback memory** - collects the system dirty memory and writeback activity.
-- **huge pages** - collects the amount of RAM used for huge pages.
-- **KSM** - collects info about Kernel Same Merging (memory dedupper).
-- **Numa** - collects Numa info on systems that support it.
-- **slab** - collects info about the Linux kernel memory usage.
+- **[ram](collectors/proc.plugin/)** - collects info about RAM usage.
+- **[swap](collectors/proc.plugin/)** - collects info about swap memory usage.
+- **[available memory](collectors/proc.plugin/)** - collects the amount of RAM available for userspace processes.
+- **[committed memory](collectors/proc.plugin/)** - collects the amount of RAM committed to userspace processes.
+- **[Page Faults](collectors/proc.plugin/)** - collects the system page faults (major and minor).
+- **[writeback memory](collectors/proc.plugin/)** - collects the system dirty memory and writeback activity.
+- **[huge pages](collectors/proc.plugin/)** - collects the amount of RAM used for huge pages.
+- **[KSM](collectors/proc.plugin/)** - collects info about Kernel Same Merging (memory dedupper).
+- **[Numa](collectors/proc.plugin/)** - collects Numa info on systems that support it.
+- **[slab](collectors/proc.plugin/)** - collects info about the Linux kernel memory usage.
 
 #### Disks
-- **block devices** - per disk: I/O, operations, backlog, utilization, space, etc.  
-- **BCACHE** - detailed performance of SSD caching devices.
-- **DiskSpace** - monitors disk space usage.
-- **mdstat** - software RAID.
-- **hddtemp** - disk temperatures.
-- **smartd** - disk S.M.A.R.T. values.
-- **device mapper** - naming disks.
-- **Veritas Volume Manager** - naming disks.
-- **megacli** - adapter, physical drives and battery stats.
+- **[block devices](collectors/proc.plugin/)** - per disk: I/O, operations, backlog, utilization, space, etc.  
+- **[BCACHE](collectors/proc.plugin/)** - detailed performance of SSD caching devices.
+- **[DiskSpace](collectors/proc.plugin/)** - monitors disk space usage.
+- **[mdstat](collectors/python.d.plugin/mdstat/)** - software RAID.
+- **[hddtemp](collectors/python.d.plugin/hddtemp/)** - disk temperatures.
+- **[smartd](collectors/python.d.plugin/smartd_log/)** - disk S.M.A.R.T. values.
+- **[device mapper](collectors/proc.plugin/)** - naming disks.
+- **[Veritas Volume Manager](collectors/proc.plugin/)** - naming disks.
+- **[megacli](collectors/python.d.plugin/megacli/)** - adapter, physical drives and battery stats.
 - **[adaptec_raid](collectors/python.d.plugin/adaptec_raid/)** -  logical and physical devices health metrics.
 
 #### Filesystems
-- **BTRFS** - detailed disk space allocation and usage.
-- **Ceph** - OSD usage, Pool usage, number of objects, etc.
-- **NFS file servers and clients** - NFS v2, v3, v4: I/O, cache, read ahead, RPC calls  
-- **Samba** - performance metrics of Samba SMB2 file sharing.
-- **ZFS** - detailed performance and resource usage.
+- **[BTRFS](collectors/proc.plugin/)** - detailed disk space allocation and usage.
+- **[Ceph](collectors/python.d.plugin/ceph/)** - OSD usage, Pool usage, number of objects, etc.
+- **[NFS file servers and clients](collectors/proc.plugin/)** - NFS v2, v3, v4: I/O, cache, read ahead, RPC calls  
+- **[Samba](collectors/python.d.plugin/samba/)** - performance metrics of Samba SMB2 file sharing.
+- **[ZFS](collectors/proc.plugin/)** - detailed performance and resource usage.
 
 #### Networking
-- **Network Stack** - everything about the networking stack (both IPv4 and IPv6 for all protocols: TCP, UDP, SCTP, UDPLite, ICMP, Multicast, Broadcast, etc), and all network interfaces (per interface: bandwidth, packets, errors, drops).
-- **Netfilter** - everything about the netfilter connection tracker.
-- **SynProxy** - collects performance data about the linux SYNPROXY (DDoS).
-- **NFacct** - collects accounting data from iptables.
-- **Network QoS** - the only tool that visualizes network `tc` classes in real-time  
-- **FPing** - to measure latency and packet loss between any number of hosts.
-- **OpenVPN** - status per tunnel.
-- **ISC dhcpd** - pools utilization, leases, etc.
-- **AP** - collects Linux access point performance data (`hostapd`).
-- **SNMP** - SNMP devices can be monitored too (although you will need to configure these).
-- **port_check** - checks TCP ports for availability and response time.
-- **LibreSwan** - collects metrics per IPSEC tunnel.
+- **[Network Stack](collectors/proc.plugin/)** - everything about the networking stack (both IPv4 and IPv6 for all protocols: TCP, UDP, SCTP, UDPLite, ICMP, Multicast, Broadcast, etc), and all network interfaces (per interface: bandwidth, packets, errors, drops).
+- **[Netfilter](collectors/proc.plugin/)** - everything about the netfilter connection tracker.
+- **[SynProxy](collectors/proc.plugin/)** - collects performance data about the linux SYNPROXY (DDoS).
+- **[NFacct](collectors/nfacct.plugin/)** - collects accounting data from iptables.
+- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time  
+- **[FPing](collectors/fping.plugin/)** - to measure latency and packet loss between any number of hosts.
+- **[OpenVPN](collectors/python.d.plugin/ovpn_status_log/)** - status per tunnel.
+- **[ISC dhcpd](collectors/python.d.plugin/isc_dhcpd/)** - pools utilization, leases, etc.
+- **[AP](collectors/charts.d.plugin/ap/)** - collects Linux access point performance data (`hostapd`).
+- **[SNMP](collectors/node.d.plugin/snmp/)** - SNMP devices can be monitored too (although you will need to configure these).
+- **[port_check](collectors/python.d.plugin/portcheck/)** - checks TCP ports for availability and response time.
+- **[LibreSwan](collectors/charts.d.plugin/libreswan/)** - collects metrics per IPSEC tunnel.
 
 #### Processes
-- **System Processes** - running, blocked, forks, active.
-- **Applications** - by grouping the process tree and reporting CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets - per process group.  
-- **systemd** - monitors systemd services using CGROUPS.
+- **[System Processes](collectors/proc.plugin/)** - running, blocked, forks, active.
+- **[Applications](collectors/apps.plugin/)** - by grouping the process tree and reporting CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets - per process group.  
+- **[systemd](collectors/cgroups.plugin/)** - monitors systemd services using CGROUPS.
 
 #### Users
-- **Users and User Groups resource usage** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets
-- **logind** - collects sessions, users and seats connected.
+- **[Users and User Groups resource usage](collectors/apps.plugin/)** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets
+- **[logind](collectors/python.d.plugin/logind/)** - collects sessions, users and seats connected.
 
 #### Containers and VMs
-- **Containers** - all kinds of containers, using CGROUPS (systemd-nspawn, lxc, lxd, docker, kubernetes, etc).
-- **libvirt VMs** - all kinds of VMs, using CGROUPS.
+- **[Containers](collectors/cgroups.plugin/)** - all kinds of containers, using CGROUPS (systemd-nspawn, lxc, lxd, docker, kubernetes, etc).
+- **[libvirt VMs](collectors/cgroups.plugin/)** - all kinds of VMs, using CGROUPS.
 
 #### Web Servers
-- **Apache and lighttpd** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
-- **IPFS** - bandwidth, peers.
-- **LiteSpeed** - reads the litespeed rtreport files to collect metrics.
-- **Nginx** - `stub-status`, for multiple servers.
-- **Nginx+** - connects to multiple nginx_plus servers (local or remote) to collect real-time performance metrics.
-- **PHP-FPM** - multiple instances, each reporting connections, requests, performance, etc.
-- **Tomcat** - accesses, threads, free memory, volume, etc.
-- **web server `access.log` files** - extracting in real-time, web server and proxy performance metrics and applying several health checks, etc.
-- **http_check** - checks one or more web servers for HTTP status code and returned content.
+- **[Apache and lighttpd](collectors/python.d.plugin/apache/)** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
+- **[IPFS](python.d.plugin/ipfs/)** - bandwidth, peers.
+- **[LiteSpeed](collectors/python.d.plugin/litespeed/)** - reads the litespeed rtreport files to collect metrics.
+- **[Nginx](collectors/python.d.plugin/nginx/)** - `stub-status`, for multiple servers.
+- **[Nginx+](collectors/python.d.plugin/nginx_plus/)** - connects to multiple nginx_plus servers (local or remote) to collect real-time performance metrics.
+- **[PHP-FPM](collectors/python.d.plugin/phpfpm/)** - multiple instances, each reporting connections, requests, performance, etc.
+- **[Tomcat](collectors/python.d.plugin/tomcat/)** - accesses, threads, free memory, volume, etc.
+- **[web server `access.log` files](collectors/python.d.plugin/web_log/)** - extracting in real-time, web server and proxy performance metrics and applying several health checks, etc.
+- **[http_check](collectors/python.d.plugin/httpcheck/)** - checks one or more web servers for HTTP status code and returned content.
 
 #### Proxies, Balancers, Accelerators
-- **HAproxy** - bandwidth, sessions, backends, etc.
-- **Squid** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
-- **Traefik** - connects to multiple traefik instances (local or remote) to collect API metrics (response status code, response time, average response time and server uptime).
-- **Varnish** - threads, sessions, hits, objects, backends, etc.
-- **IPVS** - collects metrics from the Linux IPVS load balancer.
+- **[HAproxy](collectors/python.d.plugin/haproxy/)** - bandwidth, sessions, backends, etc.
+- **[Squid](collectors/python.d.plugin/squid/)** - multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests.
+- **[Traefik](collectors/python.d.plugin/traefik/)** - connects to multiple traefik instances (local or remote) to collect API metrics (response status code, response time, average response time and server uptime).
+- **[Varnish](collectors/python.d.plugin/varnish/)** - threads, sessions, hits, objects, backends, etc.
+- **[IPVS](collectors/proc.plugin/)** - collects metrics from the Linux IPVS load balancer.
 
 #### Database Servers
-- **CouchDB** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
-- **MemCached** - multiple servers, each showing: bandwidth, connections, items, etc.
-- **MongoDB** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
-- **MySQL and mariadb** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
-- **PostgreSQL** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
-- **Redis** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
-- **RethinkDB** - connects to multiple rethinkdb servers (local or remote) to collect real-time metrics.
+- **[CouchDB](collectors/python.d.plugin/couchdb/)** - reads/writes, request methods, status codes, tasks, replication, per-db, etc.
+- **[MemCached](collectors/python.d.plugin/memcached/)** - multiple servers, each showing: bandwidth, connections, items, etc.
+- **[MongoDB](collectors/python.d.plugin/mongodb/)** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
+- **[MySQL and mariadb](collectors/python.d.plugin/mysql/)** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
+- **[PostgreSQL](collectors/python.d.plugin/postgres/)** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
+- **[Redis](collectors/python.d.plugin/redis/)** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
+- **[RethinkDB](collectors/python.d.plugin/rethinkdbs/)** - connects to multiple rethinkdb servers (local or remote) to collect real-time metrics.
 
 #### Message Brokers
-- **beanstalkd** - global and per tube monitoring.
-- **RabbitMQ** - performance and health metrics.
+- **[beanstalkd](collectors/python.d.plugin/beanstalk/)** - global and per tube monitoring.
+- **[RabbitMQ](collectors/python.d.plugin/rabbitmq/)** - performance and health metrics.
 
 #### Search and Indexing
-- **ElasticSearch** - search and index performance, latency, timings, cluster statistics, threads statistics, etc.
+- **[ElasticSearch](collectors/python.d.plugin/elasticsearch/)** - search and index performance, latency, timings, cluster statistics, threads statistics, etc.
 
 #### DNS Servers
-- **bind_rndc** - parses `named.stats` dump file to collect real-time performance metrics. All versions of bind after 9.6 are supported.
-- **dnsdist** - performance and health metrics.
-- **ISC Bind (named)** - multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics. All versions of bind after 9.9.10 are supported.
-- **NSD** - queries, zones, protocols, query types, transfers, etc.
-- **PowerDNS** - queries, answers, cache, latency, etc.
-- **unbound** - performance and resource usage metrics.
-- **dns_query_time** - DNS query time statistics.
+- **[bind_rndc](collectors/python.d.plugin/bind_rndc/)** - parses `named.stats` dump file to collect real-time performance metrics. All versions of bind after 9.6 are supported.
+- **[dnsdist](collectors/python.d.plugin/dnsdist/)** - performance and health metrics.
+- **[ISC Bind (named)](collectors/node.d.plugin/named/)** - multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics. All versions of bind after 9.9.10 are supported.
+- **[NSD](collectors/python.d.plugin/nsd/)** - queries, zones, protocols, query types, transfers, etc.
+- **[PowerDNS](collectors/python.d.plugin/powerdns/)** - queries, answers, cache, latency, etc.
+- **[unbound](collectors/python.d.plugin/unbound/)** - performance and resource usage metrics.
+- **[dns_query_time](collectors/python.d.plugin/dns_query_time/)** - DNS query time statistics.
 
 #### Time Servers
-- **chrony** - uses the `chronyc` command to collect chrony statistics (Frequency, Last offset, RMS offset, Residual freq, Root delay, Root dispersion, Skew, System time).  
-- **ntpd** - connects to multiple ntpd servers (local or remote) to provide statistics of system variables and optional also peer variables.
+- **[chrony](collectors/python.d.plugin/chrony/)** - uses the `chronyc` command to collect chrony statistics (Frequency, Last offset, RMS offset, Residual freq, Root delay, Root dispersion, Skew, System time).  
+- **[ntpd](collectors/python.d.plugin/ntpd/)** - connects to multiple ntpd servers (local or remote) to provide statistics of system variables and optional also peer variables.
 
 #### Mail Servers
-- **Dovecot** - POP3/IMAP servers.
-- **Exim** - message queue (emails queued).
-- **Postfix** - message queue (entries, size).
+- **[Dovecot](collectors/python.d.plugin/dovecot/)** - POP3/IMAP servers.
+- **[Exim](collectors/python.d.plugin/exim/)** - message queue (emails queued).
+- **[Postfix](collectors/python.d.plugin/postfix/)** - message queue (entries, size).
 
 #### Hardware Sensors
-- **IPMI** - enterprise hardware sensors and events.
-- **lm-sensors** - temperature, voltage, fans, power, humidity, etc.
-- **RPi** - Raspberry Pi temperature sensors.
-- **w1sensor** - collects data from connected 1-Wire sensors.
+- **[IPMI](collectors/freeipmi.plugin/)** - enterprise hardware sensors and events.
+- **[lm-sensors](collectors/python.d.plugin/sensors/)** - temperature, voltage, fans, power, humidity, etc.
+- **[RPi](collectors/charts.d.plugin/sensors/)** - Raspberry Pi temperature sensors.
+- **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
-- **apcupsd** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **NUT** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[apcupsd](charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 
 #### Social Sharing Servers
-- **RetroShare** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
+- **[RetroShare](collectors/python.d.plugin/retroshare/)** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
 
 #### Security
-- **Fail2Ban** - monitors the fail2ban log file to check all bans for all active jails.
+- **[Fail2Ban](collectors/python.d.plugin/fail2ban/)** - monitors the fail2ban log file to check all bans for all active jails.
 
 #### Authentication, Authorization, Accounting (AAA, RADIUS, LDAP) Servers
-- **FreeRadius** - uses the `radclient` command to provide freeradius statistics (authentication, accounting, proxy-authentication, proxy-accounting).
+- **[FreeRadius](collectors/python.d.plugin/freeradius/)** - uses the `radclient` command to provide freeradius statistics (authentication, accounting, proxy-authentication, proxy-accounting).
 
 #### Telephony Servers
-- **opensips** - connects to an opensips server (localhost only) to collect real-time performance metrics.
+- **[opensips](collectors/charts.d.plugin/opensips/)** - connects to an opensips server (localhost only) to collect real-time performance metrics.
 
 #### Provisioning Systems
-- **Puppet** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
+- **[Puppet](collectors/python.d.plugin/puppet/)** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
 
 #### Household Appliances
-- **SMA webbox** - connects to multiple remote SMA webboxes to collect real-time performance metrics of the photovoltaic (solar) power generation.
-- **Fronius** - connects to multiple remote Fronius Symo servers to collect real-time performance metrics of the photovoltaic (solar) power generation.
-- **StiebelEltron** - collects the temperatures and other metrics from your Stiebel Eltron heating system using their Internet Service Gateway (ISG web).
+- **[SMA webbox](collectors/node.d.plugin/sma_webbox/)** - connects to multiple remote SMA webboxes to collect real-time performance metrics of the photovoltaic (solar) power generation.
+- **[Fronius](collectors/node.d.plugin/fronius/)** - connects to multiple remote Fronius Symo servers to collect real-time performance metrics of the photovoltaic (solar) power generation.
+- **[StiebelEltron](collectors/node.d.plugin/stiebeleltron/)** - collects the temperatures and other metrics from your Stiebel Eltron heating system using their Internet Service Gateway (ISG web).
 
 #### Game Servers
-- **SpigotMC** - monitors Spigot Minecraft server ticks per second and number of online players using the Minecraft remote console.
+- **[SpigotMC](collectors/python.d.plugin/spigotmc/)** - monitors Spigot Minecraft server ticks per second and number of online players using the Minecraft remote console.
 
 #### Distributed Computing
-- **BOINC** - monitors task states for local and remote BOINC client software using the remote GUI RPC interface. Also provides alarms for a handful of error conditions.
+- **[BOINC](collectors/python.d.plugin/boinc/)** - monitors task states for local and remote BOINC client software using the remote GUI RPC interface. Also provides alarms for a handful of error conditions.
 
 And you can extend it, by writing plugins that collect data from any source, using any computer language.  
   
