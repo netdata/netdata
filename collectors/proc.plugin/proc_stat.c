@@ -48,7 +48,7 @@ struct cpu_chart {
 
     struct per_core_single_number_file files[PER_CORE_FILES];
 
-    struct per_core_time_in_state_file time_in_state_files[PER_CORE_FILES];
+    struct per_core_time_in_state_file time_in_state_files;
 };
 
 static int keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
@@ -121,7 +121,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
     for(x = 0; x < len ; x++) {
         struct per_core_single_number_file *f = &all_cpu_charts[x].files[index];
-        struct per_core_time_in_state_file *tsf = &all_cpu_charts[x].time_in_state_files[index];
+        struct per_core_time_in_state_file *tsf = &all_cpu_charts[x].time_in_state_files;
 
         f->found = 0;
 
@@ -411,8 +411,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
 
                             if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->time_in_state_files[CPU_FREQ_INDEX].filename = strdupz(filename);
-                                cpu_chart->time_in_state_files[CPU_FREQ_INDEX].ff = NULL;
+                                cpu_chart->time_in_state_files.filename = strdupz(filename);
+                                cpu_chart->time_in_state_files.ff = NULL;
                                 do_cpu_freq = CONFIG_BOOLEAN_YES;
                                 accurate_freq_avail = 1;
                             }
