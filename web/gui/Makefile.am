@@ -152,7 +152,7 @@ dist_webimages_DATA = \
     images/ms-icon-144x144.png \
     images/ms-icon-150x150.png \
     images/ms-icon-310x310.png \
-	images/seo-performance-128.png \
+	images/banner-icon-144x144.png \
 	$(NULL)
 
 dashboard.js: $(DASHBOARD_JS_FILES)

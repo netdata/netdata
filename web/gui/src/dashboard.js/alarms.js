@@ -91,7 +91,7 @@ NETDATA.alarms = {
         let status = entry.status.toLowerCase();
         let title = name + ' = ' + value_string.toString();
         let tag = entry.alarm_id;
-        let icon = 'images/seo-performance-128.png';
+        let icon = 'images/banner-icon-144x144.png';
         let interaction = false;
         let data = entry;
         let show = true;
