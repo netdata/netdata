@@ -1480,7 +1480,7 @@ send_slack() {
         {
             "channel": "#${channel}",
             "username": "netdata on ${host}",
-            "icon_url": "${images_base_url}/images/seo-performance-128.png",
+            "icon_url": "${images_base_url}/images/banner-icon-144x144.png",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
             "attachments": [
                 {
@@ -1545,7 +1545,7 @@ send_rocketchat() {
         {
             "channel": "#${channel}",
             "alias": "netdata on ${host}",
-            "avatar": "${images_base_url}/images/seo-performance-128.png",
+            "avatar": "${images_base_url}/images/banner-icon-144x144.png",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
             "attachments": [
                 {
@@ -1684,7 +1684,7 @@ send_flock() {
         httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -d "{
             \"sendAs\": {
                 \"name\" : \"netdata on ${host}\",
-                \"profileImage\" : \"${images_base_url}/images/seo-performance-128.png\"
+                \"profileImage\" : \"${images_base_url}/images/banner-icon-144x144.png\"
             },
             \"text\": \"${host} *${status_message}*\",
             \"timestamp\": \"${when}\",
@@ -1744,7 +1744,7 @@ send_discord() {
             "channel": "#${channel}",
             "username": "${username}",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
-            "icon_url": "${images_base_url}/images/seo-performance-128.png",
+            "icon_url": "${images_base_url}/images/banner-icon-144x144.png",
             "attachments": [
                 {
                     "color": "${color}",
@@ -1758,7 +1758,7 @@ send_discord() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer_icon": "${images_base_url}/images/seo-performance-128.png",
+                    "footer_icon": "${images_base_url}/images/banner-icon-144x144.png",
                     "footer": "${this_host}",
                     "ts": ${when}
                 }
@@ -1981,7 +1981,7 @@ color="grey"
 alarm="${name//_/ } = ${value_string}"
 
 # the image of the alarm
-image="${images_base_url}/images/seo-performance-128.png"
+image="${images_base_url}/images/banner-icon-144x144.png"
 
 # prepare the title based on status
 case "${status}" in

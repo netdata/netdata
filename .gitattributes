@@ -1,0 +1,2 @@
+web/gui/images/*.png filter=lfs diff=lfs merge=lfs -text
+web/gui/images/*.ico filter=lfs diff=lfs merge=lfs -text

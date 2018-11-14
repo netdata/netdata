@@ -126,11 +126,6 @@ connectivity is not available.
     Code license: [MIT License](http://opensource.org/licenses/mit-license.html)
 
 
-- [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
-
-    Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-
-
 - [node-extend](https://github.com/justmoon/node-extend)
 
     Copyright 2014, Stefan Thomas

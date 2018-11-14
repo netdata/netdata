@@ -1,3 +1,15 @@
+// *** src/dashboard.js/utils.js
+
+NETDATA.name2id = function (s) {
+    return s
+        .replace(/ /g, '_')
+        .replace(/:/g, '_')
+        .replace(/\(/g, '_')
+        .replace(/\)/g, '_')
+        .replace(/\./g, '_')
+        .replace(/\//g, '_');
+};
+
 NETDATA.encodeURIComponent = function (s) {
     if (typeof(s) === 'string') {
         return encodeURIComponent(s);
