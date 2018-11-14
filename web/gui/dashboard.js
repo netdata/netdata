@@ -81,6 +81,18 @@ const NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
 
+// *** src/dashboard.js/utils.js
+
+NETDATA.name2id = function (s) {
+    return s
+        .replace(/ /g, '_')
+        .replace(/:/g, '_')
+        .replace(/\(/g, '_')
+        .replace(/\)/g, '_')
+        .replace(/\./g, '_')
+        .replace(/\//g, '_');
+};
+
 NETDATA.encodeURIComponent = function (s) {
     if (typeof(s) === 'string') {
         return encodeURIComponent(s);
@@ -603,8 +615,9 @@ NETDATA.errorReset = function () {
     NETDATA.errorLast.message = "You are doing fine!";
     NETDATA.errorLast.datetime = 0;
 };
-// ------------------------------------------------------------------------
-// compatibility fixes
+// *** src/dashboard.js/compatibility.js
+
+// Compatibility fixes.
 
 // fix IE issue with console
 if (!window.console) {
@@ -633,16 +646,6 @@ if (typeof String.prototype.startsWith !== 'function') {
         return this.slice(s.length) === s;
     };
 }
-
-NETDATA.name2id = function (s) {
-    return s
-        .replace(/ /g, '_')
-        .replace(/:/g, '_')
-        .replace(/\(/g, '_')
-        .replace(/\)/g, '_')
-        .replace(/\./g, '_')
-        .replace(/\//g, '_');
-};
 // ----------------------------------------------------------------------------------------------------------------
 // XSS checks
 
