@@ -601,7 +601,6 @@ function renderMachines(machinesArray) {
                 </div>`
             )
         } else {
-            el += '<li></li>';
             html += (
                 `<div class="info-item">
                     <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a> 
