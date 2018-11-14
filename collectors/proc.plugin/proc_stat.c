@@ -694,11 +694,11 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(unlikely(!st_scaling_cur_freq))
                     st_scaling_cur_freq = rrdset_create_localhost(
                             "cpu"
-                            , "scaling_cur_freq" // TODO: disable python module and rename chart
+                            , "cpufreq"
                             , NULL
                             , "cpufreq"
-                            , "cpu.scaling_cur_freq" // TODO: disable python module and rename chart
-                            , "Per CPU Core, Current CPU Scaling Frequency"
+                            , "cpufreq.cpufreq"
+                            , "Current CPU Frequency"
                             , "MHz"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_STAT_NAME
