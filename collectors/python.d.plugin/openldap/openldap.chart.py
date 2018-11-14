@@ -17,8 +17,6 @@ priority = 60000
 DEFAULT_SERVER = 'localhost'
 DEFAULT_PORT = '389'
 DEFAULT_TIMEOUT = 1
-DEFAULT_USERNAME = ''
-DEFAULT_PASSWORD = ''
 
 ORDER = [
     'total_connections',
@@ -141,8 +139,8 @@ class Service(SimpleService):
 
         self.server = configuration.get('server', DEFAULT_SERVER)
         self.port = configuration.get('port', DEFAULT_PORT)
-        self.username = configuration.get('username', DEFAULT_USERNAME)
-        self.password = configuration.get('password', DEFAULT_PASSWORD)
+        self.username = configuration.get('username', None)
+        self.password = configuration.get('password', None)
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
 
         self.alive = False
@@ -158,7 +156,8 @@ class Service(SimpleService):
         try:
             self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
-            self.conn.simple_bind(self.username, self.password)
+            if self.username and self.password:
+                self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:
             self.error(error)
             return False
@@ -196,7 +195,7 @@ class Service(SimpleService):
             try:
                 if result_type == 101:
                     val = int(result_data[0][1].values()[0][0])
-            except ( ValueError, IndexError) as error:
+            except (ValueError, IndexError) as error:
                 self.debug(error)
                 continue
 
