@@ -139,8 +139,8 @@ class Service(SimpleService):
 
         self.server = configuration.get('server', DEFAULT_SERVER)
         self.port = configuration.get('port', DEFAULT_PORT)
-        self.username = configuration.get('username', None)
-        self.password = configuration.get('password', None)
+        self.username = configuration.get('username')
+        self.password = configuration.get('password')
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
 
         self.alive = False
