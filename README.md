@@ -4,7 +4,7 @@
 
 ---
 
-**Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is based on a powerful monitoring agent you install on all your systems and containers.
+**Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a highly optimized monitoring agent you install on all your systems and containers.
 
 Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring toolchains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
 
@@ -117,7 +117,7 @@ For more information about running netdata in docker, check the [docker installa
 
 Netdata has a quite different approach to monitoring.
 
-In its simplest from, Netdata is a monitoring agent you install on all your systems. It is:
+Netdata is a monitoring agent you install on all your systems. It is:
 
 - a **metrics collector** - for system and application metrics (including web servers, databases, containers, etc)
 - a **time-series database** - all stored in memory (does not touch the disks while it runs)
@@ -277,8 +277,9 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### APM (Application Performance Monitoring)
 - **[statsd](collectors/statsd.plugin/)** - netdata is a fully featured statsd server.
-- **[go_expvar](collectors/python.d.plugin/go_expvar/)** - collects metrics exposed by applications written in the Go programming language using the expvar package.
+- **[Go expvar](collectors/python.d.plugin/go_expvar/)** - collects metrics exposed by applications written in the Go programming language using the expvar package.
 - **[Spring Boot](collectors/python.d.plugin/springboot/)** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
+- **[uWSGI](collectors/python.d.plugin/uwsgi/)** - collects performance metrics from uWSGI applications.
 
 #### System Resources
 - **[CPU Utilization](collectors/proc.plugin/)** - total and per core CPU usage.
@@ -330,12 +331,15 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[NFacct](collectors/nfacct.plugin/)** - collects accounting data from iptables.
 - **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time  
 - **[FPing](collectors/fping.plugin/)** - to measure latency and packet loss between any number of hosts.
-- **[OpenVPN](collectors/python.d.plugin/ovpn_status_log/)** - status per tunnel.
 - **[ISC dhcpd](collectors/python.d.plugin/isc_dhcpd/)** - pools utilization, leases, etc.
 - **[AP](collectors/charts.d.plugin/ap/)** - collects Linux access point performance data (`hostapd`).
 - **[SNMP](collectors/node.d.plugin/snmp/)** - SNMP devices can be monitored too (although you will need to configure these).
 - **[port_check](collectors/python.d.plugin/portcheck/)** - checks TCP ports for availability and response time.
+
+#### Virtual Private Networks
+- **[OpenVPN](collectors/python.d.plugin/ovpn_status_log/)** - collects status per tunnel.
 - **[LibreSwan](collectors/charts.d.plugin/libreswan/)** - collects metrics per IPSEC tunnel.
+- **[Tor](collectors/python.d.plugin/tor/)** - collects Tor traffic statistics.
 
 #### Processes
 - **[System Processes](collectors/proc.plugin/)** - running, blocked, forks, active.
@@ -347,8 +351,9 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[logind](collectors/python.d.plugin/logind/)** - collects sessions, users and seats connected.
 
 #### Containers and VMs
-- **[Containers](collectors/cgroups.plugin/)** - all kinds of containers, using CGROUPS (systemd-nspawn, lxc, lxd, docker, kubernetes, etc).
-- **[libvirt VMs](collectors/cgroups.plugin/)** - all kinds of VMs, using CGROUPS.
+- **[Containers](collectors/cgroups.plugin/)** - collects resource usage for all kinds of containers, using CGROUPS (systemd-nspawn, lxc, lxd, docker, kubernetes, etc).
+- **[libvirt VMs](collectors/cgroups.plugin/)** - collects resource usage for all kinds of VMs, using CGROUPS.
+- **[dockerd](collectors/python.d.plugin/dockerd/)** - collects docker health metrics.
 
 #### Web Servers
 - **[Apache and lighttpd](collectors/python.d.plugin/apache/)** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
@@ -359,7 +364,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[PHP-FPM](collectors/python.d.plugin/phpfpm/)** - multiple instances, each reporting connections, requests, performance, etc.
 - **[Tomcat](collectors/python.d.plugin/tomcat/)** - accesses, threads, free memory, volume, etc.
 - **[web server `access.log` files](collectors/python.d.plugin/web_log/)** - extracting in real-time, web server and proxy performance metrics and applying several health checks, etc.
-- **[http_check](collectors/python.d.plugin/httpcheck/)** - checks one or more web servers for HTTP status code and returned content.
+- **[HTTP check](collectors/python.d.plugin/httpcheck/)** - checks one or more web servers for HTTP status code and returned content.
 
 #### Proxies, Balancers, Accelerators
 - **[HAproxy](collectors/python.d.plugin/haproxy/)** - bandwidth, sessions, backends, etc.
@@ -373,8 +378,9 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[MemCached](collectors/python.d.plugin/memcached/)** - multiple servers, each showing: bandwidth, connections, items, etc.
 - **[MongoDB](collectors/python.d.plugin/mongodb/)** - operations, clients, transactions, cursors, connections, asserts, locks, etc.
 - **[MySQL and mariadb](collectors/python.d.plugin/mysql/)** - multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues, tmp operations, connections, binlog metrics, threads, innodb metrics, and more.
-- **[PostgreSQL](collectors/python.d.plugin/postgres/)** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.  
-- **[Redis](collectors/python.d.plugin/redis/)** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.  
+- **[PostgreSQL](collectors/python.d.plugin/postgres/)** - multiple servers, each showing: per database statistics (connections, tuples read - written - returned, transactions, locks), backend processes, indexes, tables, write ahead, background writer and more.
+- **[Proxy SQL](collectors/python.d.plugin/proxysql/)** - collects Proxy SQL backend and frontend performance metrics.
+- **[Redis](collectors/python.d.plugin/redis/)** - multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves.
 - **[RethinkDB](collectors/python.d.plugin/rethinkdbs/)** - connects to multiple rethinkdb servers (local or remote) to collect real-time metrics.
 
 #### Message Brokers
@@ -405,12 +411,14 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Hardware Sensors
 - **[IPMI](collectors/freeipmi.plugin/)** - enterprise hardware sensors and events.
 - **[lm-sensors](collectors/python.d.plugin/sensors/)** - temperature, voltage, fans, power, humidity, etc.
+- **[Nvidia](collectors/charts.d.plugin/nvidia_smi/)** - collects information for Nvidia GPUs.
 - **[RPi](collectors/charts.d.plugin/sensors/)** - Raspberry Pi temperature sensors.
 - **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
 - **[apcupsd](charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers
 - **[RetroShare](collectors/python.d.plugin/retroshare/)** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
@@ -424,9 +432,6 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Telephony Servers
 - **[opensips](collectors/charts.d.plugin/opensips/)** - connects to an opensips server (localhost only) to collect real-time performance metrics.
 
-#### Provisioning Systems
-- **[Puppet](collectors/python.d.plugin/puppet/)** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
-
 #### Household Appliances
 - **[SMA webbox](collectors/node.d.plugin/sma_webbox/)** - connects to multiple remote SMA webboxes to collect real-time performance metrics of the photovoltaic (solar) power generation.
 - **[Fronius](collectors/node.d.plugin/fronius/)** - connects to multiple remote Fronius Symo servers to collect real-time performance metrics of the photovoltaic (solar) power generation.
@@ -437,6 +442,15 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### Distributed Computing
 - **[BOINC](collectors/python.d.plugin/boinc/)** - monitors task states for local and remote BOINC client software using the remote GUI RPC interface. Also provides alarms for a handful of error conditions.
+
+#### Media Streaming Servers
+- **[IceCast](collectors/python.d.plugin/icecast/)** - collects the number of listeners for active sources.
+
+### Monitoring Systems
+- **[Monit](collectors/python.d.plugin/monit/)** - collects metrics about monit targets (filesystems, applications, networks).
+
+#### Provisioning Systems
+- **[Puppet](collectors/python.d.plugin/puppet/)** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
 
 And you can extend it, by writing plugins that collect data from any source, using any computer language.  
   
