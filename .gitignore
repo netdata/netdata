@@ -55,7 +55,7 @@ installer/.environment.sh
 *.run
 
 # netdata makeself downloads
-makeself/tmp/
+packaging/makeself/tmp/
 
 # coverity
 cov-int/

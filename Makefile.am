@@ -47,7 +47,6 @@ EXTRA_DIST = \
 
 SUBDIRS = \
 	diagrams \
-	makeself \
 	system \
 	tests \
 	$(NULL)
