@@ -17,9 +17,77 @@ import ctypes.util
 _libc = cdll.LoadLibrary(ctypes.util.find_library("c"))
 # see https://github.com/paroj/sensors.py/issues/1
 _libc.free.argtypes = [c_void_p]
+
 _hdl = cdll.LoadLibrary(ctypes.util.find_library("sensors"))
 
 version = c_char_p.in_dll(_hdl, "libsensors_version").value.decode("ascii")
+
+
+class SensorsError(Exception):
+    pass
+
+
+class ErrorWildcards(SensorsError):
+    pass
+
+
+class ErrorNoEntry(SensorsError):
+    pass
+
+
+class ErrorAccessRead(SensorsError, PermissionError):
+    pass
+
+
+class ErrorKernel(SensorError, OSError):
+    pass
+
+
+class ErrorDivZero(SensorError, ZeroDivisionError):
+    pass
+
+
+class ErrorChipName(SensorError):
+    pass
+
+
+class ErrorBusName(SensorError):
+    pass
+
+
+class ErrorParse(SensorError):
+    pass
+
+
+class ErrorAccessWrite(SensorError, PermissionError):
+    pass
+
+
+class ErrorIO(SensorError, IOError):
+    pass
+
+
+class ErrorRecursion(SensorError):
+    pass
+
+
+_ERR_MAP = {
+    1: ErrorWildcards,
+    2: ErrorNoEntry,
+    3: ErrorAccessRead,
+    4: ErrorKernel,
+    5: ErrorDivZero,
+    6: ErrorChipName,
+    7: ErrorBusName,
+    8: ErrorParse,
+    9: ErrorAccessWrite,
+    10: ErrorIO,
+    11: ErrorRecursion
+}
+
+
+def raise_sensor_error(errno, message=''):
+    raise _ERR_MAP[abs(errno)](message)
 
 
 class bus_id(Structure):
@@ -65,8 +133,8 @@ class subfeature(Structure):
 _hdl.sensors_get_detected_chips.restype = POINTER(chip_name)
 _hdl.sensors_get_features.restype = POINTER(feature)
 _hdl.sensors_get_all_subfeatures.restype = POINTER(subfeature)
-_hdl.sensors_get_label.restype = c_void_p  # return pointer instead of str so we can free it
-_hdl.sensors_get_adapter_name.restype = c_char_p  # docs do not say whether to free this or not
+_hdl.sensors_get_label.restype = c_void_p # return pointer instead of str so we can free it
+_hdl.sensors_get_adapter_name.restype = c_char_p # docs do not say whether to free this or not
 _hdl.sensors_strerror.restype = c_char_p
 
 ### RAW API ###
@@ -78,8 +146,9 @@ COMPUTE_MAPPING = 4
 def init(cfg_file=None):
     file = _libc.fopen(cfg_file.encode("utf-8"), "r") if cfg_file is not None else None
 
-    if _hdl.sensors_init(file) != 0:
-        raise Exception("sensors_init failed")
+    result = _hdl.sensors_init(file)
+    if result != 0:
+        raise_sensor_error(result, "sensors_init failed")
 
     if file is not None:
         _libc.fclose(file)
@@ -94,7 +163,7 @@ def parse_chip_name(orig_name):
     err = _hdl.sensors_parse_chip_name(orig_name.encode("utf-8"), byref(ret))
 
     if err < 0:
-        raise Exception(strerror(err))
+        raise_sensor_error(err, strerror(err))
 
     return ret
 
@@ -129,7 +198,7 @@ def chip_snprintf_name(chip, buffer_size=200):
     err = _hdl.sensors_snprintf_chip_name(ret, buffer_size, byref(chip))
 
     if err < 0:
-        raise Exception(strerror(err))
+        raise_sensor_error(err, strerror(err))
 
     return ret.value.decode("utf-8")
 
@@ -140,7 +209,7 @@ def do_chip_sets(chip):
     """
     err = _hdl.sensors_do_chip_sets(byref(chip))
     if err < 0:
-        raise Exception(strerror(err))
+        raise_sensor_error(err, strerror(err))
 
 
 def get_adapter_name(bus):
@@ -178,7 +247,7 @@ def get_value(chip, subfeature_nr):
     val = c_double()
     err = _hdl.sensors_get_value(byref(chip), subfeature_nr, byref(val))
     if err < 0:
-        raise Exception(strerror(err))
+        raise_sensor_error(err, strerror(err))
     return val.value
 
 
@@ -189,7 +258,7 @@ def set_value(chip, subfeature_nr, value):
     val = c_double(value)
     err = _hdl.sensors_set_value(byref(chip), subfeature_nr, byref(val))
     if err < 0:
-        raise Exception(strerror(err))
+        raise_sensor_error(err, strerror(err))
 
 
 ### Convenience API ###
@@ -213,7 +282,7 @@ class ChipIterator:
         if self.match is not None:
             free_chip_name(self.match)
 
-    def next(self):  # python2 compability
+    def next(self): # python2 compability
         return self.__next__()
 
 
@@ -233,7 +302,7 @@ class FeatureIterator:
 
         return feature
 
-    def next(self):  # python2 compability
+    def next(self): # python2 compability
         return self.__next__()
 
 
@@ -254,5 +323,5 @@ class SubFeatureIterator:
 
         return subfeature
 
-    def next(self):  # python2 compability
+    def next(self): # python2 compability
         return self.__next__()
