@@ -14,14 +14,6 @@ force=0
 
 source installer/.environment.sh || exit 1
 
-# make sure we have a UID
-[ -z "${UID}" ] && UID="$(id -u)"
-INSTALL_UID="${UID}"
-if [ "${INSTALL_UID}" != '${UID}' ]; then
-	echo >&2 "This script should be run as user with uid ${INSTALL_UID} but it now runs with uid ${UID}"
-	exit 1
-fi
-
 # make sure we cd to the working directory
 cd "${REINSTALL_PWD}" || exit 1
 
