@@ -56,7 +56,7 @@ BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
 
 
 MODULE_EXTENSION = '.chart.py'
-OBSOLETE_MODULES = ['apache_cache', 'gunicorn_log', 'nginx_log']
+OBSOLETE_MODULES = ['apache_cache', 'gunicorn_log', 'nginx_log', 'cpufreq']
 
 
 def module_ok(m):
