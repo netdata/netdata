@@ -192,7 +192,7 @@ See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-28449
 Please see these two links to the official netdata documentation for more information about the values:
 
 - [External plugins - charts](../../plugins.d/#chart)
-- [Chart variables](https://github.com/netdata/netdata/wiki/How-to-write-new-module#global-variables-order-and-chart)
+- [Chart variables](../#global-variables-order-and-chart)
 
 **Line definitions**
 

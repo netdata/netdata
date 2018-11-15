@@ -104,7 +104,7 @@ This is a nice view of the traffic the web server is receiving and is sending.
 
 What is important to know for this chart, is that the bandwidth used for each request and response is accounted at the time the log is written. Since [**netdata**](https://my-netdata.io/) refreshes this chart every single second, you may have unrealistic spikes is the size of the requests or responses is too big. The reason is simple: a response may have needed 1 minute to be completed, but all the bandwidth used during that minute for the specific response will be accounted at the second the log line is written.
 
-As the legend on the chart suggests, you can use FireQoS to setup QoS on the web server ports and IPs to accurately measure the bandwidth the web server is using. Actually, [there may be a few more reasons to install QoS on your servers](https://github.com/netdata/netdata/wiki/You-should-install-QoS-on-all-your-servers)...
+As the legend on the chart suggests, you can use FireQoS to setup QoS on the web server ports and IPs to accurately measure the bandwidth the web server is using. Actually, [there may be a few more reasons to install QoS on your servers](../../tc.plugin/#tcplugin)...
 
 **Bandwidth** KB/s
  * received (bandwidth of requests)

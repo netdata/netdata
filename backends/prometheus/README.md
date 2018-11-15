@@ -9,7 +9,7 @@ Prometheus is a distributed monitoring system which offers a very simple setup a
 
 ### Installing netdata
 
-There are number of ways to install netdata according to [Installation](https://github.com/netdata/netdata/wiki/Installation)  
+There are number of ways to install netdata according to [Installation](../../installer/#installation)  
 The suggested way of installing the latest netdata and keep it upgrade automatically. Using one line installation:
 
 ```

@@ -20,9 +20,9 @@ printhelp () {
 
 fix () {
 	if [ $EXECUTE -eq 0 ] ; then
-		echo "SHOULD EXECUTE: $1"
+		echo "  SHOULD EXECUTE: $1"
 	else
-		echo "EXECUTING: $1"
+		echo "  EXECUTING: $1"
 		eval "$1"
 	fi
 }
@@ -130,7 +130,7 @@ replace_wikilink () {
 		*Writing-Plugins* ) newlnk="https://github.com/netdata/netdata/tree/master/collectors/plugins.d" ;;
 		*You-should-install-QoS-on-all-your-servers* ) newlnk="https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin" ;;
 		* ) 
-			echo " WARNING: Couldn't map $wikilnk to a known replacement" 
+			echo "  WARNING: Couldn't map $wikilnk to a known replacement. Please replace by hand in $f" 
 			return
 		;;
 	esac
@@ -145,13 +145,13 @@ ck_netdata_absolute () {
 	if [ $? -eq 0 ] ; then 
 		rlnk=$(echo $alnk | sed 's/https:\/\/github.com\/netdata\/netdata\/....\/master\///g')
 		case $rlnk in
-			\#* ) dbg "(#somelink)" ;;
-			*/ ) dbg "# (path/)" ;;
-			*/#* ) dbg "# (path/#somelink)" ;;
-			*/*.md ) dbg "# (path/filename.md)" ;;
-			*/*.md#* ) dbg "# (path/filename.md#somelink)" ;;
+			\#* ) dbg "  (#somelink)" ;;
+			*/ ) dbg "  # (path/)" ;;
+			*/#* ) dbg "  # (path/#somelink)" ;;
+			*/*.md ) dbg "  # (path/filename.md)" ;;
+			*/*.md#* ) dbg "  # (path/filename.md#somelink)" ;;
 			*#* ) 
-				dbg "# (path#somelink) -> (path/#somelink)" 
+				dbg "  # (path#somelink) -> (path/#somelink)" 
 				if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 					dbg " $rlnk -> ${BASH_REMATCH[1]}/#${BASH_REMATCH[2]}"
 					rlnk="${BASH_REMATCH[1]}/#${BASH_REMATCH[2]}" 
@@ -159,9 +159,9 @@ ck_netdata_absolute () {
 				;;		
 			* )	
 				if [[ $rlnk =~ *\.[^/]* ]] ; then
-					dbg "# (path/someotherfile) ${BASH_REMATCH[1]}"
+					dbg "  # (path/someotherfile) ${BASH_REMATCH[1]}"
 				else
-					dbg "# (path) -> (path/)"
+					dbg "  # (path) -> (path/)"
 					rlnk="$rlnk/"
 				fi
 				;;
@@ -169,12 +169,12 @@ ck_netdata_absolute () {
 
 		if [[ $f =~ ^(.*)/([^/]*)$ ]] ; then
 			fpath="${BASH_REMATCH[1]}"
-			dbg " Current file is at $fpath"
+			dbg "  Current file is at $fpath"
 		fi
 		if [[ $rlnk =~ ^(.*)/([^/]*)$ ]] ; then
 			abspath="${BASH_REMATCH[1]}"
 			rest="${BASH_REMATCH[2]}"
-			dbg " Target file is at $abspath"
+			dbg "  Target file is at $abspath"
 		fi
 		relativelink=$(realpath --relative-to=$fpath $abspath)
 		
@@ -188,7 +188,7 @@ testURL () {
 	dbg " Testing URL $1"
 	curl -sS $1 > /dev/null
 	if [ $? -gt 0 ] ; then
-		echo " ERROR: $1 is a broken link"
+		echo "  ERROR: $1 is a broken link"
 		return 1
 	fi
 	return 0
@@ -199,23 +199,23 @@ testinternal () {
 	ifile=${1}
 	ilnk=${2}
 	header=$(echo $ilnk | sed 's/#/#-/g')
-	dbg " Searching for \"$header\" in $ifile"
+	dbg "  Searching for \"$header\" in $ifile"
 	found=$(cat $ifile | tr -d ',_.:?' | tr ' ' '-' | grep -i "^\#*$header\$")
 	if [ $? -eq 0 ] ; then
-		dbg " $ilnk found in $ifile"
+		dbg "  $ilnk found in $ifile"
 		return 0
 	else
-		echo " ERROR: $ilnk header not found in $ifile"
+		echo "  ERROR: $ilnk header not found in $ifile"
 		return 1
 	fi
 }
 
 testf () {
 	if [ -f "$1" ] ; then 
-		dbg " $1 exists"
+		dbg "  $1 exists"
 		return 0
 	else
-		echo " ERROR: $1 not found"
+		echo "  ERROR: $1 not found"
 		return 1
 	fi	
 }
@@ -228,7 +228,7 @@ ck_netdata_relative () {
 	if [[ $f =~ ^(.*)/([^/]*)$ ]] ; then
 		fpath="${BASH_REMATCH[1]}"
 		fname="${BASH_REMATCH[2]}"
-		dbg " Current file is at $fpath"
+		dbg "  Current file is at $fpath"
 	fi
 	# Cases to handle:
 	# (#somelink)
@@ -245,11 +245,11 @@ ck_netdata_relative () {
 
 	case "$rlnk" in
 		\#* ) 
-			dbg "# (#somelink)"
+			dbg "  # (#somelink)"
 			testinternal $f $rlnk
 			;;
 		*/ ) 
-			dbg "# (path/)"
+			dbg "  # (path/)"
 			TRGT="$fpath/$rlnk/README.md"
 			testf $TRGT
 			if [ $? -eq 0 ] ; then
@@ -257,7 +257,7 @@ ck_netdata_relative () {
 			fi
 			;;
 		*/#* )
-			dbg "# (path/#somelink)"
+			dbg "  # (path/#somelink)"
 			if [[ $rlnk =~ ^(.*)/#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}/README.md"
 				LNK="#${BASH_REMATCH[2]}"
@@ -272,7 +272,7 @@ ck_netdata_relative () {
 			fi
 			;;
 		*.md )
-			dbg "# (path/filename.md) -> htmldoc (path/filename/)"
+			dbg "  # (path/filename.md) -> htmldoc (path/filename/)"
 			testf "$fpath/$rlnk"
 			if [ $? -eq 0 ] ; then
 				if [[ $rlnk =~ ^(.*)/(.*).md$ ]] ; then
@@ -282,12 +282,11 @@ ck_netdata_relative () {
 						s="../${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/"
 					fi
 					if [ $fname != "README.md" ] ; then s="../$s"; fi
-					dbg " WARNING: Need to replace $rlnk with $s in htmldoc/src/$f"
 				fi
 			fi
 			;;
 		*/*.md#* )
-			dbg "# (path/filename.md#somelink) -> htmldoc (path/filename/#somelink)"
+			dbg "  # (path/filename.md#somelink) -> htmldoc (path/filename/#somelink)"
 			if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}"
 				LNK="#${BASH_REMATCH[2]}"
@@ -308,7 +307,7 @@ ck_netdata_relative () {
 			fi
 			;;
 		*#* )
-			dbg "# (path#somelink) -> (path/#somelink)"
+			dbg "  # (path#somelink) -> (path/#somelink)"
 			if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}/README.md"
 				LNK="#${BASH_REMATCH[2]}"
@@ -326,13 +325,13 @@ ck_netdata_relative () {
 			;;
 		* )
 			if [[ $rlnk =~ *\.[^/]* ]] ; then
-				dbg "# (path/someotherfile) ${BASH_REMATCH[1]}"
+				dbg "  # (path/someotherfile) ${BASH_REMATCH[1]}"
 				testf "$fpath/$rlnk"
 				if [ $? -eq 0 ] ; then
 					s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
 				fi
 			else
-				dbg "# (path) -> htmldoc (path/)"
+				dbg "  # (path) -> htmldoc (path/)"
 				testf "$fpath/$rlnk/README.md"
 				if [ $? -eq 0 ] ; then
 					s="$rlnk/"
@@ -343,7 +342,7 @@ ck_netdata_relative () {
 		esac
 		
 		if [[ ! -z $s ]] ; then
-			dbg " WARNING: Need to replace $rlnk with $rlnk/ in htmldoc/src/$f"
+			dbg "  WARNING: Need to replace $rlnk with $s in htmldoc/src/$f"
 			srch=$(echo $rlnk | sed 's/\//\\\//g')
 			rplc=$(echo $s | sed 's/\//\\\//g')
 			fix "sed -i 's/($srch)/($rplc)/g' htmldoc/src/$f"
@@ -353,6 +352,7 @@ ck_netdata_relative () {
 
 checklinks () {
 	f=$1
+	dbg "Checking $f"
 	while read l ; do
 		for word in $l ; do
 			if [[ $word =~ .*\]\(([^\(\) ]*)\).* ]] ; then
@@ -360,7 +360,7 @@ checklinks () {
 				dbg " $lnk"
 				case "$lnk" in
 					https://github.com/netdata/netdata/wiki* ) 
-						dbg " $lnk points to the wiki" 
+						dbg "  $lnk points to the wiki" 
 						replace_wikilink $f $lnk
 					;;
 					https://github.com/netdata/netdata/* ) 
