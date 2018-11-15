@@ -108,8 +108,7 @@ class Service(SimpleService):
                         try:
                             val = sensors.get_value(chip, sf.number)
                             break
-                        # TODO: use specific error after upstream is fixed
-                        except Exception:
+                        except sensors.SensorsError:
                             continue
                     if val is None:
                         continue
@@ -119,7 +118,7 @@ class Service(SimpleService):
                         if val < limit[0] or val > limit[1]:
                             continue
                         data[prefix + '_' + str(feature.name.decode())] = int(val * 1000)
-        except Exception as error:
+        except sensors.SensorsError as error:
             self.error(error)
             return None
 
@@ -137,8 +136,7 @@ class Service(SimpleService):
                     for sf in sfi:
                         try:
                             vals.append(sensors.get_value(chip, sf.number))
-                        # TODO: use specific error after upstream is fixed
-                        except Exception as error:
+                        except sensors.SensorsError as error:
                             self.error('{0}: {1}'.format(sf.name, error))
                             continue
                     if not vals or vals[0] == 0:
@@ -160,7 +158,7 @@ class Service(SimpleService):
     def check(self):
         try:
             sensors.init()
-        except Exception as error:
+        except sensors.SensorsError as error:
             self.error(error)
             return False
 
