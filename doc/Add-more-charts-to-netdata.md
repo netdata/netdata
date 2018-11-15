@@ -101,7 +101,7 @@ This is a map of the all supported configuration options:
 
 #### map of configuration files
 
-plugin | language | plugin<br/>configuration | modules<br/>configuration
+plugin | language | plugin<br/>configuration | modules<br/>configuration |
 ---:|:---:|:---:|:---|
 `apps.plugin`<br/>(external plugin for monitoring the process tree on Linux and FreeBSD)|`C`|`netdata.conf` section `[plugin:apps]`|Custom configuration for the processes to be monitored at `apps_groups.conf`
 `freebsd.plugin`<br/>(internal plugin for monitoring FreeBSD system resources)|`C`|`netdata.conf` section `[plugin:freebsd]`|one section for each module `[plugin:freebsd:MODULE]`. Each module may provide additional sections in the form of `[plugin:freebsd:MODULE:SUBSECTION]`.
@@ -125,11 +125,11 @@ You can add custom plugins following the [External Plugins Guide](../collectors/
 
 ---
 
-# available data collection modules
+## available data collection modules
 
 These are all the data collection plugins currently available.
 
-## Web Servers
+### Web Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -148,7 +148,7 @@ tomcat|BASH<br/>Shell Script|Connects to a tomcat server (local or remote) to co
 
 ---
 
-## Web Log Parsers
+### Web Log Parsers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -157,7 +157,7 @@ web_log|python<br/>v2 or v3|powerful plugin, capable of incrementally parsing an
 
 ---
 
-## Database Servers
+### Database Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -173,7 +173,7 @@ rethinkdb|python<br/>v2 or v3|Connects to multiple rethinkdb servers (local or r
 
 ---
 
-## Social Sharing Servers
+### Social Sharing Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -182,7 +182,7 @@ retroshare|python<br/>v2 or v3|Connects to multiple retroshare servers (local or
 
 ---
 
-## Proxy Servers
+### Proxy Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -192,7 +192,7 @@ squid|BASH<br/>Shell Script|Connects to a squid server (local or remote) to coll
 
 ---
 
-## HTTP Accelerators
+### HTTP Accelerators
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -201,7 +201,7 @@ varnish|python<br/>v2 or v3|Uses the varnishstat command to provide varnish cach
 
 ---
 
-## Search Engines
+### Search Engines
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -210,7 +210,7 @@ elasticsearch|python<br/>v2 or v3|Monitor elasticsearch performance and health m
 
 ---
 
-## Name Servers
+### Name Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -224,7 +224,7 @@ unbound|python<br/>v2 or v3|Monitors Unbound performance and resource usage metr
 
 ---
 
-## DHCP Servers
+### DHCP Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -233,7 +233,7 @@ isc dhcp|python<br/>v2 or v3|Monitor lease database to show all active leases.<b
 
 ---
 
-## Load Balancers
+### Load Balancers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -242,7 +242,7 @@ traefik|python<br/>v2 or v3|Connects to multiple traefik instances (local or rem
 
 ---
 
-## Message Brokers
+### Message Brokers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -252,7 +252,7 @@ beanstalkd|python<br/>v2 or v3|Provides server and tube level statistics.<br/>&n
 
 ---
 
-## UPS
+### UPS
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -262,7 +262,7 @@ nut|BASH<br/>Shell Script|Connects to a nut server (upsd) to collect real-time U
 
 ---
 
-## RAID
+### RAID
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -271,7 +271,7 @@ megacli|python<br/>v2 or v3|Collects adapter, physical drives and battery stats.
 
 ---
 
-## Mail Servers
+### Mail Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -284,7 +284,7 @@ postfix|BASH<br/>Shell Script|Charts the postfix queue size.<br/><br/>DEPRECATED
 
 ---
 
-## File Servers
+### File Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -295,7 +295,7 @@ samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&n
 
 ---
 
-## System
+### System
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -307,7 +307,7 @@ mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applicati
 
 ---
 
-## Sensors
+### Sensors
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -324,7 +324,7 @@ w1sensor|python<br/>v2 or v3|Collects data from connected 1-Wire sensors.<br/>&n
 
 ---
 
-## Network
+### Network
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -338,7 +338,7 @@ port|ptyhon<br />v2 or v3|Checks if a generic TCP port for its availability and 
 
 ---
 
-## Time Servers
+### Time Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -348,7 +348,7 @@ ntpd|python<br/>v2 or v3|Connects to multiple ntpd servers (local or remote) to 
 
 ---
 
-## Security
+### Security
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -359,7 +359,7 @@ fail2ban|python<br/>v2 or v3|Monitor fail2ban log file to show all bans for all 
 
 ---
 
-## Telephony Servers
+### Telephony Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -368,7 +368,7 @@ opensips|BASH<br/>Shell Script|Connects to an opensips server (local only) to co
 
 ---
 
-## Go applications
+### Go applications
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -377,7 +377,7 @@ go_expvar|python<br/>v2 or v3|Parses metrics exposed by applications written in 
 
 ---
 
-## Household Appliances
+### Household Appliances
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -388,7 +388,7 @@ stiebeleltron|node.js|Collects the temperatures and other metrics from your Stie
 
 ---
 
-## Java Processes
+### Java Processes
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -397,7 +397,7 @@ Spring Boot Application|java|Monitors running Java [Spring Boot](https://spring.
 
 ---
 
-## Provisioning Systems
+### Provisioning Systems
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -405,7 +405,7 @@ puppet|python<br/>v2 or v3|Connects to multiple Puppet Server and Puppet DB inst
 
 ---
 
-## Game Servers
+### Game Servers
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -413,7 +413,7 @@ SpigotMC|Python<br/>v2 or v3|Monitors Spigot Minecraft server ticks per second a
 
 ---
 
-## Distributed Computing Clients
+### Distributed Computing Clients
 
 application|language|notes|
 :---------:|:------:|:----|
@@ -421,7 +421,7 @@ BOINC|Python<br/>v2 or v3|Monitors task states for local and remote BOINC client
 
 ---
 
-## Skeleton Plugins
+### Skeleton Plugins
 
 application|language|notes|
 :---------:|:------:|:----|
