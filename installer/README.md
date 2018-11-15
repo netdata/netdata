@@ -342,7 +342,7 @@ When netdata is first installed, it will run as _root_. This may or may not be a
 
 1. Creat a group `netdata` via the Synology group interface. Give it no access to anything.
 2. Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata will chuid to this user when running.
-3. Change ownership of the following directories, as defined in [Netdata Security](https://github.com/netdata/netdata/wiki/netdata-security):
+3. Change ownership of the following directories, as defined in [Netdata Security](../doc/netdata-security.md#netdata-security):
 
 ```
 $ chown -R root:netdata /opt/netdata/usr/share/netdata
