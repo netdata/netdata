@@ -179,7 +179,7 @@ ck_netdata_absolute () {
 		
 		srch=$(echo $lnkinfile | sed 's/\//\\\//g')
 		rplc=$(echo $relativelink | sed 's/\//\\\//g')
-		fix "sed -i 's/$srch/$rplc/g' $f"
+		fix "sed -i 's/($srch)/($rplc)/g' $f"
 	fi
 }
 testURL () {
@@ -195,19 +195,18 @@ testURL () {
 
 testinternal () {
 	# Check if the header referred to by the internal link exists in the same file
-	f=${1}
+	ifile=${1}
 	ilnk=${2}
-	header=$(echo $ilnk | sed 's/#/# /g' | sed 's/-/\[ -\]/g')
-	dbg " Searching for \"$header\" in $f"
-	grep -i "^\#*$header\$" $f >/dev/null
+	header=$(echo $ilnk | sed 's/#/# /g' | sed 's/[-.]/\[ -\.\]/g')
+	dbg " Searching for \"$header\" in $ifile"
+	grep -i "^\#*$header\$" $ifile >/dev/null
 	if [ $? -eq 0 ] ; then
-		dbg " $ilnk found in $f"
+		dbg " $ilnk found in $ifile"
 		return 0
 	else
-		echo " ERROR: $ilnk header not found in $f"
+		echo " ERROR: $ilnk header not found in $ifile"
 		return 1
 	fi
-
 }
 
 testf () {
@@ -346,7 +345,7 @@ ck_netdata_relative () {
 			dbg " WARNING: Need to replace $rlnk with $rlnk/ in htmldoc/src/$f"
 			srch=$(echo $rlnk | sed 's/\//\\\//g')
 			rplc=$(echo $s | sed 's/\//\\\//g')
-			fix "sed -i 's/$srch/$rplc/g' htmldoc/src/$f"
+			fix "sed -i 's/($srch)/($rplc)/g' htmldoc/src/$f"
 		fi
 }
 
@@ -354,21 +353,23 @@ ck_netdata_relative () {
 checklinks () {
 	f=$1
 	while read l ; do
-		if [[ $l =~ .*\[[^\[]*\]\(([^\(\) ]*)\).* ]] ; then
-			lnk="${BASH_REMATCH[1]}"
-			dbg " $lnk"
-			case "$lnk" in
-				https://github.com/netdata/netdata/wiki* ) 
-					dbg " $lnk points to the wiki" 
-					replace_wikilink $f $lnk
-				;;
-				https://github.com/netdata/netdata/* ) 
-					ck_netdata_absolute $f $lnk $lnk
-				;;
-				http* ) testURL $lnk ;;
-				* ) ck_netdata_relative $f $lnk ;;
-			esac
-		fi
+		for word in $l ; do
+			if [[ $word =~ .*\[[^\[]*\]\(([^\(\) ]*)\).* ]] ; then
+				lnk="${BASH_REMATCH[1]}"
+				dbg " $lnk"
+				case "$lnk" in
+					https://github.com/netdata/netdata/wiki* ) 
+						dbg " $lnk points to the wiki" 
+						replace_wikilink $f $lnk
+					;;
+					https://github.com/netdata/netdata/* ) 
+						ck_netdata_absolute $f $lnk $lnk
+					;;
+					http* ) testURL $lnk ;;
+					* ) ck_netdata_relative $f $lnk ;;
+				esac
+			fi
+		done
 	done < $f
 }
 
