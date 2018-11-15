@@ -78,6 +78,7 @@ include nvidia_smi/Makefile.inc
 include nsd/Makefile.inc
 include ntpd/Makefile.inc
 include ovpn_status_log/Makefile.inc
+include openldap/Makefile.inc
 include phpfpm/Makefile.inc
 include portcheck/Makefile.inc
 include postfix/Makefile.inc
