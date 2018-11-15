@@ -173,12 +173,13 @@ ck_netdata_absolute () {
 		fi
 		if [[ $rlnk =~ ^(.*)/([^/]*)$ ]] ; then
 			abspath="${BASH_REMATCH[1]}"
+			rest="${BASH_REMATCH[2]}"
 			dbg " Target file is at $abspath"
 		fi
 		relativelink=$(realpath --relative-to=$fpath $abspath)
 		
 		srch=$(echo $lnkinfile | sed 's/\//\\\//g')
-		rplc=$(echo $relativelink | sed 's/\//\\\//g')
+		rplc=$(echo $relativelink/$rest | sed 's/\//\\\//g')
 		fix "sed -i 's/($srch)/($rplc)/g' $f"
 	fi
 }
@@ -197,9 +198,9 @@ testinternal () {
 	# Check if the header referred to by the internal link exists in the same file
 	ifile=${1}
 	ilnk=${2}
-	header=$(echo $ilnk | sed 's/#/# /g' | sed 's/[-.]/\[ -\.\]/g')
+	header=$(echo $ilnk | sed 's/#/#-/g')
 	dbg " Searching for \"$header\" in $ifile"
-	grep -i "^\#*$header\$" $ifile >/dev/null
+	found=$(cat $ifile | tr -d ',_.:?' | tr ' ' '-' | grep -i "^\#*$header\$")
 	if [ $? -eq 0 ] ; then
 		dbg " $ilnk found in $ifile"
 		return 0
@@ -354,7 +355,7 @@ checklinks () {
 	f=$1
 	while read l ; do
 		for word in $l ; do
-			if [[ $word =~ .*\[[^\[]*\]\(([^\(\) ]*)\).* ]] ; then
+			if [[ $word =~ .*\]\(([^\(\) ]*)\).* ]] ; then
 				lnk="${BASH_REMATCH[1]}"
 				dbg " $lnk"
 				case "$lnk" in
@@ -363,10 +364,10 @@ checklinks () {
 						replace_wikilink $f $lnk
 					;;
 					https://github.com/netdata/netdata/* ) 
-						ck_netdata_absolute $f $lnk $lnk
+						if [ $WIKIONLY -eq 0 ] ; then ck_netdata_absolute $f $lnk $lnk ; fi
 					;;
 					http* ) testURL $lnk ;;
-					* ) ck_netdata_relative $f $lnk ;;
+					* ) if [ $WIKIONLY -eq 0 ] ; then ck_netdata_relative $f $lnk ; fi ;;
 				esac
 			fi
 		done
@@ -378,8 +379,8 @@ TESTURLS=0
 VERBOSE=0
 RECURSIVE=0
 EXECUTE=0
-
-while getopts :f:rxuv option
+WIKIONLY=0
+while getopts :f:rxuvw option
 do
     case "$option" in
     f)
@@ -396,6 +397,9 @@ do
 		;;
 	v)
 		VERBOSE=1
+		;;
+	w)
+		WIKIONLY=1
 		;;
 	*)
 		printhelp
