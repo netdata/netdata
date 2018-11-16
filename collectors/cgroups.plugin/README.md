@@ -54,7 +54,7 @@ To provide a sane default for this setting, netdata uses the following pattern l
 	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  * 
 ```
 
-So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](https://github.com/netdata/netdata/wiki/monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
+So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
 
 
 ### enabled cgroups
