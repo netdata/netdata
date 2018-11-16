@@ -27,6 +27,13 @@
 
 **Merged pull requests:**
 
+- Update README.md [\#4674](https://github.com/netdata/netdata/pull/4674) ([ktsaou](https://github.com/ktsaou))
+- Updates in various READMEs while testing the link checker [\#4671](https://github.com/netdata/netdata/pull/4671) ([cakrit](https://github.com/cakrit))
+- Update Doc links for adding charts and alarms in sidebar. Isuue \#4650 [\#4669](https://github.com/netdata/netdata/pull/4669) ([nekkabcire](https://github.com/nekkabcire))
+- Update lm\_sensors and catch specific errors. [\#4667](https://github.com/netdata/netdata/pull/4667) ([Ferroin](https://github.com/Ferroin))
+- Fix typo in README.md [\#4665](https://github.com/netdata/netdata/pull/4665) ([mlbarrow](https://github.com/mlbarrow))
+- Update README.md [\#4663](https://github.com/netdata/netdata/pull/4663) ([taniaab](https://github.com/taniaab))
+- Fix changelog path, add all README.md files to Debian package doc [\#4657](https://github.com/netdata/netdata/pull/4657) ([runejuhl](https://github.com/runejuhl))
 - Added new branding material \#4598 [\#4656](https://github.com/netdata/netdata/pull/4656) ([gmosx](https://github.com/gmosx))
 - Update README.md [\#4655](https://github.com/netdata/netdata/pull/4655) ([ktsaou](https://github.com/ktsaou))
 - Update README.md [\#4654](https://github.com/netdata/netdata/pull/4654) ([taniaab](https://github.com/taniaab))
@@ -74,6 +81,7 @@
 - Fix badges link that leads to 404. [\#4569](https://github.com/netdata/netdata/pull/4569) ([nekkabcire](https://github.com/nekkabcire))
 - Add diagrams for internal data structures of netdata [\#4567](https://github.com/netdata/netdata/pull/4567) ([vlvkobal](https://github.com/vlvkobal))
 - Minor documentation improvements [\#4566](https://github.com/netdata/netdata/pull/4566) ([gmosx](https://github.com/gmosx))
+- Move cpufreq python module to proc plugin [\#4562](https://github.com/netdata/netdata/pull/4562) ([vlvkobal](https://github.com/vlvkobal))
 - Clarify application configuration and fix broken link [\#4554](https://github.com/netdata/netdata/pull/4554) ([JBaczuk](https://github.com/JBaczuk))
 - first tag then generate changelog [\#4553](https://github.com/netdata/netdata/pull/4553) ([paulfantom](https://github.com/paulfantom))
 - after release cleanup [\#4552](https://github.com/netdata/netdata/pull/4552) ([paulfantom](https://github.com/paulfantom))
@@ -82,6 +90,7 @@
 - add tor python module [\#4546](https://github.com/netdata/netdata/pull/4546) ([l2isbad](https://github.com/l2isbad))
 - incremental overflows should not show zeros values [\#4538](https://github.com/netdata/netdata/pull/4538) ([ktsaou](https://github.com/ktsaou))
 - smartd\_log refactor plus SCSI support [\#4523](https://github.com/netdata/netdata/pull/4523) ([l2isbad](https://github.com/l2isbad))
+- openldap monitoring plugin added [\#4513](https://github.com/netdata/netdata/pull/4513) ([ekartsonakis](https://github.com/ekartsonakis))
 - Refactoring dashboard.js, splitting monolithic file into multiple source files. [\#4496](https://github.com/netdata/netdata/pull/4496) ([gmosx](https://github.com/gmosx))
 - Switch e-mail threading to be enabled by default. [\#3780](https://github.com/netdata/netdata/pull/3780) ([Ferroin](https://github.com/Ferroin))
 
