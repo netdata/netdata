@@ -20,7 +20,7 @@ Similarly, there is [a chart that shows outbound bandwidth per class](http://lon
 
 The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, netdata interpolates it to second boundary using microsecond calculations.
 
-Let's see a few more badge examples (they come from the [netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item)):
+Let's see a few more badge examples (they come from the [netdata registry](../../../registry/)):
 
 - **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 

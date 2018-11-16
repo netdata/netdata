@@ -8,12 +8,12 @@ We have given special attention to all aspects of netdata, ensuring that everyth
 2. [your systems are safe with netdata](#your-systems-are-safe-with-netdata)
 3. [netdata is read-only](#netdata-is-read-only)
 4. [netdata viewers authentication](#netdata-viewers-authentication)
-	- [why netdata should be protected?](#why-netdata-should-be-protected)
+	- [why netdata should be protected](#why-netdata-should-be-protected)
 	- [protect netdata from the internet](#protect-netdata-from-the-internet)
 		- [expose netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
 		- [use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
 		- [other methods](#other-methods)
-5. [registry or how to not send any information to a thirdparty server](#registry-or-how-to-not-send-any-information-to-a-thirdparty-server)
+5. [registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
 ## your data are safe with netdata
 
@@ -45,7 +45,7 @@ netdata dashboards do not expose sensitive information. Business data of any kin
 
 netdata is a monitoring system. It should be protected, the same way you protect all your admin apps. We assume netdata will be installed privately, for your eyes only.
 
-### why netdata should be protected?
+### why netdata should be protected
 
 Viewers will be able to get some information about the system netdata is running. This information is everything the dashboard provides. The dashboard includes a list of the services each system runs (the legends of the charts under the `Systemd Services` section),  the applications running (the legends of the charts under the `Applications` section), the disks of the system and their names, the user accounts of the system that are running processes (the `Users` and `User Groups` section of the dashboard), the network interfaces and their names (not the IPs) and detailed information about the performance of the system and its applications.
 
@@ -89,7 +89,7 @@ In netdata v1.9+ there is also access list support, like this:
 
 #### use an authenticating web server in proxy mode
 
-Use **one nginx** (or one apache) server to provide authentication in front of **all your netdata servers**. So, you will be accessing all your netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](https://github.com/netdata/netdata/wiki/Running-behind-nginx#as-a-subfolder-for-multiple-netdata-servers-via-one-nginx).
+Use **one nginx** (or one apache) server to provide authentication in front of **all your netdata servers**. So, you will be accessing all your netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](https://github.com/netdata/netdata/blob/master/doc/Running-behind-nginx.md#netdata-via-nginx).
 
 To use this method, you should firewall protect all your netdata servers, so that only the nginx IP will allowed to directly access netdata. To do this, run this on each of your servers (or use your firewall manager):
 
@@ -151,7 +151,7 @@ Of course, there are many more methods you could use to protect netdata:
 
 ## registry or how to not send any information to a third party server
 
-The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](https://github.com/netdata/netdata/wiki/mynetdata-menu-item) ). Please be aware that if you use that public registry, you submit at least the following information to a third party server, which might violate your security policies: 
+The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](https://github.com/netdata/netdata/tree/master/registry) ). Please be aware that if you use that public registry, you submit at least the following information to a third party server, which might violate your security policies: 
 - Your public ip where the browser runs
 - The url where you open the web-ui in the browser (via http request referer)
 - The hostnames of the netdata servers

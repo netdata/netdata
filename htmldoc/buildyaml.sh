@@ -45,7 +45,7 @@ navpart () {
 echo -e 'site_name: NetData Documentation
 repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
-edit_uri: blob/htmldoc
+edit_uri: blob/master
 site_description: NetData Documentation
 copyright: NetData, 2018
 docs_dir: src

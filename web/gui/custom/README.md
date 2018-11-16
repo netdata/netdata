@@ -282,7 +282,7 @@ You can select specific dimensions using this:
      ></div>
 ```
 
-netdata supports coma (` , `) or pipe (` | `) separated [simple patterns](https://github.com/netdata/netdata/wiki/Configuration#netdata-simple-patterns) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
+netdata supports coma (` , `) or pipe (` | `) separated [simple patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
 
 ### Chart title
 
