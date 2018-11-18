@@ -16,6 +16,7 @@
 
 **Closed issues:**
 
+- Replace http URLs with https in markdown fils [\#4626](https://github.com/netdata/netdata/issues/4626)
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
 - Improved management of netdata urls in the `my-netdata` menu [\#4582](https://github.com/netdata/netdata/issues/4582)
 - Ignore web/gui/src in LGTM and Codacy checks. [\#4516](https://github.com/netdata/netdata/issues/4516)
@@ -24,9 +25,16 @@
 - Split dashboard.js into multiple files [\#4479](https://github.com/netdata/netdata/issues/4479)
 - Hdd temperature monitoring on FreeBSD [\#4463](https://github.com/netdata/netdata/issues/4463)
 - Modernize dashboard.js [\#4461](https://github.com/netdata/netdata/issues/4461)
+- Document supported python versions [\#4322](https://github.com/netdata/netdata/issues/4322)
+- Add coverity scans to Travis [\#4248](https://github.com/netdata/netdata/issues/4248)
+- Lint all shell scripts [\#4166](https://github.com/netdata/netdata/issues/4166)
+- Include tests in CI pipeline [\#4133](https://github.com/netdata/netdata/issues/4133)
+- Runfile installation doesn't fix earlier incorrect netdata init script [\#4009](https://github.com/netdata/netdata/issues/4009)
 
 **Merged pull requests:**
 
+- Update README.md [\#4683](https://github.com/netdata/netdata/pull/4683) ([taniaab](https://github.com/taniaab))
+- clone full git history for changelog generation [\#4681](https://github.com/netdata/netdata/pull/4681) ([paulfantom](https://github.com/paulfantom))
 - Update README.md [\#4674](https://github.com/netdata/netdata/pull/4674) ([ktsaou](https://github.com/ktsaou))
 - Updates in various READMEs while testing the link checker [\#4671](https://github.com/netdata/netdata/pull/4671) ([cakrit](https://github.com/cakrit))
 - Update Doc links for adding charts and alarms in sidebar. Isuue \#4650 [\#4669](https://github.com/netdata/netdata/pull/4669) ([nekkabcire](https://github.com/nekkabcire))
@@ -102,7 +110,9 @@
 - config.status: error: cannot find input file: `web/api/badges/Makefile.in' [\#4502](https://github.com/netdata/netdata/issues/4502)
 - Diskspace plugin accesses excluded filesystem and stalls netdata process [\#4491](https://github.com/netdata/netdata/issues/4491)
 - netdata allocates 170MB memory after startup \(without the database\) [\#4487](https://github.com/netdata/netdata/issues/4487)
+- Logcheck security alert: netdata : command not allowed ; TTY=unknown ; PWD=/etc/netdata ; USER=root ; COMMAND=validate [\#4473](https://github.com/netdata/netdata/issues/4473)
 - duplicate name in cgroup if dash present in container name [\#4468](https://github.com/netdata/netdata/issues/4468)
+- Wrong logos in infographic [\#4455](https://github.com/netdata/netdata/issues/4455)
 - Netdata in Docker cannot load stock config \(permission denied\) [\#4453](https://github.com/netdata/netdata/issues/4453)
 - Icecast module not working [\#4432](https://github.com/netdata/netdata/issues/4432)
 - Installer does not detect systemd on Ubuntu 14.04 [\#4421](https://github.com/netdata/netdata/issues/4421)
@@ -157,6 +167,8 @@
 - Feature request: Support for Adaptec RAID [\#4396](https://github.com/netdata/netdata/issues/4396)
 - Is there any way to diable the example chart? [\#4384](https://github.com/netdata/netdata/issues/4384)
 - modularize c source [\#4339](https://github.com/netdata/netdata/issues/4339)
+- Diff migration of Wiki updates to new documentation [\#4320](https://github.com/netdata/netdata/issues/4320)
+- Change GPL-3.0+ to GPL-3.0-or-later in all SPDX headers [\#4274](https://github.com/netdata/netdata/issues/4274)
 - How to stop some metrics to save bandwidth [\#4223](https://github.com/netdata/netdata/issues/4223)
 - UTC Timezone [\#4202](https://github.com/netdata/netdata/issues/4202)
 - stock config files should be in `/usr/lib/netdata/` [\#4182](https://github.com/netdata/netdata/issues/4182)
@@ -186,11 +198,13 @@
 - Do you have in plan to implement Megacli \(hardware RAID\) support metrics ? [\#3757](https://github.com/netdata/netdata/issues/3757)
 - Add a Safari pinned tab icon [\#3743](https://github.com/netdata/netdata/issues/3743)
 - Colors for BTRFS graphs are inconsistent [\#3719](https://github.com/netdata/netdata/issues/3719)
+- \[Information\] Adding tutorial for Netdata in HTTPS for Plesk systems [\#3717](https://github.com/netdata/netdata/issues/3717)
 - hddtemp module fails: received data doesn't have needed records [\#3683](https://github.com/netdata/netdata/issues/3683)
 - "alarm-notify.sh test" produces error exit code on success [\#3667](https://github.com/netdata/netdata/issues/3667)
 - hide one axis in dygraph [\#3654](https://github.com/netdata/netdata/issues/3654)
 - init file is not installed on Amazon Linux 2018.03 [\#3650](https://github.com/netdata/netdata/issues/3650)
 - Option to prevent netdata dashboard.js from downloading FontAwesome [\#3644](https://github.com/netdata/netdata/issues/3644)
+- FYI: Homebrew formula \(package\) of netdata for macOS  [\#3642](https://github.com/netdata/netdata/issues/3642)
 - python.d nginx module -- stub status from https server block on localhost? [\#3628](https://github.com/netdata/netdata/issues/3628)
 - mdadm mismatch\_cnt statistic/alarm [\#3622](https://github.com/netdata/netdata/issues/3622)
 - Python.d postgres unhandled exception [\#3614](https://github.com/netdata/netdata/issues/3614)
@@ -200,6 +214,7 @@
 - web\_log: response time should support summary or histgram [\#3102](https://github.com/netdata/netdata/issues/3102)
 - Alarm for big system load [\#3003](https://github.com/netdata/netdata/issues/3003)
 - Illegal instruction - Debian Stretch i586 [\#2909](https://github.com/netdata/netdata/issues/2909)
+- New documentation \[bounty\] [\#2638](https://github.com/netdata/netdata/issues/2638)
 - web\_log: support squid logs [\#2235](https://github.com/netdata/netdata/issues/2235)
 - Monitoring PHP APCu [\#2199](https://github.com/netdata/netdata/issues/2199)
 - MySQLService \(or DatabaseService\) for python.d [\#1906](https://github.com/netdata/netdata/issues/1906)
@@ -207,6 +222,7 @@
 - SCTP Information [\#1218](https://github.com/netdata/netdata/issues/1218)
 - python.d enhancements [\#692](https://github.com/netdata/netdata/issues/692)
 - feature request: pause all data processing if noone is watching the graphs [\#656](https://github.com/netdata/netdata/issues/656)
+- netdata package maintainers [\#651](https://github.com/netdata/netdata/issues/651)
 
 **Merged pull requests:**
 
