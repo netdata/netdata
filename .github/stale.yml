@@ -2,16 +2,17 @@
 only: issues
 limitPerRun: 30
 daysUntilStale: 60
-daysUntilClose: false
+daysUntilClose: 60
 exemptLabels:
   - bug
-  - "help wanted"
+  - help wanted
 exemptProjects: true
 exemptMilestones: true
-staleLabel: help wanted
+staleLabel: stale
 markComment: >
   Currently netdata team doesn't have enough capacity to work on this issue.
   We will be more than glad to accept a pull request with a solution to problem described here.
-# closeComment: >
-#   This issue has been automatically closed due to extended period of inactivity.
-#   Please reopen if it is still valid. Thank you for your contributions.
+  This issue will be closed after another 60 days of inactivity.
+closeComment: >
+  This issue has been automatically closed due to extended period of inactivity.
+  Please reopen if it is still valid. Thank you for your contributions.
