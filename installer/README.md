@@ -1,7 +1,7 @@
 # Installation
 ![image10](https://cloud.githubusercontent.com/assets/2662304/14253729/534c6f9c-fa95-11e5-8243-93eb0df719aa.gif)
 
-### Linux package managers
+## Linux package managers
 
 You can install the latest release of netdata, using your package manager in
 
@@ -13,7 +13,11 @@ You can install the latest release of netdata, using your package manager in
    - Solus Linux (`sudo eopkg install netdata`)
    - Ubuntu Linux >= 18.04 (`sudo apt install netdata`)
 
-  For security and portability reasons, this is the preferred installation method.
+Please note that the particular packages are not build by netdata.
+
+## Docker
+
+You can [Install netdata with Docker](../docker/#install-netdata-with-docker)
 
 ## Linux one liner
 
@@ -39,6 +43,7 @@ For automated installs, append a space + `--dont-wait` to the command line. You 
 ```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) all --dont-wait --dont-start-it
 ```
+
 ## Linux 64bit pre-built static binary 
 
 You can install a pre-compiled static binary of netdata for any Intel/AMD 64bit Linux system (even those that don't have a package manager, like CoreOS, CirrOS, busybox systems, etc). You can also use these packages on systems with broken or unsupported package managers.
