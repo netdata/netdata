@@ -44,7 +44,7 @@ cpufreq_create() {
 	[ $cpufreq_source_update -eq 1 ] && echo >"$TMP_DIR/cpufreq.sh" "cpufreq_update() {"
 
 	echo "CHART cpu.cpufreq '' 'CPU Clock' 'MHz' 'cpufreq' '' line $((cpufreq_priority + 1)) $cpufreq_update_every"
-	echo >>"$TMP_DIR/cpufreq.sh" 'echo "BEGIN cpu.cpufreq $1"'
+	echo >>"$TMP_DIR/cpufreq.sh" "echo \"BEGIN cpu.cpufreq \$1\""
 
 	i=0
 	for file in $(cpufreq_find_all_files "$cpufreq_sys_dir" | sort -u); do
