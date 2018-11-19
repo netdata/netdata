@@ -39,8 +39,7 @@ declare -A libreswan_tunnel_charts=()
 
 # run the ipsec command
 libreswan_ipsec() {
-	if [ ${libreswan_sudo} -ne 0 ]
-		then
+	if [ ${libreswan_sudo} -ne 0 ]; then
 		sudo -n "${IPSEC_CMD}" "${@}"
 		return $?
 	else
@@ -61,15 +60,15 @@ libreswan_get() {
 	libreswan_connected_tunnels=()
 
 	# convert the ipsec command output to a shell script
-        # and source it to get the values
-        # shellcheck disable=SC1090
+	# and source it to get the values
+	# shellcheck disable=SC1090
 	source <(
 		{
-			libreswan_ipsec whack --status;
-			libreswan_ipsec whack --trafficstatus;
+			libreswan_ipsec whack --status
+			libreswan_ipsec whack --trafficstatus
 		} | sed -n \
-				-e "s|[0-9]\+ #\([0-9]\+\): \"\(.*\)\".*IPsec SA established.*newest IPSEC.*|libreswan_connected_tunnels[\"\1\"]=\"\2\"|p" \
-				-e "s|[0-9]\+ #\([0-9]\+\): \"\(.*\)\",.* add_time=\([0-9]\+\),.* inBytes=\([0-9]\+\),.* outBytes=\([0-9]\+\).*|libreswan_traffic_in[\"\1\"]=\"\4\"; libreswan_traffic_out[\"\1\"]=\"\5\"; libreswan_established_add_time[\"\1\"]=\"\3\";|p"
+			-e "s|[0-9]\+ #\([0-9]\+\): \"\(.*\)\".*IPsec SA established.*newest IPSEC.*|libreswan_connected_tunnels[\"\1\"]=\"\2\"|p" \
+			-e "s|[0-9]\+ #\([0-9]\+\): \"\(.*\)\",.* add_time=\([0-9]\+\),.* inBytes=\([0-9]\+\),.* outBytes=\([0-9]\+\).*|libreswan_traffic_in[\"\1\"]=\"\4\"; libreswan_traffic_out[\"\1\"]=\"\5\"; libreswan_established_add_time[\"\1\"]=\"\3\";|p"
 	) || return 1
 
 	# check we got some data
@@ -88,10 +87,9 @@ libreswan_check() {
 
 	# make sure it is libreswan
 	# shellcheck disable=SC2143
-	if [ -z "$(ipsec --version | grep -i libreswan)" ]
-	then
-	    error "ipsec command is not Libreswan. Disabling Libreswan plugin."
-	    return 1
+	if [ -z "$(ipsec --version | grep -i libreswan)" ]; then
+		error "ipsec command is not Libreswan. Disabling Libreswan plugin."
+		return 1
 	fi
 
 	# check that we can collect data
@@ -125,8 +123,7 @@ EOF
 # _create is called once, to create the charts
 libreswan_create() {
 	local n
-	for n in "${!libreswan_connected_tunnels[@]}"
-	do
+	for n in "${!libreswan_connected_tunnels[@]}"; do
 		libreswan_create_one "${n}"
 	done
 	return 0
@@ -143,10 +140,10 @@ libreswan_update_one() {
 
 	[ -z "${id}" ] && libreswan_create_one "${name}"
 
-	uptime=$(( libreswan_now - libreswan_established_add_time[${n}] ))
+	uptime=$((libreswan_now - libreswan_established_add_time[${n}]))
 	[ ${uptime} -lt 0 ] && uptime=0
 
-		# write the result of the work.
+	# write the result of the work.
 	cat <<VALUESEOF
 BEGIN libreswan.${id}_net ${microseconds}
 SET in = ${libreswan_traffic_in[${n}]}
@@ -167,8 +164,7 @@ libreswan_update() {
 	libreswan_now=$(date +%s)
 
 	local n
-	for n in "${!libreswan_connected_tunnels[@]}"
-	do
+	for n in "${!libreswan_connected_tunnels[@]}"; do
 		libreswan_update_one "${n}" "${@}"
 	done
 

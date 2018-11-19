@@ -56,8 +56,7 @@ ap_check() {
 ap_create() {
 	local ssid dev
 
-	for dev in "${!ap_devs[@]}"
-	do
+	for dev in "${!ap_devs[@]}"; do
 		ssid="${ap_devs[${dev}]}"
 
 		# create the chart with 3 dimensions
@@ -99,14 +98,13 @@ ap_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	for dev in "${!ap_devs[@]}"
-	do
-	    echo
-	    echo "DEVICE ${dev}"
+	for dev in "${!ap_devs[@]}"; do
+		echo
+		echo "DEVICE ${dev}"
 		iw "${dev}" station dump
-	done | awk "
+	done | awk '
         function zero_data() {
-            dev = \"\";
+            dev = "";
             c = 0;
             rb = 0;
             tb = 0;
@@ -121,32 +119,32 @@ ap_update() {
             e = 0;
         }
         function print_device() {
-            if(dev != \"\" && length(dev) > 0) {
-                print \"BEGIN ap_clients.\" dev;
-                print \"SET clients = \" c;
-                print \"END\";
-                print \"BEGIN ap_bandwidth.\" dev;
-                print \"SET received = \" rb;
-                print \"SET sent = \" tb;
-                print \"END\";
-                print \"BEGIN ap_packets.\" dev;
-                print \"SET received = \" rp;
-                print \"SET sent = \" tp;
-                print \"END\";
-                print \"BEGIN ap_issues.\" dev;
-                print \"SET retries = \" tr;
-                print \"SET failures = \" tf;
-                print \"END\";
+            if(dev != "" && length(dev) > 0) {
+                print "BEGIN ap_clients." dev;
+                print "SET clients = " c;
+                print "END";
+                print "BEGIN ap_bandwidth." dev;
+                print "SET received = " rb;
+                print "SET sent = " tb;
+                print "END";
+                print "BEGIN ap_packets." dev;
+                print "SET received = " rp;
+                print "SET sent = " tp;
+                print "END";
+                print "BEGIN ap_issues." dev;
+                print "SET retries = " tr;
+                print "SET failures = " tf;
+                print "END";
 
                 if( c == 0 ) c = 1;
-                print \"BEGIN ap_signal.\" dev;
-                print \"SET signal = \" int(s / c);
-                print \"END\";
-                print \"BEGIN ap_bitrate.\" dev;
-                print \"SET receive = \" int(rt / c);
-                print \"SET transmit = \" int(tt / c);
-                print \"SET expected = \" int(e / c);
-                print \"END\";
+                print "BEGIN ap_signal." dev;
+                print "SET signal = " int(s / c);
+                print "END";
+                print "BEGIN ap_bitrate." dev;
+                print "SET receive = " int(rt / c);
+                print "SET transmit = " int(tt / c);
+                print "SET expected = " int(e / c);
+                print "END";
             }
             zero_data();
         }
@@ -155,28 +153,27 @@ ap_update() {
         }
         /^DEVICE / {
             print_device();
-            dev = \$2;
+            dev = $2;
         }
         /^Station/            { c++; }
-        /^[ \\t]+rx bytes:/   { rb += \$3; }
-        /^[ \\t]+tx bytes:/   { tb += \$3; }
-        /^[ \\t]+rx packets:/ { rp += \$3; }
-        /^[ \\t]+tx packets:/ { tp += \$3; }
-        /^[ \\t]+tx retries:/ { tr += \$3; }
-        /^[ \\t]+tx failed:/  { tf += \$3; }
-        /^[ \\t]+signal:/     { x = \$2; s  += x * 1000; }
-        /^[ \\t]+rx bitrate:/ { x = \$3; rt += x * 1000; }
-        /^[ \\t]+tx bitrate:/ { x = \$3; tt += x * 1000; }
-        /^[ \\t]+expected throughput:(.*)Mbps/ {
-            x=\$3;
-            sub(/Mbps/, \"\", x);
+        /^[ \t]+rx bytes:/   { rb += $3; }
+        /^[ \t]+tx bytes:/   { tb += $3; }
+        /^[ \t]+rx packets:/ { rp += $3; }
+        /^[ \t]+tx packets:/ { tp += $3; }
+        /^[ \t]+tx retries:/ { tr += $3; }
+        /^[ \t]+tx failed:/  { tf += $3; }
+        /^[ \t]+signal:/     { x = $2; s  += x * 1000; }
+        /^[ \t]+rx bitrate:/ { x = $3; rt += x * 1000; }
+        /^[ \t]+tx bitrate:/ { x = $3; tt += x * 1000; }
+        /^[ \t]+expected throughput:(.*)Mbps/ {
+            x=$3;
+            sub(/Mbps/, "", x);
             e += x * 1000;
         }
         END {
             print_device();
         }
-    "
+    '
 
 	return 0
 }
-
