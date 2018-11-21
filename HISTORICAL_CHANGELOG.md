@@ -127,7 +127,7 @@ netdata (1.6.0) - 2017-03-20
    menu on the dashboard.
 
    For more information check:
-   https://github.com/netdata/netdata/wiki/monitoring-ephemeral-nodes
+   https://github.com/netdata/netdata/tree/master/streaming#monitoring-ephemeral-nodes
 
  * monitoring ephemeral containers and VM guests
 
@@ -135,7 +135,7 @@ netdata (1.6.0) - 2017-03-20
    disk metrics, disabling automatically their alarms too.
 
    For more information check:
-   https://github.com/netdata/netdata/wiki/monitoring-ephemeral-containers
+   https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#monitoring-ephemeral-containers
 
  * apps.plugin ported for FreeBSD
 
@@ -150,7 +150,7 @@ netdata (1.6.0) - 2017-03-20
    and web sites!
 
    For more information check:
-   https://github.com/netdata/netdata/wiki/The-spectacles-of-a-web-server-log-file
+   https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/web_log#web_log
 
  * backends
 
@@ -176,7 +176,7 @@ netdata (1.6.0) - 2017-03-20
    It also supports alarms (including the number of sensors in critical state).
 
    For more information, check:
-   https://github.com/netdata/netdata/wiki/monitoring-IPMI
+   https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin
 
  * new plugins
 
@@ -446,7 +446,7 @@ netdata (1.3.0) - 2016-08-28
  required to be installed on a system to allow it work.
  For more information, please check the installation page:
 
- https://github.com/netdata/netdata/wiki/Installation
+ https://github.com/netdata/netdata/tree/master/installer#installation
 
  In detail:
 
@@ -459,7 +459,7 @@ netdata (1.3.0) - 2016-08-28
    netdata now has a poweful health monitoring system embedded.
    Please check the wiki page:
 
-   https://github.com/netdata/netdata/wiki/health-monitoring
+   https://github.com/netdata/netdata/tree/master/health
 
  * netdata has badges!
 
