@@ -45,7 +45,7 @@ For more information check the **[[Installation]]** guide.
 ## configuring `node.d.plugin`
 
 `node.d.plugin` can work even without any configuration. Its default configuration file is
-[/etc/netdata/node.d.conf](https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
+[/etc/netdata/node.d.conf](node.d.conf) (to edit it on your system run `/etc/netdata/edit-config node.d.conf`).
 
 ## configuring `node.d.plugin` modules
 
@@ -229,4 +229,4 @@ The `service` object defines a set of functions to allow you send information to
 ---
 
 *FIXME: document an operational node.d.plugin data collector - the best example is the
-[snmp collector](https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/snmp/snmp.node.js)*
+[snmp collector](snmp/snmp.node.js)*

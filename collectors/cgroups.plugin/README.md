@@ -87,7 +87,7 @@ For this mapping netdata provides 2 configuration options:
 
 The whole point for the additional pattern list, is to limit the number of times the script will be called. Without this pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
 
-The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
+The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
 
 ## Monitoring systemd services
 

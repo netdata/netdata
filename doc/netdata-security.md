@@ -89,7 +89,7 @@ In netdata v1.9+ there is also access list support, like this:
 
 #### use an authenticating web server in proxy mode
 
-Use **one nginx** (or one apache) server to provide authentication in front of **all your netdata servers**. So, you will be accessing all your netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](https://github.com/netdata/netdata/blob/master/doc/Running-behind-nginx.md#netdata-via-nginx).
+Use **one nginx** (or one apache) server to provide authentication in front of **all your netdata servers**. So, you will be accessing all your netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](Running-behind-nginx.md#netdata-via-nginx).
 
 To use this method, you should firewall protect all your netdata servers, so that only the nginx IP will allowed to directly access netdata. To do this, run this on each of your servers (or use your firewall manager):
 
@@ -151,7 +151,7 @@ Of course, there are many more methods you could use to protect netdata:
 
 ## registry or how to not send any information to a third party server
 
-The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](https://github.com/netdata/netdata/tree/master/registry) ). Please be aware that if you use that public registry, you submit at least the following information to a third party server, which might violate your security policies: 
+The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit at least the following information to a third party server, which might violate your security policies: 
 - Your public ip where the browser runs
 - The url where you open the web-ui in the browser (via http request referer)
 - The hostnames of the netdata servers
