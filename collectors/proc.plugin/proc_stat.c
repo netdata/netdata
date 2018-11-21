@@ -360,6 +360,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
     static char next_state_filename[FILENAME_MAX + 1];
     struct stat stbuf;
     struct per_core_cpuidle_chart *cc = &cpuidle_charts[core];
+    size_t state;
 
     if(unlikely(!cc->cpuidle_state_len)) {
         int stat_file_found = 1; // check at least one state
@@ -376,7 +377,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         cc->cpuidle_state = reallocz(cc->cpuidle_state, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
         memset(cc->cpuidle_state, 0, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
 
-        for(size_t state = 0; state < cc->cpuidle_state_len; state++) {
+        for(state = 0; state < cc->cpuidle_state_len; state++) {
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, state);
             cc->cpuidle_state[state].name_filename = strdupz(filename);
             cc->cpuidle_state[state].name_fd = -1;
@@ -387,7 +388,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
     }
 
-    for(size_t state = 0; state < cc->cpuidle_state_len; state++) {
+    for(state = 0; state < cc->cpuidle_state_len; state++) {
 
         struct cpuidle_state *cs = &cc->cpuidle_state[state];
 
@@ -402,7 +403,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
 
         char name_buf[50 + 1], time_buf[50 + 1];
-        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd) \
+        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd)
            && read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
             cs->name = strdupz(name_buf);
             cs->value = str2ll(time_buf, NULL);
@@ -428,10 +429,10 @@ int do_proc_stat(int update_every, usec_t dt) {
     static struct cpu_chart *all_cpu_charts = NULL;
     static size_t all_cpu_charts_size = 0;
     static procfile *ff = NULL;
-    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1, \
+    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
            do_core_throttle_count = -1, do_package_throttle_count = -1, do_cpu_freq = -1, do_cpuidle = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
-    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL, \
+    static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL,
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
     static RRDVAR *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
@@ -920,10 +921,12 @@ int do_proc_stat(int update_every, usec_t dt) {
 
     if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
         int cpu_states_updated = 0;
+        size_t core, state;
+
 
         // proc.plugin runs on Linux systems only. Multi-platform compatibility is not needed here,
         // so bare pthread functions are used to avoid unneeded overheads.
-        for(size_t core = 0; core < cores_found; core++) {
+        for(core = 0; core < cores_found; core++) {
             if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
                 pthread_t thread;
 
@@ -936,15 +939,15 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
 
         if(unlikely(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
-            for(size_t core = 0; core < cores_found; core++) {
+            for(core = 0; core < cores_found; core++) {
                 cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
 
                 int r = read_cpuidle_states(cpuidle_name_filename, cpuidle_time_filename, cpuidle_charts, core);
                 if(likely(r != -1 && (do_cpuidle == CONFIG_BOOLEAN_YES || r > 0))) {
                     do_cpuidle = CONFIG_BOOLEAN_YES;
 
-                    char cpuidle_chart_id[RRD_ID_LENGTH_MAX + 1]; 
-                    snprintfz(cpuidle_chart_id, RRD_ID_LENGTH_MAX, "new_cpu%zu_cpuidle", core);
+                    char cpuidle_chart_id[RRD_ID_LENGTH_MAX + 1];
+                    snprintfz(cpuidle_chart_id, RRD_ID_LENGTH_MAX, "cpu%zu_cpuidle", core);
 
                     if(unlikely(!cpuidle_charts[core].st)) {
                         cpuidle_charts[core].st = rrdset_create_localhost(
@@ -962,18 +965,22 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , RRDSET_TYPE_STACKED
                         );
 
-                        cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, "C0 (active)", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                        for (size_t i = 0; i < cpuidle_charts[core].cpuidle_state_len; i++) {
-                            cpuidle_charts[core].cpuidle_state[i].rd = rrddim_add(cpuidle_charts[core].st, cpuidle_charts[core].cpuidle_state[i].name, \
-                                                                                  NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                        char cpuidle_dim_id[RRD_ID_LENGTH_MAX + 1];
+                        snprintfz(cpuidle_dim_id, RRD_ID_LENGTH_MAX, "cpu%zu_active_time", core);
+                        cpuidle_charts[core].active_time_rd = rrddim_add(cpuidle_charts[core].st, cpuidle_dim_id, "C0 (active)", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                        for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {
+                            snprintfz(cpuidle_dim_id, RRD_ID_LENGTH_MAX, "cpu%zu_cpuidle_state%zu_time", core, state);
+                            cpuidle_charts[core].cpuidle_state[state].rd = rrddim_add(cpuidle_charts[core].st, cpuidle_dim_id,
+                                                                                      cpuidle_charts[core].cpuidle_state[state].name,
+                                                                                      1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                         }
                     }
                     else
                         rrdset_next(cpuidle_charts[core].st);
 
                     rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].active_time_rd, cpuidle_charts[core].active_time);
-                    for (size_t i = 0; i < cpuidle_charts[core].cpuidle_state_len; i++) {
-                        rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].cpuidle_state[i].rd, cpuidle_charts[core].cpuidle_state[i].value);
+                    for(state = 0; state < cpuidle_charts[core].cpuidle_state_len; state++) {
+                        rrddim_set_by_pointer(cpuidle_charts[core].st, cpuidle_charts[core].cpuidle_state[state].rd, cpuidle_charts[core].cpuidle_state[state].value);
                     }
                     rrdset_done(cpuidle_charts[core].st);
                 }
