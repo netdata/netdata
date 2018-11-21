@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- Sensors module of python plugin not working \(again?\) [\#4692](https://github.com/netdata/netdata/issues/4692)
+- Ubuntu 18.04 apt package is still on v1.9.0, though apt is the recommended installation method [\#4675](https://github.com/netdata/netdata/issues/4675)
 - Errors after uninstalling netdata [\#4616](https://github.com/netdata/netdata/issues/4616)
 - Sensors don`t work [\#4602](https://github.com/netdata/netdata/issues/4602)
 - smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
@@ -29,6 +31,8 @@
 **Closed issues:**
 
 - Ignores EMAIL\_SENDER [\#4695](https://github.com/netdata/netdata/issues/4695)
+- Invalid links in \*.md files [\#4672](https://github.com/netdata/netdata/issues/4672)
+- Replace all wiki links with repo links in netdata files [\#4650](https://github.com/netdata/netdata/issues/4650)
 - Replace http URLs with https in markdown fils [\#4626](https://github.com/netdata/netdata/issues/4626)
 - Extract JS and CSS from index.html [\#4586](https://github.com/netdata/netdata/issues/4586)
 - Improved management of netdata urls in the `my-netdata` menu [\#4582](https://github.com/netdata/netdata/issues/4582)
@@ -45,12 +49,18 @@
 - Include tests in CI pipeline [\#4133](https://github.com/netdata/netdata/issues/4133)
 - Runfile installation doesn't fix earlier incorrect netdata init script [\#4009](https://github.com/netdata/netdata/issues/4009)
 - http://IP:19999/lib/bootstrap-3.3.7.min.js [\#3908](https://github.com/netdata/netdata/issues/3908)
+- Netdata - Spring boot plugin [\#2074](https://github.com/netdata/netdata/issues/2074)
 - support standard deviation in reduce functions [\#808](https://github.com/netdata/netdata/issues/808)
 - web server optimization [\#532](https://github.com/netdata/netdata/issues/532)
 - Containers: running plugins in different namespaces to allow netdata collect application metrics from containers [\#474](https://github.com/netdata/netdata/issues/474)
 
 **Merged pull requests:**
 
+- Add missing quote to tc-qos-helper.sh.in [\#4703](https://github.com/netdata/netdata/pull/4703) ([drwtsn32x](https://github.com/drwtsn32x))
+- Fix broken links [\#4700](https://github.com/netdata/netdata/pull/4700) ([cakrit](https://github.com/cakrit))
+- Wiki Link Updates [\#4699](https://github.com/netdata/netdata/pull/4699) ([cakrit](https://github.com/cakrit))
+- Fix typo and py2 compatibility issue. [\#4697](https://github.com/netdata/netdata/pull/4697) ([Ferroin](https://github.com/Ferroin))
+- Update installer/README.md [\#4689](https://github.com/netdata/netdata/pull/4689) ([cakrit](https://github.com/cakrit))
 - enable issue closing with stale bot [\#4686](https://github.com/netdata/netdata/pull/4686) ([paulfantom](https://github.com/paulfantom))
 - Update README.md [\#4683](https://github.com/netdata/netdata/pull/4683) ([taniaab](https://github.com/taniaab))
 - allign code ownership [\#4682](https://github.com/netdata/netdata/pull/4682) ([paulfantom](https://github.com/paulfantom))
@@ -209,6 +219,7 @@
 - MySQL Python Plugin not work  [\#3968](https://github.com/netdata/netdata/issues/3968)
 - How to enable sensor plugin? [\#3953](https://github.com/netdata/netdata/issues/3953)
 - netdata does not appear to send host tags via graphite backend [\#3936](https://github.com/netdata/netdata/issues/3936)
+- Mongodb with ssl/keyfile does not work [\#3846](https://github.com/netdata/netdata/issues/3846)
 - Netdata breaks suspend in debian stretch [\#3842](https://github.com/netdata/netdata/issues/3842)
 - NUT ups names [\#3829](https://github.com/netdata/netdata/issues/3829)
 - New at netdata and a lot of alarms [\#3826](https://github.com/netdata/netdata/issues/3826)
