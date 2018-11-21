@@ -100,7 +100,7 @@ if [ ! -d "${fireqos_run_dir}" ]
             warning "Although FireQoS is installed on this system as '${fireqos}', I cannot find/read its installation configuration at '${fireqos_exec_dir}/install.config'."
         fi
     else
-        warning "FireQoS is not installed on this system. Use FireQoS to apply traffic QoS and expose the class names to netdata. Check https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin
+        warning "FireQoS is not installed on this system. Use FireQoS to apply traffic QoS and expose the class names to netdata. Check https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin"
     fi
 fi
 
