@@ -8,7 +8,7 @@
  - `/proc/net/stat/nf_conntrack` (connection tracking performance)
  - `/proc/net/stat/synproxy` (synproxy performance)
  - `/proc/net/ip_vs/stats` (IPVS connection statistics)
- - `/proc/stat` (CPU utilization)
+ - `/proc/stat` (CPU utilization and attributes)
  - `/proc/meminfo` (memory information)
  - `/proc/vmstat` (system performance)
  - `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS servers)
@@ -166,6 +166,47 @@ So, to disable performance metrics for all loop devices you could add `performan
 [plugin:proc:/proc/diskstats]
        performance metrics for disks with major 7 = no
 ```
+
+## Monitoring CPUs
+
+The `/proc/stat` module monitors CPU utilization, interrupts, context switches, processes started/running, thermal throttling, frequency, and idle states. It gathers this information from multiple files.
+
+If more than 50 cores are present in a system then CPU thermal throttling, frequency, and idle state charts are disabled.
+
+#### configuration
+
+`keep per core files open` option in the `[plugin:proc:/proc/stat]` configuration section allows reducing the number of file operations on multiple files.
+
+### CPU frequency
+
+The module shows the current CPU frequency as set by the `cpufreq` kernel
+module.
+
+**Requirement:**
+You need to have `CONFIG_CPU_FREQ` and (optionally) `CONFIG_CPU_FREQ_STAT`
+enabled in your kernel.
+
+`cpufreq` interface provides two different ways of getting the information through `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` and `/sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state` files. The latter is more accurate so it is preferred in the module. `scaling_cur_freq` represents only the current CPU frequency, and doesn't account for any state changes which happen between updates. The module switches back and forth between these two methods if governor is changed.
+
+It produces one chart with multiple lines (one line per core).
+
+#### configuration
+
+`scaling_cur_freq filename to monitor` and `time_in_state filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
+
+### CPU idle states
+
+The module monitors the usage of CPU idle states.
+
+**Requirement:**
+Your kernel needs to have `CONFIG_CPU_IDLE` enabled.
+
+It produces one stacked chart per CPU, showing the percentage of time spent in
+each state.
+
+#### configuration
+
+`schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
 
 ## Linux Anti-DDoS
 
