@@ -113,9 +113,9 @@ testinternal () {
 	# Check if the header referred to by the internal link exists in the same file
 	ifile=${1}
 	ilnk=${2}
-	header=$(echo $ilnk | sed 's/-//g')
+	header=${ilnk//-/}
 	dbg "-- Searching for \"$header\" in $ifile"
-	found=$(cat $ifile | tr -d ',_.:? `' | sed 's/-//g' | grep -i "^\#*$header\$")
+	tr -d ',_.:? `'< $ifile | sed 's/-//g' | grep -i "^\#*$header\$" >/dev/null
 	if [ $? -eq 0 ] ; then
 		dbg "-- $ilnk found in $ifile"
 		return 0
@@ -318,7 +318,6 @@ checklinks () {
 	done < $f
 }
 
-REPLACE=0
 TESTURLS=0
 VERBOSE=0
 RECURSIVE=0
