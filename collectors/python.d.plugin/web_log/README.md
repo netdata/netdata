@@ -197,5 +197,5 @@ alarm|description|minimum<br/>requests|warning|critical
 
 The column `minimum requests` state the minimum number of requests required for the alarm to be evaluated. We found that when the site is receiving requests above this rate, these alarms are pretty accurate (i.e. no false-positives).
 
-[**netdata**](https://my-netdata.io/) alarms are [user configurable](../../../health/health.d). So, even [`web_log` alarms can be adapted to your needs](../../../health/health.d/web_log.conf).
+[**netdata**](https://my-netdata.io/) alarms are user configurable. Sample config files can be found under directory `health/health.d` of the netdata github repository. So, even [`web_log` alarms can be adapted to your needs](../../../health/health.d/web_log.conf).
 
