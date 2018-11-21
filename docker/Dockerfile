@@ -86,7 +86,7 @@ RUN \
     addgroup -g ${NETDATA_GID} -S netdata && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
     # Apply the permissions as described in
-    # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
+    # https://github.com/netdata/netdata/tree/master/doc/netdata-security.md#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown -R root:netdata /usr/lib/netdata && \
