@@ -238,11 +238,11 @@ static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, s
 }
 
 struct cpuidle_state {
-    const char *name;
-    const char *name_filename;
+    char *name;
+    char *name_filename;
     int name_fd;
 
-    const char *time_filename;
+    char *time_filename;
     int time_fd;
 
     collected_number value;
@@ -259,6 +259,7 @@ struct per_core_cpuidle_chart {
 
     struct cpuidle_state *cpuidle_state;
     size_t cpuidle_state_len;
+    int rescan_cpu_states;
 };
 
 static void* wake_cpu_thread(void* core) {
@@ -298,8 +299,8 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
     if(unlikely(cpuidle_charts_len < cores_found)) {
         cpuidle_charts = reallocz(cpuidle_charts, sizeof(struct per_core_cpuidle_chart) * cores_found);
         *cpuidle_charts_address = cpuidle_charts;
+        memset(cpuidle_charts + cpuidle_charts_len, 0, sizeof(struct per_core_cpuidle_chart) * (cores_found - cpuidle_charts_len));
         cpuidle_charts_len = cores_found;
-        memset(cpuidle_charts, 0, sizeof(struct per_core_cpuidle_chart) * cores_found);
     }
 
     for(l = 0; l < lines ;l++) {
@@ -362,19 +363,40 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
     struct per_core_cpuidle_chart *cc = &cpuidle_charts[core];
     size_t state;
 
-    if(unlikely(!cc->cpuidle_state_len)) {
-        int stat_file_found = 1; // check at least one state
+    if(unlikely(!cc->cpuidle_state_len || cc->rescan_cpu_states)) {
+        int state_file_found = 1; // check at least one state
 
-        while(likely(stat_file_found)) {
+        if(cc->cpuidle_state_len){
+            for(state = 0; state < cc->cpuidle_state_len; state++) {
+                freez(cc->cpuidle_state[state].name);
+
+                freez(cc->cpuidle_state[state].name_filename);
+                close(cc->cpuidle_state[state].name_fd);
+                cc->cpuidle_state[state].name_fd = -1;
+
+                freez(cc->cpuidle_state[state].time_filename);
+                close(cc->cpuidle_state[state].time_fd);
+                cc->cpuidle_state[state].time_fd = -1;
+            }
+
+            freez(cc->cpuidle_state);
+            cc->cpuidle_state = NULL;
+            cc->cpuidle_state_len = 0;
+
+            cc->active_time_rd = NULL;
+            cc->st = NULL;
+        }
+
+        while(likely(state_file_found)) {
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
             if (stat(filename, &stbuf) == 0)
                 cc->cpuidle_state_len++;
             else
-                stat_file_found = 0;
+                state_file_found = 0;
         }
         snprintfz(next_state_filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
 
-        cc->cpuidle_state = reallocz(cc->cpuidle_state, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
+        cc->cpuidle_state = callocz(cc->cpuidle_state_len, sizeof(struct cpuidle_state));
         memset(cc->cpuidle_state, 0, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
 
         for(state = 0; state < cc->cpuidle_state_len; state++) {
@@ -386,6 +408,8 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
             cc->cpuidle_state[state].time_filename = strdupz(filename);
             cc->cpuidle_state[state].time_fd = -1;
         }
+
+        cc->rescan_cpu_states = 0;
     }
 
     for(state = 0; state < cc->cpuidle_state_len; state++) {
@@ -397,7 +421,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
             cs->time_fd = open(cs->time_filename, O_RDONLY);
             if (unlikely(cs->name_fd == -1 || cs->time_fd == -1)) {
                 error("Cannot open files '%s' and '%s'", cs->name_filename, cs->time_filename);
-                cc->cpuidle_state_len = 0;
+                cc->rescan_cpu_states = 1;
                 return 1;
             }
         }
@@ -405,18 +429,21 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         char name_buf[50 + 1], time_buf[50 + 1];
         if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd)
            && read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
-            cs->name = strdupz(name_buf);
+            if(!cs->name || strncmp(cs->name, name_buf, 50)) {
+                freez(cs->name);
+                cs->name = strdupz(name_buf);
+            }
             cs->value = str2ll(time_buf, NULL);
         }
         else {
-            cc->cpuidle_state_len = 0;
+            cc->rescan_cpu_states = 1;
             return 1;
         }
     }
 
     // check if the number of states was increased
     if(unlikely(stat(next_state_filename, &stbuf) == 0)) {
-        cc->cpuidle_state_len = 0;
+        cc->rescan_cpu_states = 1;
         return 1;
     }
 
