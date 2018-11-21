@@ -37,7 +37,7 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 ## alarms
 
 netdata will automatically attach a few alarms for each host.
-Check the [latest versions of the fping alarms](https://github.com/netdata/netdata/blob/master/health/health.d/fping.conf)
+Check the [latest versions of the fping alarms](../../health/health.d/fping.conf)
 
 ## Additional Tips 
 

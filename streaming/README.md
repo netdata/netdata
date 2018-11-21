@@ -100,7 +100,7 @@ this host).
 
 ### streaming configuration
 
-A new file is introduced: [stream.conf](https://github.com/netdata/netdata/tree/master/streaming/stream.conf) (to edit it on your system run
+A new file is introduced: [stream.conf](stream.conf) (to edit it on your system run
 `/etc/netdata/edit-config stream.conf`). This file holds streaming configuration for both the
 sending and the receiving netdata.
 
@@ -404,7 +404,7 @@ When they maintain a database, they can also run health checks (alarms and notif
 for the remote host that is streaming the metrics.
 
 To configure a proxy, configure it as a receiving and a sending netdata at the same time,
-using [stream.conf](https://github.com/netdata/netdata/tree/master/streaming/stream.conf).
+using [stream.conf](stream.conf).
 
 The sending side of a netdata proxy, connects and disconnects to the final destination of the
 metrics, following the same pattern of the receiving side.

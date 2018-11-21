@@ -7,7 +7,7 @@ for every process found running.
 
 Since netdata needs to present this information in charts and track them through time,
 instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
-to which it assigns all running processes. This list is [customizable](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf) and netdata
+to which it assigns all running processes. This list is [customizable](apps_groups.conf) and netdata
 ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 
 So, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
@@ -15,7 +15,7 @@ processes together (evaluating both child and parent processes) so that the resu
 a predefined set of members (of course, only process groups found running are reported).
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
-> glad to accept pull requests improving the [defaults](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf) shipped with netdata.
+> glad to accept pull requests improving the [defaults](apps_groups.conf) shipped with netdata.
 
 Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
 utilization of exit processes. Their utilization is accounted at their currently running parents.
@@ -55,7 +55,7 @@ Each of these sections provides the same number of charts:
 
 The above are reported:
 
-- For **Applications** per [target configured](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf).
+- For **Applications** per [target configured](apps_groups.conf).
 - For **Users** per username or UID (when the username is not available).
 - For **User Groups** per groupname or GID (when groupname is not available).
 
@@ -85,7 +85,7 @@ its CPU resources will be cut in half, and data collection will be once every 2 
 
 ## Configuration
 
-The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf)).
+The configuration file is `/etc/netdata/apps_groups.conf` (the default is [here](apps_groups.conf)).
 To edit it on your system run `/etc/netdata/edit-config apps_groups.conf`.
 
 The configuration file works accepts multiple lines, each having this format:
@@ -341,7 +341,7 @@ So, the `ssh` session is using 95% CPU time.
 Why `ssh`?
 
 `apps.plugin` groups all processes based on its configuration file
-[`/etc/netdata/apps_groups.conf`](https://github.com/netdata/netdata/tree/master/collectors/apps.plugin/apps_groups.conf)
+[`/etc/netdata/apps_groups.conf`](apps_groups.conf)
 (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 The default configuration has nothing for `bash`, but it has for `sshd`, so netdata accumulates
 all ssh sessions to a dimension on the charts, called `ssh`. This includes all the processes in
