@@ -12,7 +12,6 @@ We’re extremely grateful for security researchers and users that report vulner
 
 To make a report, please email the private [security@netdata.cloud](mailto:security@netdata.cloud) list with the security details and the details expected for [all netdata bug reports](../.github/ISSUE_TEMPLATE/bug_report.md).
 
-
 ## When Should I Report a Vulnerability?
 
 - You think you discovered a potential security vulnerability in Netdata
