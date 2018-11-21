@@ -47,6 +47,4 @@ Otherwise you can just push the results; the script outputs the required
 instructions upon success.
 
 Once pushed the infrastructure will build a set of tar-files on the server.
-For information on how to verify, sign and make these available, see:
-
-    https://github.com/firehol/infrastructure/raw/master/doc/release.txt
+For information on how to verify, sign and make these available, see [here](https://github.com/firehol/infrastructure#firehol-infrastructure)
