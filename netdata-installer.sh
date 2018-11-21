@@ -930,7 +930,7 @@ Update check on the dashboard, will not work.
 If you want to have version update check, please re-install it
 following the procedure in:
 
-https://github.com/netdata/netdata/wiki/Installation
+https://github.com/netdata/netdata/tree/master/installer#installation
 
 VERMSG
 fi
