@@ -10,7 +10,7 @@ This agreement is part of the legal framework of the open-source ecosystem
 that adds some red tape, but protects both the contributor and the project.
 
 To understand why this is needed, please read [a well-written chapter from
-Karl Fogel’s Producing Open Source Software on CLAs](http://producingoss.com/en/copyright-assignment.html).
+Karl Fogel’s Producing Open Source Software on CLAs](https://producingoss.com/en/copyright-assignment.html).
 
 By signing this agreement, you do not change your rights to use your own
 contributions for any other purpose.
