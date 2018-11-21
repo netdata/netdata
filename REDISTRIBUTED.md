@@ -31,7 +31,7 @@ connectivity is not available.
 - [Gauge.js](http://bernii.github.io/gauge.js/)
 
     Copyright, Bernard Kobos
-    [MIT License](http://bernii.github.io/gauge.js/)
+    [MIT License](https://github.com/getgauge/gauge-js/blob/master/LICENSE)
 
 
 - [d3pie](https://github.com/benkeen/d3pie)
@@ -85,7 +85,7 @@ connectivity is not available.
 - [Bootstrap](http://getbootstrap.com/getting-started/)
 
     Copyright 2015, Twitter
-    [MIT License](http://getbootstrap.com/getting-started/#license-faqs)
+    [MIT License](https://github.com/twbs/bootstrap/blob/v4-dev/LICENSE)
 
 
 - [Bootstrap Toggle](http://www.bootstraptoggle.com/)
@@ -109,7 +109,7 @@ connectivity is not available.
 - [tableExport.jquery.plugin](https://github.com/hhurz/tableExport.jquery.plugin)
 
     Copyright (c) 2015,2016 hhurz
-    [MIT License](http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js)
+    [MIT License](https://github.com/hhurz/tableExport.jquery.plugin/blob/master/LICENSE)
 
 
 - [perfect-scrollbar](https://jamesflorentino.github.io/nanoScrollerJS/)
@@ -135,20 +135,20 @@ connectivity is not available.
 - [node-net-snmp](https://github.com/stephenwvickers/node-net-snmp)
 
     Copyright 2013, Stephen Vickers
-    [MIT License](https://github.com/stephenwvickers/node-net-snmp)
+    [MIT License](https://github.com/nospaceships/node-net-snmp#license)
 
 
 - [node-asn1-ber](https://github.com/stephenwvickers/node-asn1-ber)
 
     Copyright 2017, Stephen Vickers
     Copyright 2011, Mark Cavage
-    [MIT License](https://github.com/stephenwvickers/node-asn1-ber)
+    [MIT License](https://github.com/nospaceships/node-asn1-ber#license)
 
 
 - [pixl-xml](https://github.com/jhuckaby/pixl-xml)
 
     Copyright 2015, Joseph Huckaby
-    [MIT License](https://github.com/jhuckaby/pixl-xml)
+    [MIT License](https://github.com/jhuckaby/pixl-xml#license)
 
 
 - [sensors](https://github.com/paroj/sensors.py)
@@ -160,7 +160,7 @@ connectivity is not available.
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
     Copyright 2006, Kirill Simonov
-    [MIT License](https://github.com/yaml/pyyaml)
+    [MIT License](https://github.com/yaml/pyyaml/blob/master/LICENSE)
 
 
 - [urllib3](https://github.com/shazow/urllib3)
@@ -187,10 +187,10 @@ connectivity is not available.
     [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
 
 
-- [Utilities for writing code that runs on Python 2 and 3](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+- [Utilities for writing code that runs on Python 2 and 3](collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
 
     Copyright (c) 2010-2015 Benjamin Peterson
-    [MIT License](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+    [MIT License](https://github.com/benjaminp/six/blob/master/LICENSE)
 
 
 - [mcrcon](https://github.com/barneygale/MCRcon)

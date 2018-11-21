@@ -86,7 +86,7 @@ The static binary files are kept in repo [binary-packages](https://github.com/ne
     - [Enable netdata on FreeNAS Corral](#freenas)
     - [Install from package or source, on macOS (OS X)](#macos)
 
-    See also the list of netdata [package maintainers](https://github.com/netdata/netdata/blob/master/MAINTAINERS.md) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
+    See also the list of netdata [package maintainers](../packaging/maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
  
 ## Install netdata on Linux manually
 
@@ -238,7 +238,7 @@ Note first three packages are downloaded from the pfSense repository for maintai
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.10.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.11.0.txz
 ```
 To start netdata manually run `service netdata onestart`
 

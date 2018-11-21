@@ -113,7 +113,7 @@ The command line options of the netdata 1.10.0 version are the following:
  Source Code: https://github.com/netdata/netdata
  Wiki / Docs: https://github.com/netdata/netdata/wiki
  Support    : https://github.com/netdata/netdata/issues
- License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
+ License    : https://github.com/netdata/netdata/blob/master/LICENSE
 
  Twitter    : https://twitter.com/linuxnetdata
  Facebook   : https://www.facebook.com/linuxnetdata/
