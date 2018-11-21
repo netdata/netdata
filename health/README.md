@@ -485,8 +485,7 @@ The external script will be called for all status changes.
 
 ## Examples
 
-
-Check the **[health.d directory](health.d/)** for all alarms shipped with netdata.
+Check the `health/health.d/` directory for all alarms shipped with netdata.
 
 Here are a few examples:
 

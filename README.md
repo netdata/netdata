@@ -184,7 +184,7 @@ Function|Description|Documentation
 **Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)
 **Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#metrics-streaming)
 **Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
-**Query**|Multiple independent workers are attached to the [internal web server](server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
+**Query**|Multiple independent workers are attached to the [internal web server](web/server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
 
 The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
@@ -357,7 +357,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### Web Servers
 - **[Apache and lighttpd](collectors/python.d.plugin/apache/)** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
-- **[IPFS](python.d.plugin/ipfs/)** - bandwidth, peers.
+- **[IPFS](collectors/python.d.plugin/ipfs/)** - bandwidth, peers.
 - **[LiteSpeed](collectors/python.d.plugin/litespeed/)** - reads the litespeed rtreport files to collect metrics.
 - **[Nginx](collectors/python.d.plugin/nginx/)** - `stub-status`, for multiple servers.
 - **[Nginx+](collectors/python.d.plugin/nginx_plus/)** - connects to multiple nginx_plus servers (local or remote) to collect real-time performance metrics.
@@ -411,12 +411,12 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Hardware Sensors
 - **[IPMI](collectors/freeipmi.plugin/)** - enterprise hardware sensors and events.
 - **[lm-sensors](collectors/python.d.plugin/sensors/)** - temperature, voltage, fans, power, humidity, etc.
-- **[Nvidia](collectors/charts.d.plugin/nvidia_smi/)** - collects information for Nvidia GPUs.
+- **[Nvidia](collectors/python.d.plugin/nvidia_smi/)** - collects information for Nvidia GPUs.
 - **[RPi](collectors/charts.d.plugin/sensors/)** - Raspberry Pi temperature sensors.
 - **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
-- **[apcupsd](charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
 

@@ -113,9 +113,9 @@ testinternal () {
 	# Check if the header referred to by the internal link exists in the same file
 	ifile=${1}
 	ilnk=${2}
-	header=$(echo $ilnk | sed 's/#/#-/g')
+	header=$(echo $ilnk | sed 's/-//g')
 	dbg "-- Searching for \"$header\" in $ifile"
-	found=$(cat $ifile | tr -d ',_.:?' | tr ' ' '-' | grep -i "^\#*$header\$")
+	found=$(cat $ifile | tr -d ',_.:? `' | sed 's/-//g' | grep -i "^\#*$header\$")
 	if [ $? -eq 0 ] ; then
 		dbg "-- $ilnk found in $ifile"
 		return 0
@@ -144,11 +144,15 @@ ck_netdata_relative () {
 	f=${1}
 	rlnk=${2}
 	dbg "-- Checking relative link $rlnk"
+	fpath="."
+	fname="$f"
 	# First ensure that the link works in the repo, then try to fix it in htmldocs
 	if [[ $f =~ ^(.*)/([^/]*)$ ]] ; then
 		fpath="${BASH_REMATCH[1]}"
 		fname="${BASH_REMATCH[2]}"
 		dbg "-- Current file is at $fpath"
+	else
+		dbg "-- Current file is at root directory"
 	fi
 	# Cases to handle:
 	# (#somelink)
@@ -186,7 +190,7 @@ ck_netdata_relative () {
 				if [ $? -eq 0 ] ; then
 					testinternal $TRGT $LNK
 					if [ $? -eq 0 ] ; then
-						if [ $fname != "README.md" ] ; then s="../$lnk"; fi
+						if [ $fname != "README.md" ] ; then s="../$rlnk"; fi
 					fi
 				fi
 			fi
@@ -205,7 +209,7 @@ ck_netdata_relative () {
 				fi
 			fi
 			;;
-		*/*.md#* )
+		*.md#* )
 			dbg "-- # (path/filename.md#somelink) -> htmldoc (path/filename/#somelink)"
 			if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}"
@@ -246,7 +250,11 @@ ck_netdata_relative () {
 		* )
 			if [ -f "$fpath/$rlnk" ] ; then
 				dbg "-- # (path/someotherfile) $rlnk"
-				s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
+				if [ $fpath = "." ] ; then
+					s="https://github.com/netdata/netdata/tree/master/$rlnk"
+				else
+					s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
+				fi
 			else
 				if [ -d "$fpath/$rlnk" ] ; then
 					dbg "-- # (path) -> htmldoc (path/)"
@@ -278,8 +286,10 @@ checklinks () {
 		for word in $l ; do
 			if [[ $word =~ .*\]\(([^\(\) ]*)\).* ]] ; then
 				lnk="${BASH_REMATCH[1]}"
+				if [ -z $lnk ] ; then continue ; fi
 				dbg "-$lnk"
 				case "$lnk" in
+					mailto:* ) dbg "-- Mailto link, ignoring" ;;
 					https://github.com/netdata/netdata/wiki* )
 						dbg "-- Wiki Link $lnk"
 						if [ $CHKWIKI -eq 1 ] ; then echo "-- WARNING: $f - $lnk points to the wiki. Please replace it manually" ; fi
