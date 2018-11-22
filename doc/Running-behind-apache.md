@@ -1,4 +1,4 @@
-# netdata via apache's mod_proxy
+# Netdata via apache's mod_proxy
 
 Below you can find instructions for configuring an apache server to:
 

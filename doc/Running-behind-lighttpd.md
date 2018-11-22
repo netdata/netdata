@@ -1,4 +1,4 @@
-# lighttpd v1.4.x
+# Netdata via lighttpd v1.4.x
 
 Here is a config for accessing netdata in a suburl via lighttpd 1.4.46 and newer:
 
