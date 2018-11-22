@@ -9,4 +9,4 @@
   publish = "htmldoc/build"
 
   # Default build command.
-  command = "buildhtml.sh"
+  command = "htmldoc/buildhtml.sh"
