@@ -1,4 +1,4 @@
-# Messagebird Notifications
+# Messagebird
 
 The messagebird notifications will look like this on your Android device:
 

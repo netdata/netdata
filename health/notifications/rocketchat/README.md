@@ -1,4 +1,4 @@
-# Rocket.Chat notifications
+# Rocket.Chat
 
 This is what you will get:
 ![Netdata on RocketChat](https://i.imgur.com/Zu4t3j3.png)

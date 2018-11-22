@@ -1,5 +1,4 @@
-
-# PushOver notifications
+# PushOver
 
 pushover.net allows you to receive push notifications on your mobile phone. The service seems free for up to 7.500 messages per month.
 
