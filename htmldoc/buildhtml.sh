@@ -11,7 +11,7 @@ rm -rf htmldoc/src
 find . -type d \( -path ./htmldoc -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd htmldoc/src
 
 # Modify the first line of the main README.md, to enable proper static html generation 
-sed -i '0,/# netdata /s//# Introducing NetData\n\n/' htmldoc/src/README.md
+sed -i '0,/# netdata /s//# Introduction\n\n/' htmldoc/src/README.md
 
 echo "Creating mkdocs.yaml"
 

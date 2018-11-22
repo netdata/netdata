@@ -74,50 +74,60 @@ markdown_extensions:
  - wikilinks
 nav:'
 
-navpart 1 . README "Getting Started"
+navpart 1 . README "About NetData"
 
 echo -ne "    - 'doc/Why-Netdata.md'
     - 'doc/Demo-Sites.md'
-    - Installation:
-        - 'installer/README.md'
-        - 'docker/README.md'
-        - 'installer/UPDATE.md'
-        - 'installer/UNINSTALL.md'
+    - 'doc/Donations-netdata-has-received.md'
+    - 'doc/a-github-star-is-important.md'
+    - 'doc/netdata-security.md'
+    - 'doc/Netdata-Security-and-Disclosure-Information.md'
+    - REDISTRIBUTED.md
+    - CHANGELOG.md
+    - HISTORICAL_CHANGELOG.md
 "
-echo -ne "- Using NetData:
+
+echo -ne "- Installing NetData:
+    - 'installer/README.md'
+    - 'docker/README.md'
+    - 'installer/UPDATE.md'
+    - 'installer/UNINSTALL.md'
+"
+echo -ne "- Running NetData:
 "
 navpart 2 daemon
+navpart 2 daemon/config
 navpart 2 web "README" "Web Dashboards"
 navpart 3 web/gui "" "" 3
 navpart 2 web/server "" "Web Server"
 navpart 3 web/server "" "" 2 excludefirstlevel
 navpart 2 web/api "" "Web API"
-navpart 3 web/api "" "" 4 excludefirstlevel
-navpart 2 daemon/config
+navpart 3 web/api/exporters "" "Exporters" 2
+navpart 3 web/api/formatters "" "Formatters" 2
+navpart 3 web/api/badges "" "" 2
+navpart 3 web/api/health "" "" 2
+navpart 3 web/api/queries "" "Queries" 2
 #navpart 2 system
 navpart 2 registry
-navpart 2 streaming "" "" 4
-navpart 2 backends "" "Backends" 3
 navpart 2 database
 
 echo -ne "    - 'doc/Performance.md'
     - 'doc/netdata-for-IoT.md'
     - 'doc/high-performance-netdata.md'
-    - 'doc/netdata-security.md'
-    - 'doc/Netdata-Security-and-Disclosure-Information.md'
-"
-
-navpart 2 health README "Health Monitoring"
-navpart 3 health/notifications "" "" 1
-navpart 3 health/notifications "" "Supported Notifications" 2 excludefirstlevel
-
-echo -ne "    - Running-behind-another-web-server:
+    - Running-behind-another-web-server:
         - 'doc/Running-behind-nginx.md'
         - 'doc/Running-behind-apache.md'
         - 'doc/Running-behind-lighttpd.md'
         - 'doc/Running-behind-caddy.md'
 "
 
+navpart 1 health README "Health Monitoring"
+navpart 2 health/notifications "" "" 1
+navpart 2 health/notifications "" "Supported Notifications" 2 excludefirstlevel
+
+navpart 1 streaming "" "" 4
+
+navpart 1 backends "" "Backends" 3
 
 navpart 1 collectors "" "Data Collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
@@ -158,13 +168,7 @@ navpart 2 contrib
 navpart 2 tests
 navpart 2 diagrams/data_structures
 
-echo -ne "- About:
-    - 'doc/Donations-netdata-has-received.md'
-    - 'doc/a-github-star-is-important.md'
-    - CHANGELOG.md
-    - HISTORICAL_CHANGELOG.md
-    - REDISTRIBUTED.md
-"
+
 
 
 
