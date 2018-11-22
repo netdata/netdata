@@ -13,6 +13,23 @@ find . -type d \( -path ./htmldoc -o -path ./node_modules \) -prune -o -name "*.
 # Modify the first line of the main README.md, to enable proper static html generation 
 sed -i '0,/# netdata /s//# Introduction\n\n/' htmldoc/src/README.md
 
+# Remove specific files that don't belong in the documentation
+rm htmldoc/src/HISTORICAL_CHANGELOG.md
+rm htmldoc/src/collectors/charts.d.plugin/mem_apps/README.md
+rm htmldoc/src/collectors/charts.d.plugin/postfix/README.md
+rm htmldoc/src/collectors/charts.d.plugin/tomcat/README.md
+rm htmldoc/src/collectors/charts.d.plugin/sensors/README.md
+rm htmldoc/src/collectors/charts.d.plugin/cpu_apps/README.md
+rm htmldoc/src/collectors/charts.d.plugin/squid/README.md
+rm htmldoc/src/collectors/charts.d.plugin/nginx/README.md
+rm htmldoc/src/collectors/charts.d.plugin/hddtemp/README.md
+rm htmldoc/src/collectors/charts.d.plugin/cpufreq/README.md
+rm htmldoc/src/collectors/charts.d.plugin/mysql/README.md
+rm htmldoc/src/collectors/charts.d.plugin/exim/README.md
+rm htmldoc/src/collectors/charts.d.plugin/apache/README.md
+rm htmldoc/src/collectors/charts.d.plugin/load_average/README.md
+rm htmldoc/src/collectors/charts.d.plugin/phpfpm/README.md
+
 echo "Creating mkdocs.yaml"
 
 # Generate mkdocs.yaml

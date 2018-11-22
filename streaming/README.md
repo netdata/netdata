@@ -1,4 +1,4 @@
-# Metrics streaming
+# Streaming and replication
 
 Each netdata is able to replicate/mirror its database to another netdata, by streaming collected
 metrics, in real-time to it. This is quite different to [data archiving to third party time-series
