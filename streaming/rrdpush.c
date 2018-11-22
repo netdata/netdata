@@ -1114,7 +1114,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     char buf[GUID_LEN + 1];
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
