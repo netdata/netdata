@@ -1,0 +1,3 @@
+[build]
+  # Directory to change to before starting a build. 
+  base = "project/"
