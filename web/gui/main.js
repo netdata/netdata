@@ -1899,7 +1899,8 @@ function alarmsUpdateModal() {
             }
 
             var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
-            var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto';
+            var escapedChartName = alarm.chart.replace(/\//g, '_');
+            var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + escapedChartName + '&alarm=' + alarm.name + '&refresh=auto';
 
             var action_buttons = '<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/>'
                 + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
