@@ -1,11 +1,5 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
-
-**Closed issues:**
-
-- Add option to do pre-releases in GitHub [\#4684](https://github.com/netdata/netdata/issues/4684)
-
 ## [v1.11.1](https://github.com/netdata/netdata/tree/v1.11.1) (2018-11-22)
 
 **Fixed bugs:**
@@ -42,7 +36,7 @@
 
 - Improve footer of web/gui [\#4708](https://github.com/netdata/netdata/issues/4708)
 - Ignores EMAIL\_SENDER [\#4695](https://github.com/netdata/netdata/issues/4695)
-- requirements.txt in TLD are not related to netdata [\#4693](https://github.com/netdata/netdata/issues/4693)
+- Add option to do pre-releases in GitHub [\#4684](https://github.com/netdata/netdata/issues/4684)
 - Invalid links in \*.md files [\#4672](https://github.com/netdata/netdata/issues/4672)
 - Replace all wiki links with repo links in netdata files [\#4650](https://github.com/netdata/netdata/issues/4650)
 - Replace http URLs with https in markdown fils [\#4626](https://github.com/netdata/netdata/issues/4626)
@@ -69,6 +63,7 @@
 
 **Merged pull requests:**
 
+- Move changelog generation to the end in release pipeline [\#4712](https://github.com/netdata/netdata/pull/4712) ([paulfantom](https://github.com/paulfantom))
 - Cleanup of web/gui footer [\#4709](https://github.com/netdata/netdata/pull/4709) ([gmosx](https://github.com/gmosx))
 - added byte unit scaling [\#4707](https://github.com/netdata/netdata/pull/4707) ([AndCycle](https://github.com/AndCycle))
 - Add option to create release candidates [\#4706](https://github.com/netdata/netdata/pull/4706) ([paulfantom](https://github.com/paulfantom))
@@ -89,6 +84,7 @@
 - Update lm\_sensors and catch specific errors. [\#4667](https://github.com/netdata/netdata/pull/4667) ([Ferroin](https://github.com/Ferroin))
 - Fix typo in README.md [\#4665](https://github.com/netdata/netdata/pull/4665) ([mlbarrow](https://github.com/mlbarrow))
 - Update README.md [\#4663](https://github.com/netdata/netdata/pull/4663) ([taniaab](https://github.com/taniaab))
+- Remove left over code [\#4662](https://github.com/netdata/netdata/pull/4662) ([xPaw](https://github.com/xPaw))
 - Fix changelog path, add all README.md files to Debian package doc [\#4657](https://github.com/netdata/netdata/pull/4657) ([runejuhl](https://github.com/runejuhl))
 - Added new branding material \#4598 [\#4656](https://github.com/netdata/netdata/pull/4656) ([gmosx](https://github.com/gmosx))
 - Update README.md [\#4655](https://github.com/netdata/netdata/pull/4655) ([ktsaou](https://github.com/ktsaou))
