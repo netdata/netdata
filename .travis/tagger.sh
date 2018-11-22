@@ -28,7 +28,7 @@ function embed_version {
 	VERSION="$1"
 	MAJOR=$(echo "$GIT_TAG" | cut -d . -f 1 | cut -d v -f 2)
 	MINOR=$(echo "$GIT_TAG" | cut -d . -f 2)
-	PATCH=$(echo "$GIT_TAG" | cut -d . -f 3)
+	PATCH=$(echo "$GIT_TAG" | cut -d . -f 3 | cut -d '-' -f 1)
 	sed -i "s/\\[VERSION_MAJOR\\], \\[.*\\]/\\[VERSION_MAJOR\\], \\[$MAJOR\\]/" configure.ac
 	sed -i "s/\\[VERSION_MINOR\\], \\[.*\\]/\\[VERSION_MINOR\\], \\[$MINOR\\]/" configure.ac
 	sed -i "s/\\[VERSION_PATCH\\], \\[.*\\]/\\[VERSION_PATCH\\], \\[$PATCH\\]/" configure.ac
