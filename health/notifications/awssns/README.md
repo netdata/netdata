@@ -1,4 +1,4 @@
-# Amazon SNS notifications
+# Amazon SNS
 
 As part of it's AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' or SNS.  Amazon SNS works kind of similarly to Netdata's own notification system, allowing dispatch of a single notification to multiple subscribers of different types.  Among other things, SNS supports sending notifications to:
 

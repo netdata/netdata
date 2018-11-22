@@ -1,4 +1,4 @@
-# netdata via Caddy
+# Netdata via Caddy
 
 To run netdata via [Caddy's proxying,](https://caddyserver.com/docs/proxy) set your Caddyfile up like this:
 

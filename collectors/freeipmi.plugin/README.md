@@ -1,8 +1,10 @@
-netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
+# freeipmi.plugin
+
+Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 > FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
-## compile `freeipmi.plugin`
+## Compile `freeipmi.plugin`
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 
@@ -12,7 +14,7 @@ Keep in mind IPMI requires root access, so the plugin is setuid to root.
 
 If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the netdata plugin will be able to work.
 
-## netdata use
+## Netdata use
 
 The plugin creates (up to) 8 charts, based on the information collected from IPMI:
 
@@ -101,7 +103,7 @@ You can set these options in `/etc/netdata/netdata.conf` at this section:
 
 Append to `command options = ` the settings you need. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
 
-## ignoring specific sensors
+## Ignoring specific sensors
 
 Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`. **However this file is not used by `libipmimonitoring`** (the library used by netdata's `freeipmi.plugin`).
 
@@ -135,7 +137,7 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 ```
 
 
-## debugging
+## Debugging
 
 You can run the plugin by hand:
 

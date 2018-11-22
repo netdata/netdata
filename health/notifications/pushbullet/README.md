@@ -1,4 +1,4 @@
-$ PushBullet notifications
+# PushBullet
 
 Will look like this on your browser:
 ![image](https://cloud.githubusercontent.com/assets/4300670/19109636/278b1c0c-8aee-11e6-8a09-7fc94fdbfec8.png)

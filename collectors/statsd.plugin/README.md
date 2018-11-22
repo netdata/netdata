@@ -1,22 +1,20 @@
-# Netdata Statsd
+# statsd.plugin
 
 statsd is a system to collect data from any application. Applications are sending metrics to it, usually via non-blocking UDP communication, and statsd servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
 
 There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
-## netdata statsd
-
 netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other netdata servers or archive them to backend time-series databases.
 
-netdata statsd is inside netdata (an internal plugin, running inside the netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (tcp and udp 8125 - yes, netdata statsd server supports both tcp and udp at the same time).
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (tcp and udp 8125 - yes, Netdata statsd server supports both tcp and udp at the same time).
 
-Since statsd is embedded in netdata, it means you now have a statsd server embedded on all your servers. So, the application can send its metrics to `localhost:8125`. This provides a distributed statsd implementation.
+Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. So, the application can send its metrics to `localhost:8125`. This provides a distributed statsd implementation.
 
-netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core (yes, it is single threaded - actually double-threaded, one thread collects metrics, another one updates the charts from the collected data).
+Netdata statsd is fast. It can collect more than **1.200.000 metrics per second** on modern hardware, more than **200Mbps of sustained statsd traffic**, using 1 CPU core (yes, it is single threaded - actually double-threaded, one thread collects metrics, another one updates the charts from the collected data).
 
-## metrics supported by netdata
+## Metrics supported by Netdata
 
-netdata fully supports the statsd protocol. All statsd client libraries can be used with netdata too.
+Netdata fully supports the statsd protocol. All statsd client libraries can be used with Netdata too.
 
 - **Gauges**
 

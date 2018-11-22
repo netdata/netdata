@@ -1,8 +1,8 @@
-# Configuration Guide
+# Configuration guide
 
 Configuration files are placed in `/etc/netdata`.
 
-## Netdata Daemon
+## Netdata daemon
 
 The daemon configuration file is read from `/etc/netdata/netdata.conf`.
 
@@ -23,7 +23,7 @@ The configuration file is a `name = value` dictionary. Netdata will not complain
 setting | default | info
 :------:|:-------:|:----
 hostname|auto-detected|The hostname of the computer running netdata.
-history|3600|The number of entries the netdata daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](../../database/#netdata-database) for more information.
+history|3600|The number of entries the netdata daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](../../database/#database) for more information.
 config directory|`/etc/netdata`|The directory configuration files are kept.
 plugins directory|`/usr/libexec/netdata/plugins.d`|The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes.
 web files directory|`/usr/share/netdata/web`|The directory the web static files are kept.
@@ -36,7 +36,7 @@ debug log|`/var/log/netdata/debug.log`|The filename to save debug information. T
 error log|`/var/log/netdata/error.log`|The filename to save error messages for netdata daemon and all plugins (`stderr` is sent here for all netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.
 access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.
 memory mode|save|When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits.
-update every|1|The frequency in seconds, for data collection. For more information see [Performance](../../doc/Performance.md#netdata-performance).
+update every|1|The frequency in seconds, for data collection. For more information see [Performance](../../doc/Performance.md#performance).
 run as user|`netdata`|The user netdata will run as.
 web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`.
 http port listen backlog|100|The port backlog. Check `man 2 listen`.
@@ -45,7 +45,7 @@ bind to|`*`|The IP address and port to listen to. This is a space separated list
 disconnect idle web clients after seconds|60|The time in seconds to disconnect web clients after being totally idle.
 enable web responses gzip compression|yes|When set to `yes`, netdata web responses will be GZIP compressed, if the web client accepts such responses.
 
-##### netdata process priority
+##### Netdata process priority
 
 By default, netdata runs with the `idle` process scheduler, which assigns CPU resources to netdata, only when the system has such resources to spare.
 
@@ -92,22 +92,22 @@ checks|no|This is a debugging plugin for the internal latency of netdata.
 enable running new plugins|yes|When set to `yes`, netdata will enable plugins not configured specifically for them. Setting this to `no` will disable all plugins you have not set to `yes` explicitly.
 check for new plugins every|60|The time in seconds to check for new plugins in the plugins directory. This allows having other applications dynamically creating plugins for netdata.
 
-## Netdata Plugins
+## Netdata plugins
 
 The configuration options for plugins appear in sections following the pattern `[plugin:NAME]`.
 
-### Internal Plugins
+### Internal plugins
 
 Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
 
 
-### External Plugins
+### External plugins
 
 External plugins will have only 2 options at `netdata.conf`:
 
 setting | default | info
 :------:|:-------:|:----
-update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](../../doc/Performance.md#netdata-performance).
+update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](../../doc/Performance.md#performance).
 command options|*empty*|Additional command line options to pass to the plugin. 
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
@@ -138,7 +138,7 @@ Next, netdata can generate a valid configuration for the user to edit. No need t
 
 Last, what about options you believe you have set, but you misspelled? When you get the configuration file from the server, there will be a comment above all `name = value` pairs the server does not use. So you know that whatever you wrote there, is not used.
 
-### limiting access to netdata.conf
+### Limiting access to netdata.conf
 
 netdata v1.9+ limit by default access to `http://your.netdata.ip:19999/netdata.conf` to private IP addresses. This is controlled by this settings:
 
@@ -152,7 +152,7 @@ The IPs listed are all the private IPv4 addresses, including link local IPv6 add
 > Keep in mind that connections to netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[web].allow netdata.conf from` should also be allowed by `[web].allow connections from`.
 
 
-## netdata simple patterns
+## Netdata simple patterns
 
 Unix prefers regular expressions. But they are just too hard, too cryptic to use, write and understand.
 

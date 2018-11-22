@@ -15,10 +15,6 @@ You can install the latest release of netdata, using your package manager in
 
 Please note that the particular packages are not build by netdata.
 
-## Docker
-
-You can [Install netdata with Docker](../docker/#install-netdata-with-docker)
-
 ## Linux one liner
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
@@ -78,6 +74,10 @@ sh /tmp/kickstart-static64.sh
 ```
 
 The static binary files are kept in repo [binary-packages](https://github.com/netdata/binary-packages). You can download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself). The target system does **not** need to have bash installed. The same files can be used for updates too.
+
+## Docker
+
+You can [Install netdata with Docker](../docker/#install-netdata-with-docker)
 
 ## Other installation methods
 
@@ -347,7 +347,7 @@ When netdata is first installed, it will run as _root_. This may or may not be a
 
 1. Creat a group `netdata` via the Synology group interface. Give it no access to anything.
 2. Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata will chuid to this user when running.
-3. Change ownership of the following directories, as defined in [Netdata Security](../doc/netdata-security.md#netdata-security):
+3. Change ownership of the following directories, as defined in [Netdata Security](../doc/netdata-security.md#security-design):
 
 ```
 $ chown -R root:netdata /opt/netdata/usr/share/netdata

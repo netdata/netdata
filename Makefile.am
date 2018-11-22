@@ -81,8 +81,7 @@ dist_noinst_DATA= \
 	installer/README.md \
 	installer/UNINSTALL.md \
 	installer/UPDATE.md \
-	requirements.txt \
-	runtime.txt \
+	netlify.toml \
 	$(NULL)
 
 # until integrated within build
@@ -95,6 +94,9 @@ dist_noinst_SCRIPTS= \
 	installer/functions.sh \
 	htmldoc/buildhtml.sh \
 	htmldoc/buildyaml.sh \
+	htmldoc/checklinks.sh \
+	htmldoc/requirements.txt \
+	htmldoc/runtime.txt \
 	$(NULL)
 
 # -----------------------------------------------------------------------------

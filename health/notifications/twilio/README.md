@@ -1,4 +1,4 @@
-# Twilio.com notifications
+# Twilio
 
 Will look like this on your Android device:
 

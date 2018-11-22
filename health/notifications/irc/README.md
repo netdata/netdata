@@ -1,4 +1,4 @@
-# IRC notifications
+# IRC
 
 This is what you will get:
 

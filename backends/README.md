@@ -1,4 +1,4 @@
-# Metrics Long Term Archiving
+# Metrics long term archiving
 
 netdata supports backends for archiving the metrics, or providing long term dashboards,
 using Grafana or other tools, like this:

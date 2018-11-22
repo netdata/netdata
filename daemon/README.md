@@ -1,4 +1,4 @@
-# Running the Netdata Daemon
+# Netdata daemon
 
 ## Starting netdata
 
