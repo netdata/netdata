@@ -21,7 +21,6 @@
 # Requirements:
 #   - GITHUB_TOKEN variable set with GitHub token. Access level: repo.public_repo
 #   - docker
-#   - git-semver python package (pip install git-semver)
 
 set -e
 
@@ -37,7 +36,9 @@ git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
 
 echo "---- FIGURING OUT TAGS ----"
-./.travis/tagger.sh || exit 0
+# tagger.sh is sourced since we need environment variables it sets
+#shellcheck source=/dev/null
+source .travis/tagger.sh || exit 0
 
 echo "---- GENERATING CHANGELOG -----"
 ./.travis/generate_changelog.sh
@@ -57,4 +58,12 @@ tar -C /tmp -xvf "/tmp/hub-linux-amd64-${HUB_VERSION}.tgz"
 export PATH=$PATH:"/tmp/hub-linux-amd64-${HUB_VERSION}/bin"
 
 # Create a release draft
-hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
+if [ -z ${GIT_TAG+x} ]; then
+	echo "Variable GIT_TAG is not set. Something went terribly wrong! Exiting."
+	exit 1
+fi
+if [ -z ${RC+x} ]; then
+	hub release create --prerelease --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
+else
+	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
+fi
