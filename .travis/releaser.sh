@@ -40,9 +40,6 @@ echo "---- FIGURING OUT TAGS ----"
 #shellcheck source=/dev/null
 source .travis/tagger.sh || exit 0
 
-echo "---- GENERATING CHANGELOG -----"
-./.travis/generate_changelog.sh
-
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
 ./docker/build.sh
@@ -67,3 +64,7 @@ if [ -z ${RC+x} ]; then
 else
 	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
 fi
+
+# Changelog needs to be created AFTER new release to avoid problems with circular dependencies and wrong entries in changelog file
+echo "---- GENERATING CHANGELOG -----"
+./.travis/generate_changelog.sh
