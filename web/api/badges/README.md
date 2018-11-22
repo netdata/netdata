@@ -261,24 +261,6 @@ character|name|escape sequence
 ` \ `|backslash (when you need a `/`)|`%5C`
 ` \| `|pipe (delimiting parameters)|`%7C`
 
----
-
-## Using the path instead of the query string
-
-The badges can also be generated using the URL path for passing parameters. The format is exactly the same.
-
-So instead of:
-
-  `http://your.netdata:19999/api/v1/badge.svg?option1&option2&option3&...`
-
-you can write:
-
-  `http://your.netdata:19999/api/v1/badge.svg/option1/option2/option3/...`
-
-You can also append anything else you like, like this:
-
-  `http://your.netdata:19999/api/v1/badge.svg/option1/option2/option3/my-super-badge.svg`
-
 ## FAQ
 
 #### Is it fast?

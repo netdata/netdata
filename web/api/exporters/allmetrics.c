@@ -24,7 +24,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     const char *prometheus_prefix = global_backend_prefix;
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
