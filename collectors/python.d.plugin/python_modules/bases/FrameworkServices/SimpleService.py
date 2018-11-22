@@ -33,7 +33,6 @@ class RuntimeCounters:
         self.retries = 0
         self.penalty = 0
         self.elapsed = 0
-        self.next = 0
         self.prev_update = 0
         self.runs = 1
 
