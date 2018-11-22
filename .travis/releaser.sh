@@ -34,6 +34,8 @@ export GIT_USER="netdatabot"
 echo "--- Initialize git configuration ---"
 git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
+git checkout master
+git pull
 
 echo "---- FIGURING OUT TAGS ----"
 # tagger.sh is sourced since we need environment variables it sets
