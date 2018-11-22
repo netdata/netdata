@@ -62,20 +62,8 @@ if [ -z "${GIT_TAG}" ]; then
 	*"[netdata minor release]"*) GIT_TAG="v$(git semver --next-minor)" ;;
 	*"[netdata major release]"*) GIT_TAG="v$(git semver --next-major)" ;;
 	*"[netdata release candidate]"*) release_candidate ;;
-	*) echo "Keyword not detected. Exiting..."; exit 1;;
+	*) echo "Keyword not detected. Exiting..."; exit 0;;
 	esac
-	# Tag it!
-	if [ "$GIT_TAG" != "HEAD" ]; then
-		echo "Assigning a new tag: $GIT_TAG"
-		embed_version "$GIT_TAG"
-		git commit -m "[ci skip] release $GIT_TAG"
-		git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
-		git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
-		git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
-	fi
-else
-	embed_version "$GIT_TAG"
-	git commit -m "[ci skip] release $GIT_TAG"
-	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 fi
+embed_version "$GIT_TAG"
 export GIT_TAG

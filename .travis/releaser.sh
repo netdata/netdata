@@ -42,6 +42,15 @@ echo "---- FIGURING OUT TAGS ----"
 #shellcheck source=/dev/null
 source .travis/tagger.sh || exit 0
 
+echo "---- GENERATING CHANGELOG -----"
+./.travis/generate_changelog.sh
+
+echo "---- COMMIT AND PUSH CHANGES ----"
+git commit -m "[ci skip] release $GIT_TAG"
+git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
+git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
+git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
+
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
 ./docker/build.sh
@@ -70,7 +79,3 @@ if [ -z ${RC+x} ]; then
 else
 	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
 fi
-
-# Changelog needs to be created AFTER new release to avoid problems with circular dependencies and wrong entries in changelog file
-echo "---- GENERATING CHANGELOG -----"
-./.travis/generate_changelog.sh
