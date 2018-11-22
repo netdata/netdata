@@ -116,7 +116,7 @@ echo -ne "    - 'doc/Performance.md'
 
 navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
-    - Internal Plugins:
+    - Internal plugins:
 "
 navpart 3 collectors/proc.plugin
 navpart 3 collectors/statsd.plugin

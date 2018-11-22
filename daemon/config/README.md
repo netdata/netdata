@@ -1,8 +1,8 @@
-# Configuration Guide
+# Configuration guide
 
 Configuration files are placed in `/etc/netdata`.
 
-## Netdata Daemon
+## Netdata daemon
 
 The daemon configuration file is read from `/etc/netdata/netdata.conf`.
 
@@ -45,7 +45,7 @@ bind to|`*`|The IP address and port to listen to. This is a space separated list
 disconnect idle web clients after seconds|60|The time in seconds to disconnect web clients after being totally idle.
 enable web responses gzip compression|yes|When set to `yes`, netdata web responses will be GZIP compressed, if the web client accepts such responses.
 
-##### netdata process priority
+##### Netdata process priority
 
 By default, netdata runs with the `idle` process scheduler, which assigns CPU resources to netdata, only when the system has such resources to spare.
 
@@ -92,16 +92,16 @@ checks|no|This is a debugging plugin for the internal latency of netdata.
 enable running new plugins|yes|When set to `yes`, netdata will enable plugins not configured specifically for them. Setting this to `no` will disable all plugins you have not set to `yes` explicitly.
 check for new plugins every|60|The time in seconds to check for new plugins in the plugins directory. This allows having other applications dynamically creating plugins for netdata.
 
-## Netdata Plugins
+## Netdata plugins
 
 The configuration options for plugins appear in sections following the pattern `[plugin:NAME]`.
 
-### Internal Plugins
+### Internal plugins
 
 Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
 
 
-### External Plugins
+### External plugins
 
 External plugins will have only 2 options at `netdata.conf`:
 
@@ -138,7 +138,7 @@ Next, netdata can generate a valid configuration for the user to edit. No need t
 
 Last, what about options you believe you have set, but you misspelled? When you get the configuration file from the server, there will be a comment above all `name = value` pairs the server does not use. So you know that whatever you wrote there, is not used.
 
-### limiting access to netdata.conf
+### Limiting access to netdata.conf
 
 netdata v1.9+ limit by default access to `http://your.netdata.ip:19999/netdata.conf` to private IP addresses. This is controlled by this settings:
 
@@ -152,7 +152,7 @@ The IPs listed are all the private IPv4 addresses, including link local IPv6 add
 > Keep in mind that connections to netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[web].allow netdata.conf from` should also be allowed by `[web].allow connections from`.
 
 
-## netdata simple patterns
+## Netdata simple patterns
 
 Unix prefers regular expressions. But they are just too hard, too cryptic to use, write and understand.
 
