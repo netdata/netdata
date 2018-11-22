@@ -1,8 +1,8 @@
-## idlejitter.plugin
+# idlejitter.plugin
 
 It works like this:
 
-A thread is spawn that requests to sleep for 20000 microseconds (20ms).
+A thread is spawned that requests to sleep for 20000 microseconds (20ms).
 When the system wakes it up, it measures how many microseconds have passed.
 The difference between the requested and the actual duration of the sleep, is the idle jitter.
 This is done at most 50 times per second, to ensure we have a good average. 

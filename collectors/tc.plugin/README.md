@@ -1,4 +1,4 @@
-## tc.plugin
+# tc.plugin
 
 Live demo - **[see it in action here](https://registry.my-netdata.io/#menu_tc)** !
 

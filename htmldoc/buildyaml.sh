@@ -74,7 +74,7 @@ markdown_extensions:
  - wikilinks
 nav:'
 
-navpart 1 . README "About NetData"
+navpart 1 . README "About"
 
 echo -ne "    - 'doc/Why-Netdata.md'
     - 'doc/Demo-Sites.md'
@@ -87,19 +87,19 @@ echo -ne "    - 'doc/Why-Netdata.md'
     - HISTORICAL_CHANGELOG.md
 "
 
-echo -ne "- Installing NetData:
+echo -ne "- Installation:
     - 'installer/README.md'
     - 'docker/README.md'
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
 "
-echo -ne "- Running NetData:
+echo -ne "- Running netdata:
 "
 navpart 2 daemon
 navpart 2 daemon/config
-navpart 2 web "README" "Web Dashboards"
+navpart 2 web "README" "Web dashboards"
 navpart 3 web/gui "" "" 3
-navpart 2 web/server "" "Web Server"
+navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
 navpart 2 web/api "" "Web API"
 navpart 3 web/api/exporters "" "Exporters" 2
@@ -121,15 +121,7 @@ echo -ne "    - 'doc/Performance.md'
         - 'doc/Running-behind-caddy.md'
 "
 
-navpart 1 health README "Health Monitoring"
-navpart 2 health/notifications "" "" 1
-navpart 2 health/notifications "" "Supported Notifications" 2 excludefirstlevel
-
-navpart 1 streaming "" "" 4
-
-navpart 1 backends "" "Backends" 3
-
-navpart 1 collectors "" "Data Collection" 1
+navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
     - Internal Plugins:
 "
@@ -144,17 +136,25 @@ navpart 3 collectors/diskspace.plugin
 navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
-navpart 2 collectors/plugins.d "" "External Plugins"
-navpart 3 collectors/python.d.plugin "" "Python Plugins" 3
-navpart 3 collectors/node.d.plugin "" "Node.js Plugins" 3
-navpart 3 collectors/charts.d.plugin "" "BASH Plugins" 3
+navpart 2 collectors/plugins.d "" "External plugins"
+navpart 3 collectors/python.d.plugin "" "Python modules" 3
+navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
+navpart 3 collectors/charts.d.plugin "" "BASH modules" 3
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
 
-echo -ne "    - Third Party Plugins:
+echo -ne "    - Third party plugins:
         - 'doc/Third-Party-Plugins.md'
 "
+
+navpart 1 health README "Alarms and notifications"
+navpart 2 health/notifications "" "" 1
+navpart 2 health/notifications "" "Supported notifications" 2 excludefirstlevel
+
+navpart 1 streaming "" "" 4
+
+navpart 1 backends "" "Long term archiving to backends" 3
 
 echo -ne "- Hacking netdata:
     - CONTRIBUTING.md

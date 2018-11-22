@@ -1,3 +1,5 @@
+# freeipmi
+
 netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 > FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
