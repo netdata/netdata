@@ -1,4 +1,4 @@
-# flock.com notifications
+# flock.com
 
 This is what you will get:
 

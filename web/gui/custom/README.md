@@ -1,4 +1,4 @@
-# Custom Dashboards
+# Custom dashboards
 
 You can:
 

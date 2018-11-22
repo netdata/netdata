@@ -1,4 +1,4 @@
-# syslog notifications
+# Syslog
 
 You need a working `logger` command for this to work.  This is the case on pretty much every Linux system in existence, and most BSD systems.
 

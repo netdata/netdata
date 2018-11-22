@@ -111,8 +111,9 @@ testURL () {
 
 testinternal () {
 	# Check if the header referred to by the internal link exists in the same file
-	ifile=${1}
-	ilnk=${2}
+	ff=${1}
+	ifile=${2}
+	ilnk=${3}
 	header=${ilnk//-/}
 	dbg "-- Searching for \"$header\" in $ifile"
 	tr -d ',_.:? `'< $ifile | sed 's/-//g' | grep -i "^\#*$header\$" >/dev/null
@@ -120,7 +121,7 @@ testinternal () {
 		dbg "-- $ilnk found in $ifile"
 		return 0
 	else
-		echo "-- ERROR: $ifile - $ilnk header not found in the file"
+		echo "-- ERROR: $ff - $ilnk header not found in file $ifile"
 		EXITCODE=1
 		return 1
 	fi
@@ -170,7 +171,7 @@ ck_netdata_relative () {
 	case "$rlnk" in
 		\#* ) 
 			dbg "-- # (#somelink)"
-			testinternal $f $rlnk
+			testinternal $f $f $rlnk
 			;;
 		*/ ) 
 			dbg "-- # (path/)"
@@ -188,7 +189,7 @@ ck_netdata_relative () {
 				dbg "-- Look for $LNK in $TRGT"
 				testf $f $TRGT
 				if [ $? -eq 0 ] ; then
-					testinternal $TRGT $LNK
+					testinternal $f $TRGT $LNK
 					if [ $? -eq 0 ] ; then
 						if [ $fname != "README.md" ] ; then s="../$rlnk"; fi
 					fi
@@ -216,7 +217,7 @@ ck_netdata_relative () {
 				LNK="#${BASH_REMATCH[2]}"
 				testf $f $TRGT
 				if [ $? -eq 0 ] ; then
-					testinternal $TRGT $LNK
+					testinternal $f $TRGT $LNK
 					if [ $? -eq 0 ] ; then
 						if [[ $lnk =~ ^(.*)/(.*).md#(.*)$ ]] ; then
 							if [ "${BASH_REMATCH[2]}" = "README" ] ; then
@@ -237,7 +238,7 @@ ck_netdata_relative () {
 				LNK="#${BASH_REMATCH[2]}"
 				testf $f $TRGT
 				if [ $? -eq 0 ] ; then
-					testinternal $TRGT $LNK
+					testinternal $f $TRGT $LNK
 					if [ $? -eq 0 ] ; then
 						if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 							s="${BASH_REMATCH[1]}/#${BASH_REMATCH[2]}"

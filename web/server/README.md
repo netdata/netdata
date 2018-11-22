@@ -1,4 +1,4 @@
-# Netdata web server
+# Web server
 
 Netdata supports 3 implementations of its internal web server:
 

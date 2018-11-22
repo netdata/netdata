@@ -1,4 +1,4 @@
-# Discordapp.com notifications
+# Discordapp.com
 
 This is what you will get:
 

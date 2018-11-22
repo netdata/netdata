@@ -1,18 +1,15 @@
-# Netdata
+# Redistributed software
 
-Copyright 2016-2017, Costa Tsaousis.
-Copyright 2017-2018, Netdata Inc.
-Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
+netdata copyright info:
+ Copyright 2016-2018, Costa Tsaousis.
+ Copyright 2018, Netdata Inc.
+ Released under [GPL v3 or later](LICENSE).
 
-Netdata uses SPDX license tags to identify the license for its files.
+netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
 
----
-
-## Re-distributed software
-
-Netdata re-distributes the following third-party software.
-We have decided to re-distribute all these, instead of using them
+netdata redistributes the following third-party software.
+We have decided to redistribute all these, instead of using them
 through a CDN, to allow netdata to work in cases where Internet
 connectivity is not available.
 

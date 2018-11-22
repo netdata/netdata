@@ -1,4 +1,4 @@
-# Netdata Agent Web GUI
+# Netdata agent web GUI
 
 ## Generating dashboard.js
 

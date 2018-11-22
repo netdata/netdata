@@ -1,6 +1,6 @@
-# Netdata Performance
+# Performance
 
-Netdata performance is affected by:
+netdata performance is affected by:
 
 **Data collection**
 - the number of charts for which data are collected

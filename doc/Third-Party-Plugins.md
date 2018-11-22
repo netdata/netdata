@@ -1,4 +1,4 @@
-# Third-party Plugins
+# Third-party plugins
 
 The following is a list of Netdata plugins distributed by third parties:
 

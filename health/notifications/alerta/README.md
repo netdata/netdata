@@ -1,4 +1,4 @@
-# alerta.io notifications
+# alerta.io
 
 The [Alerta](https://alerta.io) monitoring system is a tool used to
 consolidate and de-duplicate alerts from multiple sources for quick

@@ -1,4 +1,4 @@
-# Demo Sites
+# Demo sites
 
 Live demo installations of netdata are available at **[https://my-netdata.io](https://my-netdata.io)**:
 

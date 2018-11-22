@@ -1,4 +1,4 @@
-# Slack.com notifications
+# Slack
 
 This is what you will get:
 ![image](https://cloud.githubusercontent.com/assets/2662304/18407116/bbd0fee6-7710-11e6-81cf-58c0defaee2b.png)

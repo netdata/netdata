@@ -1,5 +1,6 @@
+# Messagebird
 
-Will look like this on your Android device:
+The messagebird notifications will look like this on your Android device:
 
 ![image](https://cloud.githubusercontent.com/assets/17090999/20034652/620b6100-a39b-11e6-96af-4f83b8e830e2.png)
 

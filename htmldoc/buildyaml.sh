@@ -74,54 +74,49 @@ markdown_extensions:
  - wikilinks
 nav:'
 
-navpart 1 . README "Getting Started"
+navpart 1 . README "About"
 
 echo -ne "    - 'doc/Why-Netdata.md'
     - 'doc/Demo-Sites.md'
-    - Installation:
-        - 'installer/README.md'
-        - 'docker/README.md'
-        - 'installer/UPDATE.md'
-        - 'installer/UNINSTALL.md'
+    - 'doc/netdata-security.md'
+    - 'doc/Donations-netdata-has-received.md'
+    - 'doc/a-github-star-is-important.md'
+    - REDISTRIBUTED.md
+    - CHANGELOG.md
 "
-echo -ne "- Using NetData:
+
+echo -ne "- Installation:
+    - 'installer/README.md'
+    - 'docker/README.md'
+    - 'installer/UPDATE.md'
+    - 'installer/UNINSTALL.md'
+"
+echo -ne "- Running netdata:
 "
 navpart 2 daemon
-navpart 2 web "README" "Web Dashboards"
-navpart 3 web/gui "" "" 3
-navpart 2 web/server "" "Web Server"
-navpart 3 web/server "" "" 2 excludefirstlevel
-navpart 2 web/api "" "Web API"
-navpart 3 web/api "" "" 4 excludefirstlevel
 navpart 2 daemon/config
+
+navpart 2 web/server "" "Web server"
+navpart 3 web/server "" "" 2 excludefirstlevel
+echo -ne "        - Running behind another web server:
+            - 'doc/Running-behind-nginx.md'
+            - 'doc/Running-behind-apache.md'
+            - 'doc/Running-behind-lighttpd.md'
+            - 'doc/Running-behind-caddy.md'
+"
 #navpart 2 system
-navpart 2 registry
-navpart 2 streaming "" "" 4
-navpart 2 backends "" "Backends" 3
 navpart 2 database
+navpart 2 registry
 
 echo -ne "    - 'doc/Performance.md'
     - 'doc/netdata-for-IoT.md'
     - 'doc/high-performance-netdata.md'
-    - 'doc/netdata-security.md'
-    - 'doc/Netdata-Security-and-Disclosure-Information.md'
-"
-
-navpart 2 health README "Health Monitoring"
-navpart 3 health/notifications "" "" 1
-navpart 3 health/notifications "" "Supported Notifications" 2 excludefirstlevel
-
-echo -ne "    - Running-behind-another-web-server:
-        - 'doc/Running-behind-nginx.md'
-        - 'doc/Running-behind-apache.md'
-        - 'doc/Running-behind-lighttpd.md'
-        - 'doc/Running-behind-caddy.md'
 "
 
 
-navpart 1 collectors "" "Data Collection" 1
+navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
-    - Internal Plugins:
+    - Internal plugins:
 "
 navpart 3 collectors/proc.plugin
 navpart 3 collectors/statsd.plugin
@@ -134,21 +129,39 @@ navpart 3 collectors/diskspace.plugin
 navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
-navpart 2 collectors/plugins.d "" "External Plugins"
-navpart 3 collectors/python.d.plugin "" "Python Plugins" 3
-navpart 3 collectors/node.d.plugin "" "Node.js Plugins" 3
-navpart 3 collectors/charts.d.plugin "" "BASH Plugins" 3
+navpart 2 collectors/plugins.d "" "External plugins"
+navpart 3 collectors/python.d.plugin "" "Python modules" 3
+navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
+navpart 3 collectors/charts.d.plugin "" "BASH modules" 3
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
 
-echo -ne "    - Third Party Plugins:
-        - 'doc/Third-Party-Plugins.md'
+echo -ne "    - 'doc/Third-Party-Plugins.md'
 "
+
+navpart 1 health README "Alarms and notifications"
+navpart 2 health/notifications "" "" 1
+navpart 2 health/notifications "" "Supported notifications" 2 excludefirstlevel
+
+navpart 1 streaming "" "" 4
+
+navpart 1 backends "" "Archiving to backends" 3
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
+
+navpart 1 web/api "" "HTTP API"
+navpart 2 web/api/exporters "" "Exporters" 2
+navpart 2 web/api/formatters "" "Formatters" 2
+navpart 2 web/api/badges "" "" 2
+navpart 2 web/api/health "" "" 2
+navpart 2 web/api/queries "" "Queries" 2
 
 echo -ne "- Hacking netdata:
     - CONTRIBUTING.md
     - CODE_OF_CONDUCT.md
+    - 'doc/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
 navpart 2 makeself "" "" 4
@@ -158,13 +171,7 @@ navpart 2 contrib
 navpart 2 tests
 navpart 2 diagrams/data_structures
 
-echo -ne "- About:
-    - 'doc/Donations-netdata-has-received.md'
-    - 'doc/a-github-star-is-important.md'
-    - CHANGELOG.md
-    - HISTORICAL_CHANGELOG.md
-    - REDISTRIBUTED.md
-"
+
 
 
 

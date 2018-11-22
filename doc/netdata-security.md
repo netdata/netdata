@@ -1,4 +1,4 @@
-# Netdata Security
+# Security design
 
 We have given special attention to all aspects of netdata, ensuring that everything throughout its operation is as secure as possible. netdata has been designed with security in mind.
 

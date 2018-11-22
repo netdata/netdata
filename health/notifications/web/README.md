@@ -1,4 +1,4 @@
-# Dashboard notifications
+# Dashboard
 
 The netdata dashboard shows HTML notifications, when it is open.
 

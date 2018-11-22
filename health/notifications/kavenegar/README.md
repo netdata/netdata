@@ -1,4 +1,4 @@
-# Kavenegar notifications
+# Kavenegar
 
 [Kavenegar](https://www.kavenegar.com/) as service for software developers, based in Iran, provides send and receive SMS, calling voice by using its APIs.
 
