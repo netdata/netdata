@@ -2,10 +2,17 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Closed issues:**
+
+- Add option to do pre-releases in GitHub [\#4684](https://github.com/netdata/netdata/issues/4684)
+
+## [v1.11.1](https://github.com/netdata/netdata/tree/v1.11.1) (2018-11-22)
+
 **Fixed bugs:**
 
 - Sensors module of python plugin not working \(again?\) [\#4692](https://github.com/netdata/netdata/issues/4692)
 - Ubuntu 18.04 apt package is still on v1.9.0, though apt is the recommended installation method [\#4675](https://github.com/netdata/netdata/issues/4675)
+- pre-built static binary install script does not detect SLES as systemd OS [\#4641](https://github.com/netdata/netdata/issues/4641)
 - Errors after uninstalling netdata [\#4616](https://github.com/netdata/netdata/issues/4616)
 - Sensors don`t work [\#4602](https://github.com/netdata/netdata/issues/4602)
 - smartd\_log check\(\) unhandled exception: 'list' object has no attribute 'clear' [\#4583](https://github.com/netdata/netdata/issues/4583)
@@ -16,21 +23,26 @@
 - inbound packets dropped inbound  [\#4536](https://github.com/netdata/netdata/issues/4536)
 - incremental chart algorithm doesn't handle counter wrap properly [\#4533](https://github.com/netdata/netdata/issues/4533)
 - Disk full \(inodes\) due to netdata [\#4518](https://github.com/netdata/netdata/issues/4518)
+- Systemd not working on Ubuntu 14.04 [\#4465](https://github.com/netdata/netdata/issues/4465)
 - Links on the wiki are returning 404s [\#4408](https://github.com/netdata/netdata/issues/4408)
 - It figures [\#4184](https://github.com/netdata/netdata/issues/4184)
 - netdata stream clients disconnecting from netdata server [\#4049](https://github.com/netdata/netdata/issues/4049)
 - False positive alarm for RAM [\#4013](https://github.com/netdata/netdata/issues/4013)
 - Occasional rm "cannot remove" on netdata-updater [\#3457](https://github.com/netdata/netdata/issues/3457)
+- opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#3346](https://github.com/netdata/netdata/issues/3346)
 - Netdata Installation failed in Manjaro（Arch）Latest [\#2812](https://github.com/netdata/netdata/issues/2812)
 - undefined applications show up in system category? [\#2385](https://github.com/netdata/netdata/issues/2385)
 - memory mode map initialization slow when database is too big [\#2382](https://github.com/netdata/netdata/issues/2382)
+- Long hostnames cause alignment issues in my-netdata [\#2335](https://github.com/netdata/netdata/issues/2335)
 - dont get snmp running properly [\#1734](https://github.com/netdata/netdata/issues/1734)
 - Plugins continue to log to old error.log after a SIGHUP [\#805](https://github.com/netdata/netdata/issues/805)
 - decouple nightly cron jobs from packaging stage [\#4559](https://github.com/netdata/netdata/pull/4559) ([paulfantom](https://github.com/paulfantom))
 
 **Closed issues:**
 
+- Improve footer of web/gui [\#4708](https://github.com/netdata/netdata/issues/4708)
 - Ignores EMAIL\_SENDER [\#4695](https://github.com/netdata/netdata/issues/4695)
+- requirements.txt in TLD are not related to netdata [\#4693](https://github.com/netdata/netdata/issues/4693)
 - Invalid links in \*.md files [\#4672](https://github.com/netdata/netdata/issues/4672)
 - Replace all wiki links with repo links in netdata files [\#4650](https://github.com/netdata/netdata/issues/4650)
 - Replace http URLs with https in markdown fils [\#4626](https://github.com/netdata/netdata/issues/4626)
@@ -42,6 +54,7 @@
 - Split dashboard.js into multiple files [\#4479](https://github.com/netdata/netdata/issues/4479)
 - Hdd temperature monitoring on FreeBSD [\#4463](https://github.com/netdata/netdata/issues/4463)
 - Modernize dashboard.js [\#4461](https://github.com/netdata/netdata/issues/4461)
+- Documentation links sanity checker [\#4416](https://github.com/netdata/netdata/issues/4416)
 - Write a blog entry about monitoring and performance tuning mysql with netdata [\#4326](https://github.com/netdata/netdata/issues/4326)
 - Document supported python versions [\#4322](https://github.com/netdata/netdata/issues/4322)
 - Add coverity scans to Travis [\#4248](https://github.com/netdata/netdata/issues/4248)
@@ -56,7 +69,12 @@
 
 **Merged pull requests:**
 
+- Cleanup of web/gui footer [\#4709](https://github.com/netdata/netdata/pull/4709) ([gmosx](https://github.com/gmosx))
+- added byte unit scaling [\#4707](https://github.com/netdata/netdata/pull/4707) ([AndCycle](https://github.com/AndCycle))
+- Add option to create release candidates [\#4706](https://github.com/netdata/netdata/pull/4706) ([paulfantom](https://github.com/paulfantom))
+- Add CPU section to proc plugin documentation [\#4704](https://github.com/netdata/netdata/pull/4704) ([vlvkobal](https://github.com/vlvkobal))
 - Add missing quote to tc-qos-helper.sh.in [\#4703](https://github.com/netdata/netdata/pull/4703) ([drwtsn32x](https://github.com/drwtsn32x))
+- Documentation links sanity checker [\#4701](https://github.com/netdata/netdata/pull/4701) ([cakrit](https://github.com/cakrit))
 - Fix broken links [\#4700](https://github.com/netdata/netdata/pull/4700) ([cakrit](https://github.com/cakrit))
 - Wiki Link Updates [\#4699](https://github.com/netdata/netdata/pull/4699) ([cakrit](https://github.com/cakrit))
 - Fix typo and py2 compatibility issue. [\#4697](https://github.com/netdata/netdata/pull/4697) ([Ferroin](https://github.com/Ferroin))
