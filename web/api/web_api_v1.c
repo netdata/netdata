@@ -136,7 +136,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     int all = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
         if(!strcmp(value, "all")) all = 1;
@@ -153,7 +153,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     uint32_t after = 0;
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -176,7 +176,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -271,7 +271,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -489,7 +489,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 */
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if (!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");
@@ -652,7 +652,7 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     }
 
     // get the command
-    char *tok = mystrsep(&url, "/?&");
+    char *tok = mystrsep(&url, "?");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
         uint32_t hash = simple_hash(tok);

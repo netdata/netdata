@@ -580,7 +580,7 @@ static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct we
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
-    char *tok = mystrsep(&url, "/?&");
+    char *tok = mystrsep(&url, "/");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
         if(strcmp(tok, "v1") == 0)
@@ -1071,7 +1071,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         return 400;
     }
 
-    char *tok = mystrsep(&url, "/?&");
+    char *tok = mystrsep(&url, "/");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
@@ -1163,7 +1163,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             buffer_flush(w->response.data);
 
             // get the name of the data to show
-            tok = mystrsep(&url, "/?&");
+            tok = mystrsep(&url, "&");
             if(tok && *tok) {
                 debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
