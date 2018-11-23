@@ -8,10 +8,17 @@ then
   exit 1
 fi
 
+COMMIT_AND_PUSH=${COMMIT_AND_PUSH:-0}
 ORGANIZATION=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $1}')
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
 GIT_MAIL=${GIT_MAIL:-"pawel+bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
+
+if [ -z ${GIT_TAG+x} ]; then
+	OPTS=""
+else
+	OPTS="--future-release ${GIT_TAG}"
+fi
 
 echo "--- Initialize git configuration ---"
 git config user.email "${GIT_MAIL}"
@@ -27,10 +34,12 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
                                                         --token "${GITHUB_TOKEN}" \
                                                         --since-tag "v1.10.0" \
                                                         --unreleased-label "**Next release**" \
-                                                        --no-compare-link \
-                                                        --exclude-labels duplicate,question,invalid,wontfix,discussion,documentation
+                                                        --exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,area/docs,needs triage" \
+                                                        --no-compare-link ${OPTS}
 
 echo "--- Uploading changelog ---"
 git add CHANGELOG.md
-git commit -m '[ci skip] Automatic changelog update' || exit 0
-git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
+if [ "${COMMIT_AND_PUSH}" == "1" ]; then
+	git commit -m '[ci skip] Automatic changelog update' || exit 0
+	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
+fi
