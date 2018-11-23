@@ -58,6 +58,10 @@ RUN mkdir -p /app/usr/sbin/ \
 ARG ARCH
 FROM multiarch/alpine:${ARCH}
 
+# Configure system
+ARG NETDATA_UID=201
+ARG NETDATA_GID=201
+
 # Reinstall some prerequisites
 RUN apk --no-cache add curl \
                        fping \
@@ -71,21 +75,19 @@ RUN apk --no-cache add curl \
                        py-yaml \
                        python
 
-# Copy files over
-COPY --from=builder /app /
-
-# Configure system
-ARG NETDATA_UID=201
-ARG NETDATA_GID=201
-RUN \
-    # fping from alpine apk is on a different location. Moving it.
-    mv /usr/sbin/fping /usr/local/bin/fping && \
+# fping from alpine apk is on a different location. Moving it.
+RUN mv /usr/sbin/fping /usr/local/bin/fping && \
     chmod 4755 /usr/local/bin/fping && \
     mkdir -p /var/log/netdata && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S netdata && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
-    # Apply the permissions as described in
+
+# Copy files over
+COPY --from=builder /app /
+
+RUN \
+    # Apply permissions as described in
     # https://github.com/netdata/netdata/tree/master/doc/netdata-security.md#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
