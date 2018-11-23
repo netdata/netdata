@@ -34,8 +34,8 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
                                                         --token "${GITHUB_TOKEN}" \
                                                         --since-tag "v1.10.0" \
                                                         --unreleased-label "**Next release**" \
-                                                        --no-compare-link \
-                                                        --exclude-labels "duplicate,question,invalid,wontfix,discussion,area/docs,needs triage" ${OPTS}
+                                                        --exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,area/docs,needs triage" \
+                                                        --no-compare-link ${OPTS}
 
 echo "--- Uploading changelog ---"
 git add CHANGELOG.md

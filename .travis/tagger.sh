@@ -40,14 +40,14 @@ function embed_version {
 function release_candidate {
 	LAST_TAG=$(git semver)
 	if [[ $LAST_TAG =~ -rc* ]]; then
-		LAST_RELEASE=$(echo "$LAST_TAG" | cut -d'-' -f 1)
+		VERSION=$(echo "$LAST_TAG" | cut -d'-' -f 1)
 		LAST_RC=$(echo "$LAST_TAG" | cut -d'c' -f 2)
 		RC=$((LAST_RC + 1))
 	else
-		LAST_RELEASE=$LAST_TAG
+		VERSION="$(git semver --next-minor)"
 		RC=0
 	fi
-	GIT_TAG="v$LAST_RELEASE-rc$RC"
+	GIT_TAG="v$VERSION-rc$RC"
 	export GIT_TAG
 }
 
