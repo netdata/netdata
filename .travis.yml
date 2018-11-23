@@ -62,6 +62,7 @@ jobs:
     env: REPOSITORY="netdata/netdata"
   - name: changelog generation
     script: ".travis/generate_changelog.sh"
+    env: COMMIT_AND_PUSH=1
     git:
       depth: false
   - name: labeler # This job should be replaced with GitHub Actions when they hit GA
