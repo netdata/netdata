@@ -6,6 +6,7 @@ daysUntilClose: 60
 exemptLabels:
   - bug
   - help wanted
+  - feature request
 exemptProjects: true
 exemptMilestones: true
 staleLabel: stale
