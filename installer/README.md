@@ -134,6 +134,12 @@ You can [Install Netdata with Docker](../docker/#install-netdata-with-docker).
 
 ---
 
+## Manual installation
+
+TBD
+
+---
+
 ## Other installation methods  
   
 - **Linux manual installation from source**  
