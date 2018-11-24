@@ -395,3 +395,7 @@ Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as a
 # Netdata startup  
 [ -x /etc/rc.netdata ] && /etc/rc.netdata start  
 ```
+
+## Getting Started
+
+TBD
