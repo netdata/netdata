@@ -81,7 +81,7 @@ RUN mv /usr/sbin/fping /usr/local/bin/fping && \
     mkdir -p /var/log/netdata && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S netdata && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata
 
 # Copy files over
 COPY --from=builder /app /
