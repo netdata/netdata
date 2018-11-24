@@ -1,36 +1,47 @@
 # Installation
 
-The best way to install Netdata is directly from source.
-Our **automatic installer** will install required packages and compile Netdata directly on your systems.
+Netdata is a **monitoring agent**. It is designed to be installed and run on all your systems: **physical** and **virtual** servers, **containers**, even **IoT**.
+
+The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
 > **IMPORTANT**<br/>
 > Do not use Netdata packages distributed by third parties. In most of the cases, these packages are either too old or broken.
 
 1. [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2. [Any Linux 64bit, pre-built static binary](#linux-64bit-pre-built-static-binary), static binary package for any 64bit Linux
-3. [Docker](#docker), run Netdata in a docker container
-4. [FreeBSD](#freebsd)
-5. [MacOS](#macos)
-6. [Getting Started](#getting-started), after Netdata has been installed
+3. [Run Netdata in a docker container](#run-netdata-in-a-docker-container), run Netdata in a docker container
+4. [Manual installation](#manual-installation), step by step instructions to do it yourself
+5. [FreeBSD](#freebsd)
+6. [MacOS](#macos)
+7. [Getting Started](#getting-started), after Netdata has been installed
+
+---
 
 ## One line installation
+
+> This method is **fully automatic on all Linux** distributions. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
 
 To install Netdata from source and keep it up to date automatically, run the following:
 
 ```bash
-
-  bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-
-```  
-
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+```
 
 *(do not `sudo` this command, it will do it by itself as needed)*  
 
-<details><summary>Click here for more information and advanced use of this command...</summary>
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+
+<details><summary>Click here for more information and advanced use of this command.</summary>
 
 &nbsp;<br/>
-This command:
+Verify the integrity of the script with this:
+
+```bash
+[ "6c15b7d7d31dc130631c42da65df71ae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+*It should print `OK, VALID` if the script is the one we ship.*
+
+The `kickstart.sh` script:
 
 - detects the Linux distro and **installs the required system packages** for building Netdata (will ask for confirmation)  
 - downloads the latest Netdata source tree to `/usr/src/netdata.git`.  
@@ -43,13 +54,14 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata. Example:
   
 ```bash
-
   bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it
-
 ```
+
 </details>&nbsp;<br/>
-  
-> Once Netdata is installed, see [Getting Started](#getting-started).
+
+Once Netdata is installed, see [Getting Started](#getting-started).
+
+---
 
 ## Linux 64bit pre-built static binary
 
@@ -57,7 +69,7 @@ You can install a pre-compiled static binary of Netdata on any Intel/AMD 64bit L
 (even those that don't have a package manager, like CoreOS, CirrOS, busybox systems, etc).  
 You can also use these packages on systems with broken or unsupported package managers.
 
-To install Netdata with a binary package on any Linux distro, any kernel version - for **Intel/AMD 64bit** hosts, run the following:  
+To install Netdata with a binary package on any Linux distro, any kernel version - for **Intel/AMD 64bit** hosts, run the following:
   
 ```bash
 
@@ -65,15 +77,23 @@ To install Netdata with a binary package on any Linux distro, any kernel version
 
 ```
 
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)  
-
 *(do not `sudo` this command, it will do it by itself as needed; if the target system does not have `bash` installed, see below for instructions to run it without `bash`)*
+
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)  
 
 > The static builds install Netdata at **`/opt/netdata`**
 
-<details><summary>Click here for more information and advanced use of this command...</summary>
+<details><summary>Click here for more information and advanced use of this command.</summary>
 
 &nbsp;<br/>
+Verify the integrity of the script with this:
+
+```bash
+[ "a5c16b3126b696ff7b4c8d8d8dc6957d" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+
+*It should print `OK, VALID` if the script is the one we ship.*
+
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.  
   
 Example:  
@@ -104,12 +124,16 @@ sh /tmp/kickstart-static64.sh
 
 </details>&nbsp;<br/>
 
-> Once Netdata is installed, see [Getting Started](#getting-started).
+Once Netdata is installed, see [Getting Started](#getting-started).
 
-## Docker  
+---
+
+## Run Netdata in a Docker container
   
-You can [Install Netdata with Docker](../docker/#install-netdata-with-docker)  
-  
+You can [Install Netdata with Docker](../docker/#install-netdata-with-docker).
+
+---
+
 ## Other installation methods  
   
 - **Linux manual installation from source**  
