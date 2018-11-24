@@ -644,11 +644,6 @@ function renderMachines(machinesArray) {
 function netdataRegistryCallback(machinesArray) {
     let html = '';
 
-    // options.hosts = [
-    //     {hostname: "test1"},
-    //     {hostname: "test2"}
-    // ]
-
     if (options.hosts.length > 1) {
         html += renderStreamedHosts(options) + `<hr />`;
     }
