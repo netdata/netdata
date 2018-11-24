@@ -11,6 +11,7 @@
 **Closed issues:**
 
 - Use `--future-release` in changelog generation [\#4718](https://github.com/netdata/netdata/issues/4718)
+- Monitor Speed/Duplex [\#4047](https://github.com/netdata/netdata/issues/4047)
 - Feature: UKSM support [\#2994](https://github.com/netdata/netdata/issues/2994)
 - Ceph support [\#1673](https://github.com/netdata/netdata/issues/1673)
 - Adding support for time markers [\#1195](https://github.com/netdata/netdata/issues/1195)
