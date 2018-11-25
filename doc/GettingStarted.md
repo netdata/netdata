@@ -141,7 +141,7 @@ In `netdata.conf` at the `[plugin:python.d]` section, we can provide additional 
 sudo /etc/netdata/edit-config python.d.conf
 ```
 
-Then, `nginx` has its own configuration file for configuring its data collection jobs (module modules can collect data from multiple sources, so the `nginx` module could collect metrics from multiple `nginx` servers):
+Then, `nginx` has its own configuration file for configuring its data collection jobs (most modules can collect data from multiple sources, so the `nginx` module can collect metrics from multiple, local or remote, `nginx` servers):
 
 ```bash
 sudo /etc/netdata/edit-config python.d/nginx.conf
