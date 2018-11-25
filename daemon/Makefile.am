@@ -7,3 +7,7 @@ dist_noinst_DATA = \
 	README.md \
 	config/README.md \
 	$(NULL)
+
+dist_plugins_SCRIPTS = \
+	anonymous-statistics.sh \
+	$(NULL)

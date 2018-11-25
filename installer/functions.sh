@@ -418,8 +418,10 @@ iscontainer() {
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
     local pid=$( cat /proc/1/sched 2>/dev/null | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
-    pid=$(( pid + 0 ))
-    [ ${pid} -ne 1 ] && return 0
+    if [ ! -z "${pid}" ]; then
+        pid=$(( pid + 0 ))
+        [ ${pid} -gt 1 ] && return 0
+    fi
 
     # lxc sets environment variable 'container'
     [ ! -z "${container}" ] && return 0
