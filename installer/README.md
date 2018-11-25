@@ -4,8 +4,9 @@ Netdata is a **monitoring agent**. It is designed to be installed and run on all
 
 The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
-> **IMPORTANT**<br/>
-> Do not use Netdata packages distributed by third parties. In most of the cases, these packages are either too old or broken.
+!!! warning
+    Do not use Netdata packages distributed by third parties.
+    In most of the cases, these packages are either too old or broken.
 
 1. [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2. [Any Linux 64bit, pre-built static binary](#linux-64bit-pre-built-static-binary), static binary package for any 64bit Linux
