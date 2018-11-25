@@ -1,6 +1,7 @@
 #!/bin/bash
 
-cd htmldoc/src
+GENERATOR_DIR="docs/generator"
+cd ${GENERATOR_DIR}/src
 
 # create yaml nav subtree with all the files directly under a specific directory
 # arguments:
@@ -11,36 +12,35 @@ cd htmldoc/src
 # maxdepth - how many levels of subdirectories do I include in the yaml in this section. 1 means just the top level and is the default if left empty
 # excludefirstlevel - Optional param. If passed, mindepth is set to 2, to exclude the READMEs in the first directory level
 
-navpart () {
- tabs=$1
- dir=$2
- file=$3
- section=$4
- maxdepth=$5
- excludefirstlevel=$6
- spc=""
- 
- i=1
- while [ ${i} -lt ${tabs} ] ; do
-	spc="    $spc"
-	i=$[$i + 1]
- done
- 
- if [ -z "$file" ] ; then file='*' ; fi
- if [[ ! -z "$section" ]] ; then echo "$spc- ${section}:" ; fi
- if [ -z "$maxdepth" ] ; then maxdepth=1; fi
- if [[ ! -z "$excludefirstlevel" ]] ; then mindepth=2 ; else mindepth=1; fi
- 
- for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}'); do 
-	# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
-	if [ -z "$section" ] ; then 
-		echo "$spc- '$f'"
-	else
-		echo "$spc    - '$f'"
-	fi
- done
-}
+navpart() {
+	tabs=$1
+	dir=$2
+	file=$3
+	section=$4
+	maxdepth=$5
+	excludefirstlevel=$6
+	spc=""
 
+	i=1
+	while [ ${i} -lt ${tabs} ]; do
+		spc="    $spc"
+		i=$((i + 1))
+	done
+
+	if [ -z "$file" ]; then file='*'; fi
+	if [[ -n $section ]]; then echo "$spc- ${section}:"; fi
+	if [ -z "$maxdepth" ]; then maxdepth=1; fi
+	if [[ -n $excludefirstlevel ]]; then mindepth=2; else mindepth=1; fi
+
+	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}'); do
+		# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
+		if [ -z "$section" ]; then
+			echo "$spc- '$f'"
+		else
+			echo "$spc    - '$f'"
+		fi
+	done
+}
 
 echo -e 'site_name: NetData Documentation
 repo_url: https://github.com/netdata/netdata
@@ -51,6 +51,7 @@ copyright: NetData, 2018
 docs_dir: src
 site_dir: build
 #use_directory_urls: false
+strict: true
 theme:
     name: "material"
     custom_dir: themes/material
@@ -100,11 +101,11 @@ nav:'
 
 navpart 1 . README "About"
 
-echo -ne "    - 'doc/Why-Netdata.md'
-    - 'doc/Demo-Sites.md'
-    - 'doc/netdata-security.md'
-    - 'doc/Donations-netdata-has-received.md'
-    - 'doc/a-github-star-is-important.md'
+echo -ne "    - 'docs/Why-Netdata.md'
+    - 'docs/Demo-Sites.md'
+    - 'docs/netdata-security.md'
+    - 'docs/Donations-netdata-has-received.md'
+    - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
 "
@@ -116,7 +117,7 @@ echo -ne "- Installation:
     - 'installer/UNINSTALL.md'
 "
 
-echo -ne "- 'doc/GettingStarted.md'
+echo -ne "- 'docs/GettingStarted.md'
 "
 
 echo -ne "- Running netdata:
@@ -127,23 +128,22 @@ navpart 2 daemon/config
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
 echo -ne "        - Running behind another web server:
-            - 'doc/Running-behind-nginx.md'
-            - 'doc/Running-behind-apache.md'
-            - 'doc/Running-behind-lighttpd.md'
-            - 'doc/Running-behind-caddy.md'
+            - 'docs/Running-behind-nginx.md'
+            - 'docs/Running-behind-apache.md'
+            - 'docs/Running-behind-lighttpd.md'
+            - 'docs/Running-behind-caddy.md'
 "
 #navpart 2 system
 navpart 2 database
 navpart 2 registry
 
-echo -ne "    - 'doc/Performance.md'
-    - 'doc/netdata-for-IoT.md'
-    - 'doc/high-performance-netdata.md'
+echo -ne "    - 'docs/Performance.md'
+    - 'docs/netdata-for-IoT.md'
+    - 'docs/high-performance-netdata.md'
 "
 
-
 navpart 1 collectors "" "Data collection" 1
-echo -ne "    - 'doc/Add-more-charts-to-netdata.md'
+echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
     - Internal plugins:
 "
 navpart 3 collectors/proc.plugin
@@ -165,7 +165,7 @@ navpart 3 collectors/apps.plugin
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
 
-echo -ne "    - 'doc/Third-Party-Plugins.md'
+echo -ne "    - 'docs/Third-Party-Plugins.md'
 "
 
 navpart 1 health README "Alarms and notifications"
@@ -189,7 +189,7 @@ navpart 2 web/api/queries "" "Queries" 2
 echo -ne "- Hacking netdata:
     - CONTRIBUTING.md
     - CODE_OF_CONDUCT.md
-    - 'doc/Netdata-Security-and-Disclosure-Information.md'
+    - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
 navpart 2 makeself "" "" 4
@@ -198,9 +198,3 @@ navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests
 navpart 2 diagrams/data_structures
-
-
-
-
-
-
