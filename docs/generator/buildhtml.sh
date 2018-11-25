@@ -22,20 +22,6 @@ sed -i '0,/# netdata /s//# Introduction\n\n/' ${GENERATOR_DIR}/src/README.md
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
 	"HISTORICAL_CHANGELOG.md"
-	"collectors/charts.d.plugin/mem_apps/README.md"
-	"collectors/charts.d.plugin/postfix/README.md"
-	"collectors/charts.d.plugin/tomcat/README.md"
-	"collectors/charts.d.plugin/sensors/README.md"
-	"collectors/charts.d.plugin/cpu_apps/README.md"
-	"collectors/charts.d.plugin/squid/README.md"
-	"collectors/charts.d.plugin/nginx/README.md"
-	"collectors/charts.d.plugin/hddtemp/README.md"
-	"collectors/charts.d.plugin/cpufreq/README.md"
-	"collectors/charts.d.plugin/mysql/README.md"
-	"collectors/charts.d.plugin/exim/README.md"
-	"collectors/charts.d.plugin/apache/README.md"
-	"collectors/charts.d.plugin/load_average/README.md"
-	"collectors/charts.d.plugin/phpfpm/README.md"
 )
 for f in "${EXCLUDE_LIST[@]}"; do
 	rm "${GENERATOR_DIR}/src/$f"

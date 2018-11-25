@@ -77,6 +77,7 @@ dist_noinst_DATA= \
 	docs/netdata-for-IoT.md \
 	docs/netdata-security.md \
 	docs/Why-Netdata.md \
+	docs/GettingStarted.md \
 	docs/generator/themes/material/partials/footer.html \
 	installer/README.md \
 	installer/UNINSTALL.md \
