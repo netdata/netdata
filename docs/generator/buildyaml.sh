@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GENERATOR_DIR="docs/generate"
+GENERATOR_DIR="docs/generator"
 cd ${GENERATOR_DIR}/src
 
 # create yaml nav subtree with all the files directly under a specific directory
