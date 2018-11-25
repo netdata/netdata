@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- registry items are clickable, but no action is taken [\#4721](https://github.com/netdata/netdata/issues/4721)
 - Issues with prometheus exposed metrics [\#4680](https://github.com/netdata/netdata/issues/4680)
 - Constant stream of "chart took too long to be updated" INFO messages in error.log [\#3505](https://github.com/netdata/netdata/issues/3505)
 - Alarm badge link escaping for disk paths in default dashboard [\#3253](https://github.com/netdata/netdata/issues/3253)
@@ -11,13 +12,19 @@
 **Closed issues:**
 
 - Use `--future-release` in changelog generation [\#4718](https://github.com/netdata/netdata/issues/4718)
+- Fix file classification in LGTM [\#4259](https://github.com/netdata/netdata/issues/4259)
 - Monitor Speed/Duplex [\#4047](https://github.com/netdata/netdata/issues/4047)
 - Feature: UKSM support [\#2994](https://github.com/netdata/netdata/issues/2994)
 - Ceph support [\#1673](https://github.com/netdata/netdata/issues/1673)
 - Adding support for time markers [\#1195](https://github.com/netdata/netdata/issues/1195)
+- sensu/collectd integration [\#174](https://github.com/netdata/netdata/issues/174)
 
 **Merged pull requests:**
 
+- Make Getting Started just a top level link [\#4740](https://github.com/netdata/netdata/pull/4740) ([cakrit](https://github.com/cakrit))
+- docker: correct invalid syntax [\#4738](https://github.com/netdata/netdata/pull/4738) ([paulfantom](https://github.com/paulfantom))
+- updated installation page, added getting-started [\#4734](https://github.com/netdata/netdata/pull/4734) ([ktsaou](https://github.com/ktsaou))
+- Make the whole title area clickable,  closes \#4721 [\#4733](https://github.com/netdata/netdata/pull/4733) ([gmosx](https://github.com/gmosx))
 - Better changelog generation when releasing new version [\#4728](https://github.com/netdata/netdata/pull/4728) ([paulfantom](https://github.com/paulfantom))
 - Correctly apply B unit conversion [\#4724](https://github.com/netdata/netdata/pull/4724) ([gmosx](https://github.com/gmosx))
 - exempt feature requests from going stale [\#4723](https://github.com/netdata/netdata/pull/4723) ([paulfantom](https://github.com/paulfantom))
@@ -235,7 +242,6 @@
 - elasticsearch plugin python json exception if another service running on port 9200 [\#4092](https://github.com/netdata/netdata/issues/4092)
 - varnish 5 support [\#4073](https://github.com/netdata/netdata/issues/4073)
 - 'Other' is the Largest Category Under Applications \> Mem due to Node processes [\#4063](https://github.com/netdata/netdata/issues/4063)
-- send netdata health monitoring variables to backends [\#4035](https://github.com/netdata/netdata/issues/4035)
 - Badges - seconds units [\#4029](https://github.com/netdata/netdata/issues/4029)
 - Web\_log doesn't support response times in nanoseconds [\#4003](https://github.com/netdata/netdata/issues/4003)
 - 400 error when netdata tries to send slack notification [\#3989](https://github.com/netdata/netdata/issues/3989)
