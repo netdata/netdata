@@ -46,7 +46,7 @@ The registry keeps track of 3 entities:
 
 ## Who talks to the registry?
 
-Your web browser **only**! Check here if this is against your policies: [how to not send any information to a thirdparty server](../doc/netdata-security.md#security-design)
+Your web browser **only**! Check here if this is against your policies: [how to not send any information to a thirdparty server](../docs/netdata-security.md#security-design)
 
 Your netdata servers do not talk to the registry. This is a UML diagram of its operation:
 

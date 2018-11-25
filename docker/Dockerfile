@@ -88,7 +88,7 @@ COPY --from=builder /app /
 
 RUN \
     # Apply permissions as described in
-    # https://github.com/netdata/netdata/tree/master/doc/netdata-security.md#netdata-directories
+    # https://github.com/netdata/netdata/tree/master/docs/netdata-security.md#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown -R root:netdata /usr/lib/netdata && \

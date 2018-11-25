@@ -145,6 +145,6 @@ sitespeed-result/
 python.d/python-modules-installer.sh
 
 # documentation generated files
-htmldoc/src
-htmldoc/build
-htmldoc/mkdocs.yml
+docs/generator/src
+docs/generator/build
+docs/generator/mkdocs.yml

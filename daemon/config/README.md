@@ -36,7 +36,7 @@ debug log|`/var/log/netdata/debug.log`|The filename to save debug information. T
 error log|`/var/log/netdata/error.log`|The filename to save error messages for netdata daemon and all plugins (`stderr` is sent here for all netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.
 access log|`/var/log/netdata/access.log`|The filename to save the log of web clients accessing netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.
 memory mode|save|When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits.
-update every|1|The frequency in seconds, for data collection. For more information see [Performance](../../doc/Performance.md#performance).
+update every|1|The frequency in seconds, for data collection. For more information see [Performance](../../docs/Performance.md#performance).
 run as user|`netdata`|The user netdata will run as.
 web files owner|`netdata`|The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`.
 http port listen backlog|100|The port backlog. Check `man 2 listen`.
@@ -107,7 +107,7 @@ External plugins will have only 2 options at `netdata.conf`:
 
 setting | default | info
 :------:|:-------:|:----
-update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](../../doc/Performance.md#performance).
+update every|the value of `[global].update every` setting|The frequency in seconds the plugin should collect values. For more information check [Performance](../../docs/Performance.md#performance).
 command options|*empty*|Additional command line options to pass to the plugin. 
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
