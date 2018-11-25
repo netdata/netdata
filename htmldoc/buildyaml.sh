@@ -72,6 +72,30 @@ markdown_extensions:
     permalink: True
     separator: "-"
  - wikilinks
+ - pymdownx.arithmatex
+ - pymdownx.betterem:
+    smart_enable: all
+ - pymdownx.caret
+ - pymdownx.critic
+ - pymdownx.details
+ - pymdownx.emoji:
+    emoji_generator: !!python/name:pymdownx.emoji.to_svg
+ - pymdownx.inlinehilite
+ - pymdownx.magiclink
+ - pymdownx.mark
+ - pymdownx.smartsymbols
+ - pymdownx.superfences
+ - pymdownx.tasklist:
+    custom_checkbox: true
+ - pymdownx.tilde
+ - pymdownx.betterem
+ - pymdownx.superfences
+ - markdown.extensions.footnotes
+ - markdown.extensions.attr_list
+ - markdown.extensions.def_list
+ - markdown.extensions.tables
+ - markdown.extensions.abbr
+ - pymdownx.extrarawhtml
 nav:'
 
 navpart 1 . README "About"
@@ -91,6 +115,11 @@ echo -ne "- Installation:
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
 "
+
+echo -ne "- Getting Started:
+    - 'doc/GettingStarted.md'
+"
+
 echo -ne "- Running netdata:
 "
 navpart 2 daemon
