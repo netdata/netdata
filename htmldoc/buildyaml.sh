@@ -116,8 +116,7 @@ echo -ne "- Installation:
     - 'installer/UNINSTALL.md'
 "
 
-echo -ne "- Getting Started:
-    - 'doc/GettingStarted.md'
+echo -ne "- 'doc/GettingStarted.md'
 "
 
 echo -ne "- Running netdata:
