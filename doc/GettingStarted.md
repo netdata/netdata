@@ -13,25 +13,23 @@ http://your.server.ip:19999/
 
 <details markdown="1"><summary>Click here, if it does not work.</summary>
 
-1. Verify Netdata is running.
+**Verify Netdata is running.**
 
-   Open an ssh session to the server and execute `sudo ps -e netdata`. It should respond with the PID of the netdata daemon. If it prints nothing, Netdata is not running. Check the [installation page](../installer) to install it.
+Open an ssh session to the server and execute `sudo ps -e netdata`. It should respond with the PID of the netdata daemon. If it prints nothing, Netdata is not running. Check the [installation page](../installer) to install it.
 
-2. Verify Netdata responds to HTTP requests.
+**Verify Netdata responds to HTTP requests.**
 
-   Using the same ssh session, execute `curl -Ss http://localhost:19999`. It should dump on your screen
-   the `index.html` page of the dashboard. If it does not, check the [installation page](../installer) to install it.
+Using the same ssh session, execute `curl -Ss http://localhost:19999`. It should dump on your screen the `index.html` page of the dashboard. If it does not, check the [installation page](../installer) to install it.
 
-3. Verify Netdata receives the HTTP requests.
+**Verify Netdata receives the HTTP requests.**
 
-   On the same ssh session, execute `tail -f /var/log/netdata/access.log` (if you installed the static 64bit package, use: `tail -f /opt/netdata/var/log/netdata/access.log`). This command will print on
-   your screen all HTTP requests Netdata receives.
+On the same ssh session, execute `tail -f /var/log/netdata/access.log` (if you installed the static 64bit package, use: `tail -f /opt/netdata/var/log/netdata/access.log`). This command will print on your screen all HTTP requests Netdata receives.
 
-   Next, try to access the dashboard using your web browser, using the URL posted above. If nothing is printed on your terminal, the HTTP request is not routed to your Netdata.
+Next, try to access the dashboard using your web browser, using the URL posted above. If nothing is printed on your terminal, the HTTP request is not routed to your Netdata.
 
-   If you are not sure about your server IP, run this for a hint: `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "`. It should print the IP of your server.
+If you are not sure about your server IP, run this for a hint: `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "`. It should print the IP of your server.
 
-   If still Netdata does not receive the requests, something is blocking them. A firewall possibly. Please check your network.
+If still Netdata does not receive the requests, something is blocking them. A firewall possibly. Please check your network.
 
 </details>&nbsp;<br/>
 
