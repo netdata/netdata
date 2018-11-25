@@ -56,6 +56,14 @@ jobs:
     name: tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/create_artifacts.sh"
+    deploy:
+      provider: gcs
+      access_key_id: "GCS Interoperable Access Key ID"
+      secret_access_key: "GCS Interoperable Access Secret"
+      bucket: "netdata-nightlies"
+      skip_cleanup: true
+      file_glob: true
+      file: "netdata*.tar.gz"
   - name: docker images
     install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
     script: "docker/build.sh"
