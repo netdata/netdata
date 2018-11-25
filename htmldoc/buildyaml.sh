@@ -115,6 +115,11 @@ echo -ne "- Installation:
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
 "
+
+echo -ne "- Getting Started:
+    - 'doc/GettingStarted.md'
+"
+
 echo -ne "- Running netdata:
 "
 navpart 2 daemon

@@ -5,15 +5,19 @@ Netdata is a **monitoring agent**. It is designed to be installed and run on all
 The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
 !!! warning
-    Do not use Netdata packages distributed by third parties. In most of the cases, these packages are either too old or broken.
+    You can find Netdata packages distributed by third parties. In many cases, these packages are either too old or broken. So, the suggested ways to install Netdata are the ones in this page.
+    **We are currently working to provide our binary packages for all Linux distros.** Stay tuned...
 
 1. [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
-2. [Any Linux 64bit, pre-built static binary](#linux-64bit-pre-built-static-binary), static binary package for any 64bit Linux
-3. [Run Netdata in a docker container](#run-netdata-in-a-docker-container), run Netdata in a docker container
-4. [Manual installation](#manual-installation), step by step instructions to do it yourself
-5. [FreeBSD](#freebsd)
-6. [MacOS](#macos)
-7. [Getting Started](#getting-started), after Netdata has been installed
+2. [Install pre-built static binary on any 64bit Linux](#linux-64bit-pre-built-static-binary)
+3. [Run Netdata in a docker container](#run-netdata-in-a-docker-container)
+4. [Manual installation, step by step](#install-netdata-on-linux-manually)
+5. [Install on FreeBSD](#freebsd)
+6. [Install on pfSense](#pfsense)
+7. [Enable on FreeNAS Corral](#freenas)
+8. [Install on macOS (OS X)](#macos)
+
+See also the list of Netdata [package maintainers](../packaging/maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.  
 
 ---
 
@@ -59,7 +63,7 @@ For automated installs, append a space + `--dont-wait` to the command line. You 
 
 </details>&nbsp;<br/>
 
-Once Netdata is installed, see [Getting Started](#getting-started).
+Once Netdata is installed, see [Getting Started](../doc/GettingStarted.md).
 
 ---
 
@@ -124,7 +128,7 @@ sh /tmp/kickstart-static64.sh
 
 </details>&nbsp;<br/>
 
-Once Netdata is installed, see [Getting Started](#getting-started).
+Once Netdata is installed, see [Getting Started](../doc/GettingStarted.md).
 
 ---
 
@@ -134,26 +138,6 @@ You can [Install Netdata with Docker](../docker/#install-netdata-with-docker).
 
 ---
 
-## Manual installation
-
-TBD
-
----
-
-## Other installation methods  
-  
-- **Linux manual installation from source**  
-  
-  Semi-automatic, with more details about the steps involved and actions taken [here](#install-netdata-on-linux-manually)  
-  
-- **Non-Linux installation**  
-  - [Install from package or source, on FreeBSD](#freebsd)  
-  - [Install from package, on pfSense](#pfsense)  
-  - [Enable Netdata on FreeNAS Corral](#freenas)
-  - [Install from package or source, on macOS (OS X)](#macos)  
-  
-See also the list of Netdata [package maintainers](../packaging/maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.  
-   
 ## Install Netdata on Linux manually  
   
 To install the latest git version of Netdata, please follow these 2 steps:  
@@ -425,7 +409,3 @@ Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as a
 # Netdata startup  
 [ -x /etc/rc.netdata ] && /etc/rc.netdata start  
 ```
-
-## Getting Started
-
-TBD
