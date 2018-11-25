@@ -529,7 +529,9 @@ function renderStreamedHosts(options) {
                 <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                     <i class="fas fa-${icon}" style="color: #999;"></i>
                 </a>                    
-                <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
+                <span class="__title" onClick="return gotoHostedModalHandler('${url}');">
+                    <a class="registry_link" href="${url}#">${hostname}</a>
+                </span>
                 <div></div>
             </div>`
         )
@@ -581,8 +583,8 @@ function renderMachines(machinesArray) {
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <i class="fas fa-chart-bar" color: #fff"></i>
-                    <span>
-                        <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+                    <span class="__title" onClick="return gotoServerModalHandler('${machine.guid}');">
+                        <a class="registry_link" href="${machine.url}#">${machine.name}</a>
                     </span>
                     <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
                         <i class="fas fa-caret-down" style="color: #999"></i>

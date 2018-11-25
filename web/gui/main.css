@@ -551,6 +551,10 @@ body.modal-open {
     font-weight: 300;
 }
 
+#my-netdata-dropdown-content .agent-item .__title {
+    cursor: pointer;
+}
+
 #my-netdata-dropdown-content .agent-item:hover {
     background-color: #262626;
 }
