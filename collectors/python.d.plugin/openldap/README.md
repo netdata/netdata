@@ -4,7 +4,7 @@ This module provides statistics information from openldap (slapd) server.
 Statistics are taken from LDAP monitoring interface. Manual page, slapd-monitor(5) is available.
 
 **Requirement:**
-* Follow instructions from https://www.openldap.org/doc/admin24/monitoringslapd.html to activate monitoring interface.
+* Follow instructions from https://www.openldap.org/docs/admin24/monitoringslapd.html to activate monitoring interface.
 * Install python ldap module `pip install ldap` or `yum install python-ldap`
 * Modify openldap.conf with your credentials
 

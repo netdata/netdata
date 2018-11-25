@@ -63,7 +63,7 @@ For automated installs, append a space + `--dont-wait` to the command line. You 
 
 </details>&nbsp;<br/>
 
-Once Netdata is installed, see [Getting Started](../doc/GettingStarted.md).
+Once Netdata is installed, see [Getting Started](../docs/GettingStarted.md).
 
 ---
 
@@ -128,7 +128,7 @@ sh /tmp/kickstart-static64.sh
 
 </details>&nbsp;<br/>
 
-Once Netdata is installed, see [Getting Started](../doc/GettingStarted.md).
+Once Netdata is installed, see [Getting Started](../docs/GettingStarted.md).
 
 ---
 
@@ -390,7 +390,7 @@ When Netdata is first installed, it will run as _root_. This may or may not be a
   
 1. Creat a group `netdata` via the Synology group interface. Give it no access to anything.  
 2. Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata will chuid to this user when running.  
-3. Change ownership of the following directories, as defined in [Netdata Security](../doc/netdata-security.md#security-design):  
+3. Change ownership of the following directories, as defined in [Netdata Security](../docs/netdata-security.md#security-design):  
   
 ```  
 $ chown -R root:netdata /opt/netdata/usr/share/netdata  
