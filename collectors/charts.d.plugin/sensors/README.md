@@ -1,9 +1,10 @@
+# sensors
+
 > THIS MODULE IS OBSOLETE.
-> USE THE PYTHON ONE - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
+> USE [THE PYTHON ONE](../../python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 
 > Unlike the python one, this module can collect temperature on RPi.
 
-# sensors
 
 The plugin will provide charts for all configured system sensors
 

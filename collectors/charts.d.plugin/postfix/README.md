@@ -1,7 +1,7 @@
-> THIS MODULE IS OBSOLETE.
-> USE THE PYTHON ONE - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
-
 # postfix
+
+> THIS MODULE IS OBSOLETE.
+> USE [THE PYTHON ONE](../../python.d.plugin/postfix) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 
 The plugin will collect the postfix queue size.
 
