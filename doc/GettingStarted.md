@@ -1,7 +1,6 @@
 # Getting Started
 
-These are your first steps **after** you have installed netdata.
-If you haven't installed it already, please check the [installation page](../installer).
+These are your first steps **after** you have installed netdata. If you haven't installed it already, please check the [installation page](../installer).
 
 ## Accessing the dashboard
 
@@ -33,9 +32,18 @@ If still Netdata does not receive the requests, something is blocking them. A fi
 
 </details>&nbsp;<br/>
 
-When you install multiple Netdata servers, all your servers will appear at the `my-netdata` menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of all your netdata servers.
+When you install multiple Netdata servers, all your servers will appear at the `my-netdata` menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your netdata servers.
 
-The `my-netdata` menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current dashboard view are propagated to the other netdata server. So, the current visible timeframe of the charts, the highlighted time-frame, the scrolling position of the dashboard, the theme you use, etc. are all propagated to the other server.
+The `my-netdata` menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other netdata server:
+
+- the current charts panning (drag the charts left or right),
+- the current charts zooming (`SHIFT` + mouse wheel over a chart),
+- the highlighted time-frame (`ALT` + select an area on a chart),
+- the scrolling position of the dashboard,
+- the theme you use,
+- etc.
+
+are all sent over to other netdata server, to allow you troubleshoot cross-server performance issues easily.
 
 ## Starting and stopping Netdata
 
@@ -68,7 +76,7 @@ Make sure the `history` line is not commented (comment lines start with `#`).
 
 1 hour is 3600 seconds, so the number you need to set is the result of `HOURS * 3600`.
 
-!!! important
+!!! danger
     Be careful when you set this on production systems. If you set it too high, your system may run out of memory. By default, netdata is configured to be killed first when the system starves for memory, but better be careful to avoid issues.
 
 For more information about Netdata memory requirements, [check this page](../database).
