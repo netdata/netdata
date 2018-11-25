@@ -386,8 +386,6 @@ The documentation previously recommended installing the Debian Chroot package fr
   
 The good news is that the 64-bit static installer works fine if your NAS is one that uses the amd64 architecture. It will install the content into `/opt/netdata`, making future removal safe and simple.  
   
-###### Additional Work  
-  
 When Netdata is first installed, it will run as _root_. This may or may not be acceptable for you, and since other installations run it as the _netdata_ user, you might wish to do the same. This requires some extra work:  
   
 1. Creat a group `netdata` via the Synology group interface. Give it no access to anything.  

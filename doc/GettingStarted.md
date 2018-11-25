@@ -147,7 +147,7 @@ Then, `nginx` has its own configuration file for configuring its data collection
 sudo /etc/netdata/edit-config python.d/nginx.conf
 ```
 
-## Disabling health monitoring
+## Health monitoring and alarms
 
 Netdata ships hundreds of health monitoring alarms for detecting anomalies. These are optimized for production servers.
 
