@@ -139,7 +139,7 @@ class Service(SimpleService):
                         except sensors.SensorsError as error:
                             self.error('{0}: {1}'.format(sf.name, error))
                             continue
-                    if not vals or vals[0] == 0:
+                    if not vals:
                         continue
                     if TYPE_MAP[feature.type] == sensor:
                         # create chart
