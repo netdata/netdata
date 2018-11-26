@@ -25,11 +25,11 @@ ID_LIKE=
 
 if [ -f "/etc/os-release" ]; then
     OS_DETECTION="/etc/os-release"
-    eval "$(cat /etc/os-release | grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=")"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
 elif [ -f "/etc/lsb-release" ]; then
     OS_DETECTION="/etc/lsb-release"
     DISTRIB_ID= DISTRIB_RELEASE= DISTRIB_CODENAME=
-    eval "$(cat /etc/lsb-release | grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=")"
+    eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
     NAME="${DISTRIB_ID}"
     VERSION="${DISTRIB_RELEASE}"
     ID="${DISTRIB_CODENAME}"
@@ -57,7 +57,7 @@ then
 else
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
-    pid=$( cat /proc/1/sched 2>/dev/null | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
+    pid=$( head -n 1 </proc/1/sched 2>/dev/null | { IFS='(),#:' read name pid th threads; echo $pid; } )
     if [ ! -z "${pid}" ]; then
         pid=$(( pid + 0 ))
         [ ${pid} -ne 1 ] && VIRTUALIZATION="container"
