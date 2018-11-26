@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 from third_party.monotonic import monotonic
 
@@ -17,25 +17,42 @@ RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
                        'END\n'
 
+PENALTY_EVERY = 5
+
 
 class RuntimeCounters:
     def __init__(self, configuration):
         """
         :param configuration: <dict>
         """
-        self.FREQ = int(configuration.pop('update_every'))
-        self.START_RUN = 0
-        self.NEXT_RUN = 0
-        self.PREV_UPDATE = 0
-        self.SINCE_UPDATE = 0
-        self.ELAPSED = 0
-        self.RETRIES = 0
-        self.RETRIES_MAX = configuration.pop('retries')
-        self.PENALTY = 0
-        self.RUNS = 1
+        self.update_every = int(configuration.pop('update_every'))
+        self.max_retries = int(configuration.pop('retries'))
 
-    def is_sleep_time(self):
-        return self.START_RUN < self.NEXT_RUN
+        self.start_mono = 0
+        self.start_real = 0
+        self.retries = 0
+        self.penalty = 0
+        self.elapsed = 0
+        self.prev_update = 0
+        self.runs = 1
+
+    def calc_next(self):
+        self.start_mono = monotonic()
+        return self.start_mono - (self.start_mono % self.update_every) + self.update_every + self.penalty
+
+    def sleep_until_next(self):
+        next_time = self.calc_next()
+        while self.start_mono < next_time:
+            sleep(next_time - self.start_mono)
+            self.start_mono = monotonic()
+            self.start_real = time()
+
+    def handle_retries(self):
+        self.retries += 1
+        if self.retries % PENALTY_EVERY:
+            return True
+        self.penalty = self.retries * self.update_every / 2
+        return self.retries < self.max_retries
 
 
 class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, object):
@@ -83,11 +100,11 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
     @property
     def runs_counter(self):
-        return self._runtime_counters.RUNS
+        return self._runtime_counters.runs
 
     @property
     def update_every(self):
-        return self._runtime_counters.FREQ
+        return self._runtime_counters.update_every
 
     @update_every.setter
     def update_every(self, value):
@@ -95,7 +112,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :param value: <int>
         :return:
         """
-        self._runtime_counters.FREQ = value
+        self._runtime_counters.update_every = value
 
     def get_update_every(self):
         return self.update_every
@@ -163,41 +180,40 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :return: None
         """
         job = self._runtime_counters
-        self.debug('started, update frequency: {freq}, '
-                   'retries: {retries}'.format(freq=job.FREQ, retries=job.RETRIES_MAX - job.RETRIES))
+        self.debug('started, update frequency: {freq}, retries: {retries}'.format(
+            freq=job.update_every,
+            retries=job.max_retries - job.retries),
+        )
 
         while True:
-            job.START_RUN = monotonic()
+            job.sleep_until_next()
 
-            job.NEXT_RUN = job.START_RUN - (job.START_RUN % job.FREQ) + job.FREQ + job.PENALTY
-
-            self.sleep_until_next_run()
-
-            if job.PREV_UPDATE:
-                job.SINCE_UPDATE = int((job.START_RUN - job.PREV_UPDATE) * 1e6)
+            since = 0
+            if job.prev_update:
+                since = int((job.start_real - job.prev_update) * 1e6)
 
             try:
-                updated = self.update(interval=job.SINCE_UPDATE)
+                updated = self.update(interval=since)
             except Exception as error:
                 self.error('update() unhandled exception: {error}'.format(error=error))
                 updated = False
 
-            job.RUNS += 1
+            job.runs += 1
 
             if not updated:
-                if not self.manage_retries():
+                if not job.handle_retries():
                     return
             else:
-                job.ELAPSED = int((monotonic() - job.START_RUN) * 1e3)
-                job.PREV_UPDATE = job.START_RUN
-                job.RETRIES, job.PENALTY = 0, 0
+                job.elapsed = int((monotonic() - job.start_mono) * 1e3)
+                job.prev_update = job.start_real
+                job.retries, job.penalty = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
-                                                       since_last=job.SINCE_UPDATE,
-                                                       elapsed=job.ELAPSED))
+                                                       since_last=since,
+                                                       elapsed=job.elapsed))
             self.debug('update => [{status}] (elapsed time: {elapsed}, '
                        'retries left: {retries})'.format(status='OK' if updated else 'FAILED',
-                                                         elapsed=job.ELAPSED if updated else '-',
-                                                         retries=job.RETRIES_MAX - job.RETRIES))
+                                                         elapsed=job.elapsed if updated else '-',
+                                                         retries=job.max_retries - job.retries))
 
     def update(self, interval):
         """
@@ -232,27 +248,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             self.debug('none of the charts has been updated')
 
         return updated
-
-    def manage_retries(self):
-        rc = self._runtime_counters
-        rc.RETRIES += 1
-        if rc.RETRIES % 5 == 0:
-            rc.PENALTY = int(rc.RETRIES * self.update_every / 2)
-        if rc.RETRIES >= rc.RETRIES_MAX:
-            self.error('stopped after {0} data collection failures in a row'.format(rc.RETRIES_MAX))
-            return False
-        return True
-
-    def sleep_until_next_run(self):
-        job = self._runtime_counters
-
-        # sleep() is interruptable
-        while job.is_sleep_time():
-            sleep_time = job.NEXT_RUN - job.START_RUN
-            self.debug('sleeping for {sleep_time} to reach frequency of {freq} sec'.format(sleep_time=sleep_time,
-                                                                                           freq=job.FREQ + job.PENALTY))
-            sleep(sleep_time)
-            job.START_RUN = monotonic()
 
     def get_data(self):
         return self._get_data()

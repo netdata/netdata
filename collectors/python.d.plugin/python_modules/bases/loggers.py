@@ -34,7 +34,7 @@ def limiter(log_max_count=30, allowed_in_seconds=60):
     def on_decorator(func):
 
         def on_call(*args):
-            current_time = args[0]._runtime_counters.START_RUN
+            current_time = args[0]._runtime_counters.start_mono
             lc = args[0]._logger_counters
 
             if lc.logged and lc.logged % log_max_count == 0:
