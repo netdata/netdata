@@ -77,7 +77,8 @@
 // ----------------------------------------------------------------------------
 // global namespace
 
-const NETDATA = window.NETDATA || {};
+// Should stay var!
+var NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
 
