@@ -17,7 +17,7 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
-PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
+PROGRAM_NAME="${PROGRAM_NAME/.plugin/}"
 MODULE_NAME="main"
 
 # -----------------------------------------------------------------------------
@@ -26,72 +26,69 @@ MODULE_NAME="main"
 debug=0
 TMP_DIR=
 chartsd_cleanup() {
-    trap '' EXIT QUIT HUP INT TERM
+	trap '' EXIT QUIT HUP INT TERM
 
-    if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
-    then
-        [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
-        rm -rf "$TMP_DIR"
-    fi
-    exit 0
+	if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]; then
+		[ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
+		rm -rf "$TMP_DIR"
+	fi
+	exit 0
 }
 trap chartsd_cleanup EXIT QUIT HUP INT TERM
 
-if [ $UID = "0" ]
-then
-    TMP_DIR="$( mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
+if [ $UID = "0" ]; then
+	TMP_DIR="$(mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX)"
 else
-    TMP_DIR="$( mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX )"
+	TMP_DIR="$(mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX)"
 fi
 
 logdate() {
-    date "+%Y-%m-%d %H:%M:%S"
+	date "+%Y-%m-%d %H:%M:%S"
 }
 
 log() {
-    local status="${1}"
-    shift
+	local status="${1}"
+	shift
 
-    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: ${*}"
+	echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: ${*}"
 
 }
 
 warning() {
-    log WARNING "${@}"
+	log WARNING "${@}"
 }
 
 error() {
-    log ERROR "${@}"
+	log ERROR "${@}"
 }
 
 info() {
-    log INFO "${@}"
+	log INFO "${@}"
 }
 
 fatal() {
-    log FATAL "${@}"
-    echo "DISABLE"
-    exit 1
+	log FATAL "${@}"
+	echo "DISABLE"
+	exit 1
 }
 
 debug() {
-    [ $debug -eq 1 ] && log DEBUG "${@}"
+	[ $debug -eq 1 ] && log DEBUG "${@}"
 }
 
 # -----------------------------------------------------------------------------
 # check a few commands
 
 require_cmd() {
-    local x=$(which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null)
-    if [ -z "${x}" -o ! -x "${x}" ]
-        then
-        warning "command '${1}' is not found in ${PATH}."
-        eval "${1^^}_CMD=\"\""
-        return 1
-    fi
+	local x=$(which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null)
+	if [ -z "${x}" -o ! -x "${x}" ]; then
+		warning "command '${1}' is not found in ${PATH}."
+		eval "${1^^}_CMD=\"\""
+		return 1
+	fi
 
-    eval "${1^^}_CMD=\"${x}\""
-    return 0
+	eval "${1^^}_CMD=\"${x}\""
+	return 0
 }
 
 require_cmd date || exit 1
@@ -108,7 +105,7 @@ require_cmd curl || exit 1
 
 # -----------------------------------------------------------------------------
 
-[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && fatal "BASH version 4 or later is required, but found version: ${BASH_VERSION}. Please upgrade."
+[ $((BASH_VERSINFO[0])) -lt 4 ] && fatal "BASH version 4 or later is required, but found version: ${BASH_VERSION}. Please upgrade."
 
 info "started from '$PROGRAM_FILE' with options: $*"
 
@@ -117,7 +114,7 @@ info "started from '$PROGRAM_FILE' with options: $*"
 # netdata exposes a few environment variables for us
 
 [ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 pluginsd="${NETDATA_PLUGINS_DIR}"
@@ -127,7 +124,7 @@ olduserconfd="${NETDATA_USER_CONFIG_DIR}"
 chartsd="$pluginsd/../charts.d"
 
 minimum_update_frequency="${NETDATA_UPDATE_EVERY-1}"
-update_every=${minimum_update_frequency}    # this will be overwritten by the command line
+update_every=${minimum_update_frequency} # this will be overwritten by the command line
 
 # work around for non BASH shells
 charts_create="_create"
@@ -169,52 +166,45 @@ enable_all_charts="yes"
 
 check=0
 chart_only=
-while [ ! -z "$1" ]
-do
-    if [ "$1" = "check" ]
-    then
-        check=1
-        shift
-        continue
-    fi
+while [ ! -z "$1" ]; do
+	if [ "$1" = "check" ]; then
+		check=1
+		shift
+		continue
+	fi
 
-    if [ "$1" = "debug" -o "$1" = "all" ]
-    then
-        debug=1
-        shift
-        continue
-    fi
+	if [ "$1" = "debug" -o "$1" = "all" ]; then
+		debug=1
+		shift
+		continue
+	fi
 
-    if [ -f "$chartsd/$1.chart.sh" ]
-    then
-        debug=1
-        chart_only="$( echo $1.chart.sh | sed "s/\.chart\.sh$//g" )"
-        shift
-        continue
-    fi
+	if [ -f "$chartsd/$1.chart.sh" ]; then
+		debug=1
+		chart_only="$(echo $1.chart.sh | sed "s/\.chart\.sh$//g")"
+		shift
+		continue
+	fi
 
-    if [ -f "$chartsd/$1" ]
-    then
-        debug=1
-        chart_only="$( echo $1 | sed "s/\.chart\.sh$//g" )"
-        shift
-        continue
-    fi
+	if [ -f "$chartsd/$1" ]; then
+		debug=1
+		chart_only="$(echo $1 | sed "s/\.chart\.sh$//g")"
+		shift
+		continue
+	fi
 
-    # number check
-    n="$1"
-    x=$(( n ))
-    if [ "$x" = "$n" ]
-    then
-        shift
-        update_every=$x
-        [ $update_every -lt $minimum_update_frequency ] && update_every=$minimum_update_frequency
-        continue
-    fi
+	# number check
+	n="$1"
+	x=$((n))
+	if [ "$x" = "$n" ]; then
+		shift
+		update_every=$x
+		[ $update_every -lt $minimum_update_frequency ] && update_every=$minimum_update_frequency
+		continue
+	fi
 
-    fatal "Cannot understand parameter $1. Aborting."
+	fatal "Cannot understand parameter $1. Aborting."
 done
-
 
 # -----------------------------------------------------------------------------
 # loop control
@@ -223,7 +213,7 @@ done
 LOOPSLEEPMS_HIGHRES=0
 now_ms=
 current_time_ms_default() {
-    now_ms="$(date +'%s')000"
+	now_ms="$(date +'%s')000"
 }
 current_time_ms="current_time_ms_default"
 current_time_ms_accuracy=1
@@ -238,20 +228,17 @@ source "$pluginsd/loopsleepms.sh.inc"
 # -----------------------------------------------------------------------------
 # load my configuration
 
-for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}.conf" "${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf"
-do
-    if [ -f "$myconfig" ]
-    then
-        source "$myconfig"
-        if [ $? -ne 0 ]
-        then
-            error "Config file '$myconfig' loaded with errors."
-        else
-            info "Configuration file '$myconfig' loaded."
-        fi
-    else
-        warning "Configuration file '$myconfig' not found."
-    fi
+for myconfig in "${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}.conf" "${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf"; do
+	if [ -f "$myconfig" ]; then
+		source "$myconfig"
+		if [ $? -ne 0 ]; then
+			error "Config file '$myconfig' loaded with errors."
+		else
+			info "Configuration file '$myconfig' loaded."
+		fi
+	else
+		warning "Configuration file '$myconfig' not found."
+	fi
 done
 
 # make sure time_divisor is right
@@ -259,22 +246,20 @@ time_divisor=$((time_divisor))
 [ $time_divisor -lt 10 ] && time_divisor=10
 [ $time_divisor -gt 100 ] && time_divisor=100
 
-
 # we check for the timeout command, after we load our
 # configuration, so that the user may overwrite the
 # timeout command we use, providing a function that
 # can emulate the timeout command we need:
 # > timeout SECONDS command ...
-if [ $check_for_timeout -eq 1 ]
-    then
-    require_cmd timeout || exit 1
+if [ $check_for_timeout -eq 1 ]; then
+	require_cmd timeout || exit 1
 fi
 
 # -----------------------------------------------------------------------------
 # internal checks
 
 # netdata passes the requested update frequency as the first argument
-update_every=$(( update_every + 1 - 1)) # makes sure it is a number
+update_every=$((update_every + 1 - 1))     # makes sure it is a number
 test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 
 # check the charts.d directory
@@ -284,39 +269,37 @@ test $update_every -eq 0 && update_every=1 # if it is zero, make it 1
 # library functions
 
 fixid() {
-    echo "$*" |\
-        tr -c "[A-Z][a-z][0-9]" "_" |\
-        sed -e "s|^_\+||g" -e "s|_\+$||g" -e "s|_\+|_|g" |\
-        tr "[A-Z]" "[a-z]"
+	echo "$*" |
+		tr -c "[A-Z][a-z][0-9]" "_" |
+		sed -e "s|^_\+||g" -e "s|_\+$||g" -e "s|_\+|_|g" |
+		tr "[A-Z]" "[a-z]"
 }
 
 run() {
-    local ret pid="${BASHPID}" t
+	local ret pid="${BASHPID}" t
 
-    if [ "z${1}" = "z-t" -a "${2}" != "0" ]
-    then
-        t="${2}"
-        shift 2
-        timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
-        ret=$?
-    else
-        "${@}" 2>"${TMP_DIR}/run.${pid}"
-        ret=$?
-    fi
+	if [ "z${1}" = "z-t" -a "${2}" != "0" ]; then
+		t="${2}"
+		shift 2
+		timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
+		ret=$?
+	else
+		"${@}" 2>"${TMP_DIR}/run.${pid}"
+		ret=$?
+	fi
 
-    if [ ${ret} -ne 0 ]
-    then
-        {
-            printf "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: command '"
-            printf "%q " "${@}"
-            printf "' failed with code ${ret}:\n --- BEGIN TRACE ---\n"
-            cat "${TMP_DIR}/run.${pid}"
-            printf " --- END TRACE ---\n"
-        } >&2
-    fi
-    rm "${TMP_DIR}/run.${pid}"
+	if [ ${ret} -ne 0 ]; then
+		{
+			printf "$(logdate): ${PROGRAM_NAME}: ${status}: ${MODULE_NAME}: command '"
+			printf "%q " "${@}"
+			printf "' failed with code ${ret}:\n --- BEGIN TRACE ---\n"
+			cat "${TMP_DIR}/run.${pid}"
+			printf " --- END TRACE ---\n"
+		} >&2
+	fi
+	rm "${TMP_DIR}/run.${pid}"
 
-    return ${ret}
+	return ${ret}
 }
 
 # convert any floating point number
@@ -325,166 +308,155 @@ run() {
 # so that no fork is necessary
 # the multiplier must be a power of 10
 float2int() {
-    local f m="$2" a b l v=($1)
-    f=${v[0]}
+	local f m="$2" a b l v=($1)
+	f=${v[0]}
 
-    # the length of the multiplier - 1
-    l=$(( ${#m} - 1 ))
+	# the length of the multiplier - 1
+	l=$((${#m} - 1))
 
-    # check if the number is in scientific notation
-    if [[ ${f} =~ ^[[:space:]]*(-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]
-        then
-        # convert it to decimal
-        # unfortunately, this fork cannot be avoided
-        # if you know of a way to avoid it, please let me know
-        f=$(printf "%0.${l}f" ${f})
-    fi
+	# check if the number is in scientific notation
+	if [[ ${f} =~ ^[[:space:]]*(-)?[0-9.]+(e|E)(\+|-)[0-9]+ ]]; then
+		# convert it to decimal
+		# unfortunately, this fork cannot be avoided
+		# if you know of a way to avoid it, please let me know
+		f=$(printf "%0.${l}f" ${f})
+	fi
 
-    # split the floating point number
-    # in integer (a) and decimal (b)
-    a=${f/.*/}
-    b=${f/*./}
+	# split the floating point number
+	# in integer (a) and decimal (b)
+	a=${f/.*/}
+	b=${f/*./}
 
-    # if the integer part is missing
-    # set it to zero
-    [ -z "${a}" ] && a="0"
+	# if the integer part is missing
+	# set it to zero
+	[ -z "${a}" ] && a="0"
 
-    # strip leading zeros from the integer part
-    # base 10 convertion
-    a=$((10#$a))
+	# strip leading zeros from the integer part
+	# base 10 convertion
+	a=$((10#$a))
 
-    # check the length of the decimal part
-    # against the length of the multiplier
-    if [ ${#b} -gt ${l} ]
-        then
-        # too many digits - take the most significant
-        b=${b:0:${l}}
+	# check the length of the decimal part
+	# against the length of the multiplier
+	if [ ${#b} -gt ${l} ]; then
+		# too many digits - take the most significant
+		b=${b:0:l}
 
-    elif [ ${#b} -lt ${l} ]
-        then
-        # too few digits - pad with zero on the right
-        local z="00000000000000000000000" r=$((l - ${#b}))
-        b="${b}${z:0:${r}}"
-    fi
+	elif [ ${#b} -lt ${l} ]; then
+		# too few digits - pad with zero on the right
+		local z="00000000000000000000000" r=$((l - ${#b}))
+		b="${b}${z:0:r}"
+	fi
 
-    # strip leading zeros from the decimal part
-    # base 10 convertion
-    b=$((10#$b))
+	# strip leading zeros from the decimal part
+	# base 10 convertion
+	b=$((10#$b))
 
-    # store the result
-    FLOAT2INT_RESULT=$(( (a * m) + b ))
+	# store the result
+	FLOAT2INT_RESULT=$(((a * m) + b))
 }
-
 
 # -----------------------------------------------------------------------------
 # charts check functions
 
 all_charts() {
-    cd "$chartsd"
-    [ $? -ne 0 ] && error "cannot cd to $chartsd" && return 1
+	cd "$chartsd"
+	[ $? -ne 0 ] && error "cannot cd to $chartsd" && return 1
 
-    ls *.chart.sh | sed "s/\.chart\.sh$//g"
+	ls *.chart.sh | sed "s/\.chart\.sh$//g"
 }
 
 declare -A charts_enable_keyword=(
-          ['apache']="force"
-        ['cpu_apps']="force"
-         ['cpufreq']="force"
-         ['example']="force"
-            ['exim']="force"
-         ['hddtemp']="force"
-    ['load_average']="force"
-        ['mem_apps']="force"
-           ['mysql']="force"
-           ['nginx']="force"
-          ['phpfpm']="force"
-         ['postfix']="force"
-         ['sensors']="force"
-           ['squid']="force"
-          ['tomcat']="force"
-    )
+	['apache']="force"
+	['cpu_apps']="force"
+	['cpufreq']="force"
+	['example']="force"
+	['exim']="force"
+	['hddtemp']="force"
+	['load_average']="force"
+	['mem_apps']="force"
+	['mysql']="force"
+	['nginx']="force"
+	['phpfpm']="force"
+	['postfix']="force"
+	['sensors']="force"
+	['squid']="force"
+	['tomcat']="force"
+)
 
 all_enabled_charts() {
-    local charts= enabled= required=
+	local charts= enabled= required=
 
-    # find all enabled charts
+	# find all enabled charts
 
-    for chart in $( all_charts )
-    do
-        MODULE_NAME="${chart}"
+	for chart in $(all_charts); do
+		MODULE_NAME="${chart}"
 
-        eval "enabled=\$$chart"
-        if [ -z "${enabled}" ]
-            then
-            enabled="${enable_all_charts}"
-        fi
+		eval "enabled=\$$chart"
+		if [ -z "${enabled}" ]; then
+			enabled="${enable_all_charts}"
+		fi
 
-        required="${charts_enable_keyword[${chart}]}"
-        [ -z "${required}" ] && required="yes"
+		required="${charts_enable_keyword[${chart}]}"
+		[ -z "${required}" ] && required="yes"
 
-        if [ ! "${enabled}" = "${required}" ]
-        then
-            info "is disabled. Add a line with $chart=$required in '${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf' to enable it (or remove the line that disables it)."
-        else
-            debug "is enabled for auto-detection."
-            local charts="$charts $chart"
-        fi
-    done
-    MODULE_NAME="main"
+		if [ ! "${enabled}" = "${required}" ]; then
+			info "is disabled. Add a line with $chart=$required in '${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}.conf' to enable it (or remove the line that disables it)."
+		else
+			debug "is enabled for auto-detection."
+			local charts="$charts $chart"
+		fi
+	done
+	MODULE_NAME="main"
 
-    local charts2=
-    for chart in $charts
-    do
-        MODULE_NAME="${chart}"
+	local charts2=
+	for chart in $charts; do
+		MODULE_NAME="${chart}"
 
-        # check the enabled charts
-        local check="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()" )"
-        if [ -z "$check" ]
-        then
-            error "module '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
-            continue
-        fi
+		# check the enabled charts
+		local check="$(cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_check()")"
+		if [ -z "$check" ]; then
+			error "module '$chart' does not seem to have a $chart$charts_check() function. Disabling it."
+			continue
+		fi
 
-        local create="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()" )"
-        if [ -z "$create" ]
-        then
-            error "module '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
-            continue
-        fi
+		local create="$(cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_create()")"
+		if [ -z "$create" ]; then
+			error "module '$chart' does not seem to have a $chart$charts_create() function. Disabling it."
+			continue
+		fi
 
-        local update="$( cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()" )"
-        if [ -z "$update" ]
-        then
-            error "module '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
-            continue
-        fi
+		local update="$(cat "$chartsd/$chart.chart.sh" | sed "s/^ \+//g" | grep "^$chart$charts_update()")"
+		if [ -z "$update" ]; then
+			error "module '$chart' does not seem to have a $chart$charts_update() function. Disabling it."
+			continue
+		fi
 
-        # check its config
-        #if [ -f "$userconfd/$chart.conf" ]
-        #then
-        #   if [ ! -z "$( cat "$userconfd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
-        #   then
-        #       error "module's $chart config $userconfd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
-        #       continue
-        #   fi
-        #fi
+		# check its config
+		#if [ -f "$userconfd/$chart.conf" ]
+		#then
+		#   if [ ! -z "$( cat "$userconfd/$chart.conf" | sed "s/^ \+//g" | grep -v "^$" | grep -v "^#" | grep -v "^$chart$charts_undescore" )" ]
+		#   then
+		#       error "module's $chart config $userconfd/$chart.conf should only have lines starting with $chart$charts_undescore . Disabling it."
+		#       continue
+		#   fi
+		#fi
 
-        #if [ $dryrunner -eq 1 ]
-        #   then
-        #   "$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$userconfd/$chart.conf" >/dev/null
-        #   if [ $? -ne 0 ]
-        #   then
-        #       error "module's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
-        #       continue
-        #   fi
-        #fi
+		#if [ $dryrunner -eq 1 ]
+		#   then
+		#   "$pluginsd/charts.d.dryrun-helper.sh" "$chart" "$chartsd/$chart.chart.sh" "$userconfd/$chart.conf" >/dev/null
+		#   if [ $? -ne 0 ]
+		#   then
+		#       error "module's $chart did not pass the dry run check. This means it uses global variables not starting with $chart. Disabling it."
+		#       continue
+		#   fi
+		#fi
 
-        local charts2="$charts2 $chart"
-    done
-    MODULE_NAME="main"
+		local charts2="$charts2 $chart"
+	done
+	MODULE_NAME="main"
 
-    echo $charts2
-    debug "enabled charts: $charts2"
+	echo $charts2
+	debug "enabled charts: $charts2"
 }
 
 # -----------------------------------------------------------------------------
@@ -493,62 +465,55 @@ all_enabled_charts() {
 suffix_retries="_retries"
 suffix_update_every="_update_every"
 active_charts=
-for chart in $( all_enabled_charts )
-do
-    MODULE_NAME="${chart}"
+for chart in $(all_enabled_charts); do
+	MODULE_NAME="${chart}"
 
-    debug "loading module: '$chartsd/$chart.chart.sh'"
+	debug "loading module: '$chartsd/$chart.chart.sh'"
 
-    source "$chartsd/$chart.chart.sh"
-    [ $? -ne 0 ] && warning "Module '$chartsd/$chart.chart.sh' loaded with errors."
+	source "$chartsd/$chart.chart.sh"
+	[ $? -ne 0 ] && warning "Module '$chartsd/$chart.chart.sh' loaded with errors."
 
-    # first load the stock config
-    if [ -f "$stockconfd/$chart.conf" ]
-    then
-        debug "loading module configuration: '$stockconfd/$chart.conf'"
-        source "$stockconfd/$chart.conf"
-        [ $? -ne 0 ] && warning "Config file '$stockconfd/$chart.conf' loaded with errors."
-    else
-        debug "not found module configuration: '$stockconfd/$chart.conf'"
-    fi
+	# first load the stock config
+	if [ -f "$stockconfd/$chart.conf" ]; then
+		debug "loading module configuration: '$stockconfd/$chart.conf'"
+		source "$stockconfd/$chart.conf"
+		[ $? -ne 0 ] && warning "Config file '$stockconfd/$chart.conf' loaded with errors."
+	else
+		debug "not found module configuration: '$stockconfd/$chart.conf'"
+	fi
 
-    # then load the user config (it overwrites the stock)
-    if [ -f "$userconfd/$chart.conf" ]
-    then
-        debug "loading module configuration: '$userconfd/$chart.conf'"
-        source "$userconfd/$chart.conf"
-        [ $? -ne 0 ] && warning "Config file '$userconfd/$chart.conf' loaded with errors."
-    else
-        debug "not found module configuration: '$userconfd/$chart.conf'"
+	# then load the user config (it overwrites the stock)
+	if [ -f "$userconfd/$chart.conf" ]; then
+		debug "loading module configuration: '$userconfd/$chart.conf'"
+		source "$userconfd/$chart.conf"
+		[ $? -ne 0 ] && warning "Config file '$userconfd/$chart.conf' loaded with errors."
+	else
+		debug "not found module configuration: '$userconfd/$chart.conf'"
 
-        if [ -f "$olduserconfd/$chart.conf" ]
-        then
-            # support for very old netdata that had the charts.d module configs in /etc/netdata
-            info "loading module configuration from obsolete location: '$olduserconfd/$chart.conf'"
-            source "$olduserconfd/$chart.conf"
-            [ $? -ne 0 ] && warning "Config file '$olduserconfd/$chart.conf' loaded with errors."
-        fi
-    fi
+		if [ -f "$olduserconfd/$chart.conf" ]; then
+			# support for very old netdata that had the charts.d module configs in /etc/netdata
+			info "loading module configuration from obsolete location: '$olduserconfd/$chart.conf'"
+			source "$olduserconfd/$chart.conf"
+			[ $? -ne 0 ] && warning "Config file '$olduserconfd/$chart.conf' loaded with errors."
+		fi
+	fi
 
-    eval "dt=\$$chart$suffix_update_every"
-    dt=$(( dt + 1 - 1 )) # make sure it is a number
-    if [ $dt -lt $update_every ]
-    then
-        eval "$chart$suffix_update_every=$update_every"
-    fi
+	eval "dt=\$$chart$suffix_update_every"
+	dt=$((dt + 1 - 1)) # make sure it is a number
+	if [ $dt -lt $update_every ]; then
+		eval "$chart$suffix_update_every=$update_every"
+	fi
 
-    $chart$charts_check
-    if [ $? -eq 0 ]
-    then
-        debug "module '$chart' activated"
-        active_charts="$active_charts $chart"
-    else
-        error "module's '$chart' check() function reports failure."
-    fi
+	$chart$charts_check
+	if [ $? -eq 0 ]; then
+		debug "module '$chart' activated"
+		active_charts="$active_charts $chart"
+	else
+		error "module's '$chart' check() function reports failure."
+	fi
 done
 MODULE_NAME="main"
 debug "activated modules: $active_charts"
-
 
 # -----------------------------------------------------------------------------
 # check overwrites
@@ -558,28 +523,24 @@ debug_time=
 test $debug -eq 1 && debug_time=tellwork
 
 # if we only need a specific chart, remove all the others
-if [ ! -z "${chart_only}" ]
-then
-    debug "requested to run only for: '${chart_only}'"
-    check_charts=
-    for chart in $active_charts
-    do
-        if [ "$chart" = "$chart_only" ]
-        then
-            check_charts="$chart"
-            break
-        fi
-    done
-    active_charts="$check_charts"
+if [ ! -z "${chart_only}" ]; then
+	debug "requested to run only for: '${chart_only}'"
+	check_charts=
+	for chart in $active_charts; do
+		if [ "$chart" = "$chart_only" ]; then
+			check_charts="$chart"
+			break
+		fi
+	done
+	active_charts="$check_charts"
 fi
 debug "activated charts: $active_charts"
 
 # stop if we just need a pre-check
-if [ $check -eq 1 ]
-then
-    info "CHECK RESULT"
-    info "Will run the charts: $active_charts"
-    exit 0
+if [ $check -eq 1 ]; then
+	info "CHECK RESULT"
+	info "Will run the charts: $active_charts"
+	exit 0
 fi
 
 # -----------------------------------------------------------------------------
@@ -590,23 +551,20 @@ cd "${TMP_DIR}" || exit 1
 # create charts
 
 run_charts=
-for chart in $active_charts
-do
-    MODULE_NAME="${chart}"
+for chart in $active_charts; do
+	MODULE_NAME="${chart}"
 
-    debug "calling '$chart$charts_create()'..."
-    $chart$charts_create
-    if [ $? -eq 0 ]
-    then
-        run_charts="$run_charts $chart"
-        debug "'$chart' initialized."
-    else
-        error "module's '$chart' function '$chart$charts_create()' reports failure."
-    fi
+	debug "calling '$chart$charts_create()'..."
+	$chart$charts_create
+	if [ $? -eq 0 ]; then
+		run_charts="$run_charts $chart"
+		debug "'$chart' initialized."
+	else
+		error "module's '$chart' function '$chart$charts_create()' reports failure."
+	fi
 done
 MODULE_NAME="main"
 debug "run_charts='$run_charts'"
-
 
 # -----------------------------------------------------------------------------
 # update dimensions
@@ -615,129 +573,119 @@ debug "run_charts='$run_charts'"
 
 declare -A charts_last_update=() charts_update_every=() charts_retries=() charts_next_update=() charts_run_counter=() charts_serial_failures=()
 global_update() {
-    local exit_at \
-        c=0 dt ret last_ms exec_start_ms exec_end_ms \
-        chart now_charts=() next_charts=($run_charts) \
-        next_ms x seconds millis
+	local exit_at \
+		c=0 dt ret last_ms exec_start_ms exec_end_ms \
+		chart now_charts=() next_charts=($run_charts) \
+		next_ms x seconds millis
 
-    # return the current time in ms in $now_ms
-    ${current_time_ms}
+	# return the current time in ms in $now_ms
+	${current_time_ms}
 
-    exit_at=$(( now_ms + (restart_timeout * 1000) ))
+	exit_at=$((now_ms + (restart_timeout * 1000)))
 
-    for chart in $run_charts
-    do
-        eval "charts_update_every[$chart]=\$$chart$suffix_update_every"
-        test -z "${charts_update_every[$chart]}" && charts_update_every[$chart]=$update_every
+	for chart in $run_charts; do
+		eval "charts_update_every[$chart]=\$$chart$suffix_update_every"
+		test -z "${charts_update_every[$chart]}" && charts_update_every[$chart]=$update_every
 
-        eval "charts_retries[$chart]=\$$chart$suffix_retries"
-        test -z "${charts_retries[$chart]}" && charts_retries[$chart]=10
+		eval "charts_retries[$chart]=\$$chart$suffix_retries"
+		test -z "${charts_retries[$chart]}" && charts_retries[$chart]=10
 
-        charts_last_update[$chart]=$((now_ms - (now_ms % (charts_update_every[$chart] * 1000) ) ))
-        charts_next_update[$chart]=$(( charts_last_update[$chart] + (charts_update_every[$chart] * 1000) ))
-        charts_run_counter[$chart]=0
-        charts_serial_failures[$chart]=0
+		charts_last_update[$chart]=$((now_ms - (now_ms % (charts_update_every[$chart] * 1000))))
+		charts_next_update[$chart]=$((charts_last_update[$chart] + (charts_update_every[$chart] * 1000)))
+		charts_run_counter[$chart]=0
+		charts_serial_failures[$chart]=0
 
-        echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' charts.d netdata.plugin_charts area 145000 ${charts_update_every[$chart]}"
-        echo "DIMENSION run_time 'run time' absolute 1 1"
-    done
+		echo "CHART netdata.plugin_chartsd_$chart '' 'Execution time for $chart plugin' 'milliseconds / run' charts.d netdata.plugin_charts area 145000 ${charts_update_every[$chart]}"
+		echo "DIMENSION run_time 'run time' absolute 1 1"
+	done
 
-    # the main loop
-    while [ "${#next_charts[@]}" -gt 0 ]
-    do
-        c=$((c + 1))
-        now_charts=("${next_charts[@]}")
-        next_charts=()
+	# the main loop
+	while [ "${#next_charts[@]}" -gt 0 ]; do
+		c=$((c + 1))
+		now_charts=("${next_charts[@]}")
+		next_charts=()
 
-        # return the current time in ms in $now_ms
-        ${current_time_ms}
+		# return the current time in ms in $now_ms
+		${current_time_ms}
 
-        for chart in "${now_charts[@]}"
-        do
-            MODULE_NAME="${chart}"
+		for chart in "${now_charts[@]}"; do
+			MODULE_NAME="${chart}"
 
-            if [ ${now_ms} -ge ${charts_next_update[$chart]} ]
-            then
-                last_ms=${charts_last_update[$chart]}
-                dt=$(( (now_ms - last_ms) ))
+			if [ ${now_ms} -ge ${charts_next_update[$chart]} ]; then
+				last_ms=${charts_last_update[$chart]}
+				dt=$((now_ms - last_ms))
 
-                charts_last_update[$chart]=${now_ms}
+				charts_last_update[$chart]=${now_ms}
 
-                while [ ${charts_next_update[$chart]} -lt ${now_ms} ]
-                do
-                    charts_next_update[$chart]=$(( charts_next_update[$chart] + (charts_update_every[$chart] * 1000) ))
-                done
+				while [ ${charts_next_update[$chart]} -lt ${now_ms} ]; do
+					charts_next_update[$chart]=$((charts_next_update[$chart] + (charts_update_every[$chart] * 1000)))
+				done
 
-                # the first call should not give a duration
-                # so that netdata calibrates to current time
-                dt=$(( dt * 1000 ))
-                charts_run_counter[$chart]=$(( charts_run_counter[$chart] + 1 ))
-                if [ ${charts_run_counter[$chart]} -eq 1 ]
-                    then
-                    dt=
-                fi
+				# the first call should not give a duration
+				# so that netdata calibrates to current time
+				dt=$((dt * 1000))
+				charts_run_counter[$chart]=$((charts_run_counter[$chart] + 1))
+				if [ ${charts_run_counter[$chart]} -eq 1 ]; then
+					dt=
+				fi
 
-                exec_start_ms=$now_ms
-                $chart$charts_update $dt
-                ret=$?
+				exec_start_ms=$now_ms
+				$chart$charts_update $dt
+				ret=$?
 
-                # return the current time in ms in $now_ms
-                ${current_time_ms}; exec_end_ms=$now_ms
+				# return the current time in ms in $now_ms
+				${current_time_ms}
+				exec_end_ms=$now_ms
 
-                echo "BEGIN netdata.plugin_chartsd_$chart $dt"
-                echo "SET run_time = $(( exec_end_ms - exec_start_ms ))"
-                echo "END"
+				echo "BEGIN netdata.plugin_chartsd_$chart $dt"
+				echo "SET run_time = $((exec_end_ms - exec_start_ms))"
+				echo "END"
 
-                if [ $ret -eq 0 ]
-                then
-                    charts_serial_failures[$chart]=0
-                    next_charts+=($chart)
-                else
-                    charts_serial_failures[$chart]=$(( charts_serial_failures[$chart] + 1 ))
+				if [ $ret -eq 0 ]; then
+					charts_serial_failures[$chart]=0
+					next_charts+=($chart)
+				else
+					charts_serial_failures[$chart]=$((charts_serial_failures[$chart] + 1))
 
-                    if [ ${charts_serial_failures[$chart]} -gt ${charts_retries[$chart]} ]
-                        then
-                        error "module's '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
-                    else
-                        error "module's '$chart' update() function reports failure. Will keep trying for a while."
-                        next_charts+=($chart)
-                    fi
-                fi
-            else
-                next_charts+=($chart)
-            fi
-        done
-        MODULE_NAME="${chart}"
+					if [ ${charts_serial_failures[$chart]} -gt ${charts_retries[$chart]} ]; then
+						error "module's '$chart' update() function reported failure ${charts_serial_failures[$chart]} times. Disabling it."
+					else
+						error "module's '$chart' update() function reports failure. Will keep trying for a while."
+						next_charts+=($chart)
+					fi
+				fi
+			else
+				next_charts+=($chart)
+			fi
+		done
+		MODULE_NAME="${chart}"
 
-        # wait the time you are required to
-        next_ms=$((now_ms + (update_every * 1000 * 100) ))
-        for x in "${charts_next_update[@]}"; do [ ${x} -lt ${next_ms} ] && next_ms=${x}; done
-        next_ms=$((next_ms - now_ms))
+		# wait the time you are required to
+		next_ms=$((now_ms + (update_every * 1000 * 100)))
+		for x in "${charts_next_update[@]}"; do [ ${x} -lt ${next_ms} ] && next_ms=${x}; done
+		next_ms=$((next_ms - now_ms))
 
-        if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 -a ${next_ms} -gt 0 ]
-            then
-            next_ms=$(( next_ms + current_time_ms_accuracy ))
-            seconds=$(( next_ms / 1000 ))
-            millis=$(( next_ms % 1000 ))
-            if [ ${millis} -lt 10  ]
-                then
-                millis="00${millis}"
-            elif [ ${millis} -lt 100 ]
-                then
-                millis="0${millis}"
-            fi
+		if [ ${LOOPSLEEPMS_HIGHRES} -eq 1 -a ${next_ms} -gt 0 ]; then
+			next_ms=$((next_ms + current_time_ms_accuracy))
+			seconds=$((next_ms / 1000))
+			millis=$((next_ms % 1000))
+			if [ ${millis} -lt 10 ]; then
+				millis="00${millis}"
+			elif [ ${millis} -lt 100 ]; then
+				millis="0${millis}"
+			fi
 
-            debug "sleeping for ${seconds}.${millis} seconds."
-            ${mysleep} ${seconds}.${millis}
-        else
-            debug "sleeping for ${update_every} seconds."
-            ${mysleep} $update_every
-        fi
+			debug "sleeping for ${seconds}.${millis} seconds."
+			${mysleep} ${seconds}.${millis}
+		else
+			debug "sleeping for ${update_every} seconds."
+			${mysleep} $update_every
+		fi
 
-        test ${now_ms} -ge ${exit_at} && exit 0
-    done
+		test ${now_ms} -ge ${exit_at} && exit 0
+	done
 
-    fatal "nothing left to do, exiting..."
+	fatal "nothing left to do, exiting..."
 }
 
 global_update

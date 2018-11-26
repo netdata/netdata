@@ -52,21 +52,20 @@ apache_key_connsasynckeepalive=
 apache_key_connsasyncclosing=
 apache_detect() {
 	local i=0
-	for x in "${@}"
-	do
+	for x in "${@}"; do
 		case "${x}" in
-			'Total Accesses') 		apache_key_accesses=$((i + 1)) ;;
-			'Total kBytes') 		apache_key_kbytes=$((i + 1)) ;;
-			'ReqPerSec') 			apache_key_reqpersec=$((i + 1)) ;;
-			'BytesPerSec')			apache_key_bytespersec=$((i + 1)) ;;
-			'BytesPerReq')			apache_key_bytesperreq=$((i + 1)) ;;
-			'BusyWorkers')			apache_key_busyworkers=$((i + 1)) ;;
-			'IdleWorkers')			apache_key_idleworkers=$((i + 1));;
-			'ConnsTotal')			apache_key_connstotal=$((i + 1)) ;;
-			'ConnsAsyncWriting')	apache_key_connsasyncwriting=$((i + 1)) ;;
-			'ConnsAsyncKeepAlive')	apache_key_connsasynckeepalive=$((i + 1)) ;;
-			'ConnsAsyncClosing')	apache_key_connsasyncclosing=$((i + 1)) ;;
-			'Scoreboard')			apache_key_scoreboard=$((i)) ;;
+		'Total Accesses') apache_key_accesses=$((i + 1)) ;;
+		'Total kBytes') apache_key_kbytes=$((i + 1)) ;;
+		'ReqPerSec') apache_key_reqpersec=$((i + 1)) ;;
+		'BytesPerSec') apache_key_bytespersec=$((i + 1)) ;;
+		'BytesPerReq') apache_key_bytesperreq=$((i + 1)) ;;
+		'BusyWorkers') apache_key_busyworkers=$((i + 1)) ;;
+		'IdleWorkers') apache_key_idleworkers=$((i + 1)) ;;
+		'ConnsTotal') apache_key_connstotal=$((i + 1)) ;;
+		'ConnsAsyncWriting') apache_key_connsasyncwriting=$((i + 1)) ;;
+		'ConnsAsyncKeepAlive') apache_key_connsasynckeepalive=$((i + 1)) ;;
+		'ConnsAsyncClosing') apache_key_connsasyncclosing=$((i + 1)) ;;
+		'Scoreboard') apache_key_scoreboard=$((i)) ;;
 		esac
 
 		i=$((i + 1))
@@ -74,20 +73,19 @@ apache_detect() {
 
 	# we will not check of the Conns*
 	# keys, since these are apache 2.4 specific
-	[ -z "${apache_key_accesses}"    ] && error "missing 'Total Accesses' from apache server: ${*}" && return 1
-	[ -z "${apache_key_kbytes}"      ] && error "missing 'Total kBytes' from apache server: ${*}" && return 1
-	[ -z "${apache_key_reqpersec}"   ] && error "missing 'ReqPerSec' from apache server: ${*}" && return 1
+	[ -z "${apache_key_accesses}" ] && error "missing 'Total Accesses' from apache server: ${*}" && return 1
+	[ -z "${apache_key_kbytes}" ] && error "missing 'Total kBytes' from apache server: ${*}" && return 1
+	[ -z "${apache_key_reqpersec}" ] && error "missing 'ReqPerSec' from apache server: ${*}" && return 1
 	[ -z "${apache_key_bytespersec}" ] && error "missing 'BytesPerSec' from apache server: ${*}" && return 1
 	[ -z "${apache_key_bytesperreq}" ] && error "missing 'BytesPerReq' from apache server: ${*}" && return 1
 	[ -z "${apache_key_busyworkers}" ] && error "missing 'BusyWorkers' from apache server: ${*}" && return 1
 	[ -z "${apache_key_idleworkers}" ] && error "missing 'IdleWorkers' from apache server: ${*}" && return 1
-	[ -z "${apache_key_scoreboard}"  ] && error "missing 'Scoreboard' from apache server: ${*}" && return 1
+	[ -z "${apache_key_scoreboard}" ] && error "missing 'Scoreboard' from apache server: ${*}" && return 1
 
-	if [ ! -z "${apache_key_connstotal}" ] && \
-	   [ ! -z "${apache_key_connsasyncwriting}" ] && \
-	   [ ! -z "${apache_key_connsasynckeepalive}" ] && \
-	   [ ! -z "${apache_key_connsasyncclosing}" ]
-	then
+	if [ ! -z "${apache_key_connstotal}" ] &&
+		[ ! -z "${apache_key_connsasyncwriting}" ] &&
+		[ ! -z "${apache_key_connsasynckeepalive}" ] &&
+		[ ! -z "${apache_key_connsasyncclosing}" ]; then
 		apache_has_conns=1
 	else
 		apache_has_conns=0
@@ -103,15 +101,13 @@ apache_get() {
 	ret=$?
 	IFS="${oIFS}"
 
-	if [ $ret -ne 0 ] || [ "${#apache_response[@]}" -eq 0 ]
-	then
+	if [ $ret -ne 0 ] || [ "${#apache_response[@]}" -eq 0 ]; then
 		return 1
 	fi
 
 	# the last line on the apache output is "Scoreboard"
 	# we use this label to detect that the output has a new word count
-	if [ ${apache_keys_detected} -eq 0 ] || [ "${apache_response[${apache_key_scoreboard}]}" != "Scoreboard" ]
-	then
+	if [ ${apache_keys_detected} -eq 0 ] || [ "${apache_response[${apache_key_scoreboard}]}" != "Scoreboard" ]; then
 		apache_detect "${apache_response[@]}" || return 1
 		apache_keys_detected=1
 	fi
@@ -131,20 +127,20 @@ apache_get() {
 	apache_busyworkers="${apache_response[${apache_key_busyworkers}]}"
 	apache_idleworkers="${apache_response[${apache_key_idleworkers}]}"
 
-	if [ -z "${apache_accesses}" ] || \
-	   [ -z "${apache_kbytes}" ] || \
-	   [ -z "${apache_reqpersec}" ] || \
-	   [ -z "${apache_bytespersec}" ] || \
-	   [ -z "${apache_bytesperreq}" ] || \
-	   [ -z "${apache_busyworkers}" ]
-	   [ -z "${apache_idleworkers}" ]
+	if
+		[ -z "${apache_accesses}" ] ||
+			[ -z "${apache_kbytes}" ] ||
+			[ -z "${apache_reqpersec}" ] ||
+			[ -z "${apache_bytespersec}" ] ||
+			[ -z "${apache_bytesperreq}" ] ||
+			[ -z "${apache_busyworkers}" ]
+		[ -z "${apache_idleworkers}" ]
 	then
 		error "empty values got from apache server: ${apache_response[*]}"
 		return 1
 	fi
 
-	if [ ${apache_has_conns} -eq 1 ]
-	then
+	if [ ${apache_has_conns} -eq 1 ]; then
 		apache_connstotal="${apache_response[${apache_key_connstotal}]}"
 		apache_connsasyncwriting="${apache_response[${apache_key_connsasyncwriting}]}"
 		apache_connsasynckeepalive="${apache_response[${apache_key_connsasynckeepalive}]}"
@@ -159,8 +155,7 @@ apache_check() {
 
 	apache_get
 	# shellcheck disable=2181
-	if [ $? -ne 0 ]
-	then
+	if [ $? -ne 0 ]; then
 		# shellcheck disable=2154
 		error "cannot find stub_status on URL '${apache_url}'. Please set apache_url='http://apache.server:80/server-status?auto' in $confd/apache.conf"
 		return 1
@@ -191,8 +186,7 @@ CHART apache_local.net '' "apache Bandwidth" "kilobits/s" bandwidth apache.net a
 DIMENSION sent '' incremental 8 1
 EOF
 
-	if [ ${apache_has_conns} -eq 1 ]
-	then
+	if [ ${apache_has_conns} -eq 1 ]; then
 		cat <<EOF2
 CHART apache_local.connections '' "apache Connections" "connections" connections apache.connections line $((apache_priority + 2)) $apache_update_every
 DIMENSION connections '' absolute 1 1
@@ -240,9 +234,8 @@ SET busy = $((apache_busyworkers))
 END
 VALUESEOF
 
-	if [ ${apache_has_conns} -eq 1 ]
-	then
-	cat <<VALUESEOF2
+	if [ ${apache_has_conns} -eq 1 ]; then
+		cat <<VALUESEOF2
 BEGIN apache_local.connections $1
 SET connections = $((apache_connstotal))
 END
