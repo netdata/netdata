@@ -10,13 +10,10 @@ if [ "$IS_CONTAINER" != "" ]; then
   make dist
   rm -rf autom4te.cache
 else
-  if [[ "$(docker images -q netdata-builder:latest 2> /dev/null)" == "" ]]; then
-      docker build -t netdata-builder:latest -f build/Dockerfile .
-  fi
   docker run --rm -it \
     --env IS_CONTAINER=TRUE \
     --volume "${PWD}:/project:Z" \
     --workdir "/project" \
-    netdata-builder:latest \
+    netdata/builder:gcc \
     ./build/build.sh
 fi

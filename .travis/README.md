@@ -29,6 +29,9 @@ installations of netdata. Jobs are run on following operating systems:
   - CentOS 7 (containerized)
   - alpine (containerized)
 
+Images for system containers are stored on dockerhub and are created from Dockerfiles located in 
+[netdata/helper-images](https://github.com/netdata/helper-images) repository.
+
 ### Packaging
 
 This stage is executed only on "master" brach and allows us to create a new tag just looking at git commit message.
