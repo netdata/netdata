@@ -32,16 +32,15 @@ nginx_get() {
 	# shellcheck disable=SC2181
 	if [ $? -ne 0 ] || [ "${#nginx_response[@]}" -eq 0 ]; then return 1; fi
 
-	if [ "${nginx_response[0]}" != "Active" ] ||\
-	   [ "${nginx_response[1]}" != "connections:" ] ||\
-	   [ "${nginx_response[3]}" != "server" ] ||\
-	   [ "${nginx_response[4]}" != "accepts" ] ||\
-	   [ "${nginx_response[5]}" != "handled" ] ||\
-	   [ "${nginx_response[6]}" != "requests" ] ||\
-	   [ "${nginx_response[10]}" != "Reading:" ] ||\
-	   [ "${nginx_response[12]}" != "Writing:" ] ||\
-	   [ "${nginx_response[14]}" != "Waiting:" ]
-	then
+	if [ "${nginx_response[0]}" != "Active" ] ||
+		[ "${nginx_response[1]}" != "connections:" ] ||
+		[ "${nginx_response[3]}" != "server" ] ||
+		[ "${nginx_response[4]}" != "accepts" ] ||
+		[ "${nginx_response[5]}" != "handled" ] ||
+		[ "${nginx_response[6]}" != "requests" ] ||
+		[ "${nginx_response[10]}" != "Reading:" ] ||
+		[ "${nginx_response[12]}" != "Writing:" ] ||
+		[ "${nginx_response[14]}" != "Waiting:" ]; then
 		error "Invalid response from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
@@ -54,14 +53,13 @@ nginx_get() {
 	nginx_writing="${nginx_response[13]}"
 	nginx_waiting="${nginx_response[15]}"
 
-	if [ -z "${nginx_active_connections}" ] ||\
-	   [ -z "${nginx_accepts}" ] ||\
-	   [ -z "${nginx_handled}" ] ||\
-	   [ -z "${nginx_requests}" ] ||\
-	   [ -z "${nginx_reading}" ] ||\
-	   [ -z "${nginx_writing}" ] ||\
-	   [ -z "${nginx_waiting}" ]
-	then
+	if [ -z "${nginx_active_connections}" ] ||
+		[ -z "${nginx_accepts}" ] ||
+		[ -z "${nginx_handled}" ] ||
+		[ -z "${nginx_requests}" ] ||
+		[ -z "${nginx_reading}" ] ||
+		[ -z "${nginx_writing}" ] ||
+		[ -z "${nginx_waiting}" ]; then
 		error "empty values got from nginx server: ${nginx_response[*]}"
 		return 1
 	fi
@@ -74,8 +72,7 @@ nginx_check() {
 
 	nginx_get
 	# shellcheck disable=2181
-	if [ $? -ne 0 ]
-	then
+	if [ $? -ne 0 ]; then
 		# shellcheck disable=SC2154
 		error "cannot find stub_status on URL '${nginx_url}'. Please set nginx_url='http://nginx.server/stub_status' in $confd/nginx.conf"
 		return 1

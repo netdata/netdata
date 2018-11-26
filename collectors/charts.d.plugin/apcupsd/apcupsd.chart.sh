@@ -11,7 +11,7 @@ apcupsd_ip=
 apcupsd_port=
 
 declare -A apcupsd_sources=(
-    ["local"]="127.0.0.1:3551"
+	["local"]="127.0.0.1:3551"
 )
 
 # how frequently to collect UPS data
@@ -35,46 +35,40 @@ apcupsd_check() {
 	require_cmd apcaccess || return 1
 
 	# backwards compatibility
-	if [ "${apcupsd_ip}:${apcupsd_port}" != ":" ]
-	then
-	    apcupsd_sources["local"]="${apcupsd_ip}:${apcupsd_port}"
+	if [ "${apcupsd_ip}:${apcupsd_port}" != ":" ]; then
+		apcupsd_sources["local"]="${apcupsd_ip}:${apcupsd_port}"
 	fi
 
-    local host working=0 failed=0
-    for host in "${!apcupsd_sources[@]}"
-    do
-        run apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
-        # shellcheck disable=2181
-        if [ $? -ne 0 ]
-        then
-            error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
-            failed=$((failed + 1))
-        elif [ "$(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }')" != "ONLINE" ]
-        then
-            error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
-            failed=$((failed + 1))
-        else
-            working=$((working + 1))
-        fi
-    done
+	local host working=0 failed=0
+	for host in "${!apcupsd_sources[@]}"; do
+		run apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
+		# shellcheck disable=2181
+		if [ $? -ne 0 ]; then
+			error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
+			failed=$((failed + 1))
+		elif [ "$(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }')" != "ONLINE" ]; then
+			error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
+			failed=$((failed + 1))
+		else
+			working=$((working + 1))
+		fi
+	done
 
-    if [ ${working} -eq 0 ]
-    then
-        error "No APC UPSes found available."
-        return 1
-    fi
+	if [ ${working} -eq 0 ]; then
+		error "No APC UPSes found available."
+		return 1
+	fi
 
 	return 0
 }
 
 apcupsd_create() {
-    local host src
-    for host in "${!apcupsd_sources[@]}"
-    do
-        src=${apcupsd_sources[${host}]}
+	local host src
+	for host in "${!apcupsd_sources[@]}"; do
+		src=${apcupsd_sources[${host}]}
 
-        # create the charts
-        cat <<EOF
+		# create the charts
+		cat <<EOF
 CHART apcupsd_${host}.charge '' "UPS Charge for ${host} on ${src}" "percentage" ups apcupsd.charge area $((apcupsd_priority + 1)) $apcupsd_update_every
 DIMENSION battery_charge charge absolute 1 100
 
@@ -104,10 +98,9 @@ CHART apcupsd_${host}.time '' "UPS Time Remaining for ${host} on ${src}" "Minute
 DIMENSION time time absolute 1 100
 
 EOF
-    done
+	done
 	return 0
 }
-
 
 apcupsd_update() {
 	# the first argument to this function is the microseconds since last update
@@ -117,10 +110,9 @@ apcupsd_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-    local host working=0 failed=0
-    for host in "${!apcupsd_sources[@]}"
-    do
-    	apcupsd_get "${apcupsd_sources[${host}]}" | awk "
+	local host working=0 failed=0
+	for host in "${!apcupsd_sources[@]}"; do
+		apcupsd_get "${apcupsd_sources[${host}]}" | awk "
 
 BEGIN {
 	battery_charge = 0;
@@ -185,15 +177,14 @@ END {
 	print \"SET time = \" time;
 	print \"END\"
 }"
-	# shellcheck disable=SC2181
-        if [ $? -ne 0 ]
-        then
-            failed=$((failed + 1))
-        	error "failed to get values for APC UPS ${host} on ${apcupsd_sources[${host}]}" && return 1
-        else
-            working=$((working + 1))
-        fi
-    done
+		# shellcheck disable=SC2181
+		if [ $? -ne 0 ]; then
+			failed=$((failed + 1))
+			error "failed to get values for APC UPS ${host} on ${apcupsd_sources[${host}]}" && return 1
+		else
+			working=$((working + 1))
+		fi
+	done
 
 	[ $working -eq 0 ] && error "failed to get values from all APC UPSes" && return 1
 

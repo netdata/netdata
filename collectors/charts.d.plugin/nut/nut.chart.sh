@@ -34,8 +34,7 @@ nut_get_all() {
 nut_get() {
 	run -t $nut_timeout upsc "$1"
 
-	if [ "${nut_clients_chart}" -eq "1" ]
-		then
+	if [ "${nut_clients_chart}" -eq "1" ]; then
 		printf "ups.connected_clients: "
 		run -t $nut_timeout upsc -c "$1" | wc -l
 	fi
@@ -51,27 +50,23 @@ nut_check() {
 
 	require_cmd upsc || return 1
 
-	[ -z "$nut_ups" ] && nut_ups="$( nut_get_all )"
+	[ -z "$nut_ups" ] && nut_ups="$(nut_get_all)"
 
-	for x in $nut_ups
-	do
+	for x in $nut_ups; do
 		nut_get "$x" >/dev/null
 		# shellcheck disable=SC2181
-		if [ $? -eq 0 ]
-		then
-			if [ ! -z "${nut_names[${x}]}" ]
-			then
-				nut_ids[$x]="$( fixid "${nut_names[${x}]}" )"
+		if [ $? -eq 0 ]; then
+			if [ ! -z "${nut_names[${x}]}" ]; then
+				nut_ids[$x]="$(fixid "${nut_names[${x}]}")"
 			else
-				nut_ids[$x]="$( fixid "$x" )"
+				nut_ids[$x]="$(fixid "$x")"
 			fi
 			continue
 		fi
 		error "cannot get information for NUT UPS '$x'."
 	done
 
-	if [ ${#nut_ids[@]} -eq 0 ]
-	then
+	if [ ${#nut_ids[@]} -eq 0 ]; then
 		# shellcheck disable=SC2154
 		error "Cannot find UPSes - please set nut_ups='ups_name' in $confd/nut.conf"
 		return 1
@@ -84,8 +79,7 @@ nut_create() {
 	# create the charts
 	local x
 
-	for x in "${nut_ids[@]}"
-	do
+	for x in "${nut_ids[@]}"; do
 		cat <<EOF
 CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 1)) $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
@@ -121,19 +115,17 @@ CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $(
 DIMENSION temp temp absolute 1 100
 EOF
 
-	if [ "${nut_clients_chart}" = "1" ]
-		then
-		cat <<EOF2
+		if [ "${nut_clients_chart}" = "1" ]; then
+			cat <<EOF2
 CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 9)) $nut_update_every
 DIMENSION clients '' absolute 1 1
 EOF2
-	fi
+		fi
 
 	done
 
 	return 0
 }
-
 
 nut_update() {
 	# the first argument to this function is the microseconds since last update
@@ -144,8 +136,7 @@ nut_update() {
 	# remember: KEEP IT SIMPLE AND SHORT
 
 	local i x
-	for i in "${!nut_ids[@]}"
-	do
+	for i in "${!nut_ids[@]}"; do
 		x="${nut_ids[$i]}"
 		nut_get "$i" | awk "
 BEGIN {

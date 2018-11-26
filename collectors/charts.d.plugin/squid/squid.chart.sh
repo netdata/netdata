@@ -25,13 +25,10 @@ squid_get_stats() {
 squid_autodetect() {
 	local host="127.0.0.1" port url x
 
-	for port in 3128 8080
-	do
-		for url in "cache_object://$host:$port/counters" "/squid-internal-mgr/counters"
-		do
+	for port in 3128 8080; do
+		for url in "cache_object://$host:$port/counters" "/squid-internal-mgr/counters"; do
 			x=$(squid_get_stats_internal "$host" "$port" "$url" | grep client_http.requests)
-			if [ ! -z "$x" ]
-			then
+			if [ ! -z "$x" ]; then
 				squid_host="$host"
 				squid_port="$port"
 				squid_url="$url"
@@ -50,8 +47,7 @@ squid_check() {
 	require_cmd sed || return 1
 	require_cmd egrep || return 1
 
-	if [ -z "$squid_host" ] || [ -z "$squid_port" ] || [ -z "$squid_url" ]
-	then
+	if [ -z "$squid_host" ] || [ -z "$squid_port" ] || [ -z "$squid_url" ]; then
 		squid_autodetect || return 1
 	fi
 
@@ -59,8 +55,7 @@ squid_check() {
 	local x
 	x="$(squid_get_stats | grep client_http.requests)"
 	# shellcheck disable=SC2181
-	if [ ! $? -eq 0 ] || [ -z "$x" ]
-	then
+	if [ ! $? -eq 0 ] || [ -z "$x" ]; then
 		error "cannot fetch URL '$squid_url' by connecting to $squid_host:$squid_port. Please set squid_url='url' and squid_host='host' and squid_port='port' in $confd/squid.conf"
 		return 1
 	fi
@@ -93,7 +88,6 @@ EOF
 	return 0
 }
 
-
 squid_update() {
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).
@@ -114,8 +108,8 @@ squid_update() {
 	# even if something goes wrong, no other code can be executed
 
 	# shellcheck disable=SC1117
-	eval "$(squid_get_stats |\
-		 sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/^\([a-z0-9_]\+\) *= *\([0-9]\+\)$/local squid_\1=\2/g" |\
+	eval "$(squid_get_stats |
+		sed -e "s/ \+/ /g" -e "s/\./_/g" -e "s/^\([a-z0-9_]\+\) *= *\([0-9]\+\)$/local squid_\1=\2/g" |
 		grep -E "^local squid_(client_http|server_all)_[a-z0-9_]+=[0-9]+$")"
 
 	# write the result of the work.

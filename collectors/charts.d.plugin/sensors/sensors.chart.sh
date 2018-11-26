@@ -38,8 +38,7 @@ sensors_find_all_files() {
 
 sensors_find_all_dirs() {
 	# shellcheck disable=SC2162
-	sensors_find_all_files "$1" | while read
-	do
+	sensors_find_all_files "$1" | while read; do
 		dirname "$REPLY"
 	done | sort -u
 }
@@ -51,7 +50,7 @@ sensors_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ -z "$( sensors_find_all_files "$sensors_sys_dir" )" ] && error "no sensors found in '$sensors_sys_dir'." && return 1
+	[ -z "$(sensors_find_all_files "$sensors_sys_dir")" ] && error "no sensors found in '$sensors_sys_dir'." && return 1
 	return 0
 }
 
@@ -60,15 +59,14 @@ sensors_check_files() {
 	# also remove not needed sensors
 
 	local f v excluded
-	for f in "$@"
-	do
+	for f in "$@"; do
 		[ ! -f "$f" ] && continue
 		for ex in "${sensors_excluded[@]}"; do
 			[[ $f =~ .*$ex$ ]] && excluded='1' && break
 		done
 
-		[ "$excluded" != "1" ] && v="$( cat "$f" )" || v=0
-		v=$(( v + 1 - 1 ))
+		[ "$excluded" != "1" ] && v="$(cat "$f")" || v=0
+		v=$((v + 1 - 1))
 		[ $v -ne 0 ] && echo "$f" && continue
 		excluded=
 
@@ -81,15 +79,14 @@ sensors_check_temp_type() {
 	# disabled sensors have the value 0
 
 	local f t v
-	for f in "$@"
-	do
+	for f in "$@"; do
 		# shellcheck disable=SC2001
-		t=$( echo "$f" | sed "s|_input$|_type|g" )
+		t=$(echo "$f" | sed "s|_input$|_type|g")
 		[ "$f" = "$t" ] && echo "$f" && continue
 		[ ! -f "$t" ] && echo "$f" && continue
 
-		v="$( cat "$t" )"
-		v=$(( v + 1 - 1 ))
+		v="$(cat "$t")"
+		v=$((v + 1 - 1))
 		[ $v -ne 0 ] && echo "$f" && continue
 
 		error "$f is disabled"
@@ -105,120 +102,119 @@ sensors_create() {
 	# - the highest speed we can achieve -
 	[ $sensors_source_update -eq 1 ] && echo >"$TMP_DIR/sensors.sh" "sensors_update() {"
 
-	for path in $( sensors_find_all_dirs "$sensors_sys_dir" | sort -u )
-	do
-		dir=$( basename "$path" )
+	for path in $(sensors_find_all_dirs "$sensors_sys_dir" | sort -u); do
+		dir=$(basename "$path")
 		device=
 		subsystem=
 		id=
 		type=
 		name=
 
-		[ -h "$path/device" ] && device=$( readlink -f "$path/device" )
-		[ ! -z "$device" ] && device=$( basename "$device" )
+		[ -h "$path/device" ] && device=$(readlink -f "$path/device")
+		[ ! -z "$device" ] && device=$(basename "$device")
 		[ -z "$device" ] && device="$dir"
 
-		[ -h "$path/subsystem" ] && subsystem=$( readlink -f "$path/subsystem" )
-		[ ! -z "$subsystem" ] && subsystem=$( basename "$subsystem" )
+		[ -h "$path/subsystem" ] && subsystem=$(readlink -f "$path/subsystem")
+		[ ! -z "$subsystem" ] && subsystem=$(basename "$subsystem")
 		[ -z "$subsystem" ] && subsystem="$dir"
 
-		[ -f "$path/name" ] && name=$( cat "$path/name" )
+		[ -f "$path/name" ] && name=$(cat "$path/name")
 		[ -z "$name" ] && name="$dir"
 
-		[ -f "$path/type" ] && type=$( cat "$path/type" )
+		[ -f "$path/type" ] && type=$(cat "$path/type")
 		[ -z "$type" ] && type="$dir"
 
-		id="$( fixid "$device.$subsystem.$dir" )"
+		id="$(fixid "$device.$subsystem.$dir")"
 
 		debug "path='$path', dir='$dir', device='$device', subsystem='$subsystem', id='$id', name='$name'"
 
-		for mode in temperature voltage fans power current energy humidity
-		do
+		for mode in temperature voltage fans power current energy humidity; do
 			files=
 			multiplier=1
 			divisor=1
 			algorithm="absolute"
 
 			case $mode in
-				temperature)
-					files="$( ls "$path"/temp*_input 2>/dev/null; ls "$path/temp" 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					files="$( sensors_check_temp_type "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.temp_$id '' '$name Temperature' 'Celsius' 'temperature' 'sensors.temp' line $((sensors_priority + 1)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.temp_$id \$1\""
-					divisor=1000
-					;;
+			temperature)
+				files="$(
+					ls "$path"/temp*_input 2>/dev/null
+					ls "$path/temp" 2>/dev/null
+				)"
+				files="$(sensors_check_files "$files")"
+				files="$(sensors_check_temp_type "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.temp_$id '' '$name Temperature' 'Celsius' 'temperature' 'sensors.temp' line $((sensors_priority + 1)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.temp_$id \$1\""
+				divisor=1000
+				;;
 
-				voltage)
-					files="$( ls "$path"/in*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.volt_$id '' '$name Voltage' 'Volts' 'voltage' 'sensors.volt' line $((sensors_priority + 2)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.volt_$id \$1\""
-					divisor=1000
-					;;
+			voltage)
+				files="$(ls "$path"/in*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.volt_$id '' '$name Voltage' 'Volts' 'voltage' 'sensors.volt' line $((sensors_priority + 2)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.volt_$id \$1\""
+				divisor=1000
+				;;
 
-				current)
-					files="$( ls "$path"/curr*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.curr_$id '' '$name Current' 'Ampere' 'current' 'sensors.curr' line $((sensors_priority + 3)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.curr_$id \$1\""
-					divisor=1000
-					;;
+			current)
+				files="$(ls "$path"/curr*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.curr_$id '' '$name Current' 'Ampere' 'current' 'sensors.curr' line $((sensors_priority + 3)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.curr_$id \$1\""
+				divisor=1000
+				;;
 
-				power)
-					files="$( ls "$path"/power*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.power_$id '' '$name Power' 'Watt' 'power' 'sensors.power' line $((sensors_priority + 4)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.power_$id \$1\""
-					divisor=1000000
-					;;
+			power)
+				files="$(ls "$path"/power*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.power_$id '' '$name Power' 'Watt' 'power' 'sensors.power' line $((sensors_priority + 4)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.power_$id \$1\""
+				divisor=1000000
+				;;
 
-				fans)
-					files="$( ls "$path"/fan*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.fan_$id '' '$name Fans Speed' 'Rotations / Minute' 'fans' 'sensors.fans' line $((sensors_priority + 5)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.fan_$id \$1\""
-					;;
+			fans)
+				files="$(ls "$path"/fan*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.fan_$id '' '$name Fans Speed' 'Rotations / Minute' 'fans' 'sensors.fans' line $((sensors_priority + 5)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.fan_$id \$1\""
+				;;
 
-				energy)
-					files="$( ls "$path"/energy*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.energy_$id '' '$name Energy' 'Joule' 'energy' 'sensors.energy' areastack $((sensors_priority + 6)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.energy_$id \$1\""
-					algorithm="incremental"
-					divisor=1000000
-					;;
+			energy)
+				files="$(ls "$path"/energy*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.energy_$id '' '$name Energy' 'Joule' 'energy' 'sensors.energy' areastack $((sensors_priority + 6)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.energy_$id \$1\""
+				algorithm="incremental"
+				divisor=1000000
+				;;
 
-				humidity)
-					files="$( ls "$path"/humidity*_input 2>/dev/null )"
-					files="$( sensors_check_files "$files" )"
-					[ -z "$files" ] && continue
-					echo "CHART sensors.humidity_$id '' '$name Humidity' 'Percent' 'humidity' 'sensors.humidity' line $((sensors_priority + 7)) $sensors_update_every"
-					echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.humidity_$id \$1\""
-					divisor=1000
-					;;
+			humidity)
+				files="$(ls "$path"/humidity*_input 2>/dev/null)"
+				files="$(sensors_check_files "$files")"
+				[ -z "$files" ] && continue
+				echo "CHART sensors.humidity_$id '' '$name Humidity' 'Percent' 'humidity' 'sensors.humidity' line $((sensors_priority + 7)) $sensors_update_every"
+				echo >>"$TMP_DIR/sensors.sh" "echo \"BEGIN sensors.humidity_$id \$1\""
+				divisor=1000
+				;;
 
-				*)
-					continue
-					;;
+			*)
+				continue
+				;;
 			esac
 
-			for x in $files
-			do
+			for x in $files; do
 				file="$x"
-				fid="$( fixid "$file" )"
-				lfile="$( basename "$file" | sed "s|_input$|_label|g" )"
-				labelname="$( basename "$file" | sed "s|_input$||g" )"
+				fid="$(fixid "$file")"
+				lfile="$(basename "$file" | sed "s|_input$|_label|g")"
+				labelname="$(basename "$file" | sed "s|_input$||g")"
 
-				if [ ! "$path/$lfile" = "$file" ] && [ -f "$path/$lfile" ]
-				then
-					labelname="$( cat "$path/$lfile" )"
+				if [ ! "$path/$lfile" = "$file" ] && [ -f "$path/$lfile" ]; then
+					labelname="$(cat "$path/$lfile")"
 				fi
 
 				echo "DIMENSION $fid '$labelname' $algorithm $multiplier $divisor"
@@ -252,4 +248,3 @@ sensors_update() {
 
 	return 0
 }
-
