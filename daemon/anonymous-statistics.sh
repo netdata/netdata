@@ -123,7 +123,7 @@ else
     OPTOUT="$(cat "${NETDATA_CONFIG_DIR}/.opt-out-from-anonymous-statistics")"
 fi
 
-if [ "${OPTOUT}" = "all" ] || [ "${OPTOUT}" = "usage" -a "${ACTION}" = "START" ]; then
+if [ "${OPTOUT}" = "all" ] || ( [ "${OPTOUT}" = "usage" ] && [ "${ACTION}" = "START" ] ); then
     # the user does not want us to send statistics
     exit 0
 fi
