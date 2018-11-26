@@ -17,10 +17,11 @@ collectors/node.d.plugin/ @ktsaou @gmosx
 collectors/node.d.plugin/fronius/ @ktsaou @gmosx @ccremer
 collectors/node.d.plugin/snmp/ @ktsaou @gmosx @cakrit
 collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer
-collectors/python.d.plugin/ @l2isbad
+collectors/python.d.plugin/ @ilyam8
 daemon/ @ktsaou @vlvkobal
 database/ @ktsaou @mfundul
 docker/ @paulfantom
+docs/ @cakrit
 health/ @ktsaou @mfundul
 health/health.d/ @ktsaou @cakrit
 health/notifications/ @ktsaou @Ferroin
@@ -44,5 +45,9 @@ web/ @ktsaou @vlvkobal @gmosx
 .csslintrc @paulfantom
 .codeclimate.yml @paulfantom
 .codacy.yml @paulfantom
+netdata.spec.in @paulfantom
+netlify.toml @cakrit
+package.json @gmosx
 
+LICENSE.md @ktsaou
 CHANGELOG.md @netdatabot
