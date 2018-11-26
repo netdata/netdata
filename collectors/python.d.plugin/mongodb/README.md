@@ -121,6 +121,33 @@ Number of charts depends on mongodb version, storage engine and other features (
 26. **Replication set member heartbeat latency**
   * member (time when last heartbeat was received from replica set member)
 
+### prerequisite
+Create a read-only user for the netdata in the admin database.
+
+1. Authenticate as the admin user.
+
+```
+use admin
+db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
+```
+
+2. Create a user.
+
+```
+# MongoDB 2.x.
+db.addUser("netdata", "<UNIQUE_PASSWORD>", true)
+
+# MongoDB 3.x or higher.
+db.createUser({
+  "user":"netdata",
+  "pwd": "<UNIQUE_PASSWORD>",
+  "roles" : [
+    {role: 'read', db: 'admin' },
+    {role: 'clusterMonitor', db: 'admin'},
+    {role: 'read', db: 'local' }
+  ]
+})
+```
 
 ### configuration
 
