@@ -53,28 +53,40 @@ ARCHITECTURE="$(uname -m)"
 # detect the virtualization
 
 VIRTUALIZATION="unknown"
+VIRT_DETECTION="none"
+
 if [ ! -z "$(command -v systemd-detect-virt 2>/dev/null)" ]
 then
     VIRTUALIZATION="$(systemd-detect-virt)"
+    VIRT_DETECTION="systemd-detect-virt"
 else
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
     pid=$( head -n 1 </proc/1/sched 2>/dev/null | { IFS='(),#:' read name pid th threads; echo $pid; } )
     if [ ! -z "${pid}" ]; then
         pid=$(( pid + 0 ))
-        [ ${pid} -ne 1 ] && VIRTUALIZATION="container"
+        [ ${pid} -ne 1 ] &&
+            VIRTUALIZATION="container" &&
+            VIRT_DETECTION="pid"
     fi
 
     # ubuntu and debian supply /bin/running-in-container
     # https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
-    [ -x "/bin/running-in-container" ] && "/bin/running-in-container" >/dev/null 2>&1 && VIRTUALIZATION="container"
+    [ -x "/bin/running-in-container" ] &&
+        "/bin/running-in-container" >/dev/null 2>&1 &&
+        VIRTUALIZATION="container" &&
+        VIRT_DETECTION="/bin/running-in-container"
 
     # lxc sets environment variable 'container'
-    [ ! -z "${container}" ] && VIRTUALIZATION="lxc"
+    [ ! -z "${container}" ] &&
+        VIRTUALIZATION="lxc" &&
+        VIRT_DETECTION="containerenv"
 
     # docker creates /.dockerenv
     # http://stackoverflow.com/a/25518345
-    [ -f "/.dockerenv" ] && VIRTUALIZATION="docker"
+    [ -f "/.dockerenv" ] &&
+        VIRTUALIZATION="docker" &&
+        VIRT_DETECTION="dockerenv"
 fi
 
 # -------------------------------------------------------------------------------------------------
@@ -84,6 +96,9 @@ if [ -z "${NETDATA_VERSION}" ]; then
     NETDATA_VERSION="$(netdata -V 2>&1 | cut -d ' ' -f 2)"
 fi
 
+# -------------------------------------------------------------------------------------------------
+# check netdata unique id
+
 if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
     for dir in "$(netdata -W get global 'lib directory' '/var/lib/netdata' 2>/dev/null)" "/var/lib/netdata" "/opt/netdata/var/lib/netdata"; do
         if [ -f "${dir}/registry/netdata.public.unique.id" ]; then
@@ -92,6 +107,9 @@ if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
         fi
     done
 fi
+
+# -------------------------------------------------------------------------------------------------
+# check opt-out
 
 OPTOUT=
 if [ -z "${NETDATA_CONFIG_DIR}" ]; then
@@ -113,6 +131,38 @@ fi
 # -------------------------------------------------------------------------------------------------
 # send the anonymous statistics to netdata
 
-# curl -Ss >/dev/null 2>&1 --max-time 5
-echo "https://registry.my-netdata.io/log/anonymous-statistics?v=1&version=${NETDATA_VERSION}&machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&os_detection=${OS_DETECTION}&distro_name=${NAME}&distro_id=${ID}&distro_id_like=${ID_LIKE}&distro_version=${VERSION}&distro_version_id=${VERSION_ID}&kernel_name=${KERNEL_NAME}&kernel_version=${KERNEL_VERSION}&architecture=${ARCHITECTURE}&virtualization=${VIRTUALIZATION}&action=${ACTION}&action_result=${ACTION_RESULT}&action_data=${ACTION_DATA}"
+payload="$(cat <<EOF
+{
+    "v": 1,
+    "netdata": {
+        "version": "${NETDATA_VERSION}",
+        "unique_id": "${NETDATA_REGISTRY_UNIQUE_ID}"
+    },
+    "os": {
+        "name": "${NAME}",
+        "id": "${ID}",
+        "id_like": "${ID_LIKE}",
+        "version": "${VERSION}",
+        "version_id": "${VERSION_ID}",
+        "detection": "${OS_DETECTION}"
+    },
+    "kernel": {
+        "name": "${KERNEL_NAME}",
+        "version": "${KERNEL_VERSION}",
+        "arch": "${ARCHITECTURE}"
+    },
+    "virtualization": {
+        "name": "${VIRTUALIZATION}",
+        "detection": "${VIRT_DETECTION}"
+    },
+    "action": {
+        "name": "${ACTION}",
+        "result": "${ACTION_RESULT}",
+        "data": "$(echo "${ACTION_DATA}" | tr '"' "'")"
+    }
+}
+EOF
+)"
 
+# curl >/dev/null 2>&1 -X POST -Ss --max-time 5 --data-urlencode "payload=${payload}" "https://registry.my-netdata.io/log/anonymous-statistics"
+echo "${payload}"
