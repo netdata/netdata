@@ -1,16 +1,19 @@
-##### Summary
-<!--- Describe the change below, including rationale and design decisions -->
+<!--
+Describe the change in summary section, including rationale and degin decisions.
+Include "Fixes #nnn" if you are fixing an existing issue.
 
-<!--- HINT: Include "Fixes #nnn" if you are fixing an existing issue -->
+In "Component Name" section write which component is changed in this PR. This
+will help us review your PR quicker.
+
+If you have more information you want to add, write them in "Additional
+Information" section. This is usually used to help others understand your
+motivation behind this change. A step-by-step reproduction of the problem is
+helpful if there is no related issue.
+-->
+
+##### Summary
 
 ##### Component Name
-<!--- Write the short name of the module or plugin below -->
 
 ##### Additional Information
-<!--- Include additional information to help people understand the change here -->
-<!--- A step-by-step reproduction of the problem is helpful if there is no related issue -->
 
-<!--- Paste log output below, e.g. before and after your change -->
-```paste below
-
-```
