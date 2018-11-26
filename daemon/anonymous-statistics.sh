@@ -28,12 +28,14 @@ if [ -f "/etc/os-release" ]; then
     eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
 elif [ -f "/etc/lsb-release" ]; then
     OS_DETECTION="/etc/lsb-release"
-    DISTRIB_ID= DISTRIB_RELEASE= DISTRIB_CODENAME=
+    DISTRIB_ID=
+    DISTRIB_RELEASE=
+    DISTRIB_CODENAME=
     eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
     NAME="${DISTRIB_ID}"
     VERSION="${DISTRIB_RELEASE}"
     ID="${DISTRIB_CODENAME}"
-elif [ ! -z "$(which lsb_release 2>/dev/null || command -v lsb_release 2>/dev/null)" ]; then
+elif [ ! -z "$(command -v lsb_release 2>/dev/null)" ]; then
     OS_DETECTION="lsb_release"
     NAME="$(lsb_release -i 2>/dev/null | sed "s/[[:space:]]*:[[:space:]]*/:/g" | cut -d ':' -f 2)"
     VERSION_ID="$(lsb_release -f 2>/dev/null | sed "s/[[:space:]]*:[[:space:]]*/:/g" | cut -d ':' -f 2)"
@@ -51,7 +53,7 @@ ARCHITECTURE="$(uname -m)"
 # detect the virtualization
 
 VIRTUALIZATION="unknown"
-if [ ! -z "$(which systemd-detect-virt 2>/dev/null || command -v systemd-detect-virt 2>/dev/null)" ]
+if [ ! -z "$(command -v systemd-detect-virt 2>/dev/null)" ]
 then
     VIRTUALIZATION="$(systemd-detect-virt)"
 else
@@ -112,5 +114,5 @@ fi
 # send the anonymous statistics to netdata
 
 # curl -Ss >/dev/null 2>&1 --max-time 5
-echo "https://registry.my-netdata.io/log/anonymous-statistics?v=1&version=${NETDATA_VERSION}&machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&os_detection=${OS_DETECTION}&distro_name=${NAME}&distro_id=${ID}&distro_id_like=${ID_LIKE}&distro_version=${VERSION}&distro_version_id=${VERSION_ID}&kernel_name=${KERNEL_NAME}&kernel_version=${KERNEL_VERSION}&architecture=${ARCHITECTURE}&virtualization=${VIRTUALIZATION}"
+echo "https://registry.my-netdata.io/log/anonymous-statistics?v=1&version=${NETDATA_VERSION}&machine_guid=${NETDATA_REGISTRY_UNIQUE_ID}&os_detection=${OS_DETECTION}&distro_name=${NAME}&distro_id=${ID}&distro_id_like=${ID_LIKE}&distro_version=${VERSION}&distro_version_id=${VERSION_ID}&kernel_name=${KERNEL_NAME}&kernel_version=${KERNEL_VERSION}&architecture=${ARCHITECTURE}&virtualization=${VIRTUALIZATION}&action=${ACTION}&action_result=${ACTION_RESULT}&action_data=${ACTION_DATA}"
 
