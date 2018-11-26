@@ -134,9 +134,9 @@ fi
 payload="$(cat <<EOF
 {
     "v": 1,
-    "netdata": {
-        "version": "${NETDATA_VERSION}",
-        "unique_id": "${NETDATA_REGISTRY_UNIQUE_ID}"
+    "agent": {
+        "id": "${NETDATA_REGISTRY_UNIQUE_ID}",
+        "version": "${NETDATA_VERSION}"
     },
     "os": {
         "name": "${NAME}",
