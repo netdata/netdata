@@ -45,7 +45,7 @@ def create_runtime_chart(func):
         ok = func(*args, **kwargs)
         if ok:
             safe_print(RUNTIME_CHART_CREATE.format(job_name=self.name,
-                                                   update_every=self._runtime_counters.FREQ))
+                                                   update_every=self._runtime_counters.update_every))
         return ok
     return wrapper
 
