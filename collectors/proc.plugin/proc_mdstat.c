@@ -12,7 +12,7 @@ struct raid {
 
     RRDSET *st_disks;
     RRDDIM *rd_total;
-    RRDSET *rd_inuse;
+    RRDDIM *rd_inuse;
     unsigned long long total_disks;
     unsigned long long inuse_disks;
 
@@ -81,6 +81,14 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         error("PLUGIN: PROC_MDSTAT: Cannot find the number of raids in /proc/mdstat");
         return 1;
     }
+
+    // static int old_raids_num = 0;
+
+    // if(old_raids_num < raid_num) {
+    //     st_mdstat_health = reallocz(st_mdstat_health, sizeof(RRDSET *) * raid_num);
+    //     memset(&st_mdstat_health[old_raids_num], 0, sizeof(RRDSET *) * (raid_num - old_raids_num));
+    //     old_raids_num = raid_num;
+    // }
 
     // allocate the size we need;
     if(unlikely(raids_num != raids_allocated)) {
@@ -184,6 +192,48 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     }
 
     rrdset_done(st_mdstat_health);
+
+    // --------------------------------------------------------------------
+
+    for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
+        struct raid *raid = &raids[raid_idx];
+
+        if(unlikely(!raid->st_disks)) {
+
+            char id[50 + 1];
+            snprintfz(id, 50, "new_%s_disks", raid->name); // TODO: rename chart
+
+            char family[50 + 1];
+            snprintfz(family, 50, "%s", raid->name);
+
+            raid->st_disks = rrdset_create_localhost(
+                    "mdstat"
+                    , id
+                    , NULL
+                    , family
+                    , NULL
+                    , "Disk Stats"
+                    , "disks"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                    , 6500 + raid_idx // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+        }
+        else
+            rrdset_next(raid->st_disks);
+
+        if(raid->used) {
+            raid->rd_inuse = rrddim_add(raid->st_disks, "inuse", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_total = rrddim_add(raid->st_disks, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_disks, raid->rd_inuse, raid->inuse_disks);
+            rrddim_set_by_pointer(raid->st_disks, raid->rd_total, raid->total_disks);
+        }
+
+        rrdset_done(raid->st_disks);
+    }
 
     return 0;
 }
