@@ -13,11 +13,13 @@
 
 **Closed issues:**
 
+- Refresh Issue [\#4761](https://github.com/netdata/netdata/issues/4761)
 - Use `--future-release` in changelog generation [\#4718](https://github.com/netdata/netdata/issues/4718)
 - Extract registry functionality from dashboard.js [\#4474](https://github.com/netdata/netdata/issues/4474)
 - Fix file classification in LGTM [\#4259](https://github.com/netdata/netdata/issues/4259)
 - Monitor Speed/Duplex [\#4047](https://github.com/netdata/netdata/issues/4047)
 - Feature: UKSM support [\#2994](https://github.com/netdata/netdata/issues/2994)
+- web\_log reports unmatched lines [\#2295](https://github.com/netdata/netdata/issues/2295)
 - Ceph support [\#1673](https://github.com/netdata/netdata/issues/1673)
 - Adding support for time markers [\#1195](https://github.com/netdata/netdata/issues/1195)
 - Scheduled “downtime” for a type of check? [\#1133](https://github.com/netdata/netdata/issues/1133)
@@ -26,6 +28,10 @@
 
 **Merged pull requests:**
 
+- Move general issue template [\#4764](https://github.com/netdata/netdata/pull/4764) ([paulfantom](https://github.com/paulfantom))
+- bugfix: query engine resampling duration [\#4759](https://github.com/netdata/netdata/pull/4759) ([ktsaou](https://github.com/ktsaou))
+- create better issue and PR templates [\#4758](https://github.com/netdata/netdata/pull/4758) ([paulfantom](https://github.com/paulfantom))
+- web\_log: add alarm on unmatched lines [\#4757](https://github.com/netdata/netdata/pull/4757) ([ilyam8](https://github.com/ilyam8))
 - mongodb: readme update [\#4754](https://github.com/netdata/netdata/pull/4754) ([ilyam8](https://github.com/ilyam8))
 - sensors: don't ignore 0 RPM funs on start [\#4753](https://github.com/netdata/netdata/pull/4753) ([ilyam8](https://github.com/ilyam8))
 - Use var to make NETDATA variable global [\#4752](https://github.com/netdata/netdata/pull/4752) ([gmosx](https://github.com/gmosx))
