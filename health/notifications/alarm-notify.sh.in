@@ -143,6 +143,29 @@ docurl() {
 }
 
 # -----------------------------------------------------------------------------
+# List of all the notification mechanisms we support.
+# Used in a couple of places to write more compact code.
+
+method_names="
+email
+pushover
+pushbullet
+telegram
+slack
+alerta
+flock
+discord
+hipchat
+twilio
+messagebird
+pd
+fleep
+syslog
+custom
+msteam
+"
+
+# -----------------------------------------------------------------------------
 # this is to be overwritten by the config file
 
 custom_sender() {
@@ -167,26 +190,34 @@ custom_sender() {
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-roles="${1}"               # the roles that should be notified for this event
-host="${2}"                # the host generated this event
-unique_id="${3}"           # the unique id of this event
-alarm_id="${4}"            # the unique id of the alarm that generated this event
-event_id="${5}"            # the incremental id of the event, for this alarm id
-when="${6}"                # the timestamp this event occurred
-name="${7}"                # the name of the alarm, as given in netdata health.d entries
-chart="${8}"               # the name of the chart (type.id)
-family="${9}"              # the family of the chart
-status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${12}"              # the current value of the alarm
-old_value="${13}"          # the previous value of the alarm
-src="${14}"                # the line number and file the alarm has been configured
-duration="${15}"           # the duration in seconds of the previous alarm state
-non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-units="${17}"              # the units of the value
-info="${18}"               # a short description of the alarm
-value_string="${19}"       # friendly value (with units)
-old_value_string="${20}"   # friendly old value (with units)
+if [ ${1} = "unittest" ] ; then
+    unittest=1                 # enable unit testing mode
+    roles="${2}"               # the role that should be used for unit testing
+    cfgfile="${3}"             # the location of the config file to use for unit testing
+    status="${4}"              # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    old_status="${5}"          # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+else
+    roles="${1}"               # the roles that should be notified for this event
+    host="${2}"                # the host generated this event
+    unique_id="${3}"           # the unique id of this event
+    alarm_id="${4}"            # the unique id of the alarm that generated this event
+    event_id="${5}"            # the incremental id of the event, for this alarm id
+    when="${6}"                # the timestamp this event occurred
+    name="${7}"                # the name of the alarm, as given in netdata health.d entries
+    chart="${8}"               # the name of the chart (type.id)
+    family="${9}"              # the family of the chart
+    status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+    value="${12}"              # the current value of the alarm
+    old_value="${13}"          # the previous value of the alarm
+    src="${14}"                # the line number and file the alarm has been configured
+    duration="${15}"           # the duration in seconds of the previous alarm state
+    non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
+    units="${17}"              # the units of the value
+    info="${18}"               # a short description of the alarm
+    value_string="${19}"       # friendly value (with units)
+    old_value_string="${20}"   # friendly old value (with units)
+fi
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -229,112 +260,71 @@ curl=
 sendmail=
 
 # enable / disable features
-SEND_SLACK="YES"
-SEND_MSTEAM="YES"
-SEND_ALERTA="YES"
-SEND_FLOCK="YES"
-SEND_DISCORD="YES"
-SEND_PUSHOVER="YES"
-SEND_TWILIO="YES"
-SEND_HIPCHAT="YES"
-SEND_MESSAGEBIRD="YES"
-SEND_KAVENEGAR="YES"
-SEND_TELEGRAM="YES"
-SEND_EMAIL="YES"
-SEND_PUSHBULLET="YES"
-SEND_KAFKA="YES"
-SEND_PD="YES"
-SEND_FLEEP="YES"
-SEND_IRC="YES"
-SEND_AWSSNS="YES"
-SEND_SYSLOG="NO"
-SEND_CUSTOM="YES"
+for method_name in ${method_names^^} ; do
+    declare SEND_${method_name}="YES"
+    declare DEFAULT_RECIPIENT_${method_name}
+done
+
+for method_name in ${method_names} ; do
+    declare -A role_recipients_${method_name}
+done
 
 # slack configs
 SLACK_WEBHOOK_URL=
-DEFAULT_RECIPIENT_SLACK=
-declare -A role_recipients_slack=()
 
 # Microsoft Team configs
 MSTEAM_WEBHOOK_URL=
-DEFAULT_RECIPIENT_MSTEAM=
-declare -A role_recipients_msteam=()
 
 # rocketchat configs
 ROCKETCHAT_WEBHOOK_URL=
-DEFAULT_RECIPIENT_ROCKETCHAT=
-declare -A role_recipients_rocketchat=()
 
 # alerta configs
 ALERTA_WEBHOOK_URL=
 ALERTA_API_KEY=
-DEFAULT_RECIPIENT_ALERTA=
-declare -A role_recipients_alerta=()
 
 # flock configs
 FLOCK_WEBHOOK_URL=
-DEFAULT_RECIPIENT_FLOCK=
-declare -A role_recipients_flock=()
 
 # discord configs
 DISCORD_WEBHOOK_URL=
-DEFAULT_RECIPIENT_DISCORD=
-declare -A role_recipients_discord=()
 
 # pushover configs
 PUSHOVER_APP_TOKEN=
-DEFAULT_RECIPIENT_PUSHOVER=
-declare -A role_recipients_pushover=()
 
 # pushbullet configs
 PUSHBULLET_ACCESS_TOKEN=
 PUSHBULLET_SOURCE_DEVICE=
-DEFAULT_RECIPIENT_PUSHBULLET=
-declare -A role_recipients_pushbullet=()
 
 # twilio configs
 TWILIO_ACCOUNT_SID=
 TWILIO_ACCOUNT_TOKEN=
 TWILIO_NUMBER=
-DEFAULT_RECIPIENT_TWILIO=
-declare -A role_recipients_twilio=()
 
 # hipchat configs
 HIPCHAT_SERVER=
 HIPCHAT_AUTH_TOKEN=
-DEFAULT_RECIPIENT_HIPCHAT=
-declare -A role_recipients_hipchat=()
 
 # messagebird configs
 MESSAGEBIRD_ACCESS_KEY=
 MESSAGEBIRD_NUMBER=
-DEFAULT_RECIPIENT_MESSAGEBIRD=
-declare -A role_recipients_messagebird=()
 
 # kavenegar configs
 KAVENEGAR_API_KEY=""
 KAVENEGAR_SENDER=""
-DEFAULT_RECIPIENT_KAVENEGAR=()
-declare -A role_recipients_kavenegar=""
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
-DEFAULT_RECIPIENT_TELEGRAM=
-declare -A role_recipients_telegram=()
 
 # kafka configs
+SEND_KAFKA="YES"
 KAFKA_URL=
 KAFKA_SENDER_IP=
 
 # pagerduty.com configs
 PD_SERVICE_KEY=
-DEFAULT_RECIPIENT_PD=
-declare -A role_recipients_pd=()
 
 # fleep.io configs
 FLEEP_SENDER="${host}"
-DEFAULT_RECIPIENT_FLEEP=
-declare -A role_recipients_fleep=()
 
 # Amazon SNS configs
 DEFAULT_RECIPIENT_AWSSNS=
@@ -343,40 +333,38 @@ declare -A role_recipients_awssns=()
 
 # syslog configs
 SYSLOG_FACILITY=
-declare -A role_recipients_syslog=()
-
-# custom configs
-DEFAULT_RECIPIENT_CUSTOM=
-declare -A role_recipients_custom=()
 
 # email configs
 EMAIL_SENDER=
-DEFAULT_RECIPIENT_EMAIL="root"
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 EMAIL_THREADING=
-declare -A role_recipients_email=()
+DEFAULT_RECIPIENT_EMAIL="root"
 
 # irc configs
 IRC_NICKNAME=
 IRC_REALNAME=
-DEFAULT_RECIPIENT_IRC=
 IRC_NETWORK=
-declare -A role_recipients_irc=()
 
 # load the stock and user configuration files
 # these will overwrite the variables above
 
-for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
-do
-    if [ -f "${CONFIG}" ]
-        then
-        debug "Loading config file '${CONFIG}'..."
-        source "${CONFIG}"
-        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
-    else
-        warning "Cannot find file '${CONFIG}'."
-    fi
-done
+if [ ${unittest} ] ;
+    then
+    source "${cfgfile}"
+    [ $? -ne 0 ] && error "Failed to load requested config file." && exit 1
+else
+    for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
+    do
+        if [ -f "${CONFIG}" ]
+            then
+            debug "Loading config file '${CONFIG}'..."
+            source "${CONFIG}"
+            [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+        else
+            warning "Cannot find file '${CONFIG}'."
+        fi
+    done
+fi
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
@@ -442,285 +430,6 @@ filter_recipient_by_criticality() {
     debug "SEVERITY FILTERING for ${x} VIA ${method}: BLOCK: recipient should not receive this notification"
     return 1
 }
-
-# -----------------------------------------------------------------------------
-# find the recipients' addresses per method
-
-declare -A arr_slack=()
-declare -A arr_msteam=()
-declare -A arr_rocketchat=()
-declare -A arr_alerta=()
-declare -A arr_flock=()
-declare -A arr_discord=()
-declare -A arr_pushover=()
-declare -A arr_pushbullet=()
-declare -A arr_twilio=()
-declare -A arr_hipchat=()
-declare -A arr_telegram=()
-declare -A arr_pd=()
-declare -A arr_email=()
-declare -A arr_custom=()
-declare -A arr_messagebird=()
-declare -A arr_kavenegar=()
-declare -A arr_fleep=()
-declare -A arr_irc=()
-declare -A arr_syslog=()
-declare -A arr_awssns=()
-
-# netdata may call us with multiple roles, and roles may have multiple but
-# overlapping recipients - so, here we find the unique recipients.
-for x in ${roles//,/ }
-do
-    # the roles 'silent' and 'disabled' mean:
-    # don't send a notification for this role
-    [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
-
-    # email
-    a="${role_recipients_email[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_EMAIL}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality email "${r}" && arr_email[${r/|*/}]="1"
-    done
-
-    # pushover
-    a="${role_recipients_pushover[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHOVER}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushover "${r}" && arr_pushover[${r/|*/}]="1"
-    done
-
-    # pushbullet
-    a="${role_recipients_pushbullet[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PUSHBULLET}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pushbullet "${r}" && arr_pushbullet[${r/|*/}]="1"
-    done
-
-    # twilio
-    a="${role_recipients_twilio[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TWILIO}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality twilio "${r}" && arr_twilio[${r/|*/}]="1"
-    done
-
-    # hipchat
-    a="${role_recipients_hipchat[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_HIPCHAT}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality hipchat "${r}" && arr_hipchat[${r/|*/}]="1"
-    done
-
-    # messagebird
-    a="${role_recipients_messagebird[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MESSAGEBIRD}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality messagebird "${r}" && arr_messagebird[${r/|*/}]="1"
-    done
-
-    # kavenegar
-    a="${role_recipients_kavenegar[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_KAVENEGAR}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality kavenegar "${r}" && arr_kavenegar[${r/|*/}]="1"
-    done
-
-    # telegram
-    a="${role_recipients_telegram[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality telegram "${r}" && arr_telegram[${r/|*/}]="1"
-    done
-
-    # slack
-    a="${role_recipients_slack[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SLACK}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
-    done
-
-    # Microsoft Team
-    a="${role_recipients_msteam[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MSTEAM}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality msteam "${r}" && arr_msteam[${r/|*/}]="1"
-    done
-
-    # rocketchat
-    a="${role_recipients_rocketchat[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ROCKETCHAT}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality rocketchat "${r}" && arr_rocketchat[${r/|*/}]="1"
-    done
-
-    # alerta
-    a="${role_recipients_alerta[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ALERTA}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality alerta "${r}" && arr_alerta[${r/|*/}]="1"
-    done
-
-    # flock
-    a="${role_recipients_flock[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLOCK}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality flock "${r}" && arr_flock[${r/|*/}]="1"
-    done
-
-    # discord
-    a="${role_recipients_discord[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_DISCORD}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality discord "${r}" && arr_discord[${r/|*/}]="1"
-    done
-
-    # pagerduty.com
-    a="${role_recipients_pd[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PD}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
-    done
-
-    # fleep.io
-    a="${role_recipients_fleep[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLEEP}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality fleep "${r}" && arr_fleep[${r/|*/}]="1"
-    done
-
-    # irc
-    a="${role_recipients_irc[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_IRC}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality irc "${r}" && arr_irc[${r/|*/}]="1"
-    done
-
-    # amazon sns
-    a="${role_recipients_awssns[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_AWSSNS}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality awssns "${r}" && arr_awssns[${r/|*/}]="1"
-    done
-
-    # syslog
-    a="${role_recipients_syslog[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_SYSLOG}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality syslog "${r}" && arr_syslog[${r/|*/}]="1"
-    done
-
-    # custom
-    a="${role_recipients_custom[${x}]}"
-    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_CUSTOM}"
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality custom "${r}" && arr_custom[${r/|*/}]="1"
-    done
-
-done
-
-# build the list of slack recipients (channels)
-to_slack="${!arr_slack[*]}"
-[ -z "${to_slack}" ] && SEND_SLACK="NO"
-
-# build the list of Microsoft team recipients (channels)
-to_msteam="${!arr_msteam[*]}"
-[ -z "${to_msteam}" ] && SEND_MSTEAM="NO"
-
-# build the list of rocketchat recipients (channels)
-to_rocketchat="${!arr_rocketchat[*]}"
-[ -z "${to_rocketchat}" ] && SEND_ROCKETCHAT="NO"
-
-# build the list of alerta recipients (channels)
-to_alerta="${!arr_alerta[*]}"
-[ -z "${to_alerta}" ] && SEND_ALERTA="NO"
-
-# build the list of flock recipients (channels)
-to_flock="${!arr_flock[*]}"
-[ -z "${to_flock}" ] && SEND_FLOCK="NO"
-
-# build the list of discord recipients (channels)
-to_discord="${!arr_discord[*]}"
-[ -z "${to_discord}" ] && SEND_DISCORD="NO"
-
-# build the list of pushover recipients (user tokens)
-to_pushover="${!arr_pushover[*]}"
-[ -z "${to_pushover}" ] && SEND_PUSHOVER="NO"
-
-# build the list of pushbulet recipients (user tokens)
-to_pushbullet="${!arr_pushbullet[*]}"
-[ -z "${to_pushbullet}" ] && SEND_PUSHBULLET="NO"
-
-# build the list of twilio recipients (phone numbers)
-to_twilio="${!arr_twilio[*]}"
-[ -z "${to_twilio}" ] && SEND_TWILIO="NO"
-
-# build the list of hipchat recipients (rooms)
-to_hipchat="${!arr_hipchat[*]}"
-[ -z "${to_hipchat}" ] && SEND_HIPCHAT="NO"
-
-# build the list of messagebird recipients (phone numbers)
-to_messagebird="${!arr_messagebird[*]}"
-[ -z "${to_messagebird}" ] && SEND_MESSAGEBIRD="NO"
-
-# build the list of kavenegar recipients (phone numbers)
-to_kavenegar="${!arr_kavenegar[*]}"
-[ -z "${to_kavenegar}" ] && SEND_KAVENEGAR="NO"
-
-# check array of telegram recipients (chat ids)
-to_telegram="${!arr_telegram[*]}"
-[ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
-
-# build the list of pagerduty recipients (service keys)
-to_pd="${!arr_pd[*]}"
-[ -z "${to_pd}" ] && SEND_PD="NO"
-
-# build the list of fleep recipients (conversation webhooks)
-to_fleep="${!arr_fleep[*]}"
-[ -z "${to_fleep}" ] && SEND_FLEEP="NO"
-
-# build the list of custom recipients
-to_custom="${!arr_custom[*]}"
-[ -z "${to_custom}" ] && SEND_CUSTOM="NO"
-
-# build the list of email recipients (email addresses)
-to_email=
-for x in "${!arr_email[@]}"
-do
-    [ ! -z "${to_email}" ] && to_email="${to_email}, "
-    to_email="${to_email}${x}"
-done
-[ -z "${to_email}" ] && SEND_EMAIL="NO"
-
-# build the list of irc recipients (channels)
-to_irc="${!arr_irc[*]}"
-[ -z "${to_irc}" ] && SEND_IRC="NO"
-
-# build the list of awssns recipients (facilities, servers, and prefixes)
-to_awssns="${!arr_awssns[*]}"
-[ -z "${to_awssns}" ] && SEND_AWSSNS="NO"
-
-# build the list of syslog recipients (facilities, servers, and prefixes)
-to_syslog="${!arr_syslog[*]}"
-[ -z "${to_syslog}" ] && SEND_SYSLOG="NO"
 
 # -----------------------------------------------------------------------------
 # verify the delivery methods supported
@@ -859,6 +568,69 @@ if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
     fi
 fi
 
+# -----------------------------------------------------------------------------
+# find the recipients' addresses per method
+
+# netdata may call us with multiple roles, and roles may have multiple but
+# overlapping recipients - so, here we find the unique recipients.
+for method_name in ${method_names} ; do
+    send_var="SEND_${method_name^^}"
+    if [ ${!send_var} = "NO" ] ; then
+        continue
+    fi
+
+    declare -A arr_var=()
+
+    for x in ${roles//,/ } ; do
+        # the roles 'silent' and 'disabled' mean:
+        # don't send a notification for this role
+        [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
+
+        role_recipients_var="role_recipients_${method_name}"
+        role_recipients=${!role_recipients_var}
+        default_recipient_var="DEFAULT_RECIPIENT_${method_name^^}"
+
+        a="${role_recipients[${x}]}"
+        [ -z "${a}" ] && a="${!default_recipient_var}"
+        for r in ${a//,/ } ; do
+            [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr_var[${r/|*/}]="1"
+        done
+    done
+
+    # build the list of recipients
+    to_var="to_${method_name}"
+    declare to_${method_name}="${!arr_var[*]}"
+
+    [ -z "${!to_var}" ] && declare ${send_var}="NO"
+done
+
+# -----------------------------------------------------------------------------
+# handle fixup of the email recipient list.
+
+fix_to_email() {
+  to_email=
+  while [ ! -z "${1}" ]
+  do
+    [ ! -z "${to_email}" ] && to_email="${to_email}, "
+    to_email="${to_email}${1}"
+    shift 1
+  done
+}
+
+# ${to_email} without quotes here
+fix_to_email ${to_email}
+
+# -----------------------------------------------------------------------------
+# handle output if we're running in unit test mode
+if [ ${unittest} ] ; then
+    for method_name in ${method_names} ; do
+        to_var="to_${method_name}"
+        echo "results: ${method_name}: ${!to_var}"
+    done
+    exit 0
+fi
+
+# -----------------------------------------------------------------------------
 # check that we have at least a method enabled
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
