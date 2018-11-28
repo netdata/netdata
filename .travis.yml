@@ -56,6 +56,16 @@ jobs:
     name: tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/create_artifacts.sh"
+    deploy:
+      provider: gcs
+      secret_access_key:
+        secure: MWzWydVG2WJ+5S7bVQYHCcLTiC5s5l2yB3zb/E/HJUIjvv9AFZRsLmjS20umho+4MPK6dXJpI0IzWhW8V54cfFwyPHCeHGO+CBaREmWJJHQn53oiugLoFMlngSFzSAx9BGT1dfeJPxGQm1rqYk2ohLPfuKd1ORoEMK8fgnihmsn3GtNOhiJmmKyzppoottvihQBRhgy8aghkpd+3x1nKhQFeOcCvUwk6rWW4MBdRK3j6Nk3+Tlh/8s6p+FPwbIB63g9SPYBetBLvqp0ftleoUXY0Fy+tN4pR8CnhXHI4IJcesffa6JMxrQtx0CQJQrlxtRrDib0s+2zOw+wUlLfJcVMV+lyd6wvg4ltiQBYrNewA0ORmYYZVqd8ysZ8yXkQVNLkga15DNHV6uLlRkDny1xiT7buSHQc/xlT11ygOPfFJI4hMJbVSRyl+ChYsV5bJ0MBAOhH3AbBY//RZHWSed5oXugmlV6FKXcfbJOiAYPiVMjWpGVGqQexzQvbCfSNCERCTgKqAI3cFGXaiLOhvzkb0mdT4eOdvkzcWju6ucXiwnd1lNYN4ucKcazGjOL8vy5WfT0AKVlvBq7KtlQJ2vXJ1hJ2/ZOg8o88WyRBiiyMDxMBicSx6VNZhu2s2JFBPdaHxOoFcZjw9FLv04BA7GeUh0WGvasoSCA4mNIZz+PY=
+      access_key_id:
+        secure: K1zxe4IWfeguYEAYCcLaQ1SCJcFEQ34PR3ffDuUuP1+HLqpHmAXtZUF2dnOT+PPRGSIHiUYwQNwGKuYz9P9IlKT0e9szeHE2IEJ+S9sO3TXXdnjoxkPWtVomeWo7pVqeIvs892qQHoqbHeVMwktB1D3vVFFAsNLl6OxxbATWEb8irjJOAY3pvjz0ebFeObeofaM6TUknWtp5ePyxn73joYRpj9dYK7i3drciOoOOOok7QZsE2diGwrIPbMar66GB3gdS4/KBYXq0ZANrT/pTPfGXFg5zEvDeQfW11pihq6w5OfsSk4wIe3iHTowFpaLexgZM8fchbHmg2QJL7iX80HxReuPPFlAte7XLHuN9JhrwUs1u52WMNmTXlQoQFVLpSlVPDX/+qdFsLW/FUPBpVKh0k4t5fiDQVtOoPF7MpR1lt4jp6gt0toA+qSRtuOK1Tqanxez/G8vWtSkpcWZbwOG46oCCp+ymrkK9dvAuCL0L8ruAaLmyYdC3S3Ho6e5Oh+m7Dr+yho83olk9S8XhaWYenCj80yCbs37IoekEw5axSIblfdGrQkahWynT+uOHAzRmruwE2C+NIUm27hROiSmNkLdKF/v4mc3pvHVBqrthcjlpts536kkty2tsxcR9hx28SwST28MvLPavdTWqphHf0S+/pAnO9nQA/e/VzWI=
+      bucket: "netdata-nightlies"
+      skip_cleanup: true
+      file_glob: true
+      file: "netdata*.tar.gz"
   - name: docker images
     install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
     script: "docker/build.sh"
