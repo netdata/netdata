@@ -19,7 +19,7 @@ source installer/.environment.sh || exit 1
 source installer/functions.sh || exit 1
 
 echo >&2 "Stopping a possibly running netdata..."
-for p in $(pidof netdata); do run kill "$p"; done
+for p in $(stop_all_netdata netdata); do run kill "$p"; done
 sleep 2
 
 if [ ! -z "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
