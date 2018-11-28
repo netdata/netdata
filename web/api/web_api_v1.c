@@ -615,11 +615,8 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST *host, int *alarm_normal,
-                                                                  int *alarm_warn, int *alarm_crit) {
-    *alarm_normal = 0;
-    *alarm_warn = 0;
-    *alarm_crit = 0;
+inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST *host, BUFFER *wb) {
+    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
@@ -627,13 +624,27 @@ inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST 
 
         switch(rc->status) {
             case RRDCALC_STATUS_WARNING:
-                (*alarm_warn)++;
+                alarm_warn++;
                 break;
             case RRDCALC_STATUS_CRITICAL:
-                (*alarm_crit)++;
+                alarm_crit++;
                 break;
             default:
-                (*alarm_normal)++;
+                alarm_normal++;
+        }
+    }
+    buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
+    buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
+    buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
+}
+
+inline void web_client_api_request_v1_info_mirrored_hosts(const RRDHOST *host, BUFFER *wb) {
+    RRDHOST *rc;
+    for(rc = host->next; rc ; rc = rc->next) {
+        if(unlikely(rc->next)) {
+            buffer_sprintf(wb, "\t\t\"%s\",\n", rc->hostname);
+        } else {
+            buffer_sprintf(wb, "\t\t\"%s\"\n", rc->hostname);
         }
     }
 }
@@ -642,22 +653,19 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
-    buffer_sprintf(wb, "{\n");
+
+    buffer_strcat(wb, "{\n");
     buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
 
-    buffer_sprintf(wb, "\t\"mirrored_hosts\": [\n");
-    // TODO write mirrored hosts
-    buffer_sprintf(wb, "\t],\n");
+    buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
+    web_client_api_request_v1_info_mirrored_hosts(host, wb);
+    buffer_strcat(wb, "\t],\n");
 
-    buffer_sprintf(wb, "\t\"alarms\": {\n");
-    int alarm_normal, alarm_warn, alarm_crit;
-    web_client_api_request_v1_info_summary_alarm_statuses(host, &alarm_normal, &alarm_warn, &alarm_crit);
-    buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
-    buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
-    buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
-    buffer_sprintf(wb, "\t}\n");
-    buffer_sprintf(wb, "}");
+    buffer_strcat(wb, "\t\"alarms\": {\n");
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    buffer_strcat(wb, "\t}\n");
+    buffer_strcat(wb, "}");
     return 200;
 }
 
