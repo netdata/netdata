@@ -134,7 +134,7 @@ Once Netdata is installed, see [Getting Started](../docs/GettingStarted.md).
 
 ## Run Netdata in a Docker container
   
-You can [Install Netdata with Docker](../docker/#install-netdata-with-docker).
+You can [Install Netdata with Docker](../packaging/docker/#install-netdata-with-docker).
 
 ---
 
