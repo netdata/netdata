@@ -127,7 +127,7 @@ class Service(LogService):
                     self.banned_ips[jail].remove(ip)
                     self.data['{0}_in_jail'.format(jail)] -= 1
 
-            return self.data
+        return self.data
 
     def get_files_from_dir(self, dir_path, suffix):
         """
