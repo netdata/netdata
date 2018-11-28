@@ -4366,7 +4366,7 @@ function getURLParameter(name) {
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
 }
 
-function manageClaimUI() {
+function renderClaimUI() {
     const container = document.getElementById("claim-ui");
     const account = localStorage.getItem("hub.accountName");
     if (account) {
@@ -4382,10 +4382,9 @@ function initUI() {
     if (claimed) {
         localStorage.setItem("hub.accountName", decodeURIComponent(claimed));
         history.pushState(null, "", `/${window.location.hash}`);
-        // window.location = window.location.origin + window.location.pathname;
     }
 
-    manageClaimUI();
+    renderClaimUI();
 }
 
 if (document.readyState === "complete") {
