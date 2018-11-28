@@ -25,8 +25,6 @@ EXTRA_DIST = \
 	.lgtm.yml \
 	.travis \
 	.github/CODEOWNERS \
-	build/build.sh \
-	build/Dockerfile \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
 	build/m4/ax_check_enable_debug.m4 \
@@ -51,14 +49,13 @@ SUBDIRS = \
 	diagrams \
 	makeself \
 	system \
-	contrib \
 	tests \
 	$(NULL)
 
 dist_noinst_DATA= \
 	cppcheck.sh \
 	configs.signatures \
-	docker \
+	contrib \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
