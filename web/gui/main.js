@@ -457,7 +457,7 @@ function saveObjectToClient(data, filename) {
 
 const hubBaseURL = "http://localhost:8080";
 
-function hubButtonDidClick() {
+function claimButtonDidClick() {
     window.open(
         hubBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
         "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
@@ -4356,3 +4356,44 @@ var selected_server_timezone = function (timezone, status) {
 // var netdataStarted = performance.now();
 
 var netdataCallback = initializeDynamicDashboard;
+
+// =================================================================================================
+
+function getURLParameter(name) {
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
+    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
+    var results = regex.exec(location.search)
+    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
+}
+
+function manageClaimUI() {
+    const container = document.getElementById("claim-ui");
+    const account = localStorage.getItem("hub.accountName");
+    if (account) {
+        container.innerHTML = account;
+    } else {
+        container.innerHTML = '<button onclick="claimButtonDidClick();">Claim</button>';
+    }
+}
+
+function initUI() {
+    const claimed = getURLParameter("claimed");
+    
+    if (claimed) {
+        localStorage.setItem("hub.accountName", decodeURIComponent(claimed));
+        history.pushState(null, "", `/${window.location.hash}`);
+        // window.location = window.location.origin + window.location.pathname;
+    }
+
+    manageClaimUI();
+}
+
+if (document.readyState === "complete") {
+    initUI();
+} else {
+    document.addEventListener("readystatechange", () => {
+        if (document.readyState === "complete") {
+            initUI();
+        }
+    })
+}
