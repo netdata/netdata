@@ -615,12 +615,26 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
+
+int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+    buffer_sprintf(wb, "{\"version\":\"%s\",\"uid\":\"%s\"}",
+            host->program_version,
+            host->machine_guid
+            );
+    return 200;
+}
+
+
 static struct api_command {
     const char *command;
     uint32_t hash;
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
