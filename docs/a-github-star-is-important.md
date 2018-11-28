@@ -1,4 +1,4 @@
-# A GitHub start is important
+# A GitHub star is important
 
 **GitHub stars** allow netdata to expand its reach, its community, especially attract people with skills willing to contribute to it.
 
