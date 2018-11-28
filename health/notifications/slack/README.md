@@ -17,7 +17,7 @@ Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system r
 # sending slack notifications
 
 # note: multiple recipients can be given like this:
-#                  "CHANNEL1 CHANNEL2 ..."
+#                  "RECIPIENT1 RECIPIENT2 ..."
 
 # enable/disable sending pushover notifications
 SEND_SLACK="YES"
@@ -27,19 +27,26 @@ SEND_SLACK="YES"
 # Without it, netdata cannot send slack notifications.
 SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
-# if a role recipient is not configured, a notification will be send to
-# this slack channel:
+# if a role's recipients are not configured, a notification will be send to:
+# - A slack channel (syntax: '#channel' or 'channel')  
+# - A slack user (syntax: '@user')
+# - The channel or user defined in slack for the webhook (syntax: '#')
+# empty = do not send a notification for unconfigured roles 
 DEFAULT_RECIPIENT_SLACK="alarms"
 
 ```
 
-You can define multiple channels like this: `alarms systems`.
-You can give different channels per **role** using these (at the same file):
+You can define multiple recipients like this: `# #alarms systems @myuser`. 
+This example will send the alarm to:
+- The recipient defined in slack for the webhook (not known to netdata)
+- The channel 'alarms'
+- The channel 'systems'
+- The user @myuser
+
+You can give different recipients per **role** using these (at the same file):
 
 ```
 role_recipients_slack[sysadmin]="systems"
 role_recipients_slack[dba]="databases systems"
 role_recipients_slack[webmaster]="marketing development"
 ```
-
-The keywords `systems`, `databases`, `marketing`, `development` are slack.com channels (they should already exist in slack).
