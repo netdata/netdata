@@ -147,19 +147,17 @@ not just visualize metrics.
 
 ## News  
   
-`Nov 6th, 2018` - **[netdata v1.11.0 released!](https://github.com/netdata/netdata/releases)**  
+`Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**  
+
+- Improved internal database to support values above 64bit.
+- New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
+- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/python.d.plugin/cpufreq/), [`sensors`](collectors/python.d.plugin/sensors/).
+- Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
+- `my-netdata`menu has been refactored. 
+- Packaging: `openrc` service definition got a few improvements.
+
   
- - New query engine, supporting statistical functions.  
- - Fixed security issues identified by Red4Sec.com and Synacktiv.  
- - New Data Collection Modules: [`rethinkdbs`](collectors/python.d.plugin/rethinkdbs/), [`proxysql`](collectors/python.d.plugin/proxysql/), [`litespeed`](collectors/python.d.plugin/litespeed/), [`uwsgi`](collectors/python.d.plugin/uwsgi/), [`unbound`](collectors/python.d.plugin/unbound/), [`powerdns`](collectors/python.d.plugin/powerdns/), [`dockerd`](collectors/python.d.plugin/dockerd/), [`puppet`](collectors/python.d.plugin/puppet/), [`logind`](collectors/python.d.plugin/logind/), [`adaptec_raid`](collectors/python.d.plugin/adaptec_raid/), [`megacli`](collectors/python.d.plugin/megacli/), [`spigotmc`](collectors/python.d.plugin/spigotmc/), [`boinc`](collectors/python.d.plugin/boinc/), [`w1sensor`](collectors/python.d.plugin/w1sensor/), [`monit`](collectors/python.d.plugin/monit/), [`linux_power_supplies`](collectors/python.d.plugin/linux_power_supply/).  
- - Improved Data Collection Modules: [`statsd.plugin`](collectors/statsd.plugin/), [`apps.plugin`](collectors/apps.plugin/), [`freeipmi.plugin`](collectors/freeipmi.plugin/), [`proc.plugin`](collectors/proc.plugin/), [`diskspace.plugin`](collectors/diskspace.plugin/), [`freebsd.plugin`](collectors/freebsd.plugin/), [`python.d.plugin`](collectors/python.d.plugin/), [`web_log`](collectors/python.d.plugin/web_log/), [`nginx_plus`](collectors/python.d.plugin/nginx_plus/), [`ipfs`](collectors/python.d.plugin/ipfs/), [`fail2ban`](collectors/python.d.plugin/fail2ban/), [`ceph`](collectors/python.d.plugin/ceph/), [`elasticsearch`](collectors/python.d.plugin/elasticsearch/), [`redis`](collectors/python.d.plugin/redis/),   
- [`beanstalk`](collectors/python.d.plugin/beanstalk/), [`mysql`](collectors/python.d.plugin/mysql/), [`varnish`](collectors/python.d.plugin/varnish/), [`couchdb`](collectors/python.d.plugin/couchdb/), [`phpfpm`](collectors/python.d.plugin/phpfpm/), [`apache`](collectors/python.d.plugin/apache/), [`icecast`](collectors/python.d.plugin/icecast/), [`mongodb`](collectors/python.d.plugin/mongodb/), [`postgress`](collectors/python.d.plugin/postgres/), [`mdstat`](collectors/python.d.plugin/mdstat/), [`openvpn_log`](collectors/python.d.plugin/ovpn_status_log/), [`snmp`](collectors/node.d.plugin/snmp/), [`nut`](collectors/charts.d.plugin/nut/).  
-  
- - Added alarms for detecting abnormally high load average, `TCP` `SYN` and `TCP` accept queue overflows, network interfaces congestion and alarms for `bcache`, `mdstat`, `apcupsd`, `mysql`.  
- - system alarms are now enabled on FreeBSD.  
- - New notification methods: **[rocket.chat](health/notifications/rocketchat/)**, **Microsoft Teams**, **[syslog](health/notifications/syslog/)**, **fleep.io**, **[Amazon SNS](health/notifications/awssns/)**.  
-  
- - and dozens more improvements, enhancements, features and compatibility fixes  
+
   
 ---  
   
