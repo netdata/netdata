@@ -1476,9 +1476,21 @@ send_slack() {
 
     for channel in ${channels}
     do
+        # Default entry in the recipient is without a hash in front (backwards-compatible). Accept specification of channel or user.
+        if [ "${channel::1}" != "#" ] && [ "${channel::1}" != "@" ] ; then channel="#$channel"; fi
+        
+        # If channel is equal to "#" then do not send the channel attribute at all. Slack also defines channels and users in webhooks.
+        if [ "${channel}" = "#" ] ; then 
+            ch=""
+            chstr="without specifying a channel"
+        else
+            ch="\"channel\": \"${channel}\","
+            chstr="to '${channel}'"
+        fi
+        
         payload="$(cat <<EOF
         {
-            "channel": "#${channel}",
+            $ch
             "username": "netdata on ${host}",
             "icon_url": "${images_base_url}/images/banner-icon-144x144.png",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
@@ -1511,10 +1523,10 @@ EOF
         httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" = "200" ]
         then
-            info "sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            info "sent slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}"
             sent=$((sent + 1))
         else
-            error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+            error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP error code ${httpcode}."
         fi
     done
 
