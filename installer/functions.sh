@@ -1,4 +1,6 @@
 # no shebang necessary - this is a library to be sourced
+# SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC1091,SC1117,SC2002,SC2004,SC2034,SC2046,SC2059,SC2086,SC2129,SC2148,SC2154,SC2155,SC2162,SC2166,SC2181,SC2193
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -8,8 +10,8 @@
 # checking the availability of commands
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {
@@ -160,6 +162,29 @@ pidof() {
 }
 
 # -----------------------------------------------------------------------------
+# portable delete recursively interactively
+
+portable_deletedir_recursively_interactively() {
+    if [ ! -z "$1" -a -d "$1" ]
+        then
+        if [ "$(uname -s)" = "Darwin" ]
+        then
+            echo >&2
+            read >&2 -p "Press ENTER to recursively delete directory '$1' > "
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -R "$1"
+        else
+            echo >&2
+            echo >&2 "Deleting directory '$1' ..."
+            run rm -I -R "$1"
+        fi
+    else
+        echo "Directory '$1' does not exist."
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
 
 export SYSTEM_CPUS=1
 portable_find_processors() {
@@ -287,6 +312,7 @@ portable_add_user() {
 
     echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
+    # shellcheck disable=SC2230
     local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
     # Linux
@@ -415,10 +441,11 @@ iscontainer() {
 issystemd() {
     local pids p myns ns systemctl
 
-    # if the directory /etc/systemd/system does not exit, it is not systemd
-    [ ! -d /etc/systemd/system ] && return 1
+    # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+    [ ! -d /lib/systemd/system -a ! -d /usr/lib/systemd/system ] && return 1
 
     # if there is no systemctl command, it is not systemd
+    # shellcheck disable=SC2230
     systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
     [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 
@@ -436,7 +463,7 @@ issystemd() {
         ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
 
         # if pid of systemd is in our namespace, it is systemd
-        [ ! -z "${myns}" && "${myns}" = "${ns}" ] && return 0
+        [ ! -z "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
     done
 
     # else, it is not systemd
@@ -536,16 +563,25 @@ install_netdata_service() {
             NETDATA_START_CMD="systemctl start netdata"
             NETDATA_STOP_CMD="systemctl stop netdata"
 
-            if [ ! -f /etc/systemd/system/netdata.service ]
+            SYSTEMD_DIRECTORY=""
+
+            if [ -d "/lib/systemd/system" ]
+            then
+                SYSTEMD_DIRECTORY="/lib/systemd/system"
+            elif [ -d "/usr/lib/systemd/system" ]
+            then
+                SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+            fi
+
+            if [ "${SYSTEMD_DIRECTORY}x" != "x" ]
             then
                 echo >&2 "Installing systemd service..."
-                run cp system/netdata.service /etc/systemd/system/netdata.service && \
+                run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" && \
                     run systemctl daemon-reload && \
                     run systemctl enable netdata && \
                     return 0
             else
-                echo >&2 "file '/etc/systemd/system/netdata.service' already exists."
-                return 0
+                echo >&2 "no systemd directory; cannot install netdata.service"
             fi
         else
             install_non_systemd_init
@@ -800,31 +836,20 @@ download_netdata_conf() {
 # -----------------------------------------------------------------------------
 # add netdata user and group
 
-NETDATA_ADDED_TO_DOCKER=0
-NETDATA_ADDED_TO_NGINX=0
-NETDATA_ADDED_TO_VARNISH=0
-NETDATA_ADDED_TO_HAPROXY=0
-NETDATA_ADDED_TO_ADM=0
-NETDATA_ADDED_TO_NSD=0
-NETDATA_ADDED_TO_PROXY=0
-NETDATA_ADDED_TO_SQUID=0
-NETDATA_ADDED_TO_CEPH=0
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_ADDED_TO_GROUPS=""
 add_netdata_user_and_group() {
-    local homedir="${1}"
+    local homedir="${1}" g
 
     if [ ${UID} -eq 0 ]
         then
         portable_add_group netdata || return 1
         portable_add_user netdata "${homedir}"  || return 1
-        portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
-        portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
-        portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
-        portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
-        portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
-        portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-        portable_add_user_to_group proxy    netdata && NETDATA_ADDED_TO_PROXY=1
-        portable_add_user_to_group squid    netdata && NETDATA_ADDED_TO_SQUID=1
-        portable_add_user_to_group ceph     netdata && NETDATA_ADDED_TO_CEPH=1
+
+        for g in ${NETDATA_WANTED_GROUPS}
+        do
+            portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+        done
 
         [ ~netdata = / ] && cat <<USERMOD
 

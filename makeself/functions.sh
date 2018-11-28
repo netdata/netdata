@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # -----------------------------------------------------------------------------
 
@@ -38,7 +39,7 @@ fetch() {
     if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]
         then
         cd "${NETDATA_MAKESELF_PATH}/tmp"
-        run tar -zxvpf "${tar}"
+        run tar -zxpf "${tar}"
         cd -
     fi
 

@@ -1,11 +1,10 @@
-Packaging Tools
-===============
+# Packaging Tools
 
-The programs in this folder are used when packaging from within git
+The programs in folder `packaging` are used when packaging from within git
 and are not included in source or binary packages.
 
 For the most part they are used from the git commit hooks (copy
-`../hooks/*` to `../.git/hooks` to automate checking and the release
+`../.githooks/*` to `../.git/hooks` to automate checking and the release
 process.
 
 The check-files script pulls in `*.functions` and `*/*.functions` to
@@ -17,9 +16,6 @@ and post-release update.
 
 Programs and packages with specific needs should create extra
 `whatever.functions` and supporting scripts in a subdirectory.
-
-The `gpg.keys` file is a list of keys that can be expected to sign
-tags and packages.
 
 Making a release
 ----------------
@@ -51,6 +47,4 @@ Otherwise you can just push the results; the script outputs the required
 instructions upon success.
 
 Once pushed the infrastructure will build a set of tar-files on the server.
-For information on how to verify, sign and make these available, see:
-
-    https://github.com/firehol/infrastructure/raw/master/doc/release.txt
+For information on how to verify, sign and make these available, see [here](https://github.com/firehol/infrastructure#firehol-infrastructure)

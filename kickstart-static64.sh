@@ -1,13 +1,19 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
 
 umask 022
+
+# make sure UID is set
+# shellcheck disable=SC2155
+[ -z "${UID}" ] && export UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {
@@ -170,7 +176,7 @@ wget="$(which_cmd wget)"
 
 progress "Checking the latest version of static build..."
 
-BASE='https://raw.githubusercontent.com/firehol/binary-packages/master'
+BASE='https://raw.githubusercontent.com/netdata/binary-packages/master'
 
 LATEST=
 if [ ! -z "${curl}" -a -x "${curl}" ]

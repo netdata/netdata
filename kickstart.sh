@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Run me with:
 #
@@ -23,6 +24,8 @@
 #
 # 3. install netdata
 
+# shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
+
 umask 022
 
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -31,8 +34,8 @@ umask 022
 # library functions copied from installer/functions.sh
 
 which_cmd() {
-    which "${1}" 2>/dev/null || \
-        command -v "${1}" 2>/dev/null
+    # shellcheck disable=SC2230
+    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
 }
 
 check_cmd() {
@@ -268,7 +271,7 @@ then
     if [ "${HAS_BASH4}" = "1" ]
     then
         tmp="$(mktemp /tmp/netdata-kickstart-XXXXXX)"
-        url="https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh"
+        url="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
 
         progress "Downloading script to detect required packages..."
         if [ ! -z "${curl}" ]
@@ -327,7 +330,7 @@ then
     if [ ! -d "${SOURCE_DST}/netdata.git" ]
     then
         progress "Downloading netdata source code..."
-        run ${sudo} ${git} clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
+        run ${sudo} ${git} clone https://github.com/netdata/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
         cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
     else
         progress "Updating netdata source code..."

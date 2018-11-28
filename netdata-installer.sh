@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC1090,SC1091,SC1117,SC2002,SC2034,SC2044,SC2046,SC2086,SC2129,SC2162,SC2166,SC2181
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -79,7 +81,9 @@ REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
+[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${0}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
+# shellcheck disable=SC2230
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
 ME="$0"
@@ -169,48 +173,6 @@ For the plugins, you will at least need:
 USAGE
 }
 
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-get_git_config_signatures() {
-    local x s file md5
-
-    [ ! -d "conf.d" ] && echo >&2 "Wrong directory." && return 1
-    [ -z "${md5sum}" -o ! -x "${md5sum}" ] && echo >&2 "No md5sum command." && return 1
-
-    echo >configs.signatures.tmp
-
-    for x in $(find conf.d -name \*.conf)
-    do
-            x="${x/conf.d\//}"
-            echo "${x}"
-            for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
-            do
-                    git checkout ${c} "conf.d/${x}" || continue
-                    s="$(cat "conf.d/${x}" | ${md5sum} | cut -d ' ' -f 1)"
-                    echo >>configs.signatures.tmp "${s}:${x}"
-                    echo "    ${s}"
-            done
-            git checkout HEAD "conf.d/${x}" || break
-    done
-
-    cat configs.signatures.tmp |\
-        grep -v "^$" |\
-        sort -u |\
-        {
-            echo "declare -A configs_signatures=("
-            IFS=":"
-            while read md5 file
-            do
-                echo "  ['${md5}']='${file}'"
-            done
-            echo ")"
-        } >configs.signatures
-
-    rm configs.signatures.tmp
-
-    return 0
-}
-
-
 while [ ! -z "${1}" ]
 do
     if [ "$1" = "--install" ]
@@ -264,10 +226,6 @@ do
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
         usage
-        exit 1
-    elif [ "$1" = "get_git_config_signatures" ]
-        then
-        get_git_config_signatures && exit 0
         exit 1
     else
         echo >&2
@@ -396,15 +354,6 @@ autotools 2.60 or later is required
 Sorry, you do not seem to have autotools 2.60 or later, which is
 required to build from the git sources of netdata.
 
-You can either install a suitable version of autotools and automake
-or download a netdata package which does not have these dependencies.
-
-Source packages where autotools have already been run are available
-here:
-       https://firehol.org/download/netdata/
-
-The unsigned/master folder tracks the head of the git tree and released
-packages are also available.
 EOF
         exit 1
     fi
@@ -450,7 +399,7 @@ You may need to check these:
 
 If you still cannot get it to build, ask for help at github:
 
-   https://github.com/firehol/netdata/issues
+   https://github.com/netdata/netdata/issues
 
 
 EOF
@@ -477,7 +426,7 @@ progress "Run autotools to configure the build environment"
 
 if [ "$have_autotools" ]
 then
-    run ./autogen.sh || exit 1
+    run autoreconf -ivf || exit 1
 fi
 
 run ./configure \
@@ -497,6 +446,7 @@ trap - EXIT
 progress "Cleanup compilation directory"
 
 [ -f src/netdata ] && run make clean
+
 
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
@@ -549,97 +499,84 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]
 fi
 
 # -----------------------------------------------------------------------------
-progress "Backup existing netdata configuration before installing it"
 
-if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+# shellcheck disable=SC2230
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+
+deleted_stock_configs=0
+if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]
 then
-    declare -A configs_signatures=()
-    if [ -f "configs.signatures" ]
-        then
-        source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
-    fi
-fi
 
-config_signature_matches() {
-    local md5="${1}" file="${2}"
+    progress "Backup existing netdata configuration before installing it"
 
     if [ "${BASH_VERSINFO[0]}" -ge "4" ]
-        then
-        [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
-        return 1
-    fi
-
-    if [ -f "configs.signatures" ]
-        then
-        grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
-        return $?
-    fi
-
-    return 1
-}
-
-# backup user configurations
-installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -name '*.conf' -type f)
-do
-    if [ -f "${x}" ]
-        then
-        # make a backup of the configuration file
-        cp -p "${x}" "${x}.old"
-
-        if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+    then
+        declare -A configs_signatures=()
+        if [ -f "configs.signatures" ]
             then
-            # we don't have md5sum - keep it
-            echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-            run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
-        else
-            # find it relative filename
-            f="${x/*\/etc\/netdata\//}"
+            source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
+        fi
+    fi
 
-            # find its checksum
-            md5="$(cat "${x}" | ${md5sum} | cut -d ' ' -f 1)"
+    config_signature_matches() {
+        local md5="${1}" file="${2}"
 
-            # copy the original
-            if [ -f "conf.d/${f}" ]
-                then
-                cp "conf.d/${f}" "${x}.orig"
-            fi
-
-            if config_signature_matches "${md5}" "${f}"
-                then
-                # it is a stock version - don't keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
-            else
-                # edited by user - keep it
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
-            fi
+        if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+            then
+            [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
+            return 1
         fi
 
-    elif [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        rm -f "${x}.installer_backup.${installer_backup_suffix}"
-    fi
-done
+        if [ -f "configs.signatures" ]
+            then
+            grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
+            return $?
+        fi
 
+        return 1
+    }
+
+    # clean up stock config files from the user configuration directory
+    for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f)
+    do
+        if [ -f "${x}" ]
+            then
+            # find it relative filename
+            f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
+
+            # find the stock filename
+            t="${f/.conf.installer_backup.*/.conf}"
+            t="${t/.conf.old/.conf}"
+            t="${t/.conf.orig/.conf}"
+
+            if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
+                then
+                # we don't have md5sum - keep it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+            else
+                # find its checksum
+                md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
+
+                if config_signature_matches "${md5}" "${t}"
+                    then
+                    # it is a stock version - remove it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version of '${t}'."
+                    run rm -f "${x}"
+                    deleted_stock_configs=$(( deleted_stock_configs + 1 ))
+                else
+                    # edited by user - keep it
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
+                fi
+            fi
+        fi
+    done
+fi
+touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
 run make install || exit 1
-
-
-# -----------------------------------------------------------------------------
-progress "Restore user edited netdata configuration files"
-
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
-do
-    if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
-        then
-        run cp -a "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
-            run rm -f "${x}.installer_backup.${installer_backup_suffix}"
-    fi
-done
 
 
 # -----------------------------------------------------------------------------
@@ -715,28 +652,30 @@ NETDATA_LIB_DIR="$( config_option "global" "lib directory" "${NETDATA_PREFIX}/va
 NETDATA_CACHE_DIR="$( config_option "global" "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
 NETDATA_WEB_DIR="$( config_option "global" "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
 NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
-NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_USER_CONFIG_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_STOCK_CONFIG_DIR="$( config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 cat <<OPTIONSEOF
 
     Permissions
-    - netdata user     : ${NETDATA_USER}
-    - netdata group    : ${NETDATA_GROUP}
-    - web files user   : ${NETDATA_WEB_USER}
-    - web files group  : ${NETDATA_WEB_GROUP}
-    - root user        : ${ROOT_USER}
+    - netdata user             : ${NETDATA_USER}
+    - netdata group            : ${NETDATA_GROUP}
+    - web files user           : ${NETDATA_WEB_USER}
+    - web files group          : ${NETDATA_WEB_GROUP}
+    - root user                : ${ROOT_USER}
 
     Directories
-    - netdata conf dir : ${NETDATA_CONF_DIR}
-    - netdata log dir  : ${NETDATA_LOG_DIR}
-    - netdata run dir  : ${NETDATA_RUN_DIR}
-    - netdata lib dir  : ${NETDATA_LIB_DIR}
-    - netdata web dir  : ${NETDATA_WEB_DIR}
-    - netdata cache dir: ${NETDATA_CACHE_DIR}
+    - netdata user config dir  : ${NETDATA_USER_CONFIG_DIR}
+    - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
+    - netdata log dir          : ${NETDATA_LOG_DIR}
+    - netdata run dir          : ${NETDATA_RUN_DIR}
+    - netdata lib dir          : ${NETDATA_LIB_DIR}
+    - netdata web dir          : ${NETDATA_WEB_DIR}
+    - netdata cache dir        : ${NETDATA_CACHE_DIR}
 
     Other
-    - netdata port     : ${NETDATA_PORT}
+    - netdata port             : ${NETDATA_PORT}
 
 OPTIONSEOF
 
@@ -751,17 +690,36 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
 do
-    if [ ! -d "${NETDATA_CONF_DIR}/${x}" ]
+    if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]
         then
-        echo >&2 "Creating directory '${NETDATA_CONF_DIR}/${x}'"
-        run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
+        echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
+        run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
     fi
 done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
-run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0755 {} \;
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
+run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
+run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
+
+# --- stock conf dir ----
+
+[ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
+
+helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
+[ ${deleted_stock_configs} -eq 0 ] && helplink=""
+for link in "orig" "${helplink}"
+do
+    if [ ! -z "${link}" ]
+    then
+        [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
+        run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
+    fi
+done
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
+run find "${NETDATA_STOCK_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
 
 # --- web dir ----
 
@@ -960,7 +918,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Check version.txt"
 
-if [ ! -s web/version.txt ]
+if [ ! -s webserver/gui/version.txt ]
     then
     cat <<VERMSG
 
@@ -972,7 +930,7 @@ Update check on the dashboard, will not work.
 If you want to have version update check, please re-install it
 following the procedure in:
 
-https://github.com/firehol/netdata/wiki/Installation
+https://github.com/netdata/netdata/tree/master/installer#installation
 
 VERMSG
 fi
@@ -1026,24 +984,17 @@ if [ "\$1" != "--force" ]
     exit 1
 fi
 
-echo >&2 "Stopping a possibly running netdata..."
-for p in \$(pidof netdata); do kill \$p; done
-sleep 2
+source installer/functions.sh || exit 1
 
-deletedir() {
-    if [ ! -z "\$1" -a -d "\$1" ]
-        then
-        echo
-        echo "Deleting directory '\$1' ..."
-        rm -I -R "\$1"
-    fi
-}
+echo >&2 "Stopping a possibly running netdata..."
+for p in \$(pidof netdata); do run kill \$p; done
+sleep 2
 
 if [ ! -z "${NETDATA_PREFIX}" -a -d "${NETDATA_PREFIX}" ]
     then
     # installation prefix was given
 
-    deletedir "${NETDATA_PREFIX}"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}"
 
 else
     # installation prefix was NOT given
@@ -1051,49 +1002,55 @@ else
     if [ -f "${NETDATA_PREFIX}/usr/sbin/netdata" ]
         then
         echo "Deleting ${NETDATA_PREFIX}/usr/sbin/netdata ..."
-        rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
+        run rm -i "${NETDATA_PREFIX}/usr/sbin/netdata"
     fi
 
-    deletedir "${NETDATA_PREFIX}/etc/netdata"
-    deletedir "${NETDATA_PREFIX}/usr/share/netdata"
-    deletedir "${NETDATA_PREFIX}/usr/libexec/netdata"
-    deletedir "${NETDATA_PREFIX}/var/lib/netdata"
-    deletedir "${NETDATA_PREFIX}/var/cache/netdata"
-    deletedir "${NETDATA_PREFIX}/var/log/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/etc/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/share/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/libexec/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/lib/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/cache/netdata"
+    portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/log/netdata"
 fi
 
 if [ -f /etc/logrotate.d/netdata ]
     then
     echo "Deleting /etc/logrotate.d/netdata ..."
-    rm -i /etc/logrotate.d/netdata
+    run rm -i /etc/logrotate.d/netdata
 fi
 
 if [ -f /etc/systemd/system/netdata.service ]
     then
     echo "Deleting /etc/systemd/system/netdata.service ..."
-    rm -i /etc/systemd/system/netdata.service
+    run rm -i /etc/systemd/system/netdata.service
+fi
+
+if [ -f /lib/systemd/system/netdata.service ]
+    then
+    echo "Deleting /lib/systemd/system/netdata.service ..."
+    run rm -i /lib/systemd/system/netdata.service
 fi
 
 if [ -f /etc/init.d/netdata ]
     then
     echo "Deleting /etc/init.d/netdata ..."
-    rm -i /etc/init.d/netdata
+    run rm -i /etc/init.d/netdata
 fi
 
 if [ -f /etc/periodic/daily/netdata-updater ]
     then
     echo "Deleting /etc/periodic/daily/netdata-updater ..."
-    rm -i /etc/periodic/daily/netdata-updater
+    run rm -i /etc/periodic/daily/netdata-updater
 fi
 
 if [ -f /etc/cron.daily/netdata-updater ]
     then
     echo "Deleting /etc/cron.daily/netdata-updater ..."
-    rm -i /etc/cron.daily/netdata-updater
+    run rm -i /etc/cron.daily/netdata-updater
 fi
 
-getent passwd netdata > /dev/null
-if [ $? -eq 0 ]
+portable_check_user_exists netdata
+if [ \$? -eq 0 ]
     then
     echo
     echo "You may also want to remove the user netdata"
@@ -1101,8 +1058,8 @@ if [ $? -eq 0 ]
     echo "   userdel netdata"
 fi
 
-getent group netdata > /dev/null
-if [ $? -eq 0 ]
+portable_check_group_exists netdata > /dev/null
+if [ \$? -eq 0 ]
     then
     echo
     echo "You may also want to remove the group netdata"
@@ -1110,86 +1067,17 @@ if [ $? -eq 0 ]
     echo "   groupdel netdata"
 fi
 
-getent group docker > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_DOCKER}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the docker group"
-    echo "by running:"
-    echo "   gpasswd -d netdata docker"
-fi
-
-getent group nginx > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NGINX}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the nginx group"
-    echo "by running:"
-    echo "   gpasswd -d netdata nginx"
-fi
-
-getent group varnish > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_VARNISH}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the varnish group"
-    echo "by running:"
-    echo "   gpasswd -d netdata varnish"
-fi
-
-getent group haproxy > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_HAPROXY}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the haproxy group"
-    echo "by running:"
-    echo "   gpasswd -d netdata haproxy"
-fi
-
-getent group adm > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_ADM}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the adm group"
-    echo "by running:"
-    echo "   gpasswd -d netdata adm"
-fi
-
-getent group nsd > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NSD}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the nsd group"
-    echo "by running:"
-    echo "   gpasswd -d netdata nsd"
-fi
-
-getent group proxy > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_PROXY}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the proxy group"
-    echo "by running:"
-    echo "   gpasswd -d netdata proxy"
-fi
-
-getent group squid > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_SQUID}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the squid group"
-    echo "by running:"
-    echo "   gpasswd -d netdata squid"
-fi
-
-getent group ceph > /dev/null
-if [ $? -eq 0 -a "${NETDATA_ADDED_TO_CEPH}" = "1" ]
-    then
-    echo
-    echo "You may also want to remove the netdata user from the squid group"
-    echo "by running:"
-    echo "   gpasswd -d netdata ceph"
-fi
+for g in ${NETDATA_ADDED_TO_GROUPS}
+do
+    portable_check_group_exists \$g > /dev/null
+    if [ \$? -eq 0 ]
+        then
+        echo
+        echo "You may also want to remove the netdata user from the \$g group"
+        echo "by running:"
+        echo "   gpasswd -d netdata \$g"
+    fi
+done
 
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
@@ -1361,16 +1249,16 @@ REINSTALL
                 if [ "${AUTOUPDATE}" = "1" ]
                 then
                     progress "Installing netdata-updater at cron"
-                    run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
+                    run ln -fs "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
                 else
                     echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
                     echo >&2
-                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
+                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ln -fs ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
                 fi
             else
                 progress "Refreshing netdata-updater at cron"
                 run rm "${crondir}/netdata-updater"
-                run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
+                run ln -fs "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
             fi
         else
             [ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater."

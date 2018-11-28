@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 packaging_check_init() {
   version_check=
@@ -85,8 +86,6 @@ try_build() {
   git archive HEAD | tar -xf - -C "$MYTMP/build"
   git diff --staged | patch -p1 -d "$MYTMP/build"
   (cd $MYTMP/build; ./packaging/git-build || touch $MYTMP/fail)
-  if [ -f $MYTMP/fail ]; then return 1; fi
-  (cd $MYTMP/build; ./packaging/tar-compare . *.tar.gz || touch $MYTMP/fail)
   if [ -f $MYTMP/fail ]; then return 1; fi
   touch $MYTMP/success
   return 0
