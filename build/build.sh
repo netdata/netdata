@@ -1,7 +1,8 @@
 #!/bin/bash
 
-if [ -f build.sh ]; then
-    cd ../ || exit 1
+if [ ! -f .gitignore ]; then
+	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
+	exit 1
 fi
 
 if [ "$IS_CONTAINER" != "" ]; then

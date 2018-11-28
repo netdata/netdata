@@ -109,7 +109,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running netdata in docker, check the [docker installation page](docker/).
+For more information about running netdata in docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -463,7 +463,7 @@ Here is a quick list:
 Directory|Description
 :---|:---
 [`installer`](installer/)|Instructions to install netdata on your systems.
-[`docker`](docker/)|Instructions to install netdata using docker.
+[`docker`](packaging/docker/)|Instructions to install netdata using docker.
 [`daemon`](daemon/)|Information about the netdata daemon and its configuration.
 [`collectors`](collectors/)|Information about data collection plugins.
 [`health`](health/)|How netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.

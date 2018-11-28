@@ -112,7 +112,7 @@ echo -ne "    - 'docs/Why-Netdata.md'
 
 echo -ne "- Installation:
     - 'installer/README.md'
-    - 'docker/README.md'
+    - 'packaging/docker/README.md'
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
 "

@@ -53,7 +53,7 @@ git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e
 
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
-./docker/build.sh
+./packaging/docker/build.sh
 
 echo "---- CREATING RELEASE ARTIFACTS -----"
 ./.travis/create_artifacts.sh

@@ -51,16 +51,12 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
-    mv docker/run.sh        /app/usr/sbin/ && \
+    mv packaging/docker/run.sh        /app/usr/sbin/ && \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
 ARG ARCH
 FROM multiarch/alpine:${ARCH}
-
-# Configure system
-ARG NETDATA_UID=201
-ARG NETDATA_GID=201
 
 # Reinstall some prerequisites
 RUN apk --no-cache add curl \
@@ -75,20 +71,22 @@ RUN apk --no-cache add curl \
                        py-yaml \
                        python
 
-# fping from alpine apk is on a different location. Moving it.
-RUN mv /usr/sbin/fping /usr/local/bin/fping && \
+# Copy files over
+COPY --from=builder /app /
+
+# Configure system
+ARG NETDATA_UID=201
+ARG NETDATA_GID=201
+RUN \
+    # fping from alpine apk is on a different location. Moving it.
+    mv /usr/sbin/fping /usr/local/bin/fping && \
     chmod 4755 /usr/local/bin/fping && \
     mkdir -p /var/log/netdata && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S netdata && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata
-
-# Copy files over
-COPY --from=builder /app /
-
-RUN \
-    # Apply permissions as described in
-    # https://github.com/netdata/netdata/tree/master/docs/netdata-security.md#netdata-directories
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
+    # Apply the permissions as described in
+    # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown -R root:netdata /usr/lib/netdata && \
