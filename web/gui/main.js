@@ -455,8 +455,15 @@ function saveObjectToClient(data, filename) {
 
 // =============================================================================
 
+const hubBaseURL = "http://localhost:8080";
+
 function hubButtonDidClick() {
-    alert("Hub");
+    window.open(
+        hubBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
+        "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
+        encodeURIComponent(NETDATA.serverDefault), 
+        "_blank"
+    );
 }
 
 // -----------------------------------------------------------------------------
