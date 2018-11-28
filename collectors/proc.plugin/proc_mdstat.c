@@ -21,14 +21,14 @@ struct raid {
     RRDDIM *rd_resync;
     RRDDIM *rd_recovery;
     RRDDIM *rd_reshape;
-    unsigned long long check;
-    unsigned long long resync;
-    unsigned long long recovery;
-    unsigned long long reshape;
+    calculated_number check;
+    calculated_number resync;
+    calculated_number recovery;
+    calculated_number reshape;
 
     RRDSET *st_finish;
     RRDDIM *rd_finish_in;
-    unsigned long long finish_in;
+    calculated_number finish_in;
 
     RRDSET *st_speed;
     RRDDIM *rd_speed;
@@ -182,7 +182,11 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             s++;
         }
 
-        int percentage = str2l(str_percentage);
+        raid->check = 0;
+        raid->resync = 0;
+        raid->recovery = 0;
+        raid->reshape = 0;
+        calculated_number percentage = str2ld(str_percentage, NULL) * 100;
         // possible operations: check, resync, recovery, reshape
         // only 4-th character is checked
         switch(procfile_lineword(ff, l + 2, 1)[3]) {
@@ -214,9 +218,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         str_finish_in += 7; // skip "finish=" in the beginning
 
         if(s > str_finish_in)
-            raid->finish_in = str2ull(str_finish_in);
+            raid->finish_in = str2ld(str_finish_in, NULL) * 60;
 
-        char *str_speed = procfile_lineword(ff, l + 2, 5);
+        char *str_speed = procfile_lineword(ff, l + 2, 6);
 
         // remove trailing "K/sec"
         s = str_speed;
@@ -242,7 +246,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                 , "new_mdstat_health" // TODO: rename chart
                 , NULL
                 , "health"
-                , NULL
+                , "md.health"
                 , "Faulty Devices In MD"
                 , "failed disks"
                 , PLUGIN_PROC_NAME
@@ -285,7 +289,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , id
                     , NULL
                     , family
-                    , NULL
+                    , "md.disks"
                     , "Disk Stats"
                     , "disks"
                     , PLUGIN_PROC_NAME
@@ -319,7 +323,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , id
                     , NULL
                     , family
-                    , NULL
+                    , "ms.status"
                     , "Current Status"
                     , "percent"
                     , PLUGIN_PROC_NAME
@@ -333,10 +337,10 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             rrdset_next(raid->st_operation);
 
         if(raid->used) {
-            raid->rd_check    = rrddim_add(raid->st_operation, "check",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            raid->rd_resync   = rrddim_add(raid->st_operation, "resync",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            raid->rd_recovery = rrddim_add(raid->st_operation, "recovery", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            raid->rd_reshape  = rrddim_add(raid->st_operation, "reshape",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_check    = rrddim_add(raid->st_operation, "check",    NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_resync   = rrddim_add(raid->st_operation, "resync",   NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_recovery = rrddim_add(raid->st_operation, "recovery", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_reshape  = rrddim_add(raid->st_operation, "reshape",  NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(raid->st_operation, raid->rd_check, raid->check);
             rrddim_set_by_pointer(raid->st_operation, raid->rd_resync, raid->resync);
@@ -357,9 +361,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , id
                     , NULL
                     , family
-                    , NULL
+                    , "md.rate"
                     , "Approximate Time Unit Finish"
-                    , "time"
+                    , "seconds"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MDSTAT_NAME
                     , 6500 + raid_idx + 2 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
@@ -389,7 +393,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , id
                     , NULL
                     , family
-                    , NULL
+                    , "md.rate"
                     , "Operation Speed"
                     , "KB/s"
                     , PLUGIN_PROC_NAME
