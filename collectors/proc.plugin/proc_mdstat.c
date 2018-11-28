@@ -17,14 +17,14 @@ struct raid {
     unsigned long long inuse_disks;
 
     RRDSET *st_operation;
+    RRDDIM *rd_check;
     RRDDIM *rd_resync;
     RRDDIM *rd_recovery;
     RRDDIM *rd_reshape;
-    RRDDIM *rd_check;
+    unsigned long long check;
     unsigned long long resync;
     unsigned long long recovery;
     unsigned long long reshape;
-    unsigned long long check;
 
     RRDSET *st_finish;
     RRDDIM *rd_finish_in;
@@ -114,31 +114,37 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         raid->used = 0;
 
         words = procfile_linewords(ff, l);
-        if(unlikely(!words)) continue;
+        if(unlikely(words < 2)) continue;
 
         raid->name = procfile_lineword(ff, l, 0);
         if(unlikely(!raid->name || !raid->name[0])) continue;
 
         // check if raid has disk status
         words = procfile_linewords(ff, l + 1);
-        if(!words) continue;
-        if(procfile_lineword(ff, l + 1, words - 1)[0] != '[') continue;
+        if(words < 2) {
+            l++;
+            continue;
+        }
+        if(procfile_lineword(ff, l + 1, words - 1)[0] != '[') {
+            l++;
+            continue;
+        }
 
         // split inuse and total number of disks
         char *s = NULL, *str_inuse = NULL, *str_total = NULL;
 
         s = procfile_lineword(ff, l + 1, words - 2);
-        str_inuse = s + 1;
         if(unlikely(s[0] != '[')) {
             error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
             continue;
         }
-        while(*s != '\0') {
+        str_inuse = ++s;
+        while(*s) {
             if(*s == '/') {
                 *s = '\0';
                 str_total = s + 1;
             }
-            if(*s == ']') {
+            else if(*s == ']') {
                 *s = '\0';
                 break;
             }
@@ -155,6 +161,76 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
         raid_idx++;
         raid->used = 1;
+
+        // check if any operation is performed on the raid
+        words = procfile_linewords(ff, l + 2);
+        if(words < 2) continue;
+        if (unlikely(words < 7)) {
+            error("Cannot read mdstat line. Expected 7 params, read %zu.", words);
+            continue;
+        }
+        if(procfile_lineword(ff, l + 2, 0)[0] != '[') continue;
+
+        char *str_percentage = procfile_lineword(ff, l + 2, 3);
+
+        // remove trailing '%'
+        s = str_percentage;
+        while(*s) {
+            if(*s == '%') {
+                *s = '\0';
+            }
+            s++;
+        }
+
+        int percentage = str2l(str_percentage);
+        // possible operations: check, resync, recovery, reshape
+        // only 4-th character is checked
+        switch(procfile_lineword(ff, l + 2, 1)[3]) {
+            case 'c': // check
+                raid->check = percentage;
+                break;
+            case 'y': // resync
+                raid->resync = percentage;
+                break;
+            case 'o': // recovery
+                raid->recovery = percentage;
+                break;
+            case 'h': // reshape
+                raid->reshape = percentage;
+                break;
+        }
+
+        char *str_finish_in = procfile_lineword(ff, l + 2, 5);
+
+        // remove trailing "min"
+        s = str_finish_in;
+        while(*s) {
+            if(*s == 'm') {
+                *s = '\0';
+            }
+            s++;
+        }
+
+        str_finish_in += 7; // skip "finish=" in the beginning
+
+        if(s > str_finish_in)
+            raid->finish_in = str2ull(str_finish_in);
+
+        char *str_speed = procfile_lineword(ff, l + 2, 5);
+
+        // remove trailing "K/sec"
+        s = str_speed;
+        while(*s) {
+            if(*s == 'K') {
+                *s = '\0';
+            }
+            s++;
+        }
+
+        str_speed += 6; // skip "speed=" in the beginning
+
+        if(s > str_speed)
+            raid->speed = str2ull(str_speed);
     }
 
     // --------------------------------------------------------------------
