@@ -453,7 +453,13 @@ function saveObjectToClient(data, filename) {
     saveTextToClient(JSON.stringify(data), filename);
 }
 
-// --------------------------------------------------------------------
+// =============================================================================
+
+function hubButtonDidClick() {
+    alert("Hub");
+}
+
+// -----------------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
 function toggleExpandIcon(svgEl) {
