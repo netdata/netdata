@@ -273,13 +273,11 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
         struct raid *raid = &raids[raid_idx];
+        char id[50 + 1];
+        char family[50 + 1];
 
         if(unlikely(!raid->st_disks)) {
-
-            char id[50 + 1];
             snprintfz(id, 50, "new_%s_disks", raid->name); // TODO: rename chart
-
-            char family[50 + 1];
             snprintfz(family, 50, "%s", raid->name);
 
             raid->st_disks = rrdset_create_localhost(
@@ -309,6 +307,108 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         }
 
         rrdset_done(raid->st_disks);
+
+        // --------------------------------------------------------------------
+
+        if(unlikely(!raid->st_operation)) {
+            snprintfz(id, 50, "new_%s_operation", raid->name); // TODO: rename chart
+            snprintfz(family, 50, "%s", raid->name);
+
+            raid->st_operation = rrdset_create_localhost(
+                    "mdstat"
+                    , id
+                    , NULL
+                    , family
+                    , NULL
+                    , "Current Status"
+                    , "percent"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                    , 6500 + raid_idx + 1 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+        }
+        else
+            rrdset_next(raid->st_operation);
+
+        if(raid->used) {
+            raid->rd_check    = rrddim_add(raid->st_operation, "check",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_resync   = rrddim_add(raid->st_operation, "resync",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_recovery = rrddim_add(raid->st_operation, "recovery", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            raid->rd_reshape  = rrddim_add(raid->st_operation, "reshape",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_operation, raid->rd_check, raid->check);
+            rrddim_set_by_pointer(raid->st_operation, raid->rd_resync, raid->resync);
+            rrddim_set_by_pointer(raid->st_operation, raid->rd_recovery, raid->recovery);
+            rrddim_set_by_pointer(raid->st_operation, raid->rd_reshape, raid->reshape);
+        }
+
+        rrdset_done(raid->st_operation);
+
+        // --------------------------------------------------------------------
+
+        if(unlikely(!raid->st_finish)) {
+            snprintfz(id, 50, "new_%s_finish", raid->name); // TODO: rename chart
+            snprintfz(family, 50, "%s", raid->name);
+
+            raid->st_finish = rrdset_create_localhost(
+                    "mdstat"
+                    , id
+                    , NULL
+                    , family
+                    , NULL
+                    , "Approximate Time Unit Finish"
+                    , "time"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                    , 6500 + raid_idx + 2 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+        }
+        else
+            rrdset_next(raid->st_finish);
+
+        if(raid->used) {
+            raid->rd_finish_in = rrddim_add(raid->st_finish, "finish_in", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_finish, raid->rd_finish_in, raid->finish_in);
+        }
+
+        rrdset_done(raid->st_finish);
+
+        // --------------------------------------------------------------------
+
+        if(unlikely(!raid->st_speed)) {
+            snprintfz(id, 50, "new_%s_speed", raid->name); // TODO: rename chart
+            snprintfz(family, 50, "%s", raid->name);
+
+            raid->st_speed = rrdset_create_localhost(
+                    "mdstat"
+                    , id
+                    , NULL
+                    , family
+                    , NULL
+                    , "Operation Speed"
+                    , "KB/s"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                    , 6500 + raid_idx + 3 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+        }
+        else
+            rrdset_next(raid->st_speed);
+
+        if(raid->used) {
+            raid->rd_speed = rrddim_add(raid->st_speed, "speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_speed, raid->rd_speed, raid->speed);
+        }
+
+        rrdset_done(raid->st_speed);
     }
 
     return 0;
