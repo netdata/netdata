@@ -68,7 +68,7 @@ jobs:
       file: "netdata*.tar.gz"
   - name: docker images
     install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
-    script: "docker/build.sh"
+    script: "packaging/docker/build.sh"
     env: REPOSITORY="netdata/netdata"
   - name: changelog generation
     script: ".travis/generate_changelog.sh"

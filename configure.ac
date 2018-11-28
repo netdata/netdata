@@ -566,7 +566,6 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
-    contrib/Makefile
     daemon/Makefile
     database/Makefile
     diagrams/Makefile
