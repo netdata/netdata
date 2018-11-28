@@ -18,19 +18,19 @@ Community growth allows the project to attract new talent willing to contribute.
 
 ### Provide feedback
 
-Is there anything that bothers you about netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue] (https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
+Is there anything that bothers you about netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue](https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
 
 ### Sponsor a part of Netdata
 
-Netdata is a complex system, with many integrations. It's impossible for a few people to have the deep knowledge required for the various collectors, backends and notification endpoints. As a result, we rely on "sponsors", a concept similar to "power users" or "product owners". To become a sponsor, just let us know in any Github issue and we will record your GitHub username in a "CONTRIBUTORS.md" in the appropriate directory.
+Netdata is a complex system, with many integrations for the various  collectors, backends and notification endpoints. As a result, we rely on help from "sponsors", a concept similar to "power users" or "product owners". To become a sponsor, just let us know in any Github issue and we will record your GitHub username in a "CONTRIBUTORS.md" in the appropriate directory.
 
 #### Sponsor a collector
 
-Netdata is all about simplicity and meaningful presentation. But we can't know which metrics really matter when monitoring every particular software or hardware component, or which alarms make sense for a particular situation. A "sponsor" for a collector does the following:
- - Specifies the metrics required and how they should be presented in charts.
+Netdata is all about simplicity and meaningful presentation. A "sponsor" for a collector does the following:
+ - Assists the devs with feedback on the charts.
  - Specifies the alarms that would make sense for each metric.
  - When the implementation passes QA, tests the implementation in production.
- - Uses the charts and alarms in his/her day to day work and provides additional feedback after the collector is delivered.
+ - Uses the charts and alarms in his/her day to day work and provides additional feedback.
  - Requests additional improvements as things change (e.g. new versions of an API are available).
 
 #### Sponsor a backend
@@ -120,7 +120,7 @@ There are several guides for pull requests, such as the following:
 - https://thenewstack.io/getting-legit-with-git-and-github-your-first-pull-request/
 - https://github.com/firstcontributions/first-contributions#first-contributions
 
-However, it's not always that simple. Our [PR review process](@pr-review-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
+However, it's not always that simple. Our [PR approval process](#pr-approval-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
 
 One thing you will need to do only for your first pull request in Netdata is to accept the CLA. Until you do, the automated check for the CLA acceptance will be showing as failed. 
 
