@@ -58,3 +58,8 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 # send test alarms to any role
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
+If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, alarm-notify.sh calls itself with many more arguments. So first do
+ ```sh
+ bash -x /usr/libexec/netdata/plugins.d/alarm-notify.sh test
+ ```
+ Then look in the output for the alarm-notify.sh calls and run the one you want to trace with `bash -x`. 
