@@ -912,7 +912,7 @@ echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-unins
 
 if [ -d .git ]; then
 	cp ./installer/netdata-updater.sh netdata-updater.sh
-	sed -i "s/THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT/${REINSTALL_PWD}/" netdata-updater.sh
+	sed -i "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" netdata-updater.sh
 	chmod 755 netdata-updater.sh
 	echo >&2 "Update script is located at: ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
 	echo >&2
