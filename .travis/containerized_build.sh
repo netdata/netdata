@@ -17,7 +17,8 @@ docker run -d -v "${PWD}:/code:rw" -w /code --name netdata-test "netdata/os-test
 docker exec -it netdata-test ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
 
 # Test update
-docker exec -it netdata-test /etc/cron.daily/netdata-updater -f
+#docker exec -it netdata-test /etc/cron.daily/netdata-updater -f
+docker exec -it netdata-test ./netdata-updater.sh -f
 
 # Test deinstalation
 docker exec -it netdata-test ./netdata-uninstaller.sh --force
