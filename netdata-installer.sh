@@ -912,6 +912,7 @@ echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-unins
 
 if [ -d .git ]; then
 	cp ./installer/netdata-updater.sh netdata-updater.sh
+	sed -i "s/THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT/${REINSTALL_PWD}/" netdata-updater.sh
 	chmod 755 netdata-updater.sh
 	echo >&2 "Update script is located at: ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
 	echo >&2
@@ -956,13 +957,13 @@ fi
 
 # Save environment variables
 cat <<EOF > installer/.environment.sh
-PATH=${PATH}
-CFLAGS=${CFLAGS}
-NETDATA_PREFIX=${NETDATA_PREFIX}
-NETDATA_CONFIGURE_OPTIONS=${NETDATA_CONFIGURE_OPTIONS}
-NETDATA_ADDED_TO_GROUPS=${NETDATA_ADDED_TO_GROUPS}
-REINSTALL_PWD=${REINSTALL_PWD}
-REINSTALL_COMMAND=${REINSTALL_COMMAND}
+PATH="${PATH}"
+CFLAGS="${CFLAGS}"
+NETDATA_PREFIX="${NETDATA_PREFIX}"
+NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
+NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
+REINSTALL_PWD="${REINSTALL_PWD}"
+REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 EOF
 
 # -----------------------------------------------------------------------------

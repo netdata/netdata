@@ -12,10 +12,11 @@
 force=0
 [ "${1}" = "-f" ] && force=1
 
-source installer/.environment.sh || exit 1
-
 # make sure we cd to the working directory
+REINSTALL_PWD="THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT"
 cd "${REINSTALL_PWD}" || exit 1
+
+source installer/.environment.sh || exit 1
 
 # make sure there is .git here
 [ ${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: ${REINSTALL_PWD} (use -f for force re-install)" && exit 1
