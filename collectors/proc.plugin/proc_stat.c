@@ -240,8 +240,6 @@ static void chart_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, s
 
 struct cpuidle_state {
     char *name;
-    char *name_filename;
-    int name_fd;
 
     char *time_filename;
     int time_fd;
@@ -367,13 +365,9 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
     if(unlikely(!cc->cpuidle_state_len || cc->rescan_cpu_states)) {
         int state_file_found = 1; // check at least one state
 
-        if(cc->cpuidle_state_len){
+        if(cc->cpuidle_state_len) {
             for(state = 0; state < cc->cpuidle_state_len; state++) {
                 freez(cc->cpuidle_state[state].name);
-
-                freez(cc->cpuidle_state[state].name_filename);
-                close(cc->cpuidle_state[state].name_fd);
-                cc->cpuidle_state[state].name_fd = -1;
 
                 freez(cc->cpuidle_state[state].time_filename);
                 close(cc->cpuidle_state[state].time_fd);
@@ -401,9 +395,27 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         memset(cc->cpuidle_state, 0, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
 
         for(state = 0; state < cc->cpuidle_state_len; state++) {
+            char name_buf[50 + 1];
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, state);
-            cc->cpuidle_state[state].name_filename = strdupz(filename);
-            cc->cpuidle_state[state].name_fd = -1;
+
+            int fd = open(filename, O_RDONLY, 0666);
+            if(unlikely(fd == -1)) {
+                error("Cannot open file '%s'", filename);
+                cc->rescan_cpu_states = 1;
+                return 1;
+            }
+
+            ssize_t r = read(fd, name_buf, 50);
+            if(unlikely(r < 1)) {
+                error("Cannot read file '%s'", filename);
+                close(fd);
+                cc->rescan_cpu_states = 1;
+                return 1;
+            }
+
+            name_buf[r - 1] = '\0'; // erase extra character
+            cc->cpuidle_state[state].name = strdupz(name_buf);
+            close(fd);
 
             snprintfz(filename, FILENAME_MAX, cpuidle_time_filename, core, state);
             cc->cpuidle_state[state].time_filename = strdupz(filename);
@@ -417,23 +429,17 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
 
         struct cpuidle_state *cs = &cc->cpuidle_state[state];
 
-        if(unlikely(cs->name_fd == -1 || cs->time_fd == -1)) {
-            cs->name_fd = open(cs->name_filename, O_RDONLY);
+        if(unlikely(cs->time_fd == -1)) {
             cs->time_fd = open(cs->time_filename, O_RDONLY);
-            if (unlikely(cs->name_fd == -1 || cs->time_fd == -1)) {
-                error("Cannot open files '%s' and '%s'", cs->name_filename, cs->time_filename);
+            if (unlikely(cs->time_fd == -1)) {
+                error("Cannot open file '%s'", cs->time_filename);
                 cc->rescan_cpu_states = 1;
                 return 1;
             }
         }
 
-        char name_buf[50 + 1], time_buf[50 + 1];
-        if(likely(read_one_state(name_buf, cs->name_filename, &cs->name_fd)
-           && read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
-            if(!cs->name || strncmp(cs->name, name_buf, 50)) {
-                freez(cs->name);
-                cs->name = strdupz(name_buf);
-            }
+        char time_buf[50 + 1];
+        if(likely(read_one_state(time_buf, cs->time_filename, &cs->time_fd))) {
             cs->value = str2ll(time_buf, NULL);
         }
         else {
