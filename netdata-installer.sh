@@ -1121,7 +1121,7 @@ export NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 INSTALL_UID="${UID}"
 if [ "\${INSTALL_UID}" != "\${UID}" ]
     then
-    echo >&2 "You are running this script as user with uid \${UID}. The script should be run as root (user with uid \${INSTALL_UID})"
+echo >&2 "You are running this script as user with uid \${UID}. We recommend to run this script as root (user with uid 0)"
     exit 1
 fi
 
