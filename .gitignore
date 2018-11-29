@@ -45,7 +45,8 @@ freeipmi.plugin
 cgroup-network
 !cgroup-network/
 
-# netdata makeself archives
+# installation artifacts
+installer/.environment.sh
 *.tar.*
 *.run
 
