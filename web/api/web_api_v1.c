@@ -618,6 +618,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST *host, BUFFER *wb) {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
+    rrdhost_rdlock(host);
     for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
@@ -633,20 +634,23 @@ inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST 
                 alarm_normal++;
         }
     }
+    rrdhost_unlock(host);
     buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
     buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
     buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
 }
 
-inline void web_client_api_request_v1_info_mirrored_hosts(const RRDHOST *host, BUFFER *wb) {
+inline void web_client_api_request_v1_info_mirrored_hosts(const RRDHOST *localhost, BUFFER *wb) {
     RRDHOST *rc;
-    for(rc = host->next; rc ; rc = rc->next) {
+    rrd_rdlock();
+    rrdhost_foreach_read(rc) {
         if(unlikely(rc->next)) {
             buffer_sprintf(wb, "\t\t\"%s\",\n", rc->hostname);
         } else {
             buffer_sprintf(wb, "\t\t\"%s\"\n", rc->hostname);
         }
     }
+    rrd_unlock();
 }
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
@@ -659,7 +663,9 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
 
     buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
-    web_client_api_request_v1_info_mirrored_hosts(host, wb);
+    if (host->next) {
+        web_client_api_request_v1_info_mirrored_hosts(host->next, wb);
+    }
     buffer_strcat(wb, "\t],\n");
 
     buffer_strcat(wb, "\t\"alarms\": {\n");
