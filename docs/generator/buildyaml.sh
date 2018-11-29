@@ -108,6 +108,7 @@ echo -ne "    - 'docs/Why-Netdata.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
+    - CONTRIBUTING.md
 "
 
 echo -ne "- Installation:
@@ -210,7 +211,6 @@ navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
 echo -ne "- Hacking netdata:
-    - CONTRIBUTING.md
     - CODE_OF_CONDUCT.md
     - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
