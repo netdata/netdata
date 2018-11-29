@@ -19,13 +19,14 @@ LABELS_FILE=/tmp/exclude_labels
 hub issue labels > $LABELS_FILE
 
 for STATE in "open" "closed"; do
-  for ISSUE in $(hub issue -f "%I %l%n" -s "$STATE" -d "$(date +%F -d '3 days ago')" | grep -v -f $LABELS_FILE); do
+  for ISSUE in $(hub issue -f "%I %l%n" -s "$STATE" -d "$(date +%F -d '1 day ago')" | grep -v -f $LABELS_FILE); do
     echo "Processing $STATE issue no. $ISSUE"
     URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE"
     BODY="$(curl "${URL}" | jq .body 2>/dev/null)"
     case "${BODY}" in
       *"# Question summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question"]}' -X PATCH "${URL}" ;;
-      *"# Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["bug"]}' -X PATCH "${URL}" ;;
+      *"# Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","bug"]}' -X PATCH "${URL}" ;;
+      *"# Feature idea summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","feature request"]}' -X PATCH "${URL}" ;;
       * ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage"]}' -X PATCH "${URL}" ;;
     esac
   done
