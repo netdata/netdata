@@ -16,7 +16,15 @@ force=0
 REINSTALL_PWD="THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT"
 cd "${REINSTALL_PWD}" || exit 1
 
+#shellcheck source=/dev/null
 source installer/.environment.sh || exit 1
+
+UID="$(id -u)"
+if [ "${INSTALL_UID}" != "${UID}" ]
+    then
+    echo >&2 "This script should be run as user with uid ${INSTALL_UID} but it now runs with uid ${UID}"
+    exit 1
+fi
 
 # make sure there is .git here
 [ ${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: ${REINSTALL_PWD} (use -f for force re-install)" && exit 1
