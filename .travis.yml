@@ -53,7 +53,11 @@ jobs:
       depth: false
 
   - stage: nightlies
-    name: tarball and self-extractor build
+    name: docker images
+    install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
+    script: "packaging/docker/build.sh"
+    env: REPOSITORY="netdata/netdata"
+  - name: tarball and self-extractor build
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/create_artifacts.sh"
     deploy:
@@ -66,10 +70,6 @@ jobs:
       skip_cleanup: true
       file_glob: true
       file: "netdata*.tar.gz"
-  - name: docker images
-    install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
-    script: "packaging/docker/build.sh"
-    env: REPOSITORY="netdata/netdata"
   - name: changelog generation
     script: ".travis/generate_changelog.sh"
     env: COMMIT_AND_PUSH=1
