@@ -20,5 +20,5 @@ docker exec -it netdata-test ./netdata-installer.sh --dont-wait --dont-start-it 
 #docker exec -it netdata-test /etc/cron.daily/netdata-updater -f
 docker exec -it netdata-test ./netdata-updater.sh -f
 
-# Test deinstalation
-docker exec -it netdata-test ./netdata-uninstaller.sh --force
+# Test deinstalation (TODO: cannot test it now since it is ALWAYS in interactive mode)
+# docker exec -it netdata-test ./netdata-uninstaller.sh --force
