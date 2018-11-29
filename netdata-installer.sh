@@ -273,39 +273,39 @@ if [ "${UID}" -ne 0 ]
         then
         netdata_banner "wrong command line options!"
         cat <<NONROOTNOPREFIX
-  
+
   ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
-  
+
   You are attempting to install netdata as non-root, but you plan
   to install it in system paths.
-  
+
   Please set an installation prefix, like this:
-  
+
       $0 ${@} --install /tmp
-  
+
   or, run the installer as root:
-  
+
       sudo $0 ${@}
-  
+
   We suggest to install it as root, or certain data collectors will
   not be able to work. Netdata drops root privileges when running.
   So, if you plan to keep it, install it as root to get the full
   functionality.
-  
+
 NONROOTNOPREFIX
         exit 1
 
     else
         cat <<NONROOT
- 
+
   ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
   You are about to install netdata as a non-root user.
   Netdata will work, but a few data collection modules that
   require root access will fail.
-  
+
   If you installing netdata permanently on your system, run
   the installer like this:
-  
+
      ${TPUT_YELLOW}${TPUT_BOLD}sudo $0 ${@}${TPUT_RESET}
 
 NONROOT
@@ -1121,7 +1121,7 @@ export NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 INSTALL_UID="${UID}"
 if [ "\${INSTALL_UID}" != "\${UID}" ]
     then
-    echo >&2 "This script should be run as user with uid \${INSTALL_UID} but it now runs with uid \${UID}"
+echo >&2 "You are running this script as user with uid \${UID}. We recommend to run this script as root (user with uid 0)"
     exit 1
 fi
 
@@ -1283,5 +1283,5 @@ else
 fi
 
 echo >&2 "  enjoy real-time performance and health monitoring..."
-echo >&2 
+echo >&2
 exit 0
