@@ -52,6 +52,7 @@ struct cpu_chart {
 };
 
 static int keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
+static int keep_cpuidle_fds_open = CONFIG_BOOLEAN_YES;
 
 static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, size_t index) {
     char buf[50 + 1];
@@ -161,7 +162,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
                 // the whole period under schedutil governor?
                 // freez(tsf->last_ticks);
                 // tsf->last_ticks = NULL;
-                // tsf->last_ticks_len = 0;                    
+                // tsf->last_ticks_len = 0;
                 continue;
             }
 
@@ -342,7 +343,7 @@ static int read_one_state(char *buf, const char *filename, int *fd) {
         // terminate the buffer
         buf[ret - 1] = '\0';
 
-        if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+        if(unlikely(keep_cpuidle_fds_open != CONFIG_BOOLEAN_YES)) {
             close(*fd);
             *fd = -1;
         }
@@ -490,8 +491,17 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_cpu_freq = CONFIG_BOOLEAN_YES;
             do_cpuidle = CONFIG_BOOLEAN_YES;
         }
+        if(unlikely(processors > 24)) {
+            // the system has too many processors
+            keep_cpuidle_fds_open = CONFIG_BOOLEAN_NO;
+        }
+        else {
+            // the system has a reasonable number of processors
+            keep_cpuidle_fds_open = CONFIG_BOOLEAN_YES;
+        }
 
         keep_per_core_fds_open    = config_get_boolean("plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
+        keep_cpuidle_fds_open     = config_get_boolean("plugin:proc:/proc/stat", "keep cpuidle files open", keep_cpuidle_fds_open);
         do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
         do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
         do_cpu_freq               = config_get_boolean_ondemand("plugin:proc:/proc/stat", "cpu frequency", do_cpu_freq);
@@ -634,7 +644,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
                                 do_cpu_freq = CONFIG_BOOLEAN_YES;
                             }
-                            
+
                             snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
 
                             if (stat(filename, &stbuf) == 0) {
