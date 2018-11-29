@@ -216,7 +216,6 @@ echo -ne "- Hacking netdata:
     - CONTRIBUTORS.md
 "
 navpart 2 makeself "" "" 4
-navpart 2 packaging "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests
