@@ -1,7 +1,7 @@
-> THIS MODULE IS OBSOLETE.
-> USE THE PYTHON ONE - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
-
 # hddtemp
+
+> THIS MODULE IS OBSOLETE.
+> USE [THE PYTHON ONE](../../python.d.plugin/hddtemp) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 
 The plugin will collect temperatures from disks 
 

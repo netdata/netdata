@@ -10,7 +10,7 @@ Every time a security issue is fixed in netdata, we immediately release a new ve
 
 We’re extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
 
-To make a report, please email the private [security@netdata.cloud](mailto:security@netdata.cloud) list with the security details and the details expected for [all netdata bug reports](https://github.com/netdata/netdata/.github/ISSUE_TEMPLATE.md).
+To make a report, please email the private [security@netdata.cloud](mailto:security@netdata.cloud) list with the security details and the details expected for [all netdata bug reports](../.github/ISSUE_TEMPLATE/bug_report.md).
 
 ## When Should I Report a Vulnerability?
 

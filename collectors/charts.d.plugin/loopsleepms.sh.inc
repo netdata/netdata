@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 LOOPSLEEP_DATE="$(which date 2>/dev/null || command -v date 2>/dev/null)"
-if [ -z "$LOOPSLEEP_DATE" ]
-    then
-    echo >&2 "$0: ERROR: Cannot find the command 'date' in the system path."
-    exit 1
+if [ -z "$LOOPSLEEP_DATE" ]; then
+	echo >&2 "$0: ERROR: Cannot find the command 'date' in the system path."
+	exit 1
 fi
 
 # -----------------------------------------------------------------------------
@@ -14,14 +13,13 @@ fi
 now_ms=
 LOOPSLEEPMS_HIGHRES=1
 test "$($LOOPSLEEP_DATE +%N)" = "%N" && LOOPSLEEPMS_HIGHRES=0
-test -z "$($LOOPSLEEP_DATE +%N)"     && LOOPSLEEPMS_HIGHRES=0
+test -z "$($LOOPSLEEP_DATE +%N)" && LOOPSLEEPMS_HIGHRES=0
 current_time_ms_from_date() {
-    if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]
-    then
-        now_ms="$($LOOPSLEEP_DATE +'%s')000"
-    else
-        now_ms="$(( $( $LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000' ) ))"
-    fi
+	if [ $LOOPSLEEPMS_HIGHRES -eq 0 ]; then
+		now_ms="$($LOOPSLEEP_DATE +'%s')000"
+	else
+		now_ms="$(($($LOOPSLEEP_DATE +'%s * 1000 + %-N / 1000000')))"
+	fi
 }
 
 # -----------------------------------------------------------------------------
@@ -32,55 +30,49 @@ current_time_ms_from_uptime_started="${now_ms}"
 current_time_ms_from_uptime_last="${now_ms}"
 current_time_ms_from_uptime_first=0
 current_time_ms_from_uptime() {
-    local up rest arr=() n
+	local up rest arr=() n
 
-    read up rest </proc/uptime
-    if [ $? -ne 0 ]
-        then
-        echo >&2 "$0: Cannot read /proc/uptime - falling back to current_time_ms_from_date()."
-        current_time_ms="current_time_ms_from_date"
-        current_time_ms_from_date
-        current_time_ms_accuracy=1
-        return
-    fi
+	read up rest </proc/uptime
+	if [ $? -ne 0 ]; then
+		echo >&2 "$0: Cannot read /proc/uptime - falling back to current_time_ms_from_date()."
+		current_time_ms="current_time_ms_from_date"
+		current_time_ms_from_date
+		current_time_ms_accuracy=1
+		return
+	fi
 
-    arr=(${up//./ })
+	arr=(${up//./ })
 
-    if [ ${#arr[1]} -lt 1 ]
-        then
-        n="${arr[0]}000"
-    elif [ ${#arr[1]} -lt 2 ]
-        then
-        n="${arr[0]}${arr[1]}00"
-    elif [ ${#arr[1]} -lt 3 ]
-        then
-        n="${arr[0]}${arr[1]}0"
-    else
-        n="${arr[0]}${arr[1]}"
-    fi
+	if [ ${#arr[1]} -lt 1 ]; then
+		n="${arr[0]}000"
+	elif [ ${#arr[1]} -lt 2 ]; then
+		n="${arr[0]}${arr[1]}00"
+	elif [ ${#arr[1]} -lt 3 ]; then
+		n="${arr[0]}${arr[1]}0"
+	else
+		n="${arr[0]}${arr[1]}"
+	fi
 
-    now_ms=$((current_time_ms_from_uptime_started - current_time_ms_from_uptime_first + n))
+	now_ms=$((current_time_ms_from_uptime_started - current_time_ms_from_uptime_first + n))
 
-    if [ "${now_ms}" -lt "${current_time_ms_from_uptime_last}" ]
-        then
-        echo >&2 "$0: Cannot use current_time_ms_from_uptime() - new time ${now_ms} is older than the last ${current_time_ms_from_uptime_last} - falling back to current_time_ms_from_date()."
-        current_time_ms="current_time_ms_from_date"
-        current_time_ms_from_date
-        current_time_ms_accuracy=1
-    fi
+	if [ "${now_ms}" -lt "${current_time_ms_from_uptime_last}" ]; then
+		echo >&2 "$0: Cannot use current_time_ms_from_uptime() - new time ${now_ms} is older than the last ${current_time_ms_from_uptime_last} - falling back to current_time_ms_from_date()."
+		current_time_ms="current_time_ms_from_date"
+		current_time_ms_from_date
+		current_time_ms_accuracy=1
+	fi
 
-    current_time_ms_from_uptime_last="${now_ms}"
+	current_time_ms_from_uptime_last="${now_ms}"
 }
 current_time_ms_from_uptime
 current_time_ms_from_uptime_first="$((now_ms - current_time_ms_from_uptime_started))"
 current_time_ms_from_uptime_last="${current_time_ms_from_uptime_first}"
 current_time_ms="current_time_ms_from_uptime"
 current_time_ms_accuracy=10
-if [ "${current_time_ms_from_uptime_first}" -eq 0 ]
-    then
-    echo >&2 "$0: Invalid setup for current_time_ms_from_uptime() - falling back to current_time_ms_from_date()."
-    current_time_ms="current_time_ms_from_date"
-    current_time_ms_accuracy=1
+if [ "${current_time_ms_from_uptime_first}" -eq 0 ]; then
+	echo >&2 "$0: Invalid setup for current_time_ms_from_uptime() - falling back to current_time_ms_from_date()."
+	current_time_ms="current_time_ms_from_date"
+	current_time_ms_accuracy=1
 fi
 
 # -----------------------------------------------------------------------------
@@ -94,62 +86,54 @@ mysleep_fifo="${NETDATA_CACHE_DIR-/tmp}/.netdata_bash_sleep_timer_fifo"
 [ -p "${mysleep_fifo}" ] && mysleep="mysleep_read"
 
 mysleep_read() {
-    read -t "${1}" <>"${mysleep_fifo}"
-    ret=$?
-    if [ $ret -le 128 ]
-        then
-        echo >&2 "$0: Cannot use read for sleeping (return code ${ret})."
-        mysleep="sleep"
-        ${mysleep} "${1}"
-    fi
+	read -t "${1}" <>"${mysleep_fifo}"
+	ret=$?
+	if [ $ret -le 128 ]; then
+		echo >&2 "$0: Cannot use read for sleeping (return code ${ret})."
+		mysleep="sleep"
+		${mysleep} "${1}"
+	fi
 }
 
 # -----------------------------------------------------------------------------
 # use bash loadable module for sleep
 
 mysleep_builtin() {
-    builtin sleep "${1}"
-    ret=$?
-    if [ $ret -ne 0 ]
-        then
-        echo >&2 "$0: Cannot use builtin sleep for sleeping (return code ${ret})."
-        mysleep="sleep"
-        ${mysleep} "${1}"
-    fi
+	builtin sleep "${1}"
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo >&2 "$0: Cannot use builtin sleep for sleeping (return code ${ret})."
+		mysleep="sleep"
+		${mysleep} "${1}"
+	fi
 }
 
-if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] +0))" -ge 3 -a "${NETDATA_BASH_LOADABLES}" != "DISABLE" ]
-    then
-    # enable modules only for bash version 3+
+if [ -z "${mysleep}" -a "$((BASH_VERSINFO[0] + 0))" -ge 3 -a "${NETDATA_BASH_LOADABLES}" != "DISABLE" ]; then
+	# enable modules only for bash version 3+
 
-    for bash_modules_path in ${BASH_LOADABLES_PATH//:/ } "$(pkg-config bash --variable=loadablesdir 2>/dev/null)" "/usr/lib/bash" "/lib/bash" "/lib64/bash" "/usr/local/lib/bash" "/usr/local/lib64/bash"
-    do
-        [ -z "${bash_modules_path}" -o ! -d "${bash_modules_path}" ] && continue
+	for bash_modules_path in ${BASH_LOADABLES_PATH//:/ } "$(pkg-config bash --variable=loadablesdir 2>/dev/null)" "/usr/lib/bash" "/lib/bash" "/lib64/bash" "/usr/local/lib/bash" "/usr/local/lib64/bash"; do
+		[ -z "${bash_modules_path}" -o ! -d "${bash_modules_path}" ] && continue
 
-        # check for sleep
-        for bash_module_sleep in "sleep" "sleep.so"
-        do
-            if [ -f "${bash_modules_path}/${bash_module_sleep}" ]
-                then
-                if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null
-                    then
-                    mysleep="mysleep_builtin"
-                    # echo >&2 "$0: Using bash loadable ${bash_modules_path}/${bash_module_sleep} for sleep"
-                    break
-                fi
-            fi
+		# check for sleep
+		for bash_module_sleep in "sleep" "sleep.so"; do
+			if [ -f "${bash_modules_path}/${bash_module_sleep}" ]; then
+				if enable -f "${bash_modules_path}/${bash_module_sleep}" sleep 2>/dev/null; then
+					mysleep="mysleep_builtin"
+					# echo >&2 "$0: Using bash loadable ${bash_modules_path}/${bash_module_sleep} for sleep"
+					break
+				fi
+			fi
 
-        done
+		done
 
-        [ ! -z "${mysleep}" ] && break
-    done
+		[ ! -z "${mysleep}" ] && break
+	done
 fi
 
 # -----------------------------------------------------------------------------
 # fallback to external sleep
 
 [ -z "${mysleep}" ] && mysleep="sleep"
-
 
 # -----------------------------------------------------------------------------
 # this function is used to sleep a fraction of a second
@@ -163,60 +147,58 @@ LOOPSLEEPMS_LASTSLEEP=0
 LOOPSLEEPMS_LASTWORK=0
 
 loopsleepms() {
-    local tellwork=0 t="${1}" div s m now mstosleep
+	local tellwork=0 t="${1}" div s m now mstosleep
 
-    if [ "${t}" = "tellwork" ]
-    then
-        tellwork=1
-        shift
-        t="${1}"
-    fi
+	if [ "${t}" = "tellwork" ]; then
+		tellwork=1
+		shift
+		t="${1}"
+	fi
 
-    # $t = the time in seconds to wait
+	# $t = the time in seconds to wait
 
-    # if high resolution is not supported
-    # just sleep the time requested, in seconds
-    if [ ${LOOPSLEEPMS_HIGHRES} -eq 0 ]
-    then
-        sleep ${t}
-        return
-    fi
+	# if high resolution is not supported
+	# just sleep the time requested, in seconds
+	if [ ${LOOPSLEEPMS_HIGHRES} -eq 0 ]; then
+		sleep ${t}
+		return
+	fi
 
-    # get the current time, in ms in ${now_ms}
-    ${current_time_ms}
+	# get the current time, in ms in ${now_ms}
+	${current_time_ms}
 
-    # calculate ms since last run
-    [ ${LOOPSLEEPMS_LASTRUN} -gt 0 ] && \
-        LOOPSLEEPMS_LASTWORK=$((now_ms - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP + current_time_ms_accuracy))
-    # echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
-    
-    # remember this run
-    LOOPSLEEPMS_LASTRUN=${now_ms}
+	# calculate ms since last run
+	[ ${LOOPSLEEPMS_LASTRUN} -gt 0 ] &&
+		LOOPSLEEPMS_LASTWORK=$((now_ms - LOOPSLEEPMS_LASTRUN - LOOPSLEEPMS_LASTSLEEP + current_time_ms_accuracy))
+	# echo "# last loop's work took $LOOPSLEEPMS_LASTWORK ms"
 
-    # calculate the next run
-    LOOPSLEEPMS_NEXTRUN=$(( ( now_ms - ( now_ms % ( t * 1000 ) ) ) + ( t * 1000 ) ))
+	# remember this run
+	LOOPSLEEPMS_LASTRUN=${now_ms}
 
-    # calculate ms to sleep
-    mstosleep=$(( LOOPSLEEPMS_NEXTRUN - now_ms + current_time_ms_accuracy ))
-    # echo "# mstosleep is $mstosleep ms"
+	# calculate the next run
+	LOOPSLEEPMS_NEXTRUN=$(((now_ms - (now_ms % (t * 1000))) + (t * 1000)))
 
-    # if we are too slow, sleep some time
-    test ${mstosleep} -lt 200 && mstosleep=200
+	# calculate ms to sleep
+	mstosleep=$((LOOPSLEEPMS_NEXTRUN - now_ms + current_time_ms_accuracy))
+	# echo "# mstosleep is $mstosleep ms"
 
-    s=$(( mstosleep / 1000 ))
-    m=$(( mstosleep - (s * 1000) ))
-    [ "${m}" -lt 100 ] && m="0${m}"
-    [ "${m}" -lt 10  ] && m="0${m}"
+	# if we are too slow, sleep some time
+	test ${mstosleep} -lt 200 && mstosleep=200
 
-    test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK ${LOOPSLEEPMS_LASTWORK} ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu ) >>> SLEEPING ${mstosleep} ms"
+	s=$((mstosleep / 1000))
+	m=$((mstosleep - (s * 1000)))
+	[ "${m}" -lt 100 ] && m="0${m}"
+	[ "${m}" -lt 10 ] && m="0${m}"
 
-    # echo "# sleeping ${s}.${m}"
-    # echo
-    ${mysleep} ${s}.${m}
+	test $tellwork -eq 1 && echo >&2 " >>> PERFORMANCE >>> WORK TOOK ${LOOPSLEEPMS_LASTWORK} ms ( $((LOOPSLEEPMS_LASTWORK * 100 / 1000)).$((LOOPSLEEPMS_LASTWORK % 10))% cpu ) >>> SLEEPING ${mstosleep} ms"
 
-    # keep the values we need
-    # for our next run
-    LOOPSLEEPMS_LASTSLEEP=$mstosleep
+	# echo "# sleeping ${s}.${m}"
+	# echo
+	${mysleep} ${s}.${m}
+
+	# keep the values we need
+	# for our next run
+	LOOPSLEEPMS_LASTSLEEP=$mstosleep
 }
 
 # test it

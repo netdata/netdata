@@ -529,7 +529,9 @@ function renderStreamedHosts(options) {
                 <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                     <i class="fas fa-${icon}" style="color: #999;"></i>
                 </a>                    
-                <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">${hostname}</a>
+                <span class="__title" onClick="return gotoHostedModalHandler('${url}');">
+                    <a class="registry_link" href="${url}#">${hostname}</a>
+                </span>
                 <div></div>
             </div>`
         )
@@ -581,8 +583,8 @@ function renderMachines(machinesArray) {
             html += (
                 `<div class="agent-item agent-${machine.guid}">
                     <i class="fas fa-chart-bar" color: #fff"></i>
-                    <span>
-                        <a class="registry_link" href="${machine.url}#" onClick="return gotoServerModalHandler('${machine.guid}');">${machine.name}</a>
+                    <span class="__title" onClick="return gotoServerModalHandler('${machine.guid}');">
+                        <a class="registry_link" href="${machine.url}#">${machine.name}</a>
                     </span>
                     <a href="#" onClick="toggleAgentItem(event, '${machine.guid}');">
                         <i class="fas fa-caret-down" style="color: #999"></i>
@@ -601,7 +603,6 @@ function renderMachines(machinesArray) {
                 </div>`
             )
         } else {
-            el += '<li></li>';
             html += (
                 `<div class="info-item">
                     <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a> 
@@ -1611,7 +1612,7 @@ function renderPage(menus, data) {
         html += mhead + shtml + '</div></div><hr role="separator"/>';
     }
 
-    sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/doc/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
+    sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
@@ -2801,7 +2802,7 @@ function notifyForUpdate(force) {
             save = true;
             var compare = 'https://github.com/netdata/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
 
-            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/wiki/Updating-Netdata" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
+            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/tree/master/installer/UPDATE.md" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
 
             document.getElementById('update_badge').innerHTML = '!';
         }

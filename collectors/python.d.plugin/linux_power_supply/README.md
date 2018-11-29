@@ -1,4 +1,4 @@
-# linux\_power\_supply
+# Linux power supply
 
 This module monitors variosu metrics reported by power supply drivers
 on Linux.  This allows tracking and alerting on things like remaining

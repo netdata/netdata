@@ -30,7 +30,7 @@ cpufreq_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	[ -z "$( cpufreq_find_all_files "$cpufreq_sys_dir" )" ] && return 1
+	[ -z "$(cpufreq_find_all_files "$cpufreq_sys_dir")" ] && return 1
 	return 0
 }
 
@@ -47,16 +47,15 @@ cpufreq_create() {
 	echo >>"$TMP_DIR/cpufreq.sh" "echo \"BEGIN cpu.cpufreq \$1\""
 
 	i=0
-	for file in $( cpufreq_find_all_files "$cpufreq_sys_dir" | sort -u )
-	do
-		i=$(( i + 1 ))
-		dir=$( dirname "$file" )
+	for file in $(cpufreq_find_all_files "$cpufreq_sys_dir" | sort -u); do
+		i=$((i + 1))
+		dir=$(dirname "$file")
 		cpu=
 
-		[ -f "$dir/affected_cpus" ] && cpu=$( cat "$dir/affected_cpus" )
+		[ -f "$dir/affected_cpus" ] && cpu=$(cat "$dir/affected_cpus")
 		[ -z "$cpu" ] && cpu="$i.a"
 
-		id="$( fixid "cpu$cpu" )"
+		id="$(fixid "cpu$cpu")"
 
 		debug "file='$file', dir='$dir', cpu='$cpu', id='$id'"
 
@@ -68,7 +67,7 @@ cpufreq_create() {
 	[ $cpufreq_source_update -eq 1 ] && echo >>"$TMP_DIR/cpufreq.sh" "}"
 
 	# ok, load the function cpufreq_update() we created
-        # shellcheck disable=SC1090
+	# shellcheck disable=SC1090
 	[ $cpufreq_source_update -eq 1 ] && . "$TMP_DIR/cpufreq.sh"
 
 	return 0
@@ -82,9 +81,8 @@ cpufreq_update() {
 	# do all the work to collect / calculate the values
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
-        # shellcheck disable=SC1090
+	# shellcheck disable=SC1090
 	[ $cpufreq_source_update -eq 0 ] && . "$TMP_DIR/cpufreq.sh" "$1"
 
 	return 0
 }
-

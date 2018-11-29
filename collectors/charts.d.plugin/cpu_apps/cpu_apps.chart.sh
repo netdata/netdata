@@ -23,8 +23,7 @@ cpu_apps_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	if [ -z "$cpu_apps_apps" ]
-	then
+	if [ -z "$cpu_apps_apps" ]; then
 		error "manual configuration required: please set cpu_apps_apps='command1 command2 ...' in $confd/cpu_apps_apps.conf"
 		return 1
 	fi
@@ -38,8 +37,7 @@ cpu_apps_create() {
 	echo "CHART chartsd_apps.cpu '' 'Apps CPU' 'milliseconds / $cpu_apps_update_every sec' apps apps stacked 20001 $cpu_apps_update_every"
 
 	local x=
-	for x in $cpu_apps_apps
-	do
+	for x in $cpu_apps_apps; do
 		echo "DIMENSION $x $x incremental 1000 $cpu_apps_clockticks"
 
 		# this string is needed later in the update() function
@@ -55,15 +53,15 @@ cpu_apps_update() {
 	# remember: KEEP IT SIMPLE AND SHORT
 
 	echo "BEGIN chartsd_apps.cpu"
-	ps -o pid,comm -C "$cpu_apps_apps" |\
-		grep -v "COMMAND" |\
+	ps -o pid,comm -C "$cpu_apps_apps" |
+		grep -v "COMMAND" |
 		(
-			while read pid name
-			do
-				echo "$name+=`cat /proc/$pid/stat | cut -d ' ' -f 14-15`"
+			while read pid name; do
+				echo "$name+=$(cat /proc/$pid/stat | cut -d ' ' -f 14-15)"
 			done
-		) |\
-		(	sed -e "s/ \+/ /g" -e "s/ /+/g";
+		) |
+		(
+			sed -e "s/ \+/ /g" -e "s/ /+/g"
 			echo "$cpu_apps_bc_finalze"
 		) | bc
 	echo "END"

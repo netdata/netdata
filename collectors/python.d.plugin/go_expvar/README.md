@@ -106,7 +106,7 @@ the use of `netdata`s ```go_expvar``` module.
 
 ### Using netdata go_expvar module
 
-The `go_expvar` module is disabled by default. To enable it, edit [`python.d.conf`](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/python.d.conf)
+The `go_expvar` module is disabled by default. To enable it, edit [`python.d.conf`](../python.d.conf)
 (to edit it on your system run `/etc/netdata/edit-config python.d.conf`), and change the `go_expvar`
 variable to `yes`:
 
@@ -124,7 +124,7 @@ go_expvar: yes
 ...
 ```
 
-Next, we need to edit the module configuration file (found at [`/etc/netdata/python.d/go_expvar.conf`](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/go_expvar/go_expvar.conf) by default)
+Next, we need to edit the module configuration file (found at [`/etc/netdata/python.d/go_expvar.conf`](go_expvar.conf) by default)
 (to edit it on your system run `/etc/netdata/edit-config python.d/go_expvar.conf`).
 The module configuration consists of jobs, where each job can be used to monitor a separate Go application.
 Let's see a sample job configuration:
@@ -192,7 +192,7 @@ See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-28449
 Please see these two links to the official netdata documentation for more information about the values:
 
 - [External plugins - charts](../../plugins.d/#chart)
-- [Chart variables](https://github.com/netdata/netdata/wiki/How-to-write-new-module#global-variables-order-and-chart)
+- [Chart variables](../#global-variables-order-and-chart)
 
 **Line definitions**
 

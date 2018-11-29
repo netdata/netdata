@@ -1,4 +1,4 @@
-# Atlassian Confluence Dashboards
+# Atlassian Confluence dashboards
 
 With netdata you can build **live, interactive, monitoring dashboards** directly on Atlassian's **Confluence** pages.
 

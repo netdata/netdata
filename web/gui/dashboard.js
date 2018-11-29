@@ -77,7 +77,8 @@
 // ----------------------------------------------------------------------------
 // global namespace
 
-const NETDATA = window.NETDATA || {};
+// Should stay var!
+var NETDATA = window.NETDATA || {};
 
 (function(window, document, $, undefined) {
 
@@ -804,6 +805,14 @@ NETDATA.unitsConversion = {
             'MB/s': 1024,
             'GB/s': 1024 * 1024,
             'TB/s': 1024 * 1024 * 1024
+        },
+        'B': {
+            'B': 1,
+            'KB': 1024,
+            'MB': 1024 * 1024,
+            'GB': 1024 * 1024 * 1024,
+            'TB': 1024 * 1024 * 1024 * 1024,
+            'PB': 1024 * 1024 * 1024 * 1024 * 1024
         },
         'KB': {
             'B': 1 / 1024,

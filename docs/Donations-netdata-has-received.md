@@ -1,4 +1,4 @@
-# Donations received
+# Donations
 
 This is a list of the donations we have received for netdata (sorted alphabetically on their name):
 

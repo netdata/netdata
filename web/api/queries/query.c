@@ -492,7 +492,7 @@ static inline void do_dimension(
     r->min = min;
     r->max = max;
     r->before = max_date;
-    r->after = min_date;
+    r->after = min_date - (r->group - 1) * r->st->update_every;
     rrdr_done(r, rrdr_line);
 
     #ifdef NETDATA_INTERNAL_CHECKS
@@ -539,7 +539,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , resampling_group
 
          // after
-         , (size_t)r->after - (group - 1) * r->st->update_every
+         , (size_t)r->after
          , (size_t)after_wanted
          , (size_t)after_requested
          , (size_t)rrdset_first_entry_t(r->st)
@@ -666,26 +666,41 @@ RRDR *rrd2rrdr(
             info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, resampling_time_requested, duration);
             #endif
 
-            group = available_points; // use all the points
+            after_requested = before_requested - resampling_time_requested;
+            duration = before_requested - after_requested;
+            available_points = duration / st->update_every;
+            group = available_points / points_requested;
         }
-        else {
-            // the points we should group to satisfy gtime
-            resampling_group = resampling_time_requested / st->update_every;
-            if(unlikely(resampling_time_requested % st->update_every)) {
-                #ifdef NETDATA_INTERNAL_CHECKS
-                info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
-                #endif
 
-                resampling_group++;
+        // if the duration is not aligned to resampling time
+        // extend the duration to the past, to avoid a gap at the chart
+        // only when the missing duration is above 1/10th of a point
+        if(duration % resampling_time_requested) {
+            time_t delta = duration % resampling_time_requested;
+            if(delta > resampling_time_requested / 10) {
+                after_requested -= resampling_time_requested - delta;
+                duration = before_requested - after_requested;
+                available_points = duration / st->update_every;
+                group = available_points / points_requested;
             }
-
-            // adapt group according to resampling_group
-            if(unlikely(group < resampling_group)) group  = resampling_group; // do not allow grouping below the desired one
-            if(unlikely(group % resampling_group)) group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
-
-            //resampling_divisor = group / resampling_group;
-            resampling_divisor = (calculated_number)(group * st->update_every) / (calculated_number)resampling_time_requested;
         }
+
+        // the points we should group to satisfy gtime
+        resampling_group = resampling_time_requested / st->update_every;
+        if(unlikely(resampling_time_requested % st->update_every)) {
+            #ifdef NETDATA_INTERNAL_CHECKS
+            info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
+            #endif
+
+            resampling_group++;
+        }
+
+        // adapt group according to resampling_group
+        if(unlikely(group < resampling_group)) group  = resampling_group; // do not allow grouping below the desired one
+        if(unlikely(group % resampling_group)) group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
+
+        //resampling_divisor = group / resampling_group;
+        resampling_divisor = (calculated_number)(group * st->update_every) / (calculated_number)resampling_time_requested;
     }
 
     // now that we have group,
@@ -710,7 +725,7 @@ RRDR *rrd2rrdr(
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
-    long points_wanted = (before_wanted - after_requested) / st->update_every / group;
+    long points_wanted = (before_wanted - after_requested) / (st->update_every * group);
 
     time_t after_wanted  = before_wanted - (points_wanted * group * st->update_every) + st->update_every;
     if(unlikely(after_wanted < first_entry_t)) {
@@ -951,7 +966,7 @@ RRDR *rrd2rrdr(
         rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
 
     // reported 'after' varies, depending on group
-    if((r->after - (group - 1) * r->st->update_every) != after_wanted)
+    if(r->after != after_wanted)
         rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
 
     #endif

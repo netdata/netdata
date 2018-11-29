@@ -28,11 +28,27 @@ function embed_version {
 	VERSION="$1"
 	MAJOR=$(echo "$GIT_TAG" | cut -d . -f 1 | cut -d v -f 2)
 	MINOR=$(echo "$GIT_TAG" | cut -d . -f 2)
-	PATCH=$(echo "$GIT_TAG" | cut -d . -f 3)
+	PATCH=$(echo "$GIT_TAG" | cut -d . -f 3 | cut -d '-' -f 1)
 	sed -i "s/\\[VERSION_MAJOR\\], \\[.*\\]/\\[VERSION_MAJOR\\], \\[$MAJOR\\]/" configure.ac
 	sed -i "s/\\[VERSION_MINOR\\], \\[.*\\]/\\[VERSION_MINOR\\], \\[$MINOR\\]/" configure.ac
 	sed -i "s/\\[VERSION_PATCH\\], \\[.*\\]/\\[VERSION_PATCH\\], \\[$PATCH\\]/" configure.ac
 	git add configure.ac
+}
+
+# Figure out what will be new release candidate tag based only on previous ones.
+# This assumes that RELEASES are in format of "v0.1.2" and prereleases (RCs) are using "v0.1.2-rc0"
+function release_candidate {
+	LAST_TAG=$(git semver)
+	if [[ $LAST_TAG =~ -rc* ]]; then
+		VERSION=$(echo "$LAST_TAG" | cut -d'-' -f 1)
+		LAST_RC=$(echo "$LAST_TAG" | cut -d'c' -f 2)
+		RC=$((LAST_RC + 1))
+	else
+		VERSION="$(git semver --next-minor)"
+		RC=0
+	fi
+	GIT_TAG="v$VERSION-rc$RC"
+	export GIT_TAG
 }
 
 # Check if current commit is tagged or not
@@ -45,20 +61,9 @@ if [ -z "${GIT_TAG}" ]; then
 	*"[netdata patch release]"*) GIT_TAG="v$(git semver --next-patch)" ;;
 	*"[netdata minor release]"*) GIT_TAG="v$(git semver --next-minor)" ;;
 	*"[netdata major release]"*) GIT_TAG="v$(git semver --next-major)" ;;
-	*) echo "Keyword not detected. Exiting..."; exit 1;;
+	*"[netdata release candidate]"*) release_candidate ;;
+	*) echo "Keyword not detected. Exiting..."; exit 0;;
 	esac
-
-	# Tag it!
-	if [ "$GIT_TAG" != "HEAD" ]; then
-		echo "Assigning a new tag: $GIT_TAG"
-		embed_version "$GIT_TAG"
-		git commit -m "[ci skip] release $GIT_TAG"
-		git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
-		git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
-		git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
-	fi
-else
-	embed_version "$GIT_TAG"
-	git commit -m "[ci skip] release $GIT_TAG"
-	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 fi
+embed_version "$GIT_TAG"
+export GIT_TAG

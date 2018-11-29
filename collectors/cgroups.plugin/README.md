@@ -54,7 +54,7 @@ To provide a sane default for this setting, netdata uses the following pattern l
 	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  * 
 ```
 
-So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](https://github.com/netdata/netdata/wiki/monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
+So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
 
 
 ### enabled cgroups
@@ -87,7 +87,7 @@ For this mapping netdata provides 2 configuration options:
 
 The whole point for the additional pattern list, is to limit the number of times the script will be called. Without this pattern list, the script might be called thousands of times, depending on the number of cgroups available in the system.
 
-The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
+The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
 
 ## Monitoring systemd services
 

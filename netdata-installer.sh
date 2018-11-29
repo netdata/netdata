@@ -254,23 +254,23 @@ if [ "${UID}" -ne 0 ]; then
 		cat <<NONROOTNOPREFIX
   
   ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
-  
+
   You are attempting to install netdata as non-root, but you plan
   to install it in system paths.
-  
+
   Please set an installation prefix, like this:
-  
+
       $0 ${@} --install /tmp
-  
+
   or, run the installer as root:
-  
+
       sudo $0 ${@}
-  
+
   We suggest to install it as root, or certain data collectors will
   not be able to work. Netdata drops root privileges when running.
   So, if you plan to keep it, install it as root to get the full
   functionality.
-  
+
 NONROOTNOPREFIX
 		exit 1
 
@@ -281,10 +281,10 @@ NONROOTNOPREFIX
   You are about to install netdata as a non-root user.
   Netdata will work, but a few data collection modules that
   require root access will fail.
-  
+
   If you installing netdata permanently on your system, run
   the installer like this:
-  
+
      ${TPUT_YELLOW}${TPUT_BOLD}sudo $0 ${@}${TPUT_RESET}
 
 NONROOT
@@ -845,7 +845,7 @@ Update check on the dashboard, will not work.
 If you want to have version update check, please re-install it
 following the procedure in:
 
-https://github.com/netdata/netdata/wiki/Installation
+https://github.com/netdata/netdata/tree/master/installer#installation
 
 VERMSG
 fi

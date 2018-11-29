@@ -23,11 +23,11 @@ If netdata is installed on a system running a web server, it will detect it and 
 ![image](https://cloud.githubusercontent.com/assets/2662304/22900686/e283f636-f237-11e6-93d2-cbdf63de150c.png)
 *[**netdata**](https://my-netdata.io/) charts based on metrics collected by querying the `nginx` API (i.e. `/stab_status`).*
 
-> [**netdata**](https://my-netdata.io/) supports `apache`, `nginx`, `lighttpd` and `tomcat`. To obtain real-time information from a web server API, the web server needs to expose it. For directions on configuring your web server, check [`/etc/netdata/python.d/`](https://github.com/netdata/netdata/tree/master/conf.d/python.d). There is a file there for each web server.
+> [**netdata**](https://my-netdata.io/) supports `apache`, `nginx`, `lighttpd` and `tomcat`. To obtain real-time information from a web server API, the web server needs to expose it. For directions on configuring your web server, check the config files for each web server. There is a directory with a config file for each web server under [`/etc/netdata/python.d/`](../). 
 
 ## Configuration
 
-[**netdata**](https://my-netdata.io/) has a powerful `web_log` plugin, capable of incrementally parsing any number of web server log files. This plugin is automatically started with [**netdata**](https://my-netdata.io/) and comes, pre-configured, for finding web server log files on popular distributions. Its configuration is at [`/etc/netdata/python.d/web_log.conf`](https://github.com/netdata/netdata/blob/master/conf.d/python.d/web_log.conf), like this:
+[**netdata**](https://my-netdata.io/) has a powerful `web_log` plugin, capable of incrementally parsing any number of web server log files. This plugin is automatically started with [**netdata**](https://my-netdata.io/) and comes, pre-configured, for finding web server log files on popular distributions. Its configuration is at [`/etc/netdata/python.d/web_log.conf`](web_log.conf), like this:
 
 
 ```yaml
@@ -104,7 +104,7 @@ This is a nice view of the traffic the web server is receiving and is sending.
 
 What is important to know for this chart, is that the bandwidth used for each request and response is accounted at the time the log is written. Since [**netdata**](https://my-netdata.io/) refreshes this chart every single second, you may have unrealistic spikes is the size of the requests or responses is too big. The reason is simple: a response may have needed 1 minute to be completed, but all the bandwidth used during that minute for the specific response will be accounted at the second the log line is written.
 
-As the legend on the chart suggests, you can use FireQoS to setup QoS on the web server ports and IPs to accurately measure the bandwidth the web server is using. Actually, [there may be a few more reasons to install QoS on your servers](https://github.com/netdata/netdata/wiki/You-should-install-QoS-on-all-your-servers)...
+As the legend on the chart suggests, you can use FireQoS to setup QoS on the web server ports and IPs to accurately measure the bandwidth the web server is using. Actually, [there may be a few more reasons to install QoS on your servers](../../tc.plugin/#tcplugin)...
 
 **Bandwidth** KB/s
  * received (bandwidth of requests)
@@ -184,7 +184,7 @@ The last charts are about the unique IPs accessing your web server.
 
 ## Alarms
 
-The magic of [**netdata**](https://my-netdata.io/) is that all metrics are collected per second, and all metrics can be used or correlated to provide real-time alarms. Out of the box, [**netdata**](https://my-netdata.io/) automatically attaches the [following alarms](https://github.com/netdata/netdata/blob/master/conf.d/health.d/web_log.conf) to all `web_log` charts (i.e. to all log files configured, individually):
+The magic of [**netdata**](https://my-netdata.io/) is that all metrics are collected per second, and all metrics can be used or correlated to provide real-time alarms. Out of the box, [**netdata**](https://my-netdata.io/) automatically attaches the [following alarms](../../../health/health.d/web_log.conf) to all `web_log` charts (i.e. to all log files configured, individually):
 
 alarm|description|minimum<br/>requests|warning|critical
 :-------|-------|:------:|:-----:|:------:
@@ -197,5 +197,5 @@ alarm|description|minimum<br/>requests|warning|critical
 
 The column `minimum requests` state the minimum number of requests required for the alarm to be evaluated. We found that when the site is receiving requests above this rate, these alarms are pretty accurate (i.e. no false-positives).
 
-[**netdata**](https://my-netdata.io/) alarms are [user configurable](https://github.com/netdata/netdata/tree/master/conf.d/health.d). So, even [`web_log` alarms can be adapted to your needs](https://github.com/netdata/netdata/blob/master/conf.d/health.d/web_log.conf).
+[**netdata**](https://my-netdata.io/) alarms are user configurable. Sample config files can be found under directory `health/health.d` of the netdata github repository. So, even [`web_log` alarms can be adapted to your needs](../../../health/health.d/web_log.conf).
 

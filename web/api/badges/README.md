@@ -20,7 +20,7 @@ Similarly, there is [a chart that shows outbound bandwidth per class](http://lon
 
 The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, netdata interpolates it to second boundary using microsecond calculations.
 
-Let's see a few more badge examples (they come from the [netdata registry](https://github.com/netdata/netdata/wiki/mynetdata-menu-item)):
+Let's see a few more badge examples (they come from the [netdata registry](../../../registry/)):
 
 - **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 
@@ -243,7 +243,7 @@ These are options dedicated to badges:
 </script>
 ```
 
-A more advanced badges refresh method is to include `http://your.netdata.ip:19999/refresh-badges.js` in your page. For more information and use example, [check this](https://github.com/netdata/netdata/blob/master/web/gui/refresh-badges.js).
+A more advanced badges refresh method is to include `http://your.netdata.ip:19999/refresh-badges.js` in your page. For more information and use example, [check this](../../gui/refresh-badges.js).
 
 ---
 
@@ -260,24 +260,6 @@ character|name|escape sequence
 ` > `|greater than|`%3E`
 ` \ `|backslash (when you need a `/`)|`%5C`
 ` \| `|pipe (delimiting parameters)|`%7C`
-
----
-
-## Using the path instead of the query string
-
-The badges can also be generated using the URL path for passing parameters. The format is exactly the same.
-
-So instead of:
-
-  `http://your.netdata:19999/api/v1/badge.svg?option1&option2&option3&...`
-
-you can write:
-
-  `http://your.netdata:19999/api/v1/badge.svg/option1/option2/option3/...`
-
-You can also append anything else you like, like this:
-
-  `http://your.netdata:19999/api/v1/badge.svg/option1/option2/option3/my-super-badge.svg`
 
 ## FAQ
 

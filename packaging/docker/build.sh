@@ -6,6 +6,11 @@
 
 set -e
 
+if [ ! -f .gitignore ]; then
+	echo "Run as ./packaging/docker/$(basename "$0") from top level directory of git repository"
+	exit 1
+fi
+
 if [ "$1" == "" ]; then
     VERSION=$(git tag --points-at)
 else
@@ -24,15 +29,11 @@ ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
-if [ -f Dockerfile ]; then
-    cd ../ || exit 1
-fi
-
 # Build images using multi-arch Dockerfile.
 for ARCH in i386 armhf aarch64 amd64; do
      docker build --build-arg ARCH="${ARCH}-v3.8" \
                   --tag "${REPOSITORY}:${VERSION}-${ARCH}" \
-                  --file docker/Dockerfile ./ &
+                  --file packaging/docker/Dockerfile ./ &
 done
 wait
 
@@ -71,4 +72,3 @@ docker --config /tmp/docker manifest push -p "${REPOSITORY}:${VERSION}"
 
 # Show current manifest (debugging purpose only)
 docker --config /tmp/docker manifest inspect "${REPOSITORY}:${VERSION}"
-

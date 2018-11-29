@@ -1,9 +1,9 @@
+# Apache
+
 > THIS MODULE IS OBSOLETE.
-> USE THE PYTHON ONE - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
+> USE [THE PYTHON ONE](../../python.d.plugin/apache) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 
 ---
-
-# Apache Plugin (apache)
 
 The `apache` collector visualizes key performance data for an apache web server.
 

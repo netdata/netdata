@@ -1,4 +1,4 @@
-# Running the Netdata Daemon
+# Netdata daemon
 
 ## Starting netdata
 
@@ -113,7 +113,7 @@ The command line options of the netdata 1.10.0 version are the following:
  Source Code: https://github.com/netdata/netdata
  Wiki / Docs: https://github.com/netdata/netdata/wiki
  Support    : https://github.com/netdata/netdata/issues
- License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
+ License    : https://github.com/netdata/netdata/blob/master/LICENSE
 
  Twitter    : https://twitter.com/linuxnetdata
  Facebook   : https://www.facebook.com/linuxnetdata/
@@ -468,7 +468,7 @@ When you compile netdata with debugging:
 
 1. compiler optimizations for your CPU are disabled (netdata will run somewhat slower)
 
-2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is printed by default. netdata allows you to select which sections of netdata you want to trace. Tracing is activated via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find the options supported at [log.h](https://github.com/netdata/netdata/blob/master/libnetdata/log/log.h). They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
+2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is printed by default. netdata allows you to select which sections of netdata you want to trace. Tracing is activated via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find the options supported at [log.h](../libnetdata/log/log.h). They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
 Once netdata is compiled with debugging and tracing is enabled for a few sections, the file `/var/log/netdata/debug.log` will contain the messages.
 

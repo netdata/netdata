@@ -46,7 +46,8 @@ RE_JAILS = re.compile(r'\[([a-zA-Z0-9_-]+)\][^\[\]]+?enabled\s+= (true|false)')
 # Example:
 # 2018-09-12 11:45:53,715 fail2ban.actions[25029]: WARNING [ssh] Unban 195.201.88.33
 # 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Ban 217.59.246.27
-RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban) (?P<ip>[a-f0-9.:]+)')
+# 2018-09-12 11:45:58,727 fail2ban.actions[25029]: WARNING [ssh] Restore Ban 217.59.246.27
+RE_DATA = re.compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>Unban|Ban|Restore Ban) (?P<ip>[a-f0-9.:]+)')
 
 DEFAULT_JAILS = [
     'ssh',
@@ -116,7 +117,7 @@ class Service(LogService):
 
             jail, action, ip = match['jail'], match['action'], match['ip']
 
-            if action == 'Ban':
+            if action == 'Ban' or action == 'Restore Ban':
                 self.data[jail] += 1
                 if ip not in self.banned_ips[jail]:
                     self.banned_ips[jail].add(ip)
@@ -126,7 +127,7 @@ class Service(LogService):
                     self.banned_ips[jail].remove(ip)
                     self.data['{0}_in_jail'.format(jail)] -= 1
 
-            return self.data
+        return self.data
 
     def get_files_from_dir(self, dir_path, suffix):
         """

@@ -1,4 +1,4 @@
-# email notifications
+# email
 
 You need a working `sendmail` command for email alerts to work. Almost all MTAs provide a `sendmail` interface.
 

@@ -27,19 +27,19 @@ mysql_get() {
 	#arr=($(run "${@}" -e "SHOW GLOBAL STATUS WHERE value REGEXP '^[0-9]';" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)" ))
 	#arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | egrep "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^ ]+\s[0-9]" ))
 	# shellcheck disable=SC2207
-	arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | grep -E "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+" ))
+	arr=($(run "${@}" -N -e "SHOW GLOBAL STATUS;" | grep -E "^(Bytes|Slow_|Que|Handl|Table|Selec|Sort_|Creat|Conne|Abort|Binlo|Threa|Innod|Qcach|Key_|Open)[^[:space:]]+[[:space:]]+[0-9]+"))
 	IFS="${oIFS}"
 
 	[ "${#arr[@]}" -lt 3 ] && return 1
 	local end=${#arr[@]}
-	for ((i=2;i<end;i+=2)); do
-		mysql_data["${arr[$i]}"]=${arr[$i+1]}
+	for ((i = 2; i < end; i += 2)); do
+		mysql_data["${arr[$i]}"]=${arr[i + 1]}
 	done
 
 	[ -z "${mysql_data[Connections]}" ] && return 1
 
 	mysql_data[Thread_cache_misses]=0
-	[ $(( mysql_data[Connections] + 1 - 1 )) -gt 0 ] && mysql_data[Thread_cache_misses]=$(( mysql_data[Threads_created] * 10000 / mysql_data[Connections] ))
+	[ $((mysql_data[Connections] + 1 - 1)) -gt 0 ] && mysql_data[Thread_cache_misses]=$((mysql_data[Threads_created] * 10000 / mysql_data[Connections]))
 
 	return 0
 }
@@ -51,23 +51,20 @@ mysql_check() {
 
 	local x m mysql_cmd tryroot=0 unconfigured=0
 
-	if [ "${1}" = "tryroot" ]
-		then
+	if [ "${1}" = "tryroot" ]; then
 		tryroot=1
 		shift
 	fi
 
-        # shellcheck disable=SC2230
+	# shellcheck disable=SC2230
 	[ -z "${mysql_cmd}" ] && mysql_cmd="$(which mysql 2>/dev/null || command -v mysql 2>/dev/null)"
 
-	if [ ${#mysql_opts[@]} -eq 0 ]
-		then
+	if [ ${#mysql_opts[@]} -eq 0 ]; then
 		unconfigured=1
 
 		mysql_cmds[local]="$mysql_cmd"
 
-		if [ $tryroot -eq 1 ]
-			then
+		if [ $tryroot -eq 1 ]; then
 			# the user has not configured us for mysql access
 			# if the root user is passwordless in mysql, we can
 			# attempt to connect to mysql as root
@@ -78,19 +75,16 @@ mysql_check() {
 	fi
 
 	# check once if the url works
-	for m in "${!mysql_opts[@]}"
-	do
+	for m in "${!mysql_opts[@]}"; do
 		[ -z "${mysql_cmds[$m]}" ] && mysql_cmds[$m]="$mysql_cmd"
-		if [ -z "${mysql_cmds[$m]}" ]
-			then
+		if [ -z "${mysql_cmds[$m]}" ]; then
 			# shellcheck disable=SC2154
 			error "cannot get mysql command for '${m}'. Please set mysql_cmds[$m]='/path/to/mysql', in $confd/mysql.conf"
 		fi
 
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
 		# shellcheck disable=SC2181
-		if [ ! $? -eq 0 ]
-		then
+		if [ ! $? -eq 0 ]; then
 			error "cannot get global status for '$m'. Please set mysql_opts[$m]='options' to whatever needed to get connected to the mysql server, in $confd/mysql.conf"
 			unset "mysql_cmds[$m]"
 			unset "mysql_opts[$m]"
@@ -98,13 +92,11 @@ mysql_check() {
 			continue
 		fi
 
-		mysql_ids[$m]="$( fixid "$m" )"
+		mysql_ids[$m]="$(fixid "$m")"
 	done
 
-	if [ ${#mysql_opts[@]} -eq 0 ]
-		then
-		if [ ${unconfigured} -eq 1 ] && [ ${tryroot} -eq 0 ]
-			then
+	if [ ${#mysql_opts[@]} -eq 0 ]; then
+		if [ ${unconfigured} -eq 1 ] && [ ${tryroot} -eq 0 ]; then
 			mysql_check tryroot "${@}"
 			return $?
 		else
@@ -120,8 +112,7 @@ mysql_create() {
 	local x
 
 	# create the charts
-	for x in "${mysql_ids[@]}"
-	do
+	for x in "${mysql_ids[@]}"; do
 		cat <<EOF
 CHART mysql_$x.net '' "mysql Bandwidth" "kilobits/s" bandwidth mysql.net area $((mysql_priority + 1)) $mysql_update_every
 DIMENSION Bytes_received in incremental 8 1024
@@ -283,18 +274,16 @@ CHART mysql_$x.files_rate '' "mysql Opened Files Rate" "files/s" files mysql.fil
 DIMENSION Opened_files files incremental 1 1
 EOF
 
-	if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]
-		then
-		cat <<EOF
+		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
+			cat <<EOF
 CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $((mysql_priority + 50)) $mysql_update_every
 DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 1
 DIMENSION Binlog_stmt_cache_use all incremental 1 1
 EOF
-	fi
+		fi
 
-	if [ ! -z "${mysql_data[Connection_errors_accept]}" ]
-		then
-		cat <<EOF
+		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]; then
+			cat <<EOF
 CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $((mysql_priority + 51)) $mysql_update_every
 DIMENSION Connection_errors_accept accept incremental 1 1
 DIMENSION Connection_errors_internal internal incremental 1 1
@@ -303,12 +292,11 @@ DIMENSION Connection_errors_peer_addr peer_addr incremental 1 1
 DIMENSION Connection_errors_select select incremental 1 1
 DIMENSION Connection_errors_tcpwrap tcpwrap incremental 1 1
 EOF
-	fi
+		fi
 
 	done
 	return 0
 }
-
 
 mysql_update() {
 	# the first argument to this function is the microseconds since last update
@@ -319,14 +307,12 @@ mysql_update() {
 	# remember: KEEP IT SIMPLE AND SHORT
 
 	local m x
-	for m in "${!mysql_ids[@]}"
-	do
+	for m in "${!mysql_ids[@]}"; do
 		x="${mysql_ids[$m]}"
 		mysql_get "${mysql_cmds[$m]}" ${mysql_opts[$m]}
 
 		# shellcheck disable=SC2181
-		if [ $? -ne 0 ]
-			then
+		if [ $? -ne 0 ]; then
 			unset "mysql_ids[$m]"
 			unset "mysql_opts[$m]"
 			unset "mysql_cmds[$m]"
@@ -497,8 +483,7 @@ SET Opened_files = ${mysql_data[Opened_files]}
 END
 VALUESEOF
 
-		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]
-			then
+		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
 			cat <<VALUESEOF
 BEGIN mysql_$x.binlog_stmt_cache $1
 SET Binlog_stmt_cache_disk_use = ${mysql_data[Binlog_stmt_cache_disk_use]}
@@ -507,8 +492,7 @@ END
 VALUESEOF
 		fi
 
-		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]
-			then
+		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]; then
 			cat <<VALUESEOF
 BEGIN mysql_$x.connection_errors $1
 SET Connection_errors_accept = ${mysql_data[Connection_errors_accept]}
@@ -525,4 +509,3 @@ VALUESEOF
 	[ ${#mysql_ids[@]} -eq 0 ] && error "no mysql servers left active." && return 1
 	return 0
 }
-

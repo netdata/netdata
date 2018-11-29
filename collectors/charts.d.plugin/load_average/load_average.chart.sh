@@ -21,8 +21,7 @@ load_average_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	if [ ${load_average_update_every} -lt 5 ]
-		then
+	if [ ${load_average_update_every} -lt 5 ]; then
 		# there is no meaning for shorter than 5 seconds
 		# the kernel changes this value every 5 seconds
 		load_average_update_every=5
@@ -34,7 +33,7 @@ load_average_check() {
 
 load_average_create() {
 	# create a chart with 3 dimensions
-cat <<EOF
+	cat <<EOF
 CHART system.load '' "System Load Average" "load" load system.load line $((load_priority + 1)) $load_average_update_every
 DIMENSION load1 '1 min' absolute 1 100
 DIMENSION load5 '5 mins' absolute 1 100
@@ -52,10 +51,10 @@ load_average_update() {
 	# here we parse the system average load
 	# it is decimal (with 2 decimal digits), so we remove the dot and
 	# at the definition we have divisor = 100, to have the graph show the right value
-	loadavg="`cat /proc/loadavg | sed -e "s/\.//g"`"
-	load1=`echo $loadavg | cut -d ' ' -f 1`
-	load5=`echo $loadavg | cut -d ' ' -f 2`
-	load15=`echo $loadavg | cut -d ' ' -f 3`
+	loadavg="$(cat /proc/loadavg | sed -e "s/\.//g")"
+	load1=$(echo $loadavg | cut -d ' ' -f 1)
+	load5=$(echo $loadavg | cut -d ' ' -f 2)
+	load15=$(echo $loadavg | cut -d ' ' -f 3)
 
 	# write the result of the work.
 	cat <<VALUESEOF
@@ -68,4 +67,3 @@ VALUESEOF
 
 	return 0
 }
-

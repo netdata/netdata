@@ -69,9 +69,9 @@ We provide docker images for the most common architectures. These are statistics
 [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
 ### Registry
-When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](registry/#netdata-registry). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
+When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](registry/#registry). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
 
-[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
   
 *in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
 
@@ -109,7 +109,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running netdata in docker, check the [docker installation page](docker/).
+For more information about running netdata in docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -147,19 +147,17 @@ not just visualize metrics.
 
 ## News  
   
-`Nov 6th, 2018` - **[netdata v1.11.0 released!](https://github.com/netdata/netdata/releases)**  
+`Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**  
+
+- Improved internal database to support values above 64bit.
+- New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
+- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/python.d.plugin/cpufreq/), [`sensors`](collectors/python.d.plugin/sensors/).
+- Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
+- `my-netdata`menu has been refactored. 
+- Packaging: `openrc` service definition got a few improvements.
+
   
- - New query engine, supporting statistical functions.  
- - Fixed security issues identified by Red4Sec.com and Synacktiv.  
- - New Data Collection Modules: [`rethinkdbs`](collectors/python.d.plugin/rethinkdbs/), [`proxysql`](collectors/python.d.plugin/proxysql/), [`litespeed`](collectors/python.d.plugin/litespeed/), [`uwsgi`](collectors/python.d.plugin/uwsgi/), [`unbound`](collectors/python.d.plugin/unbound/), [`powerdns`](collectors/python.d.plugin/powerdns/), [`dockerd`](collectors/python.d.plugin/dockerd/), [`puppet`](collectors/python.d.plugin/puppet/), [`logind`](collectors/python.d.plugin/logind/), [`adaptec_raid`](collectors/python.d.plugin/adaptec_raid/), [`megacli`](collectors/python.d.plugin/megacli/), [`spigotmc`](collectors/python.d.plugin/spigotmc/), [`boinc`](collectors/python.d.plugin/boinc/), [`w1sensor`](collectors/python.d.plugin/w1sensor/), [`monit`](collectors/python.d.plugin/monit/), [`linux_power_supplies`](collectors/python.d.plugin/linux_power_supply/).  
- - Improved Data Collection Modules: [`statsd.plugin`](collectors/statsd.plugin/), [`apps.plugin`](collectors/apps.plugin/), [`freeipmi.plugin`](collectors/freeipmi.plugin/), [`proc.plugin`](collectors/proc.plugin/), [`diskspace.plugin`](collectors/diskspace.plugin/), [`freebsd.plugin`](collectors/freebsd.plugin/), [`python.d.plugin`](collectors/python.d.plugin/), [`web_log`](collectors/python.d.plugin/web_log/), [`nginx_plus`](collectors/python.d.plugin/nginx_plus/), [`ipfs`](collectors/python.d.plugin/ipfs/), [`fail2ban`](collectors/python.d.plugin/fail2ban/), [`ceph`](collectors/python.d.plugin/ceph/), [`elasticsearch`](collectors/python.d.plugin/elasticsearch/), [`redis`](collectors/python.d.plugin/redis/),   
- [`beanstalk`](collectors/python.d.plugin/beanstalk/), [`mysql`](collectors/python.d.plugin/mysql/), [`varnish`](collectors/python.d.plugin/varnish/), [`couchdb`](collectors/python.d.plugin/couchdb/), [`phpfpm`](collectors/python.d.plugin/phpfpm/), [`apache`](collectors/python.d.plugin/apache/), [`icecast`](collectors/python.d.plugin/icecast/), [`mongodb`](collectors/python.d.plugin/mongodb/), [`postgress`](collectors/python.d.plugin/postgres/), [`mdstat`](collectors/python.d.plugin/mdstat/), [`openvpn_log`](collectors/python.d.plugin/ovpn_status_log/), [`snmp`](collectors/node.d.plugin/snmp/), [`nut`](collectors/charts.d.plugin/nut/).  
-  
- - Added alarms for detecting abnormally high load average, `TCP` `SYN` and `TCP` accept queue overflows, network interfaces congestion and alarms for `bcache`, `mdstat`, `apcupsd`, `mysql`.  
- - system alarms are now enabled on FreeBSD.  
- - New notification methods: **rocket.chat**, **Microsoft Teams**, **syslog**, **fleep.io**, **Amazon SNS**.  
-  
- - and dozens more improvements, enhancements, features and compatibility fixes  
+
   
 ---  
   
@@ -180,11 +178,11 @@ This is how it works:
 Function|Description|Documentation
 :---:|:---|:---:
 **Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)
-**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#netdata-database)
+**Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#database)
 **Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#metrics-streaming)
-**Archieve**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
-**Query**|Multiple independent workers are attached to the [internal web server](server/#netdata-web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)
+**Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
+**Query**|Multiple independent workers are attached to the [internal web server](web/server/#web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
 
 The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
@@ -216,7 +214,7 @@ This is what you should expect from Netdata:
 
 ### Health Monitoring & Alarms
 - **Sophisticated alerting** - comes with hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods.
-- **Notifications**: email, slack.com, flock.com, pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com.
+- **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irs](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/).
 
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
@@ -253,7 +251,7 @@ Charts on netdata dashboards are synchronized to each other. There is no master 
 
 *Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the mouse pointer is over a chart.*
 
-> The visible time-frame (pan and zoom) is propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#netdata-registry).
+> The visible time-frame (pan and zoom) is propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#registry).
 
 
 ### Highlighted time-frame
@@ -264,7 +262,7 @@ To improve visual anomaly detection across charts, the user can highlight a time
 
 *A highlighted time-frame can be given by pressing `ALT` + `mouse selection` on any chart. Netdata will highlight the same range on all charts.*
 
-> Highlighted ranges are propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#netdata-registry).
+> Highlighted ranges are propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#registry).
 
 
 ## What does it monitor  
@@ -357,7 +355,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### Web Servers
 - **[Apache and lighttpd](collectors/python.d.plugin/apache/)** - `mod-status` (v2.2, v2.4) and cache log statistics, for multiple servers.
-- **[IPFS](python.d.plugin/ipfs/)** - bandwidth, peers.
+- **[IPFS](collectors/python.d.plugin/ipfs/)** - bandwidth, peers.
 - **[LiteSpeed](collectors/python.d.plugin/litespeed/)** - reads the litespeed rtreport files to collect metrics.
 - **[Nginx](collectors/python.d.plugin/nginx/)** - `stub-status`, for multiple servers.
 - **[Nginx+](collectors/python.d.plugin/nginx_plus/)** - connects to multiple nginx_plus servers (local or remote) to collect real-time performance metrics.
@@ -411,12 +409,12 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Hardware Sensors
 - **[IPMI](collectors/freeipmi.plugin/)** - enterprise hardware sensors and events.
 - **[lm-sensors](collectors/python.d.plugin/sensors/)** - temperature, voltage, fans, power, humidity, etc.
-- **[Nvidia](collectors/charts.d.plugin/nvidia_smi/)** - collects information for Nvidia GPUs.
+- **[Nvidia](collectors/python.d.plugin/nvidia_smi/)** - collects information for Nvidia GPUs.
 - **[RPi](collectors/charts.d.plugin/sensors/)** - Raspberry Pi temperature sensors.
 - **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
-- **[apcupsd](charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
 
@@ -465,7 +463,7 @@ Here is a quick list:
 Directory|Description
 :---|:---
 [`installer`](installer/)|Instructions to install netdata on your systems.
-[`docker`](docker/)|Instructions to install netdata using docker.
+[`docker`](packaging/docker/)|Instructions to install netdata using docker.
 [`daemon`](daemon/)|Information about the netdata daemon and its configuration.
 [`collectors`](collectors/)|Information about data collection plugins.
 [`health`](health/)|How netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.

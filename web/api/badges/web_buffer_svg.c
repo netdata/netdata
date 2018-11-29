@@ -913,7 +913,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     uint32_t options = 0x00000000;
 
     while(url) {
-        char *value = mystrsep(&url, "/?&");
+        char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");

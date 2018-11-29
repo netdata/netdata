@@ -1,4 +1,4 @@
-# Netdata External Plugins
+# External plugins overview
 
 `plugins.d` is the netdata internal plugin that collects metrics
 from external processes, thus allowing netdata to use **external plugins**.

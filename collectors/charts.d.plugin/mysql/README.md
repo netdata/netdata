@@ -1,7 +1,7 @@
-> THIS MODULE IS OBSOLETE.
-> USE THE PYTHON ONE - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
-
 # mysql
+
+> THIS MODULE IS OBSOLETE.
+> USE [THE PYTHON ONE](../../python.d.plugin/mysql) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
 
 The plugin will monitor one or more mysql servers
 
