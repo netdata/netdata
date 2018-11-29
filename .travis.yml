@@ -48,7 +48,7 @@ jobs:
     name: Create release
     install: sudo apt update -y && sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip && sudo apt install -y --only-upgrade docker-ce && docker info
     before_script: sudo pip install git-semver
-    script: ".travis/releaser.sh"
+    script: ".travis/releaser.sh && .travis/labeler.sh" # labeler should be replaced with GitHub Actions when they hit GA
     git:
       depth: false
 
@@ -75,8 +75,6 @@ jobs:
     env: COMMIT_AND_PUSH=1
     git:
       depth: false
-  - name: labeler # This job should be replaced with GitHub Actions when they hit GA
-    script: ".travis/labeler.sh"
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci

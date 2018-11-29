@@ -25,7 +25,8 @@ for STATE in "open" "closed"; do
     BODY="$(curl "${URL}" | jq .body 2>/dev/null)"
     case "${BODY}" in
       *"# Question summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question"]}' -X PATCH "${URL}" ;;
-      *"# Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["bug"]}' -X PATCH "${URL}" ;;
+      *"# Bug report summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","bug"]}' -X PATCH "${URL}" ;;
+      *"# Feature idea summary"* ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","feature request"]}' -X PATCH "${URL}" ;;
       * ) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage"]}' -X PATCH "${URL}" ;;
     esac
   done
