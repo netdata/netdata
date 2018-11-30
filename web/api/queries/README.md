@@ -65,12 +65,12 @@ There are 2 uses that enable this feature:
   
 Using `points` and `gtime` the query engine tries to find a best fit for **database-points**
 vs **result-points** (we call this ratio `group points`). It always tries to keep `group points`
-an integer. Keep in mind the query engine may shift `after` if required.
+an integer. Keep in mind the query engine may shift `after` if required. See also the [example](#example).
 
 #### Time-frame Alignment
 
 Alignment is a very important aspect of netdata queries. Without it, the animated
-charts on the dashboards would constantly change shape during incremental updates.
+charts on the dashboards would constantly [change shape](#example) during incremental updates.
 
 To provide consistent grouping through time, the query engine (by default) aligns
 `after` and `before` to be a multiple of `group points`.
@@ -126,3 +126,45 @@ to the caller.
 The query engine is highly optimized for speed. Most of its modules implement "online"
 versions of the algorithms, requiring just one pass on the database values to produce
 the result.
+
+## Example
+
+When netdata is reducing metrics, it tries to return always the same boundaries. So, if we want 10s averages, it will always return points starting at a `unix timestamp % 10 = 0`.
+
+Let's see why this is needed, by looking at the error case.
+
+Assume we have 5 points:
+
+| time | value |
+| :-: | :-: |
+| 00:01 | 1 |
+| 00:02 | 2 |
+| 00:03 | 3 |
+| 00:04 | 4 |
+| 00:05 | 5 |
+
+At 00:04 you ask for 2 points for 4 seconds in the past. So `group = 2`. netdata would return:
+
+| point | time | value |
+| :-: | :-: | :-: |
+| 1 | 00:01 - 00:02 | 1.5 |
+| 2 | 00:03 - 00:04 | 3.5 |
+
+A second later the chart is to be refreshed, and makes again the same request at 00:05. These are the points that would have been returned:
+
+| point | time | value |
+| :-: | :-: | :-: |
+| 1 | 00:02 - 00:03 | 2.5 |
+| 2 | 00:04 - 00:05 | 4.5 |
+
+**Wait a moment!** The chart was shifted just one point and it changed value! Point 2 was 3.5 and when shifted to point 1 is 2.5! If you see this in a chart, it's a mess. The charts change shape constantly.
+
+For this reason, netdata always aligns the data it returns to the `group`.
+
+When you request `points=1`, netdata understands that you need 1 point for the whole database, so `group = 3600`. Then it tries to find the starting point which would be `timestamp % 3600 = 0` Within a database of 3600 seconds, there is one such point for sure. Then it tries to find the average of 3600 points. But, most probably it will not find 3600 of them (for just 1 out of 3600 seconds this query will return something).
+
+So, the proper way to query the database is to also set at least `after`. The following call will returns 1 point for the last complete 10-second duration (it starts at `timestamp % 10 = 0`):
+
+http://netdata.firehol.org/api/v1/data?chart=system.cpu&points=1&after=-10&options=seconds
+
+When you keep calling this URL, you will see that it returns one new value every 10 seconds, and the timestamp always ends with zero. Similarly, if you say `points=1&after=-5` it will always return timestamps ending with 0 or 5.
