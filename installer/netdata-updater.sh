@@ -22,7 +22,7 @@ source installer/.environment.sh || exit 1
 UID="$(id -u)"
 if [ "${INSTALL_UID}" != "${UID}" ]
     then
-    echo >&2 "This script should be run as user with uid ${INSTALL_UID} but it now runs with uid ${UID}"
+    echo >&2 "You are running this script as user with uid ${UID}. We recommend to run this script as root (user with uid 0)"
     exit 1
 fi
 
