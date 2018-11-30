@@ -208,7 +208,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_usec = now_realtime_usec();
     callback(st, w->response.data);
     return 200;
 
@@ -258,7 +258,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             *responseHandler = NULL,
             *outFileName = NULL;
 
-    time_t last_timestamp_in_data = 0, google_timestamp = 0;
+    usec_t last_timestamp_in_data_usec = 0ULL, google_timestamp_usec = 0ULL;
 
     char *chart = NULL
     , *before_str = NULL
@@ -327,7 +327,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     google_reqId = tqx_value;
                 else if(!strcmp(tqx_name, "sig")) {
                     google_sig = tqx_value;
-                    google_timestamp = strtoul(google_sig, NULL, 0);
+                    google_timestamp_usec = strtoul(google_sig, NULL, 0);
                 }
                 else if(!strcmp(tqx_name, "out")) {
                     google_out = tqx_value;
@@ -362,19 +362,19 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         ret = 404;
         goto cleanup;
     }
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_usec = now_realtime_usec();
 
-    long long before = (before_str && *before_str)?str2l(before_str):0;
-    long long after  = (after_str  && *after_str) ?str2l(after_str):0;
+    long long before_usec = (before_str && *before_str)?str2duration(before_str):0;
+    long long after_usec  = (after_str  && *after_str) ?str2duration(after_str):0;
     int       points = (points_str && *points_str)?str2i(points_str):0;
-    long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
+    long      group_time_usec = (group_time_str && *group_time_str)?str2duration(group_time_str):0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
           , w->id
           , chart
           , (dimensions)?buffer_tostring(dimensions):""
-          , after
-          , before
+          , after_usec
+          , before_usec
           , points
           , group
           , format
@@ -395,8 +395,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         );
 
         buffer_sprintf(w->response.data,
-                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%ld',table:",
-                responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%llu',table:",
+                responseHandler, google_version, google_reqId, timeval_usec(&st->last_updated));
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)
@@ -406,11 +406,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
-                                 , options, &last_timestamp_in_data);
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after_usec, before_usec, group, group_time_usec, options, &last_timestamp_in_data_usec);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
-        if(google_timestamp < last_timestamp_in_data)
+        if(google_timestamp_usec < last_timestamp_in_data_usec)
             buffer_strcat(w->response.data, "});");
 
         else {

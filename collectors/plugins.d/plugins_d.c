@@ -664,7 +664,7 @@ void *pluginsd_main(void *ptr) {
 
                     cd->enabled = enabled;
                     cd->update_every_usec = (int) config_get_usec(cd->id, "update every", localhost->rrd_update_every_usec);
-                    cd->started_t = now_realtime_sec();
+                    cd->started_usec = now_realtime_usec();
 
                     char *def = "";
                     snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %llu %s", cd->fullfilename, cd->update_every_usec, config_get(cd->id, "command options", def));

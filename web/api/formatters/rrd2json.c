@@ -113,9 +113,9 @@ int rrdset2anything_api_v1(
         , int group_method
         , long long group_time_usec
         , uint32_t options
-        , time_t *latest_timestamp
+        , usec_t *latest_timestamp_usec
 ) {
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_usec = now_realtime_usec();
 
     RRDR *r = rrd2rrdr(st, points, after_usec, before_usec, group_method, group_time_usec, options, dimensions?buffer_tostring(dimensions):NULL);
     if(!r) {
@@ -128,8 +128,8 @@ int rrdset2anything_api_v1(
     else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
         buffer_cacheable(wb);
 
-    if(latest_timestamp && rrdr_rows(r) > 0)
-        *latest_timestamp = r->before_usec;
+    if(latest_timestamp_usec && rrdr_rows(r) > 0)
+        *latest_timestamp_usec = r->before_usec;
 
     switch(format) {
     case DATASOURCE_SSV:

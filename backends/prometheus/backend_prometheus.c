@@ -182,25 +182,27 @@ static int print_host_variables(RRDVAR *rv, void *data) {
     return 0;
 }
 
-static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, usec_t after_usec, usec_t before_usec, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
+    usec_t now_usec = now_realtime_usec();
+
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if(allhosts) {
         if(output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+            buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n", hostname, host->program_name, host->program_version, now_usec / USEC_PER_MS);
         else
             buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1\n", hostname, host->program_name, host->program_version);
 
         if(host->tags && *(host->tags)) {
             if(output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
-                buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_usec / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_usec / USEC_PER_MS);
             }
             else {
                 buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1\n", hostname, host->tags);
@@ -221,10 +223,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 
         if(host->tags && *(host->tags)) {
             if(output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
-                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1 %llu\n", host->tags, now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(wb, "netdata_host_tags_info{%s} 1 %llu\n", host->tags, now_usec / USEC_PER_MS);
 
                 // deprecated, exists only for compatibility with older queries
-                buffer_sprintf(wb, "netdata_host_tags{%s} 1 %llu\n", host->tags, now_realtime_usec() / USEC_PER_MS);
+                buffer_sprintf(wb, "netdata_host_tags{%s} 1 %llu\n", host->tags, now_usec / USEC_PER_MS);
             }
             else {
                 buffer_sprintf(wb, "netdata_host_tags_info{%s} 1\n", host->tags);
@@ -244,7 +246,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                 .backend_options = backend_options,
                 .output_options = output_options,
                 .prefix = prefix,
-                .now_usec = now_realtime_sec(),
+                .now_usec = now_usec,
                 .host_header_printed = 0
         };
         foreach_host_variable_callback(host, print_host_variables, &opts);
@@ -426,8 +428,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     else {
                         // we need average or sum of the data
 
-                        usec_t first_t = after, last_t = before;
-                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+                        usec_t first_t = after_usec, last_t = before_usec;
+                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
 
@@ -495,20 +497,20 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_unlock(host);
 }
 
-static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
+static inline usec_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, usec_t now_usec, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
 
-    time_t after  = prometheus_server_last_access(server, host, now);
+    usec_t after_usec  = prometheus_server_last_access(server, host, now_usec);
 
     int first_seen = 0;
-    if(!after) {
-        after = now - global_backend_update_every;
+    if(!after_usec) {
+        after_usec = now_usec - global_backend_update_every;
         first_seen = 1;
     }
 
-    if(after > now) {
+    if(after_usec > now_usec) {
         // oops! this should never happen
-        after = now - global_backend_update_every;
+        after_usec = now_usec - global_backend_update_every;
     }
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {
@@ -525,42 +527,42 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
+        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %llu %s"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
                 , mode
-                , (unsigned long)((first_seen)?0:(now - after))
-                , (first_seen)?"never":"seconds ago"
+                , ((first_seen)?0ULL:(now_usec - after_usec))
+                , (first_seen)?"never":"usec ago"
         );
 
         if(show_range)
-            buffer_sprintf(wb, ", time range %lu to %lu", (unsigned long)after, (unsigned long)now);
+            buffer_sprintf(wb, ", time range %llu to %llu", after_usec, now_usec);
 
         buffer_strcat(wb, "\n\n");
     }
 
-    return after;
+    return after_usec;
 }
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
-    time_t before = now_realtime_sec();
+    usec_t before_usec = now_realtime_usec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, backend_options, server, before, output_options);
+    usec_t after_usec = prometheus_preparation(host, wb, backend_options, server, before_usec, output_options);
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 0, output_options);
+    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after_usec, before_usec, 0, output_options);
 }
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options) {
-    time_t before = now_realtime_sec();
+    usec_t before_usec = now_realtime_usec();
 
     // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, backend_options, server, before, output_options);
+    usec_t after_usec = prometheus_preparation(host, wb, backend_options, server, before_usec, output_options);
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 1, output_options);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after_usec, before_usec, 1, output_options);
     }
     rrd_unlock();
 }

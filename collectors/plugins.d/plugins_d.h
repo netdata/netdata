@@ -55,7 +55,7 @@ struct plugind {
     volatile sig_atomic_t obsolete;     // do not touch this structure after setting this to 1
     volatile sig_atomic_t enabled;      // if this is enabled or not
 
-    time_t started_t;
+    usec_t started_usec;
 
     struct plugind *next;
 };

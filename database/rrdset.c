@@ -594,11 +594,11 @@ RRDSET *rrdset_create_custom(
                     error("File %s does not have the desired update frequency. Expected %llu, found %llu. Clearing it.", fullfilename, update_every_usec, st->update_every_usec);
                     memset(st, 0, size);
                 }
-                else if((now_usec - timeval2usec(&st->last_updated)) > update_every_usec * entries) {
+                else if((now_usec - timeval_usec(&st->last_updated)) > update_every_usec * entries) {
                     error("File %s is too old. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
-                else if(timeval2usec(&st->last_updated) > now_usec + update_every_usec) {
+                else if(timeval_usec(&st->last_updated) > now_usec + update_every_usec) {
                     error("File %s refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st->last_updated.tv_sec - now_usec));
                     st->last_updated.tv_sec = (long long)(now_usec / USEC_PER_SEC);
                     st->last_updated.tv_usec = (long long)(now_usec % USEC_PER_SEC);
@@ -685,7 +685,7 @@ RRDSET *rrdset_create_custom(
 
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
-    st->last_accessed_time = 0;
+    st->last_accessed_time_usec = 0;
     st->upstream_resync_usec = 0;
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);

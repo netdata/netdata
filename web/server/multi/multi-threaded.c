@@ -11,9 +11,9 @@
 // 3. it generates HTTP responses
 // 4. it copies data from input to output if mode is FILECOPY
 
-int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
-int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
-long web_client_streaming_rate_t = 0L;
+usec_t web_client_timeout_usec = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+usec_t web_client_first_request_timeout_usec = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
+usec_t web_client_streaming_rate_usec = 0ULL;
 
 static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
     struct web_client *w = ptr;
@@ -80,7 +80,7 @@ static void *multi_threaded_web_client_worker_main(void *ptr) {
 
                 debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
                 errno = 0;
-                timeout_ms = web_client_timeout * 1000;
+                timeout_ms = (int)(web_client_timeout_usec / USEC_PER_MS);
                 retval = poll(fds, fdmax, timeout_ms);
 
                 if(unlikely(netdata_exit)) break;

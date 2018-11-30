@@ -970,7 +970,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = 200;
         goto cleanup;
     }
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_usec = now_realtime_usec();
 
     RRDCALC *rc = NULL;
     if(alarm) {
@@ -1055,7 +1055,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(rc) {
         if (refresh_usec >= (long long)USEC_PER_SEC) {
             buffer_sprintf(w->response.header, "Refresh: %llu\r\n", refresh_usec / USEC_PER_SEC);
-            w->response.data->expires = now_realtime_sec() + refresh_usec;
+            w->response.data->expires = (time_t)((now_realtime_usec() + refresh_usec) / USEC_PER_SEC);
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -1106,7 +1106,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = 500;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_usec(st) >= (now_realtime_sec() - (st->update_every_usec * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_usec(st) >= (now_realtime_usec() - (st->update_every_usec * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
                                       , points, after_usec, before_usec, group, 0, options, NULL, &latest_timestamp_usec, &value_is_null);
 
@@ -1119,7 +1119,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         }
         else if (refresh_usec > (long long)USEC_PER_SEC) {
             buffer_sprintf(w->response.header, "Refresh: %llu\r\n", refresh_usec / USEC_PER_SEC);
-            w->response.data->expires = now_realtime_sec() + refresh_usec;
+            w->response.data->expires = (time_t)((now_realtime_usec() + refresh_usec) / USEC_PER_SEC);
         }
         else buffer_no_cacheable(w->response.data);
 

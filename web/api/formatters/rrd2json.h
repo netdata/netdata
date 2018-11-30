@@ -62,7 +62,7 @@ extern int rrdset2anything_api_v1(
         , int group_method
         , long long group_time_usec
         , uint32_t options
-        , time_t *latest_timestamp
+        , usec_t *latest_timestamp_usec
 );
 
 extern int rrdset2value_api_v1(

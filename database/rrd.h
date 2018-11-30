@@ -232,8 +232,6 @@ struct rrddim {
 #define rrddim_foreach_write(rd, st) \
     for((rd) = (st)->dimensions, rrdset_check_wrlock(st); (rd) ; (rd) = (rd)->next)
 
-#define timeval2usec(tv) ((tv)->tv_sec * USEC_PER_SEC + (tv)->tv_usec)
-
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
 
@@ -327,7 +325,7 @@ struct rrdset {
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    usec_t last_accessed_time_usec;                 // the last time this RRDSET has been accessed
     usec_t upstream_resync_usec;                    // the timestamp up to which we should resync clock upstream
 
     char *plugin_name;                              // the name of the plugin that generated this
@@ -432,9 +430,9 @@ struct alarm_entry {
     uint32_t alarm_id;
     uint32_t alarm_event_id;
 
-    time_t when;
-    time_t duration;
-    time_t non_clear_duration;
+    usec_t when_usec;
+    usec_t duration_usec;
+    usec_t non_clear_duration_usec;
 
     char *name;
     uint32_t hash_name;
@@ -446,7 +444,7 @@ struct alarm_entry {
 
     char *exec;
     char *recipient;
-    time_t exec_run_timestamp;
+    usec_t exec_run_timestamp_usec;
     int exec_code;
 
     char *source;
@@ -465,7 +463,7 @@ struct alarm_entry {
     uint32_t flags;
 
     int delay;
-    time_t delay_up_to_timestamp;
+    usec_t delay_up_to_timestamp_usec;
 
     uint32_t updated_by_id;
     uint32_t updates_id;
@@ -550,7 +548,7 @@ struct rrdhost {
     volatile size_t connected_senders;              // when remote hosts are streaming to this
                                                     // host, this is the counter of connected clients
 
-    time_t senders_disconnected_time;               // the time the last sender was disconnected
+    usec_t senders_disconnected_usec;               // the time the last sender was disconnected
 
     // ------------------------------------------------------------------------
     // health monitoring options
@@ -629,7 +627,7 @@ extern netdata_rwlock_t rrd_rwlock;
 // ----------------------------------------------------------------------------
 
 extern size_t rrd_hosts_available;
-extern time_t rrdhost_free_orphan_time;
+extern usec_t rrdhost_free_orphan_usec;
 
 extern void rrd_init(char *hostname);
 
@@ -715,7 +713,7 @@ extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
 
-extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now);
+extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, usec_t now_usec);
 
 extern void rrdset_update_heterogeneous_flag(RRDSET *st);
 

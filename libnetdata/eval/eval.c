@@ -104,7 +104,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(unlikely(v->hash == now_hash && !strcmp(v->name, "now"))) {
-        n = now_realtime_sec();
+        n = now_realtime_usec();
         buffer_strcat(exp->error_msg, "[ $now = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");

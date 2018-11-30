@@ -1501,33 +1501,33 @@ int ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 
 int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
     int i, checks = 10;
-    unsigned long long total = 0;
+    usec_t total_usec = 0;
 
     for(i = 0 ; i < checks ; i++) {
         if(debug) fprintf(stderr, "freeipmi.plugin: checking data collection speed iteration %d of %d\n", i+1, checks);
 
         // measure the time a data collection needs
-        unsigned long long start = now_realtime_usec();
+        usec_t start_usec = now_realtime_usec();
         if(ipmi_collect_data(ipmi_config) < 0)
             fatal("freeipmi.plugin: data collection failed.");
 
-        unsigned long long end = now_realtime_usec();
+        usec_t end_usec = now_realtime_usec();
 
-        if(debug) fprintf(stderr, "freeipmi.plugin: data collection speed was %llu usec\n", end - start);
+        if(debug) fprintf(stderr, "freeipmi.plugin: data collection speed was %llu usec\n", end_usec - start_usec);
 
         // add it to our total
-        total += end - start;
+        total_usec += end_usec - start_usec;
 
         // wait the same time
         // to avoid flooding the IPMI processor with requests
-        sleep_usec(end - start);
+        sleep_usec(end_usec - start_usec);
     }
 
     // so, we assume it needed 2x the time
     // we find the average in microseconds
     // and we round-up to the closest second
 
-    return (int)(( total * 2 / checks / 1000000 ) + 1);
+    return (int)(( total_usec * 2 / checks / USEC_PER_SEC ) + 1);
 }
 
 int main (int argc, char **argv) {

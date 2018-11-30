@@ -89,12 +89,12 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->updated_by_id
                             , ae->updates_id
 
-                            , (uint32_t)ae->when
-                            , (uint32_t)ae->duration
-                            , (uint32_t)ae->non_clear_duration
+                            , (uint32_t)ae->when_usec
+                            , (uint32_t)ae->duration_usec
+                            , (uint32_t)ae->non_clear_duration_usec
                             , (uint32_t)ae->flags
-                            , (uint32_t)ae->exec_run_timestamp
-                            , (uint32_t)ae->delay_up_to_timestamp
+                            , (uint32_t)ae->exec_run_timestamp_usec
+                            , (uint32_t)ae->delay_up_to_timestamp_usec
 
                             , (ae->name)?ae->name:""
                             , (ae->chart)?ae->chart:""
@@ -221,15 +221,15 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
             ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
 
-            ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
-            ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
-            ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
+            ae->when_usec                    = (uint32_t)strtoul(pointers[7], NULL, 16);
+            ae->duration_usec                = (uint32_t)strtoul(pointers[8], NULL, 16);
+            ae->non_clear_duration_usec      = (uint32_t)strtoul(pointers[9], NULL, 16);
 
             ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
 
-            ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
-            ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
+            ae->exec_run_timestamp_usec      = (uint32_t)strtoul(pointers[11], NULL, 16);
+            ae->delay_up_to_timestamp_usec   = (uint32_t)strtoul(pointers[12], NULL, 16);
 
             freez(ae->name);
             ae->name = strdupz(pointers[13]);
@@ -343,13 +343,13 @@ inline void health_alarm_log(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
-        time_t when,
+        usec_t when_usec,
         const char *name,
         const char *chart,
         const char *family,
         const char *exec,
         const char *recipient,
-        time_t duration,
+        usec_t duration_usec,
         calculated_number old_value,
         calculated_number new_value,
         RRDCALC_STATUS old_status,
@@ -383,7 +383,7 @@ inline void health_alarm_log(
     ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
     ae->alarm_event_id = alarm_event_id;
-    ae->when = when;
+    ae->when_usec = when_usec;
     ae->old_value = old_value;
     ae->new_value = new_value;
 
@@ -393,14 +393,14 @@ inline void health_alarm_log(
 
     ae->old_status = old_status;
     ae->new_status = new_status;
-    ae->duration = duration;
+    ae->duration_usec = duration_usec;
     ae->delay = delay;
-    ae->delay_up_to_timestamp = when + delay;
+    ae->delay_up_to_timestamp_usec = when_usec + delay;
 
     ae->flags |= flags;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
-        ae->non_clear_duration += ae->duration;
+        ae->non_clear_duration_usec += ae->duration_usec;
 
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
@@ -421,7 +421,7 @@ inline void health_alarm_log(
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
-                    ae->non_clear_duration += t->non_clear_duration;
+                    ae->non_clear_duration_usec += t->non_clear_duration_usec;
 
                 health_alarm_log_save(host, t);
             }

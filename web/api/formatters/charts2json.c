@@ -9,7 +9,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
 
-    time_t now = now_realtime_sec();
+    usec_t now_usec = now_realtime_usec();
 
     if(unlikely(!custom_dashboard_info_js_filename))
         custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
@@ -43,7 +43,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
             rrdset2json(st, wb, &dimensions, &memory);
 
             c++;
-            st->last_accessed_time = now;
+            st->last_accessed_time_usec = now_usec;
         }
     }
 
@@ -75,7 +75,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
         size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            if(!rrdhost_should_be_removed(h, host, now)) {
+            if(!rrdhost_should_be_removed(h, host, now_usec)) {
                 buffer_sprintf(wb
                                , "%s\n\t\t{"
                                  "\n\t\t\t\"hostname\": \"%s\""

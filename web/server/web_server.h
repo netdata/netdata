@@ -35,11 +35,11 @@ extern const char *web_server_mode_name(WEB_SERVER_MODE id);
 
 extern int api_listen_sockets_setup(void);
 
-#define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST 60
-#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
-extern int web_client_timeout;
-extern int web_client_first_request_timeout;
-extern long web_client_streaming_rate_t;
+#define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST (60 * USEC_PER_SEC)
+#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS (60 * USEC_PER_SEC)
+extern usec_t web_client_timeout_usec;
+extern usec_t web_client_first_request_timeout_usec;
+extern usec_t web_client_streaming_rate_usec;
 
 #ifdef WEB_SERVER_INTERNALS
 extern LISTEN_SOCKETS api_sockets;

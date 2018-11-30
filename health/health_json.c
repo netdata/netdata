@@ -52,20 +52,20 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->family
                    , (ae->flags & HEALTH_ENTRY_FLAG_PROCESSED)?"true":"false"
                    , (ae->flags & HEALTH_ENTRY_FLAG_UPDATED)?"true":"false"
-                   , (unsigned long)ae->exec_run_timestamp
+                   , (unsigned long)ae->exec_run_timestamp_usec
                    , (ae->flags & HEALTH_ENTRY_FLAG_EXEC_FAILED)?"true":"false"
                    , ae->exec?ae->exec:host->health_default_exec
                    , ae->recipient?ae->recipient:host->health_default_recipient
                    , ae->exec_code
                    , ae->source
                    , ae->units?ae->units:""
-                   , (unsigned long)ae->when
-                   , (unsigned long)ae->duration
-                   , (unsigned long)ae->non_clear_duration
+                   , (unsigned long)ae->when_usec
+                   , (unsigned long)ae->duration_usec
+                   , (unsigned long)ae->non_clear_duration_usec
                    , rrdcalc_status2string(ae->new_status)
                    , rrdcalc_status2string(ae->old_status)
                    , ae->delay
-                   , (unsigned long)ae->delay_up_to_timestamp
+                   , (unsigned long)ae->delay_up_to_timestamp_usec
                    , ae->updated_by_id
                    , ae->updates_id
                    , ae->new_value_string
@@ -228,12 +228,12 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                     "\n\t\"latest_alarm_log_unique_id\": %u,"
                     "\n\t\"status\": %s,"
-                    "\n\t\"now\": %lu,"
+                    "\n\t\"now_usec\": %llu,"
                     "\n\t\"alarms\": {\n",
             host->hostname,
             (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
             host->health_enabled?"true":"false",
-            (unsigned long)now_realtime_sec());
+            now_realtime_usec());
 
     RRDCALC *rc;
     for(i = 0, rc = host->alarms; rc ; rc = rc->next) {

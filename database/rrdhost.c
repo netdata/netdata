@@ -7,8 +7,8 @@ RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-time_t rrdset_free_obsolete_time = 3600;
-time_t rrdhost_free_orphan_time = 3600;
+usec_t rrdset_free_obsolete_usec = 3600 * USEC_PER_SEC;
+usec_t rrdhost_free_orphan_usec = 3600 * USEC_PER_SEC;
 
 // ----------------------------------------------------------------------------
 // RRDHOST index
@@ -403,26 +403,26 @@ RRDHOST *rrdhost_find_or_create(
     return host;
 }
 
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, usec_t now_usec) {
     if(host != protected
        && host != localhost
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !host->connected_senders
-       && host->senders_disconnected_time
-       && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
+       && host->senders_disconnected_usec
+       && host->senders_disconnected_usec + rrdhost_free_orphan_usec < now_usec)
         return 1;
 
     return 0;
 }
 
 void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected) {
-    time_t now = now_realtime_sec();
+    usec_t now_usec = now_realtime_usec();
 
     RRDHOST *host;
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_removed(host, protected, now)) {
+        if(rrdhost_should_be_removed(host, protected, now_usec)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
             if(rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST))
@@ -440,7 +440,7 @@ restart_after_removal:
 // RRDHOST global / startup initialization
 
 void rrd_init(char *hostname) {
-    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+    rrdset_free_obsolete_usec = config_get_usec(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_usec);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if(gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
@@ -713,7 +713,7 @@ void rrdhost_cleanup_all(void) {
 // RRDHOST - save or delete all the host charts from disk
 
 void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
-    time_t now = now_realtime_sec();
+    usec_t now_usec = now_realtime_usec();
 
     RRDSET *st;
 
@@ -722,9 +722,9 @@ void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
 restart_after_removal:
     rrdset_foreach_write(st, host) {
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                    && st->last_accessed_time + rrdset_free_obsolete_time < now
-                    && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
-                    && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
+                    && st->last_accessed_time_usec + rrdset_free_obsolete_usec < now_usec
+                    && timeval_usec(&st->last_updated) + rrdset_free_obsolete_usec < now_usec
+                    && timeval_usec(&st->last_collected_time) + rrdset_free_obsolete_usec < now_usec
         )) {
 
             rrdset_rdlock(st);

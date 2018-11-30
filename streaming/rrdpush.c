@@ -72,7 +72,7 @@ int rrdpush_init() {
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
-    rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+    rrdhost_free_orphan_usec    = config_get_usec(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_usec);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -215,13 +215,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         }
     }
 
-    st->upstream_resync_usec = timeval2usec(&st->last_collected_time) + (remote_clock_resync_iterations * st->update_every_usec);
+    st->upstream_resync_usec = timeval_usec(&st->last_collected_time) + (remote_clock_resync_iterations * st->update_every_usec);
 }
 
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (timeval2usec(&st->last_collected_time) > st->upstream_resync_usec)?st->usec_since_last_update:0);
+    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (timeval_usec(&st->last_collected_time) > st->upstream_resync_usec)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -830,7 +830,7 @@ static int rrdpush_receive(int fd
     char *rrdpush_destination = default_rrdpush_destination;
     char *rrdpush_api_key = default_rrdpush_api_key;
     char *rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
-    time_t alarms_delay = 60;
+    usec_t alarms_delay_usec = 60 * USEC_PER_SEC;
     RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
     update_every_usec = appconfig_get_usec(&stream_config, machine_guid, "update every", update_every_usec);
@@ -846,8 +846,8 @@ static int rrdpush_receive(int fd
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
 
-    alarms_delay = appconfig_get_number(&stream_config, key, "default postpone alarms on connect seconds", alarms_delay);
-    alarms_delay = appconfig_get_number(&stream_config, machine_guid, "postpone alarms on connect seconds", alarms_delay);
+    alarms_delay_usec = appconfig_get_usec(&stream_config, key, "default postpone alarms on connect seconds", alarms_delay_usec);
+    alarms_delay_usec = appconfig_get_usec(&stream_config, machine_guid, "postpone alarms on connect seconds", alarms_delay_usec);
 
     rrdpush_enabled = appconfig_get_boolean(&stream_config, key, "default proxy enabled", rrdpush_enabled);
     rrdpush_enabled = appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled", rrdpush_enabled);
@@ -918,7 +918,7 @@ static int rrdpush_receive(int fd
             .serial_failures = 0,
             .successful_collections = 0,
             .obsolete = 0,
-            .started_t = now_realtime_sec(),
+            .started_usec = now_realtime_usec(),
             .next = NULL,
     };
 
@@ -967,12 +967,12 @@ static int rrdpush_receive(int fd
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
-    host->senders_disconnected_time = 0;
+    host->senders_disconnected_usec = 0;
     if(health_enabled != CONFIG_BOOLEAN_NO) {
-        if(alarms_delay > 0) {
-            host->health_delay_up_to_usec = now_realtime_sec() + alarms_delay;
-            info("Postponing health checks for %ld seconds, on host '%s', because it was just connected."
-            , alarms_delay
+        if(alarms_delay_usec > 0) {
+            host->health_delay_up_to_usec = now_realtime_usec() + alarms_delay_usec;
+            info("Postponing health checks for %llu usec, on host '%s', because it was just connected."
+            , alarms_delay_usec
             , host->hostname
             );
         }
@@ -989,7 +989,7 @@ static int rrdpush_receive(int fd
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
-    host->senders_disconnected_time = now_realtime_sec();
+    host->senders_disconnected_usec = now_realtime_usec();
     host->connected_senders--;
     if(!host->connected_senders) {
         rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
@@ -1211,23 +1211,23 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         }
     }
 
-    if(unlikely(web_client_streaming_rate_t > 0)) {
+    if(unlikely(web_client_streaming_rate_usec > 0)) {
         static netdata_mutex_t stream_rate_mutex = NETDATA_MUTEX_INITIALIZER;
-        static volatile time_t last_stream_accepted_t = 0;
+        static volatile usec_t last_stream_accepted_usec = 0;
 
         netdata_mutex_lock(&stream_rate_mutex);
-        time_t now = now_realtime_sec();
+        usec_t now_usec = now_realtime_usec();
 
-        if(unlikely(last_stream_accepted_t == 0))
-            last_stream_accepted_t = now;
+        if(unlikely(last_stream_accepted_usec == 0))
+            last_stream_accepted_usec = now_usec;
 
-        if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
+        if(now_usec - last_stream_accepted_usec < web_client_streaming_rate_usec) {
             netdata_mutex_unlock(&stream_rate_mutex);
-            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %ld secs.", w->client_ip, w->client_port, (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
+            error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %llu usec.", w->client_ip, w->client_port, (web_client_streaming_rate_usec - (now_usec - last_stream_accepted_usec)));
             return rrdpush_receiver_too_busy_now(w);
         }
 
-        last_stream_accepted_t = now;
+        last_stream_accepted_usec = now_usec;
         netdata_mutex_unlock(&stream_rate_mutex);
     }
 

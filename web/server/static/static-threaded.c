@@ -326,9 +326,9 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_tmr_callback
                         , web_allow_connections_from
                         , NULL
-                        , web_client_first_request_timeout
-                        , web_client_timeout
-                        , default_rrd_update_every_usec * 1000 // timer_milliseconds
+                        , (time_t)(web_client_first_request_timeout_usec / USEC_PER_SEC)
+                        , (time_t)(web_client_timeout_usec / USEC_PER_SEC)
+                        , (time_t)(default_rrd_update_every_usec / USEC_PER_MS) // timer_milliseconds
                         , ptr // timer_data
                         , worker_private->max_sockets
             );

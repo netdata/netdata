@@ -160,7 +160,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->unique_id,
               ae->alarm_id,
               ae->alarm_event_id,
-              (unsigned long)ae->when,
+              (unsigned long)ae->when_usec,
               ae->name,
               ae->chart?ae->chart:"NOCAHRT",
               ae->family?ae->family:"NOFAMILY",
@@ -169,8 +169,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->new_value,
               ae->old_value,
               ae->source?ae->source:"UNKNOWN",
-              (uint32_t)ae->duration,
-              (uint32_t)ae->non_clear_duration,
+              (uint32_t)ae->duration_usec,
+              (uint32_t)ae->non_clear_duration_usec,
               ae->units?ae->units:"",
               ae->info?ae->info:"",
               ae->new_value_string,
@@ -178,7 +178,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-    ae->exec_run_timestamp = now_realtime_sec();
+    ae->exec_run_timestamp_usec = now_realtime_usec();
 
     debug(D_HEALTH, "executing command '%s'", command_to_run);
     FILE *fp = mypopen(command_to_run, &command_pid);
@@ -212,7 +212,7 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
 
 static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
-    time_t now = now_realtime_sec();
+    usec_t now_usec = now_realtime_usec();
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
@@ -226,7 +226,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             if(unlikely(ae->unique_id < first_waiting))
                 first_waiting = ae->unique_id;
 
-            if(likely(now >= ae->delay_up_to_timestamp))
+            if(likely(now_usec >= ae->delay_up_to_timestamp_usec))
                 health_process_notifications(host, ae);
         }
     }
@@ -328,18 +328,18 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, usec_t now_usec, usec_t *next_
 }
 
 static inline int check_if_resumed_from_suspention(void) {
-    static usec_t last_realtime = 0, last_monotonic = 0;
-    usec_t realtime = now_realtime_usec(), monotonic = now_monotonic_usec();
+    static usec_t last_realtime_usec = 0, last_monotonic_usec = 0;
+    usec_t realtime_usec = now_realtime_usec(), monotonic_usec = now_monotonic_usec();
     int ret = 0;
 
     // detect if monotonic and realtime have twice the difference
     // in which case we assume the system was just waken from hibernation
 
-    if(last_realtime && last_monotonic && realtime - last_realtime > 2 * (monotonic - last_monotonic))
+    if(last_realtime_usec && last_monotonic_usec && realtime_usec - last_realtime_usec > 2 * (monotonic_usec - last_monotonic_usec))
         ret = 1;
 
-    last_realtime = realtime;
-    last_monotonic = monotonic;
+    last_realtime_usec = realtime_usec;
+    last_monotonic_usec = monotonic_usec;
 
     return ret;
 }

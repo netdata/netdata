@@ -40,7 +40,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
 
-    rc->last_status_change_usec = now_realtime_sec();
+    rc->last_status_change_usec = now_realtime_usec();
     rc->rrdset = st;
 
     rc->rrdset_next = st->alarms;
@@ -82,18 +82,18 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     if(!rc->units) rc->units = strdupz(st->units);
 
     {
-        time_t now = now_realtime_sec();
+        usec_t now_usec = now_realtime_usec();
         health_alarm_log(
                 host,
                 rc->id,
                 rc->next_event_id++,
-                now,
+                now_usec,
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
                 rc->exec,
                 rc->recipient,
-                now - rc->last_status_change_usec,
+                now_usec - rc->last_status_change_usec,
                 rc->old_value,
                 rc->value,
                 rc->status,
@@ -143,18 +143,18 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
     RRDHOST *host = st->rrdhost;
 
     {
-        time_t now = now_realtime_sec();
+        usec_t now_usec = now_realtime_usec();
         health_alarm_log(
                 host,
                 rc->id,
                 rc->next_event_id++,
-                now,
+                now_usec,
                 rc->name,
                 rc->rrdset->id,
                 rc->rrdset->family,
                 rc->exec,
                 rc->recipient,
-                now - rc->last_status_change_usec,
+                now_usec - rc->last_status_change_usec,
                 rc->old_value,
                 rc->value,
                 rc->status,

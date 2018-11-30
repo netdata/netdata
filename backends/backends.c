@@ -387,7 +387,7 @@ void *backends_main(void *ptr) {
     info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
 
     usec_t step_ut = global_backend_update_every * USEC_PER_SEC;
-    time_t after = now_realtime_sec();
+    usec_t after_usec = now_realtime_usec();
     int failures = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -398,8 +398,8 @@ void *backends_main(void *ptr) {
         // Wait for the next iteration point.
 
         heartbeat_next(&hb, step_ut);
-        time_t before = now_realtime_sec();
-        debug(D_BACKEND, "BACKEND: preparing buffer for timeframe %lu to %lu", (unsigned long)after, (unsigned long)before);
+        usec_t before_usec = now_realtime_usec();
+        debug(D_BACKEND, "BACKEND: preparing buffer for timeframe %llu to %llu", after_usec, before_usec);
 
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
@@ -446,12 +446,12 @@ void *backends_main(void *ptr) {
 
                     RRDDIM *rd;
                     rrddim_foreach_read(rd, st) {
-                        if (likely(rd->last_collected_time.tv_sec >= after)) {
-                            chart_buffered_metrics += backend_request_formatter(b, global_backend_prefix, host, __hostname, st, rd, after, before, global_backend_options);
+                        if (likely(timeval_usec(&rd->last_collected_time) >= after_usec)) {
+                            chart_buffered_metrics += backend_request_formatter(b, global_backend_prefix, host, __hostname, st, rd, after_usec, before_usec, global_backend_options);
                             count_dims++;
                         }
                         else {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after_usec, (unsigned long)before_usec);
                             count_dims_skipped++;
                         }
                     }
@@ -495,7 +495,7 @@ void *backends_main(void *ptr) {
 
         // prepare for the next iteration
         // to add incrementally data to buffer
-        after = before;
+        after_usec = before_usec;
 
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
@@ -640,8 +640,8 @@ void *backends_main(void *ptr) {
 
         getrusage(RUSAGE_THREAD, &thread);
         if(likely(chart_rusage->counter_done)) rrdset_next(chart_rusage);
-        rrddim_set(chart_rusage, "user",   timeval2usec(&thread.ru_utime));
-        rrddim_set(chart_rusage, "system", timeval2usec(&thread.ru_stime));
+        rrddim_set(chart_rusage, "user",   timeval_usec(&thread.ru_utime));
+        rrddim_set(chart_rusage, "system", timeval_usec(&thread.ru_stime));
         rrdset_done(chart_rusage);
 
         if(likely(buffer_strlen(b) == 0))
