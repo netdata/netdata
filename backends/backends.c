@@ -91,10 +91,10 @@ calculated_number backend_calculate_value_from_stored_data(
 
     if(unlikely(before_usec < first_usec || after_usec > last_usec)) {
         // the chart has not been updated in the wanted timeframe
-        debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %llu to %llu is outside the chart's database range %llu to %llu",
               host->hostname, st->id, rd->id,
-              (unsigned long)after_usec, (unsigned long)before_usec,
-              (unsigned long)first_usec, (unsigned long)last_usec
+              after_usec, before_usec,
+              first_usec, last_usec
         );
         return NAN;
     }
@@ -386,7 +386,7 @@ void *backends_main(void *ptr) {
 
     info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
 
-    usec_t step_ut = global_backend_update_every * USEC_PER_SEC;
+    usec_t step_usec = (usec_t)global_backend_update_every;
     usec_t after_usec = now_realtime_usec();
     int failures = 0;
     heartbeat_t hb;
@@ -397,7 +397,7 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
 
-        heartbeat_next(&hb, step_ut);
+        heartbeat_next(&hb, step_usec);
         usec_t before_usec = now_realtime_usec();
         debug(D_BACKEND, "BACKEND: preparing buffer for timeframe %llu to %llu", after_usec, before_usec);
 
@@ -451,7 +451,7 @@ void *backends_main(void *ptr) {
                             count_dims++;
                         }
                         else {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after_usec, (unsigned long)before_usec);
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%llu) is not within our timeframe (%llu to %llu)", rd->id, st->id, __hostname, timeval_usec(&rd->last_collected_time), after_usec, before_usec);
                             count_dims_skipped++;
                         }
                     }
