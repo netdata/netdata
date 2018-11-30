@@ -615,12 +615,72 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
+inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST *host, BUFFER *wb) {
+    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
+    RRDCALC *rc;
+    rrdhost_rdlock(host);
+    for(rc = host->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        switch(rc->status) {
+            case RRDCALC_STATUS_WARNING:
+                alarm_warn++;
+                break;
+            case RRDCALC_STATUS_CRITICAL:
+                alarm_crit++;
+                break;
+            default:
+                alarm_normal++;
+        }
+    }
+    rrdhost_unlock(host);
+    buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
+    buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
+    buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
+}
+
+inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
+    RRDHOST *rc;
+    int count = 0;
+    rrd_rdlock();
+    rrdhost_foreach_read(rc) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+        buffer_sprintf(wb, "\t\t\"%s\"", rc->hostname);
+        count++;
+    }
+    buffer_strcat(wb, "\n");
+    rrd_unlock();
+}
+
+inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+    BUFFER *wb = w->response.data;
+    buffer_flush(wb);
+    wb->contenttype = CT_APPLICATION_JSON;
+
+    buffer_strcat(wb, "{\n");
+    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", host->program_version);
+    buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
+
+    buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
+    web_client_api_request_v1_info_mirrored_hosts(wb);
+    buffer_strcat(wb, "\t],\n");
+
+    buffer_strcat(wb, "\t\"alarms\": {\n");
+    web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
+    buffer_strcat(wb, "\t}\n");
+
+    buffer_strcat(wb, "}");
+    return 200;
+}
+
 static struct api_command {
     const char *command;
     uint32_t hash;
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
