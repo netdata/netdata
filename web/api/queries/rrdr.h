@@ -99,7 +99,15 @@ extern RRDR *rrdr_create(struct rrdset *st, long n);
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_usec_requested, long long before_usec_requested, RRDR_GROUPING group_method, long long resampling_usec_requested, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(RRDSET *st
+        , long points_requested
+        , susec_t after_usec_requested
+        , susec_t before_usec_requested
+        , RRDR_GROUPING group_method
+        , susec_t resampling_usec_requested
+        , RRDR_OPTIONS options
+        , const char *dimensions
+        );
 
 #include "query.h"
 
