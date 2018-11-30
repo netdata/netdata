@@ -52,7 +52,7 @@ docs_dir: src
 site_dir: build
 #use_directory_urls: false
 strict: true
-google_analytics: ["UA-64295674-3", "docs.netdata.cloud"]
+google_analytics: ["UA-64295674-3", ""]
 extra:
   social:
     - type: "github"
