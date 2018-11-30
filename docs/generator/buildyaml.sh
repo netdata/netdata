@@ -42,12 +42,12 @@ navpart() {
 	done
 }
 
-echo -e 'site_name: NetData Documentation
+echo -e 'site_name: Netdata Documentation
 repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/master
-site_description: NetData Documentation
-copyright: NetData, 2018
+site_description: Netdata Documentation
+copyright: Netdata, 2018
 docs_dir: src
 site_dir: build
 #use_directory_urls: false
@@ -147,6 +147,7 @@ navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
     - Internal plugins:
 "
+navpart 3 collectors/apps.plugin
 navpart 3 collectors/proc.plugin
 navpart 3 collectors/statsd.plugin
 navpart 3 collectors/cgroups.plugin
@@ -220,3 +221,8 @@ navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests
 navpart 2 diagrams/data_structures
+
+echo -ne "- Legal:
+    - 'docs/privacy-policy.md'
+    - 'docs/terms-of-use.md'
+"
