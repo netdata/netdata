@@ -46,6 +46,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static struct raid *raids = NULL;
     static size_t raids_num = 0, raids_allocated = 0;
+    static char *mismatch_cnt_filename = NULL;
     // static int do_mismatch_cnt = -1;
 
     // if(unlikely(do_mismatch_cnt == -1))
@@ -237,6 +238,26 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             raid->speed = str2ull(str_speed);
     }
 
+    // read mismatch_cnt files
+
+    if(!mismatch_cnt_filename) {
+        char filename[FILENAME_MAX + 1];
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/md/mismatch_cnt");
+        mismatch_cnt_filename = config_get("plugin:proc:/proc/mdstat", "mismatch_cnt filename to monitor", filename);
+    }
+
+    for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
+        char filename[FILENAME_MAX + 1];
+        struct raid *raid = &raids[raid_idx];
+
+        snprintfz(filename, FILENAME_MAX, mismatch_cnt_filename, raid->name);
+        if(read_single_number_file(filename, &raid->mismatch_cnt) == -1) {
+            error("Cannot read file '%s'", filename);
+            return 1;
+        }
+    }
+
     // --------------------------------------------------------------------
 
     static RRDSET *st_mdstat_health = NULL;
@@ -314,6 +335,38 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
+        if(unlikely(!raid->st_mismatch_cnt)) {
+            snprintfz(id, 50, "new_%s_mismatch", raid->name); // TODO: rename chart
+            snprintfz(family, 50, "%s", raid->name);
+
+            raid->st_mismatch_cnt = rrdset_create_localhost(
+                    "mdstat"
+                    , id
+                    , NULL
+                    , family
+                    , "md.mismatch_cnt"
+                    , "Mismatch Count"
+                    , "unsynchronized blocks"
+                    , PLUGIN_PROC_NAME
+                    , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                    , 6500 + raid_idx + 1 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+        }
+        else
+            rrdset_next(raid->st_mismatch_cnt);
+
+        if(raid->used) {
+            raid->rd_mismatch_cnt = rrddim_add(raid->st_mismatch_cnt, "count", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_mismatch_cnt, raid->rd_mismatch_cnt, raid->mismatch_cnt);
+        }
+
+        rrdset_done(raid->st_mismatch_cnt);
+
+        // --------------------------------------------------------------------
+
         if(unlikely(!raid->st_operation)) {
             snprintfz(id, 50, "new_%s_operation", raid->name); // TODO: rename chart
             snprintfz(family, 50, "%s", raid->name);
@@ -328,7 +381,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , "percent"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MDSTAT_NAME
-                    , 6500 + raid_idx + 1 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , 6500 + raid_idx + 2 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -366,7 +419,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , "seconds"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MDSTAT_NAME
-                    , 6500 + raid_idx + 2 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , 6500 + raid_idx + 3 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -398,7 +451,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , "KB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MDSTAT_NAME
-                    , 6500 + raid_idx + 3 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
+                    , 6500 + raid_idx + 4 // TODO: define NETDATA_CHART_PRIO_MDSTAT_RAID
                     , update_every
                     , RRDSET_TYPE_LINE
             );
