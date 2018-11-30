@@ -1,0 +1,13 @@
+diff -u netdata-1.6.0.orig/Makefile.am netdata-1.6.0/Makefile.am
+--- netdata-1.6.0.orig/Makefile.am  2017-03-20 19:32:47.000000000 +0100
++++ netdata-1.6.0/Makefile.am 2017-06-25 23:46:14.403426661 +0200
+@@ -1,7 +1,7 @@
+ #
+ # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
+ #
+-AUTOMAKE_OPTIONS=foreign dist-bzip2 dist-xz 1.10
++AUTOMAKE_OPTIONS=foreign dist-bzip2 1.10
+ ACLOCAL_AMFLAGS = -I m4
+ 
+ MAINTAINERCLEANFILES= \
+
