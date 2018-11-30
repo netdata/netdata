@@ -41,13 +41,9 @@
       <div class="md-footer-copyright">
         {% if config.copyright %}
           <div class="md-footer-copyright__highlight">
-            {{ config.copyright }}
+            {{ config.copyright }} | <a href="/docs/privacy-policy/">Privacy Policy</a> | <a href="/docs/terms-of-use/">Terms of Use</a>
           </div>
         {% endif %}
-		<a href="https://twitter.com/linuxnetdata" rel="nofollow"><img src="https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&amp;label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter"></a>
-		<img src="https://www.google-analytics.com/collect?v=1&amp;t=pageview&amp;_s=1&amp;ds=github&amp;dr=https%3A%2F%2Fgithub.com%2Ffirehol%2Fnetdata%2Fwiki&amp;dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fwiki&amp;_u=MAC%7E&amp;cid=8c51788e-8721-45e3-ae8c-e7c63ba8236b&amp;tid=UA-64295674-3">
-
-
       </div>
       {% block social %}
         {% include "partials/social.html" %}

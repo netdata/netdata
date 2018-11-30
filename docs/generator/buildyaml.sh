@@ -52,6 +52,15 @@ docs_dir: src
 site_dir: build
 #use_directory_urls: false
 strict: true
+google_analytics: ["UA-64295674-3", "docs.netdata.cloud"]
+extra:
+  social:
+    - type: "github"
+      link: "https://github.com/netdata/netdata"
+    - type: "twitter"
+      link: "https://twitter.com/linuxnetdata"
+    - type: "facebook"
+      link: "https://www.facebook.com/linuxnetdata/"
 theme:
     name: "material"
     custom_dir: themes/material
@@ -221,8 +230,3 @@ navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests
 navpart 2 diagrams/data_structures
-
-echo -ne "- Legal:
-    - 'docs/privacy-policy.md'
-    - 'docs/terms-of-use.md'
-"
