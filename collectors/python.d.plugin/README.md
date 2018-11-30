@@ -63,7 +63,14 @@ other_job:
 
 `update_every`, `retries`, and `priority` are always optional.
 
----
+## How to debug a python module
+
+Depending on where Netdata was installed, you can execute one of the following commands to trace the execution of a python module:
+```
+/opt/netdata/usr/libexec/netdata/plugins.d/python.d.plugin <module> debug trace
+/usr/libexec/netdata/plugins.d/python.d.plugin <module> debug trace
+```
+Where `[module]` is the directory name under https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin 
 
 ## How to write a new module
 
