@@ -1,6 +1,7 @@
 # Terms of use
 
-Netdata Master Terms of Use
+Netdata Terms of Use for the sites https://my-netdata.io and https://netdata.cloud and their subdomains. For the Netdata agent and the included redistributed software terms of use,  refer to [Redistributed software](redistributed/)
+
 Effective as of 25 May 2018
 
 ## 1. General Information Regarding These Terms of Use
