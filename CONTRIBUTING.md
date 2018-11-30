@@ -4,7 +4,8 @@ Thank you for considering contributing to Netdata.
 
 We love to receive contributions. Maintaining a platform for monitoring everything imaginable requires a broad understanding of a plethora of technologies, systems and applications. We rely on community contributions and user feedback to continue providing the best monitoring solution out there.
 
-There are many ways to contribute, with varying requirements of skills:
+There are many ways to contribute, with varying requirements of skills, explained in detail in the following sections. 
+Specific GitHub issues we need help with can be seen [here](https://github.com/netdata/netdata/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22). Some of them are also labeled as "good first issue". 
 
 ## All NetData Users
 
@@ -56,8 +57,9 @@ As the project grows, an increasing share of our time is spent on supporting thi
 
 ### Improve documentation
 
-Most of our documentation is in markdown (.md) files inside the netdata GitHub project. What remains in our Wiki will soon be moved in there as well. Don't be afraid to edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
+All of our documentation is in markdown (.md) files inside the netdata GitHub project. All of our [HTML documentation](https://docs.netdata.cloud) is generated from these files. At the top right of each documentation page you will see a pencil, that leads you directly to the markdown file that was used to generated it. Don't be afraid to afraid to click it and edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
 
+We also need help to [document each chart in the default dashboard](https://github.com/netdata/netdata/issues/279). 
 
 ## Developers
 
