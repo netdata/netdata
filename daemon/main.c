@@ -450,10 +450,10 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_GLOBAL, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY_MAX);
-        default_rrd_update_every = UPDATE_EVERY;
+    default_rrd_update_every_usec = (int) config_get_usec(CONFIG_SECTION_GLOBAL, "update every", UPDATE_EVERY_USEC);
+    if(default_rrd_update_every_usec < USEC_PER_MS || default_rrd_update_every_usec > 600 * USEC_PER_SEC) {
+        error("Invalid data collection frequency (update every) %llu given. Defaulting to %llu.", default_rrd_update_every_usec, UPDATE_EVERY_USEC);
+        default_rrd_update_every_usec = UPDATE_EVERY_USEC;
     }
 
     // ------------------------------------------------------------------------
@@ -592,8 +592,8 @@ static void get_system_timezone(void) {
 void set_global_environment() {
     {
         char b[16];
-        snprintfz(b, 15, "%d", default_rrd_update_every);
-        setenv("NETDATA_UPDATE_EVERY", b, 1);
+        snprintfz(b, 15, "%llu", default_rrd_update_every_usec);
+        setenv("NETDATA_UPDATE_EVERY_USEC", b, 1);
     }
 
     setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
@@ -767,7 +767,7 @@ int main(int argc, char **argv) {
                             if(unit_test_buffer()) return 1;
                             if(unit_test_str2ld()) return 1;
                             get_netdata_configured_variables();
-                            default_rrd_update_every = 1;
+                            default_rrd_update_every_usec = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
                             rrd_init("unittest");

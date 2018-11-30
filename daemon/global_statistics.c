@@ -221,7 +221,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 132000
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 #endif
@@ -256,7 +256,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130000
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -289,7 +289,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130200
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
 
@@ -320,7 +320,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130300
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
 
@@ -352,7 +352,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130000
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_AREA
             );
 
@@ -386,7 +386,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130400
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
 
@@ -435,7 +435,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130500
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
 
@@ -482,7 +482,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130500
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
 
@@ -515,7 +515,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , "stats"
                     , 130501
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_AREA
             );
 

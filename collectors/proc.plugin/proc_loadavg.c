@@ -84,7 +84,7 @@ int do_proc_loadavg(int update_every, usec_t dt) {
             rrddim_set_by_pointer(load_chart, rd_load15, (collected_number) (load15 * 1000));
             rrdset_done(load_chart);
 
-            next_loadavg_dt = load_chart->update_every * USEC_PER_SEC;
+            next_loadavg_dt = load_chart->update_every_usec * USEC_PER_SEC;
         }
         else next_loadavg_dt =  MIN_LOADAVG_UPDATE_EVERY * USEC_PER_SEC;
     }

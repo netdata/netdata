@@ -88,7 +88,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(unlikely(v->hash == after_hash && !strcmp(v->name, "after"))) {
-        n = (exp->after && *exp->after)?*exp->after:NAN;
+        n = (exp->after_usec && *exp->after_usec)?*exp->after_usec:NAN;
         buffer_strcat(exp->error_msg, "[ $after = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
@@ -96,7 +96,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(unlikely(v->hash == before_hash && !strcmp(v->name, "before"))) {
-        n = (exp->before && *exp->before)?*exp->before:NAN;
+        n = (exp->before_usec && *exp->before_usec)?*exp->before_usec:NAN;
         buffer_strcat(exp->error_msg, "[ $before = ");
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");

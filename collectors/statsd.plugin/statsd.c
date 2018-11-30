@@ -260,7 +260,7 @@ static struct statsd {
     size_t udp_bytes_read;
 
     int enabled;
-    int update_every;
+    usec_t update_every_usec;
     SIMPLE_PATTERN *charts_for;
 
     size_t tcp_idle_timeout;
@@ -1018,7 +1018,7 @@ void *statsd_collector_thread(void *ptr) {
             , (void *)d
             , 0                        // tcp request timeout, 0 = disabled
             , statsd.tcp_idle_timeout  // tcp idle timeout, 0 = disabled
-            , statsd.update_every * 1000
+            , (time_t)(statsd.update_every_usec / USEC_PER_MS)
             , ptr // timer_data
             , status->max_sockets
     );
@@ -1429,8 +1429,8 @@ static inline RRDSET *statsd_private_rrdset_create(
         , const char *context
         , const char *title
         , const char *units
-        , long priority
-        , int update_every
+        , size_t priority
+        , usec_t update_every_usec
         , RRDSET_TYPE chart_type
 ) {
     RRD_MEMORY_MODE memory_mode = statsd.private_charts_memory_mode;
@@ -1456,7 +1456,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , PLUGIN_STATSD_NAME // plugin
             , "private_chart" // module
             , priority        // priority
-            , update_every    // update every
+            , update_every_usec // update every
             , chart_type      // chart type
             , memory_mode     // memory mode
             , history         // history
@@ -1493,7 +1493,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , title         // title
                 , "value"       // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
-                , statsd.update_every
+                , statsd.update_every_usec
                 , RRDSET_TYPE_LINE
         );
 
@@ -1535,7 +1535,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
                 , title         // title
                 , "events/s"    // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
-                , statsd.update_every
+                , statsd.update_every_usec
                 , RRDSET_TYPE_AREA
         );
 
@@ -1577,7 +1577,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
                 , title         // title
                 , "entries"     // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
-                , statsd.update_every
+                , statsd.update_every_usec
                 , RRDSET_TYPE_LINE
         );
 
@@ -1619,7 +1619,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , title         // title
                 , units         // units
                 , NETDATA_CHART_PRIO_STATSD_PRIVATE
-                , statsd.update_every
+                , statsd.update_every_usec
                 , RRDSET_TYPE_AREA
         );
 
@@ -1994,7 +1994,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , PLUGIN_STATSD_NAME        // plugin
                 , chart->source             // module
                 , chart->priority           // priority
-                , statsd.update_every       // update every
+                , statsd.update_every_usec       // update every
                 , chart->chart_type         // chart type
                 , app->rrd_memory_mode      // memory mode
                 , app->rrd_history_entries  // history
@@ -2145,11 +2145,11 @@ void *statsd_main(void *ptr) {
 
     statsd.enabled = config_get_boolean(CONFIG_SECTION_STATSD, "enabled", statsd.enabled);
 
-    statsd.update_every = default_rrd_update_every;
-    statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
-    if(statsd.update_every < default_rrd_update_every) {
-        error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
-        statsd.update_every = default_rrd_update_every;
+    statsd.update_every_usec = default_rrd_update_every_usec;
+    statsd.update_every_usec = (int)config_get_usec(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every_usec);
+    if(statsd.update_every_usec < default_rrd_update_every_usec) {
+        error("STATSD: minimum flush interval %llu given, but the minimum is the update every of netdata. Using %llu", statsd.update_every_usec, default_rrd_update_every_usec);
+        statsd.update_every_usec = default_rrd_update_every_usec;
     }
 
 #ifdef HAVE_RECVMMSG
@@ -2254,7 +2254,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132010
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_metrics_gauge     = rrddim_add(st_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2275,7 +2275,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132010
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_useful_metrics_gauge     = rrddim_add(st_useful_metrics, "gauges", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2296,7 +2296,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132011
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_events_gauge     = rrddim_add(st_events, "gauges", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2319,7 +2319,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132012
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_reads_tcp = rrddim_add(st_reads, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2336,7 +2336,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132013
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -2353,7 +2353,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132014
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
     RRDDIM *rd_packets_tcp = rrddim_add(st_packets, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2370,7 +2370,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132015
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_LINE
     );
     RRDDIM *rd_tcp_connects = rrddim_add(st_tcp_connects, "connects", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2387,7 +2387,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132016
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_LINE
     );
     RRDDIM *rd_tcp_connected = rrddim_add(st_tcp_connected, "connected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2403,7 +2403,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132020
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_AREA
     );
     RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -2419,7 +2419,7 @@ void *statsd_main(void *ptr) {
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132001
-            , statsd.update_every
+            , statsd.update_every_usec
             , RRDSET_TYPE_STACKED
     );
 
@@ -2445,7 +2445,7 @@ void *statsd_main(void *ptr) {
                 , PLUGIN_STATSD_NAME
                 , "stats"
                 , 132002 + i
-                , statsd.update_every
+                , statsd.update_every_usec
                 , RRDSET_TYPE_STACKED
         );
 
@@ -2456,7 +2456,7 @@ void *statsd_main(void *ptr) {
             // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
 
-    usec_t step = statsd.update_every * USEC_PER_SEC;
+    usec_t step = statsd.update_every_usec * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {

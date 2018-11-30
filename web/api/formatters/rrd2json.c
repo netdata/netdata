@@ -60,16 +60,16 @@ int rrdset2value_api_v1(
         , calculated_number *n
         , const char *dimensions
         , long points
-        , long long after
-        , long long before
+        , long long after_usec
+        , long long before_usec
         , int group_method
-        , long group_time
+        , long long group_time_usec
         , uint32_t options
-        , time_t *db_after
-        , time_t *db_before
+        , usec_t *db_after_usec
+        , usec_t *db_before_usec
         , int *value_is_null
 ) {
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions);
+    RRDR *r = rrd2rrdr(st, points, after_usec, before_usec, group_method, group_time_usec, options, dimensions);
     if(!r) {
         if(value_is_null) *value_is_null = 1;
         return 500;
@@ -78,8 +78,8 @@ int rrdset2value_api_v1(
     if(rrdr_rows(r) == 0) {
         rrdr_free(r);
 
-        if(db_after)  *db_after  = 0;
-        if(db_before) *db_before = 0;
+        if(db_after_usec)  *db_after_usec  = 0;
+        if(db_before_usec) *db_before_usec = 0;
         if(value_is_null) *value_is_null = 1;
 
         return 400;
@@ -92,8 +92,8 @@ int rrdset2value_api_v1(
             buffer_cacheable(wb);
     }
 
-    if(db_after)  *db_after  = r->after;
-    if(db_before) *db_before = r->before;
+    if(db_after_usec)  *db_after_usec  = r->after_usec;
+    if(db_before_usec) *db_before_usec = r->before_usec;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null);
@@ -108,16 +108,16 @@ int rrdset2anything_api_v1(
         , BUFFER *dimensions
         , uint32_t format
         , long points
-        , long long after
-        , long long before
+        , long long after_usec
+        , long long before_usec
         , int group_method
-        , long group_time
+        , long long group_time_usec
         , uint32_t options
         , time_t *latest_timestamp
 ) {
     st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL);
+    RRDR *r = rrd2rrdr(st, points, after_usec, before_usec, group_method, group_time_usec, options, dimensions?buffer_tostring(dimensions):NULL);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return 500;
@@ -129,7 +129,7 @@ int rrdset2anything_api_v1(
         buffer_cacheable(wb);
 
     if(latest_timestamp && rrdr_rows(r) > 0)
-        *latest_timestamp = r->before;
+        *latest_timestamp = r->before_usec;
 
     switch(format) {
     case DATASOURCE_SSV:

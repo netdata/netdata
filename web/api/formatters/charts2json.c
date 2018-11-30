@@ -19,15 +19,15 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"version\": \"%s\""
                        ",\n\t\"os\": \"%s\""
                        ",\n\t\"timezone\": \"%s\""
-                       ",\n\t\"update_every\": %d"
-                       ",\n\t\"history\": %ld"
+                       ",\n\t\"update_every\": %llu"
+                       ",\n\t\"history\": %zu"
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
                    , host->hostname
                    , host->program_version
                    , host->os
                    , host->timezone
-                   , host->rrd_update_every
+                   , host->rrd_update_every_usec
                    , host->rrd_history_entries
                    , custom_dashboard_info_js_filename
     );

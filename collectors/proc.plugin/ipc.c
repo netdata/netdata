@@ -200,7 +200,7 @@ int do_ipc(int update_every, usec_t dt) {
                     , PLUGIN_PROC_NAME
                     , "ipc"
                     , NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_AREA
             );
             rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -218,7 +218,7 @@ int do_ipc(int update_every, usec_t dt) {
                     , PLUGIN_PROC_NAME
                     , "ipc"
                     , NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_AREA
             );
             rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

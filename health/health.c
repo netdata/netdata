@@ -265,24 +265,24 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
-static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
+static inline int rrdcalc_isrunnable(RRDCALC *rc, usec_t now_usec, usec_t *next_run_usec) {
     if(unlikely(!rc->rrdset)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
-    if(unlikely(rc->next_update > now)) {
-        if (unlikely(*next_run > rc->next_update)) {
+    if(unlikely(rc->next_update_usec > now_usec)) {
+        if (unlikely(*next_run_usec > rc->next_update_usec)) {
             // update the next_run time of the main loop
             // to run this alarm precisely the time required
-            *next_run = rc->next_update;
+            *next_run_usec = rc->next_update_usec;
         }
 
-        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rc->chart?rc->chart:"NOCHART", rc->name, (int) (rc->next_update - now));
+        debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %llu usec).", rc->chart?rc->chart:"NOCHART", rc->name,  (rc->next_update_usec - now_usec));
         return 0;
     }
 
-    if(unlikely(!rc->update_every)) {
+    if(unlikely(!rc->update_every_usec)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
@@ -302,26 +302,24 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    int update_every = rc->rrdset->update_every;
-    time_t first = rrdset_first_entry_t(rc->rrdset);
-    time_t last = rrdset_last_entry_t(rc->rrdset);
+    usec_t update_every_usec = rc->rrdset->update_every_usec;
+    usec_t first_usec = rrdset_first_entry_usec(rc->rrdset);
+    usec_t last_usec = rrdset_last_entry_usec(rc->rrdset);
 
-    if(unlikely(now + update_every < first /* || now - update_every > last */)) {
+    if(unlikely(now_usec + update_every_usec < first_usec /* || now - update_every > last */)) {
         debug(D_HEALTH
-              , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
-              , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) now, (unsigned long) first
-              , (unsigned long) last);
+              , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %llu but got %llu - %llu)."
+              , rc->chart ? rc->chart : "NOCHART", rc->name, now_usec, first_usec, last_usec);
         return 0;
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
-        time_t needed = now + rc->before + rc->after;
+        usec_t needed_usec = now_usec + rc->before_usec + rc->after_usec;
 
-        if(needed + update_every < first || needed - update_every > last) {
+        if(needed_usec + update_every_usec < first_usec || needed_usec - update_every_usec > last_usec) {
             debug(D_HEALTH
-                  , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu)."
-                  , rc->chart ? rc->chart : "NOCHART", rc->name, (unsigned long) needed, (unsigned long) first
-                  , (unsigned long) last);
+                  , "Health not examining alarm '%s.%s' yet (not enough data yet - we need %llu but got %llu - %llu)."
+                  , rc->chart ? rc->chart : "NOCHART", rc->name, needed_usec, first_usec, last_usec);
             return 0;
         }
     }
@@ -358,11 +356,11 @@ static void health_main_cleanup(void *ptr) {
 void *health_main(void *ptr) {
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
-    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
-    if(min_run_every < 1) min_run_every = 1;
+    usec_t min_run_every_usec = config_get_usec(CONFIG_SECTION_HEALTH, "run at least every seconds", 10 * USEC_PER_SEC);
+    if(min_run_every_usec < USEC_PER_SEC) min_run_every_usec = USEC_PER_SEC;
 
-    time_t now                = now_realtime_sec();
-    time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
+    usec_t now_usec                = now_realtime_usec();
+    usec_t hibernation_delay_usec  = config_get_usec(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     unsigned int loop = 0;
     while(!netdata_exit) {
@@ -370,14 +368,14 @@ void *health_main(void *ptr) {
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
         int runnable = 0, apply_hibernation_delay = 0;
-        time_t next_run = now + min_run_every;
+        usec_t next_run_usec = now_usec + min_run_every_usec;
         RRDCALC *rc;
 
         if(unlikely(check_if_resumed_from_suspention())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension."
-            , hibernation_delay
+            info("Postponing alarm checks for %llu usec, because it seems that the system was just resumed from suspension."
+            , hibernation_delay_usec
             );
         }
 
@@ -390,27 +388,27 @@ void *health_main(void *ptr) {
 
             if(unlikely(apply_hibernation_delay)) {
 
-                info("Postponing health checks for %ld seconds, on host '%s'."
-                     , hibernation_delay
+                info("Postponing health checks for %llu usec, on host '%s'."
+                     , hibernation_delay_usec
                      , host->hostname
                 );
 
-                host->health_delay_up_to = now + hibernation_delay;
+                host->health_delay_up_to_usec = now_usec + hibernation_delay_usec;
             }
 
-            if(unlikely(host->health_delay_up_to)) {
-                if(unlikely(now < host->health_delay_up_to))
+            if(unlikely(host->health_delay_up_to_usec)) {
+                if(unlikely(now_usec < host->health_delay_up_to_usec))
                     continue;
 
                 info("Resuming health checks on host '%s'.", host->hostname);
-                host->health_delay_up_to = 0;
+                host->health_delay_up_to_usec = 0;
             }
 
             rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
             for(rc = host->alarms; rc; rc = rc->next) {
-                if(unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
+                if(unlikely(!rrdcalc_isrunnable(rc, now_usec, &next_run_usec))) {
                     if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
                     continue;
@@ -432,13 +430,13 @@ void *health_main(void *ptr) {
                                                   , &rc->value
                                                   , rc->dimensions
                                                   , 1
-                                                  , rc->after
-                                                  , rc->before
+                                                  , rc->after_usec
+                                                  , rc->before_usec
                                                   , rc->group
                                                   , 0
                                                   , rc->options
-                                                  , &rc->db_after
-                                                  , &rc->db_before
+                                                  , &rc->db_after_usec
+                                                  , &rc->db_before_usec
                                                   , &value_is_null
                     );
 
@@ -530,10 +528,10 @@ void *health_main(void *ptr) {
 
                         rc->value = rc->calculation->result;
 
-                        if(rc->local) rc->local->last_updated = now;
-                        if(rc->family) rc->family->last_updated = now;
-                        if(rc->hostid) rc->hostid->last_updated = now;
-                        if(rc->hostname) rc->hostname->last_updated = now;
+                        if(rc->local) rc->local->last_updated_usec = now_usec;
+                        if(rc->family) rc->family->last_updated_usec = now_usec;
+                        if(rc->hostid) rc->hostid->last_updated_usec = now_usec;
+                        if(rc->hostname) rc->hostname->last_updated_usec = now_usec;
                     }
                 }
             }
@@ -651,33 +649,33 @@ void *health_main(void *ptr) {
 
                         // apply trigger hysteresis
 
-                        if(now > rc->delay_up_to_timestamp) {
-                            rc->delay_up_current = rc->delay_up_duration;
-                            rc->delay_down_current = rc->delay_down_duration;
-                            rc->delay_last = 0;
-                            rc->delay_up_to_timestamp = 0;
+                        if(now_usec > rc->delay_up_to_timestamp_usec) {
+                            rc->delay_up_current_usec = rc->delay_up_usec;
+                            rc->delay_down_current_usec = rc->delay_down_usec;
+                            rc->delay_last_usec = 0;
+                            rc->delay_up_to_timestamp_usec = 0;
                         }
                         else {
-                            rc->delay_up_current = (int) (rc->delay_up_current * rc->delay_multiplier);
-                            if(rc->delay_up_current > rc->delay_max_duration)
-                                rc->delay_up_current = rc->delay_max_duration;
+                            rc->delay_up_current_usec = (int) (rc->delay_up_current_usec * rc->delay_multiplier);
+                            if(rc->delay_up_current_usec > rc->delay_max_usec)
+                                rc->delay_up_current_usec = rc->delay_max_usec;
 
-                            rc->delay_down_current = (int) (rc->delay_down_current * rc->delay_multiplier);
-                            if(rc->delay_down_current > rc->delay_max_duration)
-                                rc->delay_down_current = rc->delay_max_duration;
+                            rc->delay_down_current_usec = (int) (rc->delay_down_current_usec * rc->delay_multiplier);
+                            if(rc->delay_down_current_usec > rc->delay_max_usec)
+                                rc->delay_down_current_usec = rc->delay_max_usec;
                         }
 
                         if(status > rc->status)
-                            delay = rc->delay_up_current;
+                            delay = rc->delay_up_current_usec;
                         else
-                            delay = rc->delay_down_current;
+                            delay = rc->delay_down_current_usec;
 
                         // COMMENTED: because we do need to send raising alarms
                         // if(now + delay < rc->delay_up_to_timestamp)
                         //    delay = (int)(rc->delay_up_to_timestamp - now);
 
-                        rc->delay_last = delay;
-                        rc->delay_up_to_timestamp = now + delay;
+                        rc->delay_last_usec = delay;
+                        rc->delay_up_to_timestamp_usec = now_usec + delay;
 
                         // add the alarm into the log
 
@@ -685,13 +683,13 @@ void *health_main(void *ptr) {
                                 host
                                 , rc->id
                                 , rc->next_event_id++
-                                , now
+                                , now_usec
                                 , rc->name
                                 , rc->rrdset->id
                                 , rc->rrdset->family
                                 , rc->exec
                                 , rc->recipient
-                                , now - rc->last_status_change
+                                , now_usec - rc->last_status_change_usec
                                 , rc->old_value
                                 , rc->value
                                 , rc->status
@@ -699,19 +697,19 @@ void *health_main(void *ptr) {
                                 , rc->source
                                 , rc->units
                                 , rc->info
-                                , rc->delay_last
+                                , rc->delay_last_usec
                                 , (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION) ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
                         );
 
-                        rc->last_status_change = now;
+                        rc->last_status_change_usec = now_usec;
                         rc->status = status;
                     }
 
-                    rc->last_updated = now;
-                    rc->next_update = now + rc->update_every;
+                    rc->last_updated_usec = now_usec;
+                    rc->next_update_usec = now_usec + rc->update_every_usec;
 
-                    if(next_run > rc->next_update)
-                        next_run = rc->next_update;
+                    if(next_run_usec > rc->next_update_usec)
+                        next_run_usec = rc->next_update_usec;
                 }
 
                 rrdhost_unlock(host);
@@ -734,11 +732,11 @@ void *health_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
 
-        now = now_realtime_sec();
-        if(now < next_run) {
-            debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
-            sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
-            now = now_realtime_sec();
+        now_usec = now_realtime_usec();
+        if(now_usec < next_run_usec) {
+            debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %llu usec", loop, (next_run_usec - now_usec));
+            sleep_usec(next_run_usec - now_usec);
+            now_usec = now_realtime_usec();
         }
         else
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);

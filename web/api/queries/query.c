@@ -349,7 +349,7 @@ static inline calculated_number *rrdr_line_values(RRDR *r, long rrdr_line) {
     return &r->v[ rrdr_line * r->d ];
 }
 
-static inline long rrdr_line_init(RRDR *r, time_t t, long rrdr_line) {
+static inline long rrdr_line_init(RRDR *r, usec_t t, long rrdr_line) {
     rrdr_line++;
 
     #ifdef NETDATA_INTERNAL_CHECKS
@@ -383,18 +383,18 @@ static inline void do_dimension(
         , long dim_id_in_rrdr
         , long after_slot
         , long before_slot
-        , time_t after_wanted
-        , time_t before_wanted
+        , usec_t after_usec_wanted
+        , usec_t before_usec_wanted
 ){
     (void) before_slot;
 
     RRDSET *st = r->st;
 
-    time_t
-        now = after_wanted,
-        dt = st->update_every,
-        max_date = 0,
-        min_date = 0;
+    usec_t
+        now_usec = after_usec_wanted,
+        dt_usec = st->update_every_usec,
+        max_date_usec = 0,
+        min_date_usec = 0;
 
     long
         slot = after_slot,
@@ -410,17 +410,17 @@ static inline void do_dimension(
 
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
-    for( ; points_added < points_wanted ; now += dt, slot++ ) {
+    for( ; points_added < points_wanted ; now_usec += dt_usec, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
 
         // make sure we return data in the proper time range
-        if(unlikely(now > before_wanted)) {
+        if(unlikely(now_usec > before_usec_wanted)) {
             #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "stopped, because attempted to access the db after 'wanted before'";
             #endif
             break;
         }
-        if(unlikely(now < after_wanted)) {
+        if(unlikely(now_usec < after_usec_wanted)) {
             #ifdef NETDATA_INTERNAL_CHECKS
             r->internal.log = "skipped, because attempted to access the db before 'wanted after'";
             #endif
@@ -447,10 +447,10 @@ static inline void do_dimension(
         db_points_read++;
 
         if(unlikely(values_in_group == group_size)) {
-            rrdr_line = rrdr_line_init(r, now, rrdr_line);
+            rrdr_line = rrdr_line_init(r, now_usec, rrdr_line);
 
-            if(unlikely(!min_date)) min_date = now;
-            max_date = now;
+            if(unlikely(!min_date_usec)) min_date_usec = now_usec;
+            max_date_usec = now_usec;
 
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_line * r->d + dim_id_in_rrdr];
@@ -491,8 +491,8 @@ static inline void do_dimension(
 
     r->min = min;
     r->max = max;
-    r->before = max_date;
-    r->after = min_date - (r->group - 1) * r->st->update_every;
+    r->before_usec = max_date_usec;
+    r->after_usec = min_date_usec - (r->group - 1) * r->st->update_every_usec;
     rrdr_done(r, rrdr_line);
 
     #ifdef NETDATA_INTERNAL_CHECKS
@@ -509,27 +509,27 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         , RRDR_GROUPING group_method
         , int aligned
         , long group
-        , long resampling_time
+        , long long resampling_time
         , long resampling_group
-        , time_t after_wanted
-        , time_t after_requested
-        , time_t before_wanted
-        , time_t before_requested
+        , usec_t after_usec_wanted
+        , usec_t after_usec_requested
+        , usec_t before_usec_wanted
+        , usec_t before_usec_requested
         , long points_requested
         , long points_wanted
         , size_t after_slot
         , size_t before_slot
         , const char *msg
         ) {
-    info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
-         "after (got: %zu, want: %zu, req: %zu, db: %zu), "
-         "before (got: %zu, want: %zu, req: %zu, db: %zu), "
-         "duration (got: %zu, want: %zu, req: %zu, db: %zu), "
+    info("INTERNAL ERROR: rrd2rrdr() on %s update every %llu with %s grouping %s (group: %ld, resampling_time: %lld, resampling_group: %ld), "
+         "after (got: %llu, want: %llu, req: %llu, db: %llu), "
+         "before (got: %llu, want: %llu, req: %llu, db: %llu), "
+         "duration (got: %llu, want: %llu, req: %llu, db: %llu), "
          "slot (after: %zu, before: %zu, delta: %zu), "
-         "points (got: %ld, want: %ld, req: %ld, db: %ld), "
+         "points (got: %ld, want: %ld, req: %ld, db: %zu), "
          "%s"
          , r->st->name
-         , r->st->update_every
+         , r->st->update_every_usec
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
@@ -539,22 +539,22 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , resampling_group
 
          // after
-         , (size_t)r->after
-         , (size_t)after_wanted
-         , (size_t)after_requested
-         , (size_t)rrdset_first_entry_t(r->st)
+         , r->after_usec
+         , after_usec_wanted
+         , after_usec_requested
+         , rrdset_first_entry_usec(r->st)
 
          // before
-         , (size_t)r->before
-         , (size_t)before_wanted
-         , (size_t)before_requested
-         , (size_t)rrdset_last_entry_t(r->st)
+         , r->before_usec
+         , before_usec_wanted
+         , before_usec_requested
+         , rrdset_last_entry_usec(r->st)
 
          // duration
-         , (size_t)(r->before - r->after + r->st->update_every)
-         , (size_t)(before_wanted - after_wanted + r->st->update_every)
-         , (size_t)(before_requested - after_requested)
-         , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
+         , (r->before_usec - r->after_usec + r->st->update_every_usec)
+         , (before_usec_wanted - after_usec_wanted + r->st->update_every_usec)
+         , (before_usec_requested - after_usec_requested)
+         , ((rrdset_last_entry_usec(r->st) - rrdset_first_entry_usec(r->st)) + r->st->update_every_usec)
 
          // slot
          , after_slot
@@ -576,10 +576,10 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
 RRDR *rrd2rrdr(
         RRDSET *st
         , long points_requested
-        , long long after_requested
-        , long long before_requested
+        , long long after_usec_requested
+        , long long before_usec_requested
         , RRDR_GROUPING group_method
-        , long resampling_time_requested
+        , long long resampling_usec_requested
         , RRDR_OPTIONS options
         , const char *dimensions
 ) {
@@ -587,37 +587,37 @@ RRDR *rrd2rrdr(
 
     int absolute_period_requested = -1;
 
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
+    usec_t first_entry_usec = rrdset_first_entry_usec(st);
+    usec_t last_entry_usec  = rrdset_last_entry_usec(st);
 
-    if(before_requested == 0 && after_requested == 0) {
+    if(before_usec_requested == 0 && after_usec_requested == 0) {
         // dump the all the data
-        before_requested = last_entry_t;
-        after_requested = first_entry_t;
+        before_usec_requested = last_entry_usec;
+        after_usec_requested = first_entry_usec;
         absolute_period_requested = 0;
     }
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
-    if(((before_requested < 0)?-before_requested:before_requested) <= API_RELATIVE_TIME_MAX) {
-        if(abs(before_requested) % st->update_every) {
+    if(((before_usec_requested < 0)?-before_usec_requested:before_usec_requested) <= API_RELATIVE_TIME_MAX) {
+        if(abs(before_usec_requested) % st->update_every_usec) {
             // make sure it is multiple of st->update_every
-            if(before_requested < 0) before_requested = before_requested - st->update_every - before_requested % st->update_every;
-            else           before_requested = before_requested + st->update_every - before_requested % st->update_every;
+            if(before_usec_requested < 0) before_usec_requested = before_usec_requested - st->update_every_usec - before_usec_requested % st->update_every_usec;
+            else before_usec_requested = before_usec_requested + st->update_every_usec - before_usec_requested % st->update_every_usec;
         }
-        if(before_requested > 0) before_requested = first_entry_t + before_requested;
-        else           before_requested = last_entry_t  + before_requested;
+        if(before_usec_requested > 0) before_usec_requested = first_entry_usec + before_usec_requested;
+        else before_usec_requested = last_entry_usec  + before_usec_requested;
         absolute_period_requested = 0;
     }
 
     // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
-    if(((after_requested < 0)?-after_requested:after_requested) <= API_RELATIVE_TIME_MAX) {
-        if(after_requested == 0) after_requested = -st->update_every;
-        if(abs(after_requested) % st->update_every) {
+    if(((after_usec_requested < 0)?-after_usec_requested:after_usec_requested) <= API_RELATIVE_TIME_MAX) {
+        if(after_usec_requested == 0) after_usec_requested = -st->update_every_usec;
+        if(abs(after_usec_requested) % st->update_every_usec) {
             // make sure it is multiple of st->update_every
-            if(after_requested < 0) after_requested = after_requested - st->update_every - after_requested % st->update_every;
-            else          after_requested = after_requested + st->update_every - after_requested % st->update_every;
+            if(after_usec_requested < 0) after_usec_requested = after_usec_requested - st->update_every_usec - after_usec_requested % st->update_every_usec;
+            else after_usec_requested = after_usec_requested + st->update_every_usec - after_usec_requested % st->update_every_usec;
         }
-        after_requested = before_requested + after_requested;
+        after_usec_requested = before_usec_requested + after_usec_requested;
         absolute_period_requested = 0;
     }
 
@@ -625,24 +625,24 @@ RRDR *rrd2rrdr(
         absolute_period_requested = 1;
 
     // make sure they are within our timeframe
-    if(before_requested > last_entry_t)  before_requested = last_entry_t;
-    if(before_requested < first_entry_t) before_requested = first_entry_t;
+    if(before_usec_requested > (long long)last_entry_usec)  before_usec_requested = last_entry_usec;
+    if(before_usec_requested < (long long)first_entry_usec) before_usec_requested = first_entry_usec;
 
-    if(after_requested > last_entry_t)  after_requested = last_entry_t;
-    if(after_requested < first_entry_t) after_requested = first_entry_t;
+    if(after_usec_requested > (long long)last_entry_usec)  after_usec_requested = last_entry_usec;
+    if(after_usec_requested < (long long)first_entry_usec) after_usec_requested = first_entry_usec;
 
     // check if they are reversed
-    if(after_requested > before_requested) {
-        time_t tmp = before_requested;
-        before_requested = after_requested;
-        after_requested = tmp;
+    if(after_usec_requested > before_usec_requested) {
+        time_t tmp = before_usec_requested;
+        before_usec_requested = after_usec_requested;
+        after_usec_requested = tmp;
     }
 
     // the duration of the chart
-    time_t duration = before_requested - after_requested;
-    long available_points = duration / st->update_every;
+    long long duration_usec = before_usec_requested - after_usec_requested;
+    long long available_points = duration_usec / st->update_every_usec;
 
-    if(duration <= 0 || available_points <= 0)
+    if(duration_usec <= 0 || available_points <= 0)
         return rrdr_create(st, 1);
 
     // check the number of wanted points in the result
@@ -658,38 +658,38 @@ RRDR *rrd2rrdr(
     // resampling_time_requested enforces a certain grouping multiple
     calculated_number resampling_divisor = 1.0;
     long resampling_group = 1;
-    if(unlikely(resampling_time_requested > st->update_every)) {
-        if (unlikely(resampling_time_requested > duration)) {
+    if(unlikely(resampling_usec_requested > (long long)st->update_every_usec)) {
+        if (unlikely(resampling_usec_requested > duration_usec)) {
             // group_time is above the available duration
 
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("INTERNAL CHECK: %s: requested gtime %ld secs, is greater than the desired duration %ld secs", st->id, resampling_time_requested, duration);
+            info("INTERNAL CHECK: %s: requested gtime %lld usec, is greater than the desired duration %lld usec", st->id, resampling_usec_requested, duration_usec);
             #endif
 
-            after_requested = before_requested - resampling_time_requested;
-            duration = before_requested - after_requested;
-            available_points = duration / st->update_every;
+            after_usec_requested = before_usec_requested - resampling_usec_requested;
+            duration_usec = before_usec_requested - after_usec_requested;
+            available_points = duration_usec / st->update_every_usec;
             group = available_points / points_requested;
         }
 
         // if the duration is not aligned to resampling time
         // extend the duration to the past, to avoid a gap at the chart
         // only when the missing duration is above 1/10th of a point
-        if(duration % resampling_time_requested) {
-            time_t delta = duration % resampling_time_requested;
-            if(delta > resampling_time_requested / 10) {
-                after_requested -= resampling_time_requested - delta;
-                duration = before_requested - after_requested;
-                available_points = duration / st->update_every;
+        if(duration_usec % resampling_usec_requested) {
+            time_t delta = duration_usec % resampling_usec_requested;
+            if(delta > resampling_usec_requested / 10) {
+                after_usec_requested -= resampling_usec_requested - delta;
+                duration_usec = before_usec_requested - after_usec_requested;
+                available_points = duration_usec / st->update_every_usec;
                 group = available_points / points_requested;
             }
         }
 
         // the points we should group to satisfy gtime
-        resampling_group = resampling_time_requested / st->update_every;
-        if(unlikely(resampling_time_requested % st->update_every)) {
+        resampling_group = resampling_usec_requested / (long long)st->update_every_usec;
+        if(unlikely(resampling_usec_requested % st->update_every_usec)) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            info("INTERNAL CHECK: %s: requested gtime %ld secs, is not a multiple of the chart's data collection frequency %d secs", st->id, resampling_time_requested, st->update_every);
+            info("INTERNAL CHECK: %s: requested gtime %lld usecs, is not a multiple of the chart's data collection frequency %llu secs", st->id, resampling_usec_requested, st->update_every_usec);
             #endif
 
             resampling_group++;
@@ -700,7 +700,7 @@ RRDR *rrd2rrdr(
         if(unlikely(group % resampling_group)) group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
 
         //resampling_divisor = group / resampling_group;
-        resampling_divisor = (calculated_number)(group * st->update_every) / (calculated_number)resampling_time_requested;
+        resampling_divisor = (calculated_number)(group * st->update_every_usec) / (calculated_number)resampling_usec_requested;
     }
 
     // now that we have group,
@@ -708,55 +708,55 @@ RRDR *rrd2rrdr(
 
     if(aligned) {
         // alignement has been requested, so align the values
-        before_requested -= (before_requested % group);
-        after_requested  -= (after_requested % group);
+        before_usec_requested -= (before_usec_requested % group);
+        after_usec_requested  -= (after_usec_requested % group);
     }
 
     // we align the request on requested_before
-    time_t before_wanted = before_requested;
-    if(likely(before_wanted > last_entry_t)) {
+    long long before_usec_wanted = (usec_t)before_usec_requested;
+    if(likely(before_usec_wanted > (long long)last_entry_usec)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL ERROR: rrd2rrdr() on %s, before_wanted is after db max", st->name);
         #endif
 
-        before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * st->update_every ));
+        before_usec_wanted = last_entry_usec - (last_entry_usec % ( ((aligned)?group:1) * st->update_every_usec ));
     }
-    size_t before_slot = rrdset_time2slot(st, before_wanted);
+    size_t before_slot = rrdset_time2slot(st, before_usec_wanted);
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
-    long points_wanted = (before_wanted - after_requested) / (st->update_every * group);
+    long points_wanted = (before_usec_wanted - after_usec_requested) / ((long long)st->update_every_usec * group);
 
-    time_t after_wanted  = before_wanted - (points_wanted * group * st->update_every) + st->update_every;
-    if(unlikely(after_wanted < first_entry_t)) {
+    long long after_usec_wanted  = before_usec_wanted - (points_wanted * group * (long long)st->update_every_usec) + (long long)st->update_every_usec;
+    if(unlikely(after_usec_wanted < (long long)first_entry_usec)) {
         // hm... we go to the past, calculate again points_wanted using all the db from before_wanted to the beginning
-        points_wanted = (before_wanted - first_entry_t) / group;
+        points_wanted = (before_usec_wanted - (long long)first_entry_usec) / group;
 
         // recalculate after wanted with the new number of points
-        after_wanted  = before_wanted - (points_wanted * group * st->update_every) + st->update_every;
+        after_usec_wanted  = before_usec_wanted - (points_wanted * group * (long long)st->update_every_usec) + (long long)st->update_every_usec;
 
-        if(unlikely(after_wanted < first_entry_t)) {
+        if(unlikely(after_usec_wanted < (long long)first_entry_usec)) {
             #ifdef NETDATA_INTERNAL_CHECKS
             error("INTERNAL ERROR: rrd2rrdr() on %s, after_wanted is before db min", st->name);
             #endif
 
-            after_wanted = first_entry_t - (first_entry_t % ( ((aligned)?group:1) * st->update_every )) + ( ((aligned)?group:1) * st->update_every );
+            after_usec_wanted = (long long)first_entry_usec - ((long long)first_entry_usec % ( ((aligned)?group:1) * (long long)st->update_every_usec )) + ( ((aligned)?group:1) * (long long)st->update_every_usec );
         }
     }
-    size_t after_slot  = rrdset_time2slot(st, after_wanted);
+    size_t after_slot  = rrdset_time2slot(st, after_usec_wanted);
 
     // check if they are reversed
-    if(unlikely(after_wanted > before_wanted)) {
+    if(unlikely(after_usec_wanted > before_usec_wanted)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL ERROR: rrd2rrdr() on %s, reversed wanted after/before", st->name);
         #endif
-        time_t tmp = before_wanted;
-        before_wanted = after_wanted;
-        after_wanted = tmp;
+        time_t tmp = before_usec_wanted;
+        before_usec_wanted = after_usec_wanted;
+        after_usec_wanted = tmp;
     }
 
     // recalculate points_wanted using the final time-frame
-    points_wanted   = (before_wanted - after_wanted) / st->update_every / group + 1;
+    points_wanted   = (before_usec_wanted - after_usec_wanted) / (long long)st->update_every_usec / group + 1;
     if(unlikely(points_wanted < 0)) {
         #ifdef NETDATA_INTERNAL_CHECKS
         error("INTERNAL ERROR: rrd2rrdr() on %s, points_wanted is %ld", st->name, points_wanted);
@@ -765,28 +765,28 @@ RRDR *rrd2rrdr(
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    duration = before_wanted - after_wanted;
+    duration_usec = before_usec_wanted - after_usec_wanted;
 
-    if(after_wanted < first_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too small, minimum %u", (uint32_t)after_wanted, (uint32_t)first_entry_t);
+    if(after_usec_wanted < (long long)first_entry_usec)
+        error("INTERNAL CHECK: after_wanted %lld is too small, minimum %llu", after_usec_wanted, first_entry_usec);
 
-    if(after_wanted > last_entry_t)
-        error("INTERNAL CHECK: after_wanted %u is too big, maximum %u", (uint32_t)after_wanted, (uint32_t)last_entry_t);
+    if(after_usec_wanted > (long long)last_entry_usec)
+        error("INTERNAL CHECK: after_wanted %lld is too big, maximum %llu", after_usec_wanted, last_entry_usec);
 
-    if(before_wanted < first_entry_t)
-        error("INTERNAL CHECK: before_wanted %u is too small, minimum %u", (uint32_t)before_wanted, (uint32_t)first_entry_t);
+    if(before_usec_wanted < (long long)first_entry_usec)
+        error("INTERNAL CHECK: before_wanted %lld is too small, minimum %llu", before_usec_wanted, first_entry_usec);
 
-    if(before_wanted > last_entry_t)
-        error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
+    if(before_usec_wanted > (long long)last_entry_usec)
+        error("INTERNAL CHECK: before_wanted %lld is too big, maximum %llu", before_usec_wanted, last_entry_usec);
 
-    if(before_slot >= (size_t)st->entries)
-        error("INTERNAL CHECK: before_slot is invalid %zu, expected 0 to %ld", before_slot, st->entries - 1);
+    if(before_slot >= st->entries)
+        error("INTERNAL CHECK: before_slot is invalid %zu, expected 0 to %zu", before_slot, st->entries - 1);
 
-    if(after_slot >= (size_t)st->entries)
-        error("INTERNAL CHECK: after_slot is invalid %zu, expected 0 to %ld", after_slot, st->entries - 1);
+    if(after_slot >= st->entries)
+        error("INTERNAL CHECK: after_slot is invalid %zu, expected 0 to %zu", after_slot, st->entries - 1);
 
-    if(points_wanted > (before_wanted - after_wanted) / group / st->update_every + 1)
-        error("INTERNAL CHECK: points_wanted %ld is more than points %ld", points_wanted, (before_wanted - after_wanted) / group / st->update_every + 1);
+    if(points_wanted > (before_usec_wanted - after_usec_wanted) / group / (long long)st->update_every_usec + 1)
+        error("INTERNAL CHECK: points_wanted %ld is more than points %lld", points_wanted, (before_usec_wanted - after_usec_wanted) / group / (long long)st->update_every_usec + 1);
 
     if(group < resampling_group)
         error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, resampling_group);
@@ -802,14 +802,14 @@ RRDR *rrd2rrdr(
     RRDR *r = rrdr_create(st, points_wanted);
     if(unlikely(!r)) {
         #ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (uint32_t)duration, points_wanted);
+        error("INTERNAL CHECK: Cannot create RRDR for %s, after=%lld, before=%lld, duration=%lld, points=%ld", st->id, after_usec_wanted, before_usec_wanted, duration_usec, points_wanted);
         #endif
         return NULL;
     }
 
     if(unlikely(!r->d || !points_wanted)) {
         #ifdef NETDATA_INTERNAL_CHECKS
-        error("INTERNAL CHECK: Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%zu, points=%ld", st->id, (uint32_t)after_wanted, (uint32_t)before_wanted, (size_t)duration, points_wanted);
+        error("INTERNAL CHECK: Returning empty RRDR (no dimensions in RRDSET) for %s, after=%lld, before=%lld, duration=%lld, points=%ld", st->id, after_usec_wanted, before_usec_wanted, duration_usec, points_wanted);
         #endif
         return r;
     }
@@ -826,9 +826,9 @@ RRDR *rrd2rrdr(
     // initialize RRDR
 
     r->group = group;
-    r->update_every = (int)group * st->update_every;
-    r->before = before_wanted;
-    r->after = after_wanted;
+    r->update_every_usec = (int)group * st->update_every_usec;
+    r->before_usec = (usec_t)before_usec_wanted;
+    r->after_usec = (usec_t)after_usec_wanted;
     r->internal.points_wanted = points_wanted;
     r->internal.resampling_group = resampling_group;
     r->internal.resampling_divisor = resampling_divisor;
@@ -878,7 +878,7 @@ RRDR *rrd2rrdr(
     // -------------------------------------------------------------------------
     // do the work for each dimension
 
-    time_t max_after = 0, min_before = 0;
+    usec_t max_after_usec = 0, min_before_usec = 0;
     long max_rows = 0;
 
     RRDDIM *rd;
@@ -902,8 +902,8 @@ RRDR *rrd2rrdr(
                 , c
                 , after_slot
                 , before_slot
-                , after_wanted
-                , before_wanted
+                , after_usec_wanted
+                , before_usec_wanted
                 );
 
         if(r->od[c] & RRDR_DIMENSION_NONZERO)
@@ -911,25 +911,25 @@ RRDR *rrd2rrdr(
 
         // verify all dimensions are aligned
         if(unlikely(!dimensions_used)) {
-            min_before = r->before;
-            max_after = r->after;
+            min_before_usec = r->before_usec;
+            max_after_usec = r->after_usec;
             max_rows = r->rows;
         }
         else {
-            if(r->after != max_after) {
+            if(r->after_usec != max_after_usec) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 error("INTERNAL ERROR: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                        st->name, (size_t)max_after, rd->name, (size_t)r->after);
+                        st->name, (size_t)max_after_usec, rd->name, (size_t)r->after_usec);
                 #endif
-                r->after = (r->after > max_after) ? r->after : max_after;
+                r->after_usec = (r->after_usec > max_after_usec) ? r->after_usec : max_after_usec;
             }
 
-            if(r->before != min_before) {
+            if(r->before_usec != min_before_usec) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 error("INTERNAL ERROR: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                        st->name, (size_t)min_before, rd->name, (size_t)r->before);
+                        st->name, (size_t)min_before_usec, rd->name, (size_t)r->before_usec);
                 #endif
-                r->before = (r->before < min_before) ? r->before : min_before;
+                r->before_usec = (r->before_usec < min_before_usec) ? r->before_usec : min_before_usec;
             }
 
             if(r->rows != max_rows) {
@@ -947,27 +947,27 @@ RRDR *rrd2rrdr(
     #ifdef NETDATA_INTERNAL_CHECKS
 
     if(r->internal.log)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
 
     if(r->rows != points_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
 
-    if(aligned && (r->before % group) != 0)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
+    if(aligned && (r->before_usec % group) != 0)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
 
     // 'after' should not be aligned, since we start inside the first group
     //if(aligned && (r->after % group) != 0)
     //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
-    if(r->before != before_requested)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
+    if(r->before_usec != (usec_t)before_usec_requested)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
 
-    if(r->before != before_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
+    if(r->before_usec != (usec_t)before_usec_wanted)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
 
     // reported 'after' varies, depending on group
-    if(r->after != after_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
+    if(r->after_usec != (usec_t)after_usec_wanted)
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_usec_requested, resampling_group, after_usec_wanted, after_usec_requested, before_usec_wanted, before_usec_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
 
     #endif
 

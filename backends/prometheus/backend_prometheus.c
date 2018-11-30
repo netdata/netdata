@@ -11,11 +11,11 @@ static struct prometheus_server {
     const char *server;
     uint32_t hash;
     RRDHOST *host;
-    time_t last_access;
+    usec_t last_access_usec;
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
-static inline time_t prometheus_server_last_access(const char *server, RRDHOST *host, time_t now) {
+static inline usec_t prometheus_server_last_access(const char *server, RRDHOST *host, usec_t now_usec) {
     static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
 
     uint32_t hash = simple_hash(server);
@@ -25,10 +25,10 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     struct prometheus_server *ps;
     for(ps = prometheus_server_root; ps ;ps = ps->next) {
         if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
-            time_t last = ps->last_access;
-            ps->last_access = now;
+            usec_t last_usec = ps->last_access_usec;
+            ps->last_access_usec = now_usec;
             netdata_mutex_unlock(&prometheus_server_root_mutex);
-            return last;
+            return last_usec;
         }
     }
 
@@ -36,7 +36,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     ps->server = strdupz(server);
     ps->hash = hash;
     ps->host = host;
-    ps->last_access = now;
+    ps->last_access_usec = now_usec;
     ps->next = prometheus_server_root;
     prometheus_server_root = ps;
 
@@ -121,7 +121,7 @@ struct host_variables_callback_options {
     PROMETHEUS_OUTPUT_OPTIONS output_options;
     const char *prefix;
     const char *labels;
-    time_t now;
+    usec_t now_usec;
     int host_header_printed;
     char name[PROMETHEUS_VARIABLE_MAX+1];
 };
@@ -164,7 +164,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
                            , opts->labels
                            , label_post
                            , value
-                           , ((rv->last_updated) ? rv->last_updated : opts->now) * 1000ULL
+                           , ((rv->last_updated_usec) ? rv->last_updated_usec : opts->now_usec) / USEC_PER_MS
             );
         else
             buffer_sprintf(opts->wb, "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
@@ -244,7 +244,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                 .backend_options = backend_options,
                 .output_options = output_options,
                 .prefix = prefix,
-                .now = now_realtime_sec(),
+                .now_usec = now_realtime_sec(),
                 .host_header_printed = 0
         };
         foreach_host_variable_callback(host, print_host_variables, &opts);
@@ -426,7 +426,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     else {
                         // we need average or sum of the data
 
-                        time_t first_t = after, last_t = before;
+                        usec_t first_t = after, last_t = before;
                         calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {

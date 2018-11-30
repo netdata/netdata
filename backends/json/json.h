@@ -12,8 +12,8 @@ extern int format_dimension_collected_json_plaintext(
         , const char *hostname      // the hostname (to override host->hostname)
         , RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+        , usec_t after_usec              // the start timestamp
+        , usec_t before_usec             // the end timestamp
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 );
 
@@ -24,8 +24,8 @@ extern int format_dimension_stored_json_plaintext(
         , const char *hostname      // the hostname (to override host->hostname)
         , RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+        , usec_t after_usec              // the start timestamp
+        , usec_t before_usec             // the end timestamp
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 );
 

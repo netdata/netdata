@@ -25,7 +25,7 @@ struct rrdcalctemplate {
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
 
-    int update_every;               // update frequency for the alarm
+    usec_t update_every_usec;       // update frequency for the alarm
 
     // the red and green threshold of this alarm (to be set to the chart)
     calculated_number green;
@@ -35,17 +35,17 @@ struct rrdcalctemplate {
     // database lookup settings
 
     char *dimensions;               // the chart dimensions
-    RRDR_GROUPING group;               // grouping method: average, max, etc.
-    int before;                     // ending point in time-series
-    int after;                      // starting point in time-series
+    RRDR_GROUPING group;            // grouping method: average, max, etc.
+    long long before_usec;          // ending point in time-series
+    long long after_usec;           // starting point in time-series
     uint32_t options;               // calculation options
 
     // ------------------------------------------------------------------------
     // notification delay settings
 
-    int delay_up_duration;         // duration to delay notifications when alarm raises
-    int delay_down_duration;       // duration to delay notifications when alarm lowers
-    int delay_max_duration;        // the absolute max delay to apply to this alarm
+    long long delay_up_duration;   // duration to delay notifications when alarm raises
+    long long delay_down_duration; // duration to delay notifications when alarm lowers
+    long long delay_max_duration;  // the absolute max delay to apply to this alarm
     float delay_multiplier;        // multiplier for all delays when alarms switch status
 
     // ------------------------------------------------------------------------
@@ -58,7 +58,7 @@ struct rrdcalctemplate {
     struct rrdcalctemplate *next;
 };
 
-#define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
+#define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after_usec)
 
 extern void rrdcalctemplate_link_matching(RRDSET *st);
 

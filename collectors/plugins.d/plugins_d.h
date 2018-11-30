@@ -51,7 +51,7 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
-    int update_every;                   // the plugin default data collection frequency
+    usec_t update_every_usec;           // the plugin default data collection frequency
     volatile sig_atomic_t obsolete;     // do not touch this structure after setting this to 1
     volatile sig_atomic_t enabled;      // if this is enabled or not
 

@@ -85,6 +85,103 @@ static inline long str2l(const char *s) {
     return n;
 }
 
+static inline char *duration2str(long long usec, char *buffer, size_t len) {
+    long long div;
+    char *units;
+
+    if(usec % (1000000ULL * 86400ULL * 365ULL) == 0) {
+        div = 1000000ULL * 86400ULL * 365ULL;
+        units = "Y";
+    }
+    else if(usec % (1000000ULL * 86400ULL * 30ULL) == 0) {
+        div = 1000000ULL * 86400ULL * 30ULL;
+        units = "M";
+    }
+    else if(usec % (1000000ULL * 86400ULL * 7ULL) == 0) {
+        div = 1000000ULL * 86400ULL * 7ULL;
+        units = "w";
+    }
+    else if(usec % (1000000ULL * 86400ULL * 1ULL) == 0) {
+        div = 1000000ULL * 86400ULL * 1ULL;
+        units = "d";
+    }
+    else if(usec % (1000000ULL * 3600ULL) == 0) {
+        div = 1000000ULL * 3600ULL;
+        units = "h";
+    }
+    else if(usec % (1000000ULL * 60ULL) == 0) {
+        div = 1000000ULL * 60ULL;
+        units = "m";
+    }
+    else if(usec % (1000000ULL) == 0) {
+        div = 1000000ULL;
+        units = "s";
+    }
+    else if(usec % (1000ULL) == 0) {
+        div = 1000ULL;
+        units = "ms";
+    }
+    else {
+        div = 1;
+        units = "u";
+    }
+
+    snprintfz(buffer, len, "%lld%s", usec / div, units);
+    return buffer;
+}
+
+static inline long long str2duration(const char *s) {
+    long long units = 1000000;
+    char *endptr = NULL;
+
+    long long value = strtoll(s, &endptr, 10);
+    if(endptr && *endptr) {
+        if(isspace(*endptr)) endptr++;
+
+        switch(*endptr) {
+            case 'Y':
+                units = 1000000ULL * 86400ULL * 356ULL; // years
+                break;
+
+            case 'M':
+                units = 1000000ULL * 86400ULL * 30ULL; // months
+                break;
+
+            case 'w':
+                units = 1000000ULL * 86400ULL * 7ULL; // weeks
+                break;
+
+            case 'd':
+                units = 1000000ULL * 86400ULL; // days
+                break;
+
+            case 'h':
+                units = 1000000ULL * 3600ULL; // hours
+                break;
+
+            case 'm':
+                if(endptr[1] == 's') {
+                    units = 1000ULL; // milliseconds
+                }
+                else {
+                    units = 1000000ULL * 60ULL; // minutes
+                }
+            break;
+
+            default:
+            case 's':
+                units = 1000000ULL; // seconds
+                break;
+
+            case 'u':
+                units = 1ULL;
+                break;
+        }
+    }
+
+    return value * units;
+}
+
 static inline uint32_t str2uint32_t(const char *s) {
     uint32_t n = 0;
     char c;

@@ -33,14 +33,14 @@ void *cpuidlejitter_main(void *ptr) {
             , "idlejitter.plugin"
             , NULL
             , NETDATA_CHART_PRIO_SYSTEM_IDLEJITTER
-            , localhost->rrd_update_every
+            , localhost->rrd_update_every_usec
             , RRDSET_TYPE_AREA
     );
     RRDDIM *rd_min = rrddim_add(st, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     RRDDIM *rd_avg = rrddim_add(st, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    usec_t update_every_ut = localhost->rrd_update_every * USEC_PER_SEC;
+    usec_t update_every_ut = localhost->rrd_update_every_usec * USEC_PER_SEC;
     struct timeval before, after;
     unsigned long long counter;
 

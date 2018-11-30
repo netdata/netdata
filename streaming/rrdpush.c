@@ -165,7 +165,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     // send the chart
     buffer_sprintf(
             host->rrdpush_sender_buffer
-            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %zu %llu \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , name
             , st->title
@@ -174,7 +174,7 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , st->context
             , rrdset_type_name(st->chart_type)
             , st->priority
-            , st->update_every
+            , st->update_every_usec
             , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
             , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
             , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
@@ -215,13 +215,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         }
     }
 
-    st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    st->upstream_resync_usec = timeval2usec(&st->last_collected_time) + (remote_clock_resync_iterations * st->update_every_usec);
 }
 
 // sends the current chart dimensions
 static inline void rrdpush_send_chart_metrics_nolock(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (st->last_collected_time.tv_sec > st->upstream_resync_time)?st->usec_since_last_update:0);
+    buffer_sprintf(host->rrdpush_sender_buffer, "BEGIN \"%s\" %llu\n", st->id, (timeval2usec(&st->last_collected_time) > st->upstream_resync_usec)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -343,7 +343,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-        st->upstream_resync_time = 0;
+        st->upstream_resync_usec = 0;
 
         rrdset_rdlock(st);
 
@@ -442,14 +442,14 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every_usec=%llu&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
               , host->hostname
               , host->registry_hostname
               , host->machine_guid
-              , default_rrd_update_every
+              , default_rrd_update_every_usec
               , host->os
               , host->timezone
               , (host->tags)?host->tags:""
@@ -818,12 +818,12 @@ static int rrdpush_receive(int fd
                            , const char *tags
                            , const char *program_name
                            , const char *program_version
-                           , int update_every
+                           , usec_t update_every_usec
                            , char *client_ip
                            , char *client_port
 ) {
     RRDHOST *host;
-    int history = default_rrd_history_entries;
+    size_t history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
     int health_enabled = default_health_enabled;
     int rrdpush_enabled = default_rrdpush_enabled;
@@ -833,11 +833,11 @@ static int rrdpush_receive(int fd
     time_t alarms_delay = 60;
     RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY rrdpush_multiple_connections_strategy = RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW;
 
-    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
-    if(update_every < 0) update_every = 1;
+    update_every_usec = appconfig_get_usec(&stream_config, machine_guid, "update every", update_every_usec);
+    if(update_every_usec < USEC_PER_SEC) update_every_usec = USEC_PER_SEC;
 
-    history = (int)appconfig_get_number(&stream_config, key, "default history", history);
-    history = (int)appconfig_get_number(&stream_config, machine_guid, "history", history);
+    history = (size_t)appconfig_get_number(&stream_config, key, "default history", history);
+    history = (size_t)appconfig_get_number(&stream_config, machine_guid, "history", history);
     if(history < 5) history = 5;
 
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
@@ -879,7 +879,7 @@ static int rrdpush_receive(int fd
                 , tags
                 , program_name
                 , program_version
-                , update_every
+                , update_every_usec
                 , history
                 , mode
                 , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
@@ -897,13 +897,13 @@ static int rrdpush_receive(int fd
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s, tags '%s'"
+    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every usec = %llu, history = %zu, memory mode = %s, health %s, tags '%s'"
          , hostname
          , client_ip
          , client_port
          , host->hostname
          , host->machine_guid
-         , host->rrd_update_every
+         , host->rrd_update_every_usec
          , host->rrd_history_entries
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
@@ -913,7 +913,7 @@ static int rrdpush_receive(int fd
 
     struct plugind cd = {
             .enabled = 1,
-            .update_every = default_rrd_update_every,
+            .update_every_usec = default_rrd_update_every_usec,
             .pid = 0,
             .serial_failures = 0,
             .successful_collections = 0,
@@ -970,7 +970,7 @@ static int rrdpush_receive(int fd
     host->senders_disconnected_time = 0;
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
-            host->health_delay_up_to = now_realtime_sec() + alarms_delay;
+            host->health_delay_up_to_usec = now_realtime_sec() + alarms_delay;
             info("Postponing health checks for %ld seconds, on host '%s', because it was just connected."
             , alarms_delay
             , host->hostname
@@ -1020,7 +1020,7 @@ struct rrdpush_thread {
     char *client_port;
     char *program_name;
     char *program_version;
-    int update_every;
+    usec_t update_every_usec;
 };
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
@@ -1063,7 +1063,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
                 , rpt->tags
                 , rpt->program_name
                 , rpt->program_version
-                , rpt->update_every
+                , rpt->update_every_usec
                 , rpt->client_ip
                 , rpt->client_port
         );
@@ -1110,7 +1110,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     info("clients wants to STREAM metrics.");
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
-    int update_every = default_rrd_update_every;
+    usec_t update_every_usec = default_rrd_update_every_usec;
     char buf[GUID_LEN + 1];
 
     while(url) {
@@ -1130,7 +1130,9 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "machine_guid"))
             machine_guid = value;
         else if(!strcmp(name, "update_every"))
-            update_every = (int)strtoul(value, NULL, 0);
+            update_every_usec = (int)strtoul(value, NULL, 0) * USEC_PER_SEC;
+        else if(!strcmp(name, "update_every_usec"))
+            update_every_usec = (int)strtoul(value, NULL, 0);
         else if(!strcmp(name, "os"))
             os = value;
         else if(!strcmp(name, "timezone"))
@@ -1240,7 +1242,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->tags              = (tags)?strdupz(tags):NULL;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
-    rpt->update_every      = update_every;
+    rpt->update_every_usec = update_every_usec;
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

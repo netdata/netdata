@@ -420,7 +420,7 @@ int unit_test_buffer() {
 // --------------------------------------------------------------------------------------------------------------------
 
 struct feed_values {
-        unsigned long long microseconds;
+        usec_t microseconds;
         collected_number value;
 };
 
@@ -428,7 +428,7 @@ struct test {
     char name[100];
     char description[1024];
 
-    int update_every;
+    usec_t update_every_usec;
     unsigned long long multiplier;
     unsigned long long divisor;
     RRD_ALGORITHM algorithm;
@@ -466,7 +466,7 @@ calculated_number test1_results[] = {
 struct test test1 = {
         "test1",            // name
         "test absolute values stored at exactly second boundaries",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_ABSOLUTE,    // algorithm
@@ -502,7 +502,7 @@ calculated_number test2_results[] = {
 struct test test2 = {
         "test2",            // name
         "test absolute values stored in the middle of second boundaries",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_ABSOLUTE,    // algorithm
@@ -537,7 +537,7 @@ calculated_number test3_results[] = {
 struct test test3 = {
         "test3",            // name
         "test incremental values stored at exactly second boundaries",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -572,7 +572,7 @@ calculated_number test4_results[] = {
 struct test test4 = {
         "test4",            // name
         "test incremental values stored in the middle of second boundaries",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -615,7 +615,7 @@ calculated_number test5_results[] = {
 struct test test5 = {
         "test5",            // name
         "test 32-bit incremental values overflow",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -658,7 +658,7 @@ calculated_number test5b_results[] = {
 struct test test5b = {
         "test5b",            // name
         "test 16-bit incremental values overflow",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -701,7 +701,7 @@ calculated_number test5c_results[] = {
 struct test test5c = {
         "test5c",            // name
         "test 8-bit incremental values overflow",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -744,7 +744,7 @@ calculated_number test5d_results[] = {
 struct test test5d = {
         "test5d",            // name
         "test 64-bit incremental values overflow",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -785,7 +785,7 @@ calculated_number test6_results[] = {
 struct test test6 = {
         "test6",            // name
         "test incremental values updated within the same second",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -820,7 +820,7 @@ calculated_number test7_results[] = {
 struct test test7 = {
         "test7",            // name
         "test incremental values updated in long durations",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -851,7 +851,7 @@ calculated_number test8_results[] = {
 struct test test8 = {
         "test8",            // name
         "test absolute values updated in long durations",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_ABSOLUTE,    // algorithm
@@ -892,7 +892,7 @@ calculated_number test9_results[] = {
 struct test test9 = {
         "test9",            // name
         "test absolute values updated within the same second",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_ABSOLUTE,    // algorithm
@@ -927,7 +927,7 @@ calculated_number test10_results[] = {
 struct test test10 = {
         "test10",           // name
         "test incremental values updated in short and long durations",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -970,7 +970,7 @@ calculated_number test11_results2[] = {
 struct test test11 = {
         "test11",           // name
         "test percentage-of-incremental-row with equal values",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
@@ -1013,7 +1013,7 @@ calculated_number test12_results2[] = {
 struct test test12 = {
         "test12",           // name
         "test percentage-of-incremental-row with equal values",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
@@ -1048,7 +1048,7 @@ calculated_number test13_results[] = {
 struct test test13 = {
         "test13",           // name
         "test incremental values updated in short and long durations",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
@@ -1083,7 +1083,7 @@ calculated_number test14_results[] = {
 struct test test14 = {
         "test14",            // name
         "issue #981 with real data",
-        30,                 // update_every
+        30 * USEC_PER_SEC,  // update_every_usec
         8,                  // multiplier
         1000000000,         // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -1113,16 +1113,16 @@ calculated_number test14b_results[] = {
 };
 
 struct test test14b = {
-        "test14b",            // name
+        "test14b",          // name
         "issue #981 with dummy data",
-        30,                 // update_every
+        30 * USEC_PER_SEC,  // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         8,                  // result entries
-        test14b_feed,        // feed
-        test14b_results,     // results
+        test14b_feed,       // feed
+        test14b_results,    // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -1145,16 +1145,16 @@ calculated_number test14c_results[] = {
 };
 
 struct test test14c = {
-        "test14c",            // name
+        "test14c",          // name
         "issue #981 with dummy data, checking for late start",
-        30,                 // update_every
+        30 * USEC_PER_SEC,  // update_every_usec
         1,                  // multiplier
         1,                  // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
-        test14c_feed,        // feed
-        test14c_results,     // results
+        test14c_feed,       // feed
+        test14c_results,    // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -1190,7 +1190,7 @@ calculated_number test15_results2[] = {
 struct test test15 = {
         "test15",           // name
         "test incremental with 2 dimensions",
-        1,                  // update_every
+        1 * USEC_PER_SEC,   // update_every_usec
         8,                  // multiplier
         1024,               // divisor
         RRD_ALGORITHM_INCREMENTAL, // algorithm
@@ -1209,14 +1209,14 @@ int run_test(struct test *test)
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
-    default_rrd_update_every = test->update_every;
+    default_rrd_update_every_usec = test->update_every_usec;
 
     char name[101];
     snprintfz(name, 100, "unittest-%s", test->name);
 
     // create the chart
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
-                                         , test->update_every, RRDSET_TYPE_LINE);
+                                         , test->update_every_usec, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
     
     RRDDIM *rd2 = NULL;
@@ -1226,18 +1226,18 @@ int run_test(struct test *test)
     rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
     // feed it with the test data
-    time_t time_now = 0, time_start = now_realtime_sec();
+    usec_t time_now_usec = 0, time_start_usec = now_realtime_usec();
     unsigned long c;
     collected_number last = 0;
     for(c = 0; c < test->feed_entries; c++) {
         if(debug_flags) fprintf(stderr, "\n\n");
 
         if(c) {
-            time_now += test->feed[c].microseconds;
+            time_now_usec += test->feed[c].microseconds;
             fprintf(stderr, "    > %s: feeding position %lu, after %0.3f seconds (%0.3f seconds from start), delta " CALCULATED_NUMBER_FORMAT ", rate " CALCULATED_NUMBER_FORMAT "\n", 
                 test->name, c+1,
-                (float)test->feed[c].microseconds / 1000000.0,
-                (float)time_now / 1000000.0,
+                (float)test->feed[c].microseconds / USEC_PER_SEC,
+                (float)time_now_usec / USEC_PER_SEC,
                 ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
                 (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
 
@@ -1280,9 +1280,9 @@ int run_test(struct test *test)
         calculated_number v = unpack_storage_number(rd->values[c]);
         calculated_number n = unpack_storage_number(pack_storage_number(test->results[c], SN_EXISTS));
         int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-        fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+        fprintf(stderr, "    %s/%s: checking position %lu (at %llu usecs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
             test->name, rd->name, c+1,
-            (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+            (rrdset_first_entry_usec(st) + c * st->update_every_usec) - time_start_usec,
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1291,9 +1291,9 @@ int run_test(struct test *test)
             v = unpack_storage_number(rd2->values[c]);
             n = test->results2[c];
             same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
-            fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
+            fprintf(stderr, "    %s/%s: checking position %lu (at %llu usecs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
-                (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
+                (rrdset_first_entry_usec(st) + c * st->update_every_usec) - time_start_usec,
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1474,7 +1474,7 @@ int unit_test(long delay, long shift)
 
     //debug_flags = 0xffffffff;
     default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
-    default_rrd_update_every = 1;
+    default_rrd_update_every_usec = 1;
 
     int do_abs = 1;
     int do_inc = 1;
@@ -1528,7 +1528,7 @@ int unit_test(long delay, long shift)
     }
 
     unsigned long oincrement = increment;
-    increment = increment * st->update_every * 1000000 / delay;
+    increment = increment * st->update_every_usec * 1000000 / delay;
     fprintf(stderr, "\n\nORIGINAL INCREMENT: %lu, INCREMENT %ld, DELAY %ld, SHIFT %ld\n", oincrement * 10, increment * 10, delay, shift);
 
     int ret = 0;

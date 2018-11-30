@@ -9,21 +9,21 @@
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
-static int check_for_new_mountpoints_every = 15;
+static usec_t check_for_new_mountpoints_every_usec = 15;
 static int cleanup_mount_points = 1;
 
 static inline void mountinfo_reload(int force) {
-    static time_t last_loaded = 0;
-    time_t now = now_realtime_sec();
+    static usec_t last_loaded_usec = 0;
+    usec_t now_usec = now_realtime_usec();
 
-    if(force || now - last_loaded >= check_for_new_mountpoints_every) {
+    if(force || now_usec - last_loaded_usec >= check_for_new_mountpoints_every_usec) {
         // mountinfo_free_all() can be called with NULL disk_mountinfo_root
         mountinfo_free_all(disk_mountinfo_root);
 
         // re-read mountinfo in case something changed
         disk_mountinfo_root = mountinfo_read(0);
 
-        last_loaded = now;
+        last_loaded_usec = now_usec;
     }
 }
 
@@ -349,18 +349,18 @@ void *diskspace_main(void *ptr) {
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
-    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
-    if(update_every < localhost->rrd_update_every)
-        update_every = localhost->rrd_update_every;
+    usec_t update_every_usec = config_get_usec(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every_usec);
+    if(update_every_usec < localhost->rrd_update_every_usec)
+        update_every_usec = localhost->rrd_update_every_usec;
 
-    check_for_new_mountpoints_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
-    if(check_for_new_mountpoints_every < update_every)
-        check_for_new_mountpoints_every = update_every;
+    check_for_new_mountpoints_every_usec = config_get_usec(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every_usec);
+    if(check_for_new_mountpoints_every_usec < update_every_usec)
+        check_for_new_mountpoints_every_usec = update_every_usec;
 
     struct rusage thread;
 
     usec_t duration = 0;
-    usec_t step = update_every * USEC_PER_SEC;
+    usec_t step = update_every_usec * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {
@@ -385,7 +385,7 @@ void *diskspace_main(void *ptr) {
             if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
-            do_disk_space_stats(mi, update_every);
+            do_disk_space_stats(mi, update_every_usec);
             if(unlikely(netdata_exit)) break;
         }
 
@@ -414,7 +414,7 @@ void *diskspace_main(void *ptr) {
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , NETDATA_CHART_PRIO_NETDATA_DISKSPACE
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 
@@ -442,7 +442,7 @@ void *diskspace_main(void *ptr) {
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , 132021
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_AREA
                 );
 

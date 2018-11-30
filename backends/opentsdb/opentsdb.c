@@ -13,13 +13,13 @@ int format_dimension_collected_opentsdb_telnet(
         , const char *hostname      // the hostname (to override host->hostname)
         , RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+        , usec_t after_usec              // the start timestamp
+        , usec_t before_usec             // the end timestamp
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
-    (void)after;
-    (void)before;
+    (void)after_usec;
+    (void)before_usec;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -49,14 +49,14 @@ int format_dimension_stored_opentsdb_telnet(
         , const char *hostname      // the hostname (to override host->hostname)
         , RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+        , usec_t after_usec              // the start timestamp
+        , usec_t before_usec             // the end timestamp
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 ) {
     (void)host;
 
-    time_t first_t = after, last_t = before;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+    usec_t first_t = after_usec, last_t = before_usec;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_t, &last_t);
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -71,7 +71,7 @@ int format_dimension_stored_opentsdb_telnet(
                 , prefix
                 , chart_name
                 , dimension_name
-                , (unsigned long long) last_t
+                , last_t / USEC_PER_SEC
                 , value
                 , hostname
                 , (host->tags)?" ":""

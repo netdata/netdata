@@ -118,12 +118,14 @@ extern long long appconfig_get_number(struct config *root, const char *section, 
 extern LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
+extern usec_t appconfig_get_usec(struct config *root, const char *section, const char *name, usec_t value);
 
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
 extern long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
 extern LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
+extern long long appconfig_set_usec(struct config *root, const char *section, const char *name, usec_t value);
 
 extern int appconfig_exists(struct config *root, const char *section, const char *name);
 extern int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new);

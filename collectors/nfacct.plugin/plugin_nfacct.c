@@ -774,21 +774,21 @@ static void nfacct_main_cleanup(void *ptr) {
 void *nfacct_main(void *ptr) {
     netdata_thread_cleanup_push(nfacct_main_cleanup, ptr);
 
-    int update_every = (int)config_get_number("plugin:netfilter", "update every", localhost->rrd_update_every);
-    if(update_every < localhost->rrd_update_every)
-        update_every = localhost->rrd_update_every;
+    usec_t update_every_usec = config_get_usec("plugin:netfilter", "update every", localhost->rrd_update_every_usec);
+    if(update_every_usec < localhost->rrd_update_every_usec)
+        update_every_usec = localhost->rrd_update_every_usec;
 
 #ifdef DO_NFACCT
-    int nfacct = !nfacct_init(update_every);
+    int nfacct = !nfacct_init(update_every_usec);
 #endif
 
 #ifdef DO_NFSTAT
-    int nfstat = !nfstat_init(update_every);
+    int nfstat = !nfstat_init(update_every_usec);
 #endif
 
     // ------------------------------------------------------------------------
 
-    usec_t step = update_every * USEC_PER_SEC;
+    usec_t step = update_every_usec * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(;;) {

@@ -54,18 +54,18 @@ typedef struct rrdresult {
 
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
 
-    time_t *t;                // array of n timestamps
+    usec_t *t;                // array of n timestamps
     calculated_number *v;     // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
 
     long group;               // how many collected values were grouped for each row
-    int update_every;         // what is the suggested update frequency in seconds
+    usec_t update_every_usec; // what is the suggested update frequency in seconds
 
     calculated_number min;
     calculated_number max;
 
-    time_t before;
-    time_t after;
+    usec_t before_usec;
+    usec_t after_usec;
 
     int has_st_lock;        // if st is read locked by us
 
@@ -99,7 +99,7 @@ extern RRDR *rrdr_create(struct rrdset *st, long n);
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"
 
-extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_requested, long long before_requested, RRDR_GROUPING group_method, long resampling_time_requested, RRDR_OPTIONS options, const char *dimensions);
+extern RRDR *rrd2rrdr(RRDSET *st, long points_requested, long long after_usec_requested, long long before_usec_requested, RRDR_GROUPING group_method, long long resampling_usec_requested, RRDR_OPTIONS options, const char *dimensions);
 
 #include "query.h"
 

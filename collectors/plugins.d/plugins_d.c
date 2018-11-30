@@ -283,9 +283,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             int priority = 1000;
             if(likely(priority_s && *priority_s)) priority = str2i(priority_s);
 
-            int update_every = cd->update_every;
+            int update_every = cd->update_every_usec;
             if(likely(update_every_s && *update_every_s)) update_every = str2i(update_every_s);
-            if(unlikely(!update_every)) update_every = cd->update_every;
+            if(unlikely(!update_every)) update_every = cd->update_every_usec;
 
             RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
             if(unlikely(chart)) chart_type = rrdset_type_id(chart);
@@ -538,7 +538,7 @@ void *pluginsd_worker_thread(void *arg) {
 
                 if(likely(cd->serial_failures <= 10)) {
                     error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
-                    sleep((unsigned int) (cd->update_every * 10));
+                    sleep((unsigned int) (cd->update_every_usec * 10));
                 }
                 else {
                     error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
@@ -554,7 +554,7 @@ void *pluginsd_worker_thread(void *arg) {
 
                 if(likely(cd->serial_failures <= 10)) {
                     error("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is now disabled.");
-                    sleep((unsigned int) (cd->update_every * 10));
+                    sleep((unsigned int) (cd->update_every_usec * 10));
                 }
                 else {
                     error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
@@ -562,7 +562,7 @@ void *pluginsd_worker_thread(void *arg) {
                 }
             }
             else
-                sleep((unsigned int) cd->update_every);
+                sleep((unsigned int) cd->update_every_usec);
         }
         cd->pid = 0;
 
@@ -663,11 +663,11 @@ void *pluginsd_main(void *ptr) {
                     snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", directory_name, cd->filename);
 
                     cd->enabled = enabled;
-                    cd->update_every = (int) config_get_number(cd->id, "update every", localhost->rrd_update_every);
+                    cd->update_every_usec = (int) config_get_usec(cd->id, "update every", localhost->rrd_update_every_usec);
                     cd->started_t = now_realtime_sec();
 
                     char *def = "";
-                    snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
+                    snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %llu %s", cd->fullfilename, cd->update_every_usec, config_get(cd->id, "command options", def));
 
                     // link it
                     if(likely(pluginsd_root)) cd->next = pluginsd_root;

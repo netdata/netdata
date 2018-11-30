@@ -40,7 +40,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
 
-    rc->last_status_change = now_realtime_sec();
+    rc->last_status_change_usec = now_realtime_sec();
     rc->rrdset = st;
 
     rc->rrdset_next = st->alarms;
@@ -51,9 +51,9 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     st->alarms = rc;
 
-    if(rc->update_every < rc->rrdset->update_every) {
-        error("Health alarm '%s.%s' has update every %d, less than chart update every %d. Setting alarm update frequency to %d.", rc->rrdset->id, rc->name, rc->update_every, rc->rrdset->update_every, rc->rrdset->update_every);
-        rc->update_every = rc->rrdset->update_every;
+    if(rc->update_every_usec < rc->rrdset->update_every_usec) {
+        error("Health alarm '%s.%s' has update every %llu, less than chart update every %llu. Setting alarm update frequency to %llu.", rc->rrdset->id, rc->name, rc->update_every_usec, rc->rrdset->update_every_usec, rc->rrdset->update_every_usec);
+        rc->update_every_usec = rc->rrdset->update_every_usec;
     }
 
     if(!isnan(rc->green) && isnan(st->green)) {
@@ -93,7 +93,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->rrdset->family,
                 rc->exec,
                 rc->recipient,
-                now - rc->last_status_change,
+                now - rc->last_status_change_usec,
                 rc->old_value,
                 rc->value,
                 rc->status,
@@ -154,7 +154,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->rrdset->family,
                 rc->exec,
                 rc->recipient,
-                now - rc->last_status_change,
+                now - rc->last_status_change_usec,
                 rc->old_value,
                 rc->value,
                 rc->status,
@@ -259,24 +259,24 @@ inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     if(rc->calculation) {
         rc->calculation->status = &rc->status;
         rc->calculation->this = &rc->value;
-        rc->calculation->after = &rc->db_after;
-        rc->calculation->before = &rc->db_before;
+        rc->calculation->after_usec = &rc->db_after_usec;
+        rc->calculation->before_usec = &rc->db_before_usec;
         rc->calculation->rrdcalc = rc;
     }
 
     if(rc->warning) {
         rc->warning->status = &rc->status;
         rc->warning->this = &rc->value;
-        rc->warning->after = &rc->db_after;
-        rc->warning->before = &rc->db_before;
+        rc->warning->after_usec = &rc->db_after_usec;
+        rc->warning->before_usec = &rc->db_before_usec;
         rc->warning->rrdcalc = rc;
     }
 
     if(rc->critical) {
         rc->critical->status = &rc->status;
         rc->critical->this = &rc->value;
-        rc->critical->after = &rc->db_after;
-        rc->critical->before = &rc->db_before;
+        rc->critical->after_usec = &rc->db_after_usec;
+        rc->critical->before_usec = &rc->db_before_usec;
         rc->critical->rrdcalc = rc;
     }
 
@@ -323,15 +323,15 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
     rc->value = NAN;
     rc->old_value = NAN;
 
-    rc->delay_up_duration = rt->delay_up_duration;
-    rc->delay_down_duration = rt->delay_down_duration;
-    rc->delay_max_duration = rt->delay_max_duration;
+    rc->delay_up_usec = rt->delay_up_duration;
+    rc->delay_down_usec = rt->delay_down_duration;
+    rc->delay_max_usec = rt->delay_max_duration;
     rc->delay_multiplier = rt->delay_multiplier;
 
     rc->group = rt->group;
-    rc->after = rt->after;
-    rc->before = rt->before;
-    rc->update_every = rt->update_every;
+    rc->after_usec = rt->after_usec;
+    rc->before_usec = rt->before_usec;
+    rc->update_every_usec = rt->update_every_usec;
     rc->options = rt->options;
 
     if(rt->exec) rc->exec = strdupz(rt->exec);
@@ -356,7 +356,7 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %lld, before %lld, options %u, dimensions '%s', update every %llu, calculation '%s', warning '%s', critical '%s', source '%s', delay up %lld, delay down %lld, delay max %lld, delay_multiplier %f",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -364,18 +364,18 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             rc->green,
             rc->red,
             (int)rc->group,
-            rc->after,
-            rc->before,
+            rc->after_usec,
+            rc->before_usec,
             rc->options,
             (rc->dimensions)?rc->dimensions:"NONE",
-            rc->update_every,
+            rc->update_every_usec,
             (rc->calculation)?rc->calculation->parsed_as:"NONE",
             (rc->warning)?rc->warning->parsed_as:"NONE",
             (rc->critical)?rc->critical->parsed_as:"NONE",
             rc->source,
-            rc->delay_up_duration,
-            rc->delay_down_duration,
-            rc->delay_max_duration,
+            rc->delay_up_usec,
+            rc->delay_down_usec,
+            rc->delay_max_usec,
             rc->delay_multiplier
     );
 

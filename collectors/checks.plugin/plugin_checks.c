@@ -16,7 +16,7 @@ static void checks_main_cleanup(void *ptr) {
 void *checks_main(void *ptr) {
     netdata_thread_cleanup_push(checks_main_cleanup, ptr);
 
-    usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
+    usec_t usec = 0, susec = localhost->rrd_update_every_usec * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
     struct timeval now, last, loop;
 
     RRDSET *check1, *check2, *check3, *apps_cpu = NULL;
@@ -32,7 +32,7 @@ void *checks_main(void *ptr) {
             , "checks.plugin"
             , ""
             , NETDATA_CHART_PRIO_CHECKS
-            , localhost->rrd_update_every
+            , localhost->rrd_update_every_usec
             , RRDSET_TYPE_LINE
     );
 
@@ -50,7 +50,7 @@ void *checks_main(void *ptr) {
             , "checks.plugin"
             , ""
             , NETDATA_CHART_PRIO_CHECKS
-            , localhost->rrd_update_every
+            , localhost->rrd_update_every_usec
             , RRDSET_TYPE_LINE
     );
     rrddim_add(check2, "absolute", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -67,7 +67,7 @@ void *checks_main(void *ptr) {
             , "checks.plugin"
             , ""
             , NETDATA_CHART_PRIO_CHECKS
-            , localhost->rrd_update_every
+            , localhost->rrd_update_every_usec
             , RRDSET_TYPE_LINE
     );
     rrddim_add(check3, "caller", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -84,8 +84,8 @@ void *checks_main(void *ptr) {
         usec = loop_usec - susec;
         debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
 
-        if(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
-        else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;
+        if(usec < (localhost->rrd_update_every_usec * USEC_PER_SEC / 2ULL)) susec = (localhost->rrd_update_every_usec * USEC_PER_SEC) - usec;
+        else susec = localhost->rrd_update_every_usec * USEC_PER_SEC / 2ULL;
 
         // --------------------------------------------------------------------
         // Calculate loop time

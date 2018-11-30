@@ -110,14 +110,14 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
                                "\t\t\"name\":\"%s\",\n"
                                "\t\t\"context\":\"%s\",\n"
                                "\t\t\"units\":\"%s\",\n"
-                               "\t\t\"last_updated\": %ld,\n"
+                               "\t\t\"last_updated\": %llu,\n"
                                "\t\t\"dimensions\": {"
                            , chart_counter?",":""
                            , st->id
                            , st->name
                            , st->context
                            , st->units
-                           , rrdset_last_entry_t(st)
+                           , rrdset_last_entry_usec(st) / USEC_PER_SEC
             );
 
             chart_counter++;

@@ -42,7 +42,7 @@ struct rrdvar {
 
     void *value;
 
-    time_t last_updated;
+    usec_t last_updated_usec;
 };
 
 #define RRDVAR_MAX_LENGTH 1024

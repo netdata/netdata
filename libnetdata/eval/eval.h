@@ -29,8 +29,8 @@ typedef struct eval_expression {
 
     RRDCALC_STATUS *status;
     calculated_number *this;
-    time_t *after;
-    time_t *before;
+    usec_t *after_usec;
+    usec_t *before_usec;
 
     calculated_number result;
 

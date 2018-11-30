@@ -146,6 +146,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
+            if(rd->update_every_usec < USEC_PER_MS)
+                rd->update_every_usec *= USEC_PER_SEC;
+
             if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(rd, 0, size);
             }
@@ -162,13 +165,13 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                     memset(rd, 0, size);
                     reset = 1;
                 }
-                else if(rd->update_every != st->update_every) {
-                    error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd->update_every);
+                else if(rd->update_every_usec != st->update_every_usec) {
+                    error("File %s does not have the same update frequency, expected %llu but found %llu. Clearing it.", fullfilename, st->update_every_usec, rd->update_every_usec);
                     memset(rd, 0, size);
                     reset = 1;
                 }
-                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                    info("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
+                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every_usec)) {
+                    info("File %s is too old (last collected %llu usec ago, but the database is %llu usec long). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time), rd->entries * rd->update_every_usec);
                     memset(rd, 0, size);
                     reset = 1;
                 }
@@ -225,7 +228,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(!rd->divisor) rd->divisor = 1;
 
     rd->entries = st->entries;
-    rd->update_every = st->update_every;
+    rd->update_every_usec = st->update_every_usec;
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collections_counter = 1;

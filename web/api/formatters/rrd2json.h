@@ -57,10 +57,10 @@ extern int rrdset2anything_api_v1(
         , BUFFER *dimensions
         , uint32_t format
         , long points
-        , long long after
-        , long long before
+        , long long after_usec
+        , long long before_usec
         , int group_method
-        , long group_time
+        , long long group_time_usec
         , uint32_t options
         , time_t *latest_timestamp
 );
@@ -71,13 +71,13 @@ extern int rrdset2value_api_v1(
         , calculated_number *n
         , const char *dimensions
         , long points
-        , long long after
-        , long long before
+        , long long after_usec
+        , long long before_usec
         , int group_method
-        , long group_time
+        , long long group_time_usec
         , uint32_t options
-        , time_t *db_after
-        , time_t *db_before
+        , usec_t *db_after_usec
+        , usec_t *db_before_usec
         , int *value_is_null
 );
 

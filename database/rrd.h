@@ -22,13 +22,12 @@ typedef struct alarm_entry ALARM_ENTRY;
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
 
-#define UPDATE_EVERY 1
-#define UPDATE_EVERY_MAX 3600
+#define UPDATE_EVERY_USEC (1 * USEC_PER_SEC)
 
-#define RRD_DEFAULT_HISTORY_ENTRIES 3600
-#define RRD_HISTORY_ENTRIES_MAX (86400*365)
+#define RRD_DEFAULT_HISTORY_ENTRIES 3600       // an hour
+#define RRD_HISTORY_ENTRIES_MAX (86400*365*10) // 10 years
 
-extern int default_rrd_update_every;
+extern usec_t default_rrd_update_every_usec;
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
 
@@ -210,7 +209,7 @@ struct rrddim {
                                                     // this is the same to the entries of the data set
                                                     // we set it here, to check the data when we load it from disk.
 
-    int update_every;                               // every how many seconds is this updated
+    usec_t update_every_usec;                       // every how many seconds is this updated
 
     size_t memsize;                                 // the memory allocated for this dimension
 
@@ -233,6 +232,7 @@ struct rrddim {
 #define rrddim_foreach_write(rd, st) \
     for((rd) = (st)->dimensions, rrdset_check_wrlock(st); (rd) ; (rd) = (rd)->next)
 
+#define timeval2usec(tv) ((tv)->tv_sec * USEC_PER_SEC + (tv)->tv_usec)
 
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
@@ -299,19 +299,19 @@ struct rrdset {
 
     RRDSET_TYPE chart_type;                         // line, area, stacked
 
-    int update_every;                               // every how many seconds is this updated?
+    usec_t update_every_usec;                       // every how many seconds is this updated?
 
-    long entries;                                   // total number of entries in the data set
+    size_t entries;                                 // total number of entries in the data set
 
-    long current_entry;                             // the entry that is currently being updated
+    size_t current_entry;                           // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
 
     RRDSET_FLAGS flags;                             // configuration flags
 
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
+    size_t gap_when_lost_iterations_above;          // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
 
-    long priority;                                  // the sorting priority of this chart
+    size_t priority;                                // the sorting priority of this chart
 
 
     // ------------------------------------------------------------------------
@@ -328,7 +328,7 @@ struct rrdset {
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
     time_t last_accessed_time;                      // the last time this RRDSET has been accessed
-    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
+    usec_t upstream_resync_usec;                    // the timestamp up to which we should resync clock upstream
 
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
@@ -507,8 +507,8 @@ struct rrdhost {
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
 
-    int rrd_update_every;                           // the update frequency of the host
-    long rrd_history_entries;                       // the number of history entries for the host's charts
+    usec_t rrd_update_every_usec;                   // the update frequency of the host
+    size_t rrd_history_entries;                     // the number of history entries for the host's charts
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     char *cache_dir;                                // the directory to save RRD cache files
@@ -556,7 +556,7 @@ struct rrdhost {
     // health monitoring options
 
     unsigned int health_enabled:1;                  // 1 when this host has health enabled
-    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
+    usec_t health_delay_up_to_usec;                 // a timestamp to delay alarms processing up to
     char *health_default_exec;                      // the full path of the alarms notifications program
     char *health_default_recipient;                 // the default recipient for all alarms
     char *health_log_filename;                      // the alarms event log filename
@@ -645,8 +645,8 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *tags
         , const char *program_name
         , const char *program_version
-        , int update_every
-        , long history
+        , usec_t update_every_usec
+        , size_t history
         , RRD_MEMORY_MODE mode
         , unsigned int health_enabled
         , unsigned int rrdpush_enabled
@@ -694,17 +694,17 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *units
                              , const char *plugin
                              , const char *module
-                             , long priority
-                             , int update_every
+                             , size_t priority
+                             , usec_t update_every_usec
                              , RRDSET_TYPE chart_type
                              , RRD_MEMORY_MODE memory_mode
-                             , long history_entries);
+                             , size_t history_entries);
 
-#define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
+#define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every_usec, chart_type) \
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every_usec, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
 
-#define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
-    rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
+#define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every_usec, chart_type) \
+    rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every_usec, chart_type)
 
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
@@ -726,7 +726,6 @@ extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *i
 #define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
 
 extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-#define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
@@ -741,14 +740,23 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_HIDDEN) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
 #define rrdset_is_available_for_backends(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
-// get the total duration in seconds of the round robin database
-#define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
+// get the total duration in usec of the round robin database
+static inline usec_t rrdset_duration_usec(RRDSET *st) {
+    if(st->counter >= st->entries)
+        return st->entries * st->update_every_usec;
+    else
+        return st->counter * st->update_every_usec;
+}
 
-// get the timestamp of the last entry in the round robin database
-#define rrdset_last_entry_t(st) ((time_t)(((st)->last_updated.tv_sec)))
+// get the usec timestamp of the last entry in the round robin database
+static inline usec_t rrdset_last_entry_usec(RRDSET *st) {
+    return st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+}
 
-// get the timestamp of first entry in the round robin database
-#define rrdset_first_entry_t(st) ((time_t)(rrdset_last_entry_t(st) - rrdset_duration(st)))
+// get the usec timestamp of first entry in the round robin database
+static inline usec_t rrdset_first_entry_usec(RRDSET *st) {
+    return rrdset_last_entry_usec(st) - rrdset_duration_usec(st);
+}
 
 // get the last slot updated in the round robin database
 #define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
@@ -773,37 +781,37 @@ static inline size_t rrdset_first_slot(RRDSET *st) {
 
 // get the slot of the round robin database, for the given timestamp (t)
 // it always returns a valid slot, although may not be for the time requested if the time is outside the round robin database
-static inline size_t rrdset_time2slot(RRDSET *st, time_t t) {
+static inline size_t rrdset_time2slot(RRDSET *st, usec_t t) {
     size_t ret = 0;
 
-    if(t >= rrdset_last_entry_t(st)) {
+    if(t >= rrdset_last_entry_usec(st)) {
         // the requested time is after the last entry we have
         ret = rrdset_last_slot(st);
     }
     else {
-        if(t <= rrdset_first_entry_t(st)) {
+        if(t <= rrdset_first_entry_usec(st)) {
             // the requested time is before the first entry we have
             ret = rrdset_first_slot(st);
         }
         else {
-            if(rrdset_last_slot(st) >= ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)))
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every));
+            if(rrdset_last_slot(st) >= ((rrdset_last_entry_usec(st) - t) / st->update_every_usec))
+                ret = rrdset_last_slot(st) - ((rrdset_last_entry_usec(st) - t) / st->update_every_usec);
             else
-                ret = rrdset_last_slot(st) - ((rrdset_last_entry_t(st) - t) / (size_t)(st->update_every)) + (unsigned long)st->entries;
+                ret = rrdset_last_slot(st) - ((rrdset_last_entry_usec(st) - t) / st->update_every_usec) + st->entries;
         }
     }
 
     if(unlikely(ret >= (size_t)st->entries)) {
         error("INTERNAL ERROR: rrdset_time2slot() on %s returns values outside entries", st->name);
-        ret = (size_t)(st->entries - 1);
+        ret = st->entries - 1;
     }
 
     return ret;
 }
 
 // get the timestamp of a specific slot in the round robin database
-static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
-    time_t ret;
+static inline usec_t rrdset_slot2time(RRDSET *st, size_t slot) {
+    usec_t ret;
 
     if(slot >= (size_t)st->entries) {
         error("INTERNAL ERROR: caller of rrdset_slot2time() gives invalid slot %zu", slot);
@@ -811,20 +819,20 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
     }
 
     if(slot > rrdset_last_slot(st)) {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every * (rrdset_last_slot(st) - slot + (size_t)st->entries);
+        ret = rrdset_last_entry_usec(st) - (size_t)st->update_every_usec * (rrdset_last_slot(st) - slot + (size_t)st->entries);
     }
     else {
-        ret = rrdset_last_entry_t(st) - (size_t)st->update_every;
+        ret = rrdset_last_entry_usec(st) - (size_t)st->update_every_usec;
     }
 
-    if(unlikely(ret < rrdset_first_entry_t(st))) {
+    if(unlikely(ret < rrdset_first_entry_usec(st))) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time too far in the past", st->name);
-        ret = rrdset_first_entry_t(st);
+        ret = rrdset_first_entry_usec(st);
     }
 
-    if(unlikely(ret > rrdset_last_entry_t(st))) {
+    if(unlikely(ret > rrdset_last_entry_usec(st))) {
         error("INTERNAL ERROR: rrdset_slot2time() on %s returns time into the future", st->name);
-        ret = rrdset_last_entry_t(st);
+        ret = rrdset_last_entry_usec(st);
     }
 
     return ret;
@@ -849,7 +857,7 @@ extern int rrddim_unhide(RRDSET *st, const char *id);
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
-extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+extern size_t align_entries_to_pagesize(RRD_MEMORY_MODE mode, size_t entries);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

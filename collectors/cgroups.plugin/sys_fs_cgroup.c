@@ -31,8 +31,8 @@ static int cgroup_used_memory_without_cache = CONFIG_BOOLEAN_YES;
 static int cgroup_search_in_devices = 1;
 
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
-static int cgroup_check_for_new_every = 10;
-static int cgroup_update_every = 1;
+static usec_t cgroup_check_for_new_every_usec = 10;
+static usec_t cgroup_update_every_usec = 1;
 
 static int cgroup_recheck_zero_blkio_every_iterations = 10;
 static int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
@@ -70,13 +70,13 @@ void read_cgroup_plugin_configuration() {
     user_hash = simple_hash("user");
     system_hash = simple_hash("system");
 
-    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", localhost->rrd_update_every);
-    if(cgroup_update_every < localhost->rrd_update_every)
-        cgroup_update_every = localhost->rrd_update_every;
+    cgroup_update_every_usec = config_get_usec("plugin:cgroups", "update every", localhost->rrd_update_every_usec);
+    if(cgroup_update_every_usec < localhost->rrd_update_every_usec)
+        cgroup_update_every_usec = localhost->rrd_update_every_usec;
 
-    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
-    if(cgroup_check_for_new_every < cgroup_update_every)
-        cgroup_check_for_new_every = cgroup_update_every;
+    cgroup_check_for_new_every_usec = config_get_usec("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every_usec * (long long)cgroup_update_every_usec);
+    if(cgroup_check_for_new_every_usec < cgroup_update_every_usec)
+        cgroup_check_for_new_every_usec = cgroup_update_every_usec;
 
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
@@ -2711,8 +2711,8 @@ void *cgroups_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = cgroup_update_every * USEC_PER_SEC;
-    usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
+    usec_t step = cgroup_update_every_usec * USEC_PER_SEC;
+    usec_t find_every = cgroup_check_for_new_every_usec * USEC_PER_SEC, find_dt = 0;
 
     while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
@@ -2728,7 +2728,7 @@ void *cgroups_main(void *ptr) {
         }
 
         read_all_cgroups(cgroup_root);
-        update_cgroup_charts(cgroup_update_every);
+        update_cgroup_charts(cgroup_update_every_usec);
 
         // END -- the job is done
 
@@ -2750,7 +2750,7 @@ void *cgroups_main(void *ptr) {
                         , PLUGIN_CGROUPS_NAME
                         , "stats"
                         , 132000
-                        , cgroup_update_every
+                        , cgroup_update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 

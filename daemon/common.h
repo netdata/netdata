@@ -14,12 +14,14 @@
 #define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
+#define config_get_usec(section, name, value) appconfig_get_usec(&netdata_config, section, name, value)
 
 #define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
 #define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
 #define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
 #define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
 #define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
+#define config_set_usec(section, name, value) appconfig_set_usec(&netdata_config, section, name, value)
 
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
 #define config_move(section_old, name_old, section_new, name_new) appconfig_move(&netdata_config, section_old, name_old, section_new, name_new)

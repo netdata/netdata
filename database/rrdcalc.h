@@ -44,7 +44,7 @@ struct rrdcalc {
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm
 
-    int update_every;               // update frequency for the alarm
+    usec_t update_every_usec;       // update frequency for the alarm
 
     // the red and green threshold of this alarm (to be set to the chart)
     calculated_number green;
@@ -54,9 +54,9 @@ struct rrdcalc {
     // database lookup settings
 
     char *dimensions;               // the chart dimensions
-    RRDR_GROUPING group;               // grouping method: average, max, etc.
-    int before;                     // ending point in time-series
-    int after;                      // starting point in time-series
+    RRDR_GROUPING group;            // grouping method: average, max, etc.
+    long long before_usec;          // ending point in time-series
+    long long after_usec;           // starting point in time-series
     uint32_t options;               // calculation options
 
     // ------------------------------------------------------------------------
@@ -69,9 +69,9 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // notification delay settings
 
-    int delay_up_duration;         // duration to delay notifications when alarm raises
-    int delay_down_duration;       // duration to delay notifications when alarm lowers
-    int delay_max_duration;        // the absolute max delay to apply to this alarm
+    long long delay_up_usec;   // duration to delay notifications when alarm raises
+    long long delay_down_usec; // duration to delay notifications when alarm lowers
+    long long delay_max_usec;  // the absolute max delay to apply to this alarm
     float delay_multiplier;        // multiplier for all delays when alarms switch status
     // while now < delay_up_to
 
@@ -85,17 +85,17 @@ struct rrdcalc {
 
     uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
 
-    time_t last_updated;            // the last update timestamp of the alarm
-    time_t next_update;             // the next update timestamp of the alarm
-    time_t last_status_change;      // the timestamp of the last time this alarm changed status
+    usec_t last_updated_usec;       // the last update timestamp of the alarm
+    usec_t next_update_usec;        // the next update timestamp of the alarm
+    usec_t last_status_change_usec; // the timestamp of the last time this alarm changed status
 
-    time_t db_after;                // the first timestamp evaluated by the db lookup
-    time_t db_before;               // the last timestamp evaluated by the db lookup
+    usec_t db_after_usec;           // the first timestamp evaluated by the db lookup
+    usec_t db_before_usec;          // the last timestamp evaluated by the db lookup
 
-    time_t delay_up_to_timestamp;   // the timestamp up to which we should delay notifications
-    int delay_up_current;           // the current up notification delay duration
-    int delay_down_current;         // the current down notification delay duration
-    int delay_last;                 // the last delay we used
+    usec_t delay_up_to_timestamp_usec; // the timestamp up to which we should delay notifications
+    long long delay_up_current_usec;   // the current up notification delay duration
+    long long delay_down_current_usec; // the current down notification delay duration
+    long long delay_last_usec;         // the last delay we used
 
     // ------------------------------------------------------------------------
     // variables this alarm exposes to the rest of the alarms
@@ -117,7 +117,7 @@ struct rrdcalc {
     struct rrdcalc *next;
 };
 
-#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
+#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after_usec)
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
 extern void rrdsetcalc_unlink(RRDCALC *rc);

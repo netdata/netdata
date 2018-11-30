@@ -130,7 +130,7 @@ RRDR *rrdr_create(RRDSET *st, long n)
     }
 
     r->group = 1;
-    r->update_every = 1;
+    r->update_every_usec = 1;
 
     return r;
 }

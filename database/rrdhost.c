@@ -115,7 +115,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *tags,
                         const char *program_name,
                         const char *program_version,
-                        int update_every,
+                        usec_t update_every_usec,
                         long entries,
                         RRD_MEMORY_MODE memory_mode,
                         unsigned int health_enabled,
@@ -131,7 +131,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every    = (update_every > 0)?update_every:1;
+    host->rrd_update_every_usec    = (update_every_usec > 0)?update_every_usec:1 * USEC_PER_SEC;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
@@ -276,9 +276,9 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", tags '%s'"
                      ", program_name '%s'"
                      ", program_version '%s'"
-                     ", update every %d"
+                     ", update every %llu"
                      ", memory mode %s"
-                     ", history entries %ld"
+                     ", history entries %zu"
                      ", streaming %s"
                      " (to '%s' with api key '%s')"
                      ", health %s"
@@ -295,7 +295,7 @@ RRDHOST *rrdhost_create(const char *hostname,
              , (host->tags)?host->tags:""
              , host->program_name
              , host->program_version
-             , host->rrd_update_every
+             , host->rrd_update_every_usec
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
              , host->rrdpush_send_enabled?"enabled":"disabled"
@@ -324,8 +324,8 @@ RRDHOST *rrdhost_find_or_create(
         , const char *tags
         , const char *program_name
         , const char *program_version
-        , int update_every
-        , long history
+        , usec_t update_every_usec
+        , size_t history
         , RRD_MEMORY_MODE mode
         , unsigned int health_enabled
         , unsigned int rrdpush_enabled
@@ -347,7 +347,7 @@ RRDHOST *rrdhost_find_or_create(
                 , tags
                 , program_name
                 , program_version
-                , update_every
+                , update_every_usec
                 , history
                 , mode
                 , health_enabled
@@ -383,11 +383,11 @@ RRDHOST *rrdhost_find_or_create(
             freez(t);
         }
 
-        if(host->rrd_update_every != update_every)
-            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
+        if(host->rrd_update_every_usec != update_every_usec)
+            error("Host '%s' has an update frequency of %llu usec, but the wanted one is %llu usec. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every_usec, update_every_usec);
 
         if(host->rrd_history_entries < history)
-            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
+            error("Host '%s' has history of %zu entries, but the wanted one is %zu entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
 
         if(host->rrd_memory_mode != mode)
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
@@ -460,7 +460,7 @@ void rrd_init(char *hostname) {
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , program_name
             , program_version
-            , default_rrd_update_every
+            , default_rrd_update_every_usec
             , default_rrd_history_entries
             , default_rrd_memory_mode
             , default_health_enabled

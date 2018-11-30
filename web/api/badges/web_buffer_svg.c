@@ -983,30 +983,30 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         }
     }
 
-    long long multiply  = (multiply_str  && *multiply_str )?str2l(multiply_str):1;
-    long long divide    = (divide_str    && *divide_str   )?str2l(divide_str):1;
-    long long before    = (before_str    && *before_str   )?str2l(before_str):0;
-    long long after     = (after_str     && *after_str    )?str2l(after_str):-st->update_every;
-    int       points    = (points_str    && *points_str   )?str2i(points_str):1;
-    int       precision = (precision_str && *precision_str)?str2i(precision_str):-1;
+    long long multiply    = (multiply_str  && *multiply_str )?str2l(multiply_str):1;
+    long long divide      = (divide_str    && *divide_str   )?str2l(divide_str):1;
+    long long before_usec = (before_str    && *before_str   )?str2duration(before_str):0;
+    long long after_usec  = (after_str     && *after_str    )?str2duration(after_str):-(long long)st->update_every_usec;
+    int       points      = (points_str    && *points_str   )?str2i(points_str):1;
+    int       precision   = (precision_str && *precision_str)?str2i(precision_str):-1;
 
     if(!multiply) multiply = 1;
     if(!divide) divide = 1;
 
-    int refresh = 0;
+    long long refresh_usec = 0;
     if(refresh_str && *refresh_str) {
         if(!strcmp(refresh_str, "auto")) {
-            if(rc) refresh = rc->update_every;
+            if(rc) refresh_usec = rc->update_every_usec;
             else if(options & RRDR_OPTION_NOT_ALIGNED)
-                refresh = st->update_every;
+                refresh_usec = st->update_every_usec;
             else {
-                refresh = (int)(before - after);
-                if(refresh < 0) refresh = -refresh;
+                refresh_usec = (int)(before_usec - after_usec);
+                if(refresh_usec < 0) refresh_usec = -refresh_usec;
             }
         }
         else {
-            refresh = str2i(refresh_str);
-            if(refresh < 0) refresh = -refresh;
+            refresh_usec = str2i(refresh_str);
+            if(refresh_usec < 0) refresh_usec = -refresh_usec;
         }
     }
 
@@ -1045,17 +1045,17 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
           , chart
           , alarm?alarm:""
           , (dimensions)?buffer_tostring(dimensions):""
-          , after
-          , before
+          , after_usec
+          , before_usec
           , points
           , group
           , options
     );
 
     if(rc) {
-        if (refresh > 0) {
-            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
+        if (refresh_usec >= (long long)USEC_PER_SEC) {
+            buffer_sprintf(w->response.header, "Refresh: %llu\r\n", refresh_usec / USEC_PER_SEC);
+            w->response.data->expires = now_realtime_sec() + refresh_usec;
         }
         else buffer_no_cacheable(w->response.data);
 
@@ -1100,15 +1100,15 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = 200;
     }
     else {
-        time_t latest_timestamp = 0;
+        usec_t latest_timestamp_usec = 0;
         int value_is_null = 1;
         calculated_number n = NAN;
         ret = 500;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_usec(st) >= (now_realtime_sec() - (st->update_every_usec * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
+                                      , points, after_usec, before_usec, group, 0, options, NULL, &latest_timestamp_usec, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
@@ -1117,9 +1117,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             n = 0;
             ret = 200;
         }
-        else if (refresh > 0) {
-            buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
-            w->response.data->expires = now_realtime_sec() + refresh;
+        else if (refresh_usec > (long long)USEC_PER_SEC) {
+            buffer_sprintf(w->response.header, "Refresh: %llu\r\n", refresh_usec / USEC_PER_SEC);
+            w->response.data->expires = now_realtime_sec() + refresh_usec;
         }
         else buffer_no_cacheable(w->response.data);
 

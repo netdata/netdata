@@ -129,13 +129,13 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"last_status_change\": %lu,\n"
                     "\t\t\t\"last_updated\": %lu,\n"
                     "\t\t\t\"next_update\": %lu,\n"
-                    "\t\t\t\"update_every\": %d,\n"
-                    "\t\t\t\"delay_up_duration\": %d,\n"
-                    "\t\t\t\"delay_down_duration\": %d,\n"
-                    "\t\t\t\"delay_max_duration\": %d,\n"
+                    "\t\t\t\"update_every_usec\": %llu,\n"
+                    "\t\t\t\"delay_up_usec\": %lld,\n"
+                    "\t\t\t\"delay_down_usec\": %lld,\n"
+                    "\t\t\t\"delay_max_usec\": %lld,\n"
                     "\t\t\t\"delay_multiplier\": %f,\n"
-                    "\t\t\t\"delay\": %d,\n"
-                    "\t\t\t\"delay_up_to_timestamp\": %lu,\n"
+                    "\t\t\t\"delay_usec\": %lld,\n"
+                    "\t\t\t\"delay_up_to_timestamp_usec\": %llu,\n"
                     "\t\t\t\"value_string\": \"%s\",\n"
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
@@ -149,16 +149,16 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->units?rc->units:""
                    , rc->info?rc->info:""
                    , rrdcalc_status2string(rc->status)
-                   , (unsigned long)rc->last_status_change
-                   , (unsigned long)rc->last_updated
-                   , (unsigned long)rc->next_update
-                   , rc->update_every
-                   , rc->delay_up_duration
-                   , rc->delay_down_duration
-                   , rc->delay_max_duration
+                   , (unsigned long)rc->last_status_change_usec
+                   , (unsigned long)rc->last_updated_usec
+                   , (unsigned long)rc->next_update_usec
+                   , rc->update_every_usec
+                   , rc->delay_up_usec
+                   , rc->delay_down_usec
+                   , rc->delay_max_usec
                    , rc->delay_multiplier
-                   , rc->delay_last
-                   , (unsigned long)rc->delay_up_to_timestamp
+                   , rc->delay_last_usec
+                   , rc->delay_up_to_timestamp_usec
                    , value_string
     );
 
@@ -171,17 +171,17 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
             health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->dimensions, ",\n");
 
         buffer_sprintf(wb,
-                "\t\t\t\"db_after\": %lu,\n"
-                        "\t\t\t\"db_before\": %lu,\n"
+                "\t\t\t\"db_after_usec\": %llu,\n"
+                        "\t\t\t\"db_before_usec\": %llu,\n"
                         "\t\t\t\"lookup_method\": \"%s\",\n"
-                        "\t\t\t\"lookup_after\": %d,\n"
-                        "\t\t\t\"lookup_before\": %d,\n"
+                        "\t\t\t\"lookup_after_usec\": %lld,\n"
+                        "\t\t\t\"lookup_before_usec\": %lld,\n"
                         "\t\t\t\"lookup_options\": \"",
-                (unsigned long) rc->db_after,
-                (unsigned long) rc->db_before,
+                rc->db_after_usec,
+                rc->db_before_usec,
                 group_method2string(rc->group),
-                rc->after,
-                rc->before
+                rc->after_usec,
+                rc->before_usec
         );
         buffer_data_options2string(wb, rc->options);
         buffer_strcat(wb, "\",\n");

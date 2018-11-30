@@ -32,11 +32,11 @@ extern int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st)
 extern calculated_number backend_calculate_value_from_stored_data(
         RRDSET *st                  // the chart
         , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+        , usec_t after_usec              // the start timestamp
+        , usec_t before_usec             // the end timestamp
         , BACKEND_OPTIONS backend_options  // BACKEND_SOURCE_* bitmap
-        , time_t *first_timestamp   // the timestamp of the first point used in this response
-        , time_t *last_timestamp    // the timestamp that should be reported to backend
+        , usec_t *first_timestamp_usec   // the timestamp of the first point used in this response
+        , usec_t *last_timestamp_usec    // the timestamp that should be reported to backend
 );
 
 extern size_t backend_name_copy(char *d, const char *s, size_t usable);

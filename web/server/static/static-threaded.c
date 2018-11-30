@@ -275,7 +275,7 @@ static void web_server_tmr_callback(void *timer_data) {
                 , "web"
                 , "stats"
                 , 132000 + worker_private->id
-                , default_rrd_update_every
+                , default_rrd_update_every_usec
                 , RRDSET_TYPE_STACKED
         );
 
@@ -328,7 +328,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , NULL
                         , web_client_first_request_timeout
                         , web_client_timeout
-                        , default_rrd_update_every * 1000 // timer_milliseconds
+                        , default_rrd_update_every_usec * 1000 // timer_milliseconds
                         , ptr // timer_data
                         , worker_private->max_sockets
             );

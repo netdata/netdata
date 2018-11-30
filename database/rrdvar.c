@@ -83,7 +83,7 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
         rv->type = type;
         rv->options = options;
         rv->value = value;
-        rv->last_updated = now_realtime_sec();
+        rv->last_updated_usec = now_realtime_usec();
 
         RRDVAR *ret = rrdvar_index_add(tree, rv);
         if(unlikely(ret != rv)) {
@@ -165,7 +165,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_numbe
         if(*v != value) {
             *v = value;
 
-            rv->last_updated = now_realtime_sec();
+            rv->last_updated_usec = now_realtime_usec();
 
             // if the host is streaming, send this variable upstream immediately
             rrdpush_sender_send_this_host_variable_now(host, rv);

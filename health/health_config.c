@@ -30,7 +30,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
-    if(!rc->update_every) {
+    if(!rc->update_every_usec) {
         error("Health configuration for alarm '%s.%s' has no frequency (parameter 'every'). Ignoring it.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
@@ -45,7 +45,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %lld, before %lld, options %u, dimensions '%s', update every %llu, calculation '%s', warning '%s', critical '%s', source '%s', delay up %lld, delay down %lld, delay max %lld, delay_multiplier %f",
             rc->chart?rc->chart:"NOCHART",
             rc->name,
             rc->id,
@@ -54,18 +54,18 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             rc->green,
             rc->red,
             (int)rc->group,
-            rc->after,
-            rc->before,
+            rc->after_usec,
+            rc->before_usec,
             rc->options,
             (rc->dimensions)?rc->dimensions:"NONE",
-            rc->update_every,
+            rc->update_every_usec,
             (rc->calculation)?rc->calculation->parsed_as:"NONE",
             (rc->warning)?rc->warning->parsed_as:"NONE",
             (rc->critical)?rc->critical->parsed_as:"NONE",
             rc->source,
-            rc->delay_up_duration,
-            rc->delay_down_duration,
-            rc->delay_max_duration,
+            rc->delay_up_usec,
+            rc->delay_down_usec,
+            rc->delay_max_usec,
             rc->delay_multiplier
     );
 
@@ -79,7 +79,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
-    if(unlikely(!rt->update_every)) {
+    if(unlikely(!rt->update_every_usec)) {
         error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rt->name);
         return 0;
     }
@@ -100,7 +100,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         }
     }
 
-    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %lld, before %lld, options %u, dimensions '%s', update every %llu, calculation '%s', warning '%s', critical '%s', source '%s', delay up %lld, delay down %lld, delay max %lld, delay_multiplier %f",
             rt->name,
             (rt->context)?rt->context:"NONE",
             (rt->exec)?rt->exec:"DEFAULT",
@@ -108,11 +108,11 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             rt->green,
             rt->red,
             (int)rt->group,
-            rt->after,
-            rt->before,
+            rt->after_usec,
+            rt->before_usec,
             rt->options,
             (rt->dimensions)?rt->dimensions:"NONE",
-            rt->update_every,
+            rt->update_every_usec,
             (rt->calculation)?rt->calculation->parsed_as:"NONE",
             (rt->warning)?rt->warning->parsed_as:"NONE",
             (rt->critical)?rt->critical->parsed_as:"NONE",
@@ -134,7 +134,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
     return 1;
 }
 
-static inline int health_parse_duration(char *string, int *result) {
+static inline long long health_parse_duration(char *string, long long *result) {
     // make sure it is a number
     if(!*string || !(isdigit(*string) || *string == '+' || *string == '-')) {
         *result = 0;
@@ -146,41 +146,48 @@ static inline int health_parse_duration(char *string, int *result) {
     if(e && *e) {
         switch (*e) {
             case 'Y':
-                *result = (int) (n * 86400 * 365);
+                *result = (long long) (n * 86400 * 365 * USEC_PER_SEC);
                 break;
             case 'M':
-                *result = (int) (n * 86400 * 30);
+                *result = (long long) (n * 86400 * 30 * USEC_PER_SEC);
                 break;
             case 'w':
-                *result = (int) (n * 86400 * 7);
+                *result = (long long) (n * 86400 * 7 * USEC_PER_SEC);
                 break;
             case 'd':
-                *result = (int) (n * 86400);
+                *result = (long long) (n * 86400 * USEC_PER_SEC);
                 break;
             case 'h':
-                *result = (int) (n * 3600);
+                *result = (long long) (n * 3600 * USEC_PER_SEC);
                 break;
             case 'm':
-                *result = (int) (n * 60);
+                *result = (long long) (n * 60 * USEC_PER_SEC);
                 break;
 
             default:
             case 's':
-                *result = (int) (n);
+                *result = (long long) (n * USEC_PER_SEC);
                 break;
         }
     }
     else
-        *result = (int)(n);
+        *result = (long long)(n * USEC_PER_SEC);
 
-    return 1;
+    return USEC_PER_SEC;
+}
+
+static inline usec_t health_parse_usec_t(char *string, usec_t *result) {
+    long long r;
+    health_parse_duration(string, &r);
+    *result = (usec_t)r;
+    return (usec_t)r;
 }
 
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
-        int *delay_up_duration,
-        int *delay_down_duration,
-        int *delay_max_duration,
+        long long *delay_up_duration,
+        long long *delay_down_duration,
+        long long *delay_max_duration,
         float *delay_multiplier) {
 
     char given_up = 0;
@@ -247,10 +254,10 @@ static inline int health_parse_delay(
 
     if(!given_max) {
         if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_up_duration) * (*delay_multiplier));
+            *delay_max_duration = (usec_t)((*delay_up_duration) * (*delay_multiplier));
 
         if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_down_duration) * (*delay_multiplier));
+            *delay_max_duration = (usec_t)((*delay_down_duration) * (*delay_multiplier));
     }
 
     return 1;
@@ -287,16 +294,16 @@ static inline uint32_t health_parse_options(const char *s) {
 
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
-        RRDR_GROUPING *group_method, int *after, int *before, int *every,
+        RRDR_GROUPING *group_method, long long *after_usec, long long *before_usec, usec_t *update_every_usec,
         uint32_t *options, char **dimensions
 ) {
     debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
     if(*dimensions) freez(*dimensions);
     *dimensions = NULL;
-    *after = 0;
-    *before = 0;
-    *every = 0;
+    *after_usec = 0;
+    *before_usec = 0;
+    *update_every_usec = 0;
     *options = 0;
 
     char *s = string, *key;
@@ -322,14 +329,14 @@ static inline int health_parse_db_lookup(
     while(*s && !isspace(*s)) s++;
     while(*s && isspace(*s)) *s++ = '\0';
 
-    if(!health_parse_duration(key, after)) {
+    if(!health_parse_duration(key, after_usec)) {
         error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
                 line, filename, key);
         return 0;
     }
 
     // sane defaults
-    *every = abs(*after);
+    *update_every_usec = abs(*after_usec);
 
     // now we may have optional parameters
     while(*s) {
@@ -343,7 +350,7 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_duration(value, before)) {
+            if (!health_parse_duration(value, before_usec)) {
                 error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -353,7 +360,7 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_duration(value, every)) {
+            if (!health_parse_usec_t(value, update_every_usec)) {
                 error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -607,12 +614,12 @@ static int health_readfile(const char *filename, void *data) {
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
-                        &rc->update_every,
+                health_parse_db_lookup(line, filename, value, &rc->group, &rc->after_usec, &rc->before_usec,
+                        &rc->update_every_usec,
                         &rc->options, &rc->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_duration(value, &rc->update_every))
+                if(!health_parse_usec_t(value, &rc->update_every_usec))
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rc->name, key, value);
             }
@@ -702,7 +709,7 @@ static int health_readfile(const char *filename, void *data) {
                 strip_quotes(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
-                health_parse_delay(line, filename, value, &rc->delay_up_duration, &rc->delay_down_duration, &rc->delay_max_duration, &rc->delay_multiplier);
+                health_parse_delay(line, filename, value, &rc->delay_up_usec, &rc->delay_down_usec, &rc->delay_max_usec, &rc->delay_multiplier);
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
@@ -732,11 +739,11 @@ static int health_readfile(const char *filename, void *data) {
                 rt->family_pattern = simple_pattern_create(rt->family_match, NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
-                        &rt->update_every, &rt->options, &rt->dimensions);
+                health_parse_db_lookup(line, filename, value, &rt->group, &rt->after_usec, &rt->before_usec,
+                        &rt->update_every_usec, &rt->options, &rt->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_duration(value, &rt->update_every))
+                if(!health_parse_usec_t(value, &rt->update_every_usec))
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rt->name, key, value);
             }

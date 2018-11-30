@@ -397,7 +397,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , PLUGIN_TC_NAME
                     , NULL
                     , NETDATA_CHART_PRIO_TC_QOS
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
 
@@ -445,7 +445,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , PLUGIN_TC_NAME
                     , NULL
                     , NETDATA_CHART_PRIO_TC_QOS_PACKETS
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
         }
@@ -498,7 +498,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , PLUGIN_TC_NAME
                     , NULL
                     , NETDATA_CHART_PRIO_TC_QOS_DROPPED
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED
             );
         }
@@ -551,7 +551,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , PLUGIN_TC_NAME
                     , NULL
                     , NETDATA_CHART_PRIO_TC_QOS_TOCKENS
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
         }
@@ -605,7 +605,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     , PLUGIN_TC_NAME
                     , NULL
                     , NETDATA_CHART_PRIO_TC_QOS_CTOCKENS
-                    , localhost->rrd_update_every
+                    , localhost->rrd_update_every_usec
                     , RRDSET_TYPE_LINE
             );
         }
@@ -887,7 +887,7 @@ void *tc_main(void *ptr) {
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
-        snprintfz(command, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
+        snprintfz(command, TC_LINE_MAX, "exec %s %llu", tc_script, localhost->rrd_update_every_usec);
         debug(D_TC_LOOP, "executing '%s'", command);
 
         fp = mypopen(command, (pid_t *)&tc_child_pid);
@@ -1081,7 +1081,7 @@ void *tc_main(void *ptr) {
                             , PLUGIN_TC_NAME
                             , NULL
                             , NETDATA_CHART_PRIO_NETDATA_TC_CPU
-                            , localhost->rrd_update_every
+                            , localhost->rrd_update_every_usec
                             , RRDSET_TYPE_STACKED
                     );
                     rd_user   = rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -1108,7 +1108,7 @@ void *tc_main(void *ptr) {
                             , PLUGIN_TC_NAME
                             , NULL
                             , NETDATA_CHART_PRIO_NETDATA_TC_TIME
-                            , localhost->rrd_update_every
+                            , localhost->rrd_update_every_usec
                             , RRDSET_TYPE_AREA
                     );
                     rd_run_time = rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1159,7 +1159,7 @@ void *tc_main(void *ptr) {
             goto cleanup;
         }
 
-        sleep((unsigned int) localhost->rrd_update_every);
+        sleep((unsigned int) localhost->rrd_update_every_usec);
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement

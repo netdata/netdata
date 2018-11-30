@@ -91,7 +91,7 @@ void *proc_main(void *ptr) {
         pm->rd = NULL;
     }
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    usec_t step = localhost->rrd_update_every_usec * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     size_t iterations = 0;
@@ -117,7 +117,7 @@ void *proc_main(void *ptr) {
 //            if(pm->func == do_proc_interrupts)
 //                log_thread_memory_allocations = iterations;
 //#endif
-            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+            pm->enabled = !pm->func(localhost->rrd_update_every_usec, hb_dt);
             pm->duration = heartbeat_monotonic_dt_to_now_usec(&hb) - duration;
             duration += pm->duration;
 
@@ -151,7 +151,7 @@ void *proc_main(void *ptr) {
                             , "netdata"
                             , "stats"
                             , 132001
-                            , localhost->rrd_update_every
+                            , localhost->rrd_update_every_usec
                             , RRDSET_TYPE_STACKED
                     );
 

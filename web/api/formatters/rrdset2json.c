@@ -15,17 +15,17 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             "\t\t\t\"family\": \"%s\",\n"
             "\t\t\t\"context\": \"%s\",\n"
             "\t\t\t\"title\": \"%s (%s)\",\n"
-            "\t\t\t\"priority\": %ld,\n"
+            "\t\t\t\"priority\": %zu,\n"
             "\t\t\t\"plugin\": \"%s\",\n"
             "\t\t\t\"module\": \"%s\",\n"
             "\t\t\t\"enabled\": %s,\n"
             "\t\t\t\"units\": \"%s\",\n"
             "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
             "\t\t\t\"chart_type\": \"%s\",\n"
-            "\t\t\t\"duration\": %ld,\n"
-            "\t\t\t\"first_entry\": %ld,\n"
-            "\t\t\t\"last_entry\": %ld,\n"
-            "\t\t\t\"update_every\": %d,\n"
+            "\t\t\t\"duration\": %llu,\n"
+            "\t\t\t\"first_entry\": %llu,\n"
+            "\t\t\t\"last_entry\": %llu,\n"
+            "\t\t\t\"update_every\": %llu,\n"
             "\t\t\t\"dimensions\": {\n"
                    , st->id
                    , st->name
@@ -40,10 +40,10 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                    , st->units
                    , st->name
                    , rrdset_type_name(st->chart_type)
-                   , st->entries * st->update_every
-                   , rrdset_first_entry_t(st)
-                   , rrdset_last_entry_t(st)
-                   , st->update_every
+                   , (unsigned long long)st->entries * st->update_every_usec
+                   , rrdset_first_entry_usec(st)
+                   , rrdset_last_entry_usec(st)
+                   , st->update_every_usec
     );
 
     unsigned long memory = st->memsize;
@@ -87,14 +87,14 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                   "\t\t\t\t\t\"id\": %u,\n"
                   "\t\t\t\t\t\"status\": \"%s\",\n"
                   "\t\t\t\t\t\"units\": \"%s\",\n"
-                  "\t\t\t\t\t\"update_every\": %d\n"
+                  "\t\t\t\t\t\"update_every\": %llu\n"
                   "\t\t\t\t}"
                 , (alarms) ? ",\n" : ""
                 , rc->name
                 , rc->id
                 , rrdcalc_status2string(rc->status)
                 , rc->units
-                , rc->update_every
+                , rc->update_every_usec
         );
 
         alarms++;

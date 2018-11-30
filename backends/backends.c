@@ -50,63 +50,63 @@ size_t backend_name_copy(char *d, const char *s, size_t usable) {
 // may return NAN if the database does not have any value in the give timeframe
 
 calculated_number backend_calculate_value_from_stored_data(
-          RRDSET *st                // the chart
-        , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
+          RRDSET *st                      // the chart
+        , RRDDIM *rd                      // the dimension
+        , usec_t after_usec               // the start timestamp
+        , usec_t before_usec              // the end timestamp
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
-        , time_t *first_timestamp   // the first point of the database used in this response
-        , time_t *last_timestamp    // the timestamp that should be reported to backend
+        , usec_t *first_timestamp_usec    // the first point of the database used in this response
+        , usec_t *last_timestamp_usec     // the timestamp that should be reported to backend
 ) {
     RRDHOST *host = st->rrdhost;
     (void)host;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rrdset_first_entry_t(st);
-    time_t last_t  = rrdset_last_entry_t(st);
-    time_t update_every = st->update_every;
+    usec_t first_usec = rrdset_first_entry_usec(st);
+    usec_t last_usec  = rrdset_last_entry_usec(st);
+    usec_t update_every_usec = st->update_every_usec;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
-    after  -= update_every * 2;
-    before -= update_every * 2;
+    after_usec  -= update_every_usec * 2;
+    before_usec -= update_every_usec * 2;
 
     // align the time-frame
-    after  = after  - (after  % update_every);
-    before = before - (before % update_every);
+    after_usec  = after_usec  - (after_usec  % update_every_usec);
+    before_usec = before_usec - (before_usec % update_every_usec);
 
     // for before, loose another iteration
     // the latest point will be reported the next time
-    before -= update_every;
+    before_usec -= update_every_usec;
 
-    if(unlikely(after > before))
+    if(unlikely(after_usec > before_usec))
         // this can happen when update_every > before - after
-        after = before;
+        after_usec = before_usec;
 
-    if(unlikely(after < first_t))
-        after = first_t;
+    if(unlikely(after_usec < first_usec))
+        after_usec = first_usec;
 
-    if(unlikely(before > last_t))
-        before = last_t;
+    if(unlikely(before_usec > last_usec))
+        before_usec = last_usec;
 
-    if(unlikely(before < first_t || after > last_t)) {
+    if(unlikely(before_usec < first_usec || after_usec > last_usec)) {
         // the chart has not been updated in the wanted timeframe
         debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
               host->hostname, st->id, rd->id,
-              (unsigned long)after, (unsigned long)before,
-              (unsigned long)first_t, (unsigned long)last_t
+              (unsigned long)after_usec, (unsigned long)before_usec,
+              (unsigned long)first_usec, (unsigned long)last_usec
         );
         return NAN;
     }
 
-    *first_timestamp = after;
-    *last_timestamp = before;
+    *first_timestamp_usec = after_usec;
+    *last_timestamp_usec = before_usec;
 
     size_t counter = 0;
     calculated_number sum = 0;
 
-    long    start_at_slot = rrdset_time2slot(st, before),
-            stop_at_slot  = rrdset_time2slot(st, after),
+    long    start_at_slot = rrdset_time2slot(st, before_usec),
+            stop_at_slot  = rrdset_time2slot(st, after_usec),
             slot, stop_now = 0;
 
     for(slot = start_at_slot; !stop_now ; slot--) {
@@ -128,9 +128,9 @@ calculated_number backend_calculate_value_from_stored_data(
     }
 
     if(unlikely(!counter)) {
-        debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %llu to %llu",
               host->hostname, st->id, rd->id,
-              (unsigned long)after, (unsigned long)before
+              after_usec, before_usec
         );
         return NAN;
     }
@@ -235,7 +235,7 @@ void *backends_main(void *ptr) {
     int default_port = 0;
     int sock = -1;
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
-    int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
+    int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, usec_t, usec_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
     // ------------------------------------------------------------------------
@@ -640,8 +640,8 @@ void *backends_main(void *ptr) {
 
         getrusage(RUSAGE_THREAD, &thread);
         if(likely(chart_rusage->counter_done)) rrdset_next(chart_rusage);
-        rrddim_set(chart_rusage, "user",   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-        rrddim_set(chart_rusage, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+        rrddim_set(chart_rusage, "user",   timeval2usec(&thread.ru_utime));
+        rrddim_set(chart_rusage, "system", timeval2usec(&thread.ru_stime));
         rrdset_done(chart_rusage);
 
         if(likely(buffer_strlen(b) == 0))

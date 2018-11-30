@@ -26,22 +26,22 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
                        "   %sname%s: %s%s%s,\n"
-                       "   %sview_update_every%s: %d,\n"
-                       "   %supdate_every%s: %d,\n"
-                       "   %sfirst_entry%s: %u,\n"
-                       "   %slast_entry%s: %u,\n"
-                       "   %sbefore%s: %u,\n"
-                       "   %safter%s: %u,\n"
+                       "   %sview_update_every%s: %llu,\n"
+                       "   %supdate_every%s: %llu,\n"
+                       "   %sfirst_entry%s: %llu,\n"
+                       "   %slast_entry%s: %llu,\n"
+                       "   %sbefore%s: %llu,\n"
+                       "   %safter%s: %llu,\n"
                        "   %sdimension_names%s: ["
                    , kq, kq
                    , kq, kq, sq, r->st->id, sq
                    , kq, kq, sq, r->st->name, sq
-                   , kq, kq, r->update_every
-                   , kq, kq, r->st->update_every
-                   , kq, kq, (uint32_t)rrdset_first_entry_t(r->st)
-                   , kq, kq, (uint32_t)rrdset_last_entry_t(r->st)
-                   , kq, kq, (uint32_t)r->before
-                   , kq, kq, (uint32_t)r->after
+                   , kq, kq, r->update_every_usec
+                   , kq, kq, r->st->update_every_usec
+                   , kq, kq, rrdset_first_entry_usec(r->st)
+                   , kq, kq, rrdset_last_entry_usec(r->st)
+                   , kq, kq, r->before_usec
+                   , kq, kq, r->after_usec
                    , kq, kq);
 
     for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
