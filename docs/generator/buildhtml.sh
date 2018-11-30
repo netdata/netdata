@@ -21,12 +21,15 @@ find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o 
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i '0,/# netdata /s//# Introduction\n\n/' ${GENERATOR_DIR}/src/README.md
+sed -i -e '0,/# netdata /s//# Introduction\n\n/' -e 's/\[!\[analytics.*UA-64295674-3)\]()//g' ${GENERATOR_DIR}/src/README.md
 
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
 	"HISTORICAL_CHANGELOG.md"
+	"contrib/sles11/README.md"
+	"packaging/maintainers/README.md"
 )
+
 for f in "${EXCLUDE_LIST[@]}"; do
 	rm "${GENERATOR_DIR}/src/$f"
 done
