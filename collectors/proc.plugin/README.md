@@ -219,7 +219,7 @@ SYNPROXY is a netfilter module, in the Linux kernel (since version 3.12). It is 
 
 The net effect of this, is that the real servers will not notice any change during the attack. The valid TCP connections will pass through and served, while the attack will be stopped at the firewall.
 
-To use SYNPROXY on your firewall, please follow our setup guides:
+Netdata does not enable SYNPROXY. It just uses the SYNPROXY metrics exposed by your kernel, so you will first need to configure it. The hard way is to run iptables SYNPROXY commands directly on the console. An easier way is to use [FireHOL](https://firehol.org/), which, is a firewall manager for iptables. FireHOL can configure SYNPROXY using the following setup guides:
 
  - **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
  - **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
