@@ -428,8 +428,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     else {
                         // we need average or sum of the data
 
-                        usec_t first_t = after_usec, last_t = before_usec;
-                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_t, &last_t);
+                        usec_t first_usec = after_usec, last_usec = before_usec;
+                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_usec, &last_usec);
 
                         if(!isnan(value) && !isinf(value)) {
 
@@ -441,15 +441,15 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             prometheus_label_copy(dimension, (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                buffer_sprintf(wb, "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
+                                buffer_sprintf(wb, "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu ms to %llu ms inclusive\n"
                                                , prefix
                                                , context
                                                , units
                                                , suffix
                                                , (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rd->name : rd->id
                                                , st->units
-                                               , (unsigned long long)first_t
-                                               , (unsigned long long)last_t
+                                               , first_usec / USEC_PER_MS
+                                               , last_usec / USEC_PER_MS
                                 );
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
@@ -471,7 +471,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                                , dimension
                                                , labels
                                                , value
-                                               , last_t * MSEC_PER_SEC
+                                               , last_usec / USEC_PER_MS
                                 );
                             else
                                 buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT "\n"

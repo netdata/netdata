@@ -87,8 +87,8 @@ int format_dimension_stored_json_plaintext(
 ) {
     (void)host;
 
-    usec_t first_t = after_usec, last_t = before_usec;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_t, &last_t);
+    usec_t first_usec = after_usec, last_usec = before_usec;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_usec, &last_usec);
 
     if(!isnan(value)) {
         const char *tags_pre = "", *tags_post = "", *tags = host->tags;
@@ -137,7 +137,7 @@ int format_dimension_stored_json_plaintext(
                 rd->name,
                 value,
 
-                last_t / USEC_PER_SEC
+                last_usec / USEC_PER_SEC
         );
 
         return 1;

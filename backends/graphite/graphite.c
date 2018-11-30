@@ -60,8 +60,8 @@ int format_dimension_stored_graphite_plaintext(
     backend_name_copy(chart_name, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
     backend_name_copy(dimension_name, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
-    usec_t first_t = after_usec, last_t = before_usec;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_t, &last_t);
+    usec_t first_usec = after_usec, last_usec = before_usec;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after_usec, before_usec, backend_options, &first_usec, &last_usec);
 
     if(!isnan(value)) {
 
@@ -75,7 +75,7 @@ int format_dimension_stored_graphite_plaintext(
                 , (host->tags)?";":""
                 , (host->tags)?host->tags:""
                 , value
-                , last_t / USEC_PER_SEC
+                , last_usec / USEC_PER_SEC
         );
 
         return 1;
