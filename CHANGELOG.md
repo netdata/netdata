@@ -15,6 +15,13 @@
 
 **Closed issues:**
 
+- Tiny Proxy monitoring [\#4834](https://github.com/netdata/netdata/issues/4834)
+- Phusion Passenger monitoring [\#4833](https://github.com/netdata/netdata/issues/4833)
+- Iis monitoring [\#4832](https://github.com/netdata/netdata/issues/4832)
+- Scaleio monitoring [\#4828](https://github.com/netdata/netdata/issues/4828)
+- Gluster monitoring [\#4827](https://github.com/netdata/netdata/issues/4827)
+- Leofs monitoring [\#4826](https://github.com/netdata/netdata/issues/4826)
+- Installing and updating netdata to stable releases only \(v2\) [\#4763](https://github.com/netdata/netdata/issues/4763)
 - Use `--future-release` in changelog generation [\#4718](https://github.com/netdata/netdata/issues/4718)
 - Store nightly build artifacts somewhere [\#4628](https://github.com/netdata/netdata/issues/4628)
 - Remove old packaging scripts [\#4608](https://github.com/netdata/netdata/issues/4608)
