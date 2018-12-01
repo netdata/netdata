@@ -121,7 +121,9 @@ int format_dimension_stored_json_plaintext(
                           "\"name\":\"%s\","
                           "\"value\":" CALCULATED_NUMBER_FORMAT ","
 
-                          "\"timestamp\": %llu}\n",
+                          "\"timestamp\": %llu,"
+                          "\"timestamp_usec\": %llu"
+                          "}\n",
                 prefix,
                 hostname,
                 tags_pre, tags, tags_post,
@@ -137,7 +139,8 @@ int format_dimension_stored_json_plaintext(
                 rd->name,
                 value,
 
-                last_usec / USEC_PER_SEC
+                last_usec / USEC_PER_SEC,
+                last_usec
         );
 
         return 1;

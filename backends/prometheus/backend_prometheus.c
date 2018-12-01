@@ -532,12 +532,12 @@ static inline usec_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
                 , (first_seen)?"FIRST SEEN ":""
                 , server
                 , mode
-                , ((first_seen)?0ULL:(now_usec - after_usec))
-                , (first_seen)?"never":"usec ago"
+                , ((first_seen)?0ULL:(now_usec - after_usec) / USEC_PER_MS)
+                , (first_seen)?"never":"ms ago"
         );
 
         if(show_range)
-            buffer_sprintf(wb, ", time range %llu to %llu", after_usec, now_usec);
+            buffer_sprintf(wb, ", time range %llu ms to %llu ms", after_usec / USEC_PER_MS, now_usec / USEC_PER_MS);
 
         buffer_strcat(wb, "\n\n");
     }
