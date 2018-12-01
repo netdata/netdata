@@ -31,8 +31,8 @@ static int cgroup_used_memory_without_cache = CONFIG_BOOLEAN_YES;
 static int cgroup_search_in_devices = 1;
 
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
-static usec_t cgroup_check_for_new_every_usec = 10;
-static usec_t cgroup_update_every_usec = 1;
+static usec_t cgroup_check_for_new_every_usec = 10 * USEC_PER_SEC;
+static usec_t cgroup_update_every_usec = 1 * USEC_PER_SEC;
 
 static int cgroup_recheck_zero_blkio_every_iterations = 10;
 static int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
@@ -74,7 +74,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_update_every_usec < localhost->rrd_update_every_usec)
         cgroup_update_every_usec = localhost->rrd_update_every_usec;
 
-    cgroup_check_for_new_every_usec = config_get_usec("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every_usec * (long long)cgroup_update_every_usec);
+    cgroup_check_for_new_every_usec = config_get_usec("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every_usec);
     if(cgroup_check_for_new_every_usec < cgroup_update_every_usec)
         cgroup_check_for_new_every_usec = cgroup_update_every_usec;
 
@@ -1408,8 +1408,8 @@ static inline void find_all_cgroups() {
 
 #define CHART_TITLE_MAX 300
 
-void update_systemd_services_charts(
-          int update_every
+static void update_systemd_services_charts(
+          usec_t update_every_usec
         , int do_cpu
         , int do_mem_usage
         , int do_mem_detailed
@@ -1469,7 +1469,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1493,7 +1493,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 10
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1516,7 +1516,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 20
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1537,7 +1537,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 30
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1558,7 +1558,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 40
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1579,7 +1579,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 50
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1600,7 +1600,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 60
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
         }
@@ -1620,7 +1620,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 70
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1641,7 +1641,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 80
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1662,7 +1662,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 90
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1685,7 +1685,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 110
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1708,7 +1708,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 100
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1731,7 +1731,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 120
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1752,7 +1752,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 130
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1775,7 +1775,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 140
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1796,7 +1796,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 150
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1819,7 +1819,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 160
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1840,7 +1840,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 170
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1863,7 +1863,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 180
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1884,7 +1884,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 190
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1907,7 +1907,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 200
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1928,7 +1928,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 210
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1951,7 +1951,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 220
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -1972,7 +1972,7 @@ void update_systemd_services_charts(
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 230
-                    , update_every
+                    , update_every_usec
                     , RRDSET_TYPE_STACKED
             );
 
@@ -2197,7 +2197,7 @@ static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) 
     return buffer;
 }
 
-void update_cgroup_charts(int update_every) {
+static void update_cgroup_charts(usec_t update_every_usec) {
     debug(D_CGROUP, "updating cgroups charts");
 
     char type[RRD_ID_LENGTH_MAX + 1];
@@ -2254,7 +2254,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 
@@ -2287,7 +2287,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 100
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 
@@ -2321,7 +2321,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 210
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 
@@ -2361,7 +2361,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 300
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_AREA
                 );
 
@@ -2393,7 +2393,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 400
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2421,7 +2421,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 500
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2451,7 +2451,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 200
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_STACKED
                 );
 
@@ -2481,7 +2481,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 250
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2509,7 +2509,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_AREA
                 );
 
@@ -2539,7 +2539,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2569,7 +2569,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_AREA
                 );
 
@@ -2599,7 +2599,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2629,7 +2629,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2000
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2659,7 +2659,7 @@ void update_cgroup_charts(int update_every) {
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2100
-                        , update_every
+                        , update_every_usec
                         , RRDSET_TYPE_LINE
                 );
 
@@ -2676,7 +2676,7 @@ void update_cgroup_charts(int update_every) {
     }
 
     if(likely(cgroup_enable_systemd_services))
-        update_systemd_services_charts(update_every, services_do_cpu, services_do_mem_usage, services_do_mem_detailed
+        update_systemd_services_charts(update_every_usec, services_do_cpu, services_do_mem_usage, services_do_mem_detailed
                                        , services_do_mem_failcnt, services_do_swap_usage, services_do_io
                                        , services_do_io_ops, services_do_throttle_io, services_do_throttle_ops
                                        , services_do_queued_ops, services_do_merged_ops
@@ -2711,19 +2711,19 @@ void *cgroups_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = cgroup_update_every_usec * USEC_PER_SEC;
-    usec_t find_every = cgroup_check_for_new_every_usec * USEC_PER_SEC, find_dt = 0;
+    usec_t step_usec = cgroup_update_every_usec;
+    usec_t find_every_usec = cgroup_check_for_new_every_usec, find_delta_usec = 0;
 
     while(!netdata_exit) {
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        usec_t hb_dt = heartbeat_next(&hb, step_usec);
         if(unlikely(netdata_exit)) break;
 
         // BEGIN -- the job to be done
 
-        find_dt += hb_dt;
-        if(unlikely(find_dt >= find_every || cgroups_check)) {
+        find_delta_usec += hb_dt;
+        if(unlikely(find_delta_usec >= find_every_usec || cgroups_check)) {
             find_all_cgroups();
-            find_dt = 0;
+            find_delta_usec = 0;
             cgroups_check = 0;
         }
 

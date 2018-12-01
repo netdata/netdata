@@ -18,7 +18,7 @@ typedef enum backend_options {
 #define BACKEND_OPTIONS_SOURCE_BITS (BACKEND_SOURCE_DATA_AS_COLLECTED|BACKEND_SOURCE_DATA_AVERAGE|BACKEND_SOURCE_DATA_SUM)
 #define BACKEND_OPTIONS_DATA_SOURCE(backend_options) (backend_options & BACKEND_OPTIONS_SOURCE_BITS)
 
-extern int global_backend_update_every;
+extern usec_t global_backend_update_every_usec;
 extern BACKEND_OPTIONS global_backend_options;
 extern const char *global_backend_prefix;
 

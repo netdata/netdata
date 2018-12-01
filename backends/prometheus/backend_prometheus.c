@@ -504,13 +504,13 @@ static inline usec_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
 
     int first_seen = 0;
     if(!after_usec) {
-        after_usec = now_usec - global_backend_update_every;
+        after_usec = now_usec - global_backend_update_every_usec;
         first_seen = 1;
     }
 
     if(after_usec > now_usec) {
         // oops! this should never happen
-        after_usec = now_usec - global_backend_update_every;
+        after_usec = now_usec - global_backend_update_every_usec;
     }
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {

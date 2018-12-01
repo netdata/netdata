@@ -26,7 +26,7 @@
 //
 
 const char *global_backend_prefix = "netdata";
-int global_backend_update_every = 10;
+usec_t global_backend_update_every_usec = 10 * USEC_PER_SEC;
 BACKEND_OPTIONS global_backend_options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
 // ----------------------------------------------------------------------------
@@ -251,9 +251,9 @@ void *backends_main(void *ptr) {
     const char *destination     = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
     global_backend_prefix       = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
     const char *hostname        = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
-    global_backend_update_every = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", global_backend_update_every);
+    global_backend_update_every_usec = config_get_usec(CONFIG_SECTION_BACKEND, "update every", global_backend_update_every_usec);
     int buffer_on_failures      = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
-    long timeoutms              = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", global_backend_update_every * 2 * 1000);
+    usec_t timeout_usec         = config_get_usec(CONFIG_SECTION_BACKEND, "timeout ms", global_backend_update_every_usec * 2ULL);
 
     if(config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", (global_backend_options & BACKEND_OPTION_SEND_NAMES)))
         global_backend_options |= BACKEND_OPTION_SEND_NAMES;
@@ -270,14 +270,14 @@ void *backends_main(void *ptr) {
 
     global_backend_options = backend_parse_data_source(source, global_backend_options);
 
-    if(timeoutms < 1) {
-        error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, global_backend_update_every * 2 * 1000);
-        timeoutms = global_backend_update_every * 2 * 1000;
+    if(timeout_usec < USEC_PER_MS) {
+        error("BACKEND: invalid timeout %llu ms given. Assuming %llu ms.", timeout_usec, global_backend_update_every_usec * 2ULL);
+        timeout_usec = global_backend_update_every_usec * 2ULL;
     }
-    timeout.tv_sec  = (timeoutms * 1000) / 1000000;
-    timeout.tv_usec = (timeoutms * 1000) % 1000000;
+    timeout.tv_sec  = (unsigned long)(timeout_usec / USEC_PER_SEC);
+    timeout.tv_usec = (unsigned long)(timeout_usec % USEC_PER_SEC);
 
-    if(!enabled || global_backend_update_every < 1)
+    if(!enabled || global_backend_update_every_usec < USEC_PER_MS)
         goto cleanup;
 
     // ------------------------------------------------------------------------
@@ -347,18 +347,18 @@ void *backends_main(void *ptr) {
             chart_backend_reconnects = 0;
             // chart_backend_latency = 0;
 
-    RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, global_backend_update_every, RRDSET_TYPE_LINE);
+    RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, global_backend_update_every_usec, RRDSET_TYPE_LINE);
     rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_metrics, "lost",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_metrics, "sent",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *chart_bytes = rrdset_create_localhost("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", "backends", NULL, 130610, global_backend_update_every, RRDSET_TYPE_AREA);
+    RRDSET *chart_bytes = rrdset_create_localhost("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", "backends", NULL, 130610, global_backend_update_every_usec, RRDSET_TYPE_AREA);
     rrddim_add(chart_bytes, "buffered", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "lost",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "sent",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_bytes, "received", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
 
-    RRDSET *chart_ops = rrdset_create_localhost("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", "backends", NULL, 130630, global_backend_update_every, RRDSET_TYPE_LINE);
+    RRDSET *chart_ops = rrdset_create_localhost("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", "backends", NULL, 130630, global_backend_update_every_usec, RRDSET_TYPE_LINE);
     rrddim_add(chart_ops, "write",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_ops, "discard",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(chart_ops, "reconnect", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -376,7 +376,7 @@ void *backends_main(void *ptr) {
     rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
     */
 
-    RRDSET *chart_rusage = rrdset_create_localhost("netdata", "backend_thread_cpu", NULL, "backend", NULL, "NetData Backend Thread CPU usage", "milliseconds/s", "backends", NULL, 130630, global_backend_update_every, RRDSET_TYPE_STACKED);
+    RRDSET *chart_rusage = rrdset_create_localhost("netdata", "backend_thread_cpu", NULL, "backend", NULL, "NetData Backend Thread CPU usage", "milliseconds/s", "backends", NULL, 130630, global_backend_update_every_usec, RRDSET_TYPE_STACKED);
     rrddim_add(chart_rusage, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     rrddim_add(chart_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
 
@@ -384,9 +384,9 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // prepare the backend main loop
 
-    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every, hostname, global_backend_prefix);
+    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, global_backend_update_every_usec, hostname, global_backend_prefix);
 
-    usec_t step_usec = (usec_t)global_backend_update_every;
+    usec_t step_usec = (usec_t)global_backend_update_every_usec;
     usec_t after_usec = now_realtime_usec();
     int failures = 0;
     heartbeat_t hb;
