@@ -37,6 +37,7 @@ struct raid {
     RRDSET *st_mismatch_cnt;
     RRDDIM *rd_mismatch_cnt;
     unsigned long long mismatch_cnt;
+    struct timespec mismatch_modification_time;
 };
 
 static inline char *remove_trailing_chars(char *s, char c) {
@@ -57,6 +58,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     static struct raid *raids = NULL;
     static size_t raids_num = 0, raids_allocated = 0;
     static char *mismatch_cnt_filename = NULL;
+    struct stat stbuf;
 
     if(unlikely(!ff)) {
         snprintfz(mdstat_filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/mdstat");
@@ -65,7 +67,6 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         if(unlikely(!ff)) return 1;
     }
 
-    struct stat stbuf;
     stat(mdstat_filename, &stbuf);
     if(unlikely(stbuf.st_mtim.tv_sec != ff_modification_time.tv_sec || stbuf.st_mtim.tv_nsec != ff_modification_time.tv_nsec)) {
 
@@ -217,9 +218,14 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
         if(raid->used) {
             snprintfz(filename, FILENAME_MAX, mismatch_cnt_filename, raid->name);
-            if(read_single_number_file(filename, &raid->mismatch_cnt) == -1) {
-                error("Cannot read file '%s'", filename);
-                return 1;
+            stat(mdstat_filename, &stbuf);
+            if(unlikely(stbuf.st_mtim.tv_sec != raid->mismatch_modification_time.tv_sec || stbuf.st_mtim.tv_nsec != raid->mismatch_modification_time.tv_nsec)) {
+                if(read_single_number_file(filename, &raid->mismatch_cnt) == -1) {
+                    error("Cannot read file '%s'", filename);
+                    return 1;
+                }
+                raid->mismatch_modification_time.tv_sec = stbuf.st_mtim.tv_sec;
+                raid->mismatch_modification_time.tv_nsec = stbuf.st_mtim.tv_nsec;
             }
         }
     }
