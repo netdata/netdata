@@ -3,7 +3,7 @@ swagger: '2.0'
 info:
   title: NetData API
   description: 'Real-time performance and health monitoring.'
-  version: 1.11.0_rolling
+  version: 1.11.1_rolling
 host: registry.my-netdata.io
 schemes:
   - https
@@ -12,6 +12,23 @@ basePath: /api/v1
 produces:
   - application/json
 paths:
+  /info:
+    get:
+      summary: Get netdata basic information
+      description: |
+        The info endpoint returns basic information about netdata. It provides:
+        * netdata version
+        * netdata unique id
+        * list of hosts mirrored (includes itself)
+        * number of alarms in the host
+          * number of alarms in normal state
+          * number of alarms in warning state
+          * number of alarms in critical state
+      responses:
+        '200':
+          description: netdata basic information
+          schema:
+            $ref: '#/definitions/info'
   /charts:
     get:
       summary: 'Get a list of all charts available at the server'
@@ -341,6 +358,38 @@ paths:
         '400':
           description: 'The format requested is not supported'
 definitions:
+  info:
+    type: object
+    properties:
+      version:
+        type: string
+        description: netdata version of the server.
+        example: 1.11.1_rolling
+      uid:
+        type: string
+        description: netdata unique id of the server.
+        example: 24e9fe3c-f2ac-11e8-bafc-0242ac110002
+      mirrored_hosts:
+        type: array
+        description: list of hosts mirrored of the server (include itself).
+        items:
+          type: string
+        example:
+          - host1.example.com
+          - host2.example.com
+      alarms:
+        type: object
+        description: number of alarms in the server.
+        properties:
+          normal:
+            type: integer
+            description: number of alarms in normal state.
+          warning:
+            type: integer
+            description: number of alarms in warning state.
+          critical:
+            type: integer
+            description: number of alarms in critical state.
   chart_summary:
     type: object
     properties:
@@ -365,7 +414,7 @@ definitions:
         description: 'An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.'
         properties:
           key:
-              $ref: '#/definitions/chart'
+            $ref: '#/definitions/chart'
       charts_count:
         type: number
         description: 'The number of charts.'
@@ -429,7 +478,7 @@ definitions:
         description: 'An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.'
         properties:
           key:
-              $ref: '#/definitions/dimension'
+            $ref: '#/definitions/dimension'
       green:
         type: number
         description: 'Chart health green threshold'
@@ -442,7 +491,7 @@ definitions:
       name:
         type: string
         description: 'The name of the dimension'
-        
+
   json_wrap:
     type: object
     properties:
