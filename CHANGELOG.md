@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- nvidia\_smi module bug [\#4892](https://github.com/netdata/netdata/issues/4892)
 - Fail2ban: Read "Restore Ban" for persistent bans [\#4769](https://github.com/netdata/netdata/issues/4769)
 - registry items are clickable, but no action is taken [\#4721](https://github.com/netdata/netdata/issues/4721)
 - Issues with prometheus exposed metrics [\#4680](https://github.com/netdata/netdata/issues/4680)
@@ -41,6 +42,11 @@
 
 **Merged pull requests:**
 
+- more health debugging to trace config files [\#4897](https://github.com/netdata/netdata/pull/4897) ([ktsaou](https://github.com/ktsaou))
+- added debug statements when loading health config files [\#4896](https://github.com/netdata/netdata/pull/4896) ([ktsaou](https://github.com/ktsaou))
+- added more debug outpput to freeipmi [\#4894](https://github.com/netdata/netdata/pull/4894) ([ktsaou](https://github.com/ktsaou))
+- nvidia\_smi: handle `N/A` values [\#4893](https://github.com/netdata/netdata/pull/4893) ([ilyam8](https://github.com/ilyam8))
+- add api/v1/info endpoint to swagger [\#4807](https://github.com/netdata/netdata/pull/4807) ([Wing924](https://github.com/Wing924))
 - auto-label PRs and minor cleanup [\#4795](https://github.com/netdata/netdata/pull/4795) ([paulfantom](https://github.com/paulfantom))
 - automatic labeling of new features [\#4792](https://github.com/netdata/netdata/pull/4792) ([paulfantom](https://github.com/paulfantom))
 - Small content change to the netdata-installer.sh [\#4790](https://github.com/netdata/netdata/pull/4790) ([ei8fdb](https://github.com/ei8fdb))
