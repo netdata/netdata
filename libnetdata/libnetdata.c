@@ -1380,8 +1380,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-
-            if(de->d_type == DT_REG || de->d_type == DT_LNK) {
+            else if(de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -1392,6 +1391,9 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 }
                 else
                     debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s'", udir, de->d_name);
+            }
+            else {
+                debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' with invalid type %d", udir, de->d_name, (int)de->d_type);
             }
         }
 
@@ -1426,8 +1428,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-
-            if(de->d_type == DT_REG || de->d_type == DT_LNK) {
+            else if(de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -1439,10 +1440,15 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 else
                     debug(D_HEALTH, "CONFIG ignoring stock config file '%s/%s'", sdir, de->d_name);
             }
+            else {
+                debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' with invalid type %d", udir, de->d_name, (int)de->d_type);
+            }
         }
 
         closedir(dir);
     }
+
+    debug(D_HEALTH, "CONFIG done traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
 
     freez(udir);
     freez(sdir);
