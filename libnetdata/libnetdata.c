@@ -1386,6 +1386,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 if(path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = strdupz_path_subpath(udir, de->d_name);
+                    debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
                     callback(filename, data);
                     freez(filename);
                 }
@@ -1431,6 +1432,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                 if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = strdupz_path_subpath(sdir, de->d_name);
+                    debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
                     callback(filename, data);
                     freez(filename);
                 }
