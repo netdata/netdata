@@ -118,3 +118,4 @@ username|name|email (optional)
 @jonfairbanks|Jon Fairbanks
 @pjz|Paul Jimenez|pj@place.org
 @jgrossiord|Julien Grossiord|julien@grossiord.net
+@hamedbrd|Hamed Beiranvand|hamedbrd@gmail.com
