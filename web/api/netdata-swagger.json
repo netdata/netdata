@@ -3,7 +3,7 @@
   "info": {
     "title": "NetData API",
     "description": "Real-time performance and health monitoring.",
-    "version": "1.9.11_rolling"
+    "version": "1.11.1_rolling"
   },
   "host": "registry.my-netdata.io",
   "schemes": [
@@ -15,6 +15,20 @@
     "application/json"
   ],
   "paths": {
+    "/info": {
+      "get": {
+        "summary": "Get netdata basic information",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "responses": {
+          "200": {
+            "description": "netdata basic information",
+            "schema": {
+              "$ref": "#/definitions/info"
+            }
+          }
+        }
+      }
+    },
     "/charts": {
       "get": {
         "summary": "Get a list of all charts available at the server",
@@ -534,6 +548,50 @@
     }
   },
   "definitions": {
+    "info": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "netdata version of the server.",
+          "example": "1.11.1_rolling"
+        },
+        "uid": {
+          "type": "string",
+          "description": "netdata unique id of the server.",
+          "example": "24e9fe3c-f2ac-11e8-bafc-0242ac110002"
+        },
+        "mirrored_hosts": {
+          "type": "array",
+          "description": "list of hosts mirrored of the server (include itself).",
+          "items": {
+            "type": "string"
+          },
+          "example": [
+            "host1.example.com",
+            "host2.example.com"
+          ]
+        },
+        "alarms": {
+          "type": "object",
+          "description": "number of alarms in the server.",
+          "properties": {
+            "normal": {
+              "type": "integer",
+              "description": "number of alarms in normal state."
+            },
+            "warning": {
+              "type": "integer",
+              "description": "number of alarms in warning state."
+            },
+            "critical": {
+              "type": "integer",
+              "description": "number of alarms in critical state."
+            }
+          }
+        }
+      }
+    },
     "chart_summary": {
       "type": "object",
       "properties": {
