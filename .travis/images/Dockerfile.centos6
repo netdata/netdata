@@ -1,5 +1,0 @@
-FROM centos:6
-
-RUN yum install -y gcc make autoconf automake pkg-config zlib-devel libuuid-devel git
-
-COPY . /code
