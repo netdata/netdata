@@ -72,6 +72,7 @@ dist_python_DATA = \
     varnish.chart.py \
     w1sensor.chart.py \
     web_log.chart.py \
+    logparser.chart.py \
     $(NULL)
 
 pythonmodulesdir=$(pythondir)/python_modules

@@ -87,6 +87,7 @@ dist_pythonconfig_DATA = \
     python.d/varnish.conf \
     python.d/w1sensor.conf \
     python.d/web_log.conf \
+    python.d/logparser.conf \
     $(NULL)
 
 healthconfigdir=$(libconfigdir)/health.d

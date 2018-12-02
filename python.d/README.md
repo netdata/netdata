@@ -2757,11 +2757,24 @@ For detailed configuration information please read [`w1sensor.conf`](https://git
 
 # logparser
 
-By this module you can parse all kind of log files into multi dimension and multi charts
+This module is able to monitor an application specific log file and then create a chart based on occurrences of a log line (like amount of occurrences in a day, or a line graph of when the occurrences happen).It has no limitation to have multi dimension and multi charts.
 
-An example for 3 dimensions and 2 charts
+# Config patterns
 
 ```yaml
+chart_name:
+    log_path: path/log/file
+    dimensions:
+      dimension: regex_pattern
+```
+
+Above config show how to define your charts and how to fetching metrics from custom log files.
+For each dimension in each chart must one regex be written in order to fetch those matches from that log file.It allows us to define whatever charts we want to show in dashboard.
+
+A final config for more than one chart and more than one dimension could be something like this
+
+```yaml
+
 chart1_name:
     log_path: /path/logs/log.file
     dimensions:
@@ -2776,6 +2789,7 @@ chart2_name:
       dimension_name3: [a-z]+
 
 ```
+
 
 ---
 
