@@ -15,6 +15,8 @@ disabled_by_default = True
 
 NVIDIA_SMI = 'nvidia-smi'
 
+BAD_VALUE = 'N/A'
+
 EMPTY_ROW = ''
 EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
@@ -206,6 +208,15 @@ def handle_attr_error(method):
     return on_call
 
 
+def handle_value_error(method):
+    def on_call(*args, **kwargs):
+        try:
+            return method(*args, **kwargs)
+        except ValueError:
+            return None
+    return on_call
+
+
 class GPU:
     def __init__(self, num, root):
         self.num = num
@@ -272,6 +283,7 @@ class GPU:
     def mem_clock(self):
         return self.root.find('clocks').find('mem_clock').text.split()[0]
 
+    @handle_value_error
     @handle_attr_error
     def power_draw(self):
         return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
@@ -294,7 +306,9 @@ class GPU:
             'power_draw': self.power_draw(),
         }
 
-        return dict(('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None)
+        return dict(
+            ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
+        )
 
 
 class Service(SimpleService):
