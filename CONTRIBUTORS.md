@@ -118,10 +118,7 @@ username|name|email (optional)
 @jonfairbanks|Jon Fairbanks
 @pjz|Paul Jimenez|pj@place.org
 @jgrossiord|Julien Grossiord|julien@grossiord.net
-<<<<<<< HEAD
 @hamedbrd|Hamed Beiranvand|hamedbrd@gmail.com
-=======
 @pohzipohzi|Poh Zi How
 @vladmovchan|Vladyslav Movchan|vladislav.movchan@gmail.com
 @gmosx|George Moschovitis
->>>>>>> upstream/master
