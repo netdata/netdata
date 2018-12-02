@@ -12,14 +12,14 @@ processors=$(grep -c ^processor /proc/cpuinfo)
 base="$(dirname "${0}")"
 [ "${base}" = "." ] && base="${PWD}"
 
-cd "${base}/src" || exit 1
+cd "${base}" || exit 1
 
 [ ! -d "cppcheck-build" ] && mkdir "cppcheck-build"
 
 file="${1}"
 shift
 # shellcheck disable=SC2235
-([ "${file}" = "${base}" ] || [ -z "${file}" ]) && file="${base}/src"
+([ "${file}" = "${base}" ] || [ -z "${file}" ]) && file="${base}"
 
 "${cppcheck}" \
 	-j ${processors} \

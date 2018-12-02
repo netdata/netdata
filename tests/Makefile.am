@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
+
+MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 dist_noinst_DATA = \
     README.md \

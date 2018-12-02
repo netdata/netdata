@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+    <title>NetData - Real-time performance monitoring, done right!</title>
+    <meta name="application-name" content="netdata">
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://cloud.githubusercontent.com/assets/2662304/22945737/e98cd0c6-f2fd-11e6-96f1-5501934b0955.png"/>
+    <meta property="og:url" content="http://my-netdata.io/"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:site_name" content="netdata"/>
+    <meta property="og:title" content="netdata - real-time performance monitoring, done right!"/>
+    <meta property="og:description" content="Stunning real-time dashboards, blazingly fast and extremely interactive. Zero configuration, zero dependencies, zero maintenance." />
+</head>
+
+<script>
+    // --- OPTIONS FOR THE DASHBOARD --
+
+    // this section has to appear before loading dashboard.js
+
+    // Select a theme.
+    // uncomment on of the two themes:
+
+    // var netdataTheme = 'default'; // this is white
+    var netdataTheme = 'slate'; // this is dark
+
+
+    // Set the default netdata server.
+    // on charts without a 'data-host', this one will be used.
+    // the default is the server that dashboard.js is downloaded from.
+
+    // var netdataServer = 'http://my.server:19999/';
+    </script>
+
+    <!--
+        --- LOAD dashboard.js ---
+
+        to host this HTML file on your web server,
+        you have to load dashboard.js from the netdata server.
+
+        So, pick one the two below
+        If you pick the first, set the server name/IP.
+
+        The second assumes you host this file on /usr/share/netdata/web
+        and that you have chown it to be owned by netdata:netdata
+    -->
+    <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
+    <script type="text/javascript" src="dashboard.js?v20170724-1"></script>
+
+    <script>
+    // --- OPTIONS FOR THE CHARTS --
+
+    // destroy charts not shown (lowers memory on the browsers)
+    // set this to 'true' to destroy, 'false' to hide the charts
+    NETDATA.options.current.destroy_on_hide = false;
+    
+    // set this to false, to always show all dimensions
+    NETDATA.options.current.eliminate_zero_dimensions = true;
+    
+    // set this to false, to lower the pressure on the browser
+    NETDATA.options.current.concurrent_refreshes = true;
+
+    // if you need to support slow mobile phones, set this to false
+    NETDATA.options.current.parallel_refresher = true;
+
+    // set this to false, to always update the charts, even if focus is lost
+    NETDATA.options.current.stop_updates_when_focus_is_lost = true;
+
+    // since we have many servers and limited sockets,
+    // abort ajax calls when we scroll
+    NETDATA.options.current.abort_ajax_on_scroll = true;
+</script>
+<style>
+    body {
+        font-size: 1vw;
+    }
+
+    .mysparkline {
+        position: relative;
+        display: inline-block;
+        min-height: 50px;
+        width: 100%;
+        height: 7vmax;
+        text-align: left;
+    }
+
+    .mysparkline-overchart-label {
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 10px;
+        bottom: 0;
+        right: 0;
+        font-size: 1vmax;
+        z-index: 1;
+    }
+
+    .mysparkline-overchart-value {
+        position: absolute;
+        display: block;
+        top: 1.1vmax;
+        left: 10px;
+        bottom: 0;
+        right: 0;
+        font-size: 5vmax;
+        z-index: 2;
+        text-shadow: #333 0px 0px 2px;
+    }
+
+    .myfullchart {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+        height: 12vmax;
+        min-height: 150px;
+        text-align: left;
+    }
+
+    .mygauge-combo {
+        display: inline-block;
+    }
+
+    .mygauge {
+        position: relative;
+        display: block;
+        width: 18vw;
+        height: 11vw;
+    }
+
+    .mygauge-button {
+        display: block;
+    }
+
+    .mytitle {
+        padding-top: 6vw;
+        padding-bottom: 1vw;
+        text-align: center;
+        font-size: 2.4vw;
+    }
+
+    .mysubtitle {
+        padding-top: 2vw;
+        padding-bottom: 1vw;
+        text-align: center;
+        font-size: 1.8vw;
+    }
+
+    .mycontent {
+        text-align: center;
+        font-size: 1.5vw;
+    }
+
+    @media only screen and (min-width : 992px) {
+        .container {
+            width: 80%;
+        }
+    }
+    @media only screen and (max-width : 992px) {
+        .container {
+            width: 100%;
+        }
+    }
+</style>
+
+<body style="text-align: center; background-color: #272b30;">
+
+<div class="container">
+
+    <div style="text-align: center; font-size: 13vw; height: 14vw;">
+        <b>netdata</b>
+    </div>
+    <div style="text-align: center; font-size: 2vw; height: 2.5vw;">
+        real-time performance monitoring
+    </div>
+    <div style="width:80%; text-align: right; font-size: 2.7vw;">
+        <strong>scaled out</strong>!
+    </div>
+    <div class="mytitle">
+        pick a <b>netdata</b> demo server
+    </div>
+    <div class="mycontent">
+        these demo servers show what you will get by installing <b>netdata</b>
+    </div>
+
+    <div style="width: 100%; text-align: center; padding-top: 2vw;">
+        <div style="width: 100%; text-align: center;">
+
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//london.my-netdata.io"
+                            data-title="EU - London"
+                            data-chart-library="gauge"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="100%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#558855"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//london.my-netdata.io/default.html'" style="font-size: 1.0vw;">Enter London!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//atlanta.my-netdata.io"
+                            data-title="US - Atlanta"
+                            data-chart-library="gauge"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="100%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#AA5555"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//atlanta.my-netdata.io/default.html'" style="font-size: 1.0vw;">Enter Atlanta!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by CDN77.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//sanfrancisco.netdata.rocks"
+                            data-title="US - California"
+                            data-chart-library="gauge"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="100%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#5555AA"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//sanfrancisco.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter California!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//toronto.netdata.rocks"
+                            data-title="Canada"
+                            data-chart-library="gauge"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="100%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#885588"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//toronto.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter Canada!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <br/>&nbsp;<br/>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//frankfurt.netdata.rocks"
+                            data-title="EU - Germany"
+                            data-chart-library="easypiechart"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="75%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#AAAA55"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//frankfurt.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter Germany!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//newyork.netdata.rocks"
+                            data-title="US - New York"
+                            data-chart-library="easypiechart"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="75%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#BB5533"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//newyork.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter New York!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//singapore.netdata.rocks"
+                            data-title="Singapore"
+                            data-chart-library="easypiechart"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="75%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#5588BB"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//singapore.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter Singapore!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo">
+                <div class="mygauge">
+                    <div data-netdata="netdata.requests"
+                            data-host="//bangalore.netdata.rocks"
+                            data-title="India"
+                            data-chart-library="easypiechart"
+                            data-decimal-digits="0"
+                            data-common-max="top-gauges"
+                            data-width="75%"
+                            data-after="-300"
+                            data-points="300"
+                            data-colors="#BB55BB"
+                            ></div>
+                </div>
+                <div class="mygauge-button">
+                    <br/>&nbsp;<br/>
+                    <button type="button" class="btn btn-default" data-toggle="button" aria-pressed="false" autocomplete="off" onclick="window.location='//bangalore.netdata.rocks/default.html'" style="font-size: 1.0vw;">Enter India!</button>
+                    <div style="font-size: 0.8vw;">
+                        Donated by DigitalOcean.com
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mytitle">
+        this page is a custom <b>netdata</b> dashboard
+    </div>
+    <div class="mycontent">
+        charts are coming from 8 servers, in parallel
+        <br/>
+        the servers are not aware of this multi-server dashboard,
+        <br/>
+        each server is not aware of the other servers,
+        <br/>
+        but on this dashboard <b>they are one</b>!
+    </div>
+    <div style="padding-top: 1vw; width: 100%; text-align: center; font-size: 1.5vw;">
+        <i class="fa fa-comment" aria-hidden="true"></i>
+        hover on a chart below, or drag it to show the past - <b>the others will follow</b>!
+        <br/>
+        double click on a chart to reset them all
+    </div>
+
+    <div class="mytitle">
+        our <code>nginx</code> performance
+    </div>
+    <div class="mycontent">
+        (we proxy netdata through nginx, on the demo sites)
+    </div>
+
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+        <li role="presentation" class="active"><a href="#nginx_requests" aria-controls="nginx_requests" role="tab" data-toggle="tab">Requests</a></li>
+        <li role="presentation"><a href="#nginx_connections" aria-controls="nginx_connections" role="tab" data-toggle="tab">Connections</a></li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content">
+        <div role="tabpanel" class="tab-pane active" id="nginx_requests">
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>EU - London</b> web requests/s
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata" >
+                </div>
+                <div data-netdata="nginx_local.requests"
+                        data-dimensions="requests"
+                        data-host="//london.my-netdata.io"
+                        data-decimal-digits="0"
+                        data-common-max="web-requests"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#558855"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - Atlanta</b> web requests/s
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata2" >
+                </div>
+                <div data-netdata="nginx_local.requests"
+                        data-dimensions="requests"
+                        data-host="//atlanta.my-netdata.io"
+                        data-decimal-digits="0"
+                        data-common-max="web-requests"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#AA5555"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata2"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - California</b> web requests/s
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata3" >
+                </div>
+                <div data-netdata="nginx_local.requests"
+                        data-dimensions="requests"
+                        data-host="//sanfrancisco.netdata.rocks"
+                        data-decimal-digits="0"
+                        data-common-max="web-requests"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#5555AA"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata3"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>Canada</b> web requests/s
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.requests.netdata4" >
+                </div>
+                <div data-netdata="nginx_local.requests"
+                        data-dimensions="requests"
+                        data-host="//toronto.netdata.rocks"
+                        data-decimal-digits="0"
+                        data-common-max="web-requests"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885588"
+                        data-show-value-of-requests-at="nginx_local.requests.netdata4"
+                        ></div>
+            </div>
+        </div>
+
+        <div role="tabpanel" class="tab-pane" id="nginx_connections">
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>EU - London</b> active connections
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata1" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                        data-dimensions="active"
+                        data-host="//london.my-netdata.io"
+                        data-decimal-digits="0"
+                        data-common-max="web-connections"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#558855"
+                        data-show-value-of-active-at="nginx_local.connections.netdata1"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - Atlanta</b> active connections
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata2" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                        data-dimensions="active"
+                        data-host="//atlanta.my-netdata.io"
+                        data-decimal-digits="0"
+                        data-common-max="web-connections"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#AA5555"
+                        data-show-value-of-active-at="nginx_local.connections.netdata2"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - California</b> active connections
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata3" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                        data-dimensions="active"
+                        data-host="//sanfrancisco.netdata.rocks"
+                        data-decimal-digits="0"
+                        data-common-max="web-connections"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#5555AA"
+                        data-show-value-of-active-at="nginx_local.connections.netdata3"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>Canada</b> active connections
+                </div>
+                <div class="mysparkline-overchart-value" id="nginx_local.connections.netdata4" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                        data-dimensions="active"
+                        data-host="//toronto.netdata.rocks"
+                        data-decimal-digits="0"
+                        data-common-max="web-connections"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885588"
+                        data-show-value-of-active-at="nginx_local.connections.netdata4"
+                        ></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="width: 100%; text-align: right; font-size: 1vw;">
+        <i class="fa fa-comment" aria-hidden="true"></i> these charts are draggable and touchable, double click them to reset them
+    </div>
+
+
+    <div class="mytitle">
+        bandwidth consumption on the demo sites
+    </div>
+    <div class="mycontent">
+        Linux QoS is configured by <a href="https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin">FireQOS</a>
+    </div>
+
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+        <li role="presentation" class="active"><a href="#outbout" aria-controls="outbout" role="tab" data-toggle="tab">Outbound</a></li>
+        <li role="presentation"><a href="#inbound" aria-controls="inbound" role="tab" data-toggle="tab">Inbound</a></li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content">
+        <div role="tabpanel" class="tab-pane active" id="outbout">
+            <div class="myfullchart">
+                <div data-netdata="tc.world_out"
+                    data-host="//london.my-netdata.io"
+                    data-common-max="tc-world-out"
+                    data-chart-library="dygraph"
+                    data-title="EU - London, traffic we send per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_out"
+                    data-host="//atlanta.my-netdata.io"
+                    data-chart-library="dygraph"
+                    data-common-max="tc-world-out"
+                    data-title="US - Atlanta, traffic we send per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_out"
+                    data-host="//sanfrancisco.netdata.rocks"
+                    data-chart-library="dygraph"
+                    data-common-max="tc-world-out"
+                    data-title="US - California, traffic we send per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_out"
+                    data-host="//toronto.netdata.rocks"
+                    data-chart-library="dygraph"
+                    data-common-max="tc-world-out"
+                    data-title="Canada, traffic we send per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+            </div>
+        </div>
+
+        <div role="tabpanel" class="tab-pane" id="inbound">
+            <div class="myfullchart">
+                <div data-netdata="tc.world_in"
+                    data-host="//london.my-netdata.io"
+                    data-common-max="tc-world-in"
+                    data-chart-library="dygraph"
+                    data-title="EU - London, traffic we receive per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_in"
+                    data-host="//atlanta.my-netdata.io"
+                    data-common-max="tc-world-in"
+                    data-chart-library="dygraph"
+                    data-title="US - Atlanta, traffic we receive per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_in"
+                    data-host="//sanfrancisco.netdata.rocks"
+                    data-common-max="tc-world-in"
+                    data-chart-library="dygraph"
+                    data-title="US - California, traffic we receive per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+            </div>
+
+            <div class="myfullchart">
+                <div data-netdata="tc.world_in"
+                    data-host="//toronto.netdata.rocks"
+                    data-common-max="tc-world-in"
+                    data-chart-library="dygraph"
+                    data-title="Canada, traffic we receive per service"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    ></div>
+            </div>
+        </div>
+    </div>
+    <div style="width: 100%; text-align: right; font-size: 1vw;">
+        <i class="fa fa-comment" aria-hidden="true"></i> <i>these legends are interactive and the charts are resizable here ^^^</i>
+    </div>
+
+    <div class="mytitle">
+        DDoS protection performance on the demo sites
+    </div>
+    <div class="mycontent">
+        iptables SYNPROXY configured by <a href="https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md#linux-anti-ddos">FireHOL</a>
+    </div>
+
+    <div style="padding-top: 4vw; width: 100%; text-align: center; font-size: 1.5vw;">
+
+        <div class="mysparkline">
+            <div class="mysparkline-overchart-label">
+                <b>EU - London</b>, TCP SYN packets/s received
+            </div>
+            <div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata1" >
+            </div>
+            <div data-netdata="netfilter.synproxy_syn_received"
+                    data-dimensions="received"
+                    data-host="//london.my-netdata.io"
+                    data-decimal-digits="0"
+                    data-common-max="synproxy-in"
+                    data-chart-library="dygraph"
+                    data-dygraph-theme="sparkline"
+                    data-dygraph-type="area"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    data-colors="#558855"
+                    data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata1"
+                    ></div>
+        </div>
+
+        <div class="mysparkline">
+            <div class="mysparkline-overchart-label">
+                <b>US - Atlanta</b>, TCP SYN packets/s received
+            </div>
+            <div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata2" >
+            </div>
+            <div data-netdata="netfilter.synproxy_syn_received"
+                    data-dimensions="received"
+                    data-host="//atlanta.my-netdata.io"
+                    data-decimal-digits="0"
+                    data-common-max="synproxy-in"
+                    data-chart-library="dygraph"
+                    data-dygraph-theme="sparkline"
+                    data-dygraph-type="area"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    data-colors="#885555"
+                    data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata2"
+                    ></div>
+        </div>
+
+        <div class="mysparkline">
+            <div class="mysparkline-overchart-label">
+                <b>US - California</b>, TCP SYN packets/s received
+            </div>
+            <div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata3" >
+            </div>
+            <div data-netdata="netfilter.synproxy_syn_received"
+                    data-dimensions="received"
+                    data-host="//sanfrancisco.netdata.rocks"
+                    data-decimal-digits="0"
+                    data-common-max="synproxy-in"
+                    data-chart-library="dygraph"
+                    data-dygraph-theme="sparkline"
+                    data-dygraph-type="area"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    data-colors="#555588"
+                    data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata3"
+                    ></div>
+        </div>
+
+        <div class="mysparkline">
+            <div class="mysparkline-overchart-label">
+                <b>Canada</b>, TCP SYN packets/s received
+            </div>
+            <div class="mysparkline-overchart-value" id="netfilter.synproxy_syn_received.netdata4" >
+            </div>
+            <div data-netdata="netfilter.synproxy_syn_received"
+                    data-dimensions="received"
+                    data-host="//toronto.netdata.rocks"
+                    data-decimal-digits="0"
+                    data-common-max="synproxy-in"
+                    data-chart-library="dygraph"
+                    data-dygraph-theme="sparkline"
+                    data-dygraph-type="area"
+                    data-width="100%"
+                    data-height="100%"
+                    data-after="-300"
+                    data-colors="#885588"
+                    data-show-value-of-received-at="netfilter.synproxy_syn_received.netdata4"
+                    ></div>
+        </div>
+    </div>
+    <div style="width: 100%; text-align: right; font-size: 1vw;">
+        <i class="fa fa-comment" aria-hidden="true"></i> <i>did you notice the decimal numbers?
+        <br/>netdata interpolates collected values at second boundaries, with nanosecond detail!</i>
+    </div>
+
+
+    <div class="mytitle">
+        CPU Utilization of the demo sites
+    </div>
+
+    <div style="padding-top: 1vw;">
+        <div class="myfullchart">
+            <div data-netdata="system.cpu"
+                data-host="//london.my-netdata.io"
+                data-chart-library="dygraph"
+                data-title="EU - London, CPU Usage"
+                data-width="100%"
+                data-height="100%"
+                data-after="-300"
+                data-dygraph-valuerange="[0, 100]"
+                ></div>
+        </div>
+
+        <div class="myfullchart">
+            <div data-netdata="system.cpu"
+                data-host="//atlanta.my-netdata.io"
+                data-chart-library="dygraph"
+                data-title="US - Atlanta, CPU Usage"
+                data-width="100%"
+                data-height="100%"
+                data-after="-300"
+                data-dygraph-valuerange="[0, 100]"
+                ></div>
+        </div>
+
+        <div class="myfullchart">
+            <div data-netdata="system.cpu"
+                data-host="//sanfrancisco.netdata.rocks"
+                data-chart-library="dygraph"
+                data-title="US - California, CPU Usage"
+                data-width="100%"
+                data-height="100%"
+                data-after="-300"
+                data-dygraph-valuerange="[0, 100]"
+                ></div>
+        </div>
+
+        <div class="myfullchart">
+            <div data-netdata="system.cpu"
+                data-host="//toronto.netdata.rocks"
+                data-chart-library="dygraph"
+                data-title="Canada, CPU Usage"
+                data-width="100%"
+                data-height="100%"
+                data-after="-300"
+                data-dygraph-valuerange="[0, 100]"
+                ></div>
+        </div>
+    </div>
+    <div style="width: 100%; text-align: right; font-size: 1vw;">
+        <i class="fa fa-comment" aria-hidden="true"></i> <i>what is using so much CPU?
+        <br/>The site <a href="//iplists.firehol.org/">iplists.firehol.org</a> is maintained by FireHOL - the CPU is used for comparing security IP Lists.</i>
+    </div>
+
+    <div class="mytitle">
+        Netdata performance
+    </div>
+    <div class="mycontent">
+        netdata monitors <b>users</b>, <b>user groups</b>, <b>applications (process trees)</b>
+        <br/>
+        <b>containers</b> (<code>lxc</code>, <code>docker</code>, etc.) and SNMP devices.
+    </div>
+
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" role="tablist" style="padding-top: 1vw;">
+        <li role="presentation" class="active"><a href="#netdata_cpu" aria-controls="netdata_cpu" role="tab" data-toggle="tab">CPU</a></li>
+        <li role="presentation"><a href="#netdata_avgtime" aria-controls="netdata_avgtime" role="tab" data-toggle="tab">Average Response Time</a></li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content">
+        <div role="tabpanel" class="tab-pane active" id="netdata_cpu">
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>EU - London</b>, CPU % of a single core
+                </div>
+                <div class="mysparkline-overchart-value" id="users.cpu.netdata1" >
+                </div>
+                <div data-netdata="apps.cpu"
+                        data-dimensions="netdata"
+                        data-common-max="users-cpu"
+                        data-decimal-digits="1"
+                        data-host="//london.my-netdata.io"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#558855"
+                        data-show-value-of-netdata-at="users.cpu.netdata1"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - Atlanta</b>, CPU % of a single core
+                </div>
+                <div class="mysparkline-overchart-value" id="users.cpu.netdata2" >
+                </div>
+                <div data-netdata="apps.cpu"
+                        data-dimensions="netdata"
+                        data-common-max="users-cpu"
+                        data-decimal-digits="1"
+                        data-host="//atlanta.my-netdata.io"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885555"
+                        data-show-value-of-netdata-at="users.cpu.netdata2"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - California</b>, CPU % of a single core
+                </div>
+                <div class="mysparkline-overchart-value" id="users.cpu.netdata3" >
+                </div>
+                <div data-netdata="apps.cpu"
+                        data-dimensions="netdata"
+                        data-common-max="users-cpu"
+                        data-decimal-digits="1"
+                        data-host="//sanfrancisco.netdata.rocks"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#555588"
+                        data-show-value-of-netdata-at="users.cpu.netdata3"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>Toronto</b>, CPU % of a single core
+                </div>
+                <div class="mysparkline-overchart-value" id="users.cpu.netdata4" >
+                </div>
+                <div data-netdata="apps.cpu"
+                        data-dimensions="netdata"
+                        data-common-max="users-cpu"
+                        data-decimal-digits="1"
+                        data-host="//toronto.netdata.rocks"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885588"
+                        data-show-value-of-netdata-at="users.cpu.netdata4"
+                        ></div>
+            </div>
+
+            <div style="width: 100%; text-align: right; font-size: 1vw;">
+                <i class="fa fa-comment" aria-hidden="true"></i> <i>this utilization is about the whole netdata process tree and the percentage is of <b>a single core</b>!
+                <br/>including <b>BASH</b> plugins (it monitors <code>mysql</code> on the demo sites), <b>node.js</b> plugins (it monitors <code>bind9</code> on the demo sites), etc.
+                <br/>and including the chart refreshes for the dashboards of all viewers.</i>
+            </div>
+        </div>
+
+        <div role="tabpanel" class="tab-pane" id="netdata_avgtime">
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>EU - London</b>, API average response time in milliseconds
+                </div>
+                <div class="mysparkline-overchart-value" id="netdata.response_time1" >
+                </div>
+                <div data-netdata="netdata.response_time"
+                        data-host="//london.my-netdata.io"
+                        data-common-max="netdata-response-time"
+                        data-decimal-digits="1"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#558855 #356835"
+                        data-show-value-of-average-at="netdata.response_time1"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - Atlanta</b>, API average response time in milliseconds
+                </div>
+                <div class="mysparkline-overchart-value" id="netdata.response_time2" >
+                </div>
+                <div data-netdata="netdata.response_time"
+                        data-host="//atlanta.my-netdata.io"
+                        data-common-max="netdata-response-time"
+                        data-decimal-digits="1"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885555 #683535"
+                        data-show-value-of-average-at="netdata.response_time2"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>US - California</b>, API average response time in milliseconds
+                </div>
+                <div class="mysparkline-overchart-value" id="netdata.response_time3" >
+                </div>
+                <div data-netdata="netdata.response_time"
+                        data-host="//sanfrancisco.netdata.rocks"
+                        data-common-max="netdata-response-time"
+                        data-decimal-digits="1"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#555588 #353568"
+                        data-show-value-of-average-at="netdata.response_time3"
+                        ></div>
+            </div>
+
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    <b>Canada</b>, API average response time in milliseconds
+                </div>
+                <div class="mysparkline-overchart-value" id="netdata.response_time4" >
+                </div>
+                <div data-netdata="netdata.response_time"
+                        data-host="//toronto.netdata.rocks"
+                        data-decimal-digits="1"
+                        data-common-max="netdata-response-time"
+                        data-chart-library="dygraph"
+                        data-dygraph-theme="sparkline"
+                        data-dygraph-type="area"
+                        data-width="100%"
+                        data-height="100%"
+                        data-after="-300"
+                        data-colors="#885588 #683568"
+                        data-show-value-of-average-at="netdata.response_time4"
+                        ></div>
+            </div>
+
+            <div style="width: 100%; text-align: right; font-size: 1vw;">
+                <i class="fa fa-comment" aria-hidden="true"></i> <i>netdata is really <b>fast</b> (the values are milliseconds!)
+                <br/>
+                These values include everything, from the reception of the first byte to the dispatch of the last, including gzip compression.
+                <br/>
+                Values above 2-3ms are usually chart refreshes of charts with several dimensions, charts with very long durations (zoomed out), or file transfers.
+                </i>
+            </div>
+        </div>
+    </div>
+
+    <div style="padding-top: 6vw; width: 100%; text-align: center; font-size: 2vw;">
+        want to know more?
+        <br/>
+        jump to <a href="https://github.com/netdata/netdata/">the netdata page at github</a>
+        <br/>
+        it needs just 3 mins to be installed on your servers!
+        <br/>
+        &nbsp;
+    </div>
+</div>
+</body>
+<script>
+    // google analytics when this is used for the home page of the demo sites
+    // you don't need this if you customize this dashboard for your needs
+    setTimeout(function() {
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-64295674-3', 'auto');
+        ga('send', 'pageview');
+    }, 2000);
+</script>
+</html>

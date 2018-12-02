@@ -1,0 +1,4 @@
+# phpfm
+
+> THIS MODULE IS OBSOLETE.
+> USE [THE PYTHON ONE](../../python.d.plugin/phpfpm) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT

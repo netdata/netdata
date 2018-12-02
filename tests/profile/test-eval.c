@@ -8,8 +8,8 @@
  */
 
 #include "config.h"
-#include "common.h"
-#include "clocks.h"
+#include "libnetdata/libnetdata.h"
+#include "database/rrdcalc.h"
 
 void netdata_cleanup_and_exit(int ret) { exit(ret); }
 

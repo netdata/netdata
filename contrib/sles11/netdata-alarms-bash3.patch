@@ -1,0 +1,10 @@
+--- system/netdata.conf.orig    2018-05-10 19:44:49.000000000 +0300
++++ system/netdata.conf 2018-05-10 19:45:14.000000000 +0300
+@@ -22,3 +22,7 @@
+ [web]
+     web files owner = root
+     web files group = netdata
++
++[health]
++    # script for sles 11, mail notifications only
++    script to execute on alarm = /usr/lib64/netdata/plugins.d/alarm-notify.bash3.sh
