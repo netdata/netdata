@@ -1,5 +1,10 @@
 # cpufreq
 
+> THIS MODULE IS OBSOLETE.
+> USE THE [PROC PLUGIN](../../proc.plugin) - IT IS MORE EFFICIENT
+
+---
+
 This module shows the current CPU frequency as set by the cpufreq kernel
 module.
 
