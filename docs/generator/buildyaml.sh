@@ -139,7 +139,8 @@ echo -ne "- Running netdata:
 "
 navpart 2 daemon
 navpart 2 daemon/config
-
+echo -ne "    - 'docs/Charts.md'
+"
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
 echo -ne "        - Running behind another web server:
