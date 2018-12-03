@@ -37,7 +37,6 @@ struct raid {
     RRDSET *st_mismatch_cnt;
     RRDDIM *rd_mismatch_cnt;
     unsigned long long mismatch_cnt;
-    struct timespec mismatch_modification_time;
 };
 
 static inline char *remove_trailing_chars(char *s, char c) {
@@ -54,11 +53,10 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
     static char mdstat_filename[FILENAME_MAX + 1];
-    static struct timespec ff_modification_time = {0, 0};
     static struct raid *raids = NULL;
     static size_t raids_num = 0, raids_allocated = 0;
     static char *mismatch_cnt_filename = NULL;
-    struct stat stbuf;
+    size_t raid_idx = 0;
 
     if(unlikely(!ff)) {
         snprintfz(mdstat_filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/mdstat");
@@ -67,139 +65,131 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         if(unlikely(!ff)) return 1;
     }
 
-    stat(mdstat_filename, &stbuf);
-    if(unlikely(stbuf.st_mtim.tv_sec != ff_modification_time.tv_sec || stbuf.st_mtim.tv_nsec != ff_modification_time.tv_nsec)) {
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 0; // we return 0, so that we will retry opening it next time
 
-        ff = procfile_readall(ff);
-        if(unlikely(!ff)) return 0; // we return 0, so that we will retry opening it next time
+    size_t lines = procfile_lines(ff);
+    size_t words = procfile_linewords(ff, 0);
 
-        size_t lines = procfile_lines(ff);
-        size_t words = procfile_linewords(ff, 0);
+    if(unlikely(lines < 2)) {
+        error("Cannot read /proc/mdstat. Expected 2 or more lines, read %zu.", lines);
+        return 1;
+    }
 
-        if(unlikely(lines < 2)) {
-            error("Cannot read /proc/mdstat. Expected 2 or more lines, read %zu.", lines);
-            return 1;
+    // find how many raids are there
+    size_t l;
+    raids_num = 0;
+    for(l = 1; l < lines - 2 ; l++) {
+       if(unlikely(procfile_lineword(ff, l, 1)[0] == 'a')) // check if the raid is active
+            raids_num++;
+    }
+
+    if(unlikely(!raids_num)) return 0; // we return 0, so that we will retry searching for raids next time
+
+    // allocate the memory we need;
+    if(unlikely(raids_num != raids_allocated)) {
+        raids = (struct raid *)reallocz(raids, raids_num * sizeof(struct raid));
+        raids_allocated = raids_num;
+    }
+    memset(raids, 0, raids_num * sizeof(struct raid));
+
+    // loop through all lines except the first and the last ones
+    for(l = 1; l < (lines - 2) && raid_idx < raids_num; l++) {
+        struct raid *raid = &raids[raid_idx];
+        raid->used = 0;
+
+        words = procfile_linewords(ff, l);
+        if(unlikely(words < 2)) continue;
+
+        if(unlikely(procfile_lineword(ff, l, 1)[0] != 'a')) continue;
+        raid->name = procfile_lineword(ff, l, 0);
+        if(unlikely(!raid->name || !raid->name[0])) continue;
+
+        // check if raid has disk status
+        words = procfile_linewords(ff, l + 1);
+        if(words < 2 || procfile_lineword(ff, l + 1, words - 1)[0] != '[') {
+            l++;
+            continue;
         }
 
-        // find how many raids are there
-        size_t l;
-        raids_num = 0;
-        for(l = 1; l < lines - 2 ; l++) {
-           if(unlikely(procfile_lineword(ff, l, 1)[0] == 'a')) // check if the raid is active
-                raids_num++;
+        // split inuse and total number of disks
+        char *s = NULL, *str_total = NULL, *str_inuse = NULL;
+
+        s = procfile_lineword(ff, l + 1, words - 2);
+        if(unlikely(s[0] != '[')) {
+            error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
+            continue;
+        }
+        str_total = ++s;
+        while(*s) {
+            if(unlikely(*s == '/')) {
+                *s = '\0';
+                str_inuse = s + 1;
+            }
+            else if(unlikely(*s == ']')) {
+                *s = '\0';
+                break;
+            }
+            s++;
+        }
+        if(unlikely(str_total[0] == '\0' || str_inuse[0] == '\0')) {
+            error("Cannot read /proc/mdstat raid health status. Unexpected format.");
+            continue;
         }
 
-        if(unlikely(!raids_num)) return 0; // we return 0, so that we will retry searching for raids next time
+        raid->inuse_disks = str2ull(str_inuse);
+        raid->total_disks = str2ull(str_total);
+        raid->failed_disks = raid->total_disks - raid->inuse_disks;
 
-        // allocate the memory we need;
-        if(unlikely(raids_num != raids_allocated)) {
-            raids = (struct raid *)reallocz(raids, raids_num * sizeof(struct raid));
-            raids_allocated = raids_num;
+        raid_idx++;
+        raid->used = 1;
+
+        // check if any operation is performed on the raid
+        words = procfile_linewords(ff, l + 2);
+        if(likely(words < 2)) continue;
+        if(unlikely(words < 7)) {
+            error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
+            continue;
         }
-        memset(raids, 0, raids_num * sizeof(struct raid));
+        if(unlikely(procfile_lineword(ff, l + 2, 0)[0] != '[')) continue;
+        char *word;
 
-        // loop through all lines except the first and the last ones
-        size_t raid_idx = 0;
-        for(l = 1; l < (lines - 2) && raid_idx < raids_num; l++) {
-            struct raid *raid = &raids[raid_idx];
-            raid->used = 0;
+        word = procfile_lineword(ff, l + 2, 3);
+        remove_trailing_chars(word, '%');
 
-            words = procfile_linewords(ff, l);
-            if(unlikely(words < 2)) continue;
-
-            if(unlikely(procfile_lineword(ff, l, 1)[0] != 'a')) continue;
-            raid->name = procfile_lineword(ff, l, 0);
-            if(unlikely(!raid->name || !raid->name[0])) continue;
-
-            // check if raid has disk status
-            words = procfile_linewords(ff, l + 1);
-            if(words < 2 || procfile_lineword(ff, l + 1, words - 1)[0] != '[') {
-                l++;
-                continue;
-            }
-
-            // split inuse and total number of disks
-            char *s = NULL, *str_inuse = NULL, *str_total = NULL;
-
-            s = procfile_lineword(ff, l + 1, words - 2);
-            if(unlikely(s[0] != '[')) {
-                error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
-                continue;
-            }
-            str_inuse = ++s;
-            while(*s) {
-                if(unlikely(*s == '/')) {
-                    *s = '\0';
-                    str_total = s + 1;
-                }
-                else if(unlikely(*s == ']')) {
-                    *s = '\0';
-                    break;
-                }
-                s++;
-            }
-            if(unlikely(str_inuse[0] == '\0' || str_total[0] == '\0')) {
-                error("Cannot read /proc/mdstat raid health status. Unexpected format.");
-                continue;
-            }
-
-            raid->inuse_disks = str2ull(str_inuse);
-            raid->total_disks = str2ull(str_total);
-            raid->failed_disks = raid->total_disks - raid->inuse_disks;
-
-            raid_idx++;
-            raid->used = 1;
-
-            // check if any operation is performed on the raid
-            words = procfile_linewords(ff, l + 2);
-            if(likely(words < 2)) continue;
-            if(unlikely(words < 7)) {
-                error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
-                continue;
-            }
-            if(unlikely(procfile_lineword(ff, l + 2, 0)[0] != '[')) continue;
-            char *word;
-
-            word = procfile_lineword(ff, l + 2, 3);
-            remove_trailing_chars(word, '%');
-
-            unsigned long long percentage = (unsigned long long)(str2ld(word, NULL) * 100);
-            // possible operations: check, resync, recovery, reshape
-            // 4-th character is unique for each operation so it is checked
-            switch(procfile_lineword(ff, l + 2, 1)[3]) {
-                case 'c': // check
-                    raid->check = percentage;
-                    break;
-                case 'y': // resync
-                    raid->resync = percentage;
-                    break;
-                case 'o': // recovery
-                    raid->recovery = percentage;
-                    break;
-                case 'h': // reshape
-                    raid->reshape = percentage;
-                    break;
-            }
-
-            word = procfile_lineword(ff, l + 2, 5);
-            s = remove_trailing_chars(word, 'm'); // remove trailing "min"
-
-            word += 7; // skip leading "finish="
-
-            if(likely(s > word))
-                raid->finish_in = (unsigned long long)(str2ld(word, NULL) * 60);
-
-            word = procfile_lineword(ff, l + 2, 6);
-            s = remove_trailing_chars(word, 'K'); // remove trailing "K/sec"
-
-            word += 6; // skip leading "speed="
-
-            if(likely(s > word))
-                raid->speed = str2ull(word);
+        unsigned long long percentage = (unsigned long long)(str2ld(word, NULL) * 100);
+        // possible operations: check, resync, recovery, reshape
+        // 4-th character is unique for each operation so it is checked
+        switch(procfile_lineword(ff, l + 2, 1)[3]) {
+            case 'c': // check
+                raid->check = percentage;
+                break;
+            case 'y': // resync
+                raid->resync = percentage;
+                break;
+            case 'o': // recovery
+                raid->recovery = percentage;
+                break;
+            case 'h': // reshape
+                raid->reshape = percentage;
+                break;
         }
 
-        ff_modification_time.tv_sec = stbuf.st_mtim.tv_sec;
-        ff_modification_time.tv_nsec = stbuf.st_mtim.tv_nsec;
+        word = procfile_lineword(ff, l + 2, 5);
+        s = remove_trailing_chars(word, 'm'); // remove trailing "min"
+
+        word += 7; // skip leading "finish="
+
+        if(likely(s > word))
+            raid->finish_in = (unsigned long long)(str2ld(word, NULL) * 60);
+
+        word = procfile_lineword(ff, l + 2, 6);
+        s = remove_trailing_chars(word, 'K'); // remove trailing "K/sec"
+
+        word += 6; // skip leading "speed="
+
+        if(likely(s > word))
+            raid->speed = str2ull(word);
     }
 
     // read mismatch_cnt files
@@ -211,21 +201,15 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         mismatch_cnt_filename = config_get("plugin:proc:/proc/mdstat", "mismatch_cnt filename to monitor", filename);
     }
 
-    size_t raid_idx = 0;
     for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
         char filename[FILENAME_MAX + 1];
         struct raid *raid = &raids[raid_idx];
 
         if(likely(raid->used)) {
             snprintfz(filename, FILENAME_MAX, mismatch_cnt_filename, raid->name);
-            stat(mdstat_filename, &stbuf);
-            if(unlikely(stbuf.st_mtim.tv_sec != raid->mismatch_modification_time.tv_sec || stbuf.st_mtim.tv_nsec != raid->mismatch_modification_time.tv_nsec)) {
-                if(unlikely(read_single_number_file(filename, &raid->mismatch_cnt) == -1)) {
-                    error("Cannot read file '%s'", filename);
-                    return 1;
-                }
-                raid->mismatch_modification_time.tv_sec = stbuf.st_mtim.tv_sec;
-                raid->mismatch_modification_time.tv_nsec = stbuf.st_mtim.tv_nsec;
+            if(unlikely(read_single_number_file(filename, &raid->mismatch_cnt))) {
+                error("Cannot read file '%s'", filename);
+                return 1;
             }
         }
     }
