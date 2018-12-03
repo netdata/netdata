@@ -512,7 +512,7 @@ function renderStreamedHosts(options) {
         return naturalSortCompare(a.hostname, b.hostname);
     });
 
-    for (const s of sorted) {
+    for (s of sorted) {
         let url, icon;
         const hostname = s.hostname;
 
@@ -560,7 +560,7 @@ function renderMachines(machinesArray) {
             return naturalSortCompare(a.name, b.name);
         });
 
-        for (const machine of machines) {
+        for (machine of machines) {
             found = true;
 
             const alternateUrlItems = (
@@ -625,7 +625,7 @@ function renderMachines(machinesArray) {
 
         ]
 
-        for (const server of demoServers) {
+        for (server of demoServers) {
             html += (
                 `<div class="agent-item">
                     <i class="fas fa-chart-bar" color: #fff"></i>
