@@ -479,25 +479,13 @@ filter_recipient_by_criticality() {
 # check fleep
 [ -z "${FLEEP_SERVER}" -o -z "${FLEEP_SENDER}" ] && SEND_FLEEP="NO"
 
-# check pagerduty.com
-# if we need pd-send, check for the pd-send command
-# https://www.pagerduty.com/docs/guides/agent-install-guide/
-if [ "${SEND_PD}" = "YES" ]
-    then
-    pd_send="$(which pd-send 2>/dev/null || command -v pd-send 2>/dev/null)"
-    if [ -z "${pd_send}" ]
-        then
-        error "Cannot find pd-send command in the system path. Disabling pagerduty.com notifications."
-        SEND_PD="NO"
-    fi
-fi
-
 # if we need curl, check for the curl command
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
         -o "${SEND_ROCKETCHAT}"  = "YES" \
         -o "${SEND_ALERTA}"      = "YES" \
+        -o "${SEND_PD}"          = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
@@ -523,6 +511,7 @@ if [ \( \
         SEND_MSTEAM="NO"
         SEND_ROCKETCHAT="NO"
         SEND_ALERTA="NO"
+        SEND_PD="NO"
         SEND_FLOCK="NO"
         SEND_DISCORD="NO"
         SEND_TWILIO="NO"
@@ -898,7 +887,7 @@ EOF
 # kafka sender
 
 send_kafka() {
-    local httpcode sent=0 
+    local httpcode sent=0
     if [ "${SEND_KAFKA}" = "YES" ]
         then
             httpcode=$(docurl -X POST \
@@ -935,38 +924,42 @@ send_pd() {
         then
         for PD_SERVICE_KEY in ${recipients}
         do
-            d="${status} ${name} = ${value_string} - ${host}, ${family}"
-            ${pd_send} -k ${PD_SERVICE_KEY} \
-                       -t ${t} \
-                       -d "${d}" \
-                       -i ${host}:${chart}:${name} \
-                       -f 'info'="${info}" \
-                       -f 'value_w_units'="${value_string}" \
-                       -f 'when'="${when}" \
-                       -f 'duration'="${duration}" \
-                       -f 'roles'="${roles}" \
-                       -f 'host'="${host}" \
-                       -f 'unique_id'="${unique_id}" \
-                       -f 'alarm_id'="${alarm_id}" \
-                       -f 'event_id'="${event_id}" \
-                       -f 'name'="${name}" \
-                       -f 'chart'="${chart}" \
-                       -f 'family'="${family}" \
-                       -f 'status'="${status}" \
-                       -f 'old_status'="${old_status}" \
-                       -f 'value'="${value}" \
-                       -f 'old_value'="${old_value}" \
-                       -f 'src'="${src}" \
-                       -f 'non_clear_duration'="${non_clear_duration}" \
-                       -f 'units'="${units}"
-            retval=$?
-            if [ ${retval} -eq 0 ]
-                then
-                    info "sent pagerduty.com notification for host ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}....: ${d}"
-                    sent=$((sent + 1))
-                else
-                    error "failed to send pagerduty.com notification for ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}.... (error code ${retval}): ${d}"
-            fi
+        d="${status} ${name} = ${value_string} - ${host}, ${family}"
+            payload="$(cat << EOF
+            {
+              "service_key": "${PD_SERVICE_KEY}",
+              "event_type": "${t}",
+              "incident_key" : "${alarm_id}",
+              "description": "${d}",
+              "details": {
+                "value_w_units": "${value_string}",
+                "when": "${when}",
+                "duration" : "${duration}",
+                "roles": "${roles}",
+                "alarm_id" : "${alarm_id}",
+                "name" : "${name}",
+                "chart" : "${chart}",
+                "family" : "${family}",
+                "status" : "${status}",
+                "old_status" : "${old_status}",
+                "value" : "${value}",
+                "old_value" : "${old_value}",
+                "src" : "${src}",
+                "non_clear_duration" : "${non_clear_duration}",
+                "units" : "${units}",
+                "info" : "${info}"
+              }
+            }
+EOF
+            )"
+         httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/generic/2010-04-15/create_event.json")
+         if [ "${httpcode}" = "200" ]
+         then
+             info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
+             sent=$((sent + 1))
+         else
+             error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+         fi
         done
 
         [ ${sent} -gt 0 ] && return 0
@@ -1021,7 +1014,7 @@ send_hipchat() {
     if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${HIPCHAT_SERVER}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
     then
         # A label to be shown in addition to the sender's name
-        # Valid length range: 0 - 64. 
+        # Valid length range: 0 - 64.
         sender="netdata"
 
         # Valid values: html, text.
@@ -1048,7 +1041,7 @@ send_hipchat() {
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${host}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
                     "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
- 
+
             if [ "${httpcode}" = "204" ]
             then
                 info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
@@ -1135,7 +1128,7 @@ send_telegram() {
     local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid emoji disableNotification=""
 
     if [ "${status}" = "CLEAR" ]; then disableNotification="--data-urlencode disable_notification=true"; fi
-    
+
     case "${status}" in
         WARNING)  emoji="⚠️" ;;
         CRITICAL) emoji="🔴" ;;
@@ -1601,7 +1594,7 @@ send_fleep() {
 
 send_irc() {
     local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
-    
+
     if [ "${SEND_IRC}" = "YES" -a ! -z "${NICKNAME}" -a ! -z "${REALNAME}" -a ! -z "${CHANNELS}" -a ! -z "${NETWORK}" -a ! -z "${SERVERNAME}" ]
     then
         case "${status}" in
@@ -1626,13 +1619,13 @@ send_irc() {
                 info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}'"
                 sent=$((sent + 1))
             else
-                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}." 
+                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}."
             fi
         done
     fi
-    
+
     [ ${sent} -gt 0 ] && return 0
-    
+
     return 1
 }
 
@@ -1655,7 +1648,7 @@ send_awssns() {
             info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
             sent=$((sent + 1))
         else
-            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'" 
+            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
         fi
     done
 
@@ -1911,7 +1904,7 @@ SENT_PUSHBULLET=$?
 # -----------------------------------------------------------------------------
 # send the twilio SMS
 
-send_twilio "${TWILIO_ACCOUNT_SID}" "${TWILIO_ACCOUNT_TOKEN}" "${TWILIO_NUMBER}" "${to_twilio}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+send_twilio "${TWILIO_ACCOUNT_SID}" "${TWILIO_ACCOUNT_TOKEN}" "${TWILIO_NUMBER}" "${to_twilio}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
@@ -1922,7 +1915,7 @@ SENT_TWILIO=$?
 # -----------------------------------------------------------------------------
 # send the messagebird SMS
 
-send_messagebird "${MESSAGEBIRD_ACCESS_KEY}" "${MESSAGEBIRD_NUMBER}" "${to_messagebird}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+send_messagebird "${MESSAGEBIRD_ACCESS_KEY}" "${MESSAGEBIRD_NUMBER}" "${to_messagebird}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
@@ -1934,7 +1927,7 @@ SENT_MESSAGEBIRD=$?
 # -----------------------------------------------------------------------------
 # send the kavenegar SMS
 
-send_kavenegar "${KAVENEGAR_API_KEY}" "${KAVENEGAR_SENDER}" "${to_kavenegar}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+send_kavenegar "${KAVENEGAR_API_KEY}" "${KAVENEGAR_SENDER}" "${to_kavenegar}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
@@ -1977,7 +1970,7 @@ SENT_FLEEP=$?
 # -----------------------------------------------------------------------------
 # send the irc message
 
-send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm} 
+send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
 Severity: ${severity}
 Chart: ${chart}
 Family: ${family}
