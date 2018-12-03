@@ -186,6 +186,17 @@ if [ -z "${NAME}" ]
         else
             error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
         fi
+    elif [[ "${CGROUP}" =~ ^.*machine.slice/([0-9]+)$ && -d /etc/vz/conf ]]
+        then
+        # OpenVZ containers
+
+        FILENAME="/etc/vz/conf/${BASH_REMATCH[1]}.conf"
+        if [[ -f ${FILENAME} && -r ${FILENAME} ]]
+            then
+            NAME=$(grep -e '^HOSTNAME="' "${FILENAME}" | head -1 | sed -rn 's|HOSTNAME="(.*)"$|\1|p')
+        else
+            error "OpenVZ config file missing ${FILENAME} or netdata does not have read access."
+        fi
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"
