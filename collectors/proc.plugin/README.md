@@ -192,7 +192,12 @@ So, to disable performance metrics for all loop devices you could add `performan
  * speed in megabytes/s
 
 #### configuration
-`filename to monitor` and `mismatch_cnt filename filename to monitor` in the `[plugin:proc:/proc/mdstat]` configuration section
+
+```
+[plugin:proc:/proc/mdstat]
+    # mismatch_cnt filename to monitor = /sys/block/%s/md/mismatch_cnt
+    # filename to monitor = /proc/mdstat
+```
 
 ## Monitoring CPUs
 
