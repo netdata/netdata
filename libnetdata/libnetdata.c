@@ -1380,7 +1380,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-            else if(de->d_type == DT_REG || de->d_type == DT_LNK) {
+            else if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -1428,7 +1428,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-            else if(de->d_type == DT_REG || de->d_type == DT_LNK) {
+            else if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
