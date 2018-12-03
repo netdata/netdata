@@ -53,15 +53,21 @@ static inline char *remove_trailing_chars(char *s, char c) {
 int do_proc_mdstat(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
-    static char mdstat_filename[FILENAME_MAX + 1];
+    static char *mdstat_filename = NULL, *mismatch_cnt_filename = NULL;
     static struct raid *raids = NULL;
     static size_t raids_num = 0, raids_allocated = 0;
-    static char *mismatch_cnt_filename = NULL;
     size_t raid_idx = 0;
 
+    if(unlikely(!mismatch_cnt_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/md/mismatch_cnt");
+        mismatch_cnt_filename = config_get("plugin:proc:/proc/mdstat", "mismatch_cnt filename to monitor", filename);
+    }
+
     if(unlikely(!ff)) {
-        snprintfz(mdstat_filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/mdstat");
-        strncpy(mdstat_filename, config_get("plugin:proc:/proc/mdstat", "filename to monitor", mdstat_filename), FILENAME_MAX);
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/mdstat");
+        mdstat_filename = config_get("plugin:proc:/proc/mdstat", "filename to monitor", filename);
         ff = procfile_open(mdstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
@@ -215,14 +221,6 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     }
 
     // read mismatch_cnt files
-
-    if(unlikely(!mismatch_cnt_filename)) {
-        char filename[FILENAME_MAX + 1];
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/md/mismatch_cnt");
-        mismatch_cnt_filename = config_get("plugin:proc:/proc/mdstat", "mismatch_cnt filename to monitor", filename);
-    }
-
     for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
         char filename[FILENAME_MAX + 1];
         struct raid *raid = &raids[raid_idx];
