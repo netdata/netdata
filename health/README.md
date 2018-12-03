@@ -9,8 +9,8 @@ netdata, since many charts are dynamically created during runtime (for example, 
 chart tracking network interface packet drops, is automatically created on the first
 packet dropped).
 
-Netdata also supports alarm **templates**, so that an alarm can be attached to all
-the charts of the same context (i.e. all network interfaces, or all disks, or all mysql servers, etc.)
+Netdata also supports alarm **templates**, so that an alarm can be attached to all the charts of the same context (i.e. all network interfaces, or all disks, or all mysql servers, etc.).  
+
 
 Each alarm can execute a single query to the database using statistical algorithms against past data,
 but alarms can be combined. So, if you need 2 queries in the database, you can combine
@@ -145,7 +145,7 @@ This is useful when you centralize metrics from multiple hosts, to one netdata.
 This line is only used in alarm templates. It filters the charts. So, if you need to create
 an alarm template for a few of a kind of chart (a few of your disks, or a few of your network
 interfaces, or a few your mysql servers, etc), you can create an alarm template that would
-normally be applied to all of them, and filter them by family.
+normally be applied to all of them, and filter them by [family](../docs/Charts.md#families).
 
 The format is:
 
@@ -153,14 +153,7 @@ The format is:
 families: SIMPLE PATTERN LIST
 ```
 
-Simple patterns list is a lists of space separated patterns. Use ` * ` as wildcard and ` ! `
-for a negative match. Processing is left to right, and on the first hit (positive or negative),
-processing stops.
-
-So. `families: *` means, match anything, while `families: !bad*pattern* *` means anything
-except `bad*pattern*` (where `*` is a wildcard to match any sequence of characters).
-
-The family of a chart is usually the submenu of the netdata dashboard it appears.
+The simple pattern syntax and operation is explained in [simple patterns](../libnetdata/simple_pattern/).
 
 ---
 
@@ -349,6 +342,16 @@ delay: [[[up U] [down D] multiplier M] max X]
      their matching one) and a delay is in place.
   - All are reset to their defaults when the alarm switches state without a delay in place.
 
+#### Alarm line `option`
+
+The only possible value for the `option` line is 
+
+```
+option: no-clear-notification
+```
+
+For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an alarm template called `web_service_slow` that compares the average http call response time over the last 3 minutes, compared to the average over the last hour. It triggers a warning alarm when the average of the last 3 minutes is twice the average of the last hour. In such cases, it is easy to trigger the alarm, but difficult to tell when the alarm is cleared. As time passes, the newest window moves into the older, so the average response time of the last hour will keep increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm. However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option. 
+
 ---
 
 ### Expressions
@@ -419,10 +422,19 @@ Which in turn, results in the following behavior:
 
 ### Variables
 
-netdata supports 3 new internal indexes for variables that will be used in health monitoring:
+You can find all the variables that can be used for a given chart, using
+`http://your.netdata.ip:19999/api/v1/alarm_variables?chart=CHART_NAME`
+Example: [variables for the `system.cpu` chart of the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
+ 
+_Hint: If you don't know how to find the CHART_NAME, you can read about it [here](../docs/Charts.md#charts)._
 
-  - **chart local variables**. All the dimensions of the chart are exposed as local variables.
-     All chart alarms names are exposed as variables too.
+
+Netdata supports 3 internal indexes for variables that will be used in health monitoring. 
+<details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
+Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to the same [context](../docs/Charts.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../docs/Charts.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families). 
+</details>
+
+  - **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for the other configured alarms of the chart also appears, under the name of each configured alarm.
 
      Charts also define a few special variables:
 
@@ -448,20 +460,15 @@ netdata supports 3 new internal indexes for variables that will be used in healt
 
   - **special variables*** are:
 
-     - `this`, which is resolved to the value of the current alarm.
+     - `$this`, which is resolved to the value of the current alarm.
      
-     - `status`, which is resolved to the current status of the alarm (the current = the last
+     - `$status`, which is resolved to the current status of the alarm (the current = the last
         status, i.e. before the current database lookup and the evaluation of the `calc` line).
         This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
         `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAL` works as
         expected.
         
-     - `now`, which is resolved to current unix timestamp.
-
-You can find all the variables that can be used for a given chart, using
-`http://your.netdata.ip:19999/api/v1/alarm_variables?chart=NAME`.
-This will dump all the indexes from the chart's perspective.
-Example: [variables for the `system.cpu` chart of the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
+     - `$now`, which is resolved to current unix timestamp.
 
 ## Alarm Statuses
 
