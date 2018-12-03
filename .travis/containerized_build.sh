@@ -8,17 +8,4 @@ then
   exit 1
 fi
 
-trap "docker rm -f netdata-test" EXIT
-
-# Start long running container
-docker run -d -v "${PWD}:/code:rw" -w /code --name netdata-test "netdata/os-test:$1" sleep 1h
-
-# Test installation
-docker exec -it netdata-test ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-
-# Test update
-#docker exec -it netdata-test /etc/cron.daily/netdata-updater -f
-docker exec -it netdata-test ./netdata-updater.sh -f
-
-# Test deinstalation (TODO: cannot test it now since it is ALWAYS in interactive mode)
-# docker exec -it netdata-test ./netdata-uninstaller.sh --force
+docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:$1" ./tests/lifecycle.sh
