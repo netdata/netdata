@@ -8,4 +8,7 @@ then
   exit 1
 fi
 
+git config user.email "test@example.com"
+git config user.name "test"
+
 docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:$1" ./tests/lifecycle.sh
