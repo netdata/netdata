@@ -261,7 +261,7 @@ WHERE application_name IS NOT NULL;
     'REPSLOT_FILES': """
 WITH wal_size AS (
   SELECT
-    current_setting('wal_block_size')::INT * setting::INT AS val
+    current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val
   FROM pg_settings
   WHERE name = 'wal_segment_size'
   )
