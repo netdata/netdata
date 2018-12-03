@@ -69,6 +69,7 @@
 #define NETDATA_CHART_PRIO_CPU_PER_CORE               1000 // +1 per core
 #define NETDATA_CHART_PRIO_CPU_TEMPERATURE            1050 // freebsd only
 #define NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ   5003 // freebsd only
+#define NETDATA_CHART_PRIO_CPUIDLE                    6000
 
 #define NETDATA_CHART_PRIO_CORE_THROTTLING            5001
 #define NETDATA_CHART_PRIO_PACKAGE_THROTTLING         5002
