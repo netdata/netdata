@@ -97,7 +97,7 @@ update() {
 		git stash >&3
 		git fetch --all >&3
 		git fetch --tags >&3
-		git checkout origin/master >&3
+		git checkout master >&3
 		git reset --hard origin/master >&3
 		git pull >&3
 
