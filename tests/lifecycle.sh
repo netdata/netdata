@@ -13,17 +13,18 @@ if ! git config user.name; then
   git config user.name "test"
 fi
 
-echo "---- Install netdata ----"
+echo "========= INSTALL ========="
 ./netdata-installer.sh  --dont-wait --dont-start-it --install /tmp &>/dev/null
 
-echo "---- Add garbage ----"
+echo "========= ADD GARBAGE ========="
 touch test
 git add test
 git commit -m 'test commit'
 touch new_file
+git status
 
-echo "---- Test updater ----"
+echo "========= UPDATE ========="
 ./netdata-updater.sh
 
-#echo "---- Test uninstall ----"
+#echo "========= UNINSTALL ========="
 #./netdata-uninstaller.sh
