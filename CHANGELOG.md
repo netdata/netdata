@@ -5,11 +5,14 @@
 **Fixed bugs:**
 
 - nvidia\_smi module bug [\#4892](https://github.com/netdata/netdata/issues/4892)
+- No alarms are running in some systems [\#4809](https://github.com/netdata/netdata/issues/4809)
 - Fail2ban: Read "Restore Ban" for persistent bans [\#4769](https://github.com/netdata/netdata/issues/4769)
 - registry items are clickable, but no action is taken [\#4721](https://github.com/netdata/netdata/issues/4721)
 - Issues with prometheus exposed metrics [\#4680](https://github.com/netdata/netdata/issues/4680)
+- Enable default alarms disabled after restart service netdata [\#4636](https://github.com/netdata/netdata/issues/4636)
 - Spec file doesn't generate configure script before build [\#4570](https://github.com/netdata/netdata/issues/4570)
 - sensors.chart.py ignores fans running at 0 RPM when netdata was started [\#4158](https://github.com/netdata/netdata/issues/4158)
+- Postgres plugin lock output incorrect [\#4090](https://github.com/netdata/netdata/issues/4090)
 - python plugins got behind by 5 seconds [\#3752](https://github.com/netdata/netdata/issues/3752)
 - Constant stream of "chart took too long to be updated" INFO messages in error.log [\#3505](https://github.com/netdata/netdata/issues/3505)
 - Alarm badge link escaping for disk paths in default dashboard [\#3253](https://github.com/netdata/netdata/issues/3253)
@@ -22,7 +25,6 @@
 - Scaleio monitoring [\#4828](https://github.com/netdata/netdata/issues/4828)
 - Gluster monitoring [\#4827](https://github.com/netdata/netdata/issues/4827)
 - Leofs monitoring [\#4826](https://github.com/netdata/netdata/issues/4826)
-- Installing and updating netdata to stable releases only \(v2\) [\#4763](https://github.com/netdata/netdata/issues/4763)
 - Use `--future-release` in changelog generation [\#4718](https://github.com/netdata/netdata/issues/4718)
 - Store nightly build artifacts somewhere [\#4628](https://github.com/netdata/netdata/issues/4628)
 - Remove old packaging scripts [\#4608](https://github.com/netdata/netdata/issues/4608)
@@ -42,8 +44,14 @@
 
 **Merged pull requests:**
 
+- smartd\_log: ata 194 attr fix [\#4908](https://github.com/netdata/netdata/pull/4908) ([ilyam8](https://github.com/ilyam8))
+- Do not update repositories in CI operating system  [\#4907](https://github.com/netdata/netdata/pull/4907) ([paulfantom](https://github.com/paulfantom))
+- do not use protected variable name in updater script [\#4902](https://github.com/netdata/netdata/pull/4902) ([paulfantom](https://github.com/paulfantom))
+- postgres module: locks count fix [\#4901](https://github.com/netdata/netdata/pull/4901) ([ilyam8](https://github.com/ilyam8))
+- treat DT\_UNKNOWN files as regular files [\#4898](https://github.com/netdata/netdata/pull/4898) ([ktsaou](https://github.com/ktsaou))
 - more health debugging to trace config files [\#4897](https://github.com/netdata/netdata/pull/4897) ([ktsaou](https://github.com/ktsaou))
 - added debug statements when loading health config files [\#4896](https://github.com/netdata/netdata/pull/4896) ([ktsaou](https://github.com/ktsaou))
+- Added info on health configuration and page for Charts [\#4895](https://github.com/netdata/netdata/pull/4895) ([cakrit](https://github.com/cakrit))
 - added more debug outpput to freeipmi [\#4894](https://github.com/netdata/netdata/pull/4894) ([ktsaou](https://github.com/ktsaou))
 - nvidia\_smi: handle `N/A` values [\#4893](https://github.com/netdata/netdata/pull/4893) ([ilyam8](https://github.com/ilyam8))
 - add api/v1/info endpoint to swagger [\#4807](https://github.com/netdata/netdata/pull/4807) ([Wing924](https://github.com/Wing924))
@@ -69,6 +77,7 @@
 - add more layers to container image [\#4722](https://github.com/netdata/netdata/pull/4722) ([paulfantom](https://github.com/paulfantom))
 - python.d: use real time for calc sinceLast [\#4720](https://github.com/netdata/netdata/pull/4720) ([ilyam8](https://github.com/ilyam8))
 - Test integrity of dashboard.js [\#4715](https://github.com/netdata/netdata/pull/4715) ([paulfantom](https://github.com/paulfantom))
+- fix\(pagerduty\): Use cURL instead of PagerDuty agent to send alarms. [\#4694](https://github.com/netdata/netdata/pull/4694) ([elisiariocouto](https://github.com/elisiariocouto))
 - lint all shell collectors code [\#4690](https://github.com/netdata/netdata/pull/4690) ([paulfantom](https://github.com/paulfantom))
 - Better updater [\#4558](https://github.com/netdata/netdata/pull/4558) ([paulfantom](https://github.com/paulfantom))
 - Generalize the recipient finding logic and reduce the boilerplate code. [\#3960](https://github.com/netdata/netdata/pull/3960) ([Ferroin](https://github.com/Ferroin))
