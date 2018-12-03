@@ -46,7 +46,7 @@ jobs:
 
   - stage: packaging
     name: Create release
-    install: sudo apt update -y && sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip && sudo apt install -y --only-upgrade docker-ce && docker info
+    install: sudo apt update -y --allow-unauthenticated && sudo apt-get install --allow-unauthenticated -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip && sudo apt install --allow-unauthenticated -y --only-upgrade docker-ce && docker info
     before_script: sudo pip install git-semver
     script: ".travis/releaser.sh && .travis/labeler.sh" # labeler should be replaced with GitHub Actions when they hit GA
     git:
