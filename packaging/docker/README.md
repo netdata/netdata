@@ -1,7 +1,6 @@
 # Install netdata with Docker
 
-> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running netdata in docker with an ENTRYPOINT directive, not a COMMAND directive. Please adapt your execution scripts accordingly.
-> More information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running netdata in docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 >
 > Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
 
@@ -16,8 +15,6 @@ Netdata is then available at http://host:19999
 
 This is good for an internal network or to quickly analyse a host.
 
-For a permanent installation on a public server, you should [[secure the netdata instance|netdata-security]]. See below for an example of how to install netdata with an SSL reverse proxy and basic authentication.
-
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
@@ -29,7 +26,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-above can be converted to docker-compose file for ease of management:
+The above can be converted to docker-compose file for ease of management:
 
 ```yaml
 version: '3'
@@ -56,10 +53,15 @@ If you want to have your container names resolved by netdata it needs to have ac
 grep docker /etc/group | cut -d ':' -f 3
 ```
 
+### Pass command line options to Netdata 
+
+Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+
 ## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
 
-You can use use the following docker-compose.yml and Caddyfile files to run netdata with docker.
-Replace the Domains and email address for Letsencrypt before starting.
+For a permanent installation on a public server, you should [secure the netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
+
+You can use use the following docker-compose.yml and Caddyfile files to run netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
 
 ### Prerequisites
 * [Docker](https://docs.docker.com/install/#server)
@@ -68,8 +70,7 @@ Replace the Domains and email address for Letsencrypt before starting.
 
 ### Caddyfile
 
-This file needs to be placed in /opt with nams Caddyfile. Here you customize your domain and you need to provide your email address to obtain Letsencrypt certificate.
-Certificate renewal will happen automatically and will be executed internally by caddy server.
+This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
 ```
 netdata.example.org {
