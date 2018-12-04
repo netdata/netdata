@@ -74,6 +74,6 @@ for PR in $(hub pr list -s all -f "%I %l%n" -L 10); do
 	NEW_SET=$(sort $NEW_LABELS | uniq | grep -v "^$" | sed -e 's/^/"/g;s/$/",/g' | tr -d '\n' | sed 's/.\{1\}$//')
 	if [ ! -z "$NEW_SET" ]; then
 		echo "Assigning labels: ${NEW_SET}"
-		curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${NEW_SET}]}" -X PATCH "${URL}" &>/dev/null
+		curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${NEW_SET}]}" -X POST "${URL}" &>/dev/null
 	fi
 done
