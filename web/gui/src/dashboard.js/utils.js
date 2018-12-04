@@ -75,7 +75,7 @@ NETDATA.seconds4human = function (seconds, options) {
     if (typeof options !== 'object') {
         options = defaultOptions;
     } else {
-        for (x in defaultOptions) {
+        for (var x in defaultOptions) {
             if (typeof options[x] !== 'string') {
                 options[x] = defaultOptions[x];
             }

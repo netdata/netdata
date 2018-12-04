@@ -42,7 +42,7 @@ NETDATA.xss = {
                 } else {
                     // console.log('checking object "' + name + '"');
 
-                    for (i in obj) {
+                    for (var i in obj) {
                         if (obj.hasOwnProperty(i) === false) {
                             continue;
                         }
