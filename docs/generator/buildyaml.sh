@@ -177,8 +177,8 @@ navpart 3 collectors/macos.plugin
 navpart 2 collectors/plugins.d "" "External plugins"
 navpart 3 collectors/python.d.plugin "" "Python modules" 3
 navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
-navpart 3 collectors/charts.d.plugin "" "BASH modules" 3
-echo -ne "            - 'collectors/charts.d.plugin/README.md'
+echo -ne "        - BASH modules:
+            - 'collectors/charts.d.plugin/README.md'
             - 'collectors/charts.d.plugin/ap/README.md'
             - 'collectors/charts.d.plugin/apcupsd/README.md'
             - 'collectors/charts.d.plugin/example/README.md'
