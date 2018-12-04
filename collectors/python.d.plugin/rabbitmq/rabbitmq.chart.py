@@ -111,7 +111,7 @@ CHARTS = {
         ]
     },
     'message_rates': {
-        'options': [None, 'Message Rates', 'messages/s', 'overview', 'rabbitmq.message_rates', 'stacked'],
+        'options': [None, 'Message Rates', 'messages/s', 'overview', 'rabbitmq.message_rates', 'line'],
         'lines': [
             ['message_stats_ack', 'ack', 'incremental'],
             ['message_stats_redeliver', 'redeliver', 'incremental'],
