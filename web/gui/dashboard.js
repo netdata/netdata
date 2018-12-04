@@ -159,7 +159,7 @@ NETDATA.seconds4human = function (seconds, options) {
     if (typeof options !== 'object') {
         options = defaultOptions;
     } else {
-        for (const x in defaultOptions) {
+        for (var x in defaultOptions) {
             if (typeof options[x] !== 'string') {
                 options[x] = defaultOptions[x];
             }
@@ -691,7 +691,7 @@ NETDATA.xss = {
                 } else {
                     // console.log('checking object "' + name + '"');
 
-                    for (const i in obj) {
+                    for (var i in obj) {
                         if (obj.hasOwnProperty(i) === false) {
                             continue;
                         }
@@ -1036,7 +1036,7 @@ NETDATA.unitsConversion = {
                 //     }
                 // }
                 const sunit = this.scalableUnits[units];
-                for (const x of Object.keys(sunit)) {
+                for (var x of Object.keys(sunit)) {
                     let m = sunit[x];
                     if (m <= max && m > tdivider) {
                         tunits = x;
@@ -1072,7 +1072,7 @@ NETDATA.unitsConversion = {
 
                     // find the max divider of all charts
                     let common_units = t[uuid];
-                    for (const x in t) {
+                    for (var x in t) {
                         if (t.hasOwnProperty(x) && t[x].divider > common_units.divider) {
                             common_units = t[x];
                         }
@@ -1139,7 +1139,7 @@ NETDATA.unitsConversion = {
         } else if (typeof this.convertibleUnits[units] !== 'undefined') {
             // units that can be converted
             if (desired_units === 'auto') {
-                for (const x in this.convertibleUnits[units]) {
+                for (var x in this.convertibleUnits[units]) {
                     if (this.convertibleUnits[units].hasOwnProperty(x)) {
                         if (this.convertibleUnits[units][x].check(max)) {
                             //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
@@ -1195,7 +1195,7 @@ if (typeof netdataIcons === 'object') {
     //     if (NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
     //         NETDATA.icons[icon] = netdataIcons[icon];
     // }
-    for (const icon of Object.keys(NETDATA.icons)) {
+    for (var icon of Object.keys(NETDATA.icons)) {
         if (typeof(netdataIcons[icon]) === 'string') {
             NETDATA.icons[icon] = netdataIcons[icon]
         }
@@ -4755,7 +4755,7 @@ NETDATA.commonMin = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
         // }
-        for (const ti of Object.values(t)) {
+        for (var ti of Object.values(t)) {
             if (ti < m) {
                 m = ti;
             }
@@ -4819,7 +4819,7 @@ NETDATA.commonMax = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
         // }
-        for (const ti of Object.values(t)) {
+        for (var ti of Object.values(t)) {
             if (ti > m) {
                 m = ti;
             }
