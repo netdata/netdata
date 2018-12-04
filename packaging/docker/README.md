@@ -55,7 +55,7 @@ grep docker /etc/group | cut -d ':' -f 3
 
 ### Pass command line options to Netdata 
 
-Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address netdata will be running on, using the [CMD instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
+Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
 ## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
 
@@ -70,7 +70,7 @@ You can use use the following docker-compose.yml and Caddyfile files to run netd
 
 ### Caddyfile
 
-This file needs to be placed in /opt with nams Caddyfile. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
+This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
 ```
 netdata.example.org {
