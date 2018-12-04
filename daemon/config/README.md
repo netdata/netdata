@@ -5,17 +5,17 @@ Depending on your installation method, Netdata will have been installed either d
 
 Under that directory you will see the following:
  - `netdata.conf` is [the main configuration file](DAEMON.md#daemon-configuration) 
- - `edit-config` is [the sh script](#edit-config) that you can use to easily and safely edit the configuration
+ - `edit-config` is [the sh script](#edit-config-script) that you can use to easily and safely edit the configuration
  - Other directories, initially empty, where your custom configurations for alarms and collector plugins/modules will be copied from the stock configuration, if and when you customize them using `edit-config`. 
  - `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains the stock configurations for everything not included in `netdata.conf`:
-    - `health_alarm_notify.conf` is where you configure how and to who Netdata will send [alarm notifications](../health/notifications/#netdata-alarm-notifications). 
+    - `health_alarm_notify.conf` is where you configure how and to who Netdata will send [alarm notifications](../../health/notifications/#netdata-alarm-notifications). 
     - `health.d` is the directory that contains the alarm triggers for [health monitoring](../../health/#health-monitoring). It contains one .conf file per collector. 
     - The [modular plugin orchestrators](../../collectors/plugins.d/#external-plugins-overview) have:
         -  One config file each, mainly to turn their modules on and off: `python.d.conf` for [python](../../collectors/python.d.plugin/#pythondplugin), `node.d.conf` for [nodejs](../../collectors/node.d.plugin/#nodedplugin) and `charts.d.conf` for [bash](../../collectors/charts.d.plugin/#chartsdplugin) modules.
         - One directory each, where the module-specific configuration files can be found.
     - `stream.conf` is where you configure [streaming and replication](../../streaming/#streaming-and-replication)
     -  `stats.d` is a directory under which you can add .conf files to add [synthetic charts](../../collectors/statsd.plugin/#synthetic-statsd-charts).
-    - Individual collector plugin config files, such as `fping.conf` for the [fping plugin](../../collectors/fping.plugin/) and `apps_groups.conf` for the [apps plugin](collectors/apps.plugin/) 
+    - Individual collector plugin config files, such as `fping.conf` for the [fping plugin](../../collectors/fping.plugin/) and `apps_groups.conf` for the [apps plugin](../../collectors/apps.plugin/) 
 
 So there are many configuration files to control every aspect of Netdata's behavior. It can be overwhelming at first, but you won't have to deal with most of them anyway. The following HOWTO will guide you on how to customize your netdata, based on what you want to do. 
 
@@ -29,7 +29,7 @@ Change the IP address/port netdata listens to | [netdata.conf [global]](DAEMON.m
 Modify the netdata web server settings | [netdata.conf [web]](DAEMON.md#web-section-options) : `
 Make netdata never save metrics to disk<br>Make netdata always save metrics to disk | [netdata.conf [global]](DAEMON.md#global-section-options) : `memory mode` |
 Move some netdata directories elsewhere | [netdata.conf [global]](DAEMON.md#global-section-options) |
-Prevent netdata from getting immediately killed when my server runs out of memory | netdata.conf [global] : [OOM score](DAEMON.md#oom-score)
+Prevent netdata from getting immediately killed when my server runs out of memory | netdata.conf [global] : [OOM score](../#oom-score)
 
 
 ## edit-config script

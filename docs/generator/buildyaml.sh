@@ -123,23 +123,17 @@ echo -ne "    - 'docs/Why-Netdata.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
-"
-
-echo -ne "- Installation:
+- Installation:
     - 'installer/README.md'
     - 'packaging/docker/README.md'
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
-"
-
-echo -ne "- 'docs/GettingStarted.md'
-"
-
-echo -ne "- Running netdata:
-"
-navpart 2 daemon
-navpart 2 daemon/config
-echo -ne "    - 'docs/Charts.md'
+- 'docs/GettingStarted.md'
+- Running netdata:
+    - 'daemon/README.md'
+    - 'daemon/config/README.md'
+    - 'daemon/config/DAEMON.md'
+    - 'docs/Charts.md'
 "
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel

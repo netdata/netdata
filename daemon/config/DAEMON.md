@@ -18,7 +18,7 @@ The configuration file is a `name = value` dictionary. Netdata will not complain
 setting | default | info
 :------:|:-------:|:----
 process scheduling policy | `keep` |  
-OOM score | `keep` |  |
+OOM score | `1000` |  See [OOM score](../#oom-score)
 glibc malloc arena max for plugins | `1` |  
 glibc malloc arena max for netdata | `1` |  
 hostname | `auto-detected` | The hostname of the computer running netdata. 
