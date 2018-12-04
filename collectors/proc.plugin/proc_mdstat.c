@@ -5,10 +5,12 @@
 #define PLUGIN_PROC_MODULE_MDSTAT_NAME "/proc/mdstat"
 
 struct raid {
-    int used;
+    int redundant;
     char *name;
     RRDDIM *rd_health;
     unsigned long long failed_disks;
+
+    RRDDIM *rd_nonredundant;
 
     RRDSET *st_disks;
     RRDDIM *rd_total;
@@ -40,6 +42,11 @@ struct raid {
     unsigned long long mismatch_cnt;
 };
 
+struct nonredundant {
+    char *name;
+    int found;
+};
+
 static inline char *remove_trailing_chars(char *s, char c) {
     while(*s) {
         if(unlikely(*s == c)) {
@@ -55,8 +62,11 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static char *mdstat_filename = NULL, *mismatch_cnt_filename = NULL;
     static struct raid *raids = NULL;
-    static size_t raids_num = 0, raids_allocated = 0;
-    size_t raid_idx = 0;
+    static size_t raids_allocated = 0;
+    size_t raids_num = 0, raid_idx = 0;
+    static struct nonredundant *nonredundant_arrays = NULL;
+    static size_t nonredundant_allocated = 0;
+    size_t nonredundant_num = 0, n_idx = 0;
 
     if(unlikely(!mismatch_cnt_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -108,16 +118,16 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     // loop through all lines except the first and the last ones
     for(l = 1, raid_idx = 0; l < (lines - 2) && raid_idx < raids_num; l++) {
         struct raid *raid = &raids[raid_idx];
-        raid->used = 0;
+        raid->redundant = 0;
 
         words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
 
         if(unlikely(procfile_lineword(ff, l, 1)[0] != 'a')) continue;
-        if(!raid->name) {
+        if(unlikely(!raid->name)) {
             raid->name = strdupz(procfile_lineword(ff, l, 0));
         }
-        else if(strcmp(raid->name, procfile_lineword(ff, l, 0))) {
+        else if(unlikely(strcmp(raid->name, procfile_lineword(ff, l, 0)))) {
             freez(raid->name);
             freez(raid->mismatch_cnt_filename);
             memset(raid, 0, sizeof(struct raid));
@@ -130,6 +140,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         l++;
         words = procfile_linewords(ff, l);
         if(words < 2 || procfile_lineword(ff, l, words - 1)[0] != '[') {
+            nonredundant_num++;
             continue;
         }
 
@@ -162,7 +173,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         raid->total_disks = str2ull(str_total);
         raid->failed_disks = raid->total_disks - raid->inuse_disks;
 
-        raid->used = 1;
+        raid->redundant = 1;
 
         raid->check = 0;
         raid->resync = 0;
@@ -225,8 +236,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
         struct raid *raid = &raids[raid_idx];
 
-        if(likely(raid->used)) {
-            if(!raid->mismatch_cnt_filename) {
+        if(likely(raid->redundant)) {
+            if(unlikely(!raid->mismatch_cnt_filename)) {
                 snprintfz(filename, FILENAME_MAX, mismatch_cnt_filename, raid->name);
                 raid->mismatch_cnt_filename = strdupz(filename);
             }
@@ -235,6 +246,21 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                 return 1;
             }
         }
+    }
+
+    // check nonredundant arrays
+    for(n_idx = 0; n_idx < nonredundant_allocated; n_idx++) {
+        int found = 0;
+
+        for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
+            struct raid *raid = &raids[raid_idx];
+
+            if(!raid->redundant) {
+                if(likely(!strcmp(raid->name, nonredundant_arrays[n_idx].name))) found = 1;
+            }
+        }
+
+        nonredundant_arrays[n_idx].found = found;
     }
 
     // --------------------------------------------------------------------
@@ -261,9 +287,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     for(raid_idx = 0; raid_idx < raids_num; raid_idx++) {
         struct raid *raid = &raids[raid_idx];
 
-        if(likely(raid->used)) {
+        if(likely(raid->redundant)) {
             if(unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find(st_mdstat_health, raid->name))))
-                    raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
         }
@@ -273,12 +299,74 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
+    static RRDSET *st_nonredundant = NULL;
+    if(unlikely(!st_nonredundant))
+        st_nonredundant = rrdset_create_localhost(
+                "mdstat"
+                , "nonredundant"
+                , NULL
+                , "nonredundant"
+                , "md.nonredundant"
+                , "Diappeared Nonredundant Arrays"
+                , "disappeared arrays"
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                , NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT
+                , update_every
+                , RRDSET_TYPE_LINE
+        );
+    else
+        rrdset_next(st_nonredundant);
+
+    int n_disappeared = 0;
+    for(n_idx = 0; n_idx < nonredundant_allocated; n_idx++) {
+        if(unlikely(!nonredundant_arrays[n_idx].found)) {
+            rrddim_set(st_nonredundant, nonredundant_arrays[n_idx].name, 1); // RRDDIM pointer is already NULL
+            n_disappeared = 1;
+        }
+    }
+
+    // allocate memory for nonredundant arrays
+    if(unlikely(n_disappeared || nonredundant_allocated != nonredundant_num)) {
+        for(n_idx = 0; n_idx < nonredundant_allocated; n_idx++) {
+            freez(nonredundant_arrays[n_idx].name);
+        }
+        if(nonredundant_num) {
+           nonredundant_arrays = reallocz(nonredundant_arrays, sizeof(struct nonredundant) * nonredundant_num);
+            memset(nonredundant_arrays, 0, sizeof(struct nonredundant) * nonredundant_num);
+        }
+        else {
+            freez(nonredundant_arrays);
+            nonredundant_arrays = NULL;
+        }
+        nonredundant_allocated = nonredundant_num;
+    }
+
+    for(raid_idx = 0, n_idx = 0; raid_idx < raids_num && n_idx < nonredundant_num; raid_idx++) {
+        struct raid *raid = &raids[raid_idx];
+
+        if(likely(!raid->redundant)) {
+            if(unlikely(!nonredundant_arrays[n_idx].name)) {
+                nonredundant_arrays[n_idx].name = strdupz(raid->name);
+                n_idx++;
+            }
+            if(unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find(st_nonredundant, raid->name))))
+                raid->rd_nonredundant = rrddim_add(st_nonredundant, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(st_nonredundant, raid->rd_nonredundant, 0);
+        }
+    }
+
+    rrdset_done(st_nonredundant);
+
+    // --------------------------------------------------------------------
+
     for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
         struct raid *raid = &raids[raid_idx];
         char id[50 + 1];
         char family[50 + 1];
 
-        if(likely(raid->used)) {
+        if(likely(raid->redundant)) {
             snprintfz(id, 50, "%s_disks", raid->name);
 
             if(unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_byname_localhost(id)))) {
