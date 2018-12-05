@@ -1,5 +1,10 @@
 # mdstat
 
+> THIS MODULE IS OBSOLETE.
+> USE THE [PROC PLUGIN](../../proc.plugin) - IT IS MORE EFFICIENT
+
+---
+
 Module monitor /proc/mdstat
 
 It produces:

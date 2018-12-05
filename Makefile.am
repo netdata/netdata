@@ -237,6 +237,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/plugin_proc.c \
 	collectors/proc.plugin/plugin_proc.h \
 	collectors/proc.plugin/proc_diskstats.c \
+	collectors/proc.plugin/proc_mdstat.c \
 	collectors/proc.plugin/proc_interrupts.c \
 	collectors/proc.plugin/proc_softirqs.c \
 	collectors/proc.plugin/proc_loadavg.c \

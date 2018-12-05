@@ -2,6 +2,7 @@
 
  - `/proc/net/dev` (all network interfaces for all their values)
  - `/proc/diskstats` (all disks for all their values)
+ - `/proc/mdstat` (status of RAID arrays)
  - `/proc/net/snmp` (total IPv4, TCP and UDP usage)
  - `/proc/net/snmp6` (total IPv6 usage)
  - `/proc/net/netstat` (more IPv4 usage)
@@ -117,7 +118,7 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
 	# path to get h/w sector size = /sys/block/%s/queue/hw_sector_size
 	# path to get h/w sector size for partitions = /sys/dev/block/%lu:%lu/subsystem/%s/../queue
 /hw_sector_size
-        
+
 ```
 
 For each virtual disk, physical disk and partition you will have a section like this:
@@ -160,11 +161,42 @@ But sometimes you need disable performance metrics for all devices with the same
  251       2 zram2 27487 0 219896 188 79953 0 639624 1640 0 1828 1828
  251       3 zram3 27348 0 218784 152 79952 0 639616 1960 0 2060 2104
 ```
-All zram devices starts with `251` number and all loop devices starts with `7`.  
+All zram devices starts with `251` number and all loop devices starts with `7`.
 So, to disable performance metrics for all loop devices you could add `performance metrics for disks with major 7 = no` to `[plugin:proc:/proc/diskstats]` section.
 ```
 [plugin:proc:/proc/diskstats]
        performance metrics for disks with major 7 = no
+```
+
+## Monitoring RAID arrays
+
+### Monitored RAID array metrics
+
+1. **Health** Number of failed disks in every array (aggregate chart).
+
+2. **Disks stats**
+ * total (number of devices array ideally would have)
+ * inuse (number of devices currently are in use)
+
+3. **Mismatch count**
+ * unsynchronized blocks
+
+4. **Current status**
+ * resync in percent
+ * recovery in percent
+ * reshape in percent
+ * check in percent
+
+5. **Operation status** (if resync/recovery/reshape/check is active)
+ * finish in minutes
+ * speed in megabytes/s
+
+#### configuration
+
+```
+[plugin:proc:/proc/mdstat]
+    # mismatch_cnt filename to monitor = /sys/block/%s/md/mismatch_cnt
+    # filename to monitor = /proc/mdstat
 ```
 
 ## Monitoring CPUs
@@ -239,4 +271,4 @@ Example image:
 
 ![ddos](https://cloud.githubusercontent.com/assets/2662304/14398891/6016e3fc-fdf0-11e5-942b-55de6a52cb66.gif)
 
-See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](https://registry.my-netdata.io/#menu_netfilter_submenu_synproxy)** 
+See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](https://registry.my-netdata.io/#menu_netfilter_submenu_synproxy)**
