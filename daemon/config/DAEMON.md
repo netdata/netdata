@@ -1,17 +1,42 @@
 # Daemon configuration
 
-The daemon configuration file is read from `/etc/netdata/netdata.conf`.
 
-In this file you can configure all aspects of netdata. Netdata provides configuration settings for plugins and charts found when started. You can find all these settings, with their default values, by accessing the URL `https://netdata.server.hostname:19999/netdata.conf`. For example check the configuration file of [netdata.firehol.org](http://netdata.firehol.org/netdata.conf).
+<details markdown="1"><summary>The daemon configuration file is read from `/etc/netdata/netdata.conf`.</summary>
+Depending on your installation method, Netdata will have been installed either directly under `/`, or under `/opt/netdata`. The paths mentioned here and in the documentation in general assume that your installation is under `/`. If it is not, you will find the exact same paths under `/opt/netdata` as well. (i.e. `/etc/netdata` will be `/opt/netdata/etc/netdata`).</details>
 
-The configuration file has sections stated with `[section]`. There will be the following sections:
+This config file **is not needed by default**. Netdata works fine out of the box without it. But it does allow you to adapt the general behavior of Netdata, in great detail. You can find all these settings, with their default values, by accessing the URL `https://netdata.server.hostname:19999/netdata.conf`. For example check the configuration file of [netdata.firehol.org](http://netdata.firehol.org/netdata.conf). HTTP access to this file is limited by default to private IPs, via the [web server access lists](../../web/server/#access-lists).
 
-1. `[global]` for global netdata daemon options
-2. `[plugins]` for controlling which plugins the netdata will use
-3. `[plugin:NAME]` one such section for each plugin enabled
-4. `[CHART_NAME]` once such section for each chart defined
+`netdata.conf` has sections stated with `[section]`. You will see the following sections:
+
+1. `[global]` to [configure](#global-section-options) the [netdata daemon](../).
+2. `[web]` to [configure the web server](../../web/server).
+3. `[plugins]` to [configure](#plugins-section-options) which [collectors](../../collectors) to use and PATH settings.
+4. `[health]` to [configure](#health-section-options) general settings for [health monitoring](../../health)
+5. `[registry]` for the [netdata registry](../../registry). 
+6. `[backend]` to set up [streaming and replication](../../streaming) options.
+7. `[statsd]` for the general settings of the [stats.d.plugin](../../collectors/statsd.plugin). 
+8. `[plugin:NAME]` sections for each collector plugin
+9. `[CHART_NAME]` sections for each chart defined
 
 The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When you check the running configuration by accessing the URL `/netdata.conf` on your netdata server, netdata will add a comment on settings it does not currently use.
+
+## Applying changes
+
+After `netdata.conf` has been modified, netdata needs to be restarted for changes to apply:
+
+```bash
+sudo service netdata restart
+```
+
+If the above does not work, try the following:
+
+```bash
+sudo killall netdata; sleep 10; sudo netdata
+```
+
+Please note that your data history will be lost if you have modified `history` parameter in section `[global]`.
+
+## Sections
 
 ### [global] section options
 
@@ -87,6 +112,7 @@ CPUSchedulingPolicy=other | batch | idle | fifo | rr
 CPUSchedulingPriority=99
 Nice=-10
 ```
+
 ### [web] section options
 
 Refer to the [web server documentation](../../web/server)
@@ -151,58 +177,3 @@ update every|the value of `[global].update every` setting|The frequency in secon
 command options|*empty*|Additional command line options to pass to the plugin. 
 
 External plugins that need additional configuration may support a dedicated file in `/etc/netdata`. Check their documentation.
-
----
-
-## A note about netdata.conf
-
-This config file is not needed by default. You can just touch it (to be empty) to get rid of the error message displayed when missing.
-
-The whole idea came up when I was evaluating the documentation involved in maintaining a complex configuration system. My intention was to give configuration options for everything imaginable. But then, documenting all these options would require a tremendous amount of time, users would have to search through endless pages for the option they need, etc.
-
-I concluded then that configuring software like that is a waste for time and effort. Of course there must be plenty of configuration options, but the implementation itself should require a lot less effort for both the devs and the users.
-
-So, I did this:
-
-1. No configuration is required to run netdata
-2. There are plenty of options to tweak
-3. There is minimal documentation (or no at all)
-
-### Why this works?
-
-The configuration file is a `name = value` dictionary with `[sections]`. Write whatever you like there as long as it follows this simple format.
-
-Netdata loads this dictionary and then when the code needs a value from it, it just looks up the `name` in the dictionary at the proper `section`. In all places, in the code, there are both the `names` and their `default values`, so if something is not found in the configuration file, the default is used. The lookup is made using B-Trees and hashes (no string comparisons), so they are super fast. Also the `names` of the settings can be `my super duper setting that once set to yes, will turn the world upside down = no` - so goodbye to most of the documentation involved.
-
-Next, netdata can generate a valid configuration for the user to edit. No need to remember anything. Just get the configuration from the server (`/netdata.conf` on your netdata server), edit it and save it.
-
-Last, what about options you believe you have set, but you misspelled? When you get the configuration file from the server, there will be a comment above all `name = value` pairs the server does not use. So you know that whatever you wrote there, is not used.
-
-### Limiting access to netdata.conf
-
-netdata v1.9+ limit by default access to `http://your.netdata.ip:19999/netdata.conf` to private IP addresses. This is controlled by this settings:
-
-```
-[web]
-	allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
-```
-
-The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses.
-
-> Keep in mind that connections to netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[web].allow netdata.conf from` should also be allowed by `[web].allow connections from`.
-
-## Applying changes
-
-After `netdata.conf` has been modified, netdata needs to be restarted for changes to apply:
-
-```bash
-sudo service netdata restart
-```
-
-If the above does not work, try the following:
-
-```bash
-sudo killall netdata; sleep 10; sudo netdata
-```
-
-Please note that your data history will be lost if you have modified `history` parameter in section `[global]`.

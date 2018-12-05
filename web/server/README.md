@@ -90,7 +90,7 @@ Netdata supports access lists in `netdata.conf`:
    The setting in `netdata.conf` is checked before the ones in [stream.conf](../../streaming/stream.conf).
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
-   By default it allows only private lans.
+   The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
 ### Other netdata.conf [web] section options
 setting | default | info

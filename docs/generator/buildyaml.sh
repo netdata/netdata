@@ -64,10 +64,11 @@ extra:
 theme:
     name: "material"
     custom_dir: themes/material
+    favicon: img/favicon.ico
 extra_css:
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
 extra_javascript:
-  - "javascripts/cookie-consent.js"
+  - "docs/javascripts/cookie-consent.js"
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.js"
 markdown_extensions:
  - extra
