@@ -58,6 +58,7 @@ jobs:
   - stage: nightlies
     name: docker images
     install:
+    - sudo apt update
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
     script: "packaging/docker/build.sh"
