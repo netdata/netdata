@@ -94,12 +94,12 @@ update() {
 		fi
 
 		info "Stashing local git changes. You can use $(git stash pop) to reapply your changes."
-		git stash >&3
-		git fetch --all >&3
-		git fetch --tags >&3
-		git checkout master >&3
-		git reset --hard origin/master >&3
-		git pull >&3
+		git stash 2>&3 >&3
+		git fetch --all 2>&3 >&3
+		git fetch --tags 2>&3 >&3
+		git checkout master 2>&3 >&3
+		git reset --hard origin/master 2>&3 >&3
+		git pull 2>&3 >&3
 
 		new_commit="$(get_latest_commit_id)"
 		if [ ${force} -eq 0 ]; then
