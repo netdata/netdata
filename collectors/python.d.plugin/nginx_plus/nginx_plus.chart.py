@@ -19,7 +19,6 @@ from bases.FrameworkServices.UrlService import UrlService
 # default module values (can be overridden per job in `config`)
 update_every = 1
 priority = 60000
-retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [

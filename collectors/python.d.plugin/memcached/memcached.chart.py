@@ -8,7 +8,6 @@ from bases.FrameworkServices.SocketService import SocketService
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 priority = 60000
-retries = 60
 
 # default job configuration (overridden by python.d.plugin)
 # config = {'local': {
