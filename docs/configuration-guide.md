@@ -54,7 +54,11 @@ Just set `enabled = no` in the [netdata.conf [health]](../daemon/config/#health-
 
 ##### Modify or disable a specific alarm
 
-The `health.d` directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It has one .conf file per collector. You can easily find the .conf file you will need to modify, by looking for the "source" line on the table that appears on the right side of an alarm on the netdata gui. For example, if you click on Alarms and go to the tab 'All', the default netdata installation will show you at the top the configured alarm for `10 min cpu usage` (it's the name of the badge). Looking at the table on the right side, you will see a row that says: `source	4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. This way, you know that you will need to run `/etc/netdata/edit-config health.d/cpu.conf` and look for alarm at line 4 of the conf file. As stated at the top of the .conf file, **you can disable an alarm notification by setting the 'to' line to: silent**.
+The `health.d` directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It has one .conf file per collector. You can easily find the .conf file you will need to modify, by looking for the "source" line on the table that appears on the right side of an alarm on the netdata gui. 
+
+For example, if you click on Alarms and go to the tab 'All', the default netdata installation will show you at the top the configured alarm for `10 min cpu usage` (it's the name of the badge). Looking at the table on the right side, you will see a row that says: `source	4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. This way, you know that you will need to run `/etc/netdata/edit-config health.d/cpu.conf` and look for alarm at line 4 of the conf file. 
+
+As stated at the top of the .conf file, **you can disable an alarm notification by setting the 'to' line to: silent**.
 To modify how the alarm gets triggered, we suggest that you go through the guide on [health monitoring](../health/#health-monitoring).
 
 ##### Receive notifications using my preferred method
