@@ -51,7 +51,7 @@ class RuntimeCounters:
 
     def handle_retries(self):
         self.retries += 1
-        if self.do_penalty and self.retries % PENALTY_EVERY != 0:
+        if self.do_penalty and self.retries % PENALTY_EVERY == 0:
             self.penalty = round(min(self.retries * self.update_every / 2, MAX_PENALTY))
 
 
