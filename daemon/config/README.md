@@ -69,10 +69,10 @@ errors flood protection period | `1200` | UNUSED - Length of period (in sec) dur
 errors to trigger flood protection | `200` |  UNUSED - Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.
 run as user | `netdata` | The user netdata will run as. 
 pthread stack size | auto-detected |  
-cleanup obsolete charts after seconds | `3600` |  See [monitoring ephemeral containers](collectors/cgroups.plugin/#monitoring-ephemeral-containers)
+cleanup obsolete charts after seconds | `3600` |  See [monitoring ephemeral containers](../../collectors/cgroups.plugin/#monitoring-ephemeral-containers)
 gap when lost iterations above | `1` |  
 cleanup orphan hosts after seconds | `3600` |  How long to wait until automatically removing from the DB a remote netdata host (slave) that is no longer sending data.
-delete obsolete charts files | `yes` |  See [monitoring ephemeral containers](collectors/cgroups.plugin/#monitoring-ephemeral-containers)
+delete obsolete charts files | `yes` |  See [monitoring ephemeral containers](../../collectors/cgroups.plugin/#monitoring-ephemeral-containers)
 delete orphan hosts files | `yes` |  Set to `no` to disable non-responsive host removal.
 
 ### [web] section options
