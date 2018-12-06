@@ -31,7 +31,8 @@ makeself/ @ktsaou @paulfantom
 packaging/ @paulfantom
 registry/ @ktsaou @gmosx
 streaming/ @ktsaou @mfundul
-web/ @ktsaou @vlvkobal @gmosx
+web/ @ktsaou @vlvkobal
+web/gui/ @ktsaou @gmosx
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @ktsaou @cakrit
