@@ -42,11 +42,11 @@ Please note that your data history will be lost if you have modified `history` p
 
 setting | default | info
 :------:|:-------:|:----
-process scheduling policy | `keep` |  
+process scheduling policy | `keep` |  See [netdata process scheduling policy](../#netdata-process-scheduling-policy)
 OOM score | `1000` |  See [OOM score](../#oom-score)
-glibc malloc arena max for plugins | `1` |  
-glibc malloc arena max for netdata | `1` |  
-hostname | `auto-detected` | The hostname of the computer running netdata. 
+glibc malloc arena max for plugins | `1` |  See [Virtual memory](../#virtual-memory).
+glibc malloc arena max for netdata | `1` |  See [Virtual memory](../#virtual-memory).
+hostname | auto-detected | The hostname of the computer running netdata. 
 history | `3996` | The number of entries the netdata daemon will by default keep in memory for each chart dimension. This setting can also be configured per chart. Check [Memory Requirements](../../database/#database) for more information. 
 update every | `1` | The frequency in seconds, for data collection. For more information see [Performance](../../docs/Performance.md#performance). 
 config directory | `/etc/netdata` | The directory configuration files are kept. 
@@ -54,64 +54,26 @@ stock config directory | `/usr/lib/netdata/conf.d` |
 log directory | `/var/log/netdata` | The directory in which the [log files](../#log-files) are kept. 
 web files directory | `/usr/share/netdata/web` | The directory the web static files are kept. 
 cache directory | `/var/cache/netdata` | The directory the memory database will be stored if and when netdata exits. Netdata will re-read the database when it will start again, to continue from the same point. 
-lib directory | `/var/lib/netdata` |  
-home directory | `/var/cache/netdata` |  
+lib directory | `/var/lib/netdata` | Contains the alarm log and the netdata instance guid.
+home directory | `/var/cache/netdata` | Contains the db files for the collected metrics
 plugins directory | `"/usr/libexec/netdata/plugins.d" "/etc/netdata/custom-plugins.d"` | The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes. 
-memory mode | `save` | When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits. `none` disables the database at this host. This also disables health
-monitoring (there cannot be health monitoring without a database).
-host access prefix | | This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43). 
+memory mode | `save` | When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits. `none` disables the database at this host. This also disables health monitoring (there cannot be health monitoring without a database). host access prefix | | This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43). 
 memory deduplication (ksm) | `yes` | When set to `yes`, netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](../../database/#ksm) 
 TZ environment variable | `:/etc/localtime` | Where to find the timezone 
-timezone | `auto-detected` | The timezone retrieved from the environment variable 
+timezone | auto-detected | The timezone retrieved from the environment variable 
 debug flags | `0x0000000000000000` | Bitmap of debug options to enable. For more information check [Tracing Options](../#debugging). 
 debug log | `/var/log/netdata/debug.log` | The filename to save debug information. This file will not be created is debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](../#debugging). 
 error log | `/var/log/netdata/error.log` | The filename to save error messages for netdata daemon and all plugins (`stderr` is sent here for all netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log. 
 access log | `/var/log/netdata/access.log` | The filename to save the log of web clients accessing netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log. 
-errors flood protection period | `1200` |  
-errors to trigger flood protection | `200` |  
+errors flood protection period | `1200` | UNUSED - Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.
+errors to trigger flood protection | `200` |  UNUSED - Number of errors written to the log in `errors flood protection period` sec before flood protection is activated.
 run as user | `netdata` | The user netdata will run as. 
-pthread stack size | `8388608` |  
-cleanup obsolete charts after seconds | `3600` |  
+pthread stack size | auto-detected |  
+cleanup obsolete charts after seconds | `3600` |  How long to wait until automatically removing from the DB a chart that is no longer being refreshed (collector not sending data).
 gap when lost iterations above | `1` |  
-cleanup orphan hosts after seconds | `3600` |  
-delete obsolete charts files | `yes` |  
-delete orphan hosts files | `yes` |  
-
-##### Netdata process priority
-
-By default, netdata runs with the `idle` process scheduler, which assigns CPU resources to netdata, only when the system has such resources to spare.
-
-The following `netdata.conf` settings control this:
-
-```
-[global]
-    process scheduling policy = idle
-    process scheduling priority = 0
-    process nice level = 19
-```
-
-The policies supported by netdata are `idle` (the netdata default), `other` (also as `nice`), `batch`, `rr`, `fifo`. netdata also recognizes `keep` and `none` to keep the current settings without changing them.
-
-For `other`, `nice` and `batch`, the setting `process nice level = 19` is activated to configure the nice level of netdata. Nice gets values -20 (highest) to 19 (lowest).
-
-For `rr` and `fifo`, the setting `process scheduling priority = 0` is activated to configure the priority of the relative scheduling policy. Priority gets values 1 (lowest) to 99 (highest).
-
-For the details of each scheduler, see `man sched_setscheduler` and `man sched`.
-
-When netdata is running under systemd, it can only lower its priority (the default is `other` with `nice level = 0`). If you want to make netdata to get more CPU than that, you will need to set in `netdata.conf`:
-
-```
-[global]
-    process scheduling policy = keep
-```
-
-and edit `/etc/systemd/system/netdata.service` and add:
-
-```
-CPUSchedulingPolicy=other | batch | idle | fifo | rr
-CPUSchedulingPriority=99
-Nice=-10
-```
+cleanup orphan hosts after seconds | `3600` |  How long to wait until automatically removing from the DB a remote netdata host (slave) that is no longer sending data.
+delete obsolete charts files | `yes` |  Set to `no` to disable non-responsive chart removal.
+delete orphan hosts files | `yes` |  Set to `no` to disable non-responsive host removal.
 
 ### [web] section options
 
