@@ -7,6 +7,8 @@
 struct raid {
     int redundant;
     char *name;
+    uint32_t hash;
+
     RRDDIM *rd_health;
     unsigned long long failed_disks;
 
@@ -43,6 +45,12 @@ struct raid {
     RRDDIM *rd_nonredundant;
 };
 
+struct old_raid {
+    char *name;
+    uint32_t hash;
+    int found;
+};
+
 static inline char *remove_trailing_chars(char *s, char c) {
     while(*s) {
         if(unlikely(*s == c)) {
@@ -53,6 +61,17 @@ static inline char *remove_trailing_chars(char *s, char c) {
     return s;
 }
 
+static inline void make_chart_obsolete(char *name, const char *id_modifier) {
+    char id[50 + 1];
+    RRDSET *st = NULL;
+
+    if(likely(name && id_modifier)) {
+        snprintfz(id, 50, "mdstat.%s_%s", name, id_modifier);
+        st = rrdset_find_byname_localhost(id);
+        if(likely(st)) rrdset_is_obsolete(st);
+    }
+}
+
 int do_proc_mdstat(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
@@ -61,6 +80,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     static struct raid *raids = NULL;
     static size_t raids_allocated = 0;
     size_t raids_num = 0, raid_idx = 0;
+    static struct old_raid *old_raids = NULL;
+    static size_t old_raids_allocated = 0;
+    size_t old_raid_idx = 0;
 
     if(unlikely(do_health = -1)){
         do_health       = config_get_boolean("plugin:proc:/proc/mdstat", "faulty devices", CONFIG_BOOLEAN_YES);
@@ -102,7 +124,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             raids_num++;
     }
 
-    if(unlikely(!raids_num)) return 0; // we return 0, so that we will retry searching for raids next time
+    if(unlikely(!raids_num && !old_raids_allocated)) return 0; // we return 0, so that we will retry searching for raids next time
 
     // allocate the memory we need;
     if(unlikely(raids_num != raids_allocated)) {
@@ -111,9 +133,15 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             freez(raid->name);
             freez(raid->mismatch_cnt_filename);
         }
-        raids = (struct raid *)reallocz(raids, raids_num * sizeof(struct raid));
+        if(raids_num) {
+            raids = (struct raid *)reallocz(raids, raids_num * sizeof(struct raid));
+            memset(raids, 0, raids_num * sizeof(struct raid));
+        }
+        else {
+            freez(raids);
+            raids = NULL;
+        }
         raids_allocated = raids_num;
-        memset(raids, 0, raids_num * sizeof(struct raid));
     }
 
     // loop through all lines except the first and the last ones
@@ -127,6 +155,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         if(unlikely(procfile_lineword(ff, l, 1)[0] != 'a')) continue;
         if(unlikely(!raid->name)) {
             raid->name = strdupz(procfile_lineword(ff, l, 0));
+            raid->hash = simple_hash(raid->name);
         }
         else if(unlikely(strcmp(raid->name, procfile_lineword(ff, l, 0)))) {
             freez(raid->name);
@@ -256,6 +285,57 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         }
     }
 
+    // check for disappeared raids
+    for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+        int found = 0;
+
+        for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
+            struct raid *raid = &raids[raid_idx];
+
+            if(unlikely(raid->hash == old_raids[old_raid_idx].hash && !strcmp(raid->name, old_raids[old_raid_idx].name)))
+                found = 1;
+        }
+
+        old_raids[old_raid_idx].found = found;
+    }
+
+    int raid_disappeared = 0;
+    for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+        struct old_raid *old_raid = &old_raids[old_raid_idx];
+
+        if(unlikely(!old_raid->found)) {
+            make_chart_obsolete(old_raid->name, "disks");
+            make_chart_obsolete(old_raid->name, "mismatch");
+            make_chart_obsolete(old_raid->name, "operation");
+            make_chart_obsolete(old_raid->name, "finish");
+            make_chart_obsolete(old_raid->name, "speed");
+            make_chart_obsolete(old_raid->name, "availability");
+            raid_disappeared = 1;
+        }
+    }
+
+    // allocate memory for nonredundant arrays
+    if(unlikely(raid_disappeared || old_raids_allocated != raids_num)) {
+        for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+            freez(old_raids[old_raid_idx].name);
+        }
+        if(likely(raids_num)) {
+            old_raids = reallocz(old_raids, sizeof(struct old_raid) * raids_num);
+            memset(old_raids, 0, sizeof(struct old_raid) * raids_num);
+        }
+        else {
+            freez(old_raids);
+            old_raids = NULL;
+        }
+        old_raids_allocated = raids_num;
+        for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+            struct raid *raid = &raids[old_raid_idx];
+
+            old_raids[old_raid_idx].name = strdupz(raid->name);
+            old_raids[old_raid_idx].hash = raid->hash;
+        }
+    }
+
     // --------------------------------------------------------------------
 
     if(likely(do_health)) {
@@ -278,18 +358,23 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         else
             rrdset_next(st_mdstat_health);
 
-        for(raid_idx = 0; raid_idx < raids_num; raid_idx++) {
-            struct raid *raid = &raids[raid_idx];
-
-            if(likely(raid->redundant)) {
-                if(unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find(st_mdstat_health, raid->name))))
-                    raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-                rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
-            }
+        if(!raids_num) {
+            make_chart_obsolete("mdstat", "health");
         }
+        else {
+            for(raid_idx = 0; raid_idx < raids_num; raid_idx++) {
+                struct raid *raid = &raids[raid_idx];
 
-        rrdset_done(st_mdstat_health);
+                if(likely(raid->redundant)) {
+                    if(unlikely(!raid->rd_health && !(raid->rd_health = rrddim_find(st_mdstat_health, raid->name))))
+                        raid->rd_health = rrddim_add(st_mdstat_health, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                    rrddim_set_by_pointer(st_mdstat_health, raid->rd_health, raid->failed_disks);
+                }
+            }
+
+            rrdset_done(st_mdstat_health);
+        }
     }
 
     // --------------------------------------------------------------------
