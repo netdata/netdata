@@ -82,10 +82,13 @@ monitoring (there cannot be health monitoring without a database).
 ```
 [web]
     mode = none | static-threaded | single-threaded | multi-threaded
+    accept a streaming request every seconds = 0 
 ```
 
 `[web].mode = none` disables the API (netdata will not listen to any ports).
 This also disables the registry (there cannot be a registry without an API).
+
+`accept a streaming request every seconds` can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log entries "... too busy to accept new streaming request. Will be allowed in X secs". 
 
 ```
 [backend]

@@ -90,7 +90,25 @@ Netdata supports access lists in `netdata.conf`:
    The setting in `netdata.conf` is checked before the ones in [stream.conf](../../streaming/stream.conf).
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
-   By default it allows only private lans.
+   The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
+
+### Other netdata.conf [web] section options
+setting | default | info
+:------:|:-------:|:----
+ses max window | `15` | See [single exponential smoothing](../api/queries/des/)
+des max window | `15` | See [double exponential smoothing](../api/queries/des/)
+listen backlog | `4096` | The port backlog. Check `man 2 listen`.  
+web files owner | `netdata` | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`. 
+web files group | `netdata` | If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.
+disconnect idle clients after seconds | `60` | The time in seconds to disconnect web clients after being totally idle. 
+timeout for first request | `60` | How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.
+accept a streaming request every seconds | `0` | Can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves in a [streaming and replication setup](../../streaming)
+respect do not track policy | `no` | If set to `yes`, will respect the client's browser preferences on storing cookies. 
+x-frame-options response header |  | [Avoid clickjacking attacks, by ensuring that the content is not embedded into other sites](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options).
+enable gzip compression | `yes` | When set to `yes`, netdata web responses will be GZIP compressed, if the web client accepts such responses. 
+gzip compression strategy | `default` | Valid strategies are `default`, `filtered`, `huffman only`, `rle` and `fixed`
+gzip compression level | `3` | Valid levels are 1 (fastest) to 9 (best ratio)
+
 
 ## DDoS protection
 
@@ -101,3 +119,4 @@ If you publish your netdata to the internet, you may want to apply some protecti
 3. Don't use all your cpu cores for netdata (lower `[web].web server threads`)
 4. Run netdata with a low process scheduling priority (the default is the lowest)
 5. If possible, proxy netdata via a full featured web server (nginx, apache, etc)
+

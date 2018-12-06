@@ -19,6 +19,9 @@ echo "Copying files"
 rm -rf ${GENERATOR_DIR}/src
 find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${GENERATOR_DIR}/src
 
+# Copy netdata html resources
+cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
+
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
 sed -i -e '0,/# netdata /s//# Introduction\n\n/' -e 's/\[!\[analytics.*UA-64295674-3)\]()//g' ${GENERATOR_DIR}/src/README.md
@@ -44,9 +47,11 @@ echo "Fixing links"
 # Fix links (recursively, all types, executing replacements)
 ${GENERATOR_DIR}/checklinks.sh -rax
 
-echo "Calling mkdocs"
+if [ "${1}" != "nomkdocs" ] ; then
+	echo "Calling mkdocs"
 
-# Build html docs
-mkdocs build --config-file=${GENERATOR_DIR}/mkdocs.yml
+	# Build html docs
+	mkdocs build --config-file=${GENERATOR_DIR}/mkdocs.yml
+fi
 
 echo "Finished"

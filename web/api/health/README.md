@@ -20,7 +20,6 @@ The size of the alarm log is configured in `netdata.conf`. There are 2 settings:
 
 ```
 [health]
-	health db file = /var/lib/netdata/health/health-log.db
 	in memory max health log entries = 1000
 	rotate log every lines = 2000
 ```
