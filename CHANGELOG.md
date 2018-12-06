@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Closed issues:**
+
+- Improve configuration documentation [\#4781](https://github.com/netdata/netdata/issues/4781)
+
+**Merged pull requests:**
+
+- update code owners [\#4930](https://github.com/netdata/netdata/pull/4930) ([paulfantom](https://github.com/paulfantom))
+- Removed vlvkobal as a codeowner of web/gui [\#4929](https://github.com/netdata/netdata/pull/4929) ([gmosx](https://github.com/gmosx))
+
 ## [v1.12.0-rc0](https://github.com/netdata/netdata/tree/v1.12.0-rc0) (2018-12-06)
 
 **Fixed bugs:**
@@ -59,6 +70,7 @@
 
 **Merged pull requests:**
 
+- run shfmt on CI scripts [\#4928](https://github.com/netdata/netdata/pull/4928) ([paulfantom](https://github.com/paulfantom))
 - use relative path for logo [\#4927](https://github.com/netdata/netdata/pull/4927) ([ktsaou](https://github.com/ktsaou))
 - fix symbolic link file detection in etc [\#4926](https://github.com/netdata/netdata/pull/4926) ([ktsaou](https://github.com/ktsaou))
 - send all git log msg to fd3 [\#4922](https://github.com/netdata/netdata/pull/4922) ([paulfantom](https://github.com/paulfantom))
