@@ -17,9 +17,10 @@ GENERATOR_DIR="docs/generator"
 # Copy all netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
 rm -rf ${GENERATOR_DIR}/src
-find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print -o -wholename "./docs/javascripts/*" -print | cpio -pd ${GENERATOR_DIR}/src
+find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${GENERATOR_DIR}/src
 
-cp -a ./${GENERATOR_DIR}/img ./${GENERATOR_DIR}/src/img
+# Copy netdata html resources
+cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"

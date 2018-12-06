@@ -151,20 +151,11 @@ Of course, there are many more methods you could use to protect Netdata:
 
 ## Registry or how to not send any information to a third party server
 
-The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit at least the following information to a third party server, which might violate your security policies: 
+The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
 - The url where you open the web-ui in the browser (via http request referer)
 - The hostnames of the Netdata servers
 
-You are able to run your own registry, which is pretty simple to do:
-- If you have just one Netdata web-ui, turn on registry and set the url of that web-ui as "registry to announce"
-```
-[registry]
-enabled = yes
-registry to announce = URL_OF_THE_NETDATA_WEB-UI
-```
-- If you run multiple Netdata servers with web-ui, you need to define one as registry. On that node activate the registry and setting its url as "registry to announce". On all other nodes do not enable the registry but define the same url.
-
-restart Netdata and check with developer tools of your browser which registry is called.
+If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
 
 ## Netdata directories
 
