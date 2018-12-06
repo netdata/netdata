@@ -37,7 +37,6 @@ priority     : 90100
 
 local:
   url     : 'http://localhost/stub_status'
-  retries : 10
 ```
 
 Without configuration, module attempts to connect to `http://localhost/stub_status`

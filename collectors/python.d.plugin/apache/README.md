@@ -46,12 +46,10 @@ priority     : 90100
 
 local:
   url      : 'http://localhost/server-status?auto'
-  retries  : 20
 
 remote:
   url          : 'http://www.apache.org/server-status?auto'
   update_every : 5
-  retries      : 4
 ```
 
 Without configuration, module attempts to connect to `http://localhost/server-status?auto`

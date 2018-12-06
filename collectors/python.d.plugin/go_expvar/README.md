@@ -169,7 +169,6 @@ and its base `UrlService` class. These are:
 
     update_every: 1          # the job's data collection frequency
     priority:     60000      # the job's order on the dashboard
-    retries:      60         # the job's number of restoration attempts
     user:         admin      # use when the expvar endpoint is protected by HTTP Basic Auth
     password:     sekret     # use when the expvar endpoint is protected by HTTP Basic Auth
 

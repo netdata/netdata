@@ -65,7 +65,6 @@ Here is an example for 3 servers:
 ```yaml
 update_every : 10
 priority     : 90100
-retries      : 5
 
 local:
   'my.cnf'   : '/etc/mysql/my.cnf'
@@ -82,7 +81,6 @@ remote:
   pass : 'bla'
   host     : 'example.org'
   port     : 9000
-  retries  : 20
 ```
 
 If no configuration is given, module will attempt to connect to mysql server via unix socket at `/var/run/mysqld/mysqld.sock` without password and with username `root`
