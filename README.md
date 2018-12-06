@@ -6,7 +6,7 @@
 
 **Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a highly optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring toolchains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
@@ -40,7 +40,7 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 9. [Visualization](#visualization) - unique visualization features
 10. [What does it monitor](#what-does-it-monitor) - which metrics it collects
 11. [Documentation](#documentation) - read the docs
-12. [Community](#community) - disucss with others and get support
+12. [Community](#community) - discuss with others and get support
 13. [License](#license) - check the license of netdata
 
 
@@ -156,9 +156,6 @@ not just visualize metrics.
 - `my-netdata`menu has been refactored. 
 - Packaging: `openrc` service definition got a few improvements.
 
-  
-
-  
 ---  
   
 `Sep 18, 2018` - **netdata has its own organization**  
@@ -450,13 +447,13 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Provisioning Systems
 - **[Puppet](collectors/python.d.plugin/puppet/)** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
 
-And you can extend it, by writing plugins that collect data from any source, using any computer language.  
+You can easily extend Netdata, by writing plugins that collect data from any source, using any computer language.  
   
 ---  
   
 ## Documentation
 
-The netdata documentation is inside the repo, so by just navigating the repo on github you can find all the documentation.
+The netdata documentation is at [https://docs.netdata.cloud](https://docs.netdata.cloud). But you can also find it inside the repo, so by just navigating the repo on github you can find all the documentation.
 
 Here is a quick list:
 
@@ -474,11 +471,11 @@ Directory|Description
 [`web/gui/custom`](web/gui/custom/)|Learn how to create custom netdata dashboards.
 [`web/gui/confluence`](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
 
-But you can also check all the other directories. Most of them have plenty of documentation.
+You can also check all the other directories. Most of them have plenty of documentation.
 
 ## Community
 
-We welcome contributions. So, feel free to join the team.
+We welcome [contributions](CONTRIBUTING.md). So, feel free to join the team.
 
 To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
 
