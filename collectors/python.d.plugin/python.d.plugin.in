@@ -52,6 +52,7 @@ BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'priority': 60000,
                'autodetection_retry': 0,
                'chart_cleanup': 10,
+               'penalty': True,
                'name': str()}
 
 
