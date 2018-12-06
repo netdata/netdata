@@ -24,7 +24,7 @@ fi
 
 # Embed new version in files which need it.
 # This wouldn't be needed if we could use `git tag` everywhere.
-function embed_version {
+function embed_version() {
 	VERSION="$1"
 	MAJOR=$(echo "$GIT_TAG" | cut -d . -f 1 | cut -d v -f 2)
 	MINOR=$(echo "$GIT_TAG" | cut -d . -f 2)
@@ -37,7 +37,7 @@ function embed_version {
 
 # Figure out what will be new release candidate tag based only on previous ones.
 # This assumes that RELEASES are in format of "v0.1.2" and prereleases (RCs) are using "v0.1.2-rc0"
-function release_candidate {
+function release_candidate() {
 	LAST_TAG=$(git semver)
 	if [[ $LAST_TAG =~ -rc* ]]; then
 		VERSION=$(echo "$LAST_TAG" | cut -d'-' -f 1)
@@ -62,7 +62,10 @@ if [ -z "${GIT_TAG}" ]; then
 	*"[netdata minor release]"*) GIT_TAG="v$(git semver --next-minor)" ;;
 	*"[netdata major release]"*) GIT_TAG="v$(git semver --next-major)" ;;
 	*"[netdata release candidate]"*) release_candidate ;;
-	*) echo "Keyword not detected. Exiting..."; exit 0;;
+	*)
+		echo "Keyword not detected. Exiting..."
+		exit 0
+		;;
 	esac
 fi
 embed_version "$GIT_TAG"
