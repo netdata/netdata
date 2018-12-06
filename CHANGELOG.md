@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.0-rc0](https://github.com/netdata/netdata/tree/v1.12.0-rc0) (2018-12-06)
 
 **Fixed bugs:**
 
 - nvidia\_smi module bug [\#4892](https://github.com/netdata/netdata/issues/4892)
 - No alarms are running in some systems [\#4809](https://github.com/netdata/netdata/issues/4809)
+- netdata-updater.sh cron report [\#4808](https://github.com/netdata/netdata/issues/4808)
 - Netdata is not generating any alarms [\#4793](https://github.com/netdata/netdata/issues/4793)
 - Fail2ban: Read "Restore Ban" for persistent bans [\#4769](https://github.com/netdata/netdata/issues/4769)
 - Change in Incomming Webhooks Slack API breaks alerts [\#4755](https://github.com/netdata/netdata/issues/4755)
@@ -58,6 +59,9 @@
 
 **Merged pull requests:**
 
+- use relative path for logo [\#4927](https://github.com/netdata/netdata/pull/4927) ([ktsaou](https://github.com/ktsaou))
+- fix symbolic link file detection in etc [\#4926](https://github.com/netdata/netdata/pull/4926) ([ktsaou](https://github.com/ktsaou))
+- send all git log msg to fd3 [\#4922](https://github.com/netdata/netdata/pull/4922) ([paulfantom](https://github.com/paulfantom))
 - RabbitMQ chart for message rates should be "line" [\#4916](https://github.com/netdata/netdata/pull/4916) ([dex4er](https://github.com/dex4er))
 - better labeling [\#4915](https://github.com/netdata/netdata/pull/4915) ([paulfantom](https://github.com/paulfantom))
 - Improve docker installation readme, docs navbar fix [\#4914](https://github.com/netdata/netdata/pull/4914) ([cakrit](https://github.com/cakrit))
