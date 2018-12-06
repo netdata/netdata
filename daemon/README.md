@@ -289,7 +289,7 @@ If you want to control it entirely via systemd, you can set in `netdata.conf`:
 Using the above, whatever OOM Score you have set at `netdata.service` will be maintained by netdata.
 
 
-## netdata process scheduling policy
+## Netdata process scheduling policy
 
 By default netdata runs with the `idle` process scheduling policy, so that it uses CPU resources, only when there is idle CPU to spare. On very busy servers (or weak servers), this can lead to gaps on the charts.
 
@@ -409,20 +409,17 @@ sudo systemctl daemon-reload
 sudo systemctl restart netdata
 ```
 
-## virtual memory
+## Virtual memory
 
-You may notice that netdata's virtual memory size, as reported by `ps` or `/proc/pid/status`
-(or even netdata's applications virtual memory chart)  is unrealistically high.
+You may notice that netdata's virtual memory size, as reported by `ps` or `/proc/pid/status` (or even netdata's applications virtual memory chart) is unrealistically high.
 
-For example, it may be reported to be 150+MB, even if the resident memory size is just 25MB.
-Similar values may be reported for netdata plugins too.
+For example, it may be reported to be 150+MB, even if the resident memory size is just 25MB. Similar values may be reported for netdata plugins too.
 
-Check this for example: A netdata installation with default settings on Ubuntu 16.04LTS.
-The top chart is **real memory used**, while the bottom one is **virtual memory**:
+Check this for example: A netdata installation with default settings on Ubuntu 16.04LTS. The top chart is **real memory used**, while the bottom one is **virtual memory**:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/19013772/5eb7173e-87e3-11e6-8f2b-a2ccfeb06faf.png)
 
-#### why this happens?
+**Why does this happen?**
 
 The system memory allocator allocates virtual memory arenas, per thread running.
 On Linux systems this defaults to 16MB per thread on 64 bit machines. So, if you get the
@@ -437,21 +434,16 @@ linux (that uses **musl** instead of **glibc**) is this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/19013807/7cf5878e-87e4-11e6-9651-082e68701eab.png)
 
-#### can we do anything to lower it?
+**Can we do anything to lower it?**
 
-Since netdata already uses minimal memory allocations while it runs (i.e. it adapts its memory
-on start, so that while repeatedly collects data it does not do memory allocations), it already
-instructs the system memory allocator to minimize the memory arenas for each thread. We have also
-added [2 configuration options](https://github.com/netdata/netdata/blob/5645b1ee35248d94e6931b64a8688f7f0d865ec6/src/main.c#L410-L418)
-to allow you tweak these settings.
+Since netdata already uses minimal memory allocations while it runs (i.e. it adapts its memory on start, so that while repeatedly collects data it does not do memory allocations), it already instructs the system memory allocator to minimize the memory arenas for each thread. We have also added [2 configuration options](https://github.com/netdata/netdata/blob/5645b1ee35248d94e6931b64a8688f7f0d865ec6/src/main.c#L410-L418)
+to allow you tweak these settings: `glibc malloc arena max for plugins` and `glibc malloc arena max for netdata`.
 
-However, even if we instructed the memory allocator to use just one arena, it seems it allocates
-an arena per thread.
+However, even if we instructed the memory allocator to use just one arena, it seems it allocates an arena per thread.
 
-netdata also supports `jemalloc` and `tcmalloc`, however both behave exactly the same to the
-glibc memory allocator in this aspect.
+netdata also supports `jemalloc` and `tcmalloc`, however both behave exactly the same to the glibc memory allocator in this aspect.
 
-#### Is this a problem?
+**Is this a problem?**
 
 No, it is not.
 

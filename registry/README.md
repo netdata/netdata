@@ -46,13 +46,13 @@ The registry keeps track of 3 entities:
 
 ## Who talks to the registry?
 
-Your web browser **only**! Check here if this is against your policies: [how to not send any information to a thirdparty server](../docs/netdata-security.md#security-design)
+Your web browser **only**! If sending this information is against your policies, you can [run your own registry](#run-your-own-registry)
 
 Your netdata servers do not talk to the registry. This is a UML diagram of its operation:
 
 ![registry](https://cloud.githubusercontent.com/assets/2662304/19448565/11a70632-94ab-11e6-9d80-f410b4acb797.png)
 
-## What data the registry maintains?
+## What data does the registry store?
 
 Its database contains:
 
@@ -72,9 +72,9 @@ Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** 
 
 We believe, it can do it...
 
-## Every netdata can be a registry
+## Run your own registry
 
-Yes, you read correct, **every netdata can be a registry**. Just pick one and configure it.
+**Every netdata can be a registry**. Just pick one and configure it.
 
 **To turn any netdata into a registry**, edit `/etc/netdata/netdata.conf` and set:
 
