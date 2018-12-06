@@ -27,10 +27,10 @@ for STATE in "open" "closed"; do
 		URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE"
 		BODY="$(curl "${URL}" 2>/dev/null | jq .body)"
 		case "${BODY}" in
-		*"# Question summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question", "no changelog"]}' -X PATCH "${URL}" ;;
-		*"# Bug report summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","bug"]}' -X PATCH "${URL}" ;;
-		*"# Feature idea summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","feature request"]}' -X PATCH "${URL}" ;;
-		*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage", "no changelog"]}' -X PATCH "${URL}" ;;
+		*"# Question summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["question", "no changelog"]}' -X POST "${URL}/labels" ;;
+		*"# Bug report summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","bug"]}' -X POST "${URL}/labels" ;;
+		*"# Feature idea summary"*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage","feature request"]}' -X POST "${URL}/labels" ;;
+		*) curl -H "Authorization: token $GITHUB_TOKEN" -d '{"labels":["needs triage", "no changelog"]}' -X POST "${URL}/labels" ;;
 		esac
 	done
 done
@@ -76,6 +76,6 @@ for PR in $(hub pr list -s all -f "%I%n" -L 10); do
 	NEW_SET=$(sort $NEW_LABELS | uniq | grep -v "^$" | sed -e 's/^/"/g;s/$/",/g' | tr -d '\n' | sed 's/.\{1\}$//')
 	if [ ! -z "$NEW_SET" ]; then
 		echo "-------- Assigning labels: ${NEW_SET} --------"
-		curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${NEW_SET}]}" -X POST "${URL}" &>/dev/null
+		curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${NEW_SET}]}" -X POST "${URL}/labels" &>/dev/null
 	fi
 done
