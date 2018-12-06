@@ -191,6 +191,8 @@ So, to disable performance metrics for all loop devices you could add `performan
  * finish in minutes
  * speed in megabytes/s
 
+6. **Nonredundant array availability**
+
 #### configuration
 
 ```

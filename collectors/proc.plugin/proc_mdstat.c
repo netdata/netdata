@@ -10,6 +10,7 @@ struct raid {
     RRDDIM *rd_health;
     unsigned long long failed_disks;
 
+    RRDSET *st_nonredundant;
     RRDDIM *rd_nonredundant;
 
     RRDSET *st_disks;
@@ -299,68 +300,6 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    static RRDSET *st_nonredundant = NULL;
-    if(unlikely(!st_nonredundant))
-        st_nonredundant = rrdset_create_localhost(
-                "mdstat"
-                , "nonredundant"
-                , NULL
-                , "nonredundant"
-                , "md.nonredundant"
-                , "Diappeared Nonredundant Arrays"
-                , "disappeared arrays"
-                , PLUGIN_PROC_NAME
-                , PLUGIN_PROC_MODULE_MDSTAT_NAME
-                , NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT
-                , update_every
-                , RRDSET_TYPE_LINE
-        );
-    else
-        rrdset_next(st_nonredundant);
-
-    int n_disappeared = 0;
-    for(n_idx = 0; n_idx < nonredundant_allocated; n_idx++) {
-        if(unlikely(!nonredundant_arrays[n_idx].found)) {
-            rrddim_set(st_nonredundant, nonredundant_arrays[n_idx].name, 1); // RRDDIM pointer is already NULL
-            n_disappeared = 1;
-        }
-    }
-
-    // allocate memory for nonredundant arrays
-    if(unlikely(n_disappeared || nonredundant_allocated != nonredundant_num)) {
-        for(n_idx = 0; n_idx < nonredundant_allocated; n_idx++) {
-            freez(nonredundant_arrays[n_idx].name);
-        }
-        if(nonredundant_num) {
-           nonredundant_arrays = reallocz(nonredundant_arrays, sizeof(struct nonredundant) * nonredundant_num);
-            memset(nonredundant_arrays, 0, sizeof(struct nonredundant) * nonredundant_num);
-        }
-        else {
-            freez(nonredundant_arrays);
-            nonredundant_arrays = NULL;
-        }
-        nonredundant_allocated = nonredundant_num;
-    }
-
-    for(raid_idx = 0, n_idx = 0; raid_idx < raids_num && n_idx < nonredundant_num; raid_idx++) {
-        struct raid *raid = &raids[raid_idx];
-
-        if(likely(!raid->redundant)) {
-            if(unlikely(!nonredundant_arrays[n_idx].name)) {
-                nonredundant_arrays[n_idx].name = strdupz(raid->name);
-                n_idx++;
-            }
-            if(unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find(st_nonredundant, raid->name))))
-                raid->rd_nonredundant = rrddim_add(st_nonredundant, raid->name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrddim_set_by_pointer(st_nonredundant, raid->rd_nonredundant, 0);
-        }
-    }
-
-    rrdset_done(st_nonredundant);
-
-    // --------------------------------------------------------------------
-
     for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
         struct raid *raid = &raids[raid_idx];
         char id[50 + 1];
@@ -535,6 +474,40 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             rrddim_set_by_pointer(raid->st_speed, raid->rd_speed, raid->speed);
 
             rrdset_done(raid->st_speed);
+        }
+        else {
+
+            // --------------------------------------------------------------------
+
+            snprintfz(id, 50, "%s_availability", raid->name);
+
+            if(unlikely(!raid->st_nonredundant && !(raid->st_nonredundant = rrdset_find_localhost(id)))) {
+                snprintfz(family, 50, "%s", raid->name);
+
+                raid->st_nonredundant = rrdset_create_localhost(
+                        "mdstat"
+                        , id
+                        , NULL
+                        , family
+                        , "md.nonredundant"
+                        , "Nonredundant Array Availability"
+                        , "boolean"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_MDSTAT_NAME
+                        , NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT + raid_idx * 10
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+            }
+            else
+                rrdset_next(raid->st_nonredundant);
+
+            if(unlikely(!raid->rd_nonredundant && !(raid->rd_nonredundant = rrddim_find(raid->st_nonredundant, "available"))))
+                raid->rd_nonredundant = rrddim_add(raid->st_nonredundant, "available", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(raid->st_nonredundant, raid->rd_nonredundant, 1);
+
+            rrdset_done(raid->st_nonredundant);
         }
     }
 
