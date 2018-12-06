@@ -2,7 +2,7 @@
 * @ktsaou
 
 # Ownership by directory structure
-.travis/ @paufantom
+.travis/ @paufantom @cakrit
 build/ @paulfantom
 backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
@@ -20,12 +20,11 @@ collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer
 collectors/python.d.plugin/ @ilyam8
 daemon/ @ktsaou @vlvkobal
 database/ @ktsaou @mfundul
-docker/ @paulfantom
 docs/ @cakrit
 health/ @ktsaou @mfundul
 health/health.d/ @ktsaou @cakrit
 health/notifications/ @ktsaou @Ferroin
-installer/ @ktsaou @paulfantom
+installer/ @ktsaou @paulfantom @cakrit
 libnetdata/ @ktsaou @vlvkobal
 makeself/ @ktsaou @paulfantom
 packaging/ @paulfantom
@@ -51,4 +50,4 @@ netlify.toml @cakrit
 package.json @gmosx
 
 LICENSE.md @ktsaou
-CHANGELOG.md @netdatabot
+CHANGELOG.md @netdatabot @paulfantom
