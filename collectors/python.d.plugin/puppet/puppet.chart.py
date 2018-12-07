@@ -17,8 +17,7 @@ import socket
 
 update_every = 5
 priority = 60000
-# very long clojure-based service startup time
-retries = 180
+
 
 MB = 1048576
 CPU_SCALE = 1000

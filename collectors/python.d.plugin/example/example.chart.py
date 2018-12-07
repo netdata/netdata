@@ -10,7 +10,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # default module values
 # update_every = 4
 priority = 90000
-retries = 60
 
 ORDER = ['random']
 CHARTS = {

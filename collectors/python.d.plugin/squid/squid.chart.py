@@ -9,7 +9,6 @@ from bases.FrameworkServices.SocketService import SocketService
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 priority = 60000
-retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['clients_net', 'clients_requests', 'servers_net', 'servers_requests']

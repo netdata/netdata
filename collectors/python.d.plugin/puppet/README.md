@@ -26,16 +26,13 @@ puppetdb:
     tls_cert_file: /path/to/client.crt
     tls_key_file: /path/to/client.key
     autodetection_retry: 1
-    retries: 3600
 
 puppetserver:
     url: 'https://fqdn.example.com:8140'
     autodetection_retry: 1
-    retries: 3600
 ```
 
-When no configuration is given then `https://fqdn.example.com:8140` is
-tried without any retries.
+When no configuration is given, module uses `https://fqdn.example.com:8140`.
 
 ### notes
 
