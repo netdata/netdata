@@ -2,12 +2,24 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- No data in charts [\#4920](https://github.com/netdata/netdata/issues/4920)
+
 **Closed issues:**
 
 - Improve configuration documentation [\#4781](https://github.com/netdata/netdata/issues/4781)
+- Python.d.plugin infinite retries, ignore penalty, and plotting 'None' [\#4756](https://github.com/netdata/netdata/issues/4756)
 
 **Merged pull requests:**
 
+- Show demosite/host in GA for demo sites [\#4947](https://github.com/netdata/netdata/pull/4947) ([cakrit](https://github.com/cakrit))
+- Update GA in demosites.html [\#4946](https://github.com/netdata/netdata/pull/4946) ([cakrit](https://github.com/cakrit))
+- Add doc before path to GA in static site [\#4940](https://github.com/netdata/netdata/pull/4940) ([cakrit](https://github.com/cakrit))
+- Add a Google Analytics tag to every markdown [\#4938](https://github.com/netdata/netdata/pull/4938) ([cakrit](https://github.com/cakrit))
+- Update README.md [\#4937](https://github.com/netdata/netdata/pull/4937) ([cakrit](https://github.com/cakrit))
+- python.d.plugin update [\#4936](https://github.com/netdata/netdata/pull/4936) ([ilyam8](https://github.com/ilyam8))
+- Update Performance.md [\#4935](https://github.com/netdata/netdata/pull/4935) ([cakrit](https://github.com/cakrit))
 - update code owners [\#4930](https://github.com/netdata/netdata/pull/4930) ([paulfantom](https://github.com/paulfantom))
 - Removed vlvkobal as a codeowner of web/gui [\#4929](https://github.com/netdata/netdata/pull/4929) ([gmosx](https://github.com/gmosx))
 
@@ -70,7 +82,6 @@
 
 **Merged pull requests:**
 
-- run shfmt on CI scripts [\#4928](https://github.com/netdata/netdata/pull/4928) ([paulfantom](https://github.com/paulfantom))
 - use relative path for logo [\#4927](https://github.com/netdata/netdata/pull/4927) ([ktsaou](https://github.com/ktsaou))
 - fix symbolic link file detection in etc [\#4926](https://github.com/netdata/netdata/pull/4926) ([ktsaou](https://github.com/ktsaou))
 - send all git log msg to fd3 [\#4922](https://github.com/netdata/netdata/pull/4922) ([paulfantom](https://github.com/paulfantom))
