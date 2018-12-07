@@ -4211,7 +4211,7 @@ function finalizePage() {
             })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
             ga('create', 'UA-64295674-3', 'auto');
-            ga('send', 'pageview');
+            ga('send', 'pageview', '/demosite/' + window.location.host);
         }, 2000);
     } else {
         notifyForUpdate();
