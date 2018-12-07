@@ -168,3 +168,5 @@ So, the proper way to query the database is to also set at least `after`. The fo
 http://netdata.firehol.org/api/v1/data?chart=system.cpu&points=1&after=-10&options=seconds
 
 When you keep calling this URL, you will see that it returns one new value every 10 seconds, and the timestamp always ends with zero. Similarly, if you say `points=1&after=-5` it will always return timestamps ending with 0 or 5.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fqueries%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

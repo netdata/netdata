@@ -24,7 +24,10 @@ cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i -e '0,/# netdata /s//# Introduction\n\n/' -e 's/\[!\[analytics.*UA-64295674-3)\]()//g' ${GENERATOR_DIR}/src/README.md
+sed -i -e '0,/# netdata /s//# Introduction\n\n/' ${GENERATOR_DIR}/src/README.md
+
+# Remove all GA tracking code
+find ${GENERATOR_DIR}/src -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
 
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
