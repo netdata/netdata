@@ -142,3 +142,5 @@ External plugins that need additional configuration may support a dedicated file
 ### Per chart configuration
 
 In this section you will a separate subsection for each chart shown on the dashboard. You can control all aspects of a specific chart here. You can understand what each option does by reading [how charts are defined](../../collectors/plugins.d/#chart). If you don't know how to find the name of a chart, you can learn about it [here](../../docs/Charts.md).
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

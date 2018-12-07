@@ -134,3 +134,5 @@ We also have a series of automated checks running, such as linters to check code
 
 One special type of automated check is the "WIP" check. You may add "[WIP]" to the title of the PR, to tell us that the particular request is "Work In Progress" and should not be merged. You're still not done with it, you created it to get some feedback. When you're ready to get the final approvals and get it merged, just remove the "[WIP]" string from the title of your PR and the "WIP" check will pass.
 
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTING&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

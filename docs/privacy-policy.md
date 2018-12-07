@@ -91,3 +91,5 @@ Data transferred from the European Union to the United States or outside the Eur
 We may occasionally update this Privacy Policy. When we do, we will provide you with notice of such update through (at a minimum) a reasonably prominent notice on the Websites and Services, and will revise the Effective Date below. We encourage you to periodically review this Privacy Policy to stay informed about how we are protecting, using, processing and transferring the personal information we collect.
 
 ***Effective Date: 10 November 2018.***
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fprivacy-policy&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
