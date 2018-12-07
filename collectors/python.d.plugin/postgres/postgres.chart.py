@@ -802,7 +802,7 @@ class Service(SimpleService):
         self.debug('superuser: {0}'.format(self.is_superuser))
 
         self.databases = discover(cursor, query_factory(DATABASES))
-        self.debug('discovered databases'.format(self.databases))
+        self.debug('discovered databases {0}'.format(self.databases))
         if self.databases_to_poll:
             to_poll = self.databases_to_poll.split()
             self.databases = [db for db in self.databases if db in to_poll] or self.databases
