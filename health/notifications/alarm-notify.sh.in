@@ -198,7 +198,7 @@ if [ ${1} = "unittest" ] ; then
     old_status="${5}"          # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 else
     roles="${1}"               # the roles that should be notified for this event
-    host="${2}"                # the host generated this event
+    args_host="${2}"                # the host generated this event
     unique_id="${3}"           # the unique id of this event
     alarm_id="${4}"            # the unique id of the alarm that generated this event
     event_id="${5}"            # the incremental id of the event, for this alarm id
@@ -222,9 +222,14 @@ fi
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
 
-this_host=$(hostname -s 2>/dev/null)
-[ -z "${host}" ] && host="${this_host}"
-args_host="${host}"
+if [ -z ${args_host} ]
+    then
+    this_host=$(hostname -s 2>/dev/null)
+    host="${this_host}"
+    args_host="${this_host}"
+else
+    host="${args_host}"
+fi
 
 # -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
@@ -383,8 +388,7 @@ fi
 # FQDN of easily.
 if [ "${use_fqdn}" = "YES" -a "${host}" = "$(hostname -s 2>/dev/null)" ]
     then
-    this_host=$(hostname -f 2>/dev/null)
-    host="${this_host:-${host}}"
+    host="$(hostname -f 2>/dev/null)"
 fi
 
 # -----------------------------------------------------------------------------
