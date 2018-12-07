@@ -46,6 +46,7 @@ struct raid {
 };
 
 struct old_raid {
+    int redundant;
     char *name;
     uint32_t hash;
     int found;
@@ -75,21 +76,24 @@ static inline void make_chart_obsolete(char *name, const char *id_modifier) {
 int do_proc_mdstat(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff = NULL;
-    static int do_health = -1, do_nonredundant = -1, do_disks = -1, do_operations = -1, do_mismatch = -1;
+    static int do_health = -1, do_nonredundant = -1, do_disks = -1, do_operations = -1, do_mismatch = -1, do_mismatch_config = -1;
+    static int make_charts_obsolete = -1;
     static char *mdstat_filename = NULL, *mismatch_cnt_filename = NULL;
     static struct raid *raids = NULL;
     static size_t raids_allocated = 0;
-    size_t raids_num = 0, raid_idx = 0;
+    size_t raids_num = 0, raid_idx = 0, redundant_num = 0;
     static struct old_raid *old_raids = NULL;
     static size_t old_raids_allocated = 0;
     size_t old_raid_idx = 0;
 
-    if(unlikely(do_health = -1)){
-        do_health       = config_get_boolean("plugin:proc:/proc/mdstat", "faulty devices", CONFIG_BOOLEAN_YES);
-        do_nonredundant = config_get_boolean("plugin:proc:/proc/mdstat", "nonredundant arrays availability", CONFIG_BOOLEAN_YES);
-        do_mismatch     = config_get_boolean("plugin:proc:/proc/mdstat", "mismatch count", CONFIG_BOOLEAN_YES);
-        do_disks        = config_get_boolean("plugin:proc:/proc/mdstat", "disk stats", CONFIG_BOOLEAN_YES);
-        do_operations   = config_get_boolean("plugin:proc:/proc/mdstat", "operation status", CONFIG_BOOLEAN_YES);
+    if(unlikely(do_health == -1)){
+        do_health           = config_get_boolean("plugin:proc:/proc/mdstat", "faulty devices", CONFIG_BOOLEAN_YES);
+        do_nonredundant     = config_get_boolean("plugin:proc:/proc/mdstat", "nonredundant arrays availability", CONFIG_BOOLEAN_YES);
+        do_mismatch_config  = config_get_boolean_ondemand("plugin:proc:/proc/mdstat", "mismatch count", CONFIG_BOOLEAN_AUTO);
+        do_disks            = config_get_boolean("plugin:proc:/proc/mdstat", "disk stats", CONFIG_BOOLEAN_YES);
+        do_operations       = config_get_boolean("plugin:proc:/proc/mdstat", "operation status", CONFIG_BOOLEAN_YES);
+
+        make_charts_obsolete = config_get_boolean("plugin:proc:/proc/mdstat", "make charts obsolete", CONFIG_BOOLEAN_YES);
 
         char filename[FILENAME_MAX + 1];
 
@@ -162,6 +166,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
             freez(raid->mismatch_cnt_filename);
             memset(raid, 0, sizeof(struct raid));
             raid->name = strdupz(procfile_lineword(ff, l, 0));
+            raid->hash = simple_hash(raid->name);
         }
         if(unlikely(!raid->name || !raid->name[0])) continue;
         raid_idx++;
@@ -203,6 +208,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         }
 
         raid->redundant = 1;
+        redundant_num++;
         l++;
 
         // check if any operation is performed on the raid
@@ -265,6 +271,17 @@ int do_proc_mdstat(int update_every, usec_t dt) {
     }
 
     // read mismatch_cnt files
+    if(do_mismatch == -1) {
+        if(do_mismatch_config == CONFIG_BOOLEAN_AUTO) {
+            if(raids_num > 50)
+                do_mismatch = CONFIG_BOOLEAN_NO;
+            else
+                do_mismatch = CONFIG_BOOLEAN_YES;
+        }
+        else
+            do_mismatch = do_mismatch_config;
+    }
+
     if(likely(do_mismatch)) {
         for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
             char filename[FILENAME_MAX + 1];
@@ -287,16 +304,18 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     // check for disappeared raids
     for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+        struct old_raid *old_raid = &old_raids[old_raid_idx];
         int found = 0;
 
         for(raid_idx = 0; raid_idx < raids_num ; raid_idx++) {
             struct raid *raid = &raids[raid_idx];
 
-            if(unlikely(raid->hash == old_raids[old_raid_idx].hash && !strcmp(raid->name, old_raids[old_raid_idx].name)))
-                found = 1;
+            if(unlikely(raid->hash == old_raid->hash
+                        && !strcmp(raid->name, old_raid->name)
+                        && raid->redundant == old_raid->redundant)) found = 1;
         }
 
-        old_raids[old_raid_idx].found = found;
+        old_raid->found = found;
     }
 
     int raid_disappeared = 0;
@@ -304,12 +323,14 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         struct old_raid *old_raid = &old_raids[old_raid_idx];
 
         if(unlikely(!old_raid->found)) {
-            make_chart_obsolete(old_raid->name, "disks");
-            make_chart_obsolete(old_raid->name, "mismatch");
-            make_chart_obsolete(old_raid->name, "operation");
-            make_chart_obsolete(old_raid->name, "finish");
-            make_chart_obsolete(old_raid->name, "speed");
-            make_chart_obsolete(old_raid->name, "availability");
+            if(likely(make_charts_obsolete)) {
+                make_chart_obsolete(old_raid->name, "disks");
+                make_chart_obsolete(old_raid->name, "mismatch");
+                make_chart_obsolete(old_raid->name, "operation");
+                make_chart_obsolete(old_raid->name, "finish");
+                make_chart_obsolete(old_raid->name, "speed");
+                make_chart_obsolete(old_raid->name, "availability");
+            }
             raid_disappeared = 1;
         }
     }
@@ -329,10 +350,12 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         }
         old_raids_allocated = raids_num;
         for(old_raid_idx = 0; old_raid_idx < old_raids_allocated; old_raid_idx++) {
+            struct old_raid *old_raid = &old_raids[old_raid_idx];
             struct raid *raid = &raids[old_raid_idx];
 
-            old_raids[old_raid_idx].name = strdupz(raid->name);
-            old_raids[old_raid_idx].hash = raid->hash;
+            old_raid->name = strdupz(raid->name);
+            old_raid->hash = raid->hash;
+            old_raid->redundant = raid->redundant;
         }
     }
 
@@ -340,7 +363,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     if(likely(do_health)) {
         static RRDSET *st_mdstat_health = NULL;
-        if(unlikely(!st_mdstat_health))
+        if(unlikely(!st_mdstat_health && redundant_num)) {
             st_mdstat_health = rrdset_create_localhost(
                     "mdstat"
                     , "mdstat_health"
@@ -355,11 +378,14 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
+
+            rrdset_isnot_obsolete(st_mdstat_health);
+        }
         else
             rrdset_next(st_mdstat_health);
 
-        if(!raids_num) {
-            make_chart_obsolete("mdstat", "health");
+        if(!redundant_num) {
+            if(likely(make_charts_obsolete)) make_chart_obsolete("mdstat", "health");
         }
         else {
             for(raid_idx = 0; raid_idx < raids_num; raid_idx++) {
@@ -390,6 +416,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
                 if(unlikely(!raid->st_disks && !(raid->st_disks = rrdset_find_byname_localhost(id)))) {
                     snprintfz(family, 50, "%s", raid->name);
+
                     raid->st_disks = rrdset_create_localhost(
                             "mdstat"
                             , id
@@ -404,6 +431,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_STACKED
                     );
+
+                    rrdset_isnot_obsolete(raid->st_disks);
                 }
                 else
                     rrdset_next(raid->st_disks);
@@ -441,6 +470,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
+
+                    rrdset_isnot_obsolete(raid->st_mismatch_cnt);
                 }
                 else
                     rrdset_next(raid->st_mismatch_cnt);
@@ -475,6 +506,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
+
+                    rrdset_isnot_obsolete(raid->st_operation);
                 }
                 else
                     rrdset_next(raid->st_operation);
@@ -516,6 +549,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
+
+                    rrdset_isnot_obsolete(raid->st_finish);
                 }
                 else
                     rrdset_next(raid->st_finish);
@@ -548,6 +583,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
+
+                    rrdset_isnot_obsolete(raid->st_speed);
                 }
                 else
                     rrdset_next(raid->st_speed);
@@ -584,6 +621,8 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
+
+                    rrdset_isnot_obsolete(raid->st_nonredundant);
                 }
                 else
                     rrdset_next(raid->st_nonredundant);
