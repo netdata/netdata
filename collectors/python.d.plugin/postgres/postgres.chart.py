@@ -120,9 +120,8 @@ METRICS = {
 
 
 def wal_query(version):
-
     if version == NO_VERSION:
-        raise ValueError("standby delta query wrong server version")
+        raise ValueError("wal query wrong server version")
 
     wal = 'wal' if version >= 100000 else 'xlog'
     lsn = 'lsn' if version >= 100000 else 'location'
@@ -157,7 +156,7 @@ FROM
 
 def archive_query(version):
     if version == NO_VERSION:
-        raise ValueError("standby delta query wrong server version")
+        raise ValueError("archive query wrong server version")
 
     wal = 'wal' if version >= 100000 else 'xlog'
     return """
@@ -325,6 +324,9 @@ WHERE application_name IS NOT NULL;
 
 
 def repslot_files_query(version):
+    if version == NO_VERSION:
+        raise ValueError("repslot files query wrong server version")
+
     if version >= 110000:
         val = "current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val"
     else:
@@ -399,7 +401,7 @@ WHERE query NOT LIKE '%%pg_stat_activity%%';
 
 def diff_lsn_query(version):
     if version == NO_VERSION:
-        raise ValueError("standby delta query wrong server version")
+        raise ValueError("diff lsn wrong server version")
 
     wal = 'wal' if version >= 100000 else 'xlog'
     lsn = 'lsn' if version >= 100000 else 'location'
@@ -443,7 +445,7 @@ def query_factory(name, version=NO_VERSION):
     elif name == STANDBY_DELTA:
         return standby_delta_query(version)
     elif name == REPSLOT_FILES:
-        return repslot_files_query()
+        return repslot_files_query(version)
     elif name == IF_SUPERUSER:
         return is_superuser_query()
     elif name == SERVER_VERSION:
