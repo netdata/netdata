@@ -324,11 +324,15 @@ WHERE application_name IS NOT NULL;
 """.format(wal, lsn)
 
 
-def repslot_files_query():
+def repslot_files_query(version):
+    if version >= 110000:
+        val = "current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val"
+    else:
+        val = 'setting AS val'
     return """
 WITH wal_size AS (
   SELECT
-    current_setting('wal_block_size')::INT * setting::INT AS val
+    {0}
   FROM pg_settings
   WHERE name = 'wal_segment_size'
   )
@@ -363,7 +367,7 @@ GROUP BY
     slot_name,
     slot_type,
     replslot_wal_keep;
-"""
+""".format(val)
 
 
 def is_superuser_query():
