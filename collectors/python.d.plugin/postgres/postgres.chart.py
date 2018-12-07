@@ -16,12 +16,28 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values
-update_every = 1
-priority = 60000
+
+WAL = 'WAL'
+ARCHIVE = 'ARCHIVE'
+BACKENDS = 'BACKENDS'
+TABLE_STATS = 'TABLE_STATS'
+INDEX_STATS = 'INDEX_STATS'
+DATABASE = 'DATABASE'
+BGWRITER = 'BGWRITER'
+LOCKS = 'LOCKS'
+DATABASES = 'DATABASES'
+STANDBY = 'STANDBY'
+REPLICATION_SLOT = 'REPLICATION_SLOT'
+STANDBY_DELTA = 'STANDBY_DELTA'
+REPSLOT_FILES = 'REPSLOT_FILES'
+IF_SUPERUSER = 'IF_SUPERUSER'
+SERVER_VERSION = 'SERVER_VERSION'
+AUTOVACUUM = 'AUTOVACUUM'
+DIFF_LSN = 'DIFF_LSN'
+WAL_WRITES = 'WAL_WRITES'
 
 METRICS = {
-    'DATABASE': [
+    DATABASE: [
         'connections',
         'xact_commit',
         'xact_rollback',
@@ -37,32 +53,32 @@ METRICS = {
         'temp_bytes',
         'size'
     ],
-    'BACKENDS': [
+    BACKENDS: [
         'backends_active',
         'backends_idle'
     ],
-    'INDEX_STATS': [
+    INDEX_STATS: [
         'index_count',
         'index_size'
     ],
-    'TABLE_STATS': [
+    TABLE_STATS: [
         'table_size',
         'table_count'
     ],
-    'WAL': [
+    WAL: [
         'written_wal',
         'recycled_wal',
         'total_wal'
     ],
-    'WAL_WRITES': [
+    WAL_WRITES: [
         'wal_writes'
     ],
-    'ARCHIVE': [
+    ARCHIVE: [
         'ready_count',
         'done_count',
         'file_count'
     ],
-    'BGWRITER': [
+    BGWRITER: [
         'checkpoint_scheduled',
         'checkpoint_requested',
         'buffers_checkpoint',
@@ -72,7 +88,7 @@ METRICS = {
         'buffers_alloc',
         'buffers_backend_fsync'
     ],
-    'LOCKS': [
+    LOCKS: [
         'ExclusiveLock',
         'RowShareLock',
         'SIReadLock',
@@ -83,27 +99,34 @@ METRICS = {
         'ShareLock',
         'RowExclusiveLock'
     ],
-    'AUTOVACUUM': [
+    AUTOVACUUM: [
         'analyze',
         'vacuum_analyze',
         'vacuum',
         'vacuum_freeze',
         'brin_summarize'
     ],
-    'STANDBY_DELTA': [
+    STANDBY_DELTA: [
         'sent_delta',
         'write_delta',
         'flush_delta',
         'replay_delta'
     ],
-    'REPSLOT_FILES': [
+    REPSLOT_FILES: [
         'replslot_wal_keep',
         'replslot_files'
     ]
 }
 
-QUERIES = {
-    'WAL': """
+
+def wal_query(version):
+
+    if version == NO_VERSION:
+        raise ValueError("standby delta query wrong server version")
+
+    wal = 'wal' if version >= 100000 else 'xlog'
+    lsn = 'lsn' if version >= 100000 else 'location'
+    return """
 SELECT
     count(*) as total_wal,
     count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
@@ -129,16 +152,26 @@ FROM
     ORDER BY
         (pg_stat_file('pg_{0}/'||name)).modification,
         wal.name DESC) sub;
-""",
-    'ARCHIVE': """
+""".format(wal, lsn)
+
+
+def archive_query(version):
+    if version == NO_VERSION:
+        raise ValueError("standby delta query wrong server version")
+
+    wal = 'wal' if version >= 100000 else 'xlog'
+    return """
 SELECT
     CAST(COUNT(*) AS INT) AS file_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)),0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)),0) AS INT) AS done_count
 FROM
     pg_catalog.pg_ls_dir('pg_{0}/archive_status') AS archive_files (archive_file);
-""",
-    'BACKENDS': """
+""".format(wal)
+
+
+def backend_query():
+        return """
 SELECT
     count(*) - (SELECT  count(*)
                 FROM pg_stat_activity
@@ -149,22 +182,31 @@ SELECT
      WHERE state = 'idle')
       AS backends_idle
 FROM pg_stat_activity;
-""",
-    'TABLE_STATS': """
+"""
+
+
+def table_stats_query():
+        return """
 SELECT
     ((sum(relpages) * 8) * 1024) AS table_size,
     count(1)                     AS table_count
 FROM pg_class
 WHERE relkind IN ('r', 't');
-""",
-    'INDEX_STATS': """
+"""
+
+
+def index_stats_query():
+        return """
 SELECT
     ((sum(relpages) * 8) * 1024) AS index_size,
     count(1)                     AS index_count
 FROM pg_class
 WHERE relkind = 'i';
-""",
-    'DATABASE': """
+"""
+
+
+def database_query():
+        return """
 SELECT
     datname AS database_name,
     numbackends AS connections,
@@ -183,8 +225,11 @@ SELECT
     temp_bytes AS temp_bytes
 FROM pg_stat_database
 WHERE datname IN %(databases)s ;
-""",
-    'BGWRITER': """
+"""
+
+
+def bgwriter_query():
+        return """
 SELECT
     checkpoints_timed AS checkpoint_scheduled,
     checkpoints_req AS checkpoint_requested,
@@ -195,8 +240,11 @@ SELECT
     buffers_alloc * current_setting('block_size')::numeric buffers_alloc,
     buffers_backend_fsync
 FROM pg_stat_bgwriter;
-""",
-    'LOCKS': """
+"""
+
+
+def locks_query():
+        return """
 SELECT
     pg_database.datname as database_name,
     mode,
@@ -206,8 +254,11 @@ INNER JOIN pg_database
     ON pg_database.oid = pg_locks.database
 GROUP BY datname, mode
 ORDER BY datname, mode;
-""",
-    'FIND_DATABASES': """
+"""
+
+
+def databases_query():
+    return """
 SELECT
     datname
 FROM pg_stat_database
@@ -215,19 +266,33 @@ WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
     AND NOT datname ~* '^template\d ';
-""",
-    'FIND_STANDBY': """
+"""
+
+
+def standby_query():
+    return """
 SELECT
     application_name
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL
 GROUP BY application_name;
-""",
-    'FIND_REPLICATION_SLOT': """
+"""
+
+
+def replication_slot_query():
+    return """
 SELECT slot_name
 FROM pg_replication_slots;
-""",
-    'STANDBY_DELTA': """
+"""
+
+
+def standby_delta_query(version):
+    if version == NO_VERSION:
+        raise ValueError("standby delta query wrong server version")
+
+    wal = 'wal' if version >= 100000 else 'xlog'
+    lsn = 'lsn' if version >= 100000 else 'location'
+    return """
 SELECT
     application_name,
     pg_{0}_{1}_diff(
@@ -256,8 +321,11 @@ SELECT
     replay_{1}) AS replay_delta
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
-""",
-    'REPSLOT_FILES': """
+""".format(wal, lsn)
+
+
+def repslot_files_query():
+    return """
 WITH wal_size AS (
   SELECT
     current_setting('wal_block_size')::INT * setting::INT AS val
@@ -295,14 +363,23 @@ GROUP BY
     slot_name,
     slot_type,
     replslot_wal_keep;
-""",
-    'IF_SUPERUSER': """
+"""
+
+
+def is_superuser_query():
+    return """
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
-""",
-    'DETECT_SERVER_VERSION': """
+"""
+
+
+def server_version_query():
+    return """
 SHOW server_version_num;
-""",
-    'AUTOVACUUM': """
+"""
+
+
+def autovacuum_query():
+    return """
 SELECT
     count(*) FILTER (WHERE query LIKE 'autovacuum: ANALYZE%%') AS analyze,
     count(*) FILTER (WHERE query LIKE 'autovacuum: VACUUM ANALYZE%%') AS vacuum_analyze,
@@ -313,8 +390,16 @@ SELECT
     count(*) FILTER (WHERE query LIKE 'autovacuum: BRIN summarize%%') AS brin_summarize
 FROM pg_stat_activity
 WHERE query NOT LIKE '%%pg_stat_activity%%';
-""",
-    'DIFF_LSN': """
+"""
+
+
+def diff_lsn_query(version):
+    if version == NO_VERSION:
+        raise ValueError("standby delta query wrong server version")
+
+    wal = 'wal' if version >= 100000 else 'xlog'
+    lsn = 'lsn' if version >= 100000 else 'location'
+    return """
 SELECT
     pg_{0}_{1}_diff(
       CASE pg_is_in_recovery()
@@ -322,15 +407,50 @@ SELECT
         ELSE pg_current_{0}_{1}()
       END,
     '0/0') as wal_writes ;
-"""
-}
+""".format(wal, lsn)
 
 
-QUERY_STATS = {
-    QUERIES['DATABASE']: METRICS['DATABASE'],
-    QUERIES['BACKENDS']: METRICS['BACKENDS'],
-    QUERIES['LOCKS']: METRICS['LOCKS']
-}
+NO_VERSION = 0
+
+
+def query_factory(name, version=NO_VERSION):
+    if name == WAL:
+        return wal_query(version)
+    elif name == ARCHIVE:
+        return archive_query(version)
+    elif name == BACKENDS:
+        return backend_query()
+    elif name == TABLE_STATS:
+        return table_stats_query()
+    elif name == INDEX_STATS:
+        return index_stats_query()
+    elif name == DATABASE:
+        return database_query()
+    elif name == BGWRITER:
+        return bgwriter_query()
+    elif name == LOCKS:
+        return locks_query()
+    elif name == DATABASES:
+        return databases_query()
+    elif name == STANDBY:
+        return standby_query()
+    elif name == REPLICATION_SLOT:
+        return replication_slot_query()
+    elif name == STANDBY_DELTA:
+        return standby_delta_query(version)
+    elif name == REPSLOT_FILES:
+        return repslot_files_query()
+    elif name == IF_SUPERUSER:
+        return is_superuser_query()
+    elif name == SERVER_VERSION:
+        return server_version_query()
+    elif name == AUTOVACUUM:
+        return autovacuum_query()
+    elif name == DIFF_LSN:
+        return diff_lsn_query(version)
+
+    raise ValueError('unknown query')
+
 
 ORDER = [
     'db_stat_temp_files',
@@ -553,151 +673,112 @@ CHARTS = {
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.order = ORDER[:]
+        self.order = list(ORDER)
         self.definitions = deepcopy(CHARTS)
-        self.table_stats = configuration.pop('table_stats', False)
-        self.index_stats = configuration.pop('index_stats', False)
-        self.database_poll = configuration.pop('database_poll', None)
+
+        self.do_table_stats = configuration.pop('table_stats', False)
+        self.do_index_stats = configuration.pop('index_stats', False)
+        self.databases_to_poll = configuration.pop('database_poll', None)
         self.configuration = configuration
-        self.connection = False
+
+        self.conn = None
         self.server_version = None
-        self.data = dict()
-        self.locks_zeroed = dict()
+        self.is_superuser = False
+        self.alive = False
+
         self.databases = list()
         self.secondaries = list()
         self.replication_slots = list()
-        self.queries = QUERY_STATS.copy()
 
-    def _connect(self):
-        params = dict(user='postgres',
-                      database=None,
-                      password=None,
-                      host=None,
-                      port=5432)
-        params.update(self.configuration)
+        self.queries = dict()
 
-        if not self.connection:
-            try:
-                self.connection = psycopg2.connect(**params)
-                self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-                self.connection.set_session(readonly=True)
-            except OperationalError as error:
-                return False, str(error)
-        return True, True
+        self.data = dict()
+
+    def reconnect(self):
+        return self.connect()
+
+    def connect(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+        try:
+            params = dict(user='postgres',
+                          database=None,
+                          password=None,
+                          host=None,
+                          port=5432)
+            params.update(self.configuration)
+
+            self.conn = psycopg2.connect(**params)
+            self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            self.conn.set_session(readonly=True)
+        except OperationalError as error:
+            self.error(error)
+            self.alive = False
+        else:
+            self.alive = True
+
+        return self.alive
 
     def check(self):
         if not PSYCOPG2:
-            self.error('\'python-psycopg2\' module is needed to use postgres.chart.py')
+            self.error("'python-psycopg2' package is needed to use postgres module")
             return False
-        result, error = self._connect()
-        if not result:
-            conf = dict((k, (lambda k, v: v if k != 'password' else '*****')(k, v))
-                        for k, v in self.configuration.items())
-            self.error('Failed to connect to %s. Error: %s' % (str(conf), error))
+
+        if not self.connect():
+            self.error('failed to connect to {0}'.format(hide_password(self.configuration)))
             return False
+
         try:
-            cursor = self.connection.cursor()
-            self.databases = discover_databases_(cursor, QUERIES['FIND_DATABASES'])
-            is_superuser = check_if_superuser_(cursor, QUERIES['IF_SUPERUSER'])
-            self.secondaries = discover_secondaries_(cursor, QUERIES['FIND_STANDBY'])
-            self.server_version = detect_server_version(cursor, QUERIES['DETECT_SERVER_VERSION'])
-            if self.server_version >= 94000:
-                self.replication_slots = discover_replication_slots_(cursor, QUERIES['FIND_REPLICATION_SLOT'])
-            cursor.close()
-
-            if self.database_poll and isinstance(self.database_poll, str):
-                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()] \
-                                 or self.databases
-
-            self.locks_zeroed = populate_lock_types(self.databases)
-            self.add_additional_queries_(is_superuser)
-            self.create_dynamic_charts_()
-            return True
+            self.check_queries()
         except Exception as error:
-            self.error(str(error))
+            self.error(error)
             return False
 
-    def add_additional_queries_(self, is_superuser):
+        self.populate_queries()
+        self.create_dynamic_charts()
 
-        if self.server_version >= 100000:
-            wal = 'wal'
-            lsn = 'lsn'
-        else:
-            wal = 'xlog'
-            lsn = 'location'
-        self.queries[QUERIES['BGWRITER']] = METRICS['BGWRITER']
-        self.queries[QUERIES['DIFF_LSN'].format(wal, lsn)] = METRICS['WAL_WRITES']
-        self.queries[QUERIES['STANDBY_DELTA'].format(wal, lsn)] = METRICS['STANDBY_DELTA']
+        return True
 
-        if self.index_stats:
-            self.queries[QUERIES['INDEX_STATS']] = METRICS['INDEX_STATS']
-        if self.table_stats:
-            self.queries[QUERIES['TABLE_STATS']] = METRICS['TABLE_STATS']
-        if is_superuser:
-            self.queries[QUERIES['ARCHIVE'].format(wal)] = METRICS['ARCHIVE']
-            if self.server_version >= 90400:
-                self.queries[QUERIES['WAL'].format(wal, lsn)] = METRICS['WAL']
-            if self.server_version >= 100000:
-                self.queries[QUERIES['REPSLOT_FILES']] = METRICS['REPSLOT_FILES']
-        if self.server_version >= 90400:
-            self.queries[QUERIES['AUTOVACUUM']] = METRICS['AUTOVACUUM']
-
-    def create_dynamic_charts_(self):
-
-        for database_name in self.databases[::-1]:
-            self.definitions['database_size']['lines'].append(
-                [database_name + '_size', database_name, 'absolute', 1, 1024 * 1024])
-            for chart_name in [name for name in self.order if name.startswith('db_stat')]:
-                    add_database_stat_chart_(order=self.order, definitions=self.definitions,
-                                             name=chart_name, database_name=database_name)
-
-            add_database_lock_chart_(order=self.order, definitions=self.definitions, database_name=database_name)
-
-        for application_name in self.secondaries[::-1]:
-            add_replication_delta_chart_(
-                order=self.order,
-                definitions=self.definitions,
-                name='standby_delta',
-                application_name=application_name)
-
-        for slot_name in self.replication_slots[::-1]:
-            add_replication_slot_chart_(
-                order=self.order,
-                definitions=self.definitions,
-                name='replication_slot',
-                slot_name=slot_name)
-
-    def _get_data(self):
-        result, _ = self._connect()
-        if result:
-            cursor = self.connection.cursor(cursor_factory=DictCursor)
-            try:
-                self.data.update(self.locks_zeroed)
-                for query, metrics in self.queries.items():
-                    self.query_stats_(cursor, query, metrics)
-
-            except OperationalError:
-                self.connection = False
-                cursor.close()
-                return None
-            else:
-                cursor.close()
-                return self.data
-        else:
+    def get_data(self):
+        if not self.alive and not self.reconnect():
             return None
 
-    def query_stats_(self, cursor, query, metrics):
+        try:
+            cursor = self.conn.cursor(cursor_factory=DictCursor)
+
+            self.data.update(zero_lock_types(self.databases))
+
+            for query, metrics in self.queries.items():
+                self.query_stats(cursor, query, metrics)
+
+        except OperationalError:
+            self.alive = False
+            return None
+
+        cursor.close()
+
+        return self.data
+
+    def query_stats(self, cursor, query, metrics):
         cursor.execute(query, dict(databases=tuple(self.databases)))
+
         for row in cursor:
             for metric in metrics:
+                #  databases
                 if 'database_name' in row:
                     dimension_id = '_'.join([row['database_name'], metric])
+                #  secondaries
                 elif 'application_name' in row:
                     dimension_id = '_'.join([row['application_name'], metric])
+                # replication slots
                 elif 'slot_name' in row:
                     dimension_id = '_'.join([row['slot_name'], metric])
+                #  other
                 else:
                     dimension_id = metric
+
                 if metric in row:
                     if row[metric] is not None:
                         self.data[dimension_id] = int(row[metric])
@@ -705,35 +786,105 @@ class Service(SimpleService):
                     if metric == row['mode']:
                         self.data[dimension_id] = row['locks_count']
 
+    def check_queries(self):
+        cursor = self.conn.cursor()
 
-def discover_databases_(cursor, query):
+        self.server_version = detect_server_version(cursor, query_factory(SERVER_VERSION))
+        self.debug('server version: {0}'.format(self.server_version))
+
+        self.is_superuser = check_if_superuser(cursor, query_factory(IF_SUPERUSER))
+        self.debug('superuser: {0}'.format(self.is_superuser))
+
+        self.databases = discover(cursor, query_factory(DATABASES))
+        self.debug('discovered databases'.format(self.databases))
+        if self.databases_to_poll:
+            to_poll = self.databases_to_poll.split()
+            self.databases = [db for db in self.databases if db in to_poll] or self.databases
+
+        self.secondaries = discover(cursor, query_factory(STANDBY))
+        self.debug('discovered secondaries: {0}'.format(self.secondaries))
+
+        if self.server_version >= 94000:
+            self.replication_slots = discover(cursor, query_factory(REPLICATION_SLOT))
+            self.debug('discovered replication slots: {0}'.format(self.replication_slots))
+
+        cursor.close()
+
+    def populate_queries(self):
+        self.queries[query_factory(DATABASE)] = METRICS[DATABASE]
+        self.queries[query_factory(BACKENDS)] = METRICS[BACKENDS]
+        self.queries[query_factory(LOCKS)] = METRICS[LOCKS]
+        self.queries[query_factory(BGWRITER)] = METRICS[BGWRITER]
+        self.queries[query_factory(DIFF_LSN, self.server_version)] = METRICS[WAL_WRITES]
+        self.queries[query_factory(STANDBY_DELTA, self.server_version)] = METRICS[STANDBY_DELTA]
+
+        if self.do_index_stats:
+            self.queries[query_factory(INDEX_STATS)] = METRICS[INDEX_STATS]
+        if self.do_table_stats:
+            self.queries[query_factory(TABLE_STATS)] = METRICS[TABLE_STATS]
+
+        if self.is_superuser:
+            self.queries[query_factory(ARCHIVE, self.server_version)] = METRICS[ARCHIVE]
+
+            if self.server_version >= 90400:
+                self.queries[query_factory(WAL, self.server_version)] = METRICS[WAL]
+
+            if self.server_version >= 100000:
+                self.queries[query_factory(REPSLOT_FILES)] = METRICS[REPSLOT_FILES]
+
+        if self.server_version >= 90400:
+            self.queries[query_factory(AUTOVACUUM)] = METRICS[AUTOVACUUM]
+
+    def create_dynamic_charts(self):
+        for database_name in self.databases[::-1]:
+            dim = [
+                database_name + '_size',
+                database_name,
+                'absolute',
+                1,
+                1024 * 1024,
+            ]
+            self.definitions['database_size']['lines'].append(dim)
+            for chart_name in [name for name in self.order if name.startswith('db_stat')]:
+                    add_database_stat_chart(
+                        order=self.order,
+                        definitions=self.definitions,
+                        name=chart_name,
+                        database_name=database_name,
+                    )
+            add_database_lock_chart(
+                order=self.order,
+                definitions=self.definitions,
+                database_name=database_name,
+            )
+
+        for application_name in self.secondaries[::-1]:
+            add_replication_delta_chart(
+                order=self.order,
+                definitions=self.definitions,
+                name='standby_delta',
+                application_name=application_name,
+            )
+
+        for slot_name in self.replication_slots[::-1]:
+            add_replication_slot_chart(
+                order=self.order,
+                definitions=self.definitions,
+                name='replication_slot',
+                slot_name=slot_name,
+            )
+
+
+def discover(cursor, query):
     cursor.execute(query)
     result = list()
-    for db in [database[0] for database in cursor]:
-        if db not in result:
-            result.append(db)
+    for v in [value[0] for value in cursor]:
+        if v not in result:
+            result.append(v)
     return result
 
 
-def discover_secondaries_(cursor, query):
-    cursor.execute(query)
-    result = list()
-    for sc in [standby[0] for standby in cursor]:
-        if sc not in result:
-            result.append(sc)
-    return result
-
-
-def discover_replication_slots_(cursor, query):
-    cursor.execute(query)
-    result = list()
-    for slot in [replication_slot[0] for replication_slot in cursor]:
-        if slot not in result:
-            result.append(slot)
-    return result
-
-
-def check_if_superuser_(cursor, query):
+def check_if_superuser(cursor, query):
     cursor.execute(query)
     return cursor.fetchone()[0]
 
@@ -743,7 +894,7 @@ def detect_server_version(cursor, query):
     return int(cursor.fetchone()[0])
 
 
-def populate_lock_types(databases):
+def zero_lock_types(databases):
     result = dict()
     for database in databases:
         for lock_type in METRICS['LOCKS']:
@@ -753,7 +904,11 @@ def populate_lock_types(databases):
     return result
 
 
-def add_database_lock_chart_(order, definitions, database_name):
+def hide_password(config):
+    return dict((k, v if k != 'password' else '*****') for k, v in config.items())
+
+
+def add_database_lock_chart(order, definitions, database_name):
     def create_lines(database):
         result = list()
         for lock_type in METRICS['LOCKS']:
@@ -770,7 +925,7 @@ def add_database_lock_chart_(order, definitions, database_name):
             }
 
 
-def add_database_stat_chart_(order, definitions, name, database_name):
+def add_database_stat_chart(order, definitions, name, database_name):
     def create_lines(database, lines):
         result = list()
         for line in lines:
@@ -787,7 +942,7 @@ def add_database_stat_chart_(order, definitions, name, database_name):
                'lines': create_lines(database_name, chart_template['lines'])}
 
 
-def add_replication_delta_chart_(order, definitions, name, application_name):
+def add_replication_delta_chart(order, definitions, name, application_name):
     def create_lines(standby, lines):
         result = list()
         for line in lines:
@@ -805,7 +960,7 @@ def add_replication_delta_chart_(order, definitions, name, application_name):
                'lines': create_lines(application_name, chart_template['lines'])}
 
 
-def add_replication_slot_chart_(order, definitions, name, slot_name):
+def add_replication_slot_chart(order, definitions, name, slot_name):
     def create_lines(slot, lines):
         result = list()
         for line in lines:
