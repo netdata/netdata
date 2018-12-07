@@ -11,7 +11,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 priority = 60000
-retries = 60
 update_every = 15
 
 RADIUS_MSG = 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept'

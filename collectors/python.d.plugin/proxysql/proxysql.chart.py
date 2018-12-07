@@ -8,7 +8,6 @@ from bases.FrameworkServices.MySQLService import MySQLService
 # default module values (can be overridden per job in `config`)
 # update_every = 3
 priority = 60000
-retries = 60
 
 
 def query(table, *params):

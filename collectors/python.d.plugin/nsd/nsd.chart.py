@@ -9,7 +9,6 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 priority = 60000
-retries = 5
 update_every = 30
 
 # charts order (can be overridden if you want less charts, or different order)

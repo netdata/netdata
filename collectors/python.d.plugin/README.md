@@ -21,7 +21,6 @@ Every configuration file must have one of two formats:
 
 ```yaml
 update_every : 2 # update frequency
-retries      : 1 # how many failures in update() is tolerated
 priority     : 20000 # where it is shown on dashboard
 
 other_var1   : bla  # variables passed to module
@@ -33,7 +32,6 @@ other_var2   : alb
 ```yaml
 # module defaults:
 update_every : 2
-retries      : 1
 priority     : 20000
 
 local:  # job name
@@ -42,11 +40,10 @@ local:  # job name
 
 other_job:
   priority     : 5 # job position on dashboard
-  retries      : 20 # job retries
   other_var2   : val # module specific variable
 ```
 
-`update_every`, `retries`, and `priority` are always optional.
+`update_every` and `priority` are always optional.
 
 ## How to debug a python module
 

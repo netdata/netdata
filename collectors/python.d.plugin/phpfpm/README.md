@@ -32,7 +32,6 @@ priority     : 90100
 
 local:
   url     : 'http://localhost/status'
-  retries : 10
 ```
 
 Without configuration, module attempts to connect to `http://localhost/status`

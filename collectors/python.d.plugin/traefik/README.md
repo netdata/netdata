@@ -46,7 +46,6 @@ priority     : 60000
 
 local:
   url     : 'http://localhost:8080/health'
-  retries : 10
 ```
 
 Without configuration, module attempts to connect to `http://localhost:8080/health`.
