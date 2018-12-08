@@ -453,19 +453,6 @@ function saveObjectToClient(data, filename) {
     saveTextToClient(JSON.stringify(data), filename);
 }
 
-// =============================================================================
-
-const hubBaseURL = "http://localhost:8080";
-
-function claimButtonDidClick() {
-    window.open(
-        hubBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
-        "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
-        encodeURIComponent(NETDATA.serverDefault), 
-        "_blank"
-    );
-}
-
 // -----------------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
@@ -4358,6 +4345,9 @@ var selected_server_timezone = function (timezone, status) {
 var netdataCallback = initializeDynamicDashboard;
 
 // =================================================================================================
+// netdata.cloud
+
+const hubBaseURL = "http://localhost:8080";
 
 function getURLParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
@@ -4366,13 +4356,27 @@ function getURLParameter(name) {
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
 }
 
-function renderClaimUI() {
-    const container = document.getElementById("claim-ui");
-    const account = localStorage.getItem("hub.accountName");
-    if (account) {
-        container.innerHTML = account;
+function claimButtonDidClick() {
+    window.open(
+        hubBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
+        "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
+        encodeURIComponent(NETDATA.serverDefault), 
+        "_blank"
+    );
+}
+
+function signOut() {
+    localStorage.removeItem("hub.accountName");
+    renderAccountUI();
+}
+
+function renderAccountUI() {
+    const container = document.getElementById("account-ui");
+    const accountName = localStorage.getItem("hub.accountName");
+    if (accountName) {
+        container.innerHTML = `${accountName} &nbsp; <button onclick="signOut();">Sign Out</button>`;
     } else {
-        container.innerHTML = '<button onclick="claimButtonDidClick();">Claim</button>';
+        container.innerHTML = '<button onclick="claimButtonDidClick();">Sign In</button>';
     }
 }
 
@@ -4384,7 +4388,7 @@ function initUI() {
         history.pushState(null, "", `/${window.location.hash}`);
     }
 
-    renderClaimUI();
+    renderAccountUI();
 }
 
 if (document.readyState === "complete") {
