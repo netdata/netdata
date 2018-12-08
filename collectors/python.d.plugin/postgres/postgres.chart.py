@@ -118,14 +118,14 @@ METRICS = {
     ]
 }
 
+NO_VERSION = 0
+DEFAULT = 'DEFAULT'
+V10 = 'V10'
+V11 = 'V11'
 
-def wal_query(version):
-    if version == NO_VERSION:
-        raise ValueError("wal query wrong server version")
 
-    wal = 'wal' if version >= 100000 else 'xlog'
-    lsn = 'lsn' if version >= 100000 else 'location'
-    return """
+QUERY_WAL = {
+    DEFAULT: """
 SELECT
     count(*) as total_wal,
     count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
@@ -133,44 +133,75 @@ SELECT
 FROM
     (SELECT
         wal.name,
-        pg_{0}file_name(
+        pg_xlogfile_name(
           CASE pg_is_in_recovery()
             WHEN true THEN NULL
-            ELSE pg_current_{0}_{1}()
+            ELSE pg_current_xlog_location()
           END ),
         CASE
-          WHEN wal.name > pg_{0}file_name(
+          WHEN wal.name > pg_xlogfile_name(
             CASE pg_is_in_recovery()
               WHEN true THEN NULL
-              ELSE pg_current_{0}_{1}()
+              ELSE pg_current_xlog_location()
             END ) THEN 'recycled'
           ELSE 'written'
         END AS type
-    FROM pg_catalog.pg_ls_dir('pg_{0}') AS wal(name)
+    FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
     WHERE name ~ '^[0-9A-F]{{24}}$'
     ORDER BY
-        (pg_stat_file('pg_{0}/'||name)).modification,
+        (pg_stat_file('pg_xlog/'||name)).modification,
         wal.name DESC) sub;
-""".format(wal, lsn)
+""",
+    V10: """
+SELECT
+    count(*) as total_wal,
+    count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
+    count(*) FILTER (WHERE type = 'written') AS written_wal
+FROM
+    (SELECT
+        wal.name,
+        pg_walfile_name(
+          CASE pg_is_in_recovery()
+            WHEN true THEN NULL
+            ELSE pg_current_wal_lsn()
+          END ),
+        CASE
+          WHEN wal.name > pg_walfile_name(
+            CASE pg_is_in_recovery()
+              WHEN true THEN NULL
+              ELSE pg_current_wal_lsn()
+            END ) THEN 'recycled'
+          ELSE 'written'
+        END AS type
+    FROM pg_catalog.pg_ls_dir('pg_wal') AS wal(name)
+    WHERE name ~ '^[0-9A-F]{{24}}$'
+    ORDER BY
+        (pg_stat_file('pg_wal/'||name)).modification,
+        wal.name DESC) sub;
+""",
+}
 
-
-def archive_query(version):
-    if version == NO_VERSION:
-        raise ValueError("archive query wrong server version")
-
-    wal = 'wal' if version >= 100000 else 'xlog'
-    return """
+QUERY_ARCHIVE = {
+    DEFAULT: """
 SELECT
     CAST(COUNT(*) AS INT) AS file_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)),0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)),0) AS INT) AS done_count
 FROM
-    pg_catalog.pg_ls_dir('pg_{0}/archive_status') AS archive_files (archive_file);
-""".format(wal)
+    pg_catalog.pg_ls_dir('pg_xlog/archive_status') AS archive_files (archive_file);
+""",
+    V10: """
+SELECT
+    CAST(COUNT(*) AS INT) AS file_count,
+    CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)),0) AS INT) AS ready_count,
+    CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)),0) AS INT) AS done_count
+FROM
+    pg_catalog.pg_ls_dir('pg_wal/archive_status') AS archive_files (archive_file);
+""",
+}
 
-
-def backend_query():
-        return """
+QUERY_BACKEND = {
+    DEFAULT: """
 SELECT
     count(*) - (SELECT  count(*)
                 FROM pg_stat_activity
@@ -181,31 +212,31 @@ SELECT
      WHERE state = 'idle')
       AS backends_idle
 FROM pg_stat_activity;
-"""
+""",
+}
 
-
-def table_stats_query():
-        return """
+QUERY_TABLE_STATS = {
+    DEFAULT: """
 SELECT
     ((sum(relpages) * 8) * 1024) AS table_size,
     count(1)                     AS table_count
 FROM pg_class
 WHERE relkind IN ('r', 't');
-"""
+""",
+}
 
-
-def index_stats_query():
-        return """
+QUERY_INDEX_STATS = {
+    DEFAULT: """
 SELECT
     ((sum(relpages) * 8) * 1024) AS index_size,
     count(1)                     AS index_count
 FROM pg_class
 WHERE relkind = 'i';
-"""
+""",
+}
 
-
-def database_query():
-        return """
+QUERY_DATABASE = {
+    DEFAULT: """
 SELECT
     datname AS database_name,
     numbackends AS connections,
@@ -224,11 +255,11 @@ SELECT
     temp_bytes AS temp_bytes
 FROM pg_stat_database
 WHERE datname IN %(databases)s ;
-"""
+""",
+}
 
-
-def bgwriter_query():
-        return """
+QUERY_BGWRITER = {
+    DEFAULT: """
 SELECT
     checkpoints_timed AS checkpoint_scheduled,
     checkpoints_req AS checkpoint_requested,
@@ -239,11 +270,11 @@ SELECT
     buffers_alloc * current_setting('block_size')::numeric buffers_alloc,
     buffers_backend_fsync
 FROM pg_stat_bgwriter;
-"""
+""",
+}
 
-
-def locks_query():
-        return """
+QUERY_LOCKS = {
+    DEFAULT: """
 SELECT
     pg_database.datname as database_name,
     mode,
@@ -253,11 +284,11 @@ INNER JOIN pg_database
     ON pg_database.oid = pg_locks.database
 GROUP BY datname, mode
 ORDER BY datname, mode;
-"""
+""",
+}
 
-
-def databases_query():
-    return """
+QUERY_DATABASES = {
+    DEFAULT: """
 SELECT
     datname
 FROM pg_stat_database
@@ -265,76 +296,94 @@ WHERE
     has_database_privilege(
       (SELECT current_user), datname, 'connect')
     AND NOT datname ~* '^template\d ';
-"""
+""",
+}
 
-
-def standby_query():
-    return """
+QUERY_STANDBY = {
+    DEFAULT: """
 SELECT
     application_name
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL
 GROUP BY application_name;
-"""
+""",
+}
 
-
-def replication_slot_query():
-    return """
+QUERY_REPLICATION_SLOT = {
+    DEFAULT: """
 SELECT slot_name
 FROM pg_replication_slots;
 """
+}
 
-
-def standby_delta_query(version):
-    if version == NO_VERSION:
-        raise ValueError("standby delta query wrong server version")
-
-    wal = 'wal' if version >= 100000 else 'xlog'
-    lsn = 'lsn' if version >= 100000 else 'location'
-    return """
+QUERY_STANDBY_DELTA = {
+    DEFAULT: """
 SELECT
     application_name,
-    pg_{0}_{1}_diff(
+    pg_xlog_location_diff(
       CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_{0}_receive_{1}()
-        ELSE pg_current_{0}_{1}()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
-    sent_{1}) AS sent_delta,
-    pg_{0}_{1}_diff(
+    sent_location) AS sent_delta,
+    pg_xlog_location_diff(
       CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_{0}_receive_{1}()
-        ELSE pg_current_{0}_{1}()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
-    write_{1}) AS write_delta,
-    pg_{0}_{1}_diff(
+    write_location) AS write_delta,
+    pg_xlog_location_diff(
       CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_{0}_receive_{1}()
-        ELSE pg_current_{0}_{1}()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
-    flush_{1}) AS flush_delta,
-    pg_{0}_{1}_diff(
+    flush_location) AS flush_delta,
+    pg_xlog_location_diff(
       CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_{0}_receive_{1}()
-        ELSE pg_current_{0}_{1}()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
-    replay_{1}) AS replay_delta
+    replay_location) AS replay_delta
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
-""".format(wal, lsn)
+""",
+    V10: """
+SELECT
+    application_name,
+    pg_wal_lsn_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_wal_receive_lsn()
+        ELSE pg_current_wal_lsn()
+      END,
+    sent_lsn) AS sent_delta,
+    pg_wal_lsn_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_wal_receive_lsn()
+        ELSE pg_current_wal_lsn()
+      END,
+    write_lsn) AS write_delta,
+    pg_wal_lsn_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_wal_receive_lsn()
+        ELSE pg_current_wal_lsn()
+      END,
+    flush_lsn) AS flush_delta,
+    pg_wal_lsn_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_wal_receive_lsn()
+        ELSE pg_current_wal_lsn()
+      END,
+    replay_lsn) AS replay_delta
+FROM pg_stat_replication
+WHERE application_name IS NOT NULL;
+""",
+}
 
-
-def repslot_files_query(version):
-    if version == NO_VERSION:
-        raise ValueError("repslot files query wrong server version")
-
-    if version >= 110000:
-        val = "current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val"
-    else:
-        val = 'setting AS val'
-    return """
+QUERY_REPSLOT_FILES = {
+    DEFAULT: """
 WITH wal_size AS (
   SELECT
-    {0}
+    setting AS val
   FROM pg_settings
   WHERE name = 'wal_segment_size'
   )
@@ -369,23 +418,62 @@ GROUP BY
     slot_name,
     slot_type,
     replslot_wal_keep;
-""".format(val)
+""",
+    V11: """
+WITH wal_size AS (
+  SELECT
+    current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val
+  FROM pg_settings
+  WHERE name = 'wal_segment_size'
+  )
+SELECT
+    slot_name,
+    slot_type,
+    replslot_wal_keep,
+    count(slot_file) AS replslot_files
+FROM
+    (SELECT
+        slot.slot_name,
+        CASE
+            WHEN slot_file <> 'state' THEN 1
+        END AS slot_file ,
+        slot_type,
+        COALESCE (
+          floor(
+            (pg_wal_lsn_diff(pg_current_wal_lsn (),slot.restart_lsn)
+             - (pg_walfile_name_offset (restart_lsn)).file_offset) / (s.val)
+          ),0) AS replslot_wal_keep
+    FROM pg_replication_slots slot
+    LEFT JOIN (
+        SELECT
+            slot2.slot_name,
+            pg_ls_dir('pg_replslot/' || slot2.slot_name) AS slot_file
+        FROM pg_replication_slots slot2
+        ) files (slot_name, slot_file)
+        ON slot.slot_name = files.slot_name
+    CROSS JOIN wal_size s
+    ) AS d
+GROUP BY
+    slot_name,
+    slot_type,
+    replslot_wal_keep;
+""",
+}
 
-
-def is_superuser_query():
-    return """
+QUERY_SUPERUSER = {
+    DEFAULT: """
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
-"""
+""",
+}
 
-
-def server_version_query():
-    return """
+QUERY_SHOW_VERSION = {
+    DEFAULT: """
 SHOW server_version_num;
-"""
+""",
+}
 
-
-def autovacuum_query():
-    return """
+QUERY_AUTOVACUUM = {
+    DEFAULT: """
 SELECT
     count(*) FILTER (WHERE query LIKE 'autovacuum: ANALYZE%%') AS analyze,
     count(*) FILTER (WHERE query LIKE 'autovacuum: VACUUM ANALYZE%%') AS vacuum_analyze,
@@ -396,64 +484,76 @@ SELECT
     count(*) FILTER (WHERE query LIKE 'autovacuum: BRIN summarize%%') AS brin_summarize
 FROM pg_stat_activity
 WHERE query NOT LIKE '%%pg_stat_activity%%';
-"""
+""",
+}
 
-
-def diff_lsn_query(version):
-    if version == NO_VERSION:
-        raise ValueError("diff lsn wrong server version")
-
-    wal = 'wal' if version >= 100000 else 'xlog'
-    lsn = 'lsn' if version >= 100000 else 'location'
-    return """
+QUERY_DIFF_LSN = {
+    DEFAULT: """
 SELECT
-    pg_{0}_{1}_diff(
+    pg_xlog_location_diff(
       CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_{0}_receive_{1}()
-        ELSE pg_current_{0}_{1}()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
     '0/0') as wal_writes ;
-""".format(wal, lsn)
-
-
-NO_VERSION = 0
+""",
+    V10: """
+SELECT
+    pg_wal_lsn_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_wal_receive_lsn()
+        ELSE pg_current_wal_lsn()
+      END,
+    '0/0') as wal_writes ;
+""",
+}
 
 
 def query_factory(name, version=NO_VERSION):
-    if name == WAL:
-        return wal_query(version)
-    elif name == ARCHIVE:
-        return archive_query(version)
-    elif name == BACKENDS:
-        return backend_query()
+    if name == BACKENDS:
+        return QUERY_BACKEND[DEFAULT]
     elif name == TABLE_STATS:
-        return table_stats_query()
+        return QUERY_TABLE_STATS[DEFAULT]
     elif name == INDEX_STATS:
-        return index_stats_query()
+        return QUERY_INDEX_STATS[DEFAULT]
     elif name == DATABASE:
-        return database_query()
+        return QUERY_DATABASE[DEFAULT]
     elif name == BGWRITER:
-        return bgwriter_query()
+        return QUERY_BGWRITER[DEFAULT]
     elif name == LOCKS:
-        return locks_query()
+        return QUERY_LOCKS[DEFAULT]
     elif name == DATABASES:
-        return databases_query()
+        return QUERY_DATABASES[DEFAULT]
     elif name == STANDBY:
-        return standby_query()
+        return QUERY_STANDBY[DEFAULT]
     elif name == REPLICATION_SLOT:
-        return replication_slot_query()
-    elif name == STANDBY_DELTA:
-        return standby_delta_query(version)
-    elif name == REPSLOT_FILES:
-        return repslot_files_query(version)
+        return QUERY_REPLICATION_SLOT[DEFAULT]
     elif name == IF_SUPERUSER:
-        return is_superuser_query()
+        return QUERY_SUPERUSER[DEFAULT]
     elif name == SERVER_VERSION:
-        return server_version_query()
+        return QUERY_SHOW_VERSION[DEFAULT]
     elif name == AUTOVACUUM:
-        return autovacuum_query()
+        return QUERY_AUTOVACUUM[DEFAULT]
+    elif name == WAL:
+        if version >= 100000:
+            return QUERY_WAL[V10]
+        return QUERY_WAL[DEFAULT]
+    elif name == ARCHIVE:
+        if version >= 100000:
+            return QUERY_ARCHIVE[V10]
+        return QUERY_ARCHIVE[DEFAULT]
+    elif name == STANDBY_DELTA:
+        if version >= 100000:
+            return QUERY_STANDBY_DELTA[V10]
+        return QUERY_STANDBY_DELTA[DEFAULT]
+    elif name == REPSLOT_FILES:
+        if version >= 110000:
+            return QUERY_REPSLOT_FILES[V11]
+        return QUERY_REPSLOT_FILES[DEFAULT]
     elif name == DIFF_LSN:
-        return diff_lsn_query(version)
+        if version >= 100000:
+            return QUERY_DIFF_LSN[V10]
+        return QUERY_DIFF_LSN[DEFAULT]
 
     raise ValueError('unknown query')
 
