@@ -315,7 +315,8 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
 
             size_t core = str2ul(&row_key[3]);
             if(unlikely(core >= cores_found)) {
-                error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
+                // Temporary workaround for issue 3945
+                // error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
                 return 1;
             }
             cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7)) / 1000;
