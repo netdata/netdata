@@ -13,6 +13,7 @@
 
 **Merged pull requests:**
 
+- Temporary workaround for \#4945 [\#4951](https://github.com/netdata/netdata/pull/4951) ([cakrit](https://github.com/cakrit))
 - Show demosite/host in GA for demo sites [\#4947](https://github.com/netdata/netdata/pull/4947) ([cakrit](https://github.com/cakrit))
 - Update GA in demosites.html [\#4946](https://github.com/netdata/netdata/pull/4946) ([cakrit](https://github.com/cakrit))
 - Add doc before path to GA in static site [\#4940](https://github.com/netdata/netdata/pull/4940) ([cakrit](https://github.com/cakrit))
