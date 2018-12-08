@@ -93,7 +93,11 @@ update() {
 			failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
 		fi
 
-		info "Stashing local git changes. You can use $(git stash pop) to reapply your changes."
+		popmsg="$(git stash pop 2>&1)"
+		if [ $? -eq 0 ] ; then 
+			info "Stashing local git changes. You can use ${popmsg} to reapply your changes."
+		fi
+
 		git stash 2>&3 >&3
 		git fetch --all 2>&3 >&3
 		git fetch --tags 2>&3 >&3
