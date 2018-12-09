@@ -269,7 +269,8 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/sys_kernel_mm_ksm.c \
 	collectors/proc.plugin/sys_devices_system_edac_mc.c \
 	collectors/proc.plugin/sys_devices_system_node.c \
-	collectors/proc.plugin/sys_fs_btrfs.c \
+    collectors/proc.plugin/sys_fs_btrfs.c \
+	collectors/proc.plugin/sys_class_power_supply.c \
     $(NULL)
 
 TC_PLUGIN_FILES = \

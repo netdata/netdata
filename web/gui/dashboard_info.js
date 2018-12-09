@@ -436,7 +436,7 @@ netdataDashboard.menu = {
         info: undefined
     },
 
-    'linux_power_supply': {
+    'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
         info: 'Statistics for the various system power supplies.'
