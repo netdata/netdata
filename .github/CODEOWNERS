@@ -21,9 +21,9 @@ collectors/python.d.plugin/ @ilyam8
 daemon/ @ktsaou @vlvkobal
 database/ @ktsaou @mfundul
 docs/ @cakrit
-health/ @ktsaou @mfundul
+health/ @ktsaou @cakrit
 health/health.d/ @ktsaou @cakrit
-health/notifications/ @ktsaou @Ferroin
+health/notifications/ @ktsaou @Ferroin @cakrit
 installer/ @ktsaou @paulfantom @cakrit
 libnetdata/ @ktsaou @vlvkobal
 makeself/ @ktsaou @paulfantom
