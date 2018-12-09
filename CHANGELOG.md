@@ -10,12 +10,17 @@
 
 - Improve configuration documentation [\#4781](https://github.com/netdata/netdata/issues/4781)
 - Python.d.plugin infinite retries, ignore penalty, and plotting 'None' [\#4756](https://github.com/netdata/netdata/issues/4756)
+- FQDN in alert sending [\#2477](https://github.com/netdata/netdata/issues/2477)
+- netdata dead but pid file exists [\#2266](https://github.com/netdata/netdata/issues/2266)
 
 **Merged pull requests:**
 
+- Add cakrit to health codeowners [\#4953](https://github.com/netdata/netdata/pull/4953) ([cakrit](https://github.com/cakrit))
 - Temporary workaround for \#4945 [\#4951](https://github.com/netdata/netdata/pull/4951) ([cakrit](https://github.com/cakrit))
 - Show demosite/host in GA for demo sites [\#4947](https://github.com/netdata/netdata/pull/4947) ([cakrit](https://github.com/cakrit))
 - Update GA in demosites.html [\#4946](https://github.com/netdata/netdata/pull/4946) ([cakrit](https://github.com/cakrit))
+- Add support for providing FQDN in alarm notifications. [\#4943](https://github.com/netdata/netdata/pull/4943) ([Ferroin](https://github.com/Ferroin))
+- Add header to SMA webbox readme [\#4942](https://github.com/netdata/netdata/pull/4942) ([cakrit](https://github.com/cakrit))
 - Add doc before path to GA in static site [\#4940](https://github.com/netdata/netdata/pull/4940) ([cakrit](https://github.com/cakrit))
 - Add a Google Analytics tag to every markdown [\#4938](https://github.com/netdata/netdata/pull/4938) ([cakrit](https://github.com/cakrit))
 - Update README.md [\#4937](https://github.com/netdata/netdata/pull/4937) ([cakrit](https://github.com/cakrit))
