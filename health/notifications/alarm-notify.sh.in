@@ -198,7 +198,7 @@ if [ ${1} = "unittest" ] ; then
     old_status="${5}"          # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 else
     roles="${1}"               # the roles that should be notified for this event
-    host="${2}"                # the host generated this event
+    args_host="${2}"                # the host generated this event
     unique_id="${3}"           # the unique id of this event
     alarm_id="${4}"            # the unique id of the alarm that generated this event
     event_id="${5}"            # the incremental id of the event, for this alarm id
@@ -222,8 +222,14 @@ fi
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
 
-this_host=$(hostname -s 2>/dev/null)
-[ -z "${host}" ] && host="${this_host}"
+if [ -z ${args_host} ]
+    then
+    this_host=$(hostname -s 2>/dev/null)
+    host="${this_host}"
+    args_host="${this_host}"
+else
+    host="${args_host}"
+fi
 
 # -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
@@ -253,6 +259,9 @@ images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
 curl_options=""
+
+# hostname handling
+use_fqdn="NO"
 
 # needed commands
 # if empty they will be searched in the system path
@@ -372,6 +381,14 @@ fi
 if [ -z ${EMAIL_CHARSET} ]
     then
     EMAIL_CHARSET="UTF-8"
+fi
+
+# If we've been asked to use FQDN's for the URL's in the alarm, do so,
+# unless we're sending an alarm for a slave system which we can't get the
+# FQDN of easily.
+if [ "${use_fqdn}" = "YES" -a "${host}" = "$(hostname -s 2>/dev/null)" ]
+    then
+    host="$(hostname -f 2>/dev/null)"
 fi
 
 # -----------------------------------------------------------------------------
@@ -1277,7 +1294,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "by <${goto_url}|${this_host}>",
+                    "footer": "by <${goto_url}|${host}>",
                     "ts": ${when}
                 }
             ]
@@ -1410,7 +1427,7 @@ send_alerta() {
                 "source": "${src}",
                 "moreInfo": "<a href=\"${goto_url}\">View Netdata</a>"
             },
-            "origin": "netdata/${this_host}",
+            "origin": "netdata/${host}",
             "type": "netdataAlarm",
             "rawData": "${BASH_ARGV[@]}"
         }
@@ -1536,7 +1553,7 @@ send_discord() {
                     ],
                     "thumb_url": "${image}",
                     "footer_icon": "${images_base_url}/images/banner-icon-144x144.png",
-                    "footer": "${this_host}",
+                    "footer": "${host}",
                     "ts": ${when}
                 }
             ]
@@ -1734,7 +1751,7 @@ send_syslog() {
 # prepare the content of the notification
 
 # the url to send the user on click
-urlencode "${host}" >/dev/null; url_host="${REPLY}"
+urlencode "${args_host}" >/dev/null; url_host="${REPLY}"
 urlencode "${chart}" >/dev/null; url_chart="${REPLY}"
 urlencode "${family}" >/dev/null; url_family="${REPLY}"
 urlencode "${name}" >/dev/null; url_name="${REPLY}"
@@ -2055,7 +2072,7 @@ Severity: ${severity}
 URL     : ${goto_url}
 Source  : ${src}
 Date    : ${date}
-Notification generated on ${this_host}
+Notification generated on ${host}
 
 --multipart-boundary
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
@@ -2128,7 +2145,7 @@ Content-Transfer-Encoding: 8bit
                                     </tr>
                                     <tr style="text-align: center; margin: 0; padding: 0;">
                                         <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; vertical-align: top; margin:0; padding: 20px 0 0 0; color: #666666; border-top: 1px solid #f0f0f0;" align="center" valign="bottom">Sent by
-                                            <a href="https://mynetdata.io/" target="_blank">netdata</a>, the real-time performance and health monitoring, on <code>${this_host}</code>.
+                                            <a href="https://mynetdata.io/" target="_blank">netdata</a>, the real-time performance and health monitoring, on <code>${host}</code>.
                                         </td>
                                     </tr>
                                     </tbody>
