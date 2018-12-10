@@ -18,12 +18,26 @@ NETDATA.unitsConversion = {
             'Kpps': 1000,
             'Mpps': 1000000
         },
+        'bits/s': {
+            'bits/s': 1,
+            'kilobits/s': 1000,
+            'megabits/s': 1000000,
+            'gigabits/s': 1000000000,
+            'terabits/s': 1000000000000
+        },
         'kilobits/s': {
             'bits/s': 1 / 1000,
             'kilobits/s': 1,
             'megabits/s': 1000,
             'gigabits/s': 1000000,
             'terabits/s': 1000000000
+        },
+        'bytes/s': {
+            'bytes/s': 1,
+            'kilobytes/s': 1024,
+            'megabytes/s': 1024 * 1024,
+            'gigabytes/s': 1024 * 1024 * 1024,
+            'terabytes/s': 1024 * 1024 * 1024 * 1024
         },
         'kilobytes/s': {
             'bytes/s': 1 / 1024,
@@ -38,6 +52,14 @@ NETDATA.unitsConversion = {
             'MB/s': 1024,
             'GB/s': 1024 * 1024,
             'TB/s': 1024 * 1024 * 1024
+        },
+        'bytes': {
+            'B': 1,
+            'KB': 1024,
+            'MB': 1024 * 1024,
+            'GB': 1024 * 1024 * 1024,
+            'TB': 1024 * 1024 * 1024 * 1024,
+            'PB': 1024 * 1024 * 1024 * 1024 * 1024
         },
         'B': {
             'B': 1,
