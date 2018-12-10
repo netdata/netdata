@@ -43,15 +43,37 @@ struct power_supply {
 
     int properties_num;
     struct ps_property *properties;
+
+    struct power_supply *next;
 };
+
+static struct power_supply *power_supply_root = NULL;
+
+void power_supply_free(struct power_supply *ps) {
+    if(ps) {
+        if(ps->capacity) {
+            if(ps->capacity->st) rrdset_is_obsolete(ps->capacity->st);
+            freez(ps->capacity->filename);
+            freez(ps->capacity);
+        }
+        freez(ps->name);
+
+        if(ps == power_supply_root) {
+            power_supply_root = ps->next;
+        }
+        else {
+            struct power_supply *last;
+            for(last = power_supply_root; last && last->next != ps; last = last->next);
+            last->next = ps->next; // TODO: Fatal if last == NULL;
+        }
+        freez(ps);
+    }
+}
 
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
     static int do_capacity = -1, do_charge = -1, do_energy = -1, do_voltage = -1;
     static char *dirname = NULL;
-    static struct power_supply *power_supplies = NULL;
-    static size_t ps_allocated = 0;
-    size_t ps_idx = 0;
 
     if(unlikely(do_capacity == -1)) {
         do_capacity = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
@@ -81,45 +103,39 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
         if(likely(de->d_type == DT_DIR)) {
             uint32_t hash = simple_hash(de->d_name);
-            int found = 0;
 
-            for(ps_idx = 0; ps_idx < ps_allocated; ps_idx++) {
-                if(unlikely(power_supplies[ps_idx].hash == hash && !strcmp(power_supplies[ps_idx].name, de->d_name))){
-                    found = 1;
+            struct power_supply *ps;
+            for(ps = power_supply_root; ps; ps = ps->next) {
+                if(unlikely(ps->hash == hash && !strcmp(ps->name, de->d_name))) {
+                    ps->found = 1;
                     break;
                 }
             }
 
-            // allocate more memory and initialize it if needed
-            if(unlikely(!found)) {
-                ps_idx = ps_allocated++;
-                power_supplies = reallocz(power_supplies, sizeof(struct power_supply) * ps_allocated);
-                struct power_supply *ps = &power_supplies[ps_idx];
-                memset(ps, 0, sizeof(struct power_supply));
+            // allocate memory and initialize it if needed
+            if(unlikely(!ps)) {
+                ps = callocz(sizeof(struct power_supply), 1);
                 ps->name = strdupz(de->d_name);
                 ps->hash = simple_hash(de->d_name);
                 ps->found = 1;
+                ps->next = power_supply_root;
+                power_supply_root = ps;
 
                 struct stat stbuf;
                 if(likely(do_capacity != CONFIG_BOOLEAN_NO)) {
                     char filename[FILENAME_MAX + 1];
                     snprintfz(filename, FILENAME_MAX, "%s/%s/%s", dirname, de->d_name, "capacity");
                     if (stat(filename, &stbuf) == 0) {
-                        ps->capacity = mallocz(sizeof(struct power_supply));
-                        memset(ps->capacity, 0, sizeof(struct capacity));
+                        ps->capacity = callocz(sizeof(struct capacity), 1);
                         ps->capacity->filename = strdupz(filename);
                     }
                 }
             }
+
             // TODO: keep files open
-            struct power_supply *ps = &power_supplies[ps_idx];
             if(unlikely(read_single_number_file(ps->capacity->filename, &ps->capacity->value))) {
                 error("Cannot read file '%s'", ps->capacity->filename);
-                if(likely(ps->capacity->st))
-                    rrdset_is_obsolete(ps->capacity->st);
-                freez(ps->capacity->filename);
-                freez(ps->capacity);
-                ps->found = 0;
+                power_supply_free(ps);
             }
         }
     }
@@ -128,36 +144,45 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    for(ps_idx = 0; ps_idx < ps_allocated; ps_idx++) {
-        struct power_supply *ps = &power_supplies[ps_idx];
-
-        if(unlikely(!ps->capacity->st)) {
-            char id[50 + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_capacity", ps->name);
-
-            ps->capacity->st = rrdset_create_localhost(
-                    "powersupply"
-                    , id
-                    , NULL
-                    , ps->name
-                    , NULL
-                    , "Capacity"
-                    , "percentage"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
-                    , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
+    struct power_supply *ps = power_supply_root;
+    while(ps) {
+        if(!ps->found) {
+            struct power_supply *f = ps;
+            ps = ps->next;
+            power_supply_free(f);
+            continue;
         }
-        else
-            rrdset_next(ps->capacity->st);
 
-        if(!ps->capacity->rd) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if(ps->capacity) {
+            if(unlikely(!ps->capacity->st)) {
+                char id[50 + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_capacity", ps->name);
 
-        rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
+                ps->capacity->st = rrdset_create_localhost(
+                        "powersupply"
+                        , id
+                        , NULL
+                        , ps->name
+                        , NULL
+                        , "Capacity"
+                        , "percentage"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
+                        , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+            }
+            else
+                rrdset_next(ps->capacity->st);
 
-        rrdset_done(ps->capacity->st);
+            if(!ps->capacity->rd) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
+
+            rrdset_done(ps->capacity->st);
+            ps->found = 0;
+            ps = ps->next;
+        }
     }
 
     return 0;
