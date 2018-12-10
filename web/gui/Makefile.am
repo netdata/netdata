@@ -118,6 +118,7 @@ dist_webfonts_DATA = \
 
 webimagesdir=$(webdir)/images
 dist_webimages_DATA = \
+	images/netdata-logomark.svg \
 	images/alert-128-orange.png \
 	images/alert-128-red.png \
 	images/alert-multi-size-orange.ico \

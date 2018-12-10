@@ -18,6 +18,7 @@ RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'END\n'
 
 PENALTY_EVERY = 5
+MAX_PENALTY = 10 * 60  # 10 minutes
 
 
 class RuntimeCounters:
@@ -26,7 +27,7 @@ class RuntimeCounters:
         :param configuration: <dict>
         """
         self.update_every = int(configuration.pop('update_every'))
-        self.max_retries = int(configuration.pop('retries'))
+        self.do_penalty = configuration.pop('penalty')
 
         self.start_mono = 0
         self.start_real = 0
@@ -34,6 +35,7 @@ class RuntimeCounters:
         self.penalty = 0
         self.elapsed = 0
         self.prev_update = 0
+
         self.runs = 1
 
     def calc_next(self):
@@ -49,10 +51,8 @@ class RuntimeCounters:
 
     def handle_retries(self):
         self.retries += 1
-        if self.retries % PENALTY_EVERY:
-            return True
-        self.penalty = self.retries * self.update_every / 2
-        return self.retries < self.max_retries
+        if self.do_penalty and self.retries % PENALTY_EVERY == 0:
+            self.penalty = round(min(self.retries * self.update_every / 2, MAX_PENALTY))
 
 
 class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, object):
@@ -180,10 +180,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :return: None
         """
         job = self._runtime_counters
-        self.debug('started, update frequency: {freq}, retries: {retries}'.format(
-            freq=job.update_every,
-            retries=job.max_retries - job.retries),
-        )
+        self.debug('started, update frequency: {freq}'.format(freq=job.update_every))
 
         while True:
             job.sleep_until_next()
@@ -201,8 +198,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             job.runs += 1
 
             if not updated:
-                if not job.handle_retries():
-                    return
+                job.handle_retries()
             else:
                 job.elapsed = int((monotonic() - job.start_mono) * 1e3)
                 job.prev_update = job.start_real
@@ -210,10 +206,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=since,
                                                        elapsed=job.elapsed))
-            self.debug('update => [{status}] (elapsed time: {elapsed}, '
-                       'retries left: {retries})'.format(status='OK' if updated else 'FAILED',
-                                                         elapsed=job.elapsed if updated else '-',
-                                                         retries=job.max_retries - job.retries))
+            self.debug('update => [{status}] (elapsed time: {elapsed}, failed retries in a row: {retries})'.format(
+                status='OK' if updated else 'FAILED',
+                elapsed=job.elapsed if updated else '-',
+                retries=job.retries))
 
     def update(self, interval):
         """

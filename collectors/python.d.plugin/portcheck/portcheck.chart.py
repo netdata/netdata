@@ -14,7 +14,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 priority = 60000
-retries = 60
 
 PORT_LATENCY = 'connect'
 

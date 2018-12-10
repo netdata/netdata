@@ -75,7 +75,9 @@ dist_noinst_DATA= \
 	docs/netdata-security.md \
 	docs/Why-Netdata.md \
 	docs/GettingStarted.md \
-	docs/generator/themes/material/partials/footer.html \
+	docs/Charts.md \
+	docs/configuration-guide.md \
+	docs/generator/custom \
 	installer/README.md \
 	installer/UNINSTALL.md \
 	installer/UPDATE.md \
@@ -237,6 +239,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/plugin_proc.c \
 	collectors/proc.plugin/plugin_proc.h \
 	collectors/proc.plugin/proc_diskstats.c \
+	collectors/proc.plugin/proc_mdstat.c \
 	collectors/proc.plugin/proc_interrupts.c \
 	collectors/proc.plugin/proc_softirqs.c \
 	collectors/proc.plugin/proc_loadavg.c \

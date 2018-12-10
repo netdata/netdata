@@ -169,7 +169,6 @@ and its base `UrlService` class. These are:
 
     update_every: 1          # the job's data collection frequency
     priority:     60000      # the job's order on the dashboard
-    retries:      60         # the job's number of restoration attempts
     user:         admin      # use when the expvar endpoint is protected by HTTP Basic Auth
     password:     sekret     # use when the expvar endpoint is protected by HTTP Basic Auth
 
@@ -274,3 +273,5 @@ The images below show how do the final charts in netdata look.
 
 ![Custom charts](https://cloud.githubusercontent.com/assets/15180106/26762051/62ae915e-493b-11e7-8518-bd25a3886650.png)
 
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fgo_expvar%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

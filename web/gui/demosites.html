@@ -1269,7 +1269,7 @@ p {
             t.GoogleAnalyticsObject = n, t[n] || (t[n] = function () {
                 (t[n].q = t[n].q || []).push(arguments)
             }), t[n].l = +new Date, o = e.createElement(a), i = e.getElementsByTagName(a)[0], o.src = "//www.google-analytics.com/analytics.js", i.parentNode.insertBefore(o, i)
-        }(t, r, "script", "ga"), ga("create", "UA-64295674-3", "auto"), ga("send", "pageview"), t.document.addEventListener("click", n)
+        }(t, r, "script", "ga"), ga("create", "UA-64295674-3", "auto"), ga("send", "pageview", "/site"+window.location.pathname), t.document.addEventListener("click", n)
     }
 
     function i() {

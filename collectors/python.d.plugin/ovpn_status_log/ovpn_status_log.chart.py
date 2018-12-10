@@ -8,7 +8,6 @@ from re import compile as r_compile
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
-retries = 60
 update_every = 10
 
 ORDER = ['users', 'traffic']

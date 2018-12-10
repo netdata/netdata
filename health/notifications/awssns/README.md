@@ -29,3 +29,5 @@ Notes:
    * Netdata's native email notification support is far better in almost all respects than it's support through Amazon SNS.  If you want email notifications, use the native support, not SNS.
     * If you need to change the notification format for SNS notifications, you can do so by specifying the format in `AWSSNS_MESSAGE_FORMAT` in the configuration.  This variable supports all the same vairiables you can use in custom notifications.
     * While Amazon SNS supports sending differently formatted messages for different delivery methods, netdata does not currently support this functionality.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fawssns%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

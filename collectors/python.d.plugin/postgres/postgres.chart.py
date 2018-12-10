@@ -19,7 +19,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 # default module values
 update_every = 1
 priority = 60000
-retries = 60
 
 METRICS = {
     'DATABASE': [
@@ -703,7 +702,8 @@ class Service(SimpleService):
                     if row[metric] is not None:
                         self.data[dimension_id] = int(row[metric])
                 elif 'locks_count' in row:
-                    self.data[dimension_id] = row['locks_count'] if metric == row['mode'] else 0
+                    if metric == row['mode']:
+                        self.data[dimension_id] = row['locks_count']
 
 
 def discover_databases_(cursor, query):

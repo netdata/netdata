@@ -512,7 +512,7 @@ function renderStreamedHosts(options) {
         return naturalSortCompare(a.hostname, b.hostname);
     });
 
-    for (const s of sorted) {
+    for (var s of sorted) {
         let url, icon;
         const hostname = s.hostname;
 
@@ -560,7 +560,7 @@ function renderMachines(machinesArray) {
             return naturalSortCompare(a.name, b.name);
         });
 
-        for (const machine of machines) {
+        for (var machine of machines) {
             found = true;
 
             const alternateUrlItems = (
@@ -625,7 +625,7 @@ function renderMachines(machinesArray) {
 
         ]
 
-        for (const server of demoServers) {
+        for (var server of demoServers) {
             html += (
                 `<div class="agent-item">
                     <i class="fas fa-chart-bar" color: #fff"></i>
@@ -1698,7 +1698,7 @@ function renderChartsAndMenu(data) {
 
     // propagate the descriptive subname given to QoS
     // to all the other submenus with the same name
-    for (m in menus) {
+    for (var m in menus) {
         if (!menus.hasOwnProperty(m)) {
             continue;
         }
@@ -4211,7 +4211,7 @@ function finalizePage() {
             })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
             ga('create', 'UA-64295674-3', 'auto');
-            ga('send', 'pageview');
+            ga('send', 'pageview', '/demosite/' + window.location.host);
         }, 2000);
     } else {
         notifyForUpdate();

@@ -56,7 +56,7 @@ NETDATA.commonMin = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] < m) m = t[i];
         // }
-        for (const ti of Object.values(t)) {
+        for (var ti of Object.values(t)) {
             if (ti < m) {
                 m = ti;
             }
@@ -120,7 +120,7 @@ NETDATA.commonMax = {
         // for (let i in t) {
         //     if (t.hasOwnProperty(i) && t[i] > m) m = t[i];
         // }
-        for (const ti of Object.values(t)) {
+        for (var ti of Object.values(t)) {
             if (ti > m) {
                 m = ti;
             }
