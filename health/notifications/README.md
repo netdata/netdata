@@ -63,3 +63,4 @@ If you need to dig even deeper, you can trace the execution with `bash -x`. Note
  bash -x /usr/libexec/netdata/plugins.d/alarm-notify.sh test
  ```
  Then look in the output for the alarm-notify.sh calls and run the one you want to trace with `bash -x`. 
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

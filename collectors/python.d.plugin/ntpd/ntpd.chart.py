@@ -12,7 +12,6 @@ from bases.FrameworkServices.SocketService import SocketService
 # default module values
 update_every = 1
 priority = 60000
-retries = 60
 
 # NTP Control Message Protocol constants
 MODE = 6

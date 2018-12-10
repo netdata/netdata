@@ -18,7 +18,7 @@ if (typeof netdataIcons === 'object') {
     //     if (NETDATA.icons.hasOwnProperty(icon) && typeof(netdataIcons[icon]) === 'string')
     //         NETDATA.icons[icon] = netdataIcons[icon];
     // }
-    for (const icon of Object.keys(NETDATA.icons)) {
+    for (var icon of Object.keys(NETDATA.icons)) {
         if (typeof(netdataIcons[icon]) === 'string') {
             NETDATA.icons[icon] = netdataIcons[icon]
         }

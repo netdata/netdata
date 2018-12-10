@@ -615,7 +615,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST *host, BUFFER *wb) {
+static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
     rrdhost_rdlock(host);
@@ -640,7 +640,7 @@ inline void web_client_api_request_v1_info_summary_alarm_statuses(const RRDHOST 
     buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
 }
 
-inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
+static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     RRDHOST *rc;
     int count = 0;
     rrd_rdlock();
@@ -654,6 +654,8 @@ inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 }
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
+
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;

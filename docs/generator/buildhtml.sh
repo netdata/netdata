@@ -19,9 +19,15 @@ echo "Copying files"
 rm -rf ${GENERATOR_DIR}/src
 find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${GENERATOR_DIR}/src
 
+# Copy netdata html resources
+cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
+
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i -e '0,/# netdata /s//# Introduction\n\n/' -e 's/\[!\[analytics.*UA-64295674-3)\]()//g' ${GENERATOR_DIR}/src/README.md
+sed -i -e '0,/# netdata /s//# Introduction\n\n/' ${GENERATOR_DIR}/src/README.md
+
+# Remove all GA tracking code
+find ${GENERATOR_DIR}/src -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
 
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
@@ -44,9 +50,11 @@ echo "Fixing links"
 # Fix links (recursively, all types, executing replacements)
 ${GENERATOR_DIR}/checklinks.sh -rax
 
-echo "Calling mkdocs"
+if [ "${1}" != "nomkdocs" ] ; then
+	echo "Calling mkdocs"
 
-# Build html docs
-mkdocs build --config-file=${GENERATOR_DIR}/mkdocs.yml
+	# Build html docs
+	mkdocs build --config-file=${GENERATOR_DIR}/mkdocs.yml
+fi
 
 echo "Finished"

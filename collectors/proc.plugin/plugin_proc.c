@@ -49,6 +49,7 @@ static struct proc_module {
 
         // disk metrics
         { .name = "/proc/diskstats", .dim = "diskstats", .func = do_proc_diskstats },
+        { .name = "/proc/mdstat", .dim = "mdstat", .func = do_proc_mdstat },
 
         // NFS metrics
         { .name = "/proc/net/rpc/nfsd", .dim = "nfsd", .func = do_proc_net_rpc_nfsd },

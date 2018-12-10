@@ -19,10 +19,9 @@ cd "${REINSTALL_PWD}" || exit 1
 #shellcheck source=/dev/null
 source installer/.environment.sh || exit 1
 
-UID="$(id -u)"
-if [ "${INSTALL_UID}" != "${UID}" ]
+if [ "${INSTALL_UID}" != "$(id -u)" ]
     then
-    echo >&2 "You are running this script as user with uid ${UID}. We recommend to run this script as root (user with uid 0)"
+    echo >&2 "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
     exit 1
 fi
 
@@ -95,11 +94,12 @@ update() {
 		fi
 
 		info "Stashing local git changes. You can use $(git stash pop) to reapply your changes."
-		git stash >&3
-		git fetch --all >&3
-		git fetch --tags >&3
-		git checkout origin/master >&3
-		git reset --hard origin/master >&3
+		git stash 2>&3 >&3
+		git fetch --all 2>&3 >&3
+		git fetch --tags 2>&3 >&3
+		git checkout master 2>&3 >&3
+		git reset --hard origin/master 2>&3 >&3
+		git pull 2>&3 >&3
 
 		new_commit="$(get_latest_commit_id)"
 		if [ ${force} -eq 0 ]; then

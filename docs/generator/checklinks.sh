@@ -119,7 +119,7 @@ testinternal () {
 	ilnk=${3}
 	header=${ilnk//-/}
 	dbg "-- Searching for \"$header\" in $ifile"
-	tr -d ',_.:? `'< "$ifile" | sed 's/-//g' | grep -i "^\\#*$header\$" >/dev/null
+	tr -d '[],_.:? `'< "$ifile" | sed 's/-//g' | grep -i "^\\#*$header\$" >/dev/null
 	if [ $? -eq 0 ] ; then
 		dbg "-- $ilnk found in $ifile"
 		return 0

@@ -46,13 +46,13 @@ The registry keeps track of 3 entities:
 
 ## Who talks to the registry?
 
-Your web browser **only**! Check here if this is against your policies: [how to not send any information to a thirdparty server](../docs/netdata-security.md#security-design)
+Your web browser **only**! If sending this information is against your policies, you can [run your own registry](#run-your-own-registry)
 
 Your netdata servers do not talk to the registry. This is a UML diagram of its operation:
 
 ![registry](https://cloud.githubusercontent.com/assets/2662304/19448565/11a70632-94ab-11e6-9d80-f410b4acb797.png)
 
-## What data the registry maintains?
+## What data does the registry store?
 
 Its database contains:
 
@@ -72,9 +72,9 @@ Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** 
 
 We believe, it can do it...
 
-## Every netdata can be a registry
+## Run your own registry
 
-Yes, you read correct, **every netdata can be a registry**. Just pick one and configure it.
+**Every netdata can be a registry**. Just pick one and configure it.
 
 **To turn any netdata into a registry**, edit `/etc/netdata/netdata.conf` and set:
 
@@ -150,3 +150,5 @@ ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io respon
 ```
 
 This error is printed on your web browser console (press F12 on your browser to see it).
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fregistry%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

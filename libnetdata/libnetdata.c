@@ -1380,7 +1380,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-            else if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+
+            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -1388,13 +1389,11 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
                     callback(filename, data);
                     freez(filename);
+                    continue;
                 }
-                else
-                    debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s'", udir, de->d_name);
             }
-            else {
-                debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' with invalid type %d", udir, de->d_name, (int)de->d_type);
-            }
+
+            debug(D_HEALTH, "CONFIG ignoring user-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
         }
 
         closedir(dir);
@@ -1428,7 +1427,8 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     continue;
                 }
             }
-            else if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
+
+            if(de->d_type == DT_UNKNOWN || de->d_type == DT_REG || de->d_type == DT_LNK) {
                 size_t len = strlen(de->d_name);
                 if(path_is_file(sdir, de->d_name) && !path_is_file(udir, de->d_name) &&
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
@@ -1436,13 +1436,12 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                     debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
                     callback(filename, data);
                     freez(filename);
+                    continue;
                 }
-                else
-                    debug(D_HEALTH, "CONFIG ignoring stock config file '%s/%s'", sdir, de->d_name);
+
             }
-            else {
-                debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' with invalid type %d", udir, de->d_name, (int)de->d_type);
-            }
+
+            debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)de->d_type);
         }
 
         closedir(dir);

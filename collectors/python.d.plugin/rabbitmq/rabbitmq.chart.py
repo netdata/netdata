@@ -17,7 +17,6 @@ from bases.FrameworkServices.UrlService import UrlService
 # default module values (can be overridden per job in `config`)
 update_every = 1
 priority = 60000
-retries = 60
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
@@ -64,13 +63,13 @@ CHARTS = {
         ]
     },
     'memory': {
-        'options': [None, 'Memory', 'MB', 'overview', 'rabbitmq.memory', 'line'],
+        'options': [None, 'Memory', 'MB', 'overview', 'rabbitmq.memory', 'area'],
         'lines': [
             ['mem_used', 'used', 'absolute', 1, 1024 << 10]
         ]
     },
     'disk_space': {
-        'options': [None, 'Disk Space', 'GB', 'overview', 'rabbitmq.disk_space', 'line'],
+        'options': [None, 'Disk Space', 'GB', 'overview', 'rabbitmq.disk_space', 'area'],
         'lines': [
             ['disk_free', 'free', 'absolute', 1, 1024 ** 3]
         ]
@@ -111,7 +110,7 @@ CHARTS = {
         ]
     },
     'message_rates': {
-        'options': [None, 'Message Rates', 'messages/s', 'overview', 'rabbitmq.message_rates', 'stacked'],
+        'options': [None, 'Message Rates', 'messages/s', 'overview', 'rabbitmq.message_rates', 'line'],
         'lines': [
             ['message_stats_ack', 'ack', 'incremental'],
             ['message_stats_redeliver', 'redeliver', 'incremental'],

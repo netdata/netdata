@@ -52,7 +52,6 @@ docs_dir: src
 site_dir: build
 #use_directory_urls: false
 strict: true
-google_analytics: ["UA-64295674-3", ""]
 extra:
   social:
     - type: "github"
@@ -63,11 +62,13 @@ extra:
       link: "https://www.facebook.com/linuxnetdata/"
 theme:
     name: "material"
-    custom_dir: themes/material
+    custom_dir: custom/themes/material
+    favicon: custom/img/favicon.ico
 extra_css:
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
+  - "custom/css/netdata.css"
 extra_javascript:
-  - "javascripts/cookie-consent.js"
+  - "custom/javascripts/cookie-consent.js"
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.js"
 markdown_extensions:
  - extra
@@ -123,23 +124,17 @@ echo -ne "    - 'docs/Why-Netdata.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
-"
-
-echo -ne "- Installation:
+- Installation:
     - 'installer/README.md'
     - 'packaging/docker/README.md'
     - 'installer/UPDATE.md'
     - 'installer/UNINSTALL.md'
-"
-
-echo -ne "- 'docs/GettingStarted.md'
-"
-
-echo -ne "- Running netdata:
-"
-navpart 2 daemon
-navpart 2 daemon/config
-echo -ne "    - 'docs/Charts.md'
+- 'docs/GettingStarted.md'
+- Running netdata:
+    - 'daemon/README.md'
+    - 'docs/configuration-guide.md'
+    - 'daemon/config/README.md'
+    - 'docs/Charts.md'
 "
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
@@ -177,8 +172,8 @@ navpart 3 collectors/macos.plugin
 navpart 2 collectors/plugins.d "" "External plugins"
 navpart 3 collectors/python.d.plugin "" "Python modules" 3
 navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
-navpart 3 collectors/charts.d.plugin "" "BASH modules" 3
-echo -ne "            - 'collectors/charts.d.plugin/README.md'
+echo -ne "        - BASH modules:
+            - 'collectors/charts.d.plugin/README.md'
             - 'collectors/charts.d.plugin/ap/README.md'
             - 'collectors/charts.d.plugin/apcupsd/README.md'
             - 'collectors/charts.d.plugin/example/README.md'

@@ -427,3 +427,5 @@ application|language|notes|
 :---------:|:------:|:----|
 example|BASH<br/>Shell Script|Skeleton plugin in BASH.<br/><br/>DEPRECATED IN FAVOR OF THE PYTHON ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [example.chart.sh](../collectors/charts.d.plugin/example)<br/>configuration file: [charts.d/example.conf](../collectors/charts.d.plugin/example)|
 example|python<br/>v2 or v3|Skeleton plugin in Python.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [example.chart.py](../collectors/python.d.plugin/example)<br/>configuration file: [python.d/example.conf](../collectors/python.d.plugin/example)|
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FAdd-more-charts-to-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

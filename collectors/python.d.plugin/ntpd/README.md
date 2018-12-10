@@ -69,3 +69,5 @@ otherhost:
 If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `show_peers: yes` to also show the charts for configured peers. Local peers in the range `127.0.0.0/8` are hidden by default, use `peer_filter: ''` to show all peers.
 
 ---
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fntpd%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
