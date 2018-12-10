@@ -1,9 +1,10 @@
 #
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
-# SPDX-License-Identifier: GPL-3.0+
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
+    edit-config \
 	netdata-openrc \
 	netdata.logrotate \
 	netdata.service \
@@ -14,8 +15,11 @@ CLEANFILES = \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
-
 SUFFIXES = .in
+
+dist_config_SCRIPTS = \
+    edit-config \
+    $(NULL)
 
 nodist_noinst_DATA = \
 	netdata-openrc \
@@ -28,6 +32,7 @@ nodist_noinst_DATA = \
 	$(NULL)
 
 dist_noinst_DATA = \
+	edit-config.in \
 	netdata-openrc.in \
 	netdata.logrotate.in \
 	netdata.service.in \

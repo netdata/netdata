@@ -54,16 +54,14 @@ override_dh_install: debian/netdata.postinst
 override_dh_installdocs:
 	dh_installdocs
 
-	# Docs should not be under /usr/lib
-	#
-	mv $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/plugins.d/README.md \
-		$(TOP)/usr/share/doc/netdata/README.plugins.md
-	mv $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/charts.d/README.md \
-		$(TOP)/usr/share/doc/netdata/README.charts.md
-
-	# This doc is currently empty, so no point installing it.
-	#
-	rm $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/node.d/README.md
+	find . \
+		-name README.md \
+		-not -path './.travis/*' \
+		-not -path './debian/*' \
+		-exec cp \
+						--parents \
+						--target $(TOP)/usr/share/doc/netdata/ \
+						{} \;
 
 override_dh_fixperms:
 	dh_fixperms

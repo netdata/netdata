@@ -1,5 +1,5 @@
 <!--
-SPDX-License-Identifier: GPL-3.0+
+SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 # netdata contributors license agreement
@@ -10,7 +10,7 @@ This agreement is part of the legal framework of the open-source ecosystem
 that adds some red tape, but protects both the contributor and the project.
 
 To understand why this is needed, please read [a well-written chapter from
-Karl Fogel’s Producing Open Source Software on CLAs](http://producingoss.com/en/copyright-assignment.html).
+Karl Fogel’s Producing Open Source Software on CLAs](https://producingoss.com/en/copyright-assignment.html).
 
 By signing this agreement, you do not change your rights to use your own
 contributions for any other purpose.
@@ -48,6 +48,12 @@ original creation and that he is legally entitled to grant the above license.
 
 ## signature
 
+Since Sep 17th 2018, we use https://cla-assistant.io/netdata/netdata for signing the CLA, on all pull requests.
+Old contributors can sign the CLA at any time using this link.
+
+## HISTORICAL SIGNATURES
+(they have been imported to https://cla-assistant.io/netdata/netdata already)
+
 The Contributor (*you*) signs this agreement by adding his personal data in
 this document and committing it to the project repo
 (the same way contributions are submitted to the project).
@@ -69,7 +75,7 @@ username|name|email (optional)
 @ktsaou|Costa Tsaousis|costa@tsaousis.gr
 @tycho|Steven Noonan|steven@uplinklabs.net
 @philwhineray|Phil Whineray|
-@paulfantom|Pawel Krupa|pawel@krupa.net.pl
+@paulfantom|Paweł Krupa|pawel@krupa.net.pl
 @Ferroin|Austin S. Hemmelgarn|ahferroin7@gmail.com
 @glensc|Elan Ruusamäe|
 @l2isbad|Ilya Mashchenko|ilyamaschenko@gmail.com
@@ -104,5 +110,16 @@ username|name|email (optional)
 @rda0|Sven Mäder|maeder@phys.ethz.ch
 @alibo|Ali Borhani|aliborhani1@gmail.com
 @Nani-o|Sofiane Medjkoune|sofiane@medjkoune.fr
+@n0guest|Evgeniy K.|ask@osshelp.ru
+@amichelic|Adalbert Michelic|
 @abalabahaha|abalabahaha|hi@abal.moe
+@illes|Illes S.|
+@plasticrake|Patrick Seal
 @jonfairbanks|Jon Fairbanks
+@pjz|Paul Jimenez|pj@place.org
+@jgrossiord|Julien Grossiord|julien@grossiord.net
+@pohzipohzi|Poh Zi How
+@vladmovchan|Vladyslav Movchan|vladislav.movchan@gmail.com
+@gmosx|George Moschovitis
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTORS&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
