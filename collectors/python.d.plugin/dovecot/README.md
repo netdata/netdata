@@ -1,8 +1,12 @@
 # dovecot
 
 This module provides statistics information from Dovecot server.
+
 Statistics are taken from dovecot socket by executing `EXPORT global` command.
 More information about dovecot stats can be found on [project wiki page.](http://wiki2.dovecot.org/Statistics)
+
+Module isn't compatible with new statistic api (v2.3), but you are still able to use the module with Dovecot v2.3
+by following [upgrading steps.](https://wiki2.dovecot.org/Upgrading/2.3).
 
 **Requirement:**
 Dovecot UNIX socket with R/W permissions for user netdata or Dovecot with configured TCP/IP socket.
