@@ -4356,43 +4356,35 @@ function getURLParameter(name) {
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
 }
 
-function claimButtonDidClick() {
-    window.open(
-        cloudBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
-        "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
-        encodeURIComponent(NETDATA.serverDefault), 
-        "_blank"
-    );
+function signInDidClick() {
+    initSignInModal();
+}
+
+function signOutDidClick() {
+    signOut();
 }
 
 function signOut() {
-    localStorage.removeItem("hub.accountName");
+    localStorage.removeItem("cloud.accountID");
+    localStorage.removeItem("cloud.accountName");
+    localStorage.removeItem("cloud.token");
+    
     renderAccountUI();
-}
-
-function renderAccountUI2() {
-    const container = document.getElementById("account-ui");
-    const accountName = localStorage.getItem("hub.accountName");
-    if (accountName) {
-        container.innerHTML = `${accountName} &nbsp; <button onclick="signOut();">Sign Out</button>`;
-    } else {
-        container.innerHTML = '<button onclick="claimButtonDidClick();">Sign In</button>';
-    }
+    deinitSignInModal();
 }
 
 function renderAccountUI() {
     const container = document.getElementById("account-menu-container");
-    const accountName = localStorage.getItem("hub.accountName");
-    if (accountName) {
-        container.innerHTML = `${accountName} &nbsp; <button onclick="signOut();">Sign Out</button>`;
+    if (isSignedIn()) {
+        const accountName = localStorage.getItem("cloud.accountName");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signOut();">
-                <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
+            `<a href="#" class="btn" onclick="signOutDidClick();">
+                <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">${accountName} Sign Out</span>
             </a>`
         )
     } else {
         container.innerHTML = (
-            `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal">
+            `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal" onclick="signInDidClick();">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
@@ -4400,27 +4392,37 @@ function renderAccountUI() {
 }
 
 function handleMessage(e) {
-    console.log(e.data);
+    localStorage.setItem("cloud.accountID", e.data.accountID);
+    localStorage.setItem("cloud.accountName", e.data.accountName);
+    localStorage.setItem("cloud.token", e.data.token);
+
+    renderAccountUI();
+    deinitSignInModal();
+}
+
+function isSignedIn() {
+    return localStorage.getItem("cloud.token") != null;
 }
 
 function initSignInModal() {
-    const iframeEl = document.getElementById("sign-in-iframe");
-    iframeEl.src = cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
-    window.addEventListener("message", handleMessage, false);
+    if (!isSignedIn()) {
+        console.log("-- init");
+        const iframeEl = document.getElementById("sign-in-iframe");
+        iframeEl.src = cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+        window.addEventListener("message", handleMessage, false);    
+    }
+}
+
+function deinitSignInModal() {
+    if (isSignedIn()) {
+        const iframeEl = document.getElementById("sign-in-iframe");
+        iframeEl.src = "";
+        // TODO: Remove event listener.
+    }
 }
 
 function initUI() {
-    const claimed = getURLParameter("claimed");
-    
-    if (claimed) {
-        localStorage.setItem("hub.accountName", decodeURIComponent(claimed));
-        history.pushState(null, "", `/${window.location.hash}`);
-    }
-
-    initSignInModal();
-
     renderAccountUI();
-    renderAccountUI2();
 }
 
 if (document.readyState === "complete") {
