@@ -120,39 +120,13 @@ METRICS = {
 
 NO_VERSION = 0
 DEFAULT = 'DEFAULT'
+V96 = 'V96'
 V10 = 'V10'
 V11 = 'V11'
 
 
 QUERY_WAL = {
     DEFAULT: """
-SELECT
-    count(*) as total_wal,
-    count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
-    count(*) FILTER (WHERE type = 'written') AS written_wal
-FROM
-    (SELECT
-        wal.name,
-        pg_xlogfile_name(
-          CASE pg_is_in_recovery()
-            WHEN true THEN NULL
-            ELSE pg_current_xlog_location()
-          END ),
-        CASE
-          WHEN wal.name > pg_xlogfile_name(
-            CASE pg_is_in_recovery()
-              WHEN true THEN NULL
-              ELSE pg_current_xlog_location()
-            END ) THEN 'recycled'
-          ELSE 'written'
-        END AS type
-    FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
-    WHERE name ~ '^[0-9A-F]{{24}}$'
-    ORDER BY
-        (pg_stat_file('pg_xlog/'||name)).modification,
-        wal.name DESC) sub;
-""",
-    V10: """
 SELECT
     count(*) as total_wal,
     count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
@@ -179,6 +153,33 @@ FROM
         (pg_stat_file('pg_wal/'||name)).modification,
         wal.name DESC) sub;
 """,
+    V96: """
+SELECT
+    count(*) as total_wal,
+    count(*) FILTER (WHERE type = 'recycled') AS recycled_wal,
+    count(*) FILTER (WHERE type = 'written') AS written_wal
+FROM
+    (SELECT
+        wal.name,
+        pg_xlogfile_name(
+          CASE pg_is_in_recovery()
+            WHEN true THEN NULL
+            ELSE pg_current_xlog_location()
+          END ),
+        CASE
+          WHEN wal.name > pg_xlogfile_name(
+            CASE pg_is_in_recovery()
+              WHEN true THEN NULL
+              ELSE pg_current_xlog_location()
+            END ) THEN 'recycled'
+          ELSE 'written'
+        END AS type
+    FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
+    WHERE name ~ '^[0-9A-F]{{24}}$'
+    ORDER BY
+        (pg_stat_file('pg_xlog/'||name)).modification,
+        wal.name DESC) sub;
+""",
 }
 
 QUERY_ARCHIVE = {
@@ -188,15 +189,16 @@ SELECT
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)),0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)),0) AS INT) AS done_count
 FROM
-    pg_catalog.pg_ls_dir('pg_xlog/archive_status') AS archive_files (archive_file);
+    pg_catalog.pg_ls_dir('pg_wal/archive_status') AS archive_files (archive_file);
 """,
-    V10: """
+    V96: """
 SELECT
     CAST(COUNT(*) AS INT) AS file_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)),0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)),0) AS INT) AS done_count
 FROM
-    pg_catalog.pg_ls_dir('pg_wal/archive_status') AS archive_files (archive_file);
+    pg_catalog.pg_ls_dir('pg_xlog/archive_status') AS archive_files (archive_file);
+
 """,
 }
 
@@ -320,36 +322,6 @@ QUERY_STANDBY_DELTA = {
     DEFAULT: """
 SELECT
     application_name,
-    pg_xlog_location_diff(
-      CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_xlog_receive_location()
-        ELSE pg_current_xlog_location()
-      END,
-    sent_location) AS sent_delta,
-    pg_xlog_location_diff(
-      CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_xlog_receive_location()
-        ELSE pg_current_xlog_location()
-      END,
-    write_location) AS write_delta,
-    pg_xlog_location_diff(
-      CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_xlog_receive_location()
-        ELSE pg_current_xlog_location()
-      END,
-    flush_location) AS flush_delta,
-    pg_xlog_location_diff(
-      CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_xlog_receive_location()
-        ELSE pg_current_xlog_location()
-      END,
-    replay_location) AS replay_delta
-FROM pg_stat_replication
-WHERE application_name IS NOT NULL;
-""",
-    V10: """
-SELECT
-    application_name,
     pg_wal_lsn_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_wal_receive_lsn()
@@ -377,13 +349,43 @@ SELECT
 FROM pg_stat_replication
 WHERE application_name IS NOT NULL;
 """,
+    V96: """
+SELECT
+    application_name,
+    pg_xlog_location_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
+      END,
+    sent_location) AS sent_delta,
+    pg_xlog_location_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
+      END,
+    write_location) AS write_delta,
+    pg_xlog_location_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
+      END,
+    flush_location) AS flush_delta,
+    pg_xlog_location_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
+      END,
+    replay_location) AS replay_delta
+FROM pg_stat_replication
+WHERE application_name IS NOT NULL;
+""",
 }
 
 QUERY_REPSLOT_FILES = {
     DEFAULT: """
 WITH wal_size AS (
   SELECT
-    setting AS val
+    setting::int AS val
   FROM pg_settings
   WHERE name = 'wal_segment_size'
   )
@@ -419,13 +421,13 @@ GROUP BY
     slot_type,
     replslot_wal_keep;
 """,
-    V11: """
+    V10: """
 WITH wal_size AS (
-          SELECT
-             setting::int AS val
-          FROM pg_settings
-          WHERE name = 'wal_segment_size'
-          )
+  SELECT
+    current_setting('wal_block_size')::INT * setting::INT AS val
+  FROM pg_settings
+  WHERE name = 'wal_segment_size'
+  )
 SELECT
     slot_name,
     slot_type,
@@ -490,19 +492,19 @@ WHERE query NOT LIKE '%%pg_stat_activity%%';
 QUERY_DIFF_LSN = {
     DEFAULT: """
 SELECT
-    pg_xlog_location_diff(
-      CASE pg_is_in_recovery()
-        WHEN true THEN pg_last_xlog_receive_location()
-        ELSE pg_current_xlog_location()
-      END,
-    '0/0') as wal_writes ;
-""",
-    V10: """
-SELECT
     pg_wal_lsn_diff(
       CASE pg_is_in_recovery()
         WHEN true THEN pg_last_wal_receive_lsn()
         ELSE pg_current_wal_lsn()
+      END,
+    '0/0') as wal_writes ;
+""",
+    V96: """
+SELECT
+    pg_xlog_location_diff(
+      CASE pg_is_in_recovery()
+        WHEN true THEN pg_last_xlog_receive_location()
+        ELSE pg_current_xlog_location()
       END,
     '0/0') as wal_writes ;
 """,
@@ -535,24 +537,24 @@ def query_factory(name, version=NO_VERSION):
     elif name == AUTOVACUUM:
         return QUERY_AUTOVACUUM[DEFAULT]
     elif name == WAL:
-        if version >= 100000:
-            return QUERY_WAL[V10]
+        if version < 100000:
+            return QUERY_WAL[V96]
         return QUERY_WAL[DEFAULT]
     elif name == ARCHIVE:
-        if version >= 100000:
-            return QUERY_ARCHIVE[V10]
+        if version < 100000:
+            return QUERY_ARCHIVE[V96]
         return QUERY_ARCHIVE[DEFAULT]
     elif name == STANDBY_DELTA:
-        if version >= 100000:
-            return QUERY_STANDBY_DELTA[V10]
+        if version < 100000:
+            return QUERY_STANDBY_DELTA[V96]
         return QUERY_STANDBY_DELTA[DEFAULT]
     elif name == REPSLOT_FILES:
-        if version >= 110000:
-            return QUERY_REPSLOT_FILES[V11]
+        if version < 110000:
+            return QUERY_REPSLOT_FILES[V10]
         return QUERY_REPSLOT_FILES[DEFAULT]
     elif name == DIFF_LSN:
-        if version >= 100000:
-            return QUERY_DIFF_LSN[V10]
+        if version < 100000:
+            return QUERY_DIFF_LSN[V96]
         return QUERY_DIFF_LSN[DEFAULT]
 
     raise ValueError('unknown query')
@@ -936,7 +938,7 @@ class Service(SimpleService):
                 self.queries[query_factory(WAL, self.server_version)] = METRICS[WAL]
 
             if self.server_version >= 100000:
-                self.queries[query_factory(REPSLOT_FILES)] = METRICS[REPSLOT_FILES]
+                self.queries[query_factory(REPSLOT_FILES, self.server_version)] = METRICS[REPSLOT_FILES]
 
         if self.server_version >= 90400:
             self.queries[query_factory(AUTOVACUUM)] = METRICS[AUTOVACUUM]
