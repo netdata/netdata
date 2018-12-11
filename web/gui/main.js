@@ -631,6 +631,17 @@ function renderMachines(machinesArray) {
 function netdataRegistryCallback(machinesArray) {
     let html = '';
 
+    if (isSignedIn()) {
+        html += (
+            `<div class="agent-item">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <a href="#">Migrate Registry</a>
+                <div></div>
+            </div>
+            <hr />`
+        )
+    }
+
     if (options.hosts.length > 1) {
         html += renderStreamedHosts(options) + `<hr />`;
     }
