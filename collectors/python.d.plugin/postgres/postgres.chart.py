@@ -421,11 +421,11 @@ GROUP BY
 """,
     V11: """
 WITH wal_size AS (
-  SELECT
-    current_setting('wal_block_size')::BIGINT * setting::BIGINT AS val
-  FROM pg_settings
-  WHERE name = 'wal_segment_size'
-  )
+          SELECT
+             setting::int AS val
+          FROM pg_settings
+          WHERE name = 'wal_segment_size'
+          )
 SELECT
     slot_name,
     slot_type,
