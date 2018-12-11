@@ -629,13 +629,15 @@ function renderMachines(machinesArray) {
 
 // Populates the my-netdata menu.
 function netdataRegistryCallback(machinesArray) {
+    registryKnowAgents = machinesArray;
+
     let html = '';
 
     if (isSignedIn()) {
         html += (
             `<div class="agent-item">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <a href="#">Migrate Registry</a>
+                <i style="color: red" class="fas fa-cloud-upload-alt"></i>
+                <a href="#" onclick="migrateRegistryDidClick()">Migrate Registry</a>
                 <div></div>
             </div>
             <hr />`
@@ -664,6 +666,9 @@ function netdataRegistryCallback(machinesArray) {
 
     const el = document.getElementById('my-netdata-dropdown-content')
     el.classList.add(`theme-${netdataTheme}`);
+    if (!isRegistryMigrated()) {
+        el.classList.add("non-migrated");
+    }
     el.innerHTML = html;
 
     gotoServerInit();
@@ -4349,6 +4354,10 @@ const cloudBaseURL = "http://localhost:8080";
 
 // -------------------------------------------------------------------------------------------------
 
+let registryKnowAgents = [];
+
+// -------------------------------------------------------------------------------------------------
+
 function getURLParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
@@ -4379,6 +4388,10 @@ function signInDidClick() {
 
 function signOutDidClick() {
     signOut();
+}
+
+function migrateRegistryDidClick() {
+    console.log("---", registryKnowAgents);
 }
 
 function signOut() {
@@ -4425,6 +4438,10 @@ function handleMessage(e) {
 
 function isSignedIn() {
     return localStorage.getItem("cloud.token") != null;
+}
+
+function isRegistryMigrated() {
+    return localStorage.getItem("cloud.knownAgents") != null;
 }
 
 function initSignInModal() {
