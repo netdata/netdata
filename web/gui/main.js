@@ -4386,9 +4386,14 @@ function renderAccountUI() {
     if (isSignedIn()) {
         const accountName = localStorage.getItem("cloud.accountName");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signOutDidClick();">
-                <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">${accountName} Sign Out</span>
-            </a>`
+            `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${accountName} <strong class="caret"></strong></a>
+            <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+                <li>
+                    <a href="#" class="btn" onclick="signOutDidClick();">
+                        <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
+                    </a>
+                </li>
+            </ul>`
         )
     } else {
         container.innerHTML = (
@@ -4415,7 +4420,6 @@ function isSignedIn() {
 
 function initSignInModal() {
     if (!isSignedIn()) {
-        console.log("-- init");
         const iframeEl = document.getElementById("sign-in-iframe");
         iframeEl.src = cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
         window.addEventListener("message", handleMessage, false);    
@@ -4426,7 +4430,7 @@ function deinitSignInModal() {
     if (isSignedIn()) {
         const iframeEl = document.getElementById("sign-in-iframe");
         iframeEl.src = "";
-        // TODO: Remove event listener.
+        window.removeEventListener("message", handleMessage, false); 
     }
 }
 
