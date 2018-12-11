@@ -4349,12 +4349,20 @@ var netdataCallback = initializeDynamicDashboard;
 
 const cloudBaseURL = "http://localhost:8080";
 
+// -------------------------------------------------------------------------------------------------
+
 function getURLParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
     var results = regex.exec(location.search)
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
 }
+
+function closeModal() {
+    $(".modal-header button.close").click();
+}
+
+// -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
     initSignInModal();
@@ -4397,6 +4405,7 @@ function handleMessage(e) {
     localStorage.setItem("cloud.token", e.data.token);
 
     renderAccountUI();
+    closeModal();
     deinitSignInModal();
 }
 
