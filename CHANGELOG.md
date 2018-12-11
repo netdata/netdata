@@ -15,9 +15,11 @@
 
 **Merged pull requests:**
 
+- fix month 'Dec' being detected as IPv6 address in ovpn python.d plugin [\#4970](https://github.com/netdata/netdata/pull/4970) ([vpnable](https://github.com/vpnable))
 - dovecot readme update [\#4959](https://github.com/netdata/netdata/pull/4959) ([ilyam8](https://github.com/ilyam8))
 - Add cakrit to health codeowners [\#4953](https://github.com/netdata/netdata/pull/4953) ([cakrit](https://github.com/cakrit))
 - Temporary workaround for \#4945 [\#4951](https://github.com/netdata/netdata/pull/4951) ([cakrit](https://github.com/cakrit))
+- Fix link in streaming hosts list [\#4948](https://github.com/netdata/netdata/pull/4948) ([adherzog](https://github.com/adherzog))
 - Show demosite/host in GA for demo sites [\#4947](https://github.com/netdata/netdata/pull/4947) ([cakrit](https://github.com/cakrit))
 - Update GA in demosites.html [\#4946](https://github.com/netdata/netdata/pull/4946) ([cakrit](https://github.com/cakrit))
 - Add support for providing FQDN in alarm notifications. [\#4943](https://github.com/netdata/netdata/pull/4943) ([Ferroin](https://github.com/Ferroin))
@@ -29,6 +31,7 @@
 - Update Performance.md [\#4935](https://github.com/netdata/netdata/pull/4935) ([cakrit](https://github.com/cakrit))
 - update code owners [\#4930](https://github.com/netdata/netdata/pull/4930) ([paulfantom](https://github.com/paulfantom))
 - Removed vlvkobal as a codeowner of web/gui [\#4929](https://github.com/netdata/netdata/pull/4929) ([gmosx](https://github.com/gmosx))
+- Introduced IEC-compliant unit abbreviations \#4711 [\#4912](https://github.com/netdata/netdata/pull/4912) ([gmosx](https://github.com/gmosx))
 
 ## [v1.12.0-rc0](https://github.com/netdata/netdata/tree/v1.12.0-rc0) (2018-12-06)
 
