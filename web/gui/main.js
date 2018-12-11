@@ -517,7 +517,7 @@ function renderStreamedHosts(options) {
         const hostname = s.hostname;
 
         if (hostname === master) {
-            url = `base${'/'}`;
+            url = `${base}/`;
             icon = 'home';
         } else {
             url = `${base}/host/${hostname}/`;
