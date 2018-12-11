@@ -4,9 +4,9 @@
 
 #define PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME "/sys/class/power_supply"
 
-const char *ps_property_names[]  = {"charge", "energy", "voltage"};
-const char *ps_property_titles[] = {"Charge", "Energy", "Voltage"};
-const char *ps_property_units[]  = {    "Ah",     "Wh",       "V"};
+const char *ps_property_names[]  = {        "charge",         "energy",              "voltage"};
+const char *ps_property_titles[] = {"Battery charge", "Battery energy", "Power supply voltage"};
+const char *ps_property_units[]  = {            "Ah",             "Wh",                    "V"};
 
 const char *ps_property_dim_names[] = {"empty_design", "empty", "now", "full", "full_design",
                                        "empty_design", "empty", "now", "full", "full_design",
@@ -178,7 +178,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 pr = callocz(sizeof(struct ps_property), 1);
                                 pr->name = strdupz(ps_property_names[pr_idx]);
                                 pr->title = strdupz(ps_property_titles[pr_idx]);
-                                pr->units = strdupz(ps_property_names[pr_idx]);
+                                pr->units = strdupz(ps_property_units[pr_idx]);
                                 prev_idx = pr_idx;
                                 pr->next = ps->property_root;
                                 ps->property_root = pr;
@@ -235,16 +235,13 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
         if(ps->capacity) {
             if(unlikely(!ps->capacity->st)) {
-                char id[50 + 1];
-                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_capacity", ps->name);
-
                 ps->capacity->st = rrdset_create_localhost(
-                        "powersupply"
-                        , id
-                        , NULL
+                        "powersupply_capacity"
                         , ps->name
                         , NULL
-                        , "Capacity"
+                        , ps->name
+                        , "powersupply.capacity"
+                        , "Battery capacity"
                         , "percentage"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
@@ -265,15 +262,16 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         struct ps_property *pr;
         for(pr = ps->property_root; pr; pr = pr->next) {
             if(unlikely(!pr->st)) {
-                char id[50 + 1];
-                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", ps->name, pr->name);
+                char id[50 + 1], context[50 + 1];
+                snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", pr->name);
+                snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", pr->name);
 
                 pr->st = rrdset_create_localhost(
-                        "powersupply"
-                        , id
-                        , NULL
+                        id
                         , ps->name
                         , NULL
+                        , ps->name
+                        , context
                         , pr->title
                         , pr->units
                         , PLUGIN_PROC_NAME
