@@ -106,15 +106,15 @@ void power_supply_free(struct power_supply *ps) {
 
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
-    static int do_capacity = -1, do_charge = -1, do_energy = -1, do_voltage = -1;
+    static int do_capacity = -1, do_property[3] = {-1};
     static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
     static char *dirname = NULL;
 
     if(unlikely(do_capacity == -1)) {
-        do_capacity = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
-        do_charge   = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
-        do_energy   = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
-        do_voltage  = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
+        do_capacity    = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
+        do_property[0] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
+        do_property[1] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
+        do_property[2] = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
 
         keep_fds_open_config = config_get_boolean_ondemand("plugin:proc:/sys/class/power_supply", "keep files open", CONFIG_BOOLEAN_AUTO);
 
@@ -175,36 +175,38 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 size_t prev_idx = 3; // there is no property with this index
 
                 for(pr_idx = 0; pr_idx < 3; pr_idx++) {
-                    struct ps_property *pr;
+                    if(do_property[pr_idx] != CONFIG_BOOLEAN_NO) {
+                        struct ps_property *pr = NULL;
 
-                    for(pd_idx = pr_idx * 5; pd_idx < pr_idx * 5 + 5; pd_idx++) {
+                        for(pd_idx = pr_idx * 5; pd_idx < pr_idx * 5 + 5; pd_idx++) {
 
-                        // check if file exists
-                        char filename[FILENAME_MAX + 1];
-                        snprintfz(filename, FILENAME_MAX, "%s/%s/%s_%s", dirname, de->d_name,
-                                  ps_property_names[pr_idx], ps_property_dim_names[pd_idx]);
-                        if (stat(filename, &stbuf) == 0) {
+                            // check if file exists
+                            char filename[FILENAME_MAX + 1];
+                            snprintfz(filename, FILENAME_MAX, "%s/%s/%s_%s", dirname, de->d_name,
+                                      ps_property_names[pr_idx], ps_property_dim_names[pd_idx]);
+                            if (stat(filename, &stbuf) == 0) {
 
-                            // add chart
-                            if(prev_idx != pr_idx) {
-                                pr = callocz(sizeof(struct ps_property), 1);
-                                pr->name = strdupz(ps_property_names[pr_idx]);
-                                pr->title = strdupz(ps_property_titles[pr_idx]);
-                                pr->units = strdupz(ps_property_units[pr_idx]);
-                                prev_idx = pr_idx;
-                                pr->next = ps->property_root;
-                                ps->property_root = pr;
+                                // add chart
+                                if(prev_idx != pr_idx) {
+                                    pr = callocz(sizeof(struct ps_property), 1);
+                                    pr->name = strdupz(ps_property_names[pr_idx]);
+                                    pr->title = strdupz(ps_property_titles[pr_idx]);
+                                    pr->units = strdupz(ps_property_units[pr_idx]);
+                                    prev_idx = pr_idx;
+                                    pr->next = ps->property_root;
+                                    ps->property_root = pr;
+                                }
+
+                                // add dimension
+                                struct ps_property_dim *pd;
+                                pd= callocz(sizeof(struct ps_property_dim), 1);
+                                pd->name = strdupz(ps_property_dim_names[pd_idx]);
+                                pd->filename = strdupz(filename);
+                                pd->fd = -1;
+                                files_num++;
+                                pd->next = pr->property_dim_root;
+                                pr->property_dim_root = pd;
                             }
-
-                            // add dimension
-                            struct ps_property_dim *pd;
-                            pd= callocz(sizeof(struct ps_property_dim), 1);
-                            pd->name = strdupz(ps_property_dim_names[pd_idx]);
-                            pd->filename = strdupz(filename);
-                            pd->fd = -1;
-                            files_num++;
-                            pd->next = pr->property_dim_root;
-                            pr->property_dim_root = pd;
                         }
                     }
                 }
@@ -231,6 +233,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 ps->capacity->value = str2ull(buffer);
 
                 if(!keep_fds_open) {
+                    close(ps->capacity->fd);
+                    ps->capacity->fd = -1;
+                }
+                else if(lseek(ps->capacity->fd, 0, SEEK_SET) == -1) {
+                    error("Cannot seek in file '%s'", ps->capacity->filename);
                     close(ps->capacity->fd);
                     ps->capacity->fd = -1;
                 }
@@ -265,6 +272,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     pd->value = str2ull(buffer);
 
                     if(!keep_fds_open) {
+                        close(pd->fd);
+                        pd->fd = -1;
+                    }
+                    else if(lseek(pd->fd, 0, SEEK_SET) == -1) {
+                        error("Cannot seek in file '%s'", pd->filename);
                         close(pd->fd);
                         pd->fd = -1;
                     }
