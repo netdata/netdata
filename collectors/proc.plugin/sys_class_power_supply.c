@@ -15,6 +15,7 @@ const char *ps_property_dim_names[] = {"empty_design", "empty", "now", "full", "
 struct ps_property_dim {
     char *name;
     char *filename;
+    int fd;
 
     RRDDIM *rd;
     unsigned long long value;
@@ -36,6 +37,7 @@ struct ps_property {
 
 struct capacity {
     char *filename;
+    int fd;
 
     RRDSET *st;
     RRDDIM *rd;
@@ -55,12 +57,15 @@ struct power_supply {
 };
 
 static struct power_supply *power_supply_root = NULL;
+static int files_num = 0;
 
 void power_supply_free(struct power_supply *ps) {
     if(ps) {
         if(ps->capacity) {
             if(ps->capacity->st) rrdset_is_obsolete(ps->capacity->st);
             freez(ps->capacity->filename);
+            if(ps->capacity->fd != -1) close(ps->capacity->fd);
+            files_num--;
             freez(ps->capacity);
         }
         freez(ps->name);
@@ -71,6 +76,8 @@ void power_supply_free(struct power_supply *ps) {
             while(pd) {
                 freez(pd->name);
                 freez(pd->filename);
+                if(pd->fd != -1) close(pd->fd);
+                files_num--;
                 struct ps_property_dim *d = pd;
                 pd = pd->next;
                 freez(d);
@@ -100,6 +107,7 @@ void power_supply_free(struct power_supply *ps) {
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
     static int do_capacity = -1, do_charge = -1, do_energy = -1, do_voltage = -1;
+    static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
     static char *dirname = NULL;
 
     if(unlikely(do_capacity == -1)) {
@@ -107,6 +115,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         do_charge   = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
         do_energy   = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
         do_voltage  = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
+
+        keep_fds_open_config = config_get_boolean_ondemand("plugin:proc:/sys/class/power_supply", "keep files open", CONFIG_BOOLEAN_AUTO);
 
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/power_supply");
@@ -155,6 +165,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     if (stat(filename, &stbuf) == 0) {
                         ps->capacity = callocz(sizeof(struct capacity), 1);
                         ps->capacity->filename = strdupz(filename);
+                        ps->capacity->fd = -1;
+                        files_num++;
                     }
                 }
 
@@ -189,6 +201,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             pd= callocz(sizeof(struct ps_property_dim), 1);
                             pd->name = strdupz(ps_property_dim_names[pd_idx]);
                             pd->filename = strdupz(filename);
+                            pd->fd = -1;
+                            files_num++;
                             pd->next = pr->property_dim_root;
                             pr->property_dim_root = pd;
                         }
@@ -196,28 +210,75 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 }
             }
 
-            // TODO: keep files open
+            // read capacity file
             if(ps->capacity) {
-                if(unlikely(read_single_number_file(ps->capacity->filename, &ps->capacity->value))) {
+                char buffer[30 + 1];
+
+                if(ps->capacity->fd == -1) {
+                    ps->capacity->fd = open(ps->capacity->filename, O_RDONLY, 0666);
+                    if(unlikely(ps->capacity->fd == -1)) {
+                        error("Cannot open file '%s'", ps->capacity->filename);
+                        power_supply_free(ps);
+                    }
+                }
+
+                ssize_t r = read(ps->capacity->fd, buffer, 30);
+                if(unlikely(r < 1)) {
                     error("Cannot read file '%s'", ps->capacity->filename);
                     power_supply_free(ps);
                 }
+                buffer[r] = '\0';
+                ps->capacity->value = str2ull(buffer);
+
+                if(!keep_fds_open) {
+                    close(ps->capacity->fd);
+                    ps->capacity->fd = -1;
+                }
             }
 
+            // read property files
             int read_error = 0;
             struct ps_property *pr;
             for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
                 struct ps_property_dim *pd;
                 for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                    if(unlikely(read_single_number_file(pd->filename, &pd->value))) {
+                    char buffer[30 + 1];
+
+                    if(pd->fd == -1) {
+                        pd->fd = open(pd->filename, O_RDONLY, 0666);
+                        if(unlikely(pd->fd == -1)) {
+                            error("Cannot open file '%s'", pd->filename);
+                            read_error = 1;
+                            power_supply_free(ps);
+                            break;
+                        }
+                    }
+
+                    ssize_t r = read(pd->fd, buffer, 30);
+                    if(unlikely(r < 1)) {
                         error("Cannot read file '%s'", pd->filename);
                         read_error = 1;
                         power_supply_free(ps);
                         break;
                     }
+                    buffer[r] = '\0';
+                    pd->value = str2ull(buffer);
+
+                    if(!keep_fds_open) {
+                        close(pd->fd);
+                        pd->fd = -1;
+                    }
                 }
             }
         }
+    }
+
+    keep_fds_open = keep_fds_open_config;
+    if(keep_fds_open_config == CONFIG_BOOLEAN_AUTO) {
+        if(files_num > 32)
+            keep_fds_open = CONFIG_BOOLEAN_NO;
+        else
+            keep_fds_open = CONFIG_BOOLEAN_YES;
     }
 
     closedir(dir);
