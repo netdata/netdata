@@ -4405,7 +4405,7 @@ function handleMessage(e) {
 
 function initSignInModal() {
     const iframeEl = document.getElementById("sign-in-iframe");
-    iframeEl.src = cloudBaseURL + "/account/sign-in?iframe=" + encodeURIComponent(window.location.origin);
+    iframeEl.src = cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.addEventListener("message", handleMessage, false);
 }
 
