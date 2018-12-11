@@ -4347,7 +4347,7 @@ var netdataCallback = initializeDynamicDashboard;
 // =================================================================================================
 // netdata.cloud
 
-const hubBaseURL = "http://localhost:8080";
+const cloudBaseURL = "http://localhost:8080";
 
 function getURLParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
@@ -4358,7 +4358,7 @@ function getURLParameter(name) {
 
 function claimButtonDidClick() {
     window.open(
-        hubBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
+        cloudBaseURL + "/agents/claim?id=" + NETDATA.registry.machine_guid + 
         "&name=" + encodeURIComponent(NETDATA.registry.hostname) + "&url=" +
         encodeURIComponent(NETDATA.serverDefault), 
         "_blank"
@@ -4370,7 +4370,7 @@ function signOut() {
     renderAccountUI();
 }
 
-function renderAccountUI() {
+function renderAccountUI2() {
     const container = document.getElementById("account-ui");
     const accountName = localStorage.getItem("hub.accountName");
     if (accountName) {
@@ -4378,6 +4378,35 @@ function renderAccountUI() {
     } else {
         container.innerHTML = '<button onclick="claimButtonDidClick();">Sign In</button>';
     }
+}
+
+function renderAccountUI() {
+    const container = document.getElementById("account-menu-container");
+    const accountName = localStorage.getItem("hub.accountName");
+    if (accountName) {
+        container.innerHTML = `${accountName} &nbsp; <button onclick="signOut();">Sign Out</button>`;
+        container.innerHTML = (
+            `<a href="#" class="btn" onclick="signOut();">
+                <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
+            </a>`
+        )
+    } else {
+        container.innerHTML = (
+            `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal">
+                <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
+            </a>`
+        )
+    }
+}
+
+function handleMessage(e) {
+    console.log(e.data);
+}
+
+function initSignInModal() {
+    const iframeEl = document.getElementById("sign-in-iframe");
+    iframeEl.src = cloudBaseURL + "/account/sign-in?iframe=" + encodeURIComponent(window.location.origin);
+    window.addEventListener("message", handleMessage, false);
 }
 
 function initUI() {
@@ -4388,7 +4417,10 @@ function initUI() {
         history.pushState(null, "", `/${window.location.hash}`);
     }
 
+    initSignInModal();
+
     renderAccountUI();
+    renderAccountUI2();
 }
 
 if (document.readyState === "complete") {

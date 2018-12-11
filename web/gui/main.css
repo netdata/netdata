@@ -615,3 +615,8 @@ body.modal-open {
 #my-netdata-dropdown-content.theme-white a:hover {
     color: #000;
 }
+
+#sign-in-iframe {
+    background-color: #fff;
+    border: none;
+}
