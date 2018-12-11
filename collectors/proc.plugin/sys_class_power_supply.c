@@ -60,29 +60,35 @@ static struct power_supply *power_supply_root = NULL;
 static int files_num = 0;
 
 void power_supply_free(struct power_supply *ps) {
-    if(ps) {
-        if(ps->capacity) {
-            if(ps->capacity->st) rrdset_is_obsolete(ps->capacity->st);
+    if(likely(ps)) {
+
+        // free capacity structure
+        if(likely(ps->capacity)) {
+            if(likely(ps->capacity->st)) rrdset_is_obsolete(ps->capacity->st);
             freez(ps->capacity->filename);
-            if(ps->capacity->fd != -1) close(ps->capacity->fd);
+            if(likely(ps->capacity->fd != -1)) close(ps->capacity->fd);
             files_num--;
             freez(ps->capacity);
         }
         freez(ps->name);
 
         struct ps_property *pr = ps->property_root;
-        while(pr) {
+        while(likely(pr)) {
+
+            // free dimensions
             struct ps_property_dim *pd = pr->property_dim_root;
-            while(pd) {
+            while(likely(pd)) {
                 freez(pd->name);
                 freez(pd->filename);
-                if(pd->fd != -1) close(pd->fd);
+                if(likely(pd->fd != -1)) close(pd->fd);
                 files_num--;
                 struct ps_property_dim *d = pd;
                 pd = pd->next;
                 freez(d);
             }
-            if(pr->st) rrdset_is_obsolete(pr->st);
+
+            // free properties
+            if(likely(pr->st)) rrdset_is_obsolete(pr->st);
             freez(pr->name);
             freez(pr->title);
             freez(pr->units);
@@ -91,7 +97,8 @@ void power_supply_free(struct power_supply *ps) {
             freez(p);
         }
 
-        if(ps == power_supply_root) {
+        // remove power supply from linked list
+        if(likely(ps == power_supply_root)) {
             power_supply_root = ps->next;
         }
         else {
@@ -131,11 +138,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
     struct dirent *de = NULL;
     while(likely(de = readdir(dir))) {
-        if(de->d_type == DT_DIR
+        if(likely(de->d_type == DT_DIR
             && (
                 (de->d_name[0] == '.' && de->d_name[1] == '\0')
                 || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-                ))
+                )))
             continue;
 
         if(likely(de->d_type == DT_DIR)) {
@@ -170,12 +177,12 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     }
                 }
 
-                // allocate memory and initialize structures for every property and every file found
+                // allocate memory and initialize structures for every property and file found
                 size_t pr_idx, pd_idx;
                 size_t prev_idx = 3; // there is no property with this index
 
                 for(pr_idx = 0; pr_idx < 3; pr_idx++) {
-                    if(do_property[pr_idx] != CONFIG_BOOLEAN_NO) {
+                    if(unlikely(do_property[pr_idx] != CONFIG_BOOLEAN_NO)) {
                         struct ps_property *pr = NULL;
 
                         for(pd_idx = pr_idx * 5; pd_idx < pr_idx * 5 + 5; pd_idx++) {
@@ -187,7 +194,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             if (stat(filename, &stbuf) == 0) {
 
                                 // add chart
-                                if(prev_idx != pr_idx) {
+                                if(unlikely(prev_idx != pr_idx)) {
                                     pr = callocz(sizeof(struct ps_property), 1);
                                     pr->name = strdupz(ps_property_names[pr_idx]);
                                     pr->title = strdupz(ps_property_titles[pr_idx]);
@@ -213,10 +220,10 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             }
 
             // read capacity file
-            if(ps->capacity) {
+            if(likely(ps->capacity)) {
                 char buffer[30 + 1];
 
-                if(ps->capacity->fd == -1) {
+                if(unlikely(ps->capacity->fd == -1)) {
                     ps->capacity->fd = open(ps->capacity->filename, O_RDONLY, 0666);
                     if(unlikely(ps->capacity->fd == -1)) {
                         error("Cannot open file '%s'", ps->capacity->filename);
@@ -232,11 +239,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 buffer[r] = '\0';
                 ps->capacity->value = str2ull(buffer);
 
-                if(!keep_fds_open) {
+                if(unlikely(!keep_fds_open)) {
                     close(ps->capacity->fd);
                     ps->capacity->fd = -1;
                 }
-                else if(lseek(ps->capacity->fd, 0, SEEK_SET) == -1) {
+                else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
                     error("Cannot seek in file '%s'", ps->capacity->filename);
                     close(ps->capacity->fd);
                     ps->capacity->fd = -1;
@@ -251,7 +258,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 for(pd = pr->property_dim_root; pd; pd = pd->next) {
                     char buffer[30 + 1];
 
-                    if(pd->fd == -1) {
+                    if(unlikely(pd->fd == -1)) {
                         pd->fd = open(pd->filename, O_RDONLY, 0666);
                         if(unlikely(pd->fd == -1)) {
                             error("Cannot open file '%s'", pd->filename);
@@ -271,11 +278,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     buffer[r] = '\0';
                     pd->value = str2ull(buffer);
 
-                    if(!keep_fds_open) {
+                    if(unlikely(!keep_fds_open)) {
                         close(pd->fd);
                         pd->fd = -1;
                     }
-                    else if(lseek(pd->fd, 0, SEEK_SET) == -1) {
+                    else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
                         error("Cannot seek in file '%s'", pd->filename);
                         close(pd->fd);
                         pd->fd = -1;
@@ -285,28 +292,28 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         }
     }
 
+    closedir(dir);
+
     keep_fds_open = keep_fds_open_config;
-    if(keep_fds_open_config == CONFIG_BOOLEAN_AUTO) {
-        if(files_num > 32)
+    if(likely(keep_fds_open_config == CONFIG_BOOLEAN_AUTO)) {
+        if(unlikely(files_num > 32))
             keep_fds_open = CONFIG_BOOLEAN_NO;
         else
             keep_fds_open = CONFIG_BOOLEAN_YES;
     }
 
-    closedir(dir);
-
     // --------------------------------------------------------------------
 
     struct power_supply *ps = power_supply_root;
-    while(ps) {
-        if(!ps->found) {
+    while(unlikely(ps)) {
+        if(unlikely(!ps->found)) {
             struct power_supply *f = ps;
             ps = ps->next;
             power_supply_free(f);
             continue;
         }
 
-        if(ps->capacity) {
+        if(likely(ps->capacity)) {
             if(unlikely(!ps->capacity->st)) {
                 ps->capacity->st = rrdset_create_localhost(
                         "powersupply_capacity"
@@ -326,7 +333,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             else
                 rrdset_next(ps->capacity->st);
 
-            if(!ps->capacity->rd) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            if(unlikely(!ps->capacity->rd)) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
 
             rrdset_done(ps->capacity->st);
@@ -359,7 +366,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
             struct ps_property_dim *pd;
             for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                if(!pd->rd) pd->rd = rrddim_add(pr->st, pd->name, NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                if(unlikely(!pd->rd)) pd->rd = rrddim_add(pr->st, pd->name, NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(pr->st, pd->rd, pd->value);
             }
 
