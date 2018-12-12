@@ -4,7 +4,10 @@
 
 **Fixed bugs:**
 
+- Cannot read /proc/mdstat line. Expected 7 params, read 6. [\#4975](https://github.com/netdata/netdata/issues/4975)
+- Info logging command in netdata-updater.sh contains command substitution. [\#4950](https://github.com/netdata/netdata/issues/4950)
 - No data in charts [\#4920](https://github.com/netdata/netdata/issues/4920)
+- Postgres module: detect servers version and use the right query [\#4910](https://github.com/netdata/netdata/issues/4910)
 
 **Closed issues:**
 
@@ -15,13 +18,19 @@
 
 **Merged pull requests:**
 
+- Fix mdstat parsing [\#4977](https://github.com/netdata/netdata/pull/4977) ([vlvkobal](https://github.com/vlvkobal))
+- Fix accidentally changed file permissions [\#4974](https://github.com/netdata/netdata/pull/4974) ([vlvkobal](https://github.com/vlvkobal))
 - fix month 'Dec' being detected as IPv6 address in ovpn python.d plugin [\#4970](https://github.com/netdata/netdata/pull/4970) ([vpnable](https://github.com/vpnable))
+- Add support for Factorio server monitoring [\#4966](https://github.com/netdata/netdata/pull/4966) ([jonfairbanks](https://github.com/jonfairbanks))
+- Add mdstat to CMake configuration [\#4965](https://github.com/netdata/netdata/pull/4965) ([vlvkobal](https://github.com/vlvkobal))
 - dovecot readme update [\#4959](https://github.com/netdata/netdata/pull/4959) ([ilyam8](https://github.com/ilyam8))
 - Add cakrit to health codeowners [\#4953](https://github.com/netdata/netdata/pull/4953) ([cakrit](https://github.com/cakrit))
+- Prevent netdata-updater.sh from sending cron report for git stash entries [\#4952](https://github.com/netdata/netdata/pull/4952) ([cakrit](https://github.com/cakrit))
 - Temporary workaround for \#4945 [\#4951](https://github.com/netdata/netdata/pull/4951) ([cakrit](https://github.com/cakrit))
 - Fix link in streaming hosts list [\#4948](https://github.com/netdata/netdata/pull/4948) ([adherzog](https://github.com/adherzog))
 - Show demosite/host in GA for demo sites [\#4947](https://github.com/netdata/netdata/pull/4947) ([cakrit](https://github.com/cakrit))
 - Update GA in demosites.html [\#4946](https://github.com/netdata/netdata/pull/4946) ([cakrit](https://github.com/cakrit))
+- postgres fix: detect servers version and use the right query [\#4944](https://github.com/netdata/netdata/pull/4944) ([ilyam8](https://github.com/ilyam8))
 - Add support for providing FQDN in alarm notifications. [\#4943](https://github.com/netdata/netdata/pull/4943) ([Ferroin](https://github.com/Ferroin))
 - Add header to SMA webbox readme [\#4942](https://github.com/netdata/netdata/pull/4942) ([cakrit](https://github.com/cakrit))
 - Add doc before path to GA in static site [\#4940](https://github.com/netdata/netdata/pull/4940) ([cakrit](https://github.com/cakrit))
