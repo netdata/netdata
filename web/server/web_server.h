@@ -3,7 +3,7 @@
 #ifndef NETDATA_WEB_SERVER_H
 #define NETDATA_WEB_SERVER_H 1
 
-#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
 #include "web_client.h"
 
 #ifndef API_LISTEN_PORT
@@ -54,5 +54,7 @@ extern struct web_client *web_client_create_on_listenfd(int listener);
 #include "single/single-threaded.h"
 #include "multi/multi-threaded.h"
 #include "static/static-threaded.h"
+
+#include "daemon/common.h"
 
 #endif /* NETDATA_WEB_SERVER_H */

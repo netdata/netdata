@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-AUTOMAKE_OPTIONS=foreign subdir-objects 1.10
+AUTOMAKE_OPTIONS=foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
 MAINTAINERCLEANFILES= \
@@ -24,8 +24,7 @@ EXTRA_DIST = \
 	.eslintrc \
 	.lgtm.yml \
 	.travis \
-	build/build.sh
-	build/Dockerfile
+	.github/CODEOWNERS \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
 	build/m4/ax_check_enable_debug.m4 \
@@ -40,25 +39,49 @@ EXTRA_DIST = \
 	build/m4/ax_c__generic.m4 \
 	README.md \
 	CONTRIBUTORS.md \
+	CODE_OF_CONDUCT.md \
 	LICENSE \
 	REDISTRIBUTED.md \
+	CONTRIBUTING.md \
 	$(NULL)
 
 SUBDIRS = \
 	diagrams \
 	makeself \
 	system \
-	contrib \
 	tests \
 	$(NULL)
 
 dist_noinst_DATA= \
 	cppcheck.sh \
 	configs.signatures \
-	docker \
+	contrib \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
+	docs/Add-more-charts-to-netdata.md \
+	docs/Demo-Sites.md \
+	docs/Donations-netdata-has-received.md \
+	docs/Netdata-Security-and-Disclosure-Information.md \
+	docs/Performance.md \
+	docs/Running-behind-apache.md \
+	docs/Running-behind-caddy.md \
+	docs/Running-behind-lighttpd.md \
+	docs/Running-behind-nginx.md \
+	docs/Third-Party-Plugins.md \
+	docs/a-github-star-is-important.md \
+	docs/high-performance-netdata.md \
+	docs/netdata-for-IoT.md \
+	docs/netdata-security.md \
+	docs/Why-Netdata.md \
+	docs/GettingStarted.md \
+	docs/Charts.md \
+	docs/configuration-guide.md \
+	docs/generator/custom \
+	installer/README.md \
+	installer/UNINSTALL.md \
+	installer/UPDATE.md \
+	netlify.toml \
 	$(NULL)
 
 # until integrated within build
@@ -69,6 +92,11 @@ dist_noinst_SCRIPTS= \
 	kickstart-static64.sh \
 	netdata-installer.sh \
 	installer/functions.sh \
+	docs/generator/buildhtml.sh \
+	docs/generator/buildyaml.sh \
+	docs/generator/checklinks.sh \
+	docs/generator/requirements.txt \
+	docs/generator/runtime.txt \
 	$(NULL)
 
 # -----------------------------------------------------------------------------
@@ -77,6 +105,7 @@ dist_noinst_SCRIPTS= \
 SUBDIRS += \
     backends \
     collectors \
+    daemon \
     database \
     health \
     libnetdata \
@@ -210,6 +239,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/plugin_proc.c \
 	collectors/proc.plugin/plugin_proc.h \
 	collectors/proc.plugin/proc_diskstats.c \
+	collectors/proc.plugin/proc_mdstat.c \
 	collectors/proc.plugin/proc_interrupts.c \
 	collectors/proc.plugin/proc_softirqs.c \
 	collectors/proc.plugin/proc_loadavg.c \
@@ -280,12 +310,52 @@ RRD_PLUGIN_FILES = \
     $(NULL)
 
 API_PLUGIN_FILES = \
-    web/api/rrd2json.c \
-    web/api/rrd2json.h \
+    web/api/badges/web_buffer_svg.c \
+    web/api/badges/web_buffer_svg.h \
+    web/api/exporters/allmetrics.c \
+    web/api/exporters/allmetrics.h \
+    web/api/exporters/shell/allmetrics_shell.c \
+    web/api/exporters/shell/allmetrics_shell.h \
+    web/api/queries/average/average.c \
+    web/api/queries/average/average.h \
+    web/api/queries/des/des.c \
+    web/api/queries/des/des.h \
+    web/api/queries/incremental_sum/incremental_sum.c \
+    web/api/queries/incremental_sum/incremental_sum.h \
+    web/api/queries/max/max.c \
+    web/api/queries/max/max.h \
+    web/api/queries/median/median.c \
+    web/api/queries/median/median.h \
+    web/api/queries/min/min.c \
+    web/api/queries/min/min.h \
+    web/api/queries/query.c \
+    web/api/queries/query.h \
+    web/api/queries/rrdr.c \
+    web/api/queries/rrdr.h \
+    web/api/queries/ses/ses.c \
+    web/api/queries/ses/ses.h \
+    web/api/queries/stddev/stddev.c \
+    web/api/queries/stddev/stddev.h \
+    web/api/queries/sum/sum.c \
+    web/api/queries/sum/sum.h \
+    web/api/formatters/rrd2json.c \
+    web/api/formatters/rrd2json.h \
+    web/api/formatters/csv/csv.c \
+    web/api/formatters/csv/csv.h \
+    web/api/formatters/json/json.c \
+    web/api/formatters/json/json.h \
+    web/api/formatters/ssv/ssv.c \
+    web/api/formatters/ssv/ssv.h \
+    web/api/formatters/value/value.c \
+    web/api/formatters/value/value.h \
+    web/api/formatters/json_wrapper.c \
+    web/api/formatters/json_wrapper.h \
+    web/api/formatters/charts2json.c \
+    web/api/formatters/charts2json.h \
+    web/api/formatters/rrdset2json.c \
+    web/api/formatters/rrdset2json.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
-    web/api/web_buffer_svg.c \
-    web/api/web_buffer_svg.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \
@@ -405,7 +475,7 @@ NETDATA_COMMON_LIBS = \
 
 
 sbin_PROGRAMS += netdata
-netdata_SOURCES = ../config.h $(NETDATA_FILES)
+netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(OPTIONAL_NFACCT_LIBS) \
@@ -413,7 +483,7 @@ netdata_LDADD = \
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
-    apps_plugin_SOURCES = ../config.h $(APPS_PLUGIN_FILES)
+    apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
@@ -422,7 +492,7 @@ endif
 
 if ENABLE_PLUGIN_CGROUP_NETWORK
     plugins_PROGRAMS += cgroup-network
-    cgroup_network_SOURCES = ../config.h $(CGROUP_NETWORK_FILES)
+    cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(NULL)
@@ -430,7 +500,7 @@ endif
 
 if ENABLE_PLUGIN_FREEIPMI
     plugins_PROGRAMS += freeipmi.plugin
-    freeipmi_plugin_SOURCES = ../config.h $(FREEIPMI_PLUGIN_FILES)
+    freeipmi_plugin_SOURCES = $(FREEIPMI_PLUGIN_FILES)
     freeipmi_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \

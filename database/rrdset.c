@@ -206,6 +206,8 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
 
 inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
+
     RRDDIM *rd;
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
@@ -614,10 +616,10 @@ RRDSET *rrdset_create_custom(
         st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
-    st->plugin_name = plugin?strdup(plugin):NULL;
-    st->module_name = module?strdup(module):NULL;
+    st->plugin_name = plugin?strdupz(plugin):NULL;
+    st->module_name = module?strdupz(module):NULL;
 
-    st->config_section = strdup(config_section);
+    st->config_section = strdupz(config_section);
     st->rrdhost = host;
     st->memsize = size;
     st->entries = entries;
@@ -930,6 +932,8 @@ static inline size_t rrdset_done_interpolate(
     size_t stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
 
     usec_t first_ut = last_stored_ut, last_ut = 0;
+    (void)first_ut;
+
     ssize_t iterations = (ssize_t)((now_collect_ut - last_stored_ut) / (update_every_ut));
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
@@ -1076,7 +1080,7 @@ static inline size_t rrdset_done_interpolate(
                       , get_storage_number_flags(rd->values[current_entry])
                       , t1
                       , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
                 );
 
                 rd->collected_volume += t1;
@@ -1089,7 +1093,7 @@ static inline size_t rrdset_done_interpolate(
                       , rd->stored_volume
                       , rd->collected_volume
                       , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                      , (accuracy > ACCURACY_LOSS_ACCEPTED_PERCENT) ? " **TOO BIG** " : ""
                 );
             }
             #endif
@@ -1377,13 +1381,29 @@ void rrdset_done(RRDSET *st) {
                     if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                         storage_flags = SN_EXISTS_RESET;
 
-                    rd->last_collected_value = rd->collected_value;
-                }
+                    uint64_t last = (uint64_t)rd->last_collected_value;
+                    uint64_t new = (uint64_t)rd->collected_value;
+                    uint64_t max = (uint64_t)rd->collected_value_max;
+                    uint64_t cap = 0;
 
-                rd->calculated_value +=
-                        (calculated_number)(rd->collected_value - rd->last_collected_value)
-                        * (calculated_number)rd->multiplier
-                        / (calculated_number)rd->divisor;
+                         if(max > 0x00000000FFFFFFFFULL) cap = 0xFFFFFFFFFFFFFFFFULL;
+                    else if(max > 0x000000000000FFFFULL) cap = 0x00000000FFFFFFFFULL;
+                    else if(max > 0x00000000000000FFULL) cap = 0x000000000000FFFFULL;
+                    else                                 cap = 0x00000000000000FFULL;
+
+                    uint64_t delta = cap - last + new;
+
+                    rd->calculated_value +=
+                            (calculated_number) delta
+                            * (calculated_number) rd->multiplier
+                            / (calculated_number) rd->divisor;
+                }
+                else {
+                    rd->calculated_value +=
+                            (calculated_number) (rd->collected_value - rd->last_collected_value)
+                            * (calculated_number) rd->multiplier
+                            / (calculated_number) rd->divisor;
+                }
 
                 #ifdef NETDATA_INTERNAL_CHECKS
                 rrdset_debug(st, "%s: CALC INC PRE "

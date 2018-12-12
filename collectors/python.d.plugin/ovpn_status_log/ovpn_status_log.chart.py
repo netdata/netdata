@@ -8,7 +8,6 @@ from re import compile as r_compile
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
-retries = 60
 update_every = 10
 
 ORDER = ['users', 'traffic']
@@ -27,7 +26,7 @@ CHARTS = {
     }
 }
 
-TLS_REGEX = r_compile(r'(?:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)')
+TLS_REGEX = r_compile(r'(?:[0-9a-f]+:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)')
 STATIC_KEY_REGEX = r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)')
 
 

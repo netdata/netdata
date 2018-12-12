@@ -1,7 +1,8 @@
 #!/bin/bash
 
-if [ -f build.sh ]; then
-    cd ../ || exit 1
+if [ ! -f .gitignore ]; then
+	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
+	exit 1
 fi
 
 if [ "$IS_CONTAINER" != "" ]; then
@@ -10,13 +11,10 @@ if [ "$IS_CONTAINER" != "" ]; then
   make dist
   rm -rf autom4te.cache
 else
-  if [[ "$(docker images -q netdata-gcc-builder:latest 2> /dev/null)" == "" ]]; then
-      docker build -t netdata-gcc-builder:latest -f build/Dockerfile .
-  fi
   docker run --rm -it \
     --env IS_CONTAINER=TRUE \
     --volume "${PWD}:/project:Z" \
     --workdir "/project" \
-    netdata:gcc \
-    ./.travis/build.sh
+    netdata/builder:gcc \
+    ./build/build.sh
 fi

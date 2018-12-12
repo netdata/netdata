@@ -20,8 +20,7 @@ mem_apps_check() {
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
 
-	if [ -z "$mem_apps_apps" ]
-	then
+	if [ -z "$mem_apps_apps" ]; then
 		error "manual configuration required: please set mem_apps_apps='command1 command2 ...' in $confd/mem_apps_apps.conf"
 		return 1
 	fi
@@ -35,8 +34,7 @@ mem_apps_create() {
 	echo "CHART chartsd_apps.mem '' 'Apps Memory' MB apps apps.mem stacked 20000 $mem_apps_update_every"
 
 	local x=
-	for x in $mem_apps_apps
-	do
+	for x in $mem_apps_apps; do
 		echo "DIMENSION $x $x absolute 1 1024"
 
 		# this string is needed later in the update() function
@@ -52,9 +50,10 @@ mem_apps_update() {
 	# remember: KEEP IT SIMPLE AND SHORT
 
 	echo "BEGIN chartsd_apps.mem"
-	ps -o comm,rss -C "$mem_apps_apps" |\
-		grep -v "^COMMAND" |\
-		(	sed -e "s/ \+/ /g" -e "s/ /+=/g";
+	ps -o comm,rss -C "$mem_apps_apps" |
+		grep -v "^COMMAND" |
+		(
+			sed -e "s/ \+/ /g" -e "s/ /+=/g"
 			echo "$mem_apps_bc_finalze"
 		) | bc
 	echo "END"

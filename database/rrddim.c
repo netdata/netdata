@@ -239,6 +239,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_calculated_value = 0;
     rd->collected_value = 0;
     rd->last_collected_value = 0;
+    rd->collected_value_max = 0;
     rd->collected_volume = 0;
     rd->stored_volume = 0;
     rd->last_stored_value = 0;
@@ -379,6 +380,9 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
     rd->updated = 1;
 
     rd->collections_counter++;
+
+    collected_number v = (value >= 0) ? value : -value;
+    if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
 
     // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " CALCULATED_NUMBER_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (calculated_number)((value - rd->last_collected_value) * (calculated_number)rd->multiplier / (calculated_number)rd->divisor * 1000000.0 / (calculated_number)st->usec_since_last_update));
 

@@ -35,7 +35,7 @@ struct rrdcalctemplate {
     // database lookup settings
 
     char *dimensions;               // the chart dimensions
-    int group;                      // grouping method: average, max, etc.
+    RRDR_GROUPING group;               // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     uint32_t options;               // calculation options
@@ -58,7 +58,7 @@ struct rrdcalctemplate {
     struct rrdcalctemplate *next;
 };
 
-#define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
+#define RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) ((rt)->after)
 
 extern void rrdcalctemplate_link_matching(RRDSET *st);
 

@@ -454,6 +454,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 void procfile_print(procfile *ff) {
     size_t lines = procfile_lines(ff), l;
     char *s;
+    (void)s;
 
     debug(D_PROCFILE, "File '%s' with %zu lines and %zu words", procfile_filename(ff), ff->lines->len, ff->words->len);
 

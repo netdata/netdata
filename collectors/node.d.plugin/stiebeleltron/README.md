@@ -46,8 +46,6 @@ The charts are configurable, however, the provided default configuration collect
  
 ### configuration
 
-The default configuration is provided in [netdata/conf.d/node.d/stiebeleltron.conf.md](https://github.com/netdata/netdata/blob/master/conf.d/node.d/stiebeleltron.conf.md). Just change the `update_every` (if necessary) and hostnames. **You may have to adapt the configuration to suit your needs and setup** (which might be different).
-
 If no configuration is given, the module will be disabled. Each `update_every` is optional, the default is `10`.
 
 ---
@@ -78,7 +76,7 @@ In my case, the ISG is relatively slow with responding (at least 1s, but also up
 * The dimensions support variable digits, the default is `1`. Most of the values printed by ISG are using 1 digit, some use 2.
 * The dimensions also support the `multiplier` and `divisor` attributes, however the divisor gets overridden by `digits`, if specified. Default is `1`.
 * The test string for the regex is always the whole HTML output from the url. For each parameter you need to have a regular expression that extracts the value from the HTML source in the first capture group.
-  Recommended: [regexr.com](regexr.com) for testing and matching, [freeformatter.com](https://www.freeformatter.com/json-escape.html) for escaping the newly created regex for the JSON config.
+  Recommended: [regexr.com](https://regexr.com/) for testing and matching, [freeformatter.com](https://www.freeformatter.com/json-escape.html) for escaping the newly created regex for the JSON config.
 
 The charts are being generated using the configuration below. So if your installation is in another language or has other metrics, just adapt the structure or regexes.
 ### Configuration template
@@ -505,3 +503,5 @@ The charts are being generated using the configuration below. So if your install
     ]
 }
 ```
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fnode.d.plugin%2Fstiebeleltron%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

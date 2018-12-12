@@ -32,12 +32,42 @@ typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_DENY_NEW
 } RRDPUSH_MULTIPLE_CONNECTIONS_STRATEGY;
 
+static struct config stream_config = {
+        .sections = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+                .avl_tree = {
+                        .root = NULL,
+                        .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
+        }
+};
+
 unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
 
+static void load_stream_conf() {
+    errno = 0;
+    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
+    if(!appconfig_load(&stream_config, filename, 0)) {
+        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
+        freez(filename);
+
+        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
+        if(!appconfig_load(&stream_config, filename, 0))
+            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
+    }
+    freez(filename);
+}
+
 int rrdpush_init() {
+    // --------------------------------------------------------------------
+    // load stream.conf
+    load_stream_conf();
+
     default_rrdpush_enabled     = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
@@ -119,12 +149,25 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
+    // properly set the name for the remote end to parse it
+    char *name = "";
+    if(unlikely(strcmp(st->id, st->name))) {
+        // they differ
+        name = strchr(st->name, '.');
+        if(name)
+            name++;
+        else
+            name = "";
+    }
+
+    // info("CHART '%s' '%s'", st->id, name);
+
     // send the chart
     buffer_sprintf(
             host->rrdpush_sender_buffer
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
             , st->id
-            , st->name
+            , name
             , st->title
             , st->units
             , st->family
@@ -286,6 +329,8 @@ static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     int ret = rrdvar_callback_for_all_host_variables(host, rrdpush_sender_thread_custom_host_variables_callback, host);
+    (void)ret;
+
     debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
 }
 
@@ -509,6 +554,7 @@ void *rrdpush_sender_thread(void *ptr) {
     size_t reconnects_counter = 0;
     size_t sent_bytes = 0;
     size_t sent_bytes_on_this_connection = 0;
+    size_t send_attempts = 0;
 
 
     time_t last_sent_t = 0;
@@ -528,6 +574,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
             // if we don't have socket open, lets wait a bit
             if(unlikely(host->rrdpush_sender_socket == -1)) {
+                send_attempts = 0;
+
                 if(not_connected_loops == 0 && sent_bytes_on_this_connection > 0) {
                     // fast re-connection on first disconnect
                     sleep_usec(USEC_PER_MS * 500); // milliseconds
@@ -542,6 +590,9 @@ void *rrdpush_sender_thread(void *ptr) {
 
                     // reset the buffer, to properly send charts and metrics
                     rrdpush_sender_thread_data_flush(host);
+
+                    // send from the beginning
+                    begin = 0;
 
                     // make sure the next reconnection will be immediate
                     not_connected_loops = 0;
@@ -564,7 +615,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 continue;
             }
             else if(unlikely(now_monotonic_sec() - last_sent_t > timeout)) {
-                error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, timeout, sent_bytes_on_this_connection);
+                error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", host->hostname, connected_to, timeout, sent_bytes_on_this_connection, send_attempts);
                 rrdpush_sender_thread_close_socket(host);
             }
 
@@ -578,6 +629,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
                 ofd->events = POLLOUT;
                 fdmax = 2;
+                send_attempts++;
             }
             else {
                 debug(D_STREAM, "STREAM: Not requesting data output on streaming socket %d (nothing to send now)...", ofd->fd);
@@ -1062,7 +1114,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     char buf[GUID_LEN + 1];
 
     while(url) {
-        char *value = mystrsep(&url, "?&");
+        char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
 
         char *name = mystrsep(&value, "=");

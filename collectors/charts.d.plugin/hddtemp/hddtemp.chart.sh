@@ -21,7 +21,7 @@ hddtemp_priority=90000
 
 # _check is called once, to find out if this chart should be enabled or not
 hddtemp_check() {
-    require_cmd nc || return 1
+	require_cmd nc || return 1
 	run nc $hddtemp_host $hddtemp_port && return 0 || return 1
 }
 
@@ -29,17 +29,17 @@ hddtemp_check() {
 hddtemp_create() {
 	if [ ${#hddtemp_disks[@]} -eq 0 ]; then
 		local all
-		all=$(nc $hddtemp_host $hddtemp_port )
+		all=$(nc $hddtemp_host $hddtemp_port)
 		unset hddtemp_disks
 		# shellcheck disable=SC2190,SC2207
-		hddtemp_disks=( $(grep -Po '/dev/[^|]+' <<< "$all" | cut -c 6-) )
+		hddtemp_disks=($(grep -Po '/dev/[^|]+' <<<"$all" | cut -c 6-))
 	fi
-#	local disk_names
-#	disk_names=(`sed -e 's/||/\n/g;s/^|//' <<< "$all" | cut -d '|' -f2 | tr ' ' '_'`)
+	#	local disk_names
+	#	disk_names=(`sed -e 's/||/\n/g;s/^|//' <<< "$all" | cut -d '|' -f2 | tr ' ' '_'`)
 
 	echo "CHART hddtemp.temperature 'disks_temp' 'temperature' 'Celsius' 'Disks temperature' 'hddtemp.temp' line $((hddtemp_priority)) $hddtemp_update_every"
-	for i in $(seq 0 $((${#hddtemp_disks[@]}-1))); do
-#		echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
+	for i in $(seq 0 $((${#hddtemp_disks[@]} - 1))); do
+		#		echo "DIMENSION ${hddtemp_disks[i]} ${disk_names[i]} absolute 1 1"
 		echo "DIMENSION ${hddtemp_disks[$i]} '' absolute 1 1"
 	done
 	return 0
@@ -49,12 +49,12 @@ hddtemp_create() {
 #hddtemp_last=0
 #hddtemp_count=0
 hddtemp_update() {
-#        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
-#	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
+	#        local all=( `nc $hddtemp_host $hddtemp_port | sed -e 's/||/\n/g;s/^|//' | cut -d '|' -f3` )
+	#	local all=( `nc $hddtemp_host $hddtemp_port | awk 'BEGIN { FS="|" };{i=4; while (i <= NF) {print $i+0;i+=5;};}'` )
 	OLD_IFS=$IFS
 	set -f
 	# shellcheck disable=SC2207
-	IFS="|" all=( $(nc $hddtemp_host $hddtemp_port 2>/dev/null) )
+	IFS="|" all=($(nc $hddtemp_host $hddtemp_port 2>/dev/null))
 	set +f
 	IFS=$OLD_IFS
 
@@ -66,9 +66,9 @@ hddtemp_update() {
 	# write the result of the work.
 	echo "BEGIN hddtemp.temperature $1"
 	end=${#hddtemp_disks[@]}
-	for ((i=0; i<end; i++)); do
+	for ((i = 0; i < end; i++)); do
 		# temperature - this will turn SLP to zero
-                t=$(( ${all[ $((i * 5 + 3)) ]} ))
+		t=$((all[$((i * 5 + 3))]))
 		echo "SET ${hddtemp_disks[$i]} = $t"
 	done
 	echo "END"

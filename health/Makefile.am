@@ -3,31 +3,26 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-CLEANFILES = \
-	alarm-notify.sh \
-	$(NULL)
-
-include $(top_srcdir)/build/subst.inc
-SUFFIXES = .in
-
-dist_libconfig_DATA = \
-    health_alarm_notify.conf \
-    health_email_recipients.conf \
+SUBDIRS = \
+    notifications \
     $(NULL)
 
-dist_plugins_SCRIPTS = \
-	alarm-notify.sh \
-	alarm-email.sh \
-	alarm-test.sh \
+CLEANFILES = \
 	$(NULL)
 
 dist_noinst_DATA = \
-	alarm-notify.sh.in \
 	README.md \
 	$(NULL)
 
+userhealthconfigdir=$(configdir)/health.d
+dist_userhealthconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
+
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    health.d/adaptec_raid.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
     health.d/backend.conf \

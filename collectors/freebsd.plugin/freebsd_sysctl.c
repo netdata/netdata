@@ -86,6 +86,10 @@ typedef struct __vmmeter vmmeter_t;
 typedef struct vmmeter vmmeter_t;
 #endif
 
+#if (__FreeBSD_version >= 1101516 && __FreeBSD_version < 1200000) || __FreeBSD_version >= 1200015
+#define NETDATA_COLLECT_LAUNDRY 1
+#endif
+
 // --------------------------------------------------------------------------------------------------------------------
 // FreeBSD plugin initialization
 
@@ -961,7 +965,8 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
-               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
+               mib_cache_count[4] = {0, 0, 0, 0}, mib_laundry_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0},
+               mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
     int vfs_bufspace_count;
 
@@ -970,6 +975,9 @@ int do_system_ram(int update_every, usec_t dt) {
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_wire_count",     mib_wire_count,     vmmeter_data.v_wire_count) ||
 #if __FreeBSD_version < 1200016
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_cache_count",    mib_cache_count,    vmmeter_data.v_cache_count) ||
+#endif
+#if defined(NETDATA_COLLECT_LAUNDRY)
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_laundry_count",  mib_laundry_count,  vmmeter_data.v_laundry_count) ||
 #endif
                  GETSYSCTL_SIMPLE("vfs.bufspace",                 mib_vfs_bufspace,     vfs_bufspace_count) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_free_count,     vmmeter_data.v_free_count))) {
@@ -981,8 +989,8 @@ int do_system_ram(int update_every, usec_t dt) {
         // --------------------------------------------------------------------
 
         static RRDSET *st = NULL;
-        static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL,
-                      *rd_wired = NULL, *rd_cache = NULL, *rd_buffers = NULL;
+        static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL, *rd_wired = NULL,
+                      *rd_cache = NULL, *rd_laundry = NULL, *rd_buffers = NULL;
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -1007,6 +1015,9 @@ int do_system_ram(int update_every, usec_t dt) {
 #if __FreeBSD_version < 1200016
             rd_cache    = rrddim_add(st, "cache",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #endif
+#if defined(NETDATA_COLLECT_LAUNDRY)
+            rd_laundry  = rrddim_add(st, "laundry",  NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+#endif
             rd_buffers  = rrddim_add(st, "buffers",  NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
@@ -1017,6 +1028,9 @@ int do_system_ram(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count);
 #if __FreeBSD_version < 1200016
         rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count);
+#endif
+#if defined(NETDATA_COLLECT_LAUNDRY)
+        rrddim_set_by_pointer(st, rd_laundry,  vmmeter_data.v_laundry_count);
 #endif
         rrddim_set_by_pointer(st, rd_buffers,  vfs_bufspace_count);
         rrdset_done(st);

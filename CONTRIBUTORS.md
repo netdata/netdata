@@ -10,7 +10,7 @@ This agreement is part of the legal framework of the open-source ecosystem
 that adds some red tape, but protects both the contributor and the project.
 
 To understand why this is needed, please read [a well-written chapter from
-Karl Fogel’s Producing Open Source Software on CLAs](http://producingoss.com/en/copyright-assignment.html).
+Karl Fogel’s Producing Open Source Software on CLAs](https://producingoss.com/en/copyright-assignment.html).
 
 By signing this agreement, you do not change your rights to use your own
 contributions for any other purpose.
@@ -118,4 +118,9 @@ username|name|email (optional)
 @jonfairbanks|Jon Fairbanks
 @pjz|Paul Jimenez|pj@place.org
 @jgrossiord|Julien Grossiord|julien@grossiord.net
+@pohzipohzi|Poh Zi How
 @vladmovchan|Vladyslav Movchan|vladislav.movchan@gmail.com
+@gmosx|George Moschovitis
+@adherzog|Adam Herzog|adam@adamherzog.com
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTORS&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

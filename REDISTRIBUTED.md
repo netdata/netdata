@@ -1,18 +1,15 @@
-# Netdata
+# Redistributed software
 
-Copyright 2016-2017, Costa Tsaousis.
-Copyright 2017-2018, Netdata Inc.
-Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
+netdata copyright info:
+ Copyright 2016-2018, Costa Tsaousis.
+ Copyright 2018, Netdata Inc.
+ Released under [GPL v3 or later](LICENSE).
 
-Netdata uses SPDX license tags to identify the license for its files.
+netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
 
----
-
-## Re-distributed software
-
-Netdata re-distributes the following third-party software.
-We have decided to re-distribute all these, instead of using them
+netdata redistributes the following third-party software.
+We have decided to redistribute all these, instead of using them
 through a CDN, to allow netdata to work in cases where Internet
 connectivity is not available.
 
@@ -31,7 +28,7 @@ connectivity is not available.
 - [Gauge.js](http://bernii.github.io/gauge.js/)
 
     Copyright, Bernard Kobos
-    [MIT License](http://bernii.github.io/gauge.js/)
+    [MIT License](https://github.com/getgauge/gauge-js/blob/master/LICENSE)
 
 
 - [d3pie](https://github.com/benkeen/d3pie)
@@ -85,7 +82,7 @@ connectivity is not available.
 - [Bootstrap](http://getbootstrap.com/getting-started/)
 
     Copyright 2015, Twitter
-    [MIT License](http://getbootstrap.com/getting-started/#license-faqs)
+    [MIT License](https://github.com/twbs/bootstrap/blob/v4-dev/LICENSE)
 
 
 - [Bootstrap Toggle](http://www.bootstraptoggle.com/)
@@ -109,7 +106,7 @@ connectivity is not available.
 - [tableExport.jquery.plugin](https://github.com/hhurz/tableExport.jquery.plugin)
 
     Copyright (c) 2015,2016 hhurz
-    [MIT License](http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js)
+    [MIT License](https://github.com/hhurz/tableExport.jquery.plugin/blob/master/LICENSE)
 
 
 - [perfect-scrollbar](https://jamesflorentino.github.io/nanoScrollerJS/)
@@ -126,11 +123,6 @@ connectivity is not available.
     Code license: [MIT License](http://opensource.org/licenses/mit-license.html)
 
 
-- [IconsDB.com Icons](http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html)
-
-    Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-
-
 - [node-extend](https://github.com/justmoon/node-extend)
 
     Copyright 2014, Stefan Thomas
@@ -140,20 +132,20 @@ connectivity is not available.
 - [node-net-snmp](https://github.com/stephenwvickers/node-net-snmp)
 
     Copyright 2013, Stephen Vickers
-    [MIT License](https://github.com/stephenwvickers/node-net-snmp)
+    [MIT License](https://github.com/nospaceships/node-net-snmp#license)
 
 
 - [node-asn1-ber](https://github.com/stephenwvickers/node-asn1-ber)
 
     Copyright 2017, Stephen Vickers
     Copyright 2011, Mark Cavage
-    [MIT License](https://github.com/stephenwvickers/node-asn1-ber)
+    [MIT License](https://github.com/nospaceships/node-asn1-ber#license)
 
 
 - [pixl-xml](https://github.com/jhuckaby/pixl-xml)
 
     Copyright 2015, Joseph Huckaby
-    [MIT License](https://github.com/jhuckaby/pixl-xml)
+    [MIT License](https://github.com/jhuckaby/pixl-xml#license)
 
 
 - [sensors](https://github.com/paroj/sensors.py)
@@ -165,7 +157,7 @@ connectivity is not available.
 - [PyYAML](https://bitbucket.org/blackjack/pysensors)
 
     Copyright 2006, Kirill Simonov
-    [MIT License](https://github.com/yaml/pyyaml)
+    [MIT License](https://github.com/yaml/pyyaml/blob/master/LICENSE)
 
 
 - [urllib3](https://github.com/shazow/urllib3)
@@ -192,10 +184,10 @@ connectivity is not available.
     [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
 
 
-- [Utilities for writing code that runs on Python 2 and 3](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+- [Utilities for writing code that runs on Python 2 and 3](collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
 
     Copyright (c) 2010-2015 Benjamin Peterson
-    [MIT License](https://github.com/netdata/netdata/blob/master/python.d/python_modules/urllib3/packages/six.py)
+    [MIT License](https://github.com/benjaminp/six/blob/master/LICENSE)
 
 
 - [mcrcon](https://github.com/barneygale/MCRcon)
@@ -207,3 +199,5 @@ connectivity is not available.
 
     Copyright 2014, 2015, 2016 Ori Livneh <ori@wikimedia.org>
     [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FREDISTRIBUTED&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

@@ -9,7 +9,6 @@ from bases.FrameworkServices.UrlService import UrlService
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 priority = 60000
-retries = 60
 
 # see enum State_Type from monit.h (https://bitbucket.org/tildeslash/monit/src/master/src/monit.h)
 MONIT_SERVICE_NAMES = ['Filesystem', 'Directory', 'File', 'Process', 'Host', 'System', 'Fifo', 'Program', 'Net']

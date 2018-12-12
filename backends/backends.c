@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define BACKENDS_INTERNALS
 #include "backends.h"
 
 // ----------------------------------------------------------------------------
@@ -48,7 +49,7 @@ size_t backend_name_copy(char *d, const char *s, size_t usable) {
 // calculate the SUM or AVERAGE of a dimension, for any timeframe
 // may return NAN if the database does not have any value in the give timeframe
 
-inline calculated_number backend_calculate_value_from_stored_data(
+calculated_number backend_calculate_value_from_stored_data(
           RRDSET *st                // the chart
         , RRDDIM *rd                // the dimension
         , time_t after              // the start timestamp
@@ -58,6 +59,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
 
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
@@ -169,6 +171,7 @@ static SIMPLE_PATTERN *hosts_pattern = NULL;
 
 inline int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
+    (void)host;
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;

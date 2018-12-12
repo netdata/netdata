@@ -5,19 +5,15 @@
 AC_PREREQ(2.60)
 
 define([VERSION_MAJOR], [1])
-define([VERSION_MINOR], [10])
+define([VERSION_MINOR], [12])
 define([VERSION_FIX], [1])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
-define([VERSION_SUFFIX], [_rolling])
-
-dnl Set to "1" for a first RPM release of a new version
-PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)"
 
 # We do not use m4_esyscmd_s to support older autoconf.
 define([VERSION_STRING], m4_esyscmd(git describe 2>/dev/null | sed 's/^v//' | tr -d '\n'))
 m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_NUMBER)])
 
-AC_INIT([netdata], VERSION_STRING[]VERSION_SUFFIX)
+AC_INIT([netdata], VERSION_STRING[])
 
 AM_MAINTAINER_MODE([disable])
 if test x"$USE_MAINTAINER_MODE" = xyes; then
@@ -27,8 +23,6 @@ fi
 
 PACKAGE_RPM_VERSION="VERSION_NUMBER"
 AC_SUBST([PACKAGE_RPM_VERSION])
-AC_SUBST([PACKAGE_RPM_RELEASE])
-
 
 # -----------------------------------------------------------------------------
 # autoconf initialization
@@ -577,11 +571,11 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
-    contrib/Makefile
     daemon/Makefile
     database/Makefile
     diagrams/Makefile
     health/Makefile
+    health/notifications/Makefile
     libnetdata/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
@@ -607,6 +601,25 @@ AC_CONFIG_FILES([
     tests/Makefile
     web/Makefile
     web/api/Makefile
+    web/api/badges/Makefile
+    web/api/exporters/Makefile
+    web/api/exporters/shell/Makefile
+    web/api/exporters/prometheus/Makefile
+    web/api/formatters/Makefile
+    web/api/formatters/csv/Makefile
+    web/api/formatters/json/Makefile
+    web/api/formatters/ssv/Makefile
+    web/api/formatters/value/Makefile
+    web/api/queries/Makefile
+    web/api/queries/average/Makefile
+    web/api/queries/des/Makefile
+    web/api/queries/incremental_sum/Makefile
+    web/api/queries/max/Makefile
+    web/api/queries/median/Makefile
+    web/api/queries/min/Makefile
+    web/api/queries/ses/Makefile
+    web/api/queries/stddev/Makefile
+    web/api/queries/sum/Makefile
     web/gui/Makefile
     web/server/Makefile
     web/server/single/Makefile

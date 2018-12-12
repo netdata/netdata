@@ -44,23 +44,20 @@ example_get() {
 	example_value1=$RANDOM
 	example_value2=$RANDOM
 	example_value3=$RANDOM
-	example_value4=$((8192 + (RANDOM * 16383 / 32767) ))
+	example_value4=$((8192 + (RANDOM * 16383 / 32767)))
 
-	if [ $example_count -gt 0 ]
-	then
+	if [ $example_count -gt 0 ]; then
 		example_count=$((example_count - 1))
 
-		[ $example_last -gt 16383 ] && example_value4=$((example_last + (RANDOM * ( (32767 - example_last) / 2) / 32767)))
+		[ $example_last -gt 16383 ] && example_value4=$((example_last + (RANDOM * ((32767 - example_last) / 2) / 32767)))
 		[ $example_last -le 16383 ] && example_value4=$((example_last - (RANDOM * (example_last / 2) / 32767)))
 	else
-		example_count=$((1 + (RANDOM * 5 / 32767) ))
+		example_count=$((1 + (RANDOM * 5 / 32767)))
 
-		if [ $example_last -gt 16383 ] && [ $example_value4 -gt 16383 ]
-		then
+		if [ $example_last -gt 16383 ] && [ $example_value4 -gt 16383 ]; then
 			example_value4=$((example_value4 - 16383))
 		fi
-		if [ $example_last -le 16383 ] && [ $example_value4 -lt 16383 ]
-		then
+		if [ $example_last -le 16383 ] && [ $example_value4 -lt 16383 ]; then
 			example_value4=$((example_value4 + 16383))
 		fi
 	fi

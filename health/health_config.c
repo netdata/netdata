@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_HEALTH_INTERNALS
 #include "health.h"
 
 #define HEALTH_CONF_MAX_LINE 4096
@@ -54,7 +53,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             (rc->recipient)?rc->recipient:"DEFAULT",
             rc->green,
             rc->red,
-            rc->group,
+            (int)rc->group,
             rc->after,
             rc->before,
             rc->options,
@@ -85,7 +84,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
-    if(unlikely(!RRDCALCTEMPLATE_HAS_CALCULATION(rt) && !rt->warning && !rt->critical)) {
+    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
         error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rt->name);
         return 0;
     }
@@ -108,7 +107,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             (rt->recipient)?rt->recipient:"DEFAULT",
             rt->green,
             rt->red,
-            rt->group,
+            (int)rt->group,
             rt->after,
             rt->before,
             rt->options,
@@ -288,7 +287,7 @@ static inline uint32_t health_parse_options(const char *s) {
 
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
-        int *group_method, int *after, int *before, int *every,
+        RRDR_GROUPING *group_method, int *after, int *before, int *every,
         uint32_t *options, char **dimensions
 ) {
     debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
@@ -312,7 +311,7 @@ static inline int health_parse_db_lookup(
         return 0;
     }
 
-    if((*group_method = web_client_api_request_v1_data_group(key, -1)) == -1) {
+    if((*group_method = web_client_api_request_v1_data_group(key, RRDR_GROUPING_UNDEFINED)) == RRDR_GROUPING_UNDEFINED) {
         error("Health configuration at line %zu of file '%s': invalid group method '%s'",
                 line, filename, key);
         return 0;
@@ -854,6 +853,9 @@ static int health_readfile(const char *filename, void *data) {
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
-    if(unlikely(!host->health_enabled)) return;
+    if(unlikely(!host->health_enabled)) {
+        debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", host->hostname);
+        return;
+    }
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
 }

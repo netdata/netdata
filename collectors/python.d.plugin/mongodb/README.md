@@ -3,7 +3,7 @@
 Module monitor mongodb performance and health metrics
 
 **Requirements:**
- * `python-pymongo` package.
+ * `python-pymongo` package v2.4+.
 
 You need to install it manually.
 
@@ -121,6 +121,33 @@ Number of charts depends on mongodb version, storage engine and other features (
 26. **Replication set member heartbeat latency**
   * member (time when last heartbeat was received from replica set member)
 
+### prerequisite
+Create a read-only user for the netdata in the admin database.
+
+1. Authenticate as the admin user.
+
+```
+use admin
+db.auth("admin", "<MONGODB_ADMIN_PASSWORD>")
+```
+
+2. Create a user.
+
+```
+# MongoDB 2.x.
+db.addUser("netdata", "<UNIQUE_PASSWORD>", true)
+
+# MongoDB 3.x or higher.
+db.createUser({
+  "user":"netdata",
+  "pwd": "<UNIQUE_PASSWORD>",
+  "roles" : [
+    {role: 'read', db: 'admin' },
+    {role: 'clusterMonitor', db: 'admin'},
+    {role: 'read', db: 'local' }
+  ]
+})
+```
 
 ### configuration
 
@@ -139,3 +166,5 @@ local:
 If no configuration is given, module will attempt to connect to mongodb daemon on `127.0.0.1:27017` address
 
 ---
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fmongodb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

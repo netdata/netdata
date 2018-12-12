@@ -2,8 +2,6 @@
 
 The `ap` collector visualizes data related to access points.
 
-The source code is [here](https://github.com/netdata/netdata/blob/master/charts.d/ap.chart.sh).
-
 ## Example netdata charts
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/12377654/9f566e88-bd2d-11e5-855a-e0ba96b8fd98.png)
@@ -84,3 +82,5 @@ To edit this file on your system run `/etc/netdata/edit-config charts.d/ap.conf`
 ## Auto-detection
 
 The plugin is able to auto-detect if you are running access points on your linux box.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcharts.d.plugin%2Fap%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

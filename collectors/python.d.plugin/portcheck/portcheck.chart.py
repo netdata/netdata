@@ -14,7 +14,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 priority = 60000
-retries = 60
 
 PORT_LATENCY = 'connect'
 
@@ -103,7 +102,7 @@ class Service(SimpleService):
         return data
 
     def _create_socket(self, socket_config):
-        af, sock_type, proto, canon_name, sa = socket_config
+        af, sock_type, proto, _, sa = socket_config
         try:
             self.debug('Creating socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
             sock = socket.socket(af, sock_type, proto)
@@ -121,7 +120,7 @@ class Service(SimpleService):
         :return: dict
         """
 
-        af, sock_type, proto, canon_name, sa = socket_config
+        af, _, proto, _, sa = socket_config
         port = str(sa[1])
         try:
             self.debug('Connecting socket to "{address}", port {port}'.format(address=sa[0], port=port))

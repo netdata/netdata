@@ -19,24 +19,26 @@ dist_plugins_SCRIPTS = \
 dist_noinst_DATA = \
 	node.d.plugin.in \
 	README.md \
-	named/README.md \
-	fronius/README.md \
-	sma_webbox/README.md \
-	snmp/README.md \
-	stiebeleltron/README.md \
 	$(NULL)
+
+usernodeconfigdir=$(configdir)/node.d
+dist_usernodeconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
+    $(NULL)
 
 nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
+    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 dist_node_DATA = \
-	named/named.node.js \
-	fronius/fronius.node.js \
-	sma_webbox/sma_webbox.node.js \
-	snmp/snmp.node.js \
-	stiebeleltron/stiebeleltron.node.js \
 	$(NULL)
+
+include fronius/Makefile.inc
+include named/Makefile.inc
+include sma_webbox/Makefile.inc
+include snmp/Makefile.inc
+include stiebeleltron/Makefile.inc
 
 nodemodulesdir=$(nodedir)/node_modules
 dist_nodemodules_DATA = \

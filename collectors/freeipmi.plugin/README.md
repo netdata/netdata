@@ -1,8 +1,10 @@
-netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
+# freeipmi.plugin
+
+Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 > FreeIPMI provides in-band and out-of-band IPMI software based on the IPMI v1.5/2.0 specification. The IPMI specification defines a set of interfaces for platform management and is implemented by a number vendors for system management. The features of IPMI that most users will be interested in are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
-## compile `freeipmi.plugin`
+## Compile `freeipmi.plugin`
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 
@@ -12,7 +14,7 @@ Keep in mind IPMI requires root access, so the plugin is setuid to root.
 
 If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the netdata plugin will be able to work.
 
-## netdata use
+## Netdata use
 
 The plugin creates (up to) 8 charts, based on the information collected from IPMI:
 
@@ -87,7 +89,7 @@ The plugin supports a few options. To see them, run:
  options ipmi_si kipmid_max_busy_us=10
 
  For more information:
- https://github.com/ktsaou/netdata/tree/master/plugins/freeipmi.plugin
+ https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin
 
 ```
 
@@ -101,7 +103,7 @@ You can set these options in `/etc/netdata/netdata.conf` at this section:
 
 Append to `command options = ` the settings you need. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
 
-## ignoring specific sensors
+## Ignoring specific sensors
 
 Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`. **However this file is not used by `libipmimonitoring`** (the library used by netdata's `freeipmi.plugin`).
 
@@ -135,7 +137,7 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 ```
 
 
-## debugging
+## Debugging
 
 You can run the plugin by hand:
 
@@ -178,3 +180,5 @@ If you need to disable IPMI for netdata, edit `/etc/netdata/netdata.conf` and se
 [plugins]
     freeipmi = no
 ```
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ffreeipmi.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

@@ -12,7 +12,6 @@ from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
-retries = 60
 update_every = 30
 
 ORDER = ['name_server_statistics', 'incoming_queries', 'outgoing_queries', 'named_stats_size']

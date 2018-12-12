@@ -22,14 +22,12 @@ postfix_check() {
 	#  - 1 to disable the chart
 
 	# try to find the postqueue executable
-	if [ -z "$postfix_postqueue" ] || [ ! -x "$postfix_postqueue" ]
-	then
+	if [ -z "$postfix_postqueue" ] || [ ! -x "$postfix_postqueue" ]; then
 		# shellcheck disable=SC2230
 		postfix_postqueue="$(which postqueue 2>/dev/null || command -v postqueue 2>/dev/null)"
 	fi
 
-	if [ -z "$postfix_postqueue" ] || [ ! -x  "$postfix_postqueue" ]
-	then
+	if [ -z "$postfix_postqueue" ] || [ ! -x "$postfix_postqueue" ]; then
 		# shellcheck disable=SC2154
 		error "cannot find postqueue. Please set 'postfix_postqueue=/path/to/postqueue' in $confd/postfix.conf"
 		return 1
@@ -39,7 +37,7 @@ postfix_check() {
 }
 
 postfix_create() {
-cat <<EOF
+	cat <<EOF
 CHART postfix_local.qemails '' "Postfix Queue Emails" "emails" queue postfix.queued.emails line $((postfix_priority + 1)) $postfix_update_every
 DIMENSION emails '' absolute 1 1
 CHART postfix_local.qsize '' "Postfix Queue Emails Size" "emails size in KB" queue postfix.queued.size area $((postfix_priority + 2)) $postfix_update_every
@@ -70,9 +68,9 @@ postfix_update() {
 	postfix_q_emails=0
 	postfix_q_size=0
 
-	eval "$(run "$postfix_postqueue" -p |\
-		grep "^--" |\
-		sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" |\
+	eval "$(run "$postfix_postqueue" -p |
+		grep "^--" |
+		sed -e "s/-- \([0-9]\+\) Kbytes in \([0-9]\+\) Requests.$/local postfix_q_size=\1\nlocal postfix_q_emails=\2/g" |
 		grep -E "^local postfix_q_(emails|size)=[0-9]+$")"
 
 	# write the result of the work.

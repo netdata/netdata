@@ -3,7 +3,7 @@
 #ifndef NETDATA_RRDVAR_H
 #define NETDATA_RRDVAR_H 1
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
 extern int rrdvar_compare(void *a, void *b);
 
@@ -45,6 +45,12 @@ struct rrdvar {
     time_t last_updated;
 };
 
+#define RRDVAR_MAX_LENGTH 1024
+
+extern int rrdvar_fix_name(char *variable);
+
+#include "rrd.h"
+
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value);
 extern int foreach_host_variable_callback(RRDHOST *host, int (*callback)(RRDVAR *rv, void *data), void *data);
@@ -53,10 +59,6 @@ extern void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_l
 extern int  rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
 
 extern calculated_number rrdvar2number(RRDVAR *rv);
-
-#define RRDVAR_MAX_LENGTH 1024
-
-extern int rrdvar_fix_name(char *variable);
 
 extern RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value);
 extern void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv);

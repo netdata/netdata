@@ -448,19 +448,19 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
     listen_sockets_init(sockets);
 
-    sockets->backlog = (int) config_get_number(sockets->config_section, "listen backlog", sockets->backlog);
+    sockets->backlog = (int) appconfig_get_number(sockets->config, sockets->config_section, "listen backlog", sockets->backlog);
 
     long long int old_port = sockets->default_port;
-    long long int new_port = config_get_number(sockets->config_section, "default port", sockets->default_port);
+    long long int new_port = appconfig_get_number(sockets->config, sockets->config_section, "default port", sockets->default_port);
     if(new_port < 1 || new_port > 65535) {
         error("LISTENER: Invalid listen port %lld given. Defaulting to %lld.", new_port, old_port);
-        sockets->default_port = (uint16_t) config_set_number(sockets->config_section, "default port", old_port);
+        sockets->default_port = (uint16_t) appconfig_set_number(sockets->config, sockets->config_section, "default port", old_port);
     }
     else sockets->default_port = (uint16_t)new_port;
 
     debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 
-    char *s = config_get(sockets->config_section, "bind to", sockets->default_bind_to);
+    char *s = appconfig_get(sockets->config, sockets->config_section, "bind to", sockets->default_bind_to);
     while(*s) {
         char *e = s;
 
@@ -591,6 +591,8 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
         switch (ai->ai_addr->sa_family) {
             case PF_INET: {
                 struct sockaddr_in *pSadrIn = (struct sockaddr_in *)ai->ai_addr;
+                (void)pSadrIn;
+
                 debug(D_CONNECT_TO, "ai_addr = sin_family: %d (AF_INET = %d, AF_INET6 = %d), sin_addr: '%s', sin_port: '%s'",
                       pSadrIn->sin_family,
                       AF_INET,
@@ -602,6 +604,8 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
 
             case PF_INET6: {
                 struct sockaddr_in6 *pSadrIn6 = (struct sockaddr_in6 *) ai->ai_addr;
+                (void)pSadrIn6;
+
                 debug(D_CONNECT_TO,"ai_addr = sin6_family: %d (AF_INET = %d, AF_INET6 = %d), sin6_addr: '%s', sin6_port: '%s', sin6_flowinfo: %u, sin6_scope_id: %u",
                       pSadrIn6->sin6_family,
                       AF_INET,
@@ -1431,6 +1435,8 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     usec_t timer_usec = timer_milliseconds * USEC_PER_MS;
     usec_t now_usec = 0, next_timer_usec = 0, last_timer_usec = 0;
+    (void)last_timer_usec;
+
     if(unlikely(timer_usec)) {
         now_usec = now_boottime_usec();
         next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;

@@ -231,7 +231,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
     host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = strdup("root");
+    host->health_default_recipient = strdupz("root");
 
 
     // ------------------------------------------------------------------------

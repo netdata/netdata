@@ -16,7 +16,6 @@ from bases.FrameworkServices.UrlService import UrlService
 # default module values (can be overridden per job in `config`)
 update_every = 3
 priority = 60000
-retries = 60
 
 # Response
 HTTP_RESPONSE_TIME = 'time'

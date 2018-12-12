@@ -1,4 +1,4 @@
-# Data Collection Plugins
+# Data collection plugins
 
 netdata supports **internal** and **external** data collection plugins:
 
@@ -15,9 +15,9 @@ To minimize the number of processes spawn for data collection, netdata also supp
    data collection modules with the minimum of code.
    
    Currently netdata provides plugin orchestrators
-   BASH v4+ [charts.d.plugin](charts.d.plugin),
-   node.js [node.d.plugin](node.d.plugin) and
-   python v2+ (including v3) [python.d.plugin](python.d.plugin).
+   BASH v4+ [charts.d.plugin](charts.d.plugin/),
+   node.js [node.d.plugin](node.d.plugin/) and
+   python v2+ (including v3) [python.d.plugin](python.d.plugin/).
 
 ## Netdata Plugins
 
@@ -30,7 +30,7 @@ plugin|lang|O/S|runs as|modular|description
 [diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points
 [fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
 [freebsd.plugin](freebsd.plugin/)|`C`|freebsd|internal|yes|collects resource usage and performance data on FreeBSD systems
-[freeipmi.plugin](freeipmi.plugin/)|`C`|linux|external|-|collects metrics from enterprise hardware sensors, on Linux servers.
+[freeipmi.plugin](freeipmi.plugin/)|`C`|linux, freebsd|external|-|collects metrics from enterprise hardware sensors, on Linux and FreeBSD servers.
 [idlejitter.plugin](idlejitter.plugin/)|`C`|any|internal|-|measures CPU latency and jitter on all operating systems
 [macos.plugin](macos.plugin/)|`C`|macos|internal|yes|collects resource usage and performance data on MacOS systems
 [nfacct.plugin](nfacct.plugin/)|`C`|linux|internal|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
@@ -116,3 +116,5 @@ The best way to find your way through this, is to examine what other similar plu
 
 **External plugins** use the API and are managed by [plugins.d](plugins.d/).
 
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

@@ -9,7 +9,6 @@
 5. Allows each **module** to have one or more data collection **jobs**
 6. Each **job** is collecting one or more metrics from a single data source
 
-
 ## Disclaimer
 
 Every module should be compatible with python2 and python3.
@@ -22,7 +21,6 @@ Every configuration file must have one of two formats:
 
 ```yaml
 update_every : 2 # update frequency
-retries      : 1 # how many failures in update() is tolerated
 priority     : 20000 # where it is shown on dashboard
 
 other_var1   : bla  # variables passed to module
@@ -34,7 +32,6 @@ other_var2   : alb
 ```yaml
 # module defaults:
 update_every : 2
-retries      : 1
 priority     : 20000
 
 local:  # job name
@@ -43,13 +40,25 @@ local:  # job name
 
 other_job:
   priority     : 5 # job position on dashboard
-  retries      : 20 # job retries
   other_var2   : val # module specific variable
 ```
 
-`update_every`, `retries`, and `priority` are always optional.
+`update_every` and `priority` are always optional.
 
----
+## How to debug a python module
+
+```
+# become user netdata
+sudo su -s /bin/bash netdata
+```
+Depending on where Netdata was installed, execute one of the following commands to trace the execution of a python module:
+
+```
+# execute the plugin in debug mode, for a specific module
+/opt/netdata/usr/libexec/netdata/plugins.d/python.d.plugin <module> debug trace
+/usr/libexec/netdata/plugins.d/python.d.plugin <module> debug trace
+```
+Where `[module]` is the directory name under https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin 
 
 ## How to write a new module
 
@@ -60,7 +69,9 @@ Writing new python module is simple. You just need to remember to include 5 majo
 - **_get_data** method
 - all code needs to be compatible with Python 2 (**≥ 2.7**) *and* 3 (**≥ 3.1**)
 
-If you plan to submit the module in a PR, make sure and go through the [PR checklist for new modules](https://github.com/netdata/netdata/wiki/New-Module-PR-Checklist) beforehand to make sure you have updated all the files you need to.
+If you plan to submit the module in a PR, make sure and go through the [PR checklist for new modules](#pull-request-checklist-for-python-plugins) beforehand to make sure you have updated all the files you need to. 
+
+For a quick start, you can look at the [example plugin](example/example.chart.py).
 
 ### Global variables `ORDER` and `CHART`
 
@@ -196,3 +207,19 @@ Sockets are accessed in non-blocking mode with 15 second timeout.
 After every execution of `_get_raw_data` socket is closed, to prevent this module needs to set `_keep_alive` variable to `True` and implement custom `_check_raw_data` method.
 
 `_check_raw_data` should take raw data and return `True` if all data is received otherwise it should return `False`. Also it should do it in fast and efficient way.
+
+## Pull Request Checklist for Python Plugins
+
+This is a generic checklist for submitting a new Python plugin for Netdata.  It is by no means comprehensive.
+
+At minimum, to be buildable and testable, the PR needs to include:
+
+* The module itself, following proper naming conventions: `python.d/<module_dir>/<module_name>.chart.py`
+* A README.md file for the plugin under `python.d/<module_dir>`. 
+* The configuration file for the module: `conf.d/python.d/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md 
+* A basic configuration for the plugin in the appropriate global config file: `conf.d/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
+* A line for the plugin in `python.d/Makefile.am` under `dist_python_DATA`.
+* A line for the plugin configuration file in `conf.d/Makefile.am`, under `dist_pythonconfig_DATA`
+* Optionally, chart information in `web/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

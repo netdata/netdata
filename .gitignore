@@ -30,6 +30,7 @@ ltmain.sh
 missing
 stamp-h1
 netdata.spec
+sha256sums.txt
 
 # netdata binaries
 netdata
@@ -44,7 +45,8 @@ freeipmi.plugin
 cgroup-network
 !cgroup-network/
 
-# netdata makeself archives
+# installation artifacts
+installer/.environment.sh
 *.tar.*
 *.run
 
@@ -87,7 +89,7 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 
-health/alarm-notify.sh
+health/notifications/alarm-notify.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
@@ -101,6 +103,7 @@ netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
+cmake-build-release/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
@@ -130,6 +133,7 @@ tests/profile/benchmark-registry
 tests/profile/test-eval
 tests/profile/benchmark-line-parsing
 tests/profile/benchmark-procfile-parser
+tests/profile/benchmark-value-pairs
 tests/profile/statsd-stress
 oprofile_data/
 vgcore.*
@@ -140,3 +144,8 @@ sitespeed-result/
 
 # tests and temp files
 python.d/python-modules-installer.sh
+
+# documentation generated files
+docs/generator/src
+docs/generator/build
+docs/generator/mkdocs.yml

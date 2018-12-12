@@ -2,6 +2,18 @@
 
 #include "common.h"
 
+struct config netdata_config = {
+        .sections = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+                .avl_tree = {
+                        .root = NULL,
+                        .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
+        }
+};
+
 void netdata_cleanup_and_exit(int ret) {
     // enabling this, is wrong
     // because the threads will be cancelled while cleaning up
@@ -216,6 +228,7 @@ struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
     { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
+    { 'd', "Fork. Run in the background.",                NULL,          "run in the background"},
     { 'h', "Display this help message.",                  NULL,          NULL},
     { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
     { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
@@ -645,20 +658,6 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
-static void load_stream_conf() {
-    errno = 0;
-    char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
-    if(!appconfig_load(&stream_config, filename, 0)) {
-        info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
-        freez(filename);
-
-        filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        if(!appconfig_load(&stream_config, filename, 0))
-            info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
-    }
-    freez(filename);
-}
-
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
@@ -730,6 +729,9 @@ int main(int argc, char **argv) {
                     break;
                 case 'D':
                     dont_fork = 1;
+                    break;
+                case 'd':
+                    dont_fork = 0;
                     break;
                 case 'h':
                     return help(0);
@@ -964,11 +966,6 @@ int main(int argc, char **argv) {
 
         log_init();
         error_log_limit_unlimited();
-
-
-        // --------------------------------------------------------------------
-        // load stream.conf
-        load_stream_conf();
 
 
         // --------------------------------------------------------------------

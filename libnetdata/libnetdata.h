@@ -204,26 +204,6 @@
 
 #define GUID_LEN 36
 
-#include "os.h"
-#include "storage_number/storage_number.h"
-#include "buffer/buffer.h"
-#include "locks/locks.h"
-#include "avl/avl.h"
-#include "inlined.h"
-#include "clocks/clocks.h"
-#include "threads/threads.h"
-#include "popen/popen.h"
-#include "simple_pattern/simple_pattern.h"
-#include "socket/socket.h"
-#include "config/appconfig.h"
-#include "log/log.h"
-#include "procfile/procfile.h"
-#include "dictionary/dictionary.h"
-#include "eval/eval.h"
-#include "statistical/statistical.h"
-#include "adaptive_resortable_list/adaptive_resortable_list.h"
-#include "url/url.h"
-
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 
@@ -237,6 +217,7 @@ extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4
 
 // memory allocation functions that handle failures
 #ifdef NETDATA_LOG_ALLOCATIONS
+extern __thread size_t log_thread_memory_allocations;
 #define strdupz(s) strdupz_int(__FILE__, __FUNCTION__, __LINE__, s)
 #define callocz(nmemb, size) callocz_int(__FILE__, __FUNCTION__, __LINE__, nmemb, size)
 #define mallocz(size) mallocz_int(__FILE__, __FUNCTION__, __LINE__, size)
@@ -248,13 +229,13 @@ extern void *callocz_int(const char *file, const char *function, const unsigned 
 extern void *mallocz_int(const char *file, const char *function, const unsigned long line, size_t size);
 extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
 extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
-#else
+#else // NETDATA_LOG_ALLOCATIONS
 extern char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
 extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
 extern void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 extern void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 extern void freez(void *ptr);
-#endif
+#endif // NETDATA_LOG_ALLOCATIONS
 
 extern void json_escape_string(char *dst, const char *src, size_t size);
 extern void json_fix_string(char *s);
@@ -267,8 +248,6 @@ extern int fd_is_valid(int fd);
 extern struct rlimit rlimit_nofile;
 
 extern int enable_ksm;
-
-extern int sleep_usec(usec_t usec);
 
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
@@ -305,5 +284,25 @@ extern void recursive_config_double_dir_load(
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern char *netdata_configured_host_prefix;
+
+#include "os.h"
+#include "storage_number/storage_number.h"
+#include "threads/threads.h"
+#include "buffer/buffer.h"
+#include "locks/locks.h"
+#include "avl/avl.h"
+#include "inlined.h"
+#include "clocks/clocks.h"
+#include "popen/popen.h"
+#include "simple_pattern/simple_pattern.h"
+#include "socket/socket.h"
+#include "config/appconfig.h"
+#include "log/log.h"
+#include "procfile/procfile.h"
+#include "dictionary/dictionary.h"
+#include "eval/eval.h"
+#include "statistical/statistical.h"
+#include "adaptive_resortable_list/adaptive_resortable_list.h"
+#include "url/url.h"
 
 #endif // NETDATA_LIB_H

@@ -2,10 +2,10 @@
 
 var netdataDashboard = window.netdataDashboard || {};
 
-// ----------------------------------------------------------------------------
-// menus
+// Informational content for the various sections of the GUI (menus, sections, charts, etc.)
 
-// information about the main menus
+// ----------------------------------------------------------------------------
+// Menus
 
 netdataDashboard.menu = {
     'system': {
@@ -31,7 +31,7 @@ netdataDashboard.menu = {
         title: 'Quality of Service',
         icon: '<i class="fas fa-globe"></i>',
         info: 'Netdata collects and visualizes <code>tc</code> class utilization using its ' +
-            '<a href="https://github.com/netdata/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. ' +
+            '<a href="https://github.com/netdata/netdata/blob/master/collectors/tc.plugin/tc-qos-helper.sh.in" target="_blank">tc-helper plugin</a>. ' +
             'If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, ' +
             'netdata automatically collects interface and class names. If your QoS configuration includes overheads ' +
             'calculation, the values shown here will include these overheads (the total bandwidth for the same ' +
@@ -163,7 +163,7 @@ netdataDashboard.menu = {
     'apps': {
         title: 'Applications',
         icon: '<i class="fas fa-heartbeat"></i>',
-        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/netdata/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code>, which can be edited by running <code>$ /etc/netdata/edit-config apps_groups.conf</code> (the default is <a href="https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
@@ -892,7 +892,7 @@ netdataDashboard.context = {
     },
 
     'apps.vmem': {
-        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated by applications. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'apps.preads': {
@@ -915,7 +915,7 @@ netdataDashboard.context = {
     },
 
     'users.vmem': {
-        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'users.preads': {
@@ -938,7 +938,7 @@ netdataDashboard.context = {
     },
 
     'groups.vmem': {
-        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/netdata/netdata/wiki/netdata-virtual-memory-size" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'groups.preads': {
@@ -2021,7 +2021,7 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the spac elisted as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated</code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).  Note that some of the space listed as <code>unallocated</code> may not actually be usable if the volume uses devices of different sizes.',
         colors: [NETDATA.colors[12]]
     },
 
@@ -2249,6 +2249,72 @@ netdataDashboard.context = {
 
     'logind.seats': {
         info: 'Shows the number of active seats tracked by logind.  Each seat corresponds to a combination of a display device and input device providing a physical presence for the system.'
+    },
+
+    // ------------------------------------------------------------------------
+    // ProxySQL
+
+    'proxysql.pool_status': {
+        info: 'The status of the backend servers. ' +
+        '<code>1=ONLINE</code> backend server is fully operational, ' +
+        '<code>2=SHUNNED</code> backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold, ' +
+        '<code>3=OFFLINE_SOFT</code> when a server is put into OFFLINE_SOFT mode, new incoming connections aren\'t accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend, ' +
+        '<code>4=OFFLINE_HARD</code> when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren\'t accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work, ' +
+        '<code>-1</code> Unknown status.'
+    },
+
+    'proxysql.pool_net': {
+        info: 'The amount of data sent to/received from the backend ' +
+        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+    },
+
+    'proxysql.pool_overall_net': {
+        info: 'The amount of data sent to/received from the all backends ' +
+        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+    },
+
+    'proxysql.questions': {
+        info: '<code>questions</code> total number of queries sent from frontends, ' +
+        '<code>slow_queries</code> number of queries that ran for longer than the threshold in milliseconds defined in global variable <code>mysql-long_query_time</code>. '
+    },
+
+    'proxysql.connections': {
+        info: '<code>aborted</code> number of frontend connections aborted due to invalid credential or max_connections reached, ' +
+        '<code>connected</code> number of frontend connections currently connected, ' +
+        '<code>created</code> number of frontend connections created, ' +
+        '<code>non_idle</code> number of frontend connections that are not currently idle. '
+    },
+
+    'proxysql.pool_latency': {
+        info: 'The currently ping time in microseconds, as reported from Monitor.'
+    },
+
+    'proxysql.queries': {
+        info: 'The number of queries routed towards this particular backend server.'
+    },
+
+    'proxysql.pool_used_connections': {
+        info: 'The number of connections are currently used by ProxySQL for sending queries to the backend server.'
+    },
+
+    'proxysql.pool_free_connections': {
+        info: 'The number of connections are currently free. They are kept open in order to minimize the time cost of sending a query to the backend server.'
+    },
+
+    'proxysql.pool_ok_connections': {
+        info: 'The number of connections were established successfully.'
+    },
+
+    'proxysql.pool_error_connections': {
+        info: 'The number of connections weren\'t established successfully.'
+    },
+
+    'proxysql.commands_count': {
+        info: 'The total number of commands of that type executed'
+    },
+
+    'proxysql.commands_duration': {
+        info: 'The total time spent executing commands of that type, in ms'
     }
 
     // ------------------------------------------------------------------------

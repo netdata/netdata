@@ -2,19 +2,20 @@
 
 #include "../libnetdata.h"
 
-storage_number pack_storage_number(calculated_number value, uint32_t flags)
-{
+storage_number pack_storage_number(calculated_number value, uint32_t flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
-    // bit 27, 26, 25 flags
+    // bit 27 SN_EXISTS_100
+    // bit 26 SN_EXISTS_RESET
+    // bit 25 SN_EXISTS
     // bit 24 to bit 1 = the value
 
     storage_number r = get_storage_number_flags(flags);
     if(!value) return r;
 
     int m = 0;
-    calculated_number n = value;
+    calculated_number n = value, factor = 10;
 
     // if the value is negative
     // add the sign bit and make it positive
@@ -23,11 +24,16 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags)
         n = -n;
     }
 
+    if(n / 10000000.0 > 0x00ffffff) {
+        factor = 100;
+        r |= SN_EXISTS_100;
+    }
+
     // make its integer part fit in 0x00ffffff
     // by dividing it by 10 up to 7 times
     // and increasing the multiplier
     while(m < 7 && n > (calculated_number)0x00ffffff) {
-        n /= 10;
+        n /= factor;
         m++;
     }
 
@@ -71,35 +77,44 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags)
     return r;
 }
 
-calculated_number unpack_storage_number(storage_number value)
-{
+calculated_number unpack_storage_number(storage_number value) {
     if(!value) return 0;
 
     int sign = 0, exp = 0;
+    int factor = 10;
 
-    value ^= get_storage_number_flags(value);
-
-    if(value & (1 << 31)) {
+    // bit 32 = 0:positive, 1:negative
+    if(unlikely(value & (1 << 31)))
         sign = 1;
-        value ^= 1 << 31;
-    }
 
-    if(value & (1 << 30)) {
+    // bit 31 = 0:divide, 1:multiply
+    if(unlikely(value & (1 << 30)))
         exp = 1;
-        value ^= 1 << 30;
-    }
 
-    int mul = value >> 27;
-    value ^= mul << 27;
+    // bit 27 SN_EXISTS_100
+    if(unlikely(value & (1 << 26)))
+        factor = 100;
+
+    // bit 26 SN_EXISTS_RESET
+    // bit 25 SN_EXISTS
+
+    // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
+    int mul = (value & ((1<<29)|(1<<28)|(1<<27))) >> 27;
+
+    // bit 24 to bit 1 = the value, so remove all other bits
+    value ^= value & ((1<<31)|(1<<30)|(1<<29)|(1<<28)|(1<<27)|(1<<26)|(1<<25)|(1<<24));
 
     calculated_number n = value;
 
-    // fprintf(stderr, "UNPACK: %08X, sign = %d, exp = %d, mul = %d, n = " CALCULATED_NUMBER_FORMAT "\n", value, sign, exp, mul, n);
+    // fprintf(stderr, "UNPACK: %08X, sign = %d, exp = %d, mul = %d, factor = %d, n = " CALCULATED_NUMBER_FORMAT "\n", value, sign, exp, mul, factor, n);
 
-    while(mul > 0) {
-        if(exp) n *= 10;
-        else n /= 10;
-        mul--;
+    if(exp) {
+        for(; mul; mul--)
+            n *= factor;
+    }
+    else {
+        for( ; mul ; mul--)
+            n /= 10;
     }
 
     if(sign) n = -n;

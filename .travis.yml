@@ -1,94 +1,88 @@
----
 dist: trusty
 sudo: true
-
-# C includes autotools and make by default
 language: c
 services:
-  - docker
+- docker
 
 stages:
-  - lint
-  - test
-  - build
-  - name: release
-    if: branch = master AND type != pull_request
-  - name: package
-    if: branch = master AND type != pull_request
+- test
+- build
+- name: packaging
+  if: branch = master AND type != pull_request AND type != cron
+- name: nightlies
+  if: branch = master AND type = cron
 
 jobs:
   include:
-    - stage: "lint"
-      name: "python"
-      install: skip
-      script: docker run -ti --rm -v $(pwd):/apps alpine/flake8:3.5.0 --max-line-length=120 --exclude=third_party,urllib3,pyyaml3,pyyaml2 python.d/ plugins.d/python.d.plugin
-    - name: "javascript"
-      install: skip
-      script: docker run -it --rm -v $(pwd)/web:/code eeacms/jslint --color /code/web/*.js /code/plugins.d/node.d.plugin/*.js /code/node.d/*.js /code/node.d/node_modules/netdata.js
-    - name: "css"
-      install: skip
-      script: docker run --rm -v $(pwd)/web:/code eeacms/csslint sh -c "csslint /code/*.css" || echo "OK"
-    - name: "bash"
-      install: skip
-      script: docker run --rm --volume "$(pwd)":/project:ro --entrypoint sh koalaman/shellcheck-alpine:v0.5.0 -c 'for file in $(find /project/ -type f -name "*.sh" ! -path "*/makeself/*" ); do if ! shellcheck --format=gcc $file; then export FAILED=true; fi; done; if [ "$FAILED" != "" ]; then exit 1; fi'
-    - stage: "test"
-      name: "C"
-      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
-      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
-#      env: CFLAGS='-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
-#    - name: "Node.js"
-#      script: tests/run_nodejs.sh
-    - name: "coverity"
-      install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-      script: ./coverity-scan.sh || echo "Coverity failed :("
-      env: INSTALL_COVERITY="true"
-      if: type = cron
+  - stage: test
+    name: C
+    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
+    env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+  - name: dashboard.js
+    script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
+  - name: coverity
+    install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
+    script: ./coverity-scan.sh || echo "Coverity failed :("
+    env: INSTALL_COVERITY="true"
+    if: type = cron
 
-    - stage: "build"
-      name: "OSX"
-      install: brew install fakeroot ossp-uuid
-      script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-      os: osx
-    - name: "ubuntu 14.04 (not containerized)"
-      install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME 
-    - name: "ubuntu 18.04"
-      script: ./.travis/containerized_build.sh ubuntu1804
-    - name: "CentOS 7"
-      script: ./.travis/containerized_build.sh centos7
-    - name: "CentOS 6"
-      script: ./.travis/containerized_build.sh centos6
-    - name: "alpine"
-      script: ./.travis/containerized_build.sh alpine
+  - stage: build
+    name: OSX
+    install: brew install fakeroot ossp-uuid
+    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+    os: osx
+  - name: ubuntu 14.04 (not containerized)
+    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
+    script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
+  - name: alpine + lifecycle
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:alpine" ./tests/lifecycle.sh
+  - name: ubuntu 18.04
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+  - name: CentOS 7
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+  - name: CentOS 6
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
 
-    - stage: "release"
-      name: "Create release"
-      script: .travis/releaser.sh
+  - stage: packaging
+    name: Create release
+    install:
+    - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
+    - sudo apt install -y --only-upgrade docker-ce
+    - docker info
+    before_script: sudo pip install git-semver
+    script: ".travis/releaser.sh && .travis/labeler.sh" # labeler should be replaced with GitHub Actions when they hit GA
+    git:
+      depth: false
 
-    - stage: "package"
-      name: "Archive and self-extractor"
-      install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-      script: .travis/create_artifacts.sh
-      deploy:
-        - provider: releases
-          draft: true
-          api_key:
-            secure: hbyuWsTshQ8Ixrgla2J6xtBNhQ1OjjaQ7hUEteclHrlx6i8B1ughCdhC3bYE1VGKClmq9mUvuZxcPGDDUaMBoLYTNaFx93IWorlrB29mpeNPd3b+DZqOePBYqU6NCA7PQccEUBkXJrGS44ZNg+pHFVCHMBe99+5u1Dfx/IJW0ojOb9XOfde6p5aL7syYWYXR/Ov/K40QAgpEDhAKUY4T1D/Yyk2ucdh6QsM00aq51F3D1SxIcFXcnBpacD3iGdkd3fM+c9PLMtq47mOicRjJsDnXYV58/upzmR9OPJYBbOPtNy0UKRl3f81cm5O4X3wcUBUMV4AQew8udy06TlWu2SQipGeh0RPDspRrBIqKhPJGX+h4Zyw/9iGvsDPetQqgoAsPqcruKGqNjC538LXr/fi8mur35VcKhmxi6gH7SNbs7TXfVLnrvNGgr6KCcKoLvFMxsJW1fQObVOq2mO+MwH6wQbqfRIo8btu6WVrzI4cYkZomny2i4D5YWVfTYEJ+BSTZCZ/l/RvxEYPUPFGyASxZ1OVCYA2in1JYdiPPMwK4gH66nYJG+ZDeTK5JUlXZAELZSRcDzecOAbi5zS/C3XXiGaHOXZBXjI0Gsw4kDaZn0xGUIzBFvMoSf1SMw5CuJ1kbSIzi4VGU1v85JaCB4znQ4pA4Yvw0/5l/q/B08aI=
-          skip_cleanup: true
-          file_glob: true
-          file:
-            - "netdata*.tar.gz*"
-            - "netdata*.gz.run*"
-            - "sha256sums.txt"
-          on:
-            repo: netdata/netdata
-            tags: true
-    - name: "Docker images"
-      install: sudo apt update -y && sudo apt install -y --only-upgrade docker-ce && docker info
-      script: docker/build.sh
-      env: REPOSITORY="netdata/netdata"
-      if: type = cron OR tag =~ ^v
+  - stage: nightlies
+    name: docker images
+    install:
+    - sudo apt update
+    - sudo apt install -y --only-upgrade docker-ce
+    - docker info
+    script: "packaging/docker/build.sh"
+    env: REPOSITORY="netdata/netdata"
+  - name: tarball and self-extractor build
+    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
+    script: ".travis/create_artifacts.sh"
+    deploy:
+      provider: gcs
+      access_key_id: GOOGOJOHYBTPOGXLXMYVRE2H
+      secret_access_key:
+        secure: MWzWydVG2WJ+5S7bVQYHCcLTiC5s5l2yB3zb/E/HJUIjvv9AFZRsLmjS20umho+4MPK6dXJpI0IzWhW8V54cfFwyPHCeHGO+CBaREmWJJHQn53oiugLoFMlngSFzSAx9BGT1dfeJPxGQm1rqYk2ohLPfuKd1ORoEMK8fgnihmsn3GtNOhiJmmKyzppoottvihQBRhgy8aghkpd+3x1nKhQFeOcCvUwk6rWW4MBdRK3j6Nk3+Tlh/8s6p+FPwbIB63g9SPYBetBLvqp0ftleoUXY0Fy+tN4pR8CnhXHI4IJcesffa6JMxrQtx0CQJQrlxtRrDib0s+2zOw+wUlLfJcVMV+lyd6wvg4ltiQBYrNewA0ORmYYZVqd8ysZ8yXkQVNLkga15DNHV6uLlRkDny1xiT7buSHQc/xlT11ygOPfFJI4hMJbVSRyl+ChYsV5bJ0MBAOhH3AbBY//RZHWSed5oXugmlV6FKXcfbJOiAYPiVMjWpGVGqQexzQvbCfSNCERCTgKqAI3cFGXaiLOhvzkb0mdT4eOdvkzcWju6ucXiwnd1lNYN4ucKcazGjOL8vy5WfT0AKVlvBq7KtlQJ2vXJ1hJ2/ZOg8o88WyRBiiyMDxMBicSx6VNZhu2s2JFBPdaHxOoFcZjw9FLv04BA7GeUh0WGvasoSCA4mNIZz+PY=
+      bucket: "netdata-nightlies"
+      skip_cleanup: true
+      file_glob: true
+      file: "netdata*.tar.gz"
+  - name: changelog generation
+    script: ".travis/generate_changelog.sh"
+    env: COMMIT_AND_PUSH=1
+    git:
+      depth: false
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
+  slack:
+    rooms:
+      - secure: "NuW1p7s+WGLcyhEceeiLRSV1JgAc6N47zgdSsYoxrjSFRQHDfc8jensypDcEJwgs1K2Hcve9iKRaAddEHEw7AkS6rie9gFR5HmmbKXfW2GFMqOr6maYTFsvaECPqiWk1n9/XnRLsAi5kZ8HxH+a8ldb/eaVoFQesY1jPXgh11BM5DwvpXjEtwg0WGASsKiymvnXFS3KcC+sR7Lln2GX1a8vfCX2I3TEmOedKMlSHUy5JilGGC3AWA0SWS8tR8PUH0u3dHL5j0RNIr1RO3Yx24QgUpg/YpvKymnW/iIIEOq2vb2mBhhiKEQjJ1djUL4VSPzjIDpUzThVpKaHk3syOp6W9qZEHKhR/sqjc5Yk2XRjsw1cM0nS60gaCgxtKhEMKWcjtvWf04oJAVrmcUwcYXj0eA+jgRCZl5VhyufK/fUJavjOfsQGjwhdjxQfwDCw33W17ypJUt4GZngdb6jbIhEOcKHSLQDu1vuHTw82hJJkthkmR59PX30qJdl/MEGcfVLdN/fkCokjR/qwfmkNwQm+wYSKsK/Jq4RgBT0/oZwY3e8nkCq2ov7lBbDO3/0rzQKWZ9Uy//tnoCM3vGhDwGHQxsHshv7g6KwdhYTcmm7WWWIucfLupcjFUO1HbRuJ+7ZnvxRRwKiV+MGkFT2SNJkS8q1/jCu9KGbmktd0WUSE="
