@@ -4418,6 +4418,7 @@ function migrateRegistryDidClick() {
         `${cloudBaseURL}/api/v1/agents/migrate`,
         {
             method: "POST",
+            mode: "cors",
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
                 "Authorization": `Bearer ${token}`
