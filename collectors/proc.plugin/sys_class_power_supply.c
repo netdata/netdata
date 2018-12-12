@@ -145,7 +145,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 )))
             continue;
 
-        if(likely(de->d_type == DT_DIR)) {
+        if(likely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
             uint32_t hash = simple_hash(de->d_name);
 
             struct power_supply *ps;
