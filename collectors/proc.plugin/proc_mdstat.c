@@ -175,13 +175,13 @@ int do_proc_mdstat(int update_every, usec_t dt) {
         l++;
         words = procfile_linewords(ff, l);
         if(likely(words < 2)) continue;
+        if(unlikely(procfile_lineword(ff, l, 0)[0] != '[')) continue;
         if(unlikely(words < 7)) {
             error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
             continue;
         }
-        if(unlikely(procfile_lineword(ff, l, 0)[0] != '[')) continue;
-        char *word;
 
+        char *word;
         word = procfile_lineword(ff, l, 3);
         remove_trailing_chars(word, '%');
 
