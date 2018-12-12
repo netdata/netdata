@@ -3,7 +3,8 @@
 # This is a simple script which should apply labels to unlabelled issues from last 3 days.
 # It will soon be deprecated by GitHub Actions so no futher development on it is planned.
 
-add_labels() {
+# Previously this was using POST to only add labels. But this method seems to be failing with larger number of requests
+new_labels() {
 	ISSUE="$1"
 	URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE/labels"
 	# deduplicate array and add quotes
@@ -12,8 +13,10 @@ add_labels() {
 	LABELS="${SET[*]}"
 	# add commas between quotes (replace spaces)
 	LABELS="${LABELS//\" \"/\",\"}"
+	# remove duplicate quotes in case parameters were already quoted
+	LABELS="${LABELS//\"\"/\"}"
 	echo "-------- Assigning labels to #${ISSUE}: ${LABELS} --------"
-	curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${LABELS}]}" -X POST "${URL}"
+	curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${LABELS}]}" -X PUT "${URL}" &>/dev/null
 }
 
 if [ "$GITHUB_TOKEN" == "" ]; then
@@ -34,19 +37,21 @@ LABELS_FILE=/tmp/labels
 hub issue labels >$LABELS_FILE
 
 echo "===== Categorizing issues ====="
+# This won't touch issues which already have at least one label assigned
 for STATE in "open" "closed"; do
 	for ISSUE in $(hub issue -f "%I %l%n" -s "$STATE" -d "$(date +%F -d '1 day ago')" | grep -v -f $LABELS_FILE); do
 		echo "-------- Processing $STATE issue no. $ISSUE --------"
 		BODY="$(curl "https://api.github.com/repos/netdata/netdata/issues/$ISSUE" 2>/dev/null | jq .body)"
 		case "${BODY}" in
-		*"# Question summary"*) add_labels "$ISSUE" "question" "no changelog" ;;
-		*"# Bug report summary"*) add_labels "$ISSUE" "needs triage" "bug" ;;
-		*"# Feature idea summary"*) add_labels "$ISSUE" "needs triage" "feature request" ;;
-		*) add_labels "$ISSUE" "needs triage" "no changelog" ;;
+		*"# Question summary"*) new_labels "$ISSUE" "question" "no changelog" ;;
+		*"# Bug report summary"*) new_labels "$ISSUE" "needs triage" "bug" ;;
+		*"# Feature idea summary"*) new_labels "$ISSUE" "needs triage" "feature request" ;;
+		*) new_labels "$ISSUE" "needs triage" "no changelog" ;;
 		esac
 	done
 done
 
+# Change all 'area' labels assigned to PR saving non-area labels.
 echo "===== Categorizing PRs ====="
 NEW_LABELS=/tmp/new_labels
 for PR in $(hub pr list -s all -f "%I%n" -L 10); do
@@ -86,6 +91,8 @@ for PR in $(hub pr list -s all -f "%I%n" -L 10); do
 	done
 	NEW_SET=$(sort $NEW_LABELS | uniq)
 	if [ ! -z "$NEW_SET" ]; then
-		add_labels "$PR" ${NEW_SET}
+		PREV=$(curl "https://api.github.com/repos/netdata/netdata/issues/$PR/labels" 2>/dev/null | jq '.[].name' | grep -v "area")
+		new_labels "$PR" ${NEW_SET} "${PREV[*]}"
+		exit 0
 	fi
 done
