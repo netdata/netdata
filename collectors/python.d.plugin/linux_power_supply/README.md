@@ -1,5 +1,10 @@
 # Linux power supply
 
+> THIS MODULE IS OBSOLETE.
+> USE THE [PROC PLUGIN](../../proc.plugin) - IT IS MORE EFFICIENT
+
+---
+
 This module monitors variosu metrics reported by power supply drivers
 on Linux.  This allows tracking and alerting on things like remaining
 battery capacity.
