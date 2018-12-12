@@ -4390,8 +4390,45 @@ function signOutDidClick() {
     signOut();
 }
 
+// https://github.com/netdata/hub/issues/128
 function migrateRegistryDidClick() {
-    console.log("---", registryKnowAgents);
+    const accountID = localStorage.getItem("cloud.accountID");
+    const token = localStorage.getItem("cloud.token");
+    if (accountID == null || token == null) {
+        return;
+    }
+
+    const agents = registryKnowAgents.map((a) => {
+        return {
+            "id": a.guid,
+            "name": a.name,
+            "urls": [ a.url ]
+        }
+    })
+
+    const payload = {
+        "accountID": accountID,
+        "agents": agents
+    };
+
+    console.log("...")
+    console.log(JSON.stringify(payload, null, 4))
+    
+    fetch(
+        `${cloudBaseURL}/api/v1/agents/migrate`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        }
+    ).then(function(response) {
+        return response.json();
+    }).then(function(myJson) {
+        console.log(JSON.stringify(myJson));
+    });
 }
 
 function signOut() {
@@ -4427,6 +4464,8 @@ function renderAccountUI() {
 }
 
 function handleMessage(e) {
+    console.log("...", e.data);
+    
     localStorage.setItem("cloud.accountID", e.data.accountID);
     localStorage.setItem("cloud.accountName", e.data.accountName);
     localStorage.setItem("cloud.token", e.data.token);
