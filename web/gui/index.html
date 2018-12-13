@@ -79,7 +79,7 @@
                        <img src="images/netdata-logomark.svg" height="32"/>
                     </li>
                     <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">My Agents <strong class="caret"></strong></a>
                         <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
                         </div>
                     </li>
@@ -106,8 +106,9 @@
                     <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fas fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
                     <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fas fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
                     <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
+                    <li id="account-menu-container" class="dropdown" data-toggle="tooltip"></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">My Agents <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                             <li><a href="#" onclick="return false;" style="color: #999;">loading...</a></li>
                         </ul>
@@ -581,6 +582,26 @@
                 <div class="modal-footer">
                     <!-- <a href="#" onclick="alarmsUpdateModal(); return false;" type="button" class="btn btn-default">Update</a> -->
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="signInModal" tabindex="-1" role="dialog" aria-labelledby="signInModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="singInModalLabel">netdata sign in</h4>
+                </div>
+                <div class="modal-body">
+                    <iframe 
+                        id="sign-in-iframe"
+                        src="" 
+                        width="100%" 
+                        height="300px"
+                    >
+                    </iframe>
                 </div>
             </div>
         </div>
