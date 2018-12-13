@@ -1038,8 +1038,8 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
 
     p->uid                  = proc_info->ki_uid;
     p->gid                  = proc_info->ki_groups[0];
-    p->status_vmsize        = proc_info->ki_size / 1024; // in kB
-    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in kB
+    p->status_vmsize        = proc_info->ki_size / 1024; // in KiB
+    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in KiB
     // TODO: what about shared and swap memory on FreeBSD?
     return 1;
 #else
