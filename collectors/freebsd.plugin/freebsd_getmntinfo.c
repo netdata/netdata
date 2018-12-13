@@ -227,9 +227,9 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                               "disk.space",
                                                               title,
                                                               "GiB",
-                                "freebsd.plugin",
+                                                              "freebsd.plugin",
                                                               "getmntinfo",
-                                NETDATA_CHART_PRIO_DISKSPACE_SPACE,
+                                                              NETDATA_CHART_PRIO_DISKSPACE_SPACE,
                                                               update_every,
                                                               RRDSET_TYPE_STACKED
                         );
@@ -265,10 +265,10 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                                mntbuf[i].f_mntonname,
                                                                "disk.inodes",
                                                                title,
-                                                               "Inodes",
-                                "freebsd.plugin",
+                                                               "inodes",
+                                                               "freebsd.plugin",
                                                                "getmntinfo",
-                                NETDATA_CHART_PRIO_DISKSPACE_INODES,
+                                                               NETDATA_CHART_PRIO_DISKSPACE_INODES,
                                                                update_every,
                                                                RRDSET_TYPE_STACKED
                         );

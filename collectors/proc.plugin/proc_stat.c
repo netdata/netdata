@@ -1000,8 +1000,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                                 , NULL
                                 , "cpuidle"
                                 , "cpuidle.cpuidle"
-                                , "C-state residency"
-                                , "time%"
+                                , "C-state residency time"
+                                , "percentage"
                                 , PLUGIN_PROC_NAME
                                 , PLUGIN_PROC_MODULE_STAT_NAME
                                 , NETDATA_CHART_PRIO_CPUIDLE + core

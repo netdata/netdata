@@ -334,7 +334,7 @@ void registry_statistics(void) {
                 , "registry"
                 , NULL
                 , "NetData Registry Sessions"
-                , "session"
+                , "sessions"
                 , "registry"
                 , "stats"
                 , 131000

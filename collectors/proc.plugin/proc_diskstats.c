@@ -960,7 +960,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , family
                         , "disk.io"
                         , "Disk I/O Bandwidth"
-                        , "kilobytes/s"
+                        , "KiB/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                         , NETDATA_CHART_PRIO_DISK_IO
@@ -1055,7 +1055,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , family
                         , "disk.backlog"
                         , "Disk Backlog"
-                        , "backlog (ms)"
+                        , "milliseconds"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                         , NETDATA_CHART_PRIO_DISK_BACKLOG
@@ -1186,7 +1186,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
-                            , "ms per operation"
+                            , "milliseconds/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_AWAIT
@@ -1217,7 +1217,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
-                            , "kilobytes per operation"
+                            , "KiB/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_AVGSZ
@@ -1248,7 +1248,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.svctm"
                             , "Average Service Time"
-                            , "ms per operation"
+                            , "milliseconds/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_SVCTM
@@ -1437,7 +1437,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_usage"
                             , "BCache Cache Usage"
-                            , "percent"
+                            , "percentage"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_USAGE
@@ -1563,7 +1563,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     , "disk"
                     , NULL
                     , "Disk I/O"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                     , NETDATA_CHART_PRIO_SYSTEM_IO

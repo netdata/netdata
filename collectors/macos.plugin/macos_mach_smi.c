@@ -165,7 +165,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , "swap"
                             , NULL
                             , "Swap I/O"
-                            , "kilobytes/s"
+                            , "KiB/s"
                             , "macos"
                             , "mach_smi"
                             , 250
@@ -196,7 +196,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , "system"
                             , NULL
                             , "Memory Page Faults"
-                            , "page faults/s"
+                            , "faults/s"
                             , "macos"
                             , "mach_smi"
                             , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS

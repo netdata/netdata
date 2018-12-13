@@ -573,7 +573,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             "mdstat"
                             , id
                             , NULL
-                            , family
+				    , family
                             , "md.rate"
                             , "Operation Speed"
                             , "KiB/s"
