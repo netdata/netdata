@@ -1681,7 +1681,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_failcnt"
                     , "Systemd Services Memory Limit Failures"
-                    , "MiB"
+                    , "count"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 110
