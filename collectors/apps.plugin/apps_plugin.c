@@ -3290,7 +3290,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     // we have something new to show
     // update the charts
-    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, system_hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
@@ -3320,20 +3320,20 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
     }
 
-    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
-        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
+        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
                 fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
