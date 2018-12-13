@@ -640,26 +640,8 @@ function renderMachines(machinesArray) {
     return html;
 }
 
-// Populates the my-netdata menu.
-function netdataRegistryCallback(machinesArray) {
-    if (isSignedIn() && isRegistryMigrated()) {
-        machinesArray = associatedAgents;
-    } else {
-        registryKnownAgents = machinesArray;        
-    }
-
+function renderMyNetdataMenu(machinesArray) {
     let html = '';
-
-    // if (isSignedIn()) {
-    //     html += (
-    //         `<div class="agent-item">
-    //             <i style="color: red" class="fas fa-cloud-upload-alt"></i>
-    //             <a href="#" onclick="migrateRegistryDidClick()">Migrate Registry</a>
-    //             <div></div>
-    //         </div>
-    //         <hr />`
-    //     )
-    // }
 
     if (options.hosts.length > 1) {
         html += renderStreamedHosts(options) + `<hr />`;
@@ -689,6 +671,21 @@ function netdataRegistryCallback(machinesArray) {
     el.innerHTML = html;
 
     gotoServerInit();
+}
+
+// This callback is called after NETDATA.registry is initialized.
+function netdataRegistryCallback(machinesArray) {
+    if (isSignedIn() && isRegistryMigrated()) {
+        // We call getAgentsList() here because it requires that 
+        // NETDATA.registry is initialized.
+        getAgentsList().then((agents) => {
+            associatedAgents = agents; // TODO: Is this needed?
+            renderMyNetdataMenu(agents);
+        });
+    } else {
+        registryKnownAgents = machinesArray;  
+        renderMyNetdataMenu(machinesArray)
+    }
 };
 
 function isdemo() {
@@ -4368,10 +4365,6 @@ var netdataCallback = initializeDynamicDashboard;
 // =================================================================================================
 // netdata.cloud
 
-const cloudBaseURL = "http://localhost:8080"; // TODO: Read from configuration.
-
-// -------------------------------------------------------------------------------------------------
-
 // The known agents in the legacy global registry.
 let registryKnownAgents = [];
 
@@ -4412,8 +4405,8 @@ function getAgentsList() {
         return;
     }
     
-    fetch(
-        `${cloudBaseURL}/api/v1/agents/list?accountID=${accountID}`,
+    return fetch(
+        `${NETDATA.registry.cloudBaseURL}/api/v1/agents/list?accountID=${accountID}`,
         {
             method: "GET",
             mode: "cors",
@@ -4431,7 +4424,7 @@ function getAgentsList() {
             return;
         }
 
-        associatedAgents = agents.map((a) => {
+        return agents.map((a) => {
             return {
                 "guid": a.id,
                 "name": a.name,
@@ -4464,7 +4457,7 @@ function postAgentsMigrate() {
     };
     
     fetch(
-        `${cloudBaseURL}/api/v1/agents/migrate`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/agents/migrate`,
         {
             method: "POST",
             mode: "cors",
@@ -4559,7 +4552,7 @@ function isRegistryMigrated() {
 function initSignInModal() {
     if (!isSignedIn()) {
         const iframeEl = document.getElementById("sign-in-iframe");
-        iframeEl.src = cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+        iframeEl.src = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
         window.addEventListener("message", handleMessage, false);    
     }
 }
@@ -4574,10 +4567,6 @@ function deinitSignInModal() {
 
 function initUI() {
     renderAccountUI();
-
-    if (isSignedIn()) {
-        getAgentsList();
-    }
 }
 
 if (document.readyState === "complete") {
