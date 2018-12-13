@@ -192,12 +192,20 @@ So, to disable performance metrics for all loop devices you could add `performan
  * finish in minutes
  * speed in megabytes/s
 
+6. **Nonredundant array availability**
+
 #### configuration
 
 ```
 [plugin:proc:/proc/mdstat]
-    # mismatch_cnt filename to monitor = /sys/block/%s/md/mismatch_cnt
-    # filename to monitor = /proc/mdstat
+  # faulty devices = yes
+  # nonredundant arrays availability = yes
+  # mismatch count = auto
+  # disk stats = yes
+  # operation status = yes
+  # make charts obsolete = yes
+  # filename to monitor = /proc/mdstat
+  # mismatch_cnt filename to monitor = /sys/block/%s/md/mismatch_cnt
 ```
 
 ## Monitoring CPUs
