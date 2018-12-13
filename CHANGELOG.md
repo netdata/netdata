@@ -5,24 +5,32 @@
 **Fixed bugs:**
 
 - Cannot read /proc/mdstat line. Expected 7 params, read 6. [\#4975](https://github.com/netdata/netdata/issues/4975)
+- custom notification method does not work [\#4968](https://github.com/netdata/netdata/issues/4968)
 - Info logging command in netdata-updater.sh contains command substitution. [\#4950](https://github.com/netdata/netdata/issues/4950)
 - No data in charts [\#4920](https://github.com/netdata/netdata/issues/4920)
 - Postgres module: detect servers version and use the right query [\#4910](https://github.com/netdata/netdata/issues/4910)
+- \[bug\]some metrics don't report to /allmetrics endpoint with prometheus format [\#3866](https://github.com/netdata/netdata/issues/3866)
 
 **Closed issues:**
 
+- Pass cloud\_base\_url from netdata.conf to web/gui [\#4980](https://github.com/netdata/netdata/issues/4980)
 - Improve configuration documentation [\#4781](https://github.com/netdata/netdata/issues/4781)
 - Python.d.plugin infinite retries, ignore penalty, and plotting 'None' [\#4756](https://github.com/netdata/netdata/issues/4756)
+- move `/proc` and `/sys` python modules to `proc` plugin [\#4541](https://github.com/netdata/netdata/issues/4541)
+- mdstat RAID0 support [\#4010](https://github.com/netdata/netdata/issues/4010)
 - FQDN in alert sending [\#2477](https://github.com/netdata/netdata/issues/2477)
 - netdata dead but pid file exists [\#2266](https://github.com/netdata/netdata/issues/2266)
 
 **Merged pull requests:**
 
+- Pass cloud\_base\_url from daemon to web/gui through hello endpoint \#4980 [\#4982](https://github.com/netdata/netdata/pull/4982) ([gmosx](https://github.com/gmosx))
+- Fix to \#4968, custom recipients were not working properly [\#4978](https://github.com/netdata/netdata/pull/4978) ([cakrit](https://github.com/cakrit))
 - Fix mdstat parsing [\#4977](https://github.com/netdata/netdata/pull/4977) ([vlvkobal](https://github.com/vlvkobal))
 - Fix accidentally changed file permissions [\#4974](https://github.com/netdata/netdata/pull/4974) ([vlvkobal](https://github.com/vlvkobal))
 - fix month 'Dec' being detected as IPv6 address in ovpn python.d plugin [\#4970](https://github.com/netdata/netdata/pull/4970) ([vpnable](https://github.com/vpnable))
 - Add support for Factorio server monitoring [\#4966](https://github.com/netdata/netdata/pull/4966) ([jonfairbanks](https://github.com/jonfairbanks))
 - Add mdstat to CMake configuration [\#4965](https://github.com/netdata/netdata/pull/4965) ([vlvkobal](https://github.com/vlvkobal))
+- Move power supply python module to proc plugin [\#4960](https://github.com/netdata/netdata/pull/4960) ([vlvkobal](https://github.com/vlvkobal))
 - dovecot readme update [\#4959](https://github.com/netdata/netdata/pull/4959) ([ilyam8](https://github.com/ilyam8))
 - Add cakrit to health codeowners [\#4953](https://github.com/netdata/netdata/pull/4953) ([cakrit](https://github.com/cakrit))
 - Prevent netdata-updater.sh from sending cron report for git stash entries [\#4952](https://github.com/netdata/netdata/pull/4952) ([cakrit](https://github.com/cakrit))
@@ -40,6 +48,7 @@
 - Update Performance.md [\#4935](https://github.com/netdata/netdata/pull/4935) ([cakrit](https://github.com/cakrit))
 - update code owners [\#4930](https://github.com/netdata/netdata/pull/4930) ([paulfantom](https://github.com/paulfantom))
 - Removed vlvkobal as a codeowner of web/gui [\#4929](https://github.com/netdata/netdata/pull/4929) ([gmosx](https://github.com/gmosx))
+- Add support for nonredundant arrays [\#4923](https://github.com/netdata/netdata/pull/4923) ([vlvkobal](https://github.com/vlvkobal))
 - Introduced IEC-compliant unit abbreviations \#4711 [\#4912](https://github.com/netdata/netdata/pull/4912) ([gmosx](https://github.com/gmosx))
 
 ## [v1.12.0-rc0](https://github.com/netdata/netdata/tree/v1.12.0-rc0) (2018-12-06)
