@@ -5988,6 +5988,29 @@ let chartState = function (element) {
         });
     }
 
+    // The friendly labels map
+    this.labels_map = {};
+    var rawLabels = NETDATA.dataAttribute(this.element, 'friendly-labels', "").split(",");
+    for (var i in rawLabels) {
+        infos = rawLabels[i].split("=");
+        this.labels_map[infos[0]] = infos[1];
+    }
+    
+    // The friendly hostname map
+    this.hosts_map = {};
+    var rawHosts = NETDATA.dataAttribute(this.element, 'friendly-host-names', "").split(",");
+    for (var i in rawHosts) {
+        infos = rawHosts[i].split("=");
+        this.hosts_map[infos[0]] = infos[1];
+    }
+    
+    this.filter_graph = NETDATA.dataAttribute(this.element, 'filter-graph', "")
+    if (this.filter_graph) {
+        this.filter_graph = this.filter_graph.split(",");
+    } else {
+        this.filter_graph = [];
+    }
+
     // the chart library requested by the user
     this.library_name = NETDATA.dataAttribute(this.element, 'chart-library', NETDATA.chartDefaults.library);
 
@@ -8071,7 +8094,7 @@ let chartState = function (element) {
         return ret;
     };
 
-    this.chartURL = function () {
+    this.chartsInfos = function() {
         let after, before, points_multiplier = 1;
         if (NETDATA.globalPanAndZoom.isActive()) {
             if (this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
@@ -8127,29 +8150,33 @@ let chartState = function (element) {
             data_points = this.data_points * points_multiplier;
         }
 
-        // build the data URL
-        this.data_url = this.host + this.chart.data_url;
-        this.data_url += "&format=" + this.library.format();
-        this.data_url += "&points=" + (data_points).toString();
-        this.data_url += "&group=" + this.method;
-        this.data_url += "&gtime=" + this.gtime;
-        this.data_url += "&options=" + this.chartURLOptions();
+        var chart_infos = [];
+        for (var i in this.multi_ids) {
+            var chart_id = this.multi_ids[i];
+            for (var j in this.multi_hosts) {
+                var host = this.multi_hosts[j];
+                // build the data URL
+                var data_url = host + "/api/v1/data?chart=" + chart_id;
+                data_url += "&format=" + this.library.format();
+                data_url += "&points=" + (data_points).toString();
+                data_url += "&group=" + this.method;
+                data_url += "&gtime=" + this.gtime;
+                data_url += "&options=" + this.chartURLOptions();
+                if (after)
+                    data_url += "&after=" + after.toString();
 
-        if (after) {
-            this.data_url += "&after=" + after.toString();
-        }
+                if (before)
+                    data_url += "&before=" + before.toString();
 
-        if (before) {
-            this.data_url += "&before=" + before.toString();
-        }
+                if (this.dimensions)
+                    data_url += "&dimensions=" + this.dimensions;
 
-        if (this.dimensions) {
-            this.data_url += "&dimensions=" + this.dimensions;
+                if (NETDATA.options.debug.chart_data_url === true || this.debug === true)
+                    this.log('chartsURLs(): ' + data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
+                chart_infos.push({ chart_id: chart_id, data_url: data_url, host: host });
+            }
         }
-
-        if (NETDATA.options.debug.chart_data_url || this.debug) {
-            this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
-        }
+        return chart_infos;
     };
 
     this.redrawChart = function () {
@@ -8440,7 +8467,6 @@ let chartState = function (element) {
         }
 
         this.clearSelection();
-        this.chartURL();
 
         NETDATA.statistics.refreshes_total++;
         NETDATA.statistics.refreshes_active++;
@@ -8475,12 +8501,128 @@ let chartState = function (element) {
             return;
         }
 
+        this.fetchChartData(0, [], callback);
+    };
+
+    this.formatDimensionName = function (result, toFormat) {
+        var metric = "";
+        // Only add the host to the metric if the chart is showing data from multiple hosts
+        if (this.multi_hosts.length > 1) {
+            var friendly_host = this.hosts_map[result.host] != undefined ? this.hosts_map[result.host] : result.host;
+            metric += friendly_host + ".";
+        }
+        var friendly_label = this.labels_map[result.id] != undefined ? this.labels_map[result.id] : result.id;
+        if (friendly_label != "") metric += friendly_label + "."
+        metric += toFormat;
+        return metric;
+    };
+
+    this.handleChartData = function (data) {
+        var newData = data[0];
+        if (this.filter_graph.length > 0) {
+            restartLoop:
+            while (true) {
+                for (var i in data) {
+                    var d = data[i];
+                    for (var j in d.result.labels) {
+                        var label = d.result.labels[j];
+                        for (var k in this.filter_graph) {
+                            if (label != "time" && label != this.filter_graph[k]) {
+                                d.result.labels.splice(j, 1);
+                                d.dimension_ids.splice(j - 1, 1);
+                                d.dimension_names.splice(j - 1, 1);
+                                for (var l in d.result.data) {
+                                    d.result.data[l].splice(j, 1)
+                                }
+                                continue restartLoop;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        // Don't handle multi-chart if there is only one chart
+        if (this.multi_ids.length > 1 || this.multi_hosts.length > 1) {
+            // Format the first chart data
+            for (var j in newData.dimension_ids) {
+                newData.dimension_ids[j] = this.formatDimensionName(newData, newData.dimension_ids[j]);
+            }
+            for (var j in newData.dimension_names) {
+                newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
+            }
+            for (var j in newData.result.labels) {
+                if (j == 0) continue;
+                newData.result.labels[j] = this.formatDimensionName(newData, newData.result.labels[j]);
+            }
+            // Format the data from the other charts and merge it with the first one
+            for (var i in data) {
+                if (i == 0) continue;
+                var dataPart = data[i];
+                newData.dimensions += 1;
+                newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
+                for (var j in dataPart.dimension_ids) {
+                    newData.dimension_ids.push(this.formatDimensionName(dataPart, dataPart.dimension_ids[j]));
+                }
+                for (var j in dataPart.dimension_names) {
+                    newData.dimension_names.push(this.formatDimensionName(dataPart, dataPart.dimension_names[j]));
+                }
+                newData.view_latest_values = newData.view_latest_values.concat(dataPart.view_latest_values);
+                if (dataPart.max > newData.max) {
+                    newData.max = dataPart.max;
+                }
+                if (dataPart.min > newData.min) {
+                    newData.min = dataPart.min;
+                }
+                var resultMap = {};
+                for (var j in dataPart.result.data) {
+                    var result = dataPart.result.data[j];
+                    resultMap[result[0]] = result.slice(1);
+                }
+                var length = 0;
+                for (var j in resultMap) {
+                    if (resultMap[j].length > length) {
+                        length = resultMap[j].length;
+                    }
+                }
+                var previous = [];
+                for (var j in newData.result.data) {
+                    if (resultMap[newData.result.data[j][0]]) {
+                        newData.result.data[j] = newData.result.data[j].concat(resultMap[newData.result.data[j][0]]);
+                        previous = newData.result.data[j];
+                    } else if (previous.length > 0) {
+                        newData.result.data[j] = previous;
+                    } else {
+                        var a = [];
+                        for (var k = 0; k < length; k++) a.push(0);
+                        newData.result.data[j] = newData.result.data[j].concat(a);
+                    }
+                }
+                for (var j in dataPart.result.labels) {
+                    if (j == 0) continue;
+                    newData.result.labels.push(this.formatDimensionName(dataPart, dataPart.result.labels[j]));
+                }
+            }
+        }
+        this.data = newData;
+        this.updateChartWithData(newData);
+    };
+
+    this.fetchChartData = function (i, data, callback) {
+        var infos = this.chartsInfos();
+        var chart_info = infos[i];
+        var data_url = chart_info["data_url"];
+        var last_loop = false;
+        if (i == infos.length - 1) {
+            last_loop = true;
+        }
+
         if (this.debug) {
-            this.log('updating from ' + this.data_url);
+            this.log('updating from ' + data_url);
         }
 
         this.xhr = $.ajax({
-            url: this.data_url,
+            url: data_url,
             cache: false,
             async: true,
             headers: {
@@ -8489,8 +8631,10 @@ let chartState = function (element) {
             },
             xhrFields: {withCredentials: true} // required for the cookie
         })
-            .done(function (data) {
-                data = NETDATA.xss.checkData('/api/v1/data', data, that.library.xssRegexIgnore);
+        .done(function(dataPart) {
+            dataPart = $.extend({}, chart_info, dataPart);
+            dataPart = NETDATA.xss.checkData('/api/v1/data', dataPart, that.library.xssRegexIgnore);
+            data.push(dataPart);
 
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
@@ -8500,7 +8644,7 @@ let chartState = function (element) {
                     that.log('data received. updating chart.');
                 }
 
-                that.updateChartWithData(data);
+                // that.updateChartWithData(data);
             })
             .fail(function (msg) {
                 that.xhr = undefined;
@@ -8524,8 +8668,15 @@ let chartState = function (element) {
                 NETDATA.statistics.refreshes_active--;
                 that.fetching_data = false;
 
-                if (typeof callback === 'function') {
-                    return callback(ok, 'download');
+                if (last_loop) {
+                    that.handleChartData(data);
+                } else {
+                    that.fetchChartData(i+1, data, callback);
+                }
+                
+                if (last_loop) {
+                    if(typeof callback === 'function')
+                        return callback(ok, 'download');
                 }
             });
     };
@@ -8749,9 +8900,20 @@ let chartState = function (element) {
         }
     };
 
+    this.firstChartId = function() {
+        return this.id.split(",")[0];
+    };
+     this.firstHost = function() {
+        return this.host.split(",")[0];
+    };
+
     // fetch the chart description from the netdata server
     this.getChart = function (callback) {
-        this.chart = NETDATA.chartRegistry.get(this.host, this.id);
+            this.chart = NETDATA.chartRegistry.get(this.host, this.firstChartId());
+            this.multi_ids = this.id.split(",");
+            this.multi_hosts = this.host.split(",");
+            this.host = this.firstHost();
+            
         if (this.chart) {
             this.__defaultsFromDownloadedChart(this.chart);
 
@@ -8768,7 +8930,7 @@ let chartState = function (element) {
                 return callback();
             }
         } else {
-            this.chart_url = "/api/v1/chart?chart=" + this.id;
+            this.chart_url = "/api/v1/chart?chart=" + this.firstChartId();
 
             if (this.debug) {
                 this.log('downloading ' + this.chart_url);

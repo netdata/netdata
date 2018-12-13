@@ -50,6 +50,7 @@ dist_web_DATA = \
 	demo2.html \
 	demosites.html \
 	demosites2.html \
+    demo-multi-metrics.html \
 	dashboard.html \
 	dashboard.js \
 	dashboard_info.js \
