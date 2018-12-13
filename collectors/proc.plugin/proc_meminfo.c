@@ -162,7 +162,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , "ram"
                         , NULL
                         , "System RAM"
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_MEMINFO_NAME
                         , NETDATA_CHART_PRIO_SYSTEM_RAM
@@ -197,7 +197,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , "system"
                         , NULL
                         , "Available RAM for applications"
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_MEMINFO_NAME
                         , NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE
@@ -233,7 +233,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "swap"
                     , NULL
                     , "System Swap"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_SYSTEM_SWAP
@@ -270,7 +270,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "ecc"
                     , NULL
                     , "Corrupted Memory, detected by ECC"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HW
@@ -303,7 +303,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "system"
                     , NULL
                     , "Committed (Allocated) Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED
@@ -336,7 +336,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "kernel"
                     , NULL
                     , "Writeback Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_KERNEL
@@ -376,7 +376,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "kernel"
                     , NULL
                     , "Memory Used by Kernel"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_KERNEL + 1
@@ -415,7 +415,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "slab"
                     , NULL
                     , "Reclaimable Kernel Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_SLAB
@@ -452,7 +452,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "hugepages"
                     , NULL
                     , "Dedicated HugePages Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HUGEPAGES + 1
@@ -493,7 +493,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "hugepages"
                     , NULL
                     , "Transparent HugePages Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_MEMINFO_NAME
                     , NETDATA_CHART_PRIO_MEM_HUGEPAGES
