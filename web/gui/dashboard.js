@@ -9677,6 +9677,7 @@ NETDATA.alarms = {
 
 NETDATA.registry = {
     server: null,         // the netdata registry server
+    cloudBaseURL: null,   // the netdata cloud base url
     person_guid: null,    // the unique ID of this browser / user
     machine_guid: null,   // the unique ID the netdata server that served dashboard.js
     hostname: 'unknown',  // the hostname of the netdata server that served dashboard.js
@@ -9738,6 +9739,7 @@ NETDATA.registry = {
         NETDATA.registry.hello(NETDATA.serverDefault, function (data) {
             if (data) {
                 NETDATA.registry.server = data.registry;
+                NETDATA.registry.cloudBaseURL = data.cloud_base_url;
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
 
