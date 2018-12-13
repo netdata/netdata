@@ -226,7 +226,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                               mntbuf[i].f_mntonname,
                                                               "disk.space",
                                                               title,
-                                                              "GB",
+                                                              "GiB",
                                 "freebsd.plugin",
                                                               "getmntinfo",
                                 NETDATA_CHART_PRIO_DISKSPACE_SPACE,

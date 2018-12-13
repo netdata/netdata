@@ -463,7 +463,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , mntbuf[i].f_mntonname
                                 , "disk.space"
                                 , title
-                                , "GB"
+                                , "GiB"
                                 , "macos"
                                 , "iokit"
                                 , 2023
