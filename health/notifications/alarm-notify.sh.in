@@ -592,11 +592,10 @@ for method_name in ${method_names} ; do
         # don't send a notification for this role
         [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
 
-        role_recipients_var="role_recipients_${method_name}"
-        role_recipients=${!role_recipients_var}
+        role_recipients="role_recipients_${method_name}[$x]"
         default_recipient_var="DEFAULT_RECIPIENT_${method_name^^}"
 
-        a="${role_recipients[${x}]}"
+        a="${!role_recipients}"
         [ -z "${a}" ] && a="${!default_recipient_var}"
         for r in ${a//,/ } ; do
             [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr_var[${r/|*/}]="1"
