@@ -86,11 +86,11 @@
 #define CONFIG_SECTION_WEB      "web"
 #define CONFIG_SECTION_STATSD   "statsd"
 #define CONFIG_SECTION_PLUGINS  "plugins"
+#define CONFIG_SECTION_CLOUD    "cloud"
 #define CONFIG_SECTION_REGISTRY "registry"
 #define CONFIG_SECTION_HEALTH   "health"
 #define CONFIG_SECTION_BACKEND  "backend"
 #define CONFIG_SECTION_STREAM   "stream"
-#define CONFIG_SECTION_CLOUD    "cloud"
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
