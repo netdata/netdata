@@ -305,7 +305,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "tcp"
                     , NULL
                     , "IPv4 TCP Sockets Memory"
-                    , "KB"
+                    , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_TCP_MEM
@@ -369,7 +369,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "udp"
                     , NULL
                     , "IPv4 UDP Sockets Memory"
-                    , "KB"
+                    , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_UDP_MEM
@@ -497,7 +497,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "fragments"
                     , NULL
                     , "IPv4 FRAG Sockets Memory"
-                    , "KB"
+                    , "KiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_NET_SOCKSTAT_NAME
                     , NETDATA_CHART_PRIO_IPV4_FRAGMENTS_MEM

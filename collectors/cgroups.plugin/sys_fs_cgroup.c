@@ -1727,7 +1727,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.io_read"
                     , "Systemd Services Disk Read Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 120
@@ -1748,7 +1748,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.io_write"
                     , "Systemd Services Disk Write Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 130
@@ -1815,7 +1815,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.throttle_io_read"
                     , "Systemd Services Throttle Disk Read Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 160
@@ -1836,7 +1836,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.throttle_io_write"
                     , "Systemd Services Throttle Disk Write Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 170
@@ -2505,7 +2505,7 @@ void update_cgroup_charts(int update_every) {
                         , "disk"
                         , "cgroup.io"
                         , title
-                        , "KB/s"
+                        , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
@@ -2565,7 +2565,7 @@ void update_cgroup_charts(int update_every) {
                         , "disk"
                         , "cgroup.throttle_io"
                         , title
-                        , "KB/s"
+                        , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200

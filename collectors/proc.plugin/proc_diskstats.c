@@ -1385,7 +1385,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_rates"
                             , "BCache Rates"
-                            , "KB/s"
+                            , "KiB/s"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_RATES
