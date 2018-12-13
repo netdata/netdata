@@ -90,7 +90,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
      }
 
     // --------------------------------------------------------------------
-    
+
     if (likely(do_ram || do_swapio || do_pgfaults)) {
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         count = sizeof(vm_statistics64_data_t);
@@ -118,7 +118,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                             , "ram"
                             , NULL
                             , "System RAM"
-                            , "MB"
+                            , "MiB"
                             , "macos"
                             , "mach_smi"
                             , 200
@@ -233,8 +233,8 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-    } 
- 
+    }
+
     // --------------------------------------------------------------------
 
     return 0;

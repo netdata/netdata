@@ -798,7 +798,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
         global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
-        
+
         char buffer[FILENAME_MAX + 1];
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s");
@@ -1412,7 +1412,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_size"
                             , "BCache Cache Sizes"
-                            , "MB"
+                            , "MiB"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_SIZE
