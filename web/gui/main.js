@@ -489,8 +489,8 @@ function clipString(str, maxLength) {
     return `${str.substring(0, spanLength)}...${str.substring(str.length - spanLength)}`;
 }
 
-// When you stream metrics from netdata to netdata, the recieving netdata now 
-// has multiple host databases. It's own, and multiple mirrored. Mirrored databases 
+// When you stream metrics from netdata to netdata, the recieving netdata now
+// has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
 function renderStreamedHosts(options) {
     let html = `<div class="info-item">Databases streamed to this agent</div>`;
@@ -528,7 +528,7 @@ function renderStreamedHosts(options) {
             `<div class="agent-item">
                 <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                     <i class="fas fa-${icon}" style="color: #999;"></i>
-                </a>                    
+                </a>
                 <span class="__title" onClick="return gotoHostedModalHandler('${url}');">
                     <a class="registry_link" href="${url}#">${hostname}</a>
                 </span>
@@ -599,13 +599,13 @@ function renderMachines(machinesArray) {
         if (machines) {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty</a> 
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty</a>
                 </div>`
             )
         } else {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a> 
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a>
                 </div>`
             )
         }
@@ -1167,6 +1167,7 @@ function enrichChartData(chart) {
         case 'ap':
         case 'net':
         case 'disk':
+        case 'powersupply':
         case 'statsd':
             chart.menu = tmp;
             break;
@@ -4108,7 +4109,7 @@ function runOnceOnDashboardWithjQuery() {
                                 }
                             }
                         }
-                        
+
                         if (inTag && content[i] === '>') {
                             inTag = false;
                         }

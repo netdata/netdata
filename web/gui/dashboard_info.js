@@ -436,10 +436,10 @@ netdataDashboard.menu = {
         info: undefined
     },
 
-    'linux_power_supply': {
+    'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: 'Statistics for the various system power supplies.'
+        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
     }
 };
 
@@ -2315,6 +2315,25 @@ netdataDashboard.context = {
 
     'proxysql.commands_duration': {
         info: 'The total time spent executing commands of that type, in ms'
+    },
+
+    // ------------------------------------------------------------------------
+    // Power Supplies
+
+    'powersupply.capacity': {
+        info: undefined
+    },
+
+    'powersupply.charge': {
+        info: undefined
+    },
+
+    'powersupply.energy': {
+        info: undefined
+    },
+
+    'powersupply.voltage': {
+        info: undefined
     }
 
     // ------------------------------------------------------------------------

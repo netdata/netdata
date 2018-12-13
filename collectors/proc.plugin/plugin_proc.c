@@ -64,6 +64,9 @@ static struct proc_module {
         // IPC metrics
         { .name = "ipc", .dim = "ipc", .func = do_ipc },
 
+        // linux power supply metrics
+        { .name = "/sys/class/power_supply", .dim = "power_supply", .func = do_sys_class_power_supply },
+
         // the terminator of this array
         { .name = NULL, .dim = NULL, .func = NULL }
 };
