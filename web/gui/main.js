@@ -649,19 +649,31 @@ function renderMyNetdataMenu(machinesArray) {
 
     html += renderMachines(machinesArray);
 
-    html += (
-        `<hr />
-        <div class="agent-item">
-            <i class="fas fa-cog""></i>
-            <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
-            <div></div>
-        </div>
-        <div class="agent-item">
-            <i class="fas fa-question-circle""></i>
-            <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">What is this?</a>
-            <div></div>
-        </div>`
-    )
+    html += "<hr />"
+
+    if (!isSignedIn()) {
+        html += (
+            `<div class="agent-item">
+                <i class="fas fa-cog""></i>
+                <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
+                <div></div>
+            </div>
+            <div class="agent-item">
+                <i class="fas fa-question-circle""></i>
+                <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">What is this?</a>
+                <div></div>
+            </div>`
+        )
+    } else {
+        html += (
+            `<div class="agent-item">
+                <i class="fas fa-question-circle""></i>
+                <a href="https://netdata.cloud" target="_blank">What is this?</a>
+                <div></div>
+            </div>`
+        )
+    
+    }
 
     const el = document.getElementById('my-netdata-dropdown-content')
     el.classList.add(`theme-${netdataTheme}`);
