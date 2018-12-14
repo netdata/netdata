@@ -17,6 +17,12 @@ except ImportError:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
+DEFAULT_PORT = 5432
+DEFAULT_USER = 'postgres'
+DEFAULT_CONNECT_TIMEOUT = 2       # seconds
+DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
+
+
 WAL = 'WAL'
 ARCHIVE = 'ARCHIVE'
 BACKENDS = 'BACKENDS'
@@ -787,6 +793,7 @@ class Service(SimpleService):
         self.do_table_stats = configuration.pop('table_stats', False)
         self.do_index_stats = configuration.pop('index_stats', False)
         self.databases_to_poll = configuration.pop('database_poll', None)
+        self.statement_timeout = configuration.pop('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)
         self.configuration = configuration
 
         self.conn = None
@@ -811,11 +818,15 @@ class Service(SimpleService):
             self.conn = None
 
         try:
-            params = dict(user='postgres',
-                          database=None,
-                          password=None,
-                          host=None,
-                          port=5432)
+            params = dict(
+                host=None,
+                port=DEFAULT_PORT,
+                database=None,
+                user=DEFAULT_USER,
+                password=None,
+                connect_timeout=DEFAULT_CONNECT_TIMEOUT,
+                options='-c statement_timeout={0}'.format(self.statement_timeout),
+            )
             params.update(self.configuration)
 
             self.conn = psycopg2.connect(**params)
