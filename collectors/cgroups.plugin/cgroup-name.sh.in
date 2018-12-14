@@ -133,6 +133,19 @@ if [ -z "${NAME}" ]
         else
             error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
         fi
+    elif [[ "${CGROUP}" =~ ^.*ecs[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]
+        then
+        # ECS
+
+        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|" )"
+        # echo "DOCKERID=${DOCKERID}"
+
+        if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
+            then
+            docker_get_name "${DOCKERID}"
+        else
+            error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
+        fi 
     elif [[ "${CGROUP}" =~ ^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]+[_/][a-fA-F0-9]+$ ]]
         then
         # kubernetes
