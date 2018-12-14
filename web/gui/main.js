@@ -4495,6 +4495,9 @@ function signOut() {
     
     renderAccountUI();
     deinitSignInModal();
+
+    // Update `My Agents` menu.
+    // netdataRegistryCallback(registryKnownAgents);
 }
 
 function renderAccountUI() {
@@ -4534,6 +4537,9 @@ function handleMessage(e) {
     renderAccountUI();
     closeModal();
     deinitSignInModal();
+
+    // Update `My Agents` menu.
+    netdataRegistryCallback(registryKnownAgents);
 
     if (!isRegistryMigrated()) {
         postAgentsMigrate();
