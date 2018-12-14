@@ -8552,12 +8552,12 @@ let chartState = function (element) {
                 newData.dimension_names[j] = this.formatDimensionName(newData, newData.dimension_names[j]);
             }
             for (var j in newData.result.labels) {
-                if (j == 0) continue;
+                if (j === 0) continue;
                 newData.result.labels[j] = this.formatDimensionName(newData, newData.result.labels[j]);
             }
             // Format the data from the other charts and merge it with the first one
             for (var i in data) {
-                if (i == 0) continue;
+                if (i === 0) continue;
                 var dataPart = data[i];
                 newData.dimensions += 1;
                 newData.latest_values = newData.latest_values.concat(dataPart.latest_values);
