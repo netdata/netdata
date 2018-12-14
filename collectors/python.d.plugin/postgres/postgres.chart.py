@@ -20,7 +20,7 @@ from bases.FrameworkServices.SimpleService import SimpleService
 DEFAULT_PORT = 5432
 DEFAULT_USER = 'postgres'
 DEFAULT_CONNECT_TIMEOUT = 2       # seconds
-DEFAULT_STATEMENT_TIMEOUT = 2000  # ms
+DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
 
 
 WAL = 'WAL'
