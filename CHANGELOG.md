@@ -23,6 +23,8 @@
 
 **Merged pull requests:**
 
+- postgres timeouts [\#4988](https://github.com/netdata/netdata/pull/4988) ([ilyam8](https://github.com/ilyam8))
+- Typo: `stab\_status` -\> `stub\_status` [\#4984](https://github.com/netdata/netdata/pull/4984) ([petecooper](https://github.com/petecooper))
 - Pass cloud\_base\_url from daemon to web/gui through hello endpoint \#4980 [\#4982](https://github.com/netdata/netdata/pull/4982) ([gmosx](https://github.com/gmosx))
 - Fix to \#4968, custom recipients were not working properly [\#4978](https://github.com/netdata/netdata/pull/4978) ([cakrit](https://github.com/cakrit))
 - Fix mdstat parsing [\#4977](https://github.com/netdata/netdata/pull/4977) ([vlvkobal](https://github.com/vlvkobal))
