@@ -101,4 +101,8 @@ RUN \
 ENV NETDATA_PORT 19999
 EXPOSE $NETDATA_PORT
 
+# Assume everything works fine when netdata presents metrics api enpoint.
+HEALTHCHECK --interval=3s --timeout=5s \
+    CMD [ "curl", "-f", "localhost:$NETDATA_PORT/api/v1/allmetrics" ]
+
 ENTRYPOINT ["/usr/sbin/run.sh"]
