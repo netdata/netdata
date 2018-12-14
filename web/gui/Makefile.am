@@ -9,36 +9,36 @@ CLEANFILES = \
 	$(NULL)
 
 DASHBOARD_JS_FILES = \
-    src/dashboard.js/prologue.js.inc \
-    src/dashboard.js/utils.js \
-    src/dashboard.js/server-detection.js \
-    src/dashboard.js/dependencies.js \
-    src/dashboard.js/error-handling.js \
-    src/dashboard.js/compatibility.js \
-    src/dashboard.js/xss.js \
-    src/dashboard.js/colors.js \
-    src/dashboard.js/units-conversion.js \
-    src/dashboard.js/options.js \
-    src/dashboard.js/localstorage.js \
-    src/dashboard.js/timeout.js \
-    src/dashboard.js/themes.js \
-    src/dashboard.js/charting/dygraph.js \
-    src/dashboard.js/charting/sparkline.js \
-    src/dashboard.js/charting/google-charts.js \
-    src/dashboard.js/charting/gauge.js \
-    src/dashboard.js/charting/easy-pie-chart.js \
-    src/dashboard.js/charting/d3pie.js \
-    src/dashboard.js/charting/d3.js \
-    src/dashboard.js/charting/peity.js \
-    src/dashboard.js/charting.js \
-    src/dashboard.js/chart-registry.js \
-    src/dashboard.js/common.js \
-    src/dashboard.js/main.js \
-    src/dashboard.js/alarms.js \
-    src/dashboard.js/registry.js \
-    src/dashboard.js/boot.js \
-    src/dashboard.js/epilogue.js.inc \
-    $(NULL)
+	src/dashboard.js/prologue.js.inc \
+	src/dashboard.js/utils.js \
+	src/dashboard.js/server-detection.js \
+	src/dashboard.js/dependencies.js \
+	src/dashboard.js/error-handling.js \
+	src/dashboard.js/compatibility.js \
+	src/dashboard.js/xss.js \
+	src/dashboard.js/colors.js \
+	src/dashboard.js/units-conversion.js \
+	src/dashboard.js/options.js \
+	src/dashboard.js/localstorage.js \
+	src/dashboard.js/timeout.js \
+	src/dashboard.js/themes.js \
+	src/dashboard.js/charting/dygraph.js \
+	src/dashboard.js/charting/sparkline.js \
+	src/dashboard.js/charting/google-charts.js \
+	src/dashboard.js/charting/gauge.js \
+	src/dashboard.js/charting/easy-pie-chart.js \
+	src/dashboard.js/charting/d3pie.js \
+	src/dashboard.js/charting/d3.js \
+	src/dashboard.js/charting/peity.js \
+	src/dashboard.js/charting.js \
+	src/dashboard.js/chart-registry.js \
+	src/dashboard.js/common.js \
+	src/dashboard.js/main.js \
+	src/dashboard.js/alarms.js \
+	src/dashboard.js/registry.js \
+	src/dashboard.js/boot.js \
+	src/dashboard.js/epilogue.js.inc \
+	$(NULL)
 
 dist_noinst_DATA = \
 	README.md \
@@ -50,7 +50,7 @@ dist_web_DATA = \
 	demo2.html \
 	demosites.html \
 	demosites2.html \
-    demo-multi-metrics.html \
+	demo-multi-metrics.html \
 	dashboard.html \
 	dashboard.js \
 	dashboard_info.js \
