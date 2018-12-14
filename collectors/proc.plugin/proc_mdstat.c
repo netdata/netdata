@@ -361,9 +361,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(likely(do_health)) {
+    if(likely(do_health && redundant_num)) {
         static RRDSET *st_mdstat_health = NULL;
-        if(unlikely(!st_mdstat_health && redundant_num)) {
+        if(unlikely(!st_mdstat_health)) {
             st_mdstat_health = rrdset_create_localhost(
                     "mdstat"
                     , "mdstat_health"
