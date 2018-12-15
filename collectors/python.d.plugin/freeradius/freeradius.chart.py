@@ -9,14 +9,25 @@ from subprocess import Popen, PIPE
 from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
 update_every = 15
 
 RADIUS_MSG = 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept'
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['authentication', 'accounting', 'proxy-auth', 'proxy-acct']
+RADCLIENT_RETRIES = 1
+RADCLIENT_TIMEOUT = 1
+
+DEFAULT_HOST = 'localhost'
+DEFAULT_PORT = 18121
+DEFAULT_DO_ACCT = False
+DEFAULT_DO_PROXY_AUTH = False
+DEFAULT_DO_PROXY_ACCT = False
+
+ORDER = [
+    'authentication',
+    'accounting',
+    'proxy-auth',
+    'proxy-acct',
+]
 
 CHARTS = {
     'authentication': {
@@ -70,36 +81,67 @@ CHARTS = {
 }
 
 
+def radclient_status(radclient, retries, timeout, host, port, secret):
+    # radclient -r 1 -t 1 -x 127.0.0.1:18121 status secret
+
+    return '{radclient} -r {num_retries} -t {timeout} -x {host}:{port} status {secret}'.format(
+        radclient=radclient,
+        num_retries=retries,
+        timeout=timeout,
+        host=host,
+        port=port,
+        secret=secret,
+    ).split()
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
         self.definitions = CHARTS
-        self.host = self.configuration.get('host', 'localhost')
-        self.port = self.configuration.get('port', '18121')
+
+        self.host = self.configuration.get('host', DEFAULT_HOST)
+        self.port = self.configuration.get('port', DEFAULT_PORT)
         self.secret = self.configuration.get('secret')
-        self.acct = self.configuration.get('acct', False)
-        self.proxy_auth = self.configuration.get('proxy_auth', False)
-        self.proxy_acct = self.configuration.get('proxy_acct', False)
-        chart_choice = [True, bool(self.acct), bool(self.proxy_auth), bool(self.proxy_acct)]
-        self.order = [chart for chart, choice in zip(ORDER, chart_choice) if choice]
+        self.do_acct = self.configuration.get('acct', DEFAULT_DO_ACCT)
+        self.do_proxy_auth = self.configuration.get('proxy_auth', DEFAULT_DO_PROXY_AUTH)
+        self.do_proxy_acct = self.configuration.get('proxy_acct', DEFAULT_DO_PROXY_ACCT)
+
         self.echo = find_binary('echo')
         self.radclient = find_binary('radclient')
+
         self.sub_echo = [self.echo, RADIUS_MSG]
-        self.sub_radclient = [self.radclient, '-r', '1', '-t', '1', '-x',
-                              ':'.join([self.host, self.port]), 'status', self.secret]
+        self.sub_radclient = radclient_status(
+            self.radclient, RADCLIENT_RETRIES, RADCLIENT_TIMEOUT, self.host, self.port, self.secret,
+        )
 
     def check(self):
-        if not all([self.echo, self.radclient]):
-            self.error('Can\'t locate "radclient" binary or binary is not executable by netdata')
+        if not self.radclient:
+            self.error("Can't locate 'radclient' binary or binary is not executable by netdata user")
             return False
-        if not self.secret:
-            self.error('"secret" not set')
+
+        if not self.echo:
+            self.error("Can't locate 'echo' binary or binary is not executable by netdata user")
             return None
 
-        if self._get_raw_data():
-            return True
-        self.error('Request returned no data. Is server alive?')
-        return False
+        if not self.secret:
+            self.error("'secret' isn't set")
+            return None
+
+        if not self._get_raw_data():
+            self.error('Request returned no data. Is server alive?')
+            return False
+
+        if not self.do_acct:
+            self.order.remove('accounting')
+
+        if not self.do_proxy_auth:
+            self.order.remove('proxy-auth')
+
+        if not self.do_proxy_acct:
+            self.order.remove('proxy-acct')
+
+        return True
 
     def _get_data(self):
         """
@@ -123,6 +165,8 @@ class Service(SimpleService):
             raw_result = process_rad.communicate()[0]
         except OSError:
             return None
+
         if process_rad.returncode is 0:
             return raw_result.decode()
+
         return None
