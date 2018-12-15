@@ -7,10 +7,17 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
-priority = 60000
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['system', 'offsets', 'stratum', 'root', 'frequency', 'residualfreq', 'skew']
+ORDER = [
+    'system',
+    'offsets',
+    'stratum',
+    'root',
+    'frequency',
+    'residualfreq',
+    'skew',
+]
 
 CHARTS = {
     'system': {
