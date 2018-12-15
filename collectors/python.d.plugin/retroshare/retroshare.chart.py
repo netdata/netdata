@@ -18,14 +18,14 @@ CHARTS = {
     'bandwidth': {
         'options': [None, 'RetroShare Bandwidth', 'kilobits/s', 'RetroShare', 'retroshare.bandwidth', 'area'],
         'lines': [
-            ['bandwidth_up_kb',   'Upload'],
+            ['bandwidth_up_kb', 'Upload'],
             ['bandwidth_down_kb', 'Download']
         ]
     },
     'peers': {
         'options': [None, 'RetroShare Peers', 'peers', 'RetroShare', 'retroshare.peers', 'line'],
         'lines': [
-            ['peers_all',       'All friends'],
+            ['peers_all', 'All friends'],
             ['peers_connected', 'Connected friends']
         ]
     },
@@ -33,7 +33,7 @@ CHARTS = {
         'options': [None, 'Retroshare DHT', 'peers', 'RetroShare', 'retroshare.dht', 'line'],
         'lines': [
             ['dht_size_all', 'DHT nodes estimated'],
-            ['dht_size_rs',  'RS nodes estimated']
+            ['dht_size_rs', 'RS nodes estimated']
         ]
     }
 }
