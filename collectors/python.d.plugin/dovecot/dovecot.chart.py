@@ -5,11 +5,7 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'sessions',
     'logins',
@@ -52,14 +48,14 @@ CHARTS = {
         ]
     },
     'context_switches': {
-        'options': [None, 'Dovecot Context Switches', '', 'context switches', 'dovecot.context_switches', 'line'],
+        'options': [None, 'Dovecot Context Switches', 'switches', 'context switches', 'dovecot.context_switches', 'line'],
         'lines': [
             ['vol_cs', 'voluntary', 'absolute'],
             ['invol_cs', 'involuntary', 'absolute']
         ]
     },
     'io': {
-        'options': [None, 'Dovecot Disk I/O', 'kilobytes/s', 'disk', 'dovecot.io', 'area'],
+        'options': [None, 'Dovecot Disk I/O', 'KiB/s', 'disk', 'dovecot.io', 'area'],
         'lines': [
             ['disk_input', 'read', 'incremental', 1, 1024],
             ['disk_output', 'write', 'incremental', -1, 1024]
@@ -68,8 +64,8 @@ CHARTS = {
     'net': {
         'options': [None, 'Dovecot Network Bandwidth', 'kilobits/s', 'network', 'dovecot.net', 'area'],
         'lines': [
-            ['read_bytes', 'read', 'incremental', 8, 1024],
-            ['write_bytes', 'write', 'incremental', -8, 1024]
+            ['read_bytes', 'read', 'incremental', 8, 1000],
+            ['write_bytes', 'write', 'incremental', -8, 1000]
         ]
     },
     'syscalls': {
