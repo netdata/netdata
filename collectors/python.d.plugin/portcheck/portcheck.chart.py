@@ -12,8 +12,6 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
 
 PORT_LATENCY = 'connect'
 
@@ -25,7 +23,7 @@ ORDER = ['latency', 'status']
 
 CHARTS = {
     'latency': {
-        'options': [None, 'TCP connect latency', 'ms', 'latency', 'portcheck.latency', 'line'],
+        'options': [None, 'TCP connect latency', 'milliseconds', 'latency', 'portcheck.latency', 'line'],
         'lines': [
             [PORT_LATENCY, 'connect', 'absolute', 100, 1000]
         ]
@@ -47,6 +45,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+
         self.host = self.configuration.get('host')
         self.port = self.configuration.get('port')
         self.timeout = self.configuration.get('timeout', 1)
