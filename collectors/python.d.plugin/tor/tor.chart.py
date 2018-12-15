@@ -24,7 +24,7 @@ ORDER = [
 
 CHARTS = {
     'traffic': {
-        'options': [None, 'Tor Traffic', 'KB/s', 'traffic', 'tor.traffic', 'area'],
+        'options': [None, 'Tor Traffic', 'KiB/s', 'traffic', 'tor.traffic', 'area'],
         'lines': [
             ['read', 'read', 'incremental', 1, 1024],
             ['write', 'write', 'incremental', 1, -1024],
