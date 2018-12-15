@@ -11,8 +11,6 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
 
 DEFAULT_SERVER = 'localhost'
 DEFAULT_PORT = '389'
@@ -36,7 +34,7 @@ CHARTS = {
         ]
     },
     'bytes_sent': {
-        'options': [None, 'Traffic', 'KB/s', 'ldap', 'openldap.traffic_stats', 'line'],
+        'options': [None, 'Traffic', 'KiB/s', 'ldap', 'openldap.traffic_stats', 'line'],
         'lines': [
             ['bytes_sent', 'sent', 'incremental', 1, 1024]
         ]
