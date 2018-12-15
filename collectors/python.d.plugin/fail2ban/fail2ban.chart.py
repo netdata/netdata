@@ -35,8 +35,19 @@ def charts(jails):
         },
     }
     for jail in jails:
-        ch[ORDER[0]]['lines'].append([jail, jail, 'incremental'])
-        ch[ORDER[1]]['lines'].append(['{0}_in_jail'.format(jail), jail, 'absolute'])
+        dim = [
+            jail,
+            jail,
+            'incremental',
+        ]
+        ch[ORDER[0]]['lines'].append(dim)
+
+        dim = [
+            '{0}_in_jail'.format(jail),
+            jail,
+            'absolute',
+        ]
+        ch[ORDER[1]]['lines'].append(dim)
 
     return ch
 
