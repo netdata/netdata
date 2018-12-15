@@ -14,9 +14,6 @@ except ImportError:
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-update_every = 1
-priority = 60000
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
@@ -63,15 +60,15 @@ CHARTS = {
         ]
     },
     'memory': {
-        'options': [None, 'Memory', 'MB', 'overview', 'rabbitmq.memory', 'area'],
+        'options': [None, 'Memory', 'MiB', 'overview', 'rabbitmq.memory', 'area'],
         'lines': [
-            ['mem_used', 'used', 'absolute', 1, 1024 << 10]
+            ['mem_used', 'used', 'absolute', 1, 1 << 20]
         ]
     },
     'disk_space': {
-        'options': [None, 'Disk Space', 'GB', 'overview', 'rabbitmq.disk_space', 'area'],
+        'options': [None, 'Disk Space', 'GiB', 'overview', 'rabbitmq.disk_space', 'area'],
         'lines': [
-            ['disk_free', 'free', 'absolute', 1, 1024 ** 3]
+            ['disk_free', 'free', 'absolute', 1, 1 << 30]
         ]
     },
     'socket_descriptors': {
@@ -126,6 +123,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 15672)
         self.scheme = self.configuration.get('scheme', 'http')
