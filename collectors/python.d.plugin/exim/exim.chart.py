@@ -5,12 +5,10 @@
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['qemails']
+ORDER = [
+    'qemails',
+]
 
 CHARTS = {
     'qemails': {
@@ -25,9 +23,10 @@ CHARTS = {
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(self, configuration=configuration, name=name)
-        self.command = 'exim -bpc'
         self.order = ORDER
         self.definitions = CHARTS
+
+        self.command = 'exim -bpc'
 
     def _get_data(self):
         """
