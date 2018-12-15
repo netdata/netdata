@@ -13,7 +13,11 @@ from bases.loaders import YamlOrderedLoader
 
 PRECISION = 1000
 
-ORDER = ['queries', 'recursion', 'reqlist']
+ORDER = [
+    'queries',
+    'recursion',
+    'reqlist',
+]
 
 CHARTS = {
     'queries': {
