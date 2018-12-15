@@ -33,7 +33,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.url = self.configuration.get('url')
         self._manager = self._build_manager()
 

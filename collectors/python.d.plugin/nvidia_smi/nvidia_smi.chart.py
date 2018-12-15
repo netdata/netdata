@@ -316,7 +316,6 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-
         poll = int(configuration.get('poll_seconds', 1))
         self.poller = NvidiaSMIPoller(poll)
 

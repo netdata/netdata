@@ -118,11 +118,9 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.host = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 0)
         self.password = self.configuration.get('password', '')
-
         self.client = boinc_client.BoincClient(host=self.host, port=self.port, passwd=self.password)
         self.alive = False
 

@@ -123,7 +123,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 15672)
         self.scheme = self.configuration.get('scheme', 'http')

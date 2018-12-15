@@ -93,7 +93,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
         self.connector_name = self.configuration.get('connector_name', None)
 

@@ -85,14 +85,11 @@ class Service(SocketService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
         self.url = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 1717)
-
         # Clear dynamic dimensions, these are added during `_get_data()` to allow adding workers at run-time
         for chart in DYNAMIC_CHARTS:
             self.definitions[chart]['lines'] = []
-
         self.last_result = {}
         self.workers = []
 

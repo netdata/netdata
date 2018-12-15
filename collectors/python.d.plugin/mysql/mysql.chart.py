@@ -560,7 +560,6 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.queries = dict(
             global_status=QUERY_GLOBAL,
             slave_status=QUERY_SLAVE,

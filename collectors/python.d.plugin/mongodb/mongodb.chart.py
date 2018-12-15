@@ -424,13 +424,11 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
-
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 27017)
         self.timeout = self.configuration.get('timeout', 100)
-
         self.metrics_to_collect = deepcopy(DEFAULT_METRICS)
         self.connection = None
         self.do_replica = None

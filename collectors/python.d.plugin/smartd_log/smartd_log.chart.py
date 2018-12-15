@@ -586,11 +586,9 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
         self.log_path = configuration.get('log_path', DEF_PATH)
         self.age = configuration.get('age', DEF_AGE)
         self.exclude = configuration.get('exclude_disks', str()).split()
-
         self.disks = list()
         self.runs = 0
 

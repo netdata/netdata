@@ -148,14 +148,11 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-
         self._keep_alive = True
-
         self.host = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 6379)
         self.unix_socket = self.configuration.get('socket')
         p = self.configuration.get('pass')
-
         self.auth_request = 'AUTH {0} \r\n'.format(p).encode() if p else None
         self.request = 'INFO\r\n'.encode()
         self.bgsave_time = 0

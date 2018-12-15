@@ -789,24 +789,19 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = deepcopy(CHARTS)
-
         self.do_table_stats = configuration.pop('table_stats', False)
         self.do_index_stats = configuration.pop('index_stats', False)
         self.databases_to_poll = configuration.pop('database_poll', None)
         self.statement_timeout = configuration.pop('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)
         self.configuration = configuration
-
         self.conn = None
         self.server_version = None
         self.is_superuser = False
         self.alive = False
-
         self.databases = list()
         self.secondaries = list()
         self.replication_slots = list()
-
         self.queries = dict()
-
         self.data = dict()
 
     def reconnect(self):

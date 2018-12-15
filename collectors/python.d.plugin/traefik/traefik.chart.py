@@ -96,7 +96,6 @@ class Service(UrlService):
         self.url = self.configuration.get('url', 'http://localhost:8080/health')
         self.order = ORDER
         self.definitions = CHARTS
-
         self.last_total_response_time = 0
         self.last_total_count = 0
         self.data = {

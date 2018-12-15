@@ -16,9 +16,9 @@ except ImportError:
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
+
 update_every = 1
-priority = 60000
+
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
@@ -245,7 +245,7 @@ class Service(UrlService):
         try:
             self.dbs = self.configuration.get('databases').split(' ')
         except (KeyError, AttributeError):
-            self.dbs = []
+            self.dbs = list()
 
     def check(self):
         if not (self.host and self.port):

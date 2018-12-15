@@ -44,11 +44,9 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.host = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 25575)
         self.password = self.configuration.get('password', '')
-
         self.console = mcrcon.MCRcon()
         self.alive = True
 

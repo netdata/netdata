@@ -65,7 +65,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         pattern = self.configuration.get('regex')
         self.regex = re.compile(pattern) if pattern else None
         self.status_codes_accepted = self.configuration.get('status_accepted', [200])

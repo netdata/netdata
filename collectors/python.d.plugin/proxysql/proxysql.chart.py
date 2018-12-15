@@ -200,7 +200,6 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.queries = dict(
             global_status=QUERY_GLOBAL,
             connection_pool_status=QUERY_CONNECTION_POOL,

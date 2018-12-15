@@ -6,6 +6,9 @@
 from bases.FrameworkServices.SocketService import SocketService
 
 
+UNIX_SOCKET = '/var/run/dovecot/stats'
+
+
 ORDER = [
     'sessions',
     'logins',
@@ -108,13 +111,12 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
-        self.request = 'EXPORT\tglobal\r\n'
-        self.host = None  # localhost
-        self.port = None  # 24242
-        # self._keep_alive = True
-        self.unix_socket = '/var/run/dovecot/stats'
         self.order = ORDER
         self.definitions = CHARTS
+        self.host = None  # localhost
+        self.port = None  # 24242
+        self.unix_socket = UNIX_SOCKET
+        self.request = 'EXPORT\tglobal\r\n'
 
     def _get_data(self):
         """

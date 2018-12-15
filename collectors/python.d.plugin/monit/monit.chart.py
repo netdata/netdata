@@ -99,7 +99,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         base_url = self.configuration.get('url', 'http://localhost:2812')
         self.url = '{0}/_status?format=xml&level=full'.format(base_url)
 

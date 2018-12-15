@@ -103,7 +103,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.url = self.configuration.get('url', 'http://localhost/status?full&json')
         self.json = '&json' in self.url or '?json' in self.url
         self.json_full = self.url.endswith(('?full&json', '?json&full'))

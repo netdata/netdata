@@ -122,7 +122,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
         lease_path = self.configuration.get('leases_path', '/var/lib/dhcp/dhcpd.leases')
         self.dhcpd_leases = DhcpdLeasesFile(path=lease_path)
         self.pools = list()

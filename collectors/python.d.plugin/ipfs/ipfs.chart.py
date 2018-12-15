@@ -63,10 +63,8 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.baseurl = self.configuration.get('url', 'http://localhost:5001')
         self.do_pinapi = self.configuration.get('pinapi')
-
         self.__storage_max = None
 
     def _get_json(self, sub_url):

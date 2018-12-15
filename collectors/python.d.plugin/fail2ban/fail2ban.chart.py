@@ -70,12 +70,10 @@ class Service(LogService):
         LogService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = dict()
-
         self.log_path = self.configuration.get('log_path', '/var/log/fail2ban.log')
         self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
         self.conf_dir = self.configuration.get('conf_dir', '/etc/fail2ban/jail.d/')
         self.exclude = self.configuration.get('exclude', str())
-
         self.monitoring_jails = list()
         self.banned_ips = defaultdict(set)
         self.data = dict()

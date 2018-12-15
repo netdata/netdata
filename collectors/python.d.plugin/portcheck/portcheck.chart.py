@@ -45,7 +45,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.host = self.configuration.get('host')
         self.port = self.configuration.get('port')
         self.timeout = self.configuration.get('timeout', 1)

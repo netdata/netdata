@@ -44,7 +44,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.baseurl = self.configuration.get('url', 'http://localhost:9090')
 
     def _get_stats(self):

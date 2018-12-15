@@ -96,10 +96,20 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.named_stats_path = self.configuration.get('named_stats_path', '/var/log/bind/named.stats')
         self.rndc = find_binary('rndc')
-        self.data = dict(nms_requests=0, nms_responses=0, nms_failure=0, nms_auth=0,
-                         nms_non_auth=0, nms_nxrrset=0, nms_success=0, nms_nxdomain=0,
-                         nms_recursion=0, nms_duplicate=0, nms_rejected_queries=0,
-                         nms_dropped_queries=0)
+        self.data = dict(
+            nms_requests=0,
+            nms_responses=0,
+            nms_failure=0,
+            nms_auth=0,
+            nms_non_auth=0,
+            nms_nxrrset=0,
+            nms_success=0,
+            nms_nxdomain=0,
+            nms_recursion=0,
+            nms_duplicate=0,
+            nms_rejected_queries=0,
+            nms_dropped_queries=0,
+        )
 
     def check(self):
         if not self.rndc:

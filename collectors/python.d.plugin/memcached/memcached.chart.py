@@ -129,7 +129,6 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.request = 'stats\r\n'
         self.host = 'localhost'
         self.port = 11211

@@ -44,7 +44,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.log_path = self.configuration.get('log_path')
         self.regex = {
             'tls': TLS_REGEX,

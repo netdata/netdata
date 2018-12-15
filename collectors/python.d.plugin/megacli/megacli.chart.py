@@ -180,9 +180,7 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-
         self.do_battery = self.configuration.get('do_battery')
-
         self.megacli = Megacli()
 
     def check_sudo(self):

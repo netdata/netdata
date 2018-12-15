@@ -6,6 +6,8 @@
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
 
+EXIM_COMMAND = 'exim -bpc'
+
 ORDER = [
     'qemails',
 ]
@@ -25,8 +27,7 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
-        self.command = 'exim -bpc'
+        self.command = EXIM_COMMAND
 
     def _get_data(self):
         """

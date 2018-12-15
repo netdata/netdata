@@ -132,9 +132,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.path = self.configuration.get('path', '/tmp/lshttpd/')
-
         self.files = list()
 
     def check(self):

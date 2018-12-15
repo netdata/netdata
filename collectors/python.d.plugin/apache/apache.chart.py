@@ -96,7 +96,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.url = self.configuration.get('url', 'http://localhost/server-status?auto')
 
     def check(self):

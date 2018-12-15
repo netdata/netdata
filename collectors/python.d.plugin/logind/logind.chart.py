@@ -47,7 +47,6 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.command = LOGINCTL_COMMAND
 
     def _get_data(self):

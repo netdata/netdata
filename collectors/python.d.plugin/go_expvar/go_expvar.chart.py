@@ -87,7 +87,6 @@ def flatten(d, top='', sep='.'):
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-
         # if memstats collection is enabled, add the charts and their order
         if self.configuration.get('collect_memstats'):
             self.definitions = dict(MEMSTATS_CHARTS)

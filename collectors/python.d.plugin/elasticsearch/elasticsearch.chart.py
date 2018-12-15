@@ -494,9 +494,11 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.host = self.configuration.get('host')
         self.port = self.configuration.get('port', 9200)
-        self.url = '{scheme}://{host}:{port}'.format(scheme=self.configuration.get('scheme', 'http'),
-                                                     host=self.host,
-                                                     port=self.port)
+        self.url = '{scheme}://{host}:{port}'.format(
+            scheme=self.configuration.get('scheme', 'http'),
+            host=self.host,
+            port=self.port,
+        )
         self.latency = dict()
         self.methods = list()
 

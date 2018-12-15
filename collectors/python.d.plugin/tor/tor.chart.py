@@ -39,10 +39,8 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.port = self.configuration.get('control_port', DEF_PORT)
         self.password = self.configuration.get('password')
-
         self.use_socket = isinstance(self.port, str) and self.port != DEF_PORT and not self.port.isdigit()
         self.conn = None
         self.alive = False

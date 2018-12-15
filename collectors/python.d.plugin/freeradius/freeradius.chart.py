@@ -101,17 +101,14 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.host = self.configuration.get('host', DEFAULT_HOST)
         self.port = self.configuration.get('port', DEFAULT_PORT)
         self.secret = self.configuration.get('secret')
         self.do_acct = self.configuration.get('acct', DEFAULT_DO_ACCT)
         self.do_proxy_auth = self.configuration.get('proxy_auth', DEFAULT_DO_PROXY_AUTH)
         self.do_proxy_acct = self.configuration.get('proxy_acct', DEFAULT_DO_PROXY_ACCT)
-
         self.echo = find_binary('echo')
         self.radclient = find_binary('radclient')
-
         self.sub_echo = [self.echo, RADIUS_MSG]
         self.sub_radclient = radclient_status(
             self.radclient, RADCLIENT_RETRIES, RADCLIENT_TIMEOUT, self.host, self.port, self.secret,

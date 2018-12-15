@@ -52,7 +52,6 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.url = self.configuration.get('url', 'http://localhost/stub_status')
 
     def _get_data(self):
