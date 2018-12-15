@@ -16,7 +16,10 @@ update_every = 5
 
 PRECISION = 100
 
-ORDER = ['tps', 'users']
+ORDER = [
+    'tps',
+    'users',
+]
 
 CHARTS = {
     'tps': {
@@ -41,9 +44,11 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+
         self.host = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 25575)
         self.password = self.configuration.get('password', '')
+
         self.console = mcrcon.MCRcon()
         self.alive = True
 
