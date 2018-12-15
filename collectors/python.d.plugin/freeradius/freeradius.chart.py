@@ -130,7 +130,7 @@ class Service(SimpleService):
             self.error("'secret' isn't set")
             return None
 
-        if not self._get_raw_data():
+        if not self.get_raw_data():
             self.error('Request returned no data. Is server alive?')
             return False
 
