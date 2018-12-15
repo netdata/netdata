@@ -3,13 +3,15 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from re import findall
+import re
 from subprocess import Popen, PIPE
 
 from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
 update_every = 15
+
+PARSER = re.compile(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)')
 
 RADIUS_MSG = 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept'
 
@@ -31,7 +33,7 @@ ORDER = [
 
 CHARTS = {
     'authentication': {
-        'options': [None, 'Authentication', 'packets/s', 'Authentication', 'freerad.auth', 'line'],
+        'options': [None, 'Authentication', 'packets/s', 'authentication', 'freerad.auth', 'line'],
         'lines': [
             ['access-accepts', None, 'incremental'],
             ['access-rejects', None, 'incremental'],
@@ -43,7 +45,7 @@ CHARTS = {
         ]
     },
     'accounting': {
-        'options': [None, 'Accounting', 'packets/s', 'Accounting', 'freerad.acct', 'line'],
+        'options': [None, 'Accounting', 'packets/s', 'accounting', 'freerad.acct', 'line'],
         'lines': [
             ['accounting-requests', 'requests', 'incremental'],
             ['accounting-responses', 'responses', 'incremental'],
@@ -55,7 +57,7 @@ CHARTS = {
         ]
     },
     'proxy-auth': {
-        'options': [None, 'Proxy Authentication', 'packets/s', 'Authentication', 'freerad.proxy.auth', 'line'],
+        'options': [None, 'Proxy Authentication', 'packets/s', 'authentication', 'freerad.proxy.auth', 'line'],
         'lines': [
             ['proxy-access-accepts', 'access-accepts', 'incremental'],
             ['proxy-access-rejects', 'access-rejects', 'incremental'],
@@ -67,7 +69,7 @@ CHARTS = {
         ]
     },
     'proxy-acct': {
-        'options': [None, 'Proxy Accounting', 'packets/s', 'Accounting', 'freerad.proxy.acct', 'line'],
+        'options': [None, 'Proxy Accounting', 'packets/s', 'accounting', 'freerad.proxy.acct', 'line'],
         'lines': [
             ['proxy-accounting-requests', 'requests', 'incremental'],
             ['proxy-accounting-responses', 'responses', 'incremental'],
@@ -143,15 +145,21 @@ class Service(SimpleService):
 
         return True
 
-    def _get_data(self):
+    def get_data(self):
         """
         Format data received from shell command
         :return: dict
         """
-        result = self._get_raw_data()
-        return dict([(elem[0].lower(), int(elem[1])) for elem in findall(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)', result)])
+        result = self.get_raw_data()
 
-    def _get_raw_data(self):
+        if not result:
+            return None
+
+        return dict(
+            (key.lower(), value) for key, value in PARSER.findall(result)
+        )
+
+    def get_raw_data(self):
         """
         The following code is equivalent to
         'echo "Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept"
