@@ -8,10 +8,9 @@ import json
 from bases.FrameworkServices.UrlService import UrlService
 
 
-priority = 60000
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['listeners']
+ORDER = [
+    'listeners',
+]
 
 CHARTS = {
     'listeners': {
@@ -34,6 +33,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+
         self.url = self.configuration.get('url')
         self._manager = self._build_manager()
 
