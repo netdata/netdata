@@ -11,10 +11,15 @@ from subprocess import Popen
 from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
-priority = 60000
+
 update_every = 30
 
-ORDER = ['name_server_statistics', 'incoming_queries', 'outgoing_queries', 'named_stats_size']
+ORDER = [
+    'name_server_statistics',
+    'incoming_queries',
+    'outgoing_queries',
+    'named_stats_size',
+]
 
 CHARTS = {
     'name_server_statistics': {
@@ -43,7 +48,7 @@ CHARTS = {
         'lines': [
         ]},
     'named_stats_size': {
-        'options': [None, 'Named Stats File Size', 'MB', 'file size', 'bind_rndc.stats_size', 'line'],
+        'options': [None, 'Named Stats File Size', 'MiB', 'file size', 'bind_rndc.stats_size', 'line'],
         'lines': [
             ['stats_size', None, 'absolute', 1, 1 << 20]
         ]
