@@ -268,7 +268,7 @@ CHARTS = {
         'algo': INCREMENTAL,
     },
     'reserved_block_count': {
-        'options': [None, 'Reserved Block Count', '%', 'wear', 'smartd_log.reserved_block_count', 'line'],
+        'options': [None, 'Reserved Block Count', 'percentage', 'wear', 'smartd_log.reserved_block_count', 'line'],
         'lines': [],
         'attrs': [ATTR170],
         'algo': ABSOLUTE,
@@ -321,7 +321,7 @@ CHARTS = {
 
     },
     'percent_lifetime_used': {
-        'options': [None, 'Percent Lifetime Used', '%', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
+        'options': [None, 'Percent Lifetime Used', 'percentage', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
         'lines': [],
         'attrs': [ATTR202],
         'algo': ABSOLUTE,
