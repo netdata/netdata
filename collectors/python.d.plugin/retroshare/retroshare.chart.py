@@ -7,16 +7,16 @@ import json
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['bandwidth', 'peers', 'dht']
+ORDER = [
+    'bandwidth',
+    'peers',
+    'dht',
+]
 
 CHARTS = {
     'bandwidth': {
-        'options': [None, 'RetroShare Bandwidth', 'kB/s', 'RetroShare', 'retroshare.bandwidth', 'area'],
+        'options': [None, 'RetroShare Bandwidth', 'kilobits/s', 'RetroShare', 'retroshare.bandwidth', 'area'],
         'lines': [
             ['bandwidth_up_kb',   'Upload'],
             ['bandwidth_down_kb', 'Download']
@@ -42,9 +42,10 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.baseurl = self.configuration.get('url', 'http://localhost:9090')
         self.order = ORDER
         self.definitions = CHARTS
+
+        self.baseurl = self.configuration.get('url', 'http://localhost:9090')
 
     def _get_stats(self):
         """
