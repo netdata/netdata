@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- mdstat module causing netdata segv and crash [\#4990](https://github.com/netdata/netdata/issues/4990)
 - Cannot read /proc/mdstat line. Expected 7 params, read 6. [\#4975](https://github.com/netdata/netdata/issues/4975)
 - custom notification method does not work [\#4968](https://github.com/netdata/netdata/issues/4968)
 - Info logging command in netdata-updater.sh contains command substitution. [\#4950](https://github.com/netdata/netdata/issues/4950)
@@ -23,6 +24,7 @@
 
 **Merged pull requests:**
 
+- Fix crash in mdstat module [\#4992](https://github.com/netdata/netdata/pull/4992) ([vlvkobal](https://github.com/vlvkobal))
 - postgres timeouts [\#4988](https://github.com/netdata/netdata/pull/4988) ([ilyam8](https://github.com/ilyam8))
 - Typo: `stab\_status` -\> `stub\_status` [\#4984](https://github.com/netdata/netdata/pull/4984) ([petecooper](https://github.com/petecooper))
 - Pass cloud\_base\_url from daemon to web/gui through hello endpoint \#4980 [\#4982](https://github.com/netdata/netdata/pull/4982) ([gmosx](https://github.com/gmosx))
