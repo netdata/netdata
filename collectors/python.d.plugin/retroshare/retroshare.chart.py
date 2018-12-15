@@ -16,7 +16,7 @@ ORDER = [
 
 CHARTS = {
     'bandwidth': {
-        'options': [None, 'RetroShare Bandwidth', 'kilobits/s', 'RetroShare', 'retroshare.bandwidth', 'area'],
+        'options': [None, 'RetroShare Bandwidth', 'KiB/s', 'RetroShare', 'retroshare.bandwidth', 'area'],
         'lines': [
             ['bandwidth_up_kb', 'Upload'],
             ['bandwidth_down_kb', 'Download']
