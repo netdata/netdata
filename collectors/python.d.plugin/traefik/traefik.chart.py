@@ -3,8 +3,10 @@
 # Author: Alexandre Menezes (@ale_menezes)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from json import loads
 from collections import defaultdict
+
+from json import loads
+
 from bases.FrameworkServices.UrlService import UrlService
 
 
