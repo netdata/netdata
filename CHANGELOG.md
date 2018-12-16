@@ -10,6 +10,8 @@
 - Info logging command in netdata-updater.sh contains command substitution. [\#4950](https://github.com/netdata/netdata/issues/4950)
 - No data in charts [\#4920](https://github.com/netdata/netdata/issues/4920)
 - Postgres module: detect servers version and use the right query [\#4910](https://github.com/netdata/netdata/issues/4910)
+- Cannot update & cannot disable mail logging of events [\#4557](https://github.com/netdata/netdata/issues/4557)
+- Apcupsd: Connection loss further collects data, but it should stop [\#3927](https://github.com/netdata/netdata/issues/3927)
 - \[bug\]some metrics don't report to /allmetrics endpoint with prometheus format [\#3866](https://github.com/netdata/netdata/issues/3866)
 
 **Closed issues:**
