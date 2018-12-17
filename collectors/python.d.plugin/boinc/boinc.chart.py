@@ -10,7 +10,12 @@ from bases.FrameworkServices.SimpleService import SimpleService
 from third_party import boinc_client
 
 
-ORDER = ['tasks', 'states', 'sched_states', 'process_states']
+ORDER = [
+    'tasks',
+    'states',
+    'sched_states',
+    'process_states',
+]
 
 CHARTS = {
     'tasks': {
@@ -141,14 +146,16 @@ class Service(SimpleService):
     def _get_data(self):
         if not self.is_alive():
             return None
+
         data = dict(_DATA_TEMPLATE)
-        results = []
+
         try:
             results = self.client.get_tasks()
         except socket.error:
             self.error('Connection is dead')
             self.alive = False
             return None
+
         for task in results:
             data['total'] += 1
             data[_TASK_MAP[task.state]] += 1
@@ -159,4 +166,5 @@ class Service(SimpleService):
                     data[_PROC_MAP[task.active_task_state]] += 1
             except AttributeError:
                 pass
-        return data
+
+        return data or None

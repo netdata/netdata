@@ -47,13 +47,13 @@ CHARTS = {
         ]
     },
     'hit_rate': {
-        'options': [None, 'Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
+        'options': [None, 'Hit rate', 'percentage', 'hits', 'redis.hit_rate', 'line'],
         'lines': [
             ['hit_rate', 'rate', 'absolute']
         ]
     },
     'memory': {
-        'options': [None, 'Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
+        'options': [None, 'Memory utilization', 'KiB', 'memory', 'redis.memory', 'line'],
         'lines': [
             ['used_memory', 'total', 'absolute', 1, 1024],
             ['used_memory_lua', 'lua', 'absolute', 1, 1024]
@@ -62,8 +62,8 @@ CHARTS = {
     'net': {
         'options': [None, 'Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
         'lines': [
-            ['total_net_input_bytes', 'in', 'incremental', 8, 1024],
-            ['total_net_output_bytes', 'out', 'incremental', -8, 1024]
+            ['total_net_input_bytes', 'in', 'incremental', 8, 1000],
+            ['total_net_output_bytes', 'out', 'incremental', -8, 1000]
         ]
     },
     'keys_redis': {
@@ -146,16 +146,13 @@ RE = re.compile(r'\n([a-z_0-9 ]+):(?:keys=)?([^,\r]+)')
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
-        self._keep_alive = True
-
         self.order = list()
         self.definitions = dict()
-
+        self._keep_alive = True
         self.host = self.configuration.get('host', 'localhost')
         self.port = self.configuration.get('port', 6379)
         self.unix_socket = self.configuration.get('socket')
         p = self.configuration.get('pass')
-
         self.auth_request = 'AUTH {0} \r\n'.format(p).encode() if p else None
         self.request = 'INFO\r\n'.encode()
         self.bgsave_time = 0

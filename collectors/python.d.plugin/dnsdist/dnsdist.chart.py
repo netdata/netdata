@@ -90,9 +90,9 @@ CHARTS = {
         ]
     },
     'servermem': {
-        'options': [None, 'DNSDIST server memory utilization', 'MB', 'server', 'dnsdist.servermem', 'area'],
+        'options': [None, 'DNSDIST server memory utilization', 'MiB', 'server', 'dnsdist.servermem', 'area'],
         'lines': [
-            ['real-memory-usage', 'memory usage', 'absolute', 1, 1048576]
+            ['real-memory-usage', 'memory usage', 'absolute', 1, 1 << 20]
         ]
     },
     'query_latency': {

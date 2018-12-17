@@ -12,12 +12,18 @@ except ImportError:
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.loaders import safe_load
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-ORDER = ['cpu_usage', 'jobs_rate', 'connections_rate', 'commands_rate', 'current_tubes', 'current_jobs',
-         'current_connections', 'binlog', 'uptime']
+ORDER = [
+    'cpu_usage',
+    'jobs_rate',
+    'connections_rate',
+    'commands_rate',
+    'current_tubes',
+    'current_jobs',
+    'current_connections',
+    'binlog',
+    'uptime',
+]
 
 CHARTS = {
     'cpu_usage': {

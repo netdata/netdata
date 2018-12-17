@@ -28,11 +28,15 @@ HTTP_BAD_STATUS = 'bad_status'
 HTTP_TIMEOUT = 'timeout'
 HTTP_NO_CONNECTION = 'no_connection'
 
-ORDER = ['response_time', 'response_length', 'status']
+ORDER = [
+    'response_time',
+    'response_length',
+    'status',
+]
 
 CHARTS = {
     'response_time': {
-        'options': [None, 'HTTP response time', 'ms', 'response', 'httpcheck.responsetime', 'line'],
+        'options': [None, 'HTTP response time', 'milliseconds', 'response', 'httpcheck.responsetime', 'line'],
         'lines': [
             [HTTP_RESPONSE_TIME, 'time', 'absolute', 100, 1000]
         ]
@@ -59,12 +63,12 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
+        self.definitions = CHARTS
         pattern = self.configuration.get('regex')
         self.regex = re.compile(pattern) if pattern else None
         self.status_codes_accepted = self.configuration.get('status_accepted', [200])
         self.follow_redirect = self.configuration.get('redirect', True)
-        self.order = ORDER
-        self.definitions = CHARTS
 
     def _get_data(self):
         """

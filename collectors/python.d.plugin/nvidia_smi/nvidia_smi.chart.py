@@ -49,39 +49,39 @@ def gpu_charts(gpu):
 
     charts = {
         PCI_BANDWIDTH: {
-            'options': [None, 'PCI Express Bandwidth Utilization', 'KB/s', fam, 'nvidia_smi.pci_bandwidth', 'area'],
+            'options': [None, 'PCI Express Bandwidth Utilization', 'KiB/s', fam, 'nvidia_smi.pci_bandwidth', 'area'],
             'lines': [
                 ['rx_util', 'rx', 'absolute', 1, 1],
                 ['tx_util', 'tx', 'absolute', 1, -1],
             ]
         },
         FAN_SPEED: {
-            'options': [None, 'Fan Speed', '%', fam, 'nvidia_smi.fan_speed', 'line'],
+            'options': [None, 'Fan Speed', 'percentage', fam, 'nvidia_smi.fan_speed', 'line'],
             'lines': [
                 ['fan_speed', 'speed'],
             ]
         },
         GPU_UTIL: {
-            'options': [None, 'GPU Utilization', '%', fam, 'nvidia_smi.gpu_utilization', 'line'],
+            'options': [None, 'GPU Utilization', 'percentage', fam, 'nvidia_smi.gpu_utilization', 'line'],
             'lines': [
                 ['gpu_util', 'utilization'],
             ]
         },
         MEM_UTIL: {
-            'options': [None, 'Memory Bandwidth Utilization', '%', fam, 'nvidia_smi.mem_utilization', 'line'],
+            'options': [None, 'Memory Bandwidth Utilization', 'percentage', fam, 'nvidia_smi.mem_utilization', 'line'],
             'lines': [
                 ['memory_util', 'utilization'],
             ]
         },
         ENCODER_UTIL: {
-            'options': [None, 'Encoder/Decoder Utilization', '%', fam, 'nvidia_smi.encoder_utilization', 'line'],
+            'options': [None, 'Encoder/Decoder Utilization', 'percentage', fam, 'nvidia_smi.encoder_utilization', 'line'],
             'lines': [
                 ['encoder_util', 'encoder'],
                 ['decoder_util', 'decoder'],
             ]
         },
         MEM_ALLOCATED: {
-            'options': [None, 'Memory Allocated', 'MB', fam, 'nvidia_smi.memory_allocated', 'line'],
+            'options': [None, 'Memory Allocated', 'MiB', fam, 'nvidia_smi.memory_allocated', 'line'],
             'lines': [
                 ['fb_memory_usage', 'used'],
             ]
@@ -316,7 +316,6 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-
         poll = int(configuration.get('poll_seconds', 1))
         self.poller = NvidiaSMIPoller(poll)
 

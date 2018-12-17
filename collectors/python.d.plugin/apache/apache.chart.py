@@ -5,63 +5,60 @@
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'url': 'http://www.apache.org/server-status?auto'
-#          }}
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['requests', 'connections', 'conns_async', 'net', 'workers', 'reqpersec', 'bytespersec', 'bytesperreq']
+ORDER = [
+    'requests',
+    'connections',
+    'conns_async',
+    'net',
+    'workers',
+    'reqpersec',
+    'bytespersec',
+    'bytesperreq',
+]
 
 CHARTS = {
     'bytesperreq': {
-        'options': [None, 'apache Lifetime Avg. Response Size', 'bytes/request',
+        'options': [None, 'Lifetime Avg. Request Size', 'KiB',
                     'statistics', 'apache.bytesperreq', 'area'],
         'lines': [
-            ['size_req']
+            ['size_req', 'size', 'absolute', 1, 1024 * 100000]
         ]},
     'workers': {
-        'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
+        'options': [None, 'Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
             ['idle'],
             ['busy'],
         ]},
     'reqpersec': {
-        'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics',
+        'options': [None, 'Lifetime Avg. Requests/s', 'requests/s', 'statistics',
                     'apache.reqpersec', 'area'],
         'lines': [
-            ['requests_sec']
+            ['requests_sec', 'requests', 'absolute', 1, 100000]
         ]},
     'bytespersec': {
-        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobits/s', 'statistics',
+        'options': [None, 'Lifetime Avg. Bandwidth/s', 'kilobits/s', 'statistics',
                     'apache.bytesperreq', 'area'],
         'lines': [
-            ['size_sec', None, 'absolute', 8, 1000]
+            ['size_sec', None, 'absolute', 8, 1000 * 100000]
         ]},
     'requests': {
-        'options': [None, 'apache Requests', 'requests/s', 'requests', 'apache.requests', 'line'],
+        'options': [None, 'Requests', 'requests/s', 'requests', 'apache.requests', 'line'],
         'lines': [
             ['requests', None, 'incremental']
         ]},
     'net': {
-        'options': [None, 'apache Bandwidth', 'kilobits/s', 'bandwidth', 'apache.net', 'area'],
+        'options': [None, 'Bandwidth', 'kilobits/s', 'bandwidth', 'apache.net', 'area'],
         'lines': [
             ['sent', None, 'incremental', 8, 1]
         ]},
     'connections': {
-        'options': [None, 'apache Connections', 'connections', 'connections', 'apache.connections', 'line'],
+        'options': [None, 'Connections', 'connections', 'connections', 'apache.connections', 'line'],
         'lines': [
             ['connections']
         ]},
     'conns_async': {
-        'options': [None, 'apache Async Connections', 'connections', 'connections', 'apache.conns_async', 'stacked'],
+        'options': [None, 'Async Connections', 'connections', 'connections', 'apache.conns_async', 'stacked'],
         'lines': [
             ['keepalive'],
             ['closing'],
@@ -85,6 +82,14 @@ ASSIGNMENT = {
     'ConnsAsyncWriting': 'writing'
 }
 
+FLOAT_VALUES = [
+    'BytesPerReq',
+    'ReqPerSec',
+    'BytesPerSec',
+]
+
+LIGHTTPD_MARKER = 'idle_servers'
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
@@ -95,20 +100,15 @@ class Service(UrlService):
 
     def check(self):
         self._manager = self._build_manager()
+
         data = self._get_data()
+
         if not data:
             return None
 
-        if 'idle_servers' in data:
-            self.module_name = 'lighttpd'
-            for chart in self.definitions:
-                if chart == 'workers':
-                    lines = self.definitions[chart]['lines']
-                    lines[0] = ['idle_servers', 'idle']
-                    lines[1] = ['busy_servers', 'busy']
-                opts = self.definitions[chart]['options']
-                opts[1] = opts[1].replace('apache', 'lighttpd')
-                opts[4] = opts[4].replace('apache', 'lighttpd')
+        if LIGHTTPD_MARKER in data:
+            self.turn_into_lighttpd()
+
         return True
 
     def _get_data(self):
@@ -117,15 +117,44 @@ class Service(UrlService):
         :return: dict
         """
         raw_data = self._get_raw_data()
+
         if not raw_data:
             return None
+
         data = dict()
 
-        for row in raw_data.split('\n'):
-            tmp = row.split(':')
-            if tmp[0] in ASSIGNMENT:
-                try:
-                    data[ASSIGNMENT[tmp[0]]] = int(float(tmp[1]))
-                except (IndexError, ValueError):
-                    continue
+        for line in raw_data.split('\n'):
+            try:
+                parse_line(line, data)
+            except ValueError:
+                continue
+
         return data or None
+
+    def turn_into_lighttpd(self):
+        self.module_name = 'lighttpd'
+        for chart in self.definitions:
+            if chart == 'workers':
+                lines = self.definitions[chart]['lines']
+                lines[0] = ['idle_servers', 'idle']
+                lines[1] = ['busy_servers', 'busy']
+            opts = self.definitions[chart]['options']
+            opts[1] = opts[1].replace('apache', 'lighttpd')
+            opts[4] = opts[4].replace('apache', 'lighttpd')
+
+
+def parse_line(line, data):
+    parts = line.split(':')
+
+    if len(parts) != 2:
+        return
+
+    key, value = parts[0], parts[1]
+
+    if key not in ASSIGNMENT:
+        return
+
+    if key in FLOAT_VALUES:
+        data[ASSIGNMENT[key]] = int((float(value) * 100000))
+    else:
+        data[ASSIGNMENT[key]] = int(value)

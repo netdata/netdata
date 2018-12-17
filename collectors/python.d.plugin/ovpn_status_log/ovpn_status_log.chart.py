@@ -3,14 +3,18 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from re import compile as r_compile
+import re
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-priority = 60000
+
 update_every = 10
 
-ORDER = ['users', 'traffic']
+ORDER = [
+    'users',
+    'traffic',
+]
+
 CHARTS = {
     'users': {
         'options': [None, 'OpenVPN Active Users', 'active users', 'users', 'openvpn_status.users', 'line'],
@@ -19,15 +23,20 @@ CHARTS = {
         ]
     },
     'traffic': {
-        'options': [None, 'OpenVPN Traffic', 'KB/s', 'traffic', 'openvpn_status.traffic', 'area'],
+        'options': [None, 'OpenVPN Traffic', 'KiB/s', 'traffic', 'openvpn_status.traffic', 'area'],
         'lines': [
-            ['bytes_in', 'in', 'incremental', 1, 1 << 10], ['bytes_out', 'out', 'incremental', 1, -1 << 10]
+            ['bytes_in', 'in', 'incremental', 1, 1 << 10],
+            ['bytes_out', 'out', 'incremental', -1, 1 << 10]
         ]
     }
 }
 
-TLS_REGEX = r_compile(r'(?:[0-9a-f]+:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)')
-STATIC_KEY_REGEX = r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)')
+TLS_REGEX = re.compile(
+    r'(?:[0-9a-f]+:[0-9a-f:]+|(?:\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?)) (?P<bytes_in>\d+) (?P<bytes_out>\d+)'
+)
+STATIC_KEY_REGEX = re.compile(
+    r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)'
+)
 
 
 class Service(SimpleService):

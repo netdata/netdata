@@ -24,7 +24,7 @@ ORDER = [
 
 CHARTS = {
     'traffic': {
-        'options': [None, 'Tor Traffic', 'KB/s', 'traffic', 'tor.traffic', 'area'],
+        'options': [None, 'Tor Traffic', 'KiB/s', 'traffic', 'tor.traffic', 'area'],
         'lines': [
             ['read', 'read', 'incremental', 1, 1024],
             ['write', 'write', 'incremental', 1, -1024],
@@ -39,10 +39,8 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.port = self.configuration.get('control_port', DEF_PORT)
         self.password = self.configuration.get('password')
-
         self.use_socket = isinstance(self.port, str) and self.port != DEF_PORT and not self.port.isdigit()
         self.conn = None
         self.alive = False

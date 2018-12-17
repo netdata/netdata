@@ -24,9 +24,7 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 
 disabled_by_default = True
 
-# default module values (can be overridden per job in `config`)
 update_every = 5
-priority = 60000
 
 ORDER = [
     'syscall_rw',
@@ -40,14 +38,14 @@ ORDER = [
 
 CHARTS = {
     'syscall_rw': {
-        'options': [None, 'R/Ws', 'kilobytes/s', 'syscall', 'syscall.rw', 'area'],
+        'options': [None, 'R/Ws', 'KiB/s', 'syscall', 'syscall.rw', 'area'],
         'lines': [
             ['syscall_sendfile_bytes', 'sendfile', 'incremental', 1, 1024],
             ['syscall_recvfile_bytes', 'recvfile', 'incremental', -1, 1024]
         ]
     },
     'smb2_rw': {
-        'options': [None, 'R/Ws', 'kilobytes/s', 'smb2', 'smb2.rw', 'area'],
+        'options': [None, 'R/Ws', 'KiB/s', 'smb2', 'smb2.rw', 'area'],
         'lines': [
             ['smb2_read_outbytes', 'readout', 'incremental', 1, 1024],
             ['smb2_write_inbytes', 'writein', 'incremental', -1, 1024],
