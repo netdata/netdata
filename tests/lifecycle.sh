@@ -30,5 +30,5 @@ echo "========= UPDATE ========="
 ./netdata-updater.sh
 
 echo "========= UNINSTALL ========="
-/tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
+mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
 ./netdata-uninstaller.sh --yes --force
