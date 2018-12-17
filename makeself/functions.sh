@@ -49,7 +49,7 @@ fetch() {
 # -----------------------------------------------------------------------------
 
 # load the functions of the netdata-installer.sh
-. "${NETDATA_SOURCE_PATH}/installer/functions.sh"
+. "${NETDATA_SOURCE_PATH}/packaging/installer/functions.sh"
 
 # -----------------------------------------------------------------------------
 

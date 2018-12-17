@@ -45,7 +45,7 @@ run mkdir -p "${NETDATA_INSTALL_PATH}/system"
 run cp \
     makeself/post-installer.sh \
     makeself/install-or-update.sh \
-    installer/functions.sh \
+    packaging/installer/functions.sh \
     configs.signatures \
     system/netdata-init-d \
     system/netdata-lsb \

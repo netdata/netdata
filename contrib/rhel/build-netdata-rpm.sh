@@ -5,7 +5,7 @@
 
 cd "$(dirname "$0")/../../" || exit 1
 # shellcheck disable=SC1091
-source "installer/functions.sh" || exit 1
+source "packaging/installer/functions.sh" || exit 1
 
 set -e
 
