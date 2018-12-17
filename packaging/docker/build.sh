@@ -20,20 +20,28 @@ if [ "${VERSION}" == "" ]; then
     VERSION="latest"
 fi
 
-REPOSITORY="${REPOSITORY:-netdata}"
-
-echo "Building $VERSION of netdata container"
-
 declare -A ARCH_MAP
 ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
+if [ -z ${DEVEL+x} ]; then
+    declare -a ARCHITECTURES=(i386 armhf aarch64 amd64)
+    BG="&"
+else
+    declare -a ARCHITECTURES=(amd64)
+    unset DOCKER_PASSWORD
+    unset DOCKER_USERNAME
+    BG=""
+fi
+
+REPOSITORY="${REPOSITORY:-netdata}"
+echo "Building ${VERSION} of ${REPOSITORY} container"
 
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 # Build images using multi-arch Dockerfile.
-for ARCH in i386 armhf aarch64 amd64; do
-     docker build --build-arg ARCH="${ARCH}-v3.8" \
+for ARCH in "${ARCHITECTURES[@]}"; do
+     eval docker build --build-arg ARCH="${ARCH}-v3.8" \
                   --tag "${REPOSITORY}:${VERSION}-${ARCH}" \
-                  --file packaging/docker/Dockerfile ./ &
+                  --file packaging/docker/Dockerfile ./ ${BG}
 done
 wait
 
