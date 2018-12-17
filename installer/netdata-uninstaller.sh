@@ -11,11 +11,11 @@ usage="$(basename "$0") [-h] [-f ] -- program to calculate the answer to life, t
 
 where:
     -h           show this help text
-    -y, --yes    flag needs to be set to proceed with uninstallation
     -f, --force  force uninstallation and do not ask any questions
     -y, --yes    flag needs to be set to proceed with uninstallation"
 
 RM_FLAGS="-i"
+INTERACTIVE=1
 YES=0
 while :; do
 	case "$1" in
@@ -25,6 +25,7 @@ while :; do
 		;;
 	-f | --force)
 		RM_FLAGS="-f"
+		INTERACTIVE=0
 		shift
 		;;
 	-y | --yes)
@@ -56,9 +57,11 @@ sleep 2
 
 if [ ! -z "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
 	# installation prefix was given
-
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}"
-
+	if [ $INTERACTIVE -eq 1 ]; then
+		portable_deletedir_recursively_interactively "${NETDATA_PREFIX}"
+	else
+		run rm -f -R "${NETDATA_PREFIX}"
+	fi
 else
 	# installation prefix was NOT given
 
@@ -67,12 +70,19 @@ else
 		run rm ${RM_FLAGS} "${NETDATA_PREFIX}/usr/sbin/netdata"
 	fi
 
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/etc/netdata"
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/share/netdata"
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/usr/libexec/netdata"
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/lib/netdata"
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/cache/netdata"
-	portable_deletedir_recursively_interactively "${NETDATA_PREFIX}/var/log/netdata"
+	for dir in "${NETDATA_PREFIX}/etc/netdata" \
+			"${NETDATA_PREFIX}/usr/share/netdata" \
+			"${NETDATA_PREFIX}/usr/libexec/netdata" \
+			"${NETDATA_PREFIX}/var/lib/netdata" \
+			"${NETDATA_PREFIX}/var/cache/netdata" \
+			"${NETDATA_PREFIX}/var/log/netdata"
+	do
+		if [ $INTERACTIVE -eq 1 ]; then
+			portable_deletedir_recursively_interactively "${dir}"
+		else
+			run rm -f -R "${NETDATA_PREFIX}"
+		fi
+	done
 fi
 
 if [ -f /etc/logrotate.d/netdata ]; then
