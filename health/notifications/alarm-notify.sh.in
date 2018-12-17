@@ -163,6 +163,7 @@ fleep
 syslog
 custom
 msteam
+kavenegar
 "
 
 # -----------------------------------------------------------------------------
@@ -318,8 +319,8 @@ MESSAGEBIRD_ACCESS_KEY=
 MESSAGEBIRD_NUMBER=
 
 # kavenegar configs
-KAVENEGAR_API_KEY=""
-KAVENEGAR_SENDER=""
+KAVENEGAR_API_KEY=
+KAVENEGAR_SENDER=
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
