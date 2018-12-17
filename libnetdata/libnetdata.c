@@ -50,7 +50,7 @@ static inline void print_allocations(const char *file, const char *function, con
             type, size
     );
 
-    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KB (%+zd B), mmapped %zd KB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
+    fprintf(stderr, "%s iteration %zu MEMORY ALLOCATIONS: (%04lu@%-40.40s:%-40.40s): Allocated %zd KiB (%+zd B), mmapped %zd KiB (%+zd B): %s : malloc %zd (%+zd), calloc %zd (%+zd), realloc %zd (%+zd), strdup %zd (%+zd), free %zd (%+zd)\n",
             netdata_thread_tag(),
             log_thread_memory_allocations,
             line, file, function,

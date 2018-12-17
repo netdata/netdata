@@ -276,7 +276,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             "system",
                             NULL,
                             "Committed (Allocated) Memory",
-                            "MB",
+                            "MiB",
                             "freebsd.plugin",
                             "vm.vmtotal",
                             NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED,
@@ -936,7 +936,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                     "swap",
                     NULL,
                     "System Swap",
-                    "MB",
+                    "MiB",
                     "freebsd.plugin",
                     "vm.swap_info",
                     NETDATA_CHART_PRIO_SYSTEM_SWAP,
@@ -1000,7 +1000,7 @@ int do_system_ram(int update_every, usec_t dt) {
                     "ram",
                     NULL,
                     "System RAM",
-                    "MB",
+                    "MiB",
                     "freebsd.plugin",
                     "system.ram",
                     NETDATA_CHART_PRIO_SYSTEM_RAM,
@@ -1067,7 +1067,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
                     "swap",
                     NULL,
                     "Swap I/O",
-                    "kilobytes/s",
+                    "KiB/s",
                     "freebsd.plugin",
                     "vm.stats.vm.v_swappgs",
                     NETDATA_CHART_PRIO_SYSTEM_SWAPIO,
@@ -1327,7 +1327,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                         "ipc shared memory",
                         NULL,
                         "IPC Shared Memory Segments Size",
-                        "kilobytes",
+                        "KiB",
                         "freebsd.plugin",
                         "kern.ipc.shm",
                         NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SIZE,
@@ -2034,7 +2034,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_failed, tcpstat.tcps_sc_zonefail);
                 rrdset_done(st);
             }
-            
+
             // --------------------------------------------------------------------
 
             if(do_tcpext_listen == CONFIG_BOOLEAN_YES || (do_tcpext_listen == CONFIG_BOOLEAN_AUTO && tcpstat.tcps_listendrop)) {
@@ -2668,7 +2668,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                              NULL,
                              "IPv6 Fragments Sent",
                              "packets/s",
-                            "freebsd.plugin",
+                             "freebsd.plugin",
                              "net.inet6.ip6.stats",
                              3010,
                              update_every,

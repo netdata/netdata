@@ -105,7 +105,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , "ksm"
                     , NULL
                     , "Kernel Same Page Merging"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_KSM_NAME
                     , NETDATA_CHART_PRIO_MEM_KSM
@@ -145,7 +145,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , "ksm"
                     , NULL
                     , "Kernel Same Page Merging Savings"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_KSM_NAME
                     , NETDATA_CHART_PRIO_MEM_KSM_SAVINGS
