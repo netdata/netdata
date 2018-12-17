@@ -2,7 +2,6 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-
 **Fixed bugs:**
 
 - mdstat module causing netdata segv and crash [\#4990](https://github.com/netdata/netdata/issues/4990)
@@ -17,18 +16,31 @@
 
 **Closed issues:**
 
+- move python module portcheck to go.d [\#5005](https://github.com/netdata/netdata/issues/5005)
+- move python module httpcheck to go.d [\#5004](https://github.com/netdata/netdata/issues/5004)
+- move python module lighttpd to go.d [\#5003](https://github.com/netdata/netdata/issues/5003)
+- move python module rabbitmq to go.d  [\#5002](https://github.com/netdata/netdata/issues/5002)
+- move python module nginx to go.d [\#5001](https://github.com/netdata/netdata/issues/5001)
+- move python module apache to go.d [\#5000](https://github.com/netdata/netdata/issues/5000)
 - Pass cloud\_base\_url from netdata.conf to web/gui [\#4980](https://github.com/netdata/netdata/issues/4980)
 - Improve configuration documentation [\#4781](https://github.com/netdata/netdata/issues/4781)
 - Python.d.plugin infinite retries, ignore penalty, and plotting 'None' [\#4756](https://github.com/netdata/netdata/issues/4756)
 - move `/proc` and `/sys` python modules to `proc` plugin [\#4541](https://github.com/netdata/netdata/issues/4541)
 - mdstat RAID0 support [\#4010](https://github.com/netdata/netdata/issues/4010)
+- FreeIPMI Plugin cant graph the wattage [\#3977](https://github.com/netdata/netdata/issues/3977)
 - FQDN in alert sending [\#2477](https://github.com/netdata/netdata/issues/2477)
+- on frontend, if JavaScript is disabled, there's no graceful degradation [\#2422](https://github.com/netdata/netdata/issues/2422)
 - netdata dead but pid file exists [\#2266](https://github.com/netdata/netdata/issues/2266)
 
 **Merged pull requests:**
 
+- Kavenegar returns 200 [\#5020](https://github.com/netdata/netdata/pull/5020) ([salehi](https://github.com/salehi))
+- Fix missing method\_name: kavenegar [\#5019](https://github.com/netdata/netdata/pull/5019) ([salehi](https://github.com/salehi))
+- \[python\] make units compliant with IEC standard  [\#4995](https://github.com/netdata/netdata/pull/4995) ([ilyam8](https://github.com/ilyam8))
+- Integrate patches from freeipmi and set paramters [\#4993](https://github.com/netdata/netdata/pull/4993) ([Preisschild](https://github.com/Preisschild))
 - Fix crash in mdstat module [\#4992](https://github.com/netdata/netdata/pull/4992) ([vlvkobal](https://github.com/vlvkobal))
 - postgres timeouts [\#4988](https://github.com/netdata/netdata/pull/4988) ([ilyam8](https://github.com/ilyam8))
+- Make units compliant with IEC standard [\#4985](https://github.com/netdata/netdata/pull/4985) ([vlvkobal](https://github.com/vlvkobal))
 - Typo: `stab\_status` -\> `stub\_status` [\#4984](https://github.com/netdata/netdata/pull/4984) ([petecooper](https://github.com/petecooper))
 - Pass cloud\_base\_url from daemon to web/gui through hello endpoint \#4980 [\#4982](https://github.com/netdata/netdata/pull/4982) ([gmosx](https://github.com/gmosx))
 - Fix to \#4968, custom recipients were not working properly [\#4978](https://github.com/netdata/netdata/pull/4978) ([cakrit](https://github.com/cakrit))
