@@ -55,10 +55,16 @@
 </head>
 
 <body data-spy="scroll" data-target="#sidebar" data-offset="100">
-    <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
-        netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>
+    <div id="loadOverlay" class="loadOverlay" style="background-color: #fff; color: #888;">
+        <div style="font-size: 3vh;">
+            You must enable JavaScript in order to use Netdata!<br />
+            You can do this in <a href="https://enable-javascript.com/" target="_blank">your browser settings</a>.
+        </div>
     </div>
     <script type="text/javascript">
+        // Cleanup JS warning.
+        document.documentElement.style.overflowY = "scroll";
+
         // Change the loadOverlay colors ASAP to match the theme.
         let theme;
         const hash = document.location.hash;
@@ -69,7 +75,9 @@
         } else {
             theme = localStorage.getItem('netdataTheme') || 'slate';
         }
-        document.getElementById('loadOverlay').style = theme == 'slate' ? "background-color: #272b30; color: #373b40;" : "background-color: #fff; color: #ddd;";
+        const overlayEl = document.getElementById('loadOverlay');
+        overlayEl.innerHTML = 'netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>';
+        overlayEl.style = theme == 'slate' ? "background-color: #272b30; color: #373b40;" : "background-color: #fff; color: #ddd;";
     </script>
     <nav class="navbar navbar-default navbar-fixed-top" role="banner">
         <div class="container">
