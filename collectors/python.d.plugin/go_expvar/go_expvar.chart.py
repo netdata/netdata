@@ -8,13 +8,20 @@ import json
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
+
+MEMSTATS_ORDER = [
+    'memstats_heap',
+    'memstats_stack',
+    'memstats_mspan',
+    'memstats_mcache',
+    'memstats_sys',
+    'memstats_live_objects',
+    'memstats_gc_pauses',
+]
 
 MEMSTATS_CHARTS = {
     'memstats_heap': {
-        'options': ['heap', 'memory: size of heap memory structures', 'kB', 'memstats',
+        'options': ['heap', 'memory: size of heap memory structures', 'KiB', 'memstats',
                     'expvar.memstats.heap', 'line'],
         'lines': [
             ['memstats_heap_alloc', 'alloc', 'absolute', 1, 1024],
@@ -22,21 +29,21 @@ MEMSTATS_CHARTS = {
         ]
     },
     'memstats_stack': {
-        'options': ['stack', 'memory: size of stack memory structures', 'kB', 'memstats',
+        'options': ['stack', 'memory: size of stack memory structures', 'KiB', 'memstats',
                     'expvar.memstats.stack', 'line'],
         'lines': [
             ['memstats_stack_inuse', 'inuse', 'absolute', 1, 1024]
         ]
     },
     'memstats_mspan': {
-        'options': ['mspan', 'memory: size of mspan memory structures', 'kB', 'memstats',
+        'options': ['mspan', 'memory: size of mspan memory structures', 'KiB', 'memstats',
                     'expvar.memstats.mspan', 'line'],
         'lines': [
             ['memstats_mspan_inuse', 'inuse', 'absolute', 1, 1024]
         ]
     },
     'memstats_mcache': {
-        'options': ['mcache', 'memory: size of mcache memory structures', 'kB', 'memstats',
+        'options': ['mcache', 'memory: size of mcache memory structures', 'KiB', 'memstats',
                     'expvar.memstats.mcache', 'line'],
         'lines': [
             ['memstats_mcache_inuse', 'inuse', 'absolute', 1, 1024]
@@ -50,7 +57,7 @@ MEMSTATS_CHARTS = {
         ]
     },
     'memstats_sys': {
-        'options': ['sys', 'memory: size of reserved virtual address space', 'kB', 'memstats',
+        'options': ['sys', 'memory: size of reserved virtual address space', 'KiB', 'memstats',
                     'expvar.memstats.sys', 'line'],
         'lines': [
             ['memstats_sys', 'sys', 'absolute', 1, 1024]
@@ -64,9 +71,6 @@ MEMSTATS_CHARTS = {
         ]
     }
 }
-
-MEMSTATS_ORDER = ['memstats_heap', 'memstats_stack', 'memstats_mspan', 'memstats_mcache',
-                  'memstats_sys', 'memstats_live_objects', 'memstats_gc_pauses']
 
 
 def flatten(d, top='', sep='.'):
@@ -83,7 +87,6 @@ def flatten(d, top='', sep='.'):
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-
         # if memstats collection is enabled, add the charts and their order
         if self.configuration.get('collect_memstats'):
             self.definitions = dict(MEMSTATS_CHARTS)

@@ -8,9 +8,6 @@ import re
 from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
 ORDER = [
     'session_connections',
@@ -46,7 +43,7 @@ CHARTS = {
         ]
     },
     'all_time_hit_rate': {
-        'options': [None, 'All History Hit Rate Ratio', 'percent', 'cache performance',
+        'options': [None, 'All History Hit Rate Ratio', 'percentage', 'cache performance',
                     'varnish.all_time_hit_rate', 'stacked'],
         'lines': [
             ['cache_hit', 'hit', 'percentage-of-absolute-row'],
@@ -54,7 +51,7 @@ CHARTS = {
             ['cache_hitpass', 'hitpass', 'percentage-of-absolute-row']]
     },
     'current_poll_hit_rate': {
-        'options': [None, 'Current Poll Hit Rate Ratio', 'percent', 'cache performance',
+        'options': [None, 'Current Poll Hit Rate Ratio', 'percentage', 'cache performance',
                     'varnish.current_poll_hit_rate', 'stacked'],
         'lines': [
             ['cache_hit', 'hit', 'percentage-of-incremental-row'],
@@ -126,7 +123,7 @@ CHARTS = {
         ]
     },
     'memory_usage': {
-        'options': [None, 'Memory Usage', 'MB', 'memory usage', 'varnish.memory_usage', 'stacked'],
+        'options': [None, 'Memory Usage', 'MiB', 'memory usage', 'varnish.memory_usage', 'stacked'],
         'lines': [
             ['memory_free', 'free', 'absolute', 1, 1 << 20],
             ['memory_allocated', 'allocated', 'absolute', 1, 1 << 20]]

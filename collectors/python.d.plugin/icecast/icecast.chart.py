@@ -8,10 +8,9 @@ import json
 from bases.FrameworkServices.UrlService import UrlService
 
 
-priority = 60000
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['listeners']
+ORDER = [
+    'listeners',
+]
 
 CHARTS = {
     'listeners': {

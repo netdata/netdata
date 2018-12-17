@@ -7,9 +7,6 @@ import json
 from copy import deepcopy
 from bases.FrameworkServices.SocketService import SocketService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
 ORDER = [
     'requests',
@@ -39,27 +36,27 @@ CHARTS = {
         ]
     },
     'tx': {
-        'options': [None, 'Transmitted data', 'KB/s', 'requests', 'uwsgi.tx', 'stacked'],
+        'options': [None, 'Transmitted data', 'KiB/s', 'requests', 'uwsgi.tx', 'stacked'],
         'lines': [
             ['tx', 'tx', 'incremental']
         ]
     },
     'avg_rt': {
-        'options': [None, 'Average request time', 'ms', 'requests', 'uwsgi.avg_rt', 'line'],
+        'options': [None, 'Average request time', 'milliseconds', 'requests', 'uwsgi.avg_rt', 'line'],
         'lines': [
             ['avg_rt', 'avg_rt', 'absolute']
         ]
     },
     'memory_rss': {
-        'options': [None, 'RSS (Resident Set Size)', 'MB', 'memory', 'uwsgi.memory_rss', 'stacked'],
+        'options': [None, 'RSS (Resident Set Size)', 'MiB', 'memory', 'uwsgi.memory_rss', 'stacked'],
         'lines': [
-            ['memory_rss', 'memory_rss', 'absolute', 1, 1024 * 1024]
+            ['memory_rss', 'memory_rss', 'absolute', 1, 1 << 20]
         ]
     },
     'memory_vsz': {
-        'options': [None, 'VSZ (Virtual Memory Size)', 'MB', 'memory', 'uwsgi.memory_vsz', 'stacked'],
+        'options': [None, 'VSZ (Virtual Memory Size)', 'MiB', 'memory', 'uwsgi.memory_vsz', 'stacked'],
         'lines': [
-            ['memory_vsz', 'memory_vsz', 'absolute', 1, 1024 * 1024]
+            ['memory_vsz', 'memory_vsz', 'absolute', 1, 1 << 20]
         ]
     },
     'exceptions': {
@@ -86,15 +83,13 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         super(Service, self).__init__(configuration=configuration, name=name)
-        self.url = self.configuration.get('host', 'localhost')
-        self.port = self.configuration.get('port', 1717)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
+        self.url = self.configuration.get('host', 'localhost')
+        self.port = self.configuration.get('port', 1717)
         # Clear dynamic dimensions, these are added during `_get_data()` to allow adding workers at run-time
         for chart in DYNAMIC_CHARTS:
             self.definitions[chart]['lines'] = []
-
         self.last_result = {}
         self.workers = []
 

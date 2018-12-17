@@ -8,6 +8,7 @@ from collections import namedtuple, defaultdict
 from json import loads
 from threading import Thread
 from socket import gethostbyname, gaierror
+
 try:
     from queue import Queue
 except ImportError:
@@ -15,9 +16,9 @@ except ImportError:
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
+
 update_every = 1
-priority = 60000
+
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
@@ -108,7 +109,7 @@ ORDER = [
 
 CHARTS = {
     'activity': {
-        'options': [None, 'Overall Activity', 'req/s',
+        'options': [None, 'Overall Activity', 'requests/s',
                     'dbactivity', 'couchdb.activity', 'stacked'],
         'lines': [
             ['couchdb_database_reads', 'DB reads', 'incremental'],
@@ -117,7 +118,7 @@ CHARTS = {
         ]
     },
     'request_methods': {
-        'options': [None, 'HTTP request methods', 'req/s',
+        'options': [None, 'HTTP request methods', 'requests/s',
                     'httptraffic', 'couchdb.request_methods',
                     'stacked'],
         'lines': [
@@ -132,7 +133,7 @@ CHARTS = {
         ]
     },
     'response_codes': {
-        'options': [None, 'HTTP response status codes', 'resp/s',
+        'options': [None, 'HTTP response status codes', 'responses/s',
                     'httptraffic', 'couchdb.response_codes',
                     'stacked'],
         'lines': [
@@ -150,15 +151,13 @@ CHARTS = {
         ]
     },
     'open_files': {
-        'options': [None, 'Open files', 'files',
-                    'ops', 'couchdb.open_files', 'line'],
+        'options': [None, 'Open files', 'files', 'ops', 'couchdb.open_files', 'line'],
         'lines': [
             ['couchdb_open_os_files', '# files', 'absolute']
         ]
     },
     'active_tasks': {
-        'options': [None, 'Active task breakdown', 'tasks',
-                    'ops', 'couchdb.active_tasks', 'stacked'],
+        'options': [None, 'Active task breakdown', 'tasks', 'ops', 'couchdb.active_tasks', 'stacked'],
         'lines': [
             ['activetasks_indexer', 'Indexer', 'absolute'],
             ['activetasks_database_compaction', 'DB Compaction', 'absolute'],
@@ -167,8 +166,7 @@ CHARTS = {
         ]
     },
     'replicator_jobs': {
-        'options': [None, 'Replicator job breakdown', 'jobs',
-                    'ops', 'couchdb.replicator_jobs', 'stacked'],
+        'options': [None, 'Replicator job breakdown', 'jobs', 'ops', 'couchdb.replicator_jobs', 'stacked'],
         'lines': [
             ['couch_replicator_jobs_running', 'Running', 'absolute'],
             ['couch_replicator_jobs_pending', 'Pending', 'absolute'],
@@ -178,8 +176,7 @@ CHARTS = {
         ]
     },
     'erlang_memory': {
-        'options': [None, 'Erlang VM memory usage', 'bytes',
-                    'erlang', 'couchdb.erlang_vm_memory', 'stacked'],
+        'options': [None, 'Erlang VM memory usage', 'B', 'erlang', 'couchdb.erlang_vm_memory', 'stacked'],
         'lines': [
             ['memory_atom', 'atom', 'absolute'],
             ['memory_binary', 'binaries', 'absolute'],
@@ -190,23 +187,20 @@ CHARTS = {
         ]
     },
     'erlang_reductions': {
-        'options': [None, 'Erlang reductions', 'count',
-                    'erlang', 'couchdb.reductions', 'line'],
+        'options': [None, 'Erlang reductions', 'count', 'erlang', 'couchdb.reductions', 'line'],
         'lines': [
             ['reductions', 'reductions', 'incremental']
         ]
     },
     'erlang_proc_counts': {
-        'options': [None, 'Process counts', 'count',
-                    'erlang', 'couchdb.proccounts', 'line'],
+        'options': [None, 'Process counts', 'count', 'erlang', 'couchdb.proccounts', 'line'],
         'lines': [
             ['os_proc_count', 'OS procs', 'absolute'],
             ['process_count', 'erl procs', 'absolute']
         ]
     },
     'erlang_peak_msg_queue': {
-        'options': [None, 'Peak message queue size', 'count',
-                    'erlang', 'couchdb.peakmsgqueue',
+        'options': [None, 'Peak message queue size', 'count', 'erlang', 'couchdb.peakmsgqueue',
                     'line'],
         'lines': [
             ['peak_msg_queue', 'peak size', 'absolute']
@@ -214,18 +208,15 @@ CHARTS = {
     },
     # Lines for the following are added as part of check()
     'db_sizes_file': {
-        'options': [None, 'Database sizes (file)', 'KB',
-                    'perdbstats', 'couchdb.db_sizes_file', 'line'],
+        'options': [None, 'Database sizes (file)', 'KiB', 'perdbstats', 'couchdb.db_sizes_file', 'line'],
         'lines': []
     },
     'db_sizes_external': {
-        'options': [None, 'Database sizes (external)', 'KB',
-                    'perdbstats', 'couchdb.db_sizes_external', 'line'],
+        'options': [None, 'Database sizes (external)', 'KiB', 'perdbstats', 'couchdb.db_sizes_external', 'line'],
         'lines': []
     },
     'db_sizes_active': {
-        'options': [None, 'Database sizes (active)', 'KB',
-                    'perdbstats', 'couchdb.db_sizes_active', 'line'],
+        'options': [None, 'Database sizes (active)', 'KiB', 'perdbstats', 'couchdb.db_sizes_active', 'line'],
         'lines': []
     },
     'db_doc_counts': {
@@ -234,8 +225,7 @@ CHARTS = {
         'lines': []
     },
     'db_doc_del_counts': {
-        'options': [None, 'Database # of deleted docs', 'docs',
-                    'perdbstats', 'couchdb_db_doc_del_count', 'line'],
+        'options': [None, 'Database # of deleted docs', 'docs', 'perdbstats', 'couchdb_db_doc_del_count', 'line'],
         'lines': []
     }
 }
@@ -255,7 +245,7 @@ class Service(UrlService):
         try:
             self.dbs = self.configuration.get('databases').split(' ')
         except (KeyError, AttributeError):
-            self.dbs = []
+            self.dbs = list()
 
     def check(self):
         if not (self.host and self.port):

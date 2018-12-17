@@ -636,7 +636,7 @@ CHARTS = {
         ]
     },
     'db_stat_temp_bytes': {
-        'options': [None, 'Temp files written to disk', 'KB/s', 'db statistics', 'postgres.db_stat_temp_bytes',
+        'options': [None, 'Temp files written to disk', 'KiB/s', 'db statistics', 'postgres.db_stat_temp_bytes',
                     'line'],
         'lines': [
             ['temp_bytes', 'size', 'incremental', 1, 1024]
@@ -650,7 +650,7 @@ CHARTS = {
         ]
     },
     'database_size': {
-        'options': [None, 'Database size', 'MB', 'database size', 'postgres.db_size', 'stacked'],
+        'options': [None, 'Database size', 'MiB', 'database size', 'postgres.db_size', 'stacked'],
         'lines': [
         ]
     },
@@ -669,7 +669,7 @@ CHARTS = {
         ]
     },
     'index_size': {
-        'options': [None, 'Indexes size', 'MB', 'indexes', 'postgres.index_size', 'line'],
+        'options': [None, 'Indexes size', 'MiB', 'indexes', 'postgres.index_size', 'line'],
         'lines': [
             ['index_size', 'size', 'absolute', 1, 1024 * 1024]
         ]
@@ -681,7 +681,7 @@ CHARTS = {
         ]
     },
     'table_size': {
-        'options': [None, 'Tables size', 'MB', 'tables', 'postgres.table_size', 'line'],
+        'options': [None, 'Tables size', 'MiB', 'tables', 'postgres.table_size', 'line'],
         'lines': [
             ['table_size', 'size', 'absolute', 1, 1024 * 1024]
         ]
@@ -695,7 +695,7 @@ CHARTS = {
         ]
     },
     'wal_writes': {
-        'options': [None, 'Write-Ahead Logs', 'kilobytes/s', 'wal_writes', 'postgres.wal_writes', 'line'],
+        'options': [None, 'Write-Ahead Logs', 'KiB/s', 'wal_writes', 'postgres.wal_writes', 'line'],
         'lines': [
             ['wal_writes', 'writes', 'incremental', 1, 1024]
         ]
@@ -716,20 +716,20 @@ CHARTS = {
         ]
     },
     'stat_bgwriter_alloc': {
-        'options': [None, 'Buffers allocated', 'kilobytes/s', 'bgwriter', 'postgres.stat_bgwriter_alloc', 'line'],
+        'options': [None, 'Buffers allocated', 'KiB/s', 'bgwriter', 'postgres.stat_bgwriter_alloc', 'line'],
         'lines': [
             ['buffers_alloc', 'alloc', 'incremental', 1, 1024]
         ]
     },
     'stat_bgwriter_checkpoint': {
-        'options': [None, 'Buffers written during checkpoints', 'kilobytes/s', 'bgwriter',
+        'options': [None, 'Buffers written during checkpoints', 'KiB/s', 'bgwriter',
                     'postgres.stat_bgwriter_checkpoint', 'line'],
         'lines': [
             ['buffers_checkpoint', 'checkpoint', 'incremental', 1, 1024]
         ]
     },
     'stat_bgwriter_backend': {
-        'options': [None, 'Buffers written directly by a backend', 'kilobytes/s', 'bgwriter',
+        'options': [None, 'Buffers written directly by a backend', 'KiB/s', 'bgwriter',
                     'postgres.stat_bgwriter_backend', 'line'],
         'lines': [
             ['buffers_backend', 'backend', 'incremental', 1, 1024]
@@ -742,7 +742,7 @@ CHARTS = {
         ]
     },
     'stat_bgwriter_bgwriter': {
-        'options': [None, 'Buffers written by the background writer', 'kilobytes/s', 'bgwriter',
+        'options': [None, 'Buffers written by the background writer', 'KiB/s', 'bgwriter',
                     'postgres.bgwriter_bgwriter', 'line'],
         'lines': [
             ['buffers_clean', 'clean', 'incremental', 1, 1024]
@@ -766,7 +766,7 @@ CHARTS = {
         ]
     },
     'standby_delta': {
-        'options': [None, 'Standby delta', 'kilobytes', 'replication delta', 'postgres.standby_delta', 'line'],
+        'options': [None, 'Standby delta', 'KiB', 'replication delta', 'postgres.standby_delta', 'line'],
         'lines': [
             ['sent_delta', 'sent delta', 'absolute', 1, 1024],
             ['write_delta', 'write delta', 'absolute', 1, 1024],
@@ -789,24 +789,19 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = deepcopy(CHARTS)
-
         self.do_table_stats = configuration.pop('table_stats', False)
         self.do_index_stats = configuration.pop('index_stats', False)
         self.databases_to_poll = configuration.pop('database_poll', None)
         self.statement_timeout = configuration.pop('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)
         self.configuration = configuration
-
         self.conn = None
         self.server_version = None
         self.is_superuser = False
         self.alive = False
-
         self.databases = list()
         self.secondaries = list()
         self.replication_slots = list()
-
         self.queries = dict()
-
         self.data = dict()
 
     def reconnect(self):

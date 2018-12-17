@@ -6,9 +6,6 @@
 
 from bases.FrameworkServices.MySQLService import MySQLService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 3
-priority = 60000
 
 # query executed on MySQL server
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
@@ -207,8 +204,8 @@ CHARTS = {
     'net': {
         'options': [None, 'mysql Bandwidth', 'kilobits/s', 'bandwidth', 'mysql.net', 'area'],
         'lines': [
-            ['Bytes_received', 'in', 'incremental', 8, 1024],
-            ['Bytes_sent', 'out', 'incremental', -8, 1024]
+            ['Bytes_received', 'in', 'incremental', 8, 1000],
+            ['Bytes_sent', 'out', 'incremental', -8, 1000]
         ]
     },
     'queries': {
@@ -320,7 +317,7 @@ CHARTS = {
         ]
     },
     'innodb_io': {
-        'options': [None, 'mysql InnoDB I/O Bandwidth', 'kilobytes/s', 'innodb', 'mysql.innodb_io', 'area'],
+        'options': [None, 'mysql InnoDB I/O Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_io', 'area'],
         'lines': [
             ['Innodb_data_read', 'read', 'incremental', 1, 1024],
             ['Innodb_data_written', 'write', 'incremental', -1, 1024]
@@ -360,7 +357,7 @@ CHARTS = {
         ]
     },
     'innodb_os_log_io': {
-        'options': [None, 'mysql InnoDB OS Log Bandwidth', 'kilobytes/s', 'innodb', 'mysql.innodb_os_log_io', 'area'],
+        'options': [None, 'mysql InnoDB OS Log Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_os_log_io', 'area'],
         'lines': [
             ['Innodb_os_log_written', 'write', 'incremental', -1, 1024],
         ]
@@ -394,7 +391,7 @@ CHARTS = {
         ]
     },
     'innodb_buffer_pool_bytes': {
-        'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
+        'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MiB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
         'lines': [
             ['Innodb_buffer_pool_bytes_data', 'data', 'absolute', 1, 1024 * 1024],
             ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024]
@@ -441,7 +438,7 @@ CHARTS = {
         ]
     },
     'qcache_freemem': {
-        'options': [None, 'mysql QCache Free Memory', 'MB', 'qcache', 'mysql.qcache_freemem', 'area'],
+        'options': [None, 'mysql QCache Free Memory', 'MiB', 'qcache', 'mysql.qcache_freemem', 'area'],
         'lines': [
             ['Qcache_free_memory', 'free', 'absolute', 1, 1024 * 1024]
         ]
@@ -529,7 +526,7 @@ CHARTS = {
         ]
     },
     'galera_bytes': {
-        'options': [None, 'Replicated bytes', 'KB/s', 'galera', 'mysql.galera_bytes', 'area'],
+        'options': [None, 'Replicated bytes', 'KiB/s', 'galera', 'mysql.galera_bytes', 'area'],
         'lines': [
             ['wsrep_received_bytes', 'rx', 'incremental', 1, 1024],
             ['wsrep_replicated_bytes', 'tx', 'incremental', -1, 1024],
@@ -563,7 +560,11 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.queries = dict(global_status=QUERY_GLOBAL, slave_status=QUERY_SLAVE, variables=QUERY_VARIABLES)
+        self.queries = dict(
+            global_status=QUERY_GLOBAL,
+            slave_status=QUERY_SLAVE,
+            variables=QUERY_VARIABLES,
+        )
 
     def _get_data(self):
 
