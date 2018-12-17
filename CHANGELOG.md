@@ -2,6 +2,7 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+
 **Fixed bugs:**
 
 - mdstat module causing netdata segv and crash [\#4990](https://github.com/netdata/netdata/issues/4990)
