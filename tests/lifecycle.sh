@@ -2,12 +2,6 @@
 
 set -e
 
-function show_logs {
-  echo "--- updater logs ----"
-  cat /tmp/netdata-updater.log.*
-}
-trap show_logs EXIT
-
 if [ ! -f .gitignore ]
 then
   echo "Run as ./tests/$(basename "$0") from top level directory of git repository"
