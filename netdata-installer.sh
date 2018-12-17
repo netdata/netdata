@@ -911,9 +911,6 @@ END
 echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ -d .git ]; then
-	echo >&2
-	echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} can work from cron. It will trigger an email from cron"
-	echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
 	if [ "${UID}" -ne "0" ]; then
 		[ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
 	else
@@ -933,6 +930,10 @@ if [ -d .git ]; then
 				progress "Installing new netdata-updater in cron"
 				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
 				chmod 0755 ${crondir}/netdata-updater
+				echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
+				echo >&2
+				echo >&2 "By default ${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+				echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
 			else
 				echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
 				echo >&2
