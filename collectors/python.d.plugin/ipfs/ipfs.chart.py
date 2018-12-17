@@ -32,8 +32,8 @@ CHARTS = {
     'repo_size': {
         'options': [None, 'IPFS Repo Size', 'GiB', 'Size', 'ipfs.repo_size', 'area'],
         'lines': [
-            ['avail', None, 'absolute', 1, 1e9],
-            ['size', None, 'absolute', 1, 1e9],
+            ['avail', None, 'absolute', 1, 1 << 30],
+            ['size', None, 'absolute', 1, 1 << 30],
         ]
     },
     'repo_objects': {
