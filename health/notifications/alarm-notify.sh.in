@@ -1123,7 +1123,7 @@ send_kavenegar() {
                 --data-urlencode "receptor=${user}" \
                 --data-urlencode "message=${title} ${message}")
 
-            if [ "${httpcode}" = "201" ]
+            if [ "${httpcode}" = "200" ]
             then
                 info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
