@@ -27,8 +27,8 @@ if [ -z ${DEVEL+x} ]; then
     BG="&"
 else
     declare -a ARCHITECTURES=(amd64)
-    DOCKER_PASSWORD=""
-    DOCKER_USERNAME=""
+    unset DOCKER_PASSWORD
+    unset DOCKER_USERNAME
     BG=""
 fi
 
