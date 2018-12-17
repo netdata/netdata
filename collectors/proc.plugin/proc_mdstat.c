@@ -573,10 +573,10 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             "mdstat"
                             , id
                             , NULL
-                            , family
+				    , family
                             , "md.rate"
                             , "Operation Speed"
-                            , "KB/s"
+                            , "KiB/s"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_MDSTAT_NAME
                             , NETDATA_CHART_PRIO_MDSTAT_SPEED + raid_idx * 10

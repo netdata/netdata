@@ -1489,7 +1489,7 @@ void update_systemd_services_charts(
                     , "services.mem_usage"
                     , (cgroup_used_memory_without_cache) ? "Systemd Services Used Memory without Cache"
                                                          : "Systemd Services Used Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 10
@@ -1512,7 +1512,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_rss"
                     , "Systemd Services RSS Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 20
@@ -1533,7 +1533,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_mapped"
                     , "Systemd Services Mapped Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 30
@@ -1554,7 +1554,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_cache"
                     , "Systemd Services Cache Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 40
@@ -1575,7 +1575,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_writeback"
                     , "Systemd Services Writeback Memory"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 50
@@ -1596,7 +1596,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_pgfault"
                     , "Systemd Services Memory Minor Page Faults"
-                    , "MB/s"
+                    , "MiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 60
@@ -1616,7 +1616,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_pgmajfault"
                     , "Systemd Services Memory Major Page Faults"
-                    , "MB/s"
+                    , "MiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 70
@@ -1637,7 +1637,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_pgpgin"
                     , "Systemd Services Memory Charging Activity"
-                    , "MB/s"
+                    , "MiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 80
@@ -1658,7 +1658,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_pgpgout"
                     , "Systemd Services Memory Uncharging Activity"
-                    , "MB/s"
+                    , "MiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 90
@@ -1681,7 +1681,7 @@ void update_systemd_services_charts(
                     , "mem"
                     , "services.mem_failcnt"
                     , "Systemd Services Memory Limit Failures"
-                    , "MB"
+                    , "failures"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 110
@@ -1704,7 +1704,7 @@ void update_systemd_services_charts(
                     , "swap"
                     , "services.swap_usage"
                     , "Systemd Services Swap Memory Used"
-                    , "MB"
+                    , "MiB"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 100
@@ -1727,7 +1727,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.io_read"
                     , "Systemd Services Disk Read Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 120
@@ -1748,7 +1748,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.io_write"
                     , "Systemd Services Disk Write Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 130
@@ -1815,7 +1815,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.throttle_io_read"
                     , "Systemd Services Throttle Disk Read Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 160
@@ -1836,7 +1836,7 @@ void update_systemd_services_charts(
                     , "disk"
                     , "services.throttle_io_write"
                     , "Systemd Services Throttle Disk Write Bandwidth"
-                    , "KB/s"
+                    , "KiB/s"
                     , PLUGIN_CGROUPS_NAME
                     , PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME
                     , NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 170
@@ -2317,7 +2317,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , "cgroup.mem"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 210
@@ -2357,7 +2357,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , "cgroup.writeback"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 300
@@ -2389,7 +2389,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , "cgroup.mem_activity"
                         , title
-                        , "MB/s"
+                        , "MiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 400
@@ -2417,7 +2417,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , "cgroup.pgfaults"
                         , title
-                        , "MB/s"
+                        , "MiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 500
@@ -2447,7 +2447,7 @@ void update_cgroup_charts(int update_every) {
                         , "mem"
                         , "cgroup.mem_usage"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 200
@@ -2505,7 +2505,7 @@ void update_cgroup_charts(int update_every) {
                         , "disk"
                         , "cgroup.io"
                         , title
-                        , "KB/s"
+                        , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
@@ -2565,7 +2565,7 @@ void update_cgroup_charts(int update_every) {
                         , "disk"
                         , "cgroup.throttle_io"
                         , title
-                        , "KB/s"
+                        , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                         , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200

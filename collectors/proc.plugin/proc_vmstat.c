@@ -105,7 +105,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "swap"
                     , NULL
                     , "Swap I/O"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_VMSTAT_NAME
                     , NETDATA_CHART_PRIO_SYSTEM_SWAPIO
@@ -137,7 +137,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "disk"
                     , NULL
                     , "Memory Paged from/to disk"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_VMSTAT_NAME
                     , NETDATA_CHART_PRIO_SYSTEM_PGPGIO
@@ -169,7 +169,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "system"
                     , NULL
                     , "Memory Page Faults"
-                    , "page faults/s"
+                    , "faults/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_VMSTAT_NAME
                     , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
