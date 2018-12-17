@@ -64,13 +64,15 @@ jobs:
     script: "packaging/docker/build.sh"
     env: REPOSITORY="netdata/netdata"
   - name: tarball and self-extractor build
+    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in gcs-credentials.json.enc -out gcs-credentials.json -d
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/create_artifacts.sh"
     deploy:
       provider: gcs
-      access_key_id: GOOGOJOHYBTPOGXLXMYVRE2H
-      secret_access_key:
-        secure: MWzWydVG2WJ+5S7bVQYHCcLTiC5s5l2yB3zb/E/HJUIjvv9AFZRsLmjS20umho+4MPK6dXJpI0IzWhW8V54cfFwyPHCeHGO+CBaREmWJJHQn53oiugLoFMlngSFzSAx9BGT1dfeJPxGQm1rqYk2ohLPfuKd1ORoEMK8fgnihmsn3GtNOhiJmmKyzppoottvihQBRhgy8aghkpd+3x1nKhQFeOcCvUwk6rWW4MBdRK3j6Nk3+Tlh/8s6p+FPwbIB63g9SPYBetBLvqp0ftleoUXY0Fy+tN4pR8CnhXHI4IJcesffa6JMxrQtx0CQJQrlxtRrDib0s+2zOw+wUlLfJcVMV+lyd6wvg4ltiQBYrNewA0ORmYYZVqd8ysZ8yXkQVNLkga15DNHV6uLlRkDny1xiT7buSHQc/xlT11ygOPfFJI4hMJbVSRyl+ChYsV5bJ0MBAOhH3AbBY//RZHWSed5oXugmlV6FKXcfbJOiAYPiVMjWpGVGqQexzQvbCfSNCERCTgKqAI3cFGXaiLOhvzkb0mdT4eOdvkzcWju6ucXiwnd1lNYN4ucKcazGjOL8vy5WfT0AKVlvBq7KtlQJ2vXJ1hJ2/ZOg8o88WyRBiiyMDxMBicSx6VNZhu2s2JFBPdaHxOoFcZjw9FLv04BA7GeUh0WGvasoSCA4mNIZz+PY=
+      edge:
+        branch: gcs-ng
+      project_id: netdata-storage
+      credentials: .travis/gcs-credentials.json
       bucket: "netdata-nightlies"
       skip_cleanup: true
       file_glob: true

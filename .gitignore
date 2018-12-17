@@ -1,3 +1,6 @@
+# Secrets
+gcs-credentials.json
+
 .deps
 .libs
 .dirstamp
