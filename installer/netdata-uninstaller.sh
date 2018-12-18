@@ -80,7 +80,7 @@ else
 		if [ $INTERACTIVE -eq 1 ]; then
 			portable_deletedir_recursively_interactively "${dir}"
 		else
-			run rm -f -R "${NETDATA_PREFIX}"
+			run rm -f -R "${dir}"
 		fi
 	done
 fi
