@@ -16,12 +16,11 @@ dist_noinst_DATA = \
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
+    .keep \
     $(NULL)
 
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
     health.d/adaptec_raid.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \

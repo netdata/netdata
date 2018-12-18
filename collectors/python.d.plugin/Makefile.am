@@ -29,12 +29,11 @@ dist_python_DATA = \
 
 userpythonconfigdir=$(configdir)/python.d
 dist_userpythonconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
+    .keep \
     $(NULL)
 
 pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 include adaptec_raid/Makefile.inc
