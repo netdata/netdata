@@ -29,6 +29,6 @@ git status
 echo "========= UPDATE ========="
 ./netdata-updater.sh
 
-echo "========= UNINSTALL ========="
-mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
-./netdata-uninstaller.sh --yes --force
+#echo "========= UNINSTALL ========="
+#mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
+#./netdata-uninstaller.sh --yes --force
