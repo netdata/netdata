@@ -8,7 +8,7 @@ new_labels() {
 	ISSUE="$1"
 	URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE/labels"
 	# deduplicate array and add quotes
-	SET=( $(for i in "${@:2}"; do echo "\"$i\""; done | sort -u) )
+	SET=( $(for i in "${@:2}"; do [ "$i" != "" ] && echo "\"$i\""; done | sort -u) )
 	# implode array to string
 	LABELS="${SET[*]}"
 	# add commas between quotes (replace spaces)
