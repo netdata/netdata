@@ -99,6 +99,9 @@ static inline void debug_log_dummy(void) {}
 // etc.
 #define RATES_DETAIL 10000ULL
 
+// ----------------------------------------------------------------------------
+// factor for calculating correct CPU time values depending on units of raw data
+static unsigned int time_factor = 0;
 
 // ----------------------------------------------------------------------------
 // to avoid reallocating too frequently, we can increase the number of spare
@@ -106,7 +109,6 @@ static inline void debug_log_dummy(void) {}
 // IMPORTANT:
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
-
 
 // ----------------------------------------------------------------------------
 // command line options
@@ -2986,7 +2988,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = processors * system_hz * RATES_DETAIL;
+    kernel_uint_t max_time = processors * time_factor * RATES_DETAIL;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -3293,7 +3295,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, system_hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
@@ -3323,20 +3325,20 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
     fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
         fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
         }
     }
 
@@ -3710,7 +3712,14 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     time_t started_t = now_monotonic_sec();
+
     get_system_HZ();
+#ifdef __FreeBSD__
+    time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
+#else
+    time_factor = system_hz; // Linux uses clock ticks
+#endif
+
     get_system_pid_max();
     get_system_cpus();
 
