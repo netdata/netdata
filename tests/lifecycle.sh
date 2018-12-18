@@ -8,13 +8,16 @@ then
   exit 1
 fi
 
-if ! git config user.name; then
-  git config user.email "test@example.com"
-  git config user.name "test"
-fi
+WORKSPACE=$(mktemp -d)
+cp -r ./ "${WORKSPACE}/"
+cd "${WORKSPACE}"
+git config user.email "test@example.com"
+git config user.name "test"
 
 echo "========= INSTALL ========="
 ./netdata-installer.sh  --dont-wait --dont-start-it --install /tmp &>/dev/null
+# Copy uninstaller as upgrader will overwrite it with a version from master branch
+cp netdata-uninstaller.sh /tmp/netdata-uninstaller.sh
 
 echo "========= ADD GARBAGE ========="
 touch test
@@ -26,5 +29,6 @@ git status
 echo "========= UPDATE ========="
 ./netdata-updater.sh
 
-#echo "========= UNINSTALL ========="
-#./netdata-uninstaller.sh
+echo "========= UNINSTALL ========="
+mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
+./netdata-uninstaller.sh --yes --force
