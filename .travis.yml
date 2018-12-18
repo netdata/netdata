@@ -64,7 +64,7 @@ jobs:
     script: "packaging/docker/build.sh"
     env: REPOSITORY="netdata/netdata"
   - name: tarball and self-extractor build
-    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in gcs-credentials.json.enc -out gcs-credentials.json -d
+    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
     install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: ".travis/create_artifacts.sh"
     deploy:
