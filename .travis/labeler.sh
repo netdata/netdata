@@ -93,6 +93,5 @@ for PR in $(hub pr list -s all -f "%I%n" -L 10); do
 	if [ ! -z "$NEW_SET" ]; then
 		PREV=$(curl "https://api.github.com/repos/netdata/netdata/issues/$PR/labels" 2>/dev/null | jq '.[].name' | grep -v "area")
 		new_labels "$PR" ${NEW_SET} "${PREV[*]}"
-		exit 0
 	fi
 done
