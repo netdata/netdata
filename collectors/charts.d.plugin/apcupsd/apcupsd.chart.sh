@@ -150,41 +150,41 @@ END {
     print \"END\"
 
 	if (online == 1) {
-	print \"BEGIN apcupsd_${host}.charge $1\";
-	print \"SET battery_charge = \" battery_charge;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.charge $1\";
+        print \"SET battery_charge = \" battery_charge;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.battery_voltage $1\";
-	print \"SET battery_voltage = \" battery_voltage;
-	print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.battery_voltage $1\";
+        print \"SET battery_voltage = \" battery_voltage;
+        print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.input_voltage $1\";
-	print \"SET input_voltage = \" input_voltage;
-	print \"SET input_voltage_min = \" input_voltage_min;
-	print \"SET input_voltage_max = \" input_voltage_max;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.input_voltage $1\";
+        print \"SET input_voltage = \" input_voltage;
+        print \"SET input_voltage_min = \" input_voltage_min;
+        print \"SET input_voltage_max = \" input_voltage_max;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.input_frequency $1\";
-	print \"SET input_frequency = \" input_frequency;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.input_frequency $1\";
+        print \"SET input_frequency = \" input_frequency;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.output_voltage $1\";
-	print \"SET output_voltage = \" output_voltage;
+        print \"BEGIN apcupsd_${host}.output_voltage $1\";
+        print \"SET output_voltage = \" output_voltage;
         print \"SET output_voltage_nominal = \" output_voltage_nominal;
-	print \"END\"
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.load $1\";
-	print \"SET load = \" load;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.load $1\";
+        print \"SET load = \" load;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.temp $1\";
-	print \"SET temp = \" temp;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.temp $1\";
+        print \"SET temp = \" temp;
+        print \"END\"
 
-	print \"BEGIN apcupsd_${host}.time $1\";
-	print \"SET time = \" time;
-	print \"END\"
+        print \"BEGIN apcupsd_${host}.time $1\";
+        print \"SET time = \" time;
+        print \"END\"
     }
 }"
 		# shellcheck disable=SC2181
