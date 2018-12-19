@@ -16,7 +16,7 @@ new_labels() {
 	# remove duplicate quotes in case parameters were already quoted
 	LABELS="${LABELS//\"\"/\"}"
 	echo "-------- Assigning labels to #${ISSUE}: ${LABELS} --------"
-	curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${LABELS}]}" -X POST "${URL}" &>/dev/null
+	curl -H "Authorization: token $GITHUB_TOKEN" -d "{\"labels\":[${LABELS}]}" -X PUT "${URL}" &>/dev/null
 }
 
 if [ "$GITHUB_TOKEN" == "" ]; then
