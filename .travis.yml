@@ -75,8 +75,7 @@ jobs:
       credentials: .travis/gcs-credentials.json
       bucket: "netdata-nightlies"
       skip_cleanup: true
-      file_glob: true
-      file: "netdata*.tar.gz"
+      local_dir: "upload"
   - name: changelog generation
     script: ".travis/generate_changelog.sh"
     env: COMMIT_AND_PUSH=1

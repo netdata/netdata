@@ -38,6 +38,7 @@ sha256sums.txt
 # netdata binaries
 netdata
 !netdata/
+upload/
 
 apps.plugin
 !apps.plugin/
