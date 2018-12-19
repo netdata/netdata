@@ -1,9 +1,9 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.0-rc1](https://github.com/netdata/netdata/tree/v1.12.0-rc1) (2018-12-19)
 
 **Fixed bugs:**
- 
+
 - mdstat module causing netdata segv and crash [\#4990](https://github.com/netdata/netdata/issues/4990)
 - Cannot read /proc/mdstat line. Expected 7 params, read 6. [\#4975](https://github.com/netdata/netdata/issues/4975)
 - custom notification method does not work [\#4968](https://github.com/netdata/netdata/issues/4968)
