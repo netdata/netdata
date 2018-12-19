@@ -12,6 +12,7 @@
 - Postgres module: detect servers version and use the right query [\#4910](https://github.com/netdata/netdata/issues/4910)
 - Uninstaller script is always interactive [\#4791](https://github.com/netdata/netdata/issues/4791)
 - Cannot update & cannot disable mail logging of events [\#4557](https://github.com/netdata/netdata/issues/4557)
+- web\_log plugin cannot handle high load traffic [\#4354](https://github.com/netdata/netdata/issues/4354)
 - \[bug\]some metrics don't report to /allmetrics endpoint with prometheus format [\#3866](https://github.com/netdata/netdata/issues/3866)
 
 **Closed issues:**
@@ -28,19 +29,18 @@
 - move `/proc` and `/sys` python modules to `proc` plugin [\#4541](https://github.com/netdata/netdata/issues/4541)
 - mdstat RAID0 support [\#4010](https://github.com/netdata/netdata/issues/4010)
 - FreeIPMI Plugin cant graph the wattage [\#3977](https://github.com/netdata/netdata/issues/3977)
+- web\_log: charts per URL [\#3111](https://github.com/netdata/netdata/issues/3111)
 - FQDN in alert sending [\#2477](https://github.com/netdata/netdata/issues/2477)
 - on frontend, if JavaScript is disabled, there's no graceful degradation [\#2422](https://github.com/netdata/netdata/issues/2422)
 - netdata dead but pid file exists [\#2266](https://github.com/netdata/netdata/issues/2266)
 
 **Merged pull requests:**
 
-- fix location of encrypted file [\#5024](https://github.com/netdata/netdata/pull/5024) ([paulfantom](https://github.com/paulfantom))
 - Non-interactive uninstaller [\#5021](https://github.com/netdata/netdata/pull/5021) ([paulfantom](https://github.com/paulfantom))
 - Kavenegar returns 200 [\#5020](https://github.com/netdata/netdata/pull/5020) ([salehi](https://github.com/salehi))
 - Fix missing method\_name: kavenegar [\#5019](https://github.com/netdata/netdata/pull/5019) ([salehi](https://github.com/salehi))
-- add new generation uploading schema [\#5018](https://github.com/netdata/netdata/pull/5018) ([paulfantom](https://github.com/paulfantom))
-- allow development build [\#5015](https://github.com/netdata/netdata/pull/5015) ([paulfantom](https://github.com/paulfantom))
 - remove cross-directory dependency in build system [\#5012](https://github.com/netdata/netdata/pull/5012) ([paulfantom](https://github.com/paulfantom))
+- Move installer dir under packaging [\#5009](https://github.com/netdata/netdata/pull/5009) ([paulfantom](https://github.com/paulfantom))
 - Show a warning if JavaScript is disabled \#2422 [\#4999](https://github.com/netdata/netdata/pull/4999) ([gmosx](https://github.com/gmosx))
 - \[python\] make units compliant with IEC standard  [\#4995](https://github.com/netdata/netdata/pull/4995) ([ilyam8](https://github.com/ilyam8))
 - Integrate patches from freeipmi and set paramters [\#4993](https://github.com/netdata/netdata/pull/4993) ([Preisschild](https://github.com/Preisschild))
