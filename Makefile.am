@@ -78,9 +78,9 @@ dist_noinst_DATA= \
 	docs/Charts.md \
 	docs/configuration-guide.md \
 	docs/generator/custom \
-	installer/README.md \
-	installer/UNINSTALL.md \
-	installer/UPDATE.md \
+	packaging/installer/README.md \
+	packaging/installer/UNINSTALL.md \
+	packaging/installer/UPDATE.md \
 	netlify.toml \
 	$(NULL)
 
@@ -91,7 +91,7 @@ dist_noinst_SCRIPTS= \
 	kickstart.sh \
 	kickstart-static64.sh \
 	netdata-installer.sh \
-	installer/functions.sh \
+	packaging/installer/functions.sh \
 	docs/generator/buildhtml.sh \
 	docs/generator/buildyaml.sh \
 	docs/generator/checklinks.sh \
@@ -125,10 +125,10 @@ AM_CFLAGS = \
 	$(NULL)
 
 sbin_PROGRAMS =
-dist_cache_DATA = installer/.keep
-dist_varlib_DATA = installer/.keep
-dist_registry_DATA = installer/.keep
-dist_log_DATA = installer/.keep
+dist_cache_DATA = packaging/installer/.keep
+dist_varlib_DATA = packaging/installer/.keep
+dist_registry_DATA = packaging/installer/.keep
+dist_log_DATA = packaging/installer/.keep
 plugins_PROGRAMS =
 
 LIBNETDATA_FILES = \

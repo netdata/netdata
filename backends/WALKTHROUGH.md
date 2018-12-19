@@ -67,7 +67,7 @@ chooses the base container images (centos:latest). After running this you should
 be sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not
-be easier. If you take a look at [this link](../installer/#installation), the Netdata devs give us
+be easier. If you take a look at [this link](../packaging/installer/#installation), the Netdata devs give us
 several one-liners to install netdata. I have not had any issues with these one
 liners and their bootstrapping scripts so far (If you guys run into anything do
 share). Run the following command in your container.

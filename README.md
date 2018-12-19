@@ -94,7 +94,7 @@ The above command will:
 2. download netdata source to `/usr/src/netdata.git`
 3. compile it, install it and start it
 
-More installation methods and additional options can be found at the [installation page](installer/#installation).
+More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
 
 To try netdata in a docker container, run this:
 
@@ -459,7 +459,7 @@ Here is a quick list:
 
 Directory|Description
 :---|:---
-[`installer`](installer/)|Instructions to install netdata on your systems.
+[`installer`](packaging/installer/)|Instructions to install netdata on your systems.
 [`docker`](packaging/docker/)|Instructions to install netdata using docker.
 [`daemon`](daemon/)|Information about the netdata daemon and its configuration.
 [`collectors`](collectors/)|Information about data collection plugins.
