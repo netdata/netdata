@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-. $(dirname "$0")/../installer/functions.sh || exit 1
+. $(dirname "$0")/../packaging/installer/functions.sh || exit 1
 
 set -e
 

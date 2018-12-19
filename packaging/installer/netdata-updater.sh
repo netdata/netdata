@@ -17,7 +17,7 @@ REINSTALL_PWD="THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT"
 cd "${REINSTALL_PWD}" || exit 1
 
 #shellcheck source=/dev/null
-source installer/.environment.sh || exit 1
+source packaging/installer/.environment.sh || exit 1
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]
     then
@@ -94,7 +94,7 @@ update() {
 		fi
 
 		popmsg="$(git stash pop 2>&1)"
-		if [ $? -eq 0 ] ; then 
+		if [ $? -eq 0 ] ; then
 			info "Stashing local git changes. You can use ${popmsg} to reapply your changes."
 		fi
 

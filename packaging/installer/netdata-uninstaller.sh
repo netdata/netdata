@@ -47,9 +47,9 @@ if [ "$YES" != "1" ]; then
 fi
 
 #shellcheck source=/dev/null
-source installer/.environment.sh || exit 1
+source packaging/installer/.environment.sh || exit 1
 #shellcheck source=/dev/null
-source installer/functions.sh || exit 1
+source packaging/installer/functions.sh || exit 1
 
 echo >&2 "Stopping a possibly running netdata..."
 for p in $(stop_all_netdata netdata); do run kill "$p"; done
