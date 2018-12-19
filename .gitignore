@@ -101,6 +101,9 @@ collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
 
+# installer generated files
+netdata-uninstaller.sh
+
 # cmake files
 cmake-build-debug/
 cmake-build-release/
