@@ -3,6 +3,7 @@
 
 # Ownership by directory structure
 .travis/ @paufantom @cakrit
+.github/ @paufantom @cakrit
 build/ @paulfantom
 backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
