@@ -1,5 +1,20 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- Apcupsd: Connection loss further collects data, but it should stop [\#3927](https://github.com/netdata/netdata/issues/3927)
+
+**Closed issues:**
+
+- move python module web\_log to go.d [\#5046](https://github.com/netdata/netdata/issues/5046)
+
+**Merged pull requests:**
+
+- New option clear\_alarm\_always [\#5050](https://github.com/netdata/netdata/pull/5050) ([dex4er](https://github.com/dex4er))
+- Apcupsd add check for UPS online [\#5037](https://github.com/netdata/netdata/pull/5037) ([cakrit](https://github.com/cakrit))
+
 ## [v1.12.0-rc1](https://github.com/netdata/netdata/tree/v1.12.0-rc1) (2018-12-19)
 
 **Fixed bugs:**
