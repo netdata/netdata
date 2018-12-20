@@ -243,7 +243,7 @@ then
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
-if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
+if [ "${clear_alarm_always}" != "YES" -a "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
 then
     info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
     exit 1
