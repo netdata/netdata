@@ -131,19 +131,19 @@ BEGIN {
 	temp = 0;
 	time = 0;
 }
-/^BCHARGE.*/	{ battery_charge = \$3 * 100 };
-/^BATTV.*/		{ battery_voltage = \$3 * 100 };
-/^NOMBATTV.*/	{battery_voltage_nominal = \$3 * 100 };
-/^LINEV.*/		{ input_voltage = \$3 * 100 };
-/^MINLINEV.*/	{ input_voltage_min = \$3 * 100 };
-/^MAXLINEV.*/	{ input_voltage_max = \$3 * 100 };
-/^LINEFREQ.*/	{ input_frequency = \$3 * 100 };
-/^OUTPUTV.*/	{ output_voltage = \$3 * 100 };
-/^NOMOUTV.*/	{ output_voltage_nominal = \$3 * 100 };
-/^LOADPCT.*/	{ load = \$3 * 100 };
-/^ITEMP.*/		{ temp = \$3 * 100 };
-/^TIMELEFT.*/	{ time = \$3 * 100 };
-/^STATUS.*/		{ online=(\$3 == \"ONLINE\")?1:0 };
+/^BCHARGE.*/   { battery_charge = \$3 * 100 };
+/^BATTV.*/     { battery_voltage = \$3 * 100 };
+/^NOMBATTV.*/  { battery_voltage_nominal = \$3 * 100 };
+/^LINEV.*/     { input_voltage = \$3 * 100 };
+/^MINLINEV.*/  { input_voltage_min = \$3 * 100 };
+/^MAXLINEV.*/  { input_voltage_max = \$3 * 100 };
+/^LINEFREQ.*/  { input_frequency = \$3 * 100 };
+/^OUTPUTV.*/   { output_voltage = \$3 * 100 };
+/^NOMOUTV.*/   { output_voltage_nominal = \$3 * 100 };
+/^LOADPCT.*/   { load = \$3 * 100 };
+/^ITEMP.*/     { temp = \$3 * 100 };
+/^TIMELEFT.*/  { time = \$3 * 100 };
+/^STATUS.*/    { online=(\$3 == \"ONLINE\")?1:0 };
 END {
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;
