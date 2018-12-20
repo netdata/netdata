@@ -1,7 +1,7 @@
 ---
 only: issues
 limitPerRun: 30
-daysUntilStale: 60
+daysUntilStale: 45
 daysUntilClose: 60
 exemptLabels:
   - bug
