@@ -87,4 +87,4 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 FILE="netdata-${FILE_VERSION}.gz.run"
 
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
-echo >&2 "Self-extracting installer copied to '${FILE}'"
+echo >&2 "Self-extracting installer moved to '${FILE}'"
