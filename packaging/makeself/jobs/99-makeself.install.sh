@@ -8,34 +8,11 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # find the netdata version
 
-NOWNER="unknown"
-ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
-if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/git@github.com:/}"
-    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
-
-elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/https:\/\/github.com\//}"
-    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
+FILE_VERSION="$(git describe 2>/dev/null)"
+if [ -z "${FILE_VERSION}" ]; then
+    echo >&2 "Cannot find version number. Create makeself executable from source code with git tree structure."
+    exit 1
 fi
-
-# make sure it does not have any slashes in it
-NOWNER="${NOWNER//\//_}"
-
-if [ "${NOWNER}" = "netdata" ]
-    then
-    NOWNER=
-else
-    NOWNER="-${NOWNER}"
-fi
-
-VERSION="$(git describe || echo "undefined")"
-[ -z "${VERSION}" ] && VERSION="undefined"
-
-FILE_VERSION="${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}"
-
 
 # -----------------------------------------------------------------------------
 # copy the files needed by makeself installation
@@ -109,9 +86,5 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 FILE="netdata-${FILE_VERSION}.gz.run"
 
-run cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
+run mv "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
 echo >&2 "Self-extracting installer copied to '${FILE}'"
-
-[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
-run ln -s "${FILE}" netdata-latest.gz.run
-echo >&2 "Self-extracting installer linked to 'netdata-latest.gz.run'"
