@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Free memory shows as 'inactive' in FreeBSD [\#4737](https://github.com/netdata/netdata/issues/4737)
 - Apcupsd: Connection loss further collects data, but it should stop [\#3927](https://github.com/netdata/netdata/issues/3927)
 
 **Closed issues:**
@@ -418,7 +419,6 @@
 - \[Information\] Adding tutorial for Netdata in HTTPS for Plesk systems [\#3717](https://github.com/netdata/netdata/issues/3717)
 - hddtemp module fails: received data doesn't have needed records [\#3683](https://github.com/netdata/netdata/issues/3683)
 - "alarm-notify.sh test" produces error exit code on success [\#3667](https://github.com/netdata/netdata/issues/3667)
-- hide one axis in dygraph [\#3654](https://github.com/netdata/netdata/issues/3654)
 - init file is not installed on Amazon Linux 2018.03 [\#3650](https://github.com/netdata/netdata/issues/3650)
 - Option to prevent netdata dashboard.js from downloading FontAwesome [\#3644](https://github.com/netdata/netdata/issues/3644)
 - FYI: Homebrew formula \(package\) of netdata for macOS  [\#3642](https://github.com/netdata/netdata/issues/3642)
