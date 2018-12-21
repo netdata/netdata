@@ -168,12 +168,10 @@ static size_t
 // metric.
 
 // the total system time, as reported by /proc/stat
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static kernel_uint_t
         global_utime = 0,
         global_stime = 0,
         global_gtime = 0;
-#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 double  utime_fix_ratio = 1.0,
@@ -1329,8 +1327,8 @@ cleanup:
 #endif
 }
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-static inline int read_proc_stat() {
+#ifndef __FreeBSD__
+static inline int read_global_time() {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
@@ -1388,10 +1386,50 @@ cleanup:
     return 0;
 }
 #else
-static inline int read_proc_stat() {
+static inline int read_global_time() {
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, ntime_raw = 0;
+    static usec_t collected_usec = 0, last_collected_usec = 0;
+    long cp_time[CPUSTATES];
+
+    if (unlikely(CPUSTATES != 5)) {
+        goto cleanup;
+    } else {
+        static int mib[2] = {0, 0};
+
+        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+            goto cleanup;
+        }
+    }
+
+    last_collected_usec = collected_usec;
+    collected_usec = now_monotonic_usec();
+
+    calls_counter++;
+
+    // temporary - it is added global_ntime;
+    kernel_uint_t global_ntime = 0;
+
+    incremental_rate(global_utime, utime_raw, cp_time[0] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_ntime, ntime_raw, cp_time[1] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_stime, stime_raw, cp_time[2] * 100LLU / system_hz, collected_usec, last_collected_usec);
+
+    global_utime += global_ntime;
+
+    if(unlikely(global_iterations_counter == 1)) {
+        global_utime = 0;
+        global_stime = 0;
+        global_gtime = 0;
+    }
+
+    return 1;
+
+cleanup:
+    global_utime = 0;
+    global_stime = 0;
+    global_gtime = 0;
     return 0;
 }
-#endif
+#endif /* !__FreeBSD__ */
 
 // ----------------------------------------------------------------------------
 
@@ -2398,7 +2436,7 @@ static int collect_data_for_all_processes(void) {
         return 0;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs
-    read_proc_stat();
+    read_global_time();
 
     // build the process tree
     link_all_processes_to_their_parents();
@@ -2886,7 +2924,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 , update_every
         );
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         fprintf(stdout,
                 "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
                 "DIMENSION utime '' absolute 1 %2$llu\n"
@@ -2909,7 +2946,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                     , update_every
                     , RATES_DETAIL
             );
-#endif
 
     }
 
@@ -2944,7 +2980,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , targets_assignment_counter
         );
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     fprintf(stdout,
             "BEGIN netdata.apps_fix %llu\n"
             "SET utime = %u\n"
@@ -2977,10 +3012,8 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
-#endif
 }
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -3011,7 +3044,7 @@ static void normalize_utilization(struct target *root) {
         cmajflt += w->cmajflt;
     }
 
-    if((global_utime || global_stime || global_gtime) && (utime || stime || gtime)) {
+    if(global_utime || global_stime || global_gtime) {
         if(global_utime + global_stime + global_gtime > utime + cutime + stime + cstime + gtime + cgtime) {
             // everything we collected fits
             utime_fix_ratio  =
@@ -3021,7 +3054,7 @@ static void normalize_utilization(struct target *root) {
             cstime_fix_ratio =
             cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
         }
-        else if(global_utime + global_stime > utime + stime) {
+        else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
             // childrens resources are too high
             // lower only the children resources
             utime_fix_ratio  =
@@ -3031,13 +3064,21 @@ static void normalize_utilization(struct target *root) {
             cstime_fix_ratio =
             cgtime_fix_ratio = (double)((global_utime + global_stime) - (utime + stime)) / (double)(cutime + cstime);
         }
-        else {
+        else if(utime || stime) {
             // even running processes are unrealistic
             // zero the children resources
             // lower the running processes resources
             utime_fix_ratio  =
             stime_fix_ratio  =
             gtime_fix_ratio  = (double)(global_utime + global_stime) / (double)(utime + stime);
+            cutime_fix_ratio =
+            cstime_fix_ratio =
+            cgtime_fix_ratio = 0.0;
+        }
+        else {
+            utime_fix_ratio  =
+            stime_fix_ratio  =
+            gtime_fix_ratio  =
             cutime_fix_ratio =
             cstime_fix_ratio =
             cgtime_fix_ratio = 0.0;
@@ -3123,11 +3164,6 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
     );
 }
-#else // ALL_PIDS_ARE_READ_INSTANTLY == 1
-static void normalize_utilization(struct target *root) {
-    (void)root;
-}
-#endif // ALL_PIDS_ARE_READ_INSTANTLY
 
 static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
     struct target *w;
