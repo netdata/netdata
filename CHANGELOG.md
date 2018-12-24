@@ -13,6 +13,7 @@
 
 **Merged pull requests:**
 
+- Fixed typo [\#5054](https://github.com/netdata/netdata/pull/5054) ([samnela](https://github.com/samnela))
 - New option clear\_alarm\_always [\#5050](https://github.com/netdata/netdata/pull/5050) ([dex4er](https://github.com/dex4er))
 - Apcupsd add check for UPS online [\#5037](https://github.com/netdata/netdata/pull/5037) ([cakrit](https://github.com/cakrit))
 
