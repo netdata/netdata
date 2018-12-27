@@ -9,6 +9,7 @@
 
 **Closed issues:**
 
+- move freeradius module to go.d [\#5063](https://github.com/netdata/netdata/issues/5063)
 - move python module dns\_query\_time to go.d [\#5047](https://github.com/netdata/netdata/issues/5047)
 - move python module web\_log to go.d [\#5046](https://github.com/netdata/netdata/issues/5046)
 
