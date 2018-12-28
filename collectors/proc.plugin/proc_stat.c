@@ -536,6 +536,13 @@ int do_proc_stat(int update_every, usec_t dt) {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/schedstat");
         schedstat_filename = config_get("plugin:proc:/proc/stat", "schedstat filename to monitor", filename);
 
+        if(do_cpuidle != CONFIG_BOOLEAN_NO) {
+            struct stat stbuf;
+
+            if (stat(schedstat_filename, &stbuf))
+                do_cpuidle = CONFIG_BOOLEAN_NO;
+        }
+
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/cpu/cpu%zu/cpuidle/state%zu/name");
         cpuidle_name_filename = config_get("plugin:proc:/proc/stat", "cpuidle name filename to monitor", filename);
 
