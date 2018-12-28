@@ -394,7 +394,7 @@ var snmp = {
                     var d = dim_keys[j];
 
                     if (dimensions[d].value !== null) {
-                        if(typeof dimensions[d].offset === 'number')
+                        if(typeof dimensions[d].offset === 'number' && typeof dimensions[d].value === 'number')
                             service.set(d, dimensions[d].value + dimensions[d].offset);
                         else
                             service.set(d, dimensions[d].value);
