@@ -4,8 +4,14 @@
 
 **Fixed bugs:**
 
+- Additional character in Counter64 hex string [\#5028](https://github.com/netdata/netdata/issues/5028)
+- Error every second PLUGIN\[proc\] [\#4994](https://github.com/netdata/netdata/issues/4994)
+- Docker-compose: a lot of errors; Connection refused, Can't establish connection to MySQL... [\#4956](https://github.com/netdata/netdata/issues/4956)
+- Log flooding with new proc plugin [\#4945](https://github.com/netdata/netdata/issues/4945)
 - Free memory shows as 'inactive' in FreeBSD [\#4737](https://github.com/netdata/netdata/issues/4737)
+- FreeBSD: \(apps.cpu\) not show a specific program [\#4037](https://github.com/netdata/netdata/issues/4037)
 - Apcupsd: Connection loss further collects data, but it should stop [\#3927](https://github.com/netdata/netdata/issues/3927)
+- FreeBSD: apps.plugin reports spikes and apps.cpu less user CPU [\#3245](https://github.com/netdata/netdata/issues/3245)
 
 **Closed issues:**
 
@@ -15,9 +21,17 @@
 
 **Merged pull requests:**
 
+- Add how to add new alarm [\#5069](https://github.com/netdata/netdata/pull/5069) ([cakrit](https://github.com/cakrit))
+- Fix cpuidle statistics in containers [\#5065](https://github.com/netdata/netdata/pull/5065) ([vlvkobal](https://github.com/vlvkobal))
+- Fix coverity issues [\#5061](https://github.com/netdata/netdata/pull/5061) ([vlvkobal](https://github.com/vlvkobal))
+- Disable cpuidle module if schedstat file is missing [\#5059](https://github.com/netdata/netdata/pull/5059) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed typo [\#5054](https://github.com/netdata/netdata/pull/5054) ([samnela](https://github.com/samnela))
 - New option clear\_alarm\_always [\#5050](https://github.com/netdata/netdata/pull/5050) ([dex4er](https://github.com/dex4er))
+- Gracefully ignore the offset if the value is not a number [\#5040](https://github.com/netdata/netdata/pull/5040) ([cakrit](https://github.com/cakrit))
+- Fix process statistics collection for FreeBSD in apps.plugin [\#5038](https://github.com/netdata/netdata/pull/5038) ([vlvkobal](https://github.com/vlvkobal))
 - Apcupsd add check for UPS online [\#5037](https://github.com/netdata/netdata/pull/5037) ([cakrit](https://github.com/cakrit))
+- Add warning for offset in Counter64 metrics [\#5032](https://github.com/netdata/netdata/pull/5032) ([cakrit](https://github.com/cakrit))
+- Add other web servers to proxy instructions [\#5027](https://github.com/netdata/netdata/pull/5027) ([cakrit](https://github.com/cakrit))
 
 ## [v1.12.0-rc1](https://github.com/netdata/netdata/tree/v1.12.0-rc1) (2018-12-19)
 
