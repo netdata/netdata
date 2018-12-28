@@ -265,24 +265,34 @@ static void* wake_cpu_thread(void* core) {
     pthread_t thread;
     cpu_set_t cpu_set;
     static size_t cpu_wakeups = 0;
+    static int errors = 0;
 
     CPU_ZERO(&cpu_set);
     CPU_SET(*(int*)core, &cpu_set);
 
     thread = pthread_self();
-    if(unlikely(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set)))
-        error("Cannot set CPU affinity");
+    if(unlikely(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set))) {
+        if(unlikely(errors < 8)) {
+            error("Cannot set CPU affinity for core %d", *(int*)core);
+            errors++;
+        }
+        else if(unlikely(errors < 9)) {
+            error("CPU affinity errors are disabled");
+            errors++;
+        }
+    }
 
-    // Make the CPU core do something
+    // Make the CPU core do something to force it to update its idle counters
     cpu_wakeups++;
 
     return 0;
 }
 
-static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_chart **cpuidle_charts_address, size_t cores_found) {
+static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_chart **cpuidle_charts_address, size_t *schedstat_cores_found) {
     static size_t cpuidle_charts_len = 0;
     static procfile *ff = NULL;
     struct per_core_cpuidle_chart *cpuidle_charts = *cpuidle_charts_address;
+    size_t cores_found = 0;
 
     if(unlikely(!ff)) {
         ff = procfile_open(schedstat_filename, " \t:", PROCFILE_FLAG_DEFAULT);
@@ -295,13 +305,6 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
     size_t lines = procfile_lines(ff), l;
     size_t words;
 
-    if(unlikely(cpuidle_charts_len < cores_found)) {
-        cpuidle_charts = reallocz(cpuidle_charts, sizeof(struct per_core_cpuidle_chart) * cores_found);
-        *cpuidle_charts_address = cpuidle_charts;
-        memset(cpuidle_charts + cpuidle_charts_len, 0, sizeof(struct per_core_cpuidle_chart) * (cores_found - cpuidle_charts_len));
-        cpuidle_charts_len = cores_found;
-    }
-
     for(l = 0; l < lines ;l++) {
         char *row_key = procfile_lineword(ff, l, 0);
 
@@ -312,17 +315,26 @@ static int read_schedstat(char* schedstat_filename, struct per_core_cpuidle_char
                 error("Cannot read /proc/schedstat cpu line. Expected 9 params, read %zu.", words);
                 return 1;
             }
+            cores_found++;
 
             size_t core = str2ul(&row_key[3]);
             if(unlikely(core >= cores_found)) {
-                // Temporary workaround for issue 3945
-                // error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
+                error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
                 return 1;
             }
+
+            if(unlikely(cpuidle_charts_len < cores_found)) {
+                cpuidle_charts = reallocz(cpuidle_charts, sizeof(struct per_core_cpuidle_chart) * cores_found);
+                *cpuidle_charts_address = cpuidle_charts;
+                memset(cpuidle_charts + cpuidle_charts_len, 0, sizeof(struct per_core_cpuidle_chart) * (cores_found - cpuidle_charts_len));
+                cpuidle_charts_len = cores_found;
+            }
+
             cpuidle_charts[core].active_time = str2ull(procfile_lineword(ff, l, 7)) / 1000;
         }
     }
 
+    *schedstat_cores_found = cores_found;
     return 0;
 }
 
@@ -969,15 +981,16 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     static struct per_core_cpuidle_chart *cpuidle_charts = NULL;
+    size_t schedstat_cores_found = 0;
 
-    if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
+    if(likely(do_cpuidle != CONFIG_BOOLEAN_NO && !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found))) {
         int cpu_states_updated = 0;
         size_t core, state;
 
 
         // proc.plugin runs on Linux systems only. Multi-platform compatibility is not needed here,
         // so bare pthread functions are used to avoid unneeded overheads.
-        for(core = 0; core < cores_found; core++) {
+        for(core = 0; core < schedstat_cores_found; core++) {
             if(unlikely(!(cpuidle_charts[core].active_time - cpuidle_charts[core].last_active_time))) {
                 pthread_t thread;
 
@@ -989,8 +1002,8 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
 
-        if(unlikely(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, cores_found))) {
-            for(core = 0; core < cores_found; core++) {
+        if(unlikely(!cpu_states_updated || !read_schedstat(schedstat_filename, &cpuidle_charts, &schedstat_cores_found))) {
+            for(core = 0; core < schedstat_cores_found; core++) {
                 cpuidle_charts[core].last_active_time = cpuidle_charts[core].active_time;
 
                 int r = read_cpuidle_states(cpuidle_name_filename, cpuidle_time_filename, cpuidle_charts, core);
