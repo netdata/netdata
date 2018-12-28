@@ -47,6 +47,10 @@ Entire plugins can be turned off from the [netdata.conf [plugins]](../daemon/con
 
 ### Modify alarms and notifications
 
+##### Add a new alarm
+
+You can add a new alarm definition either by editing an existing stock alarm config file under `health.d` (e.g. `/etc/netdata/edit-config health.d/load.conf`), or by adding a new `.conf` file under `/etc/netdata/health.d`. The documentation on how to define an alarm is in [health monitoring](../health/#health-monitoring). It is suggested to look at some of the stock alarm definitions, so you can ensure you understand how the various options work.  
+
 ##### Turn off all alarms and notifications
 
 Just set `enabled = no` in the [netdata.conf [health]](../daemon/config/#health-section-options) section
