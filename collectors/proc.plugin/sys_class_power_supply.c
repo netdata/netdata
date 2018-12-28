@@ -104,7 +104,7 @@ void power_supply_free(struct power_supply *ps) {
         else {
             struct power_supply *last;
             for(last = power_supply_root; last && last->next != ps; last = last->next);
-            last->next = ps->next;
+            if(likely(last)) last->next = ps->next;
         }
 
         freez(ps);
@@ -236,8 +236,10 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     error("Cannot read file '%s'", ps->capacity->filename);
                     power_supply_free(ps);
                 }
-                buffer[r] = '\0';
-                ps->capacity->value = str2ull(buffer);
+                else {
+                    buffer[r] = '\0';
+                    ps->capacity->value = str2ull(buffer);
+                }
 
                 if(unlikely(!keep_fds_open)) {
                     close(ps->capacity->fd);
@@ -342,7 +344,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         struct ps_property *pr;
         for(pr = ps->property_root; pr; pr = pr->next) {
             if(unlikely(!pr->st)) {
-                char id[50 + 1], context[50 + 1];
+                char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", pr->name);
                 snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", pr->name);
 
