@@ -92,16 +92,14 @@ In this example:
 
 `family` sets the name of the submenu of the dashboard each chart will appear under.
 
+`multiplier` and `divisor` are passed by the plugin to the Netdata daemon and are applied to the metric to convert it properly to `units`. For incremental counters with the exception of Counter64 type metrics, `offset` is added to the metric from within the SNMP plugin. This means that the value you will see in debug mode in the `DEBUG: setting current chart to... SET` line for a metric will not have been multiplied or divided, but it will have had the offset added to it. 
+
+<details markdown="1"><summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
+The SNMP plugin supports Counter64 metrics with the only limitation that the `offset` parameter should not be defined. Due to the way Javascript handles large numbers and the fact that the offset is applied to metrics inside the plugin, the offset will be ignored silently.
+</details> 
+<br>
 If you need to define many charts using incremental OIDs, you can use something like this:
 
-This is like the previous, but the option `multiply_range` given, will multiply the current chart from `1` to `24` inclusive, producing 24 charts in total for the 24 ports of the switch `10.11.12.8`.
-
-Each of the 24 new charts will have its id (1-24) appended at:
-
-1. its chart unique id, i.e. `snmp_switch.bandwidth_port1` to `snmp_switch.bandwidth_port24`
-2. its `title`, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for port 24`
-3. its `oid` (for all dimensions), i.e. dimension `in` will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`
-3. its priority (which will be incremented for each chart so that the charts will appear on the dashboard in this order)
 
 ```json
 {
@@ -143,6 +141,16 @@ Each of the 24 new charts will have its id (1-24) appended at:
     ]
 }
 ```
+
+This is like the previous, but the option `multiply_range` given, will multiply the current chart from `1` to `24` inclusive, producing 24 charts in total for the 24 ports of the switch `10.11.12.8`.
+
+Each of the 24 new charts will have its id (1-24) appended at:
+
+1. its chart unique id, i.e. `snmp_switch.bandwidth_port1` to `snmp_switch.bandwidth_port24`
+2. its `title`, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for port 24`
+3. its `oid` (for all dimensions), i.e. dimension `in` will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`
+3. its priority (which will be incremented for each chart so that the charts will appear on the dashboard in this order)
+
 
 The `options` given for each server, are:
 
