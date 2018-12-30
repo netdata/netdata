@@ -298,6 +298,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     if (as_collected) {
                         // we need as-collected / raw data
 
+                        if(unlikely(rd->last_collected_time.tv_sec < after))
+                            continue;
+
                         const char *t = "gauge", *h = "gives";
                         if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
                            rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
@@ -512,12 +515,9 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
     }
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {
-        int show_range = 1;
         char *mode;
-        if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED) {
+        if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             mode = "as collected";
-            show_range = 0;
-        }
         else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
             mode = "average";
         else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
@@ -525,19 +525,15 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
+        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s, time range %lu to %lu\n\n"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
                 , mode
                 , (unsigned long)((first_seen)?0:(now - after))
                 , (first_seen)?"never":"seconds ago"
+                , (unsigned long)after, (unsigned long)now
         );
-
-        if(show_range)
-            buffer_sprintf(wb, ", time range %lu to %lu", (unsigned long)after, (unsigned long)now);
-
-        buffer_strcat(wb, "\n\n");
     }
 
     return after;
