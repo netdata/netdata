@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- smartd\_log: check\(\) unhandled exception: list index out of range [\#5079](https://github.com/netdata/netdata/issues/5079)
 - Additional character in Counter64 hex string [\#5028](https://github.com/netdata/netdata/issues/5028)
 - Error every second PLUGIN\[proc\] [\#4994](https://github.com/netdata/netdata/issues/4994)
 - Docker-compose: a lot of errors; Connection refused, Can't establish connection to MySQL... [\#4956](https://github.com/netdata/netdata/issues/4956)
@@ -21,6 +22,9 @@
 
 **Merged pull requests:**
 
+- smartd\_log: skip non-CSVs early [\#5081](https://github.com/netdata/netdata/pull/5081) ([kevlar1818](https://github.com/kevlar1818))
+- Add systemd pattern list parameter to the documentation [\#5077](https://github.com/netdata/netdata/pull/5077) ([vlvkobal](https://github.com/vlvkobal))
+- Fix update instructions URL in frontend [\#5076](https://github.com/netdata/netdata/pull/5076) ([jorisvervuurt](https://github.com/jorisvervuurt))
 - Add how to add new alarm [\#5069](https://github.com/netdata/netdata/pull/5069) ([cakrit](https://github.com/cakrit))
 - Fix cpuidle statistics in containers [\#5065](https://github.com/netdata/netdata/pull/5065) ([vlvkobal](https://github.com/vlvkobal))
 - Fix coverity issues [\#5061](https://github.com/netdata/netdata/pull/5061) ([vlvkobal](https://github.com/vlvkobal))
