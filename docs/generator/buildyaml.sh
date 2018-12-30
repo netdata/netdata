@@ -116,7 +116,7 @@ nav:'
 
 navpart 1 . README "About"
 
-echo -ne "    - 'docs/Why-Netdata.md'
+echo -ne "    - 'docs/README.md'
     - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/Donations-netdata-has-received.md'
