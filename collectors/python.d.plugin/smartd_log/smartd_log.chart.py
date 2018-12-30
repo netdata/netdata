@@ -650,6 +650,10 @@ class Service(SimpleService):
         return len(self.disks)
 
     def create_disk_from_file(self, full_name,  current_time):
+        if not full_name.endswith(CSV):
+            self.debug('skipping {0}: not a csv file'.format(full_name))
+            return None
+
         name = os.path.basename(full_name).split('.')[-3]
         path = os.path.join(self.log_path, full_name)
 
@@ -657,10 +661,6 @@ class Service(SimpleService):
             return None
 
         if [p for p in self.exclude if p in name]:
-            return None
-
-        if not full_name.endswith(CSV):
-            self.debug('skipping {0}: not a csv file'.format(full_name))
             return None
 
         if not os.access(path, os.R_OK):
