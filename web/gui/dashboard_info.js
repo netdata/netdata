@@ -647,7 +647,7 @@ netdataDashboard.context = {
     },
 
     'system.swapio': {
-        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of them are not shown in the chart, it is because they are zero - you can change the page settings to always render all the available dimensions on all charts).'
+        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because they are zero - you can change the page settings to always render all the available dimensions on all charts).'
     },
 
     'system.pgfaults': {
