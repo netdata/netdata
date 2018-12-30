@@ -113,15 +113,17 @@ class UrlService(SimpleService):
         url = url or self.url
         manager = manager or self._manager
         retry = urllib3.Retry(retries)
-        if hasattr(retries, 'respect_retry_after_header'):
+        if hasattr(retry, 'respect_retry_after_header'):
             retry.respect_retry_after_header = bool(self.respect_retry_after_header)
 
-        response = manager.request(method=self.method,
-                                   url=url,
-                                   timeout=self.request_timeout,
-                                   retries=retry,
-                                   headers=manager.headers,
-                                   redirect=redirect)
+        response = manager.request(
+            method=self.method,
+            url=url,
+            timeout=self.request_timeout,
+            retries=retry,
+            headers=manager.headers,
+            redirect=redirect,
+        )
         if isinstance(response.data, str):
             return response.status, response.data
         return response.status, response.data.decode()
