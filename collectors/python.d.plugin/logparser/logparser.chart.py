@@ -3,6 +3,7 @@
 # Author: Hamed Beiranvand (hamedbrd)
 
 import re
+
 from bases.FrameworkServices.LogService import LogService
 
 
@@ -16,7 +17,7 @@ CHARTS = {
     }
 }
 
-METHOD_REGEX = "regex"
+METHOD_REGEX = "regexp"
 METHOD_STRING = "string"
 
 
@@ -54,8 +55,8 @@ class Service(LogService):
         for name, pattern in self.dimensions.items():
             try:
                 matcher = matcher_factory(pattern)
-            except ValueError as error:
-                self.error("error on creating matchers : {0}".format(error))
+            except ValueError as re.error:
+                self.error("error on creating matchers : {0}".format(re.error))
                 return False
 
             self.matchers.append(DimensionMatcher(name, matcher))
@@ -68,9 +69,6 @@ class Service(LogService):
 
         if not lines:
             return None if lines is None else self.data
-
-        for matcher in self.matchers:
-            self.data[matcher.name] = 0
 
         for line in lines:
             for matcher in self.matchers:
