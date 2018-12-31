@@ -3,7 +3,6 @@
 # Author: Hamed Beiranvand (hamedbrd)
 
 import re
-import sys
 from bases.FrameworkServices.LogService import LogService
 
 
@@ -28,58 +27,130 @@ class Service(LogService):
         self.definitions = CHARTS
         self.dimensions = self.configuration.get('dimensions')
         self.log_path = self.configuration.get('log_path')
-        self.data = {}
+
+        self.matchers = list()  # list of DimensionMatcher's
+        self.data = dict()
+
     def check(self):
-        if not LogService.check(self):
+        if not self.log_path:
+            self.error('no log_path specified')
             return False
-        try:
-            for item in self.dimensions:
-                 CHARTS['jobs']['lines'].append([item,item,'incremental'])
-                 self.data[item] = 0
-                 re.compile(self.dimensions[item])
-        except re.error as err:
-            self.error("regex compile error: ", err)
+
+        if not self.dimensions:
+            self.error('no dimensions specified')
             return False
+
+        if not self.populate_matchers():
+            return False
+
+        for matcher in self.matchers:
+            dim = [matcher.name, matcher.name, 'incremental']
+            self.definitions['jobs']['lines'].append(dim)
+            self.data[matcher.name] = 0
+
+        return LogService.check(self)
+
+    def populate_matchers(self):
+        for name, pattern in self.dimensions.items():
+            try:
+                matcher = self.matcher_factory(pattern)
+            except ValueError as error:
+                self.error("error on creating matchers : {0}".format(error))
+                return False
+
+            self.matchers.append(DimensionMatcher(name, matcher))
+
         return True
 
+
     def get_data(self):      
-        raw = self._get_raw_data()
-        if not raw:
-            return None if raw is None else self.data
+        lines = self._get_raw_data()
 
-        for item in self.dimensions:
-            item_val = self.dimensions[item]
-            method, value = item_val.split("=")
+        if not lines:
+            return None if lines is None else self.data
 
-            if method == METHOD_REGEX:
-                 self.data[item] = self.regex_matcher_factory(value,item,raw)
+        for matcher in self.matchers:
+            self.data[matcher.name] = 0
 
-            if method == METHOD_STRING:
-                 self.data[item] = self.string_matcher_factory(value,item,raw)
+        for line in lines:
+            for matcher in self.matchers:
+                if matcher.match(line):
+                    self.data[matcher.name] += 1
+                    break
 
         return self.data
-            
-        
-    def regex_matcher_factory(self,value,item,data):
-        count = 0
-        for line in data:
-            if value.startswith('^'):
-                    regex = re.compile(value)
-                    count += bool(regex.match(line))
-            else:
-                    regex = re.compile(value)
-                    count += bool(regex.search(line))
-        return count
     
-    def string_matcher_factory(self,value,item,data):
-         count = 0
-         for line in data:
-            if value.startswith("^"):
-                count += regex.startswith(line)
-            elif value.endswith('$'):
-                count += regex.endswith(line)
-            else:
-                regex = re.compile(value)
-                count += bool(regex.search(line))
+    def regex_matcher_factory(self,value):
+        if value.startswith('^'):
+            return RegexMatchMatcher(value)
+        return RegexSearchMatcher(value)
 
-         return count
+
+    def string_matcher_factory(self,value):
+        if value.startswith("^"):
+            return StringPrefixMatcher(value)
+        elif value.endswith('$'):
+            return StringSuffixMatcher(value)
+        return StringMatcher(value)
+
+
+    def matcher_factory(self,raw_value):
+        method, value = raw_value.split("=")
+        
+        if method == METHOD_REGEX:
+            return self.regex_matcher_factory(value)
+
+        if method == METHOD_STRING:
+            return self.string_matcher_factory(value)
+
+
+        raise ValueError('unknown search method')
+
+class DimensionMatcher:
+    def __init__(self, name, matcher):
+        self.name = name
+        self.matcher = matcher
+
+    def match(self, line):
+        return self.matcher.match(line)  
+
+
+class BaseStringMatcher:
+    def __init__(self, value):
+        self.value = value
+
+
+class BaseRegexMatcher:
+    def __init__(self, value):
+        self.value = re.compile(value)
+
+
+class StringMatcher(BaseStringMatcher):
+    def match(self, row):
+        return self.value in row
+
+
+class StringPrefixMatcher(BaseStringMatcher):
+
+    def match(self, row):
+        return row.startswith(self.value)
+
+
+class StringSuffixMatcher(BaseStringMatcher):
+
+    def match(self, row):
+        return row.endswith(self.value)
+
+
+class RegexMatchMatcher(BaseRegexMatcher):
+
+    def match(self, row):
+        return bool(self.value.match(row))
+
+
+class RegexSearchMatcher(BaseRegexMatcher):
+
+    def match(self, row):
+        return bool(self.value.search(row))
+
+
