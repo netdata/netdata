@@ -51,6 +51,7 @@ cgroup-network
 
 # installation artifacts
 installer/.environment.sh
+packaging/installer/.environment.sh
 *.tar.*
 *.run
 
