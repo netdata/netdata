@@ -18,8 +18,9 @@ a netdata performs:
 Local netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another netdata (`master`).
 
-The user can take the full functionality of the `slave` netdata at
-http://master.ip:19999/host/slave.hostname/. Alarms for the `slave` are served by the `master`.
+The `my-netdata` menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
+
+Alarms for the `slave` are served by the `master`.
 
 In this mode the `slave` is just a plain data collector.
 It runs with... **5MB** of RAM (yes, you read correct), spawns all external plugins, but instead
@@ -33,8 +34,8 @@ The same `master` can collect data for any number of `slaves`.
 Local netdata (`slave`), **with a local database (and possibly alarms)**, collects metrics and
 sends them to another netdata (`master`).
 
-The user can use all the functions **at both** http://slave.ip:19999/ and
-http://master.ip:19999/host/slave.hostname/.
+The user can use all the functions **at both** http://slave-ip:slave-port/ and
+http://master-host:master-port/host/slave-host/.
 
 The `slave` and the `master` may have different data retention policies for the same metrics.
 
