@@ -53,7 +53,7 @@ class Service(LogService):
     def populate_matchers(self):
         for name, pattern in self.dimensions.items():
             try:
-                matcher = self.matcher_factory(pattern)
+                matcher = matcher_factory(pattern)
             except ValueError as error:
                 self.error("error on creating matchers : {0}".format(error))
                 return False
@@ -63,7 +63,7 @@ class Service(LogService):
         return True
 
 
-    def get_data(self):      
+    def get_data(self):
         lines = self._get_raw_data()
 
         if not lines:
@@ -80,31 +80,6 @@ class Service(LogService):
 
         return self.data
     
-    def regex_matcher_factory(self,value):
-        if value.startswith('^'):
-            return RegexMatchMatcher(value)
-        return RegexSearchMatcher(value)
-
-
-    def string_matcher_factory(self,value):
-        if value.startswith("^"):
-            return StringPrefixMatcher(value)
-        elif value.endswith('$'):
-            return StringSuffixMatcher(value)
-        return StringMatcher(value)
-
-
-    def matcher_factory(self,raw_value):
-        method, value = raw_value.split("=")
-        
-        if method == METHOD_REGEX:
-            return self.regex_matcher_factory(value)
-
-        if method == METHOD_STRING:
-            return self.string_matcher_factory(value)
-
-
-        raise ValueError('unknown search method')
 
 class DimensionMatcher:
     def __init__(self, name, matcher):
@@ -112,7 +87,7 @@ class DimensionMatcher:
         self.matcher = matcher
 
     def match(self, line):
-        return self.matcher.match(line)  
+        return self.matcher.match(line)
 
 
 class BaseStringMatcher:
@@ -152,5 +127,32 @@ class RegexSearchMatcher(BaseRegexMatcher):
 
     def match(self, row):
         return bool(self.value.search(row))
+
+
+
+def regex_matcher_factory(value):
+        if value.startswith('^'):
+            return RegexMatchMatcher(value)
+        return RegexSearchMatcher(value)
+
+
+def string_matcher_factory(value):
+    if value.startswith("^"):
+        return StringPrefixMatcher(value)
+    elif value.endswith('$'):
+        return StringSuffixMatcher(value)
+    return StringMatcher(value)
+
+
+def matcher_factory(raw_value):
+    method, value = raw_value.split("=")
+    
+    if method == METHOD_REGEX:
+        return regex_matcher_factory(value)
+
+    if method == METHOD_STRING:
+        return string_matcher_factory(value)
+
+    raise ValueError('unknown search method')
 
 
