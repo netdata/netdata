@@ -144,7 +144,6 @@ def string_matcher_factory(value):
 
 def matcher_factory(raw_value):
     method, value = raw_value.split("=")
-    
     if method == METHOD_REGEX:
         return regex_matcher_factory(value)
 
