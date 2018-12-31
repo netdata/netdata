@@ -55,8 +55,8 @@ class Service(LogService):
         for name, pattern in self.dimensions.items():
             try:
                 matcher = matcher_factory(pattern)
-            except ValueError as re.error:
-                self.error("error on creating matchers : {0}".format(re.error))
+            except (ValueError, re.error) as error:
+                self.error("error on creating matchers : {0}".format(error))
                 return False
 
             self.matchers.append(DimensionMatcher(name, matcher))
