@@ -16,7 +16,9 @@ W1_DIR = '/sys/bus/w1/devices/'
 # Lines matching the following regular expression contain a temperature value
 RE_TEMP = re.compile(r' t=(\d+)')
 
-ORDER = ['temp']
+ORDER = [
+    'temp',
+]
 
 CHARTS = {
     'temp': {

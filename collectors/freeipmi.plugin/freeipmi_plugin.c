@@ -102,11 +102,11 @@ char *sensor_config_file = NULL;
  * - See ipmi_monitoring.h for descriptions of these flags.
  */
 int reread_sdr_cache = 0;
-int ignore_non_interpretable_sensors = 1;
+int ignore_non_interpretable_sensors = 0;
 int bridge_sensors = 0;
 int interpret_oem_data = 0;
 int shared_sensors = 0;
-int discrete_reading = 0;
+int discrete_reading = 1;
 int ignore_scanning_disabled = 0;
 int assume_bmc_owner = 0;
 int entity_sensor_names = 0;
@@ -972,12 +972,13 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
             goto cleanup;
         }
 
-        if (!(sensor_bitmask_strings = ipmi_monitoring_sensor_read_sensor_bitmask_strings (ctx)))
-        {
-            error( "ipmi_monitoring_sensor_read_sensor_bitmask_strings(): %s",
-                    ipmi_monitoring_ctx_errormsg (ctx));
-            goto cleanup;
-        }
+         /* it's ok for this to be NULL, i.e. sensor_bitmask ==
+          * IPMI_MONITORING_SENSOR_BITMASK_TYPE_UNKNOWN
+          */
+        sensor_bitmask_strings = ipmi_monitoring_sensor_read_sensor_bitmask_strings (ctx);
+        
+        
+        
 #endif // NETDATA_COMMENTED
 
         if ((sensor_reading_type = ipmi_monitoring_sensor_read_sensor_reading_type (ctx)) < 0)
@@ -1084,7 +1085,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
         else
             printf (", N/A");
 
-        if (sensor_bitmask_type != IPMI_MONITORING_SENSOR_BITMASK_TYPE_UNKNOWN)
+        if (sensor_bitmask_type != IPMI_MONITORING_SENSOR_BITMASK_TYPE_UNKNOWN
+            && sensor_bitmask_strings)
         {
             unsigned int i = 0;
 

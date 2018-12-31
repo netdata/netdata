@@ -9,9 +9,6 @@ import re
 
 from bases.FrameworkServices.SocketService import SocketService
 
-# default module values
-update_every = 1
-priority = 60000
 
 # NTP Control Message Protocol constants
 MODE = 6
@@ -53,13 +50,15 @@ ORDER = [
 
 CHARTS = {
     'sys_offset': {
-        'options': [None, 'Combined offset of server relative to this host', 'ms', 'system', 'ntpd.sys_offset', 'area'],
+        'options': [None, 'Combined offset of server relative to this host', 'milliseconds',
+                    'system', 'ntpd.sys_offset', 'area'],
         'lines': [
             ['offset', 'offset', 'absolute', 1, PRECISION]
         ]
     },
     'sys_jitter': {
-        'options': [None, 'Combined system jitter and clock jitter', 'ms', 'system', 'ntpd.sys_jitter', 'line'],
+        'options': [None, 'Combined system jitter and clock jitter', 'milliseconds',
+                    'system', 'ntpd.sys_jitter', 'line'],
         'lines': [
             ['sys_jitter', 'system', 'absolute', 1, PRECISION],
             ['clk_jitter', 'clock', 'absolute', 1, PRECISION]
@@ -78,14 +77,14 @@ CHARTS = {
         ]
     },
     'sys_rootdelay': {
-        'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'system',
+        'options': [None, 'Total roundtrip delay to the primary reference clock', 'milliseconds', 'system',
                     'ntpd.sys_rootdelay', 'area'],
         'lines': [
             ['rootdelay', 'delay', 'absolute', 1, PRECISION]
         ]
     },
     'sys_rootdisp': {
-        'options': [None, 'Total root dispersion to the primary reference clock', 'ms', 'system',
+        'options': [None, 'Total root dispersion to the primary reference clock', 'milliseconds', 'system',
                     'ntpd.sys_rootdisp', 'area'],
         'lines': [
             ['rootdisp', 'dispersion', 'absolute', 1, PRECISION]
@@ -114,27 +113,27 @@ CHARTS = {
 
 PEER_CHARTS = {
     'peer_offset': {
-        'options': [None, 'Filter offset', 'ms', 'peers', 'ntpd.peer_offset', 'line'],
+        'options': [None, 'Filter offset', 'milliseconds', 'peers', 'ntpd.peer_offset', 'line'],
         'lines': []
     },
     'peer_delay': {
-        'options': [None, 'Filter delay', 'ms', 'peers', 'ntpd.peer_delay', 'line'],
+        'options': [None, 'Filter delay', 'milliseconds', 'peers', 'ntpd.peer_delay', 'line'],
         'lines': []
     },
     'peer_dispersion': {
-        'options': [None, 'Filter dispersion', 'ms', 'peers', 'ntpd.peer_dispersion', 'line'],
+        'options': [None, 'Filter dispersion', 'milliseconds', 'peers', 'ntpd.peer_dispersion', 'line'],
         'lines': []
     },
     'peer_jitter': {
-        'options': [None, 'Filter jitter', 'ms', 'peers', 'ntpd.peer_jitter', 'line'],
+        'options': [None, 'Filter jitter', 'milliseconds', 'peers', 'ntpd.peer_jitter', 'line'],
         'lines': []
     },
     'peer_xleave': {
-        'options': [None, 'Interleave delay', 'ms', 'peers', 'ntpd.peer_xleave', 'line'],
+        'options': [None, 'Interleave delay', 'milliseconds', 'peers', 'ntpd.peer_xleave', 'line'],
         'lines': []
     },
     'peer_rootdelay': {
-        'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'peers',
+        'options': [None, 'Total roundtrip delay to the primary reference clock', 'milliseconds', 'peers',
                     'ntpd.peer_rootdelay', 'line'],
         'lines': []
     },
@@ -234,7 +233,6 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = dict(CHARTS)
-
         self.port = 'ntp'
         self.dgram_socket = True
         self.system = System()
@@ -243,7 +241,6 @@ class Service(SocketService):
         self.retries = 0
         self.show_peers = self.configuration.get('show_peers', False)
         self.peer_rescan = self.configuration.get('peer_rescan', 60)
-
         if self.show_peers:
             self.definitions.update(PEER_CHARTS)
 

@@ -163,6 +163,7 @@ fleep
 syslog
 custom
 msteam
+kavenegar
 "
 
 # -----------------------------------------------------------------------------
@@ -242,7 +243,7 @@ then
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
-if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
+if [ "${clear_alarm_always}" != "YES" -a "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
 then
     info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
     exit 1
@@ -318,8 +319,8 @@ MESSAGEBIRD_ACCESS_KEY=
 MESSAGEBIRD_NUMBER=
 
 # kavenegar configs
-KAVENEGAR_API_KEY=""
-KAVENEGAR_SENDER=""
+KAVENEGAR_API_KEY=
+KAVENEGAR_SENDER=
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -1122,7 +1123,7 @@ send_kavenegar() {
                 --data-urlencode "receptor=${user}" \
                 --data-urlencode "message=${title} ${message}")
 
-            if [ "${httpcode}" = "201" ]
+            if [ "${httpcode}" = "200" ]
             then
                 info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))

@@ -131,7 +131,7 @@ static inline int registry_person_url_callback_verify_machine_exists(void *entry
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
-    buffer_sprintf(w->response.data, 
+    buffer_sprintf(w->response.data,
             ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\"",
             registry.registry_to_announce,
             registry.cloud_base_url);
@@ -334,7 +334,7 @@ void registry_statistics(void) {
                 , "registry"
                 , NULL
                 , "NetData Registry Sessions"
-                , "session"
+                , "sessions"
                 , "registry"
                 , "stats"
                 , 131000
@@ -392,7 +392,7 @@ void registry_statistics(void) {
                 , "registry"
                 , NULL
                 , "NetData Registry Memory"
-                , "KB"
+                , "KiB"
                 , "registry"
                 , "stats"
                 , 131300

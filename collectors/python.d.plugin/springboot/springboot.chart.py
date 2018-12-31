@@ -6,12 +6,14 @@
 import json
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-
-DEFAULT_ORDER = ['response_code', 'threads', 'gc_time', 'gc_ope', 'heap']
+DEFAULT_ORDER = [
+    'response_code',
+    'threads',
+    'gc_time',
+    'gc_ope',
+    'heap',
+]
 
 DEFAULT_CHARTS = {
     'response_code': {
@@ -59,7 +61,7 @@ DEFAULT_CHARTS = {
         ]
     },
     'heap': {
-        'options': [None, "Heap Memory Usage", "KB", "heap memory", "springboot.heap", "area"],
+        'options': [None, "Heap Memory Usage", "KiB", "heap memory", "springboot.heap", "area"],
         'lines': [
             ["heap_committed", 'committed', "absolute"],
             ["heap_used", 'used', "absolute"],

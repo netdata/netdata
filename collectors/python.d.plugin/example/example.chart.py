@@ -7,11 +7,13 @@ from random import SystemRandom
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values
-# update_every = 4
+
 priority = 90000
 
-ORDER = ['random']
+ORDER = [
+    'random',
+]
+
 CHARTS = {
     'random': {
         'options': [None, 'A random number', 'random number', 'random', 'random', 'line'],

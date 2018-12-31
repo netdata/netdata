@@ -361,9 +361,9 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(likely(do_health)) {
+    if(likely(do_health && redundant_num)) {
         static RRDSET *st_mdstat_health = NULL;
-        if(unlikely(!st_mdstat_health && redundant_num)) {
+        if(unlikely(!st_mdstat_health)) {
             st_mdstat_health = rrdset_create_localhost(
                     "mdstat"
                     , "mdstat_health"
@@ -573,10 +573,10 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                             "mdstat"
                             , id
                             , NULL
-                            , family
+				    , family
                             , "md.rate"
                             , "Operation Speed"
-                            , "KB/s"
+                            , "KiB/s"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_MDSTAT_NAME
                             , NETDATA_CHART_PRIO_MDSTAT_SPEED + raid_idx * 10

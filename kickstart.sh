@@ -31,7 +31,7 @@ umask 022
 [ -z "${UID}" ] && UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
-# library functions copied from installer/functions.sh
+# library functions copied from packaging/installer/functions.sh
 
 which_cmd() {
     # shellcheck disable=SC2230

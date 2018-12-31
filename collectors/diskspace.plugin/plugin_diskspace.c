@@ -263,7 +263,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , family
                         , "disk.space"
                         , title
-                        , "GB"
+                        , "GiB"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , NETDATA_CHART_PRIO_DISKSPACE_SPACE
@@ -303,7 +303,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , family
                         , "disk.inodes"
                         , title
-                        , "Inodes"
+                        , "inodes"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , NETDATA_CHART_PRIO_DISKSPACE_INODES

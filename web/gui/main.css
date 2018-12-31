@@ -1,6 +1,6 @@
 /* force the vertical window scrollbar */
 html {
-    overflow-y: scroll;
+    overflow-y: hidden;
 }
 
 /* prevent body from hiding under the navbar */

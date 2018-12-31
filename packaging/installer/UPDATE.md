@@ -11,7 +11,7 @@ The update procedure depends on how you installed it:
 
 ### Manual update
 
-The installer `netdata-installer.sh` generates a `netdata-updater.sh` script in the directory you downloaded netdata. 
+The installer `netdata-installer.sh` generates a `netdata-updater.sh` script in the directory you downloaded netdata.
 You can use this script to update your netdata installation with the same options you used to install it in the first place.
 Just run it and it will download and install the latest version of netdata. The same script can be put in a cronjob to update your netdata at regular intervals.
 
@@ -46,7 +46,7 @@ Keep in mind, netdata may now have new features, or certain old features may now
 
 _Please, consider the risks of running an auto-update. Something can always go wrong. Keep an eye on your installation, and run a manual update if something ever fails._
 
-You can call `netdata-updater.sh` from a cron-job. A successful update will not trigger an email from cron. 
+You can call `netdata-updater.sh` from a cron-job. A successful update will not trigger an email from cron.
 
 ```sh
 # Edit your cron-jobs

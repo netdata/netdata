@@ -2383,7 +2383,7 @@ void *statsd_main(void *ptr) {
             , "statsd"
             , NULL
             , "statsd server TCP connected sockets"
-            , "connected"
+            , "sockets"
             , PLUGIN_STATSD_NAME
             , "stats"
             , 132016

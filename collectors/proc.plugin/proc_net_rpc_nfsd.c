@@ -657,7 +657,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , "threads"
                         , NULL
                         , "NFS Server Threads Full Count"
-                        , "ops/s"
+                        , "events"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_NFSD_NAME
                         , NETDATA_CHART_PRIO_NFSD_THREADS_FULLCNT

@@ -9,19 +9,8 @@ import re
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#     'update_every': update_every,
-#     'retries': retries,
-#     'priority': priority,
-#     'url': 'http://localhost/status?full&json'
-# }}
-
-# charts order (can be overridden if you want less charts, or different order)
+REGEX = re.compile(r'([a-z][a-z ]+): ([\d.]+)')
 
 POOL_INFO = [
     ('active processes', 'active'),
@@ -49,7 +38,14 @@ CALC = [
     ('avg', average)
 ]
 
-ORDER = ['connections', 'requests', 'performance', 'request_duration', 'request_cpu', 'request_mem']
+ORDER = [
+    'connections',
+    'requests',
+    'performance',
+    'request_duration',
+    'request_cpu',
+    'request_mem',
+]
 
 CHARTS = {
     'connections': {
@@ -84,7 +80,7 @@ CHARTS = {
         ]
     },
     'request_cpu': {
-        'options': [None, 'PHP-FPM Request CPU', 'percent', 'request CPU', 'phpfpm.request_cpu', 'line'],
+        'options': [None, 'PHP-FPM Request CPU', 'percentage', 'request CPU', 'phpfpm.request_cpu', 'line'],
         'lines': [
             ['minReqCpu', 'min'],
             ['maxReqCpu', 'max'],
@@ -92,7 +88,7 @@ CHARTS = {
         ]
     },
     'request_mem': {
-        'options': [None, 'PHP-FPM Request Memory', 'kilobytes', 'request memory', 'phpfpm.request_mem', 'line'],
+        'options': [None, 'PHP-FPM Request Memory', 'KB', 'request memory', 'phpfpm.request_mem', 'line'],
         'lines': [
             ['minReqMem', 'min', 'absolute', 1, 1024],
             ['maxReqMem', 'max', 'absolute', 1, 1024],
@@ -105,14 +101,14 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = self.configuration.get('url', 'http://localhost/status?full&json')
         self.order = ORDER
         self.definitions = CHARTS
-        self.regex = re.compile(r'([a-z][a-z ]+): ([\d.]+)')
+        self.url = self.configuration.get('url', 'http://localhost/status?full&json')
         self.json = '&json' in self.url or '?json' in self.url
         self.json_full = self.url.endswith(('?full&json', '?json&full'))
-        self.if_all_processes_running = dict([(c_name + p_name, 0) for c_name, func in CALC
-                                              for metric, p_name in PER_PROCESS_INFO])
+        self.if_all_processes_running = dict(
+            [(c_name + p_name, 0) for c_name, func in CALC for metric, p_name in PER_PROCESS_INFO]
+        )
 
     def _get_data(self):
         """
@@ -123,7 +119,7 @@ class Service(UrlService):
         if not raw:
             return None
 
-        raw_json = parse_raw_data_(is_json=self.json, regex=self.regex, raw_data=raw)
+        raw_json = parse_raw_data_(is_json=self.json, raw_data=raw)
 
         # Per Pool info: active connections, requests and performance charts
         to_netdata = fetch_data_(raw_data=raw_json, metrics_list=POOL_INFO)
@@ -159,7 +155,7 @@ def fetch_data_(raw_data, metrics_list, pid=''):
     return result
 
 
-def parse_raw_data_(is_json, regex, raw_data):
+def parse_raw_data_(is_json, raw_data):
     """
     :param is_json: bool
     :param regex: compiled regular expr
@@ -173,4 +169,4 @@ def parse_raw_data_(is_json, regex, raw_data):
             return dict()
     else:
         raw_data = ' '.join(raw_data.split())
-        return dict(regex.findall(raw_data))
+        return dict(REGEX.findall(raw_data))

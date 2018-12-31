@@ -154,7 +154,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , diskstat.name
                                 , "disk.io"
                                 , "Disk I/O Bandwidth"
-                                , "kilobytes/s"
+                                , "KiB/s"
                                 , "macos"
                                 , "iokit"
                                 , 2000
@@ -306,7 +306,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , diskstat.name
                                     , "disk.await"
                                     , "Average Completed I/O Operation Time"
-                                    , "ms per operation"
+                                    , "milliseconds/operation"
                                     , "macos"
                                     , "iokit"
                                     , 2005
@@ -337,7 +337,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , diskstat.name
                                     , "disk.avgsz"
                                     , "Average Completed I/O Operation Bandwidth"
-                                    , "kilobytes per operation"
+                                    , "KiB/operation"
                                     , "macos"
                                     , "iokit"
                                     , 2006
@@ -368,7 +368,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , diskstat.name
                                     , "disk.svctm"
                                     , "Average Service Time"
-                                    , "ms per operation"
+                                    , "milliseconds/operation"
                                     , "macos"
                                     , "iokit"
                                     , 2007
@@ -410,7 +410,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     , "disk"
                     , NULL
                     , "Disk I/O"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , "macos"
                     , "iokit"
                     , 150
@@ -463,7 +463,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , mntbuf[i].f_mntonname
                                 , "disk.space"
                                 , title
-                                , "GB"
+                                , "GiB"
                                 , "macos"
                                 , "iokit"
                                 , 2023
@@ -496,7 +496,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , mntbuf[i].f_mntonname
                                 , "disk.inodes"
                                 , title
-                                , "Inodes"
+                                , "inodes"
                                 , "macos"
                                 , "iokit"
                                 , 2024

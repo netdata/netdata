@@ -16,10 +16,6 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
-retries = 60
 
 REPL_SET_STATES = [
     ('1', 'primary'),
@@ -209,21 +205,21 @@ CHARTS = {
         ]
     },
     'journaling_volume': {
-        'options': [None, 'Volume of data written to the journal', 'MB', 'database performance',
+        'options': [None, 'Volume of data written to the journal', 'MiB', 'database performance',
                     'mongodb.journaling_volume', 'line'],
         'lines': [
             ['journaledMB', 'volume', 'absolute', 1, 100]
         ]
     },
     'background_flush_average': {
-        'options': [None, 'Average time taken by flushes to execute', 'ms', 'database performance',
+        'options': [None, 'Average time taken by flushes to execute', 'milliseconds', 'database performance',
                     'mongodb.background_flush_average', 'line'],
         'lines': [
             ['average_ms', 'time', 'absolute', 1, 100]
         ]
     },
     'background_flush_last': {
-        'options': [None, 'Time taken by the last flush operation to execute', 'ms', 'database performance',
+        'options': [None, 'Time taken by the last flush operation to execute', 'milliseconds', 'database performance',
                     'mongodb.background_flush_last', 'line'],
         'lines': [
             ['last_ms', 'time', 'absolute', 1, 100]
@@ -269,7 +265,7 @@ CHARTS = {
         ]
     },
     'memory': {
-        'options': [None, 'Memory metrics', 'MB', 'resource utilization', 'mongodb.memory', 'stacked'],
+        'options': [None, 'Memory metrics', 'MiB', 'resource utilization', 'mongodb.memory', 'stacked'],
         'lines': [
             ['virtual', None, 'absolute', 1, 1],
             ['resident', None, 'absolute', 1, 1],
@@ -313,7 +309,7 @@ CHARTS = {
     },
     'wiredtiger_cache': {
         'options': [None, 'The percentage of the wiredTiger cache that is in use and cache with dirty bytes',
-                    'percent', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
+                    'percentage', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
             ['wiredTiger_percent_clean', 'inuse', 'absolute', 1, 1000],
             ['wiredTiger_percent_dirty', 'dirty', 'absolute', 1, 1000]
@@ -333,14 +329,14 @@ CHARTS = {
         'lines': []
     },
     'tcmalloc_generic': {
-        'options': [None, 'Tcmalloc generic metrics', 'MB', 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
+        'options': [None, 'Tcmalloc generic metrics', 'MiB', 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
         'lines': [
-            ['current_allocated_bytes', 'allocated', 'absolute', 1, 1048576],
-            ['heap_size', 'heap_size', 'absolute', 1, 1048576]
+            ['current_allocated_bytes', 'allocated', 'absolute', 1, 1 << 20],
+            ['heap_size', 'heap_size', 'absolute', 1, 1 << 20]
         ]
     },
     'tcmalloc_metrics': {
-        'options': [None, 'Tcmalloc metrics', 'KB', 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
+        'options': [None, 'Tcmalloc metrics', 'KiB', 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
         'lines': [
             ['central_cache_free_bytes', 'central_cache_free', 'absolute', 1, 1024],
             ['current_total_thread_cache_bytes', 'current_total_thread_cache', 'absolute', 1, 1024],

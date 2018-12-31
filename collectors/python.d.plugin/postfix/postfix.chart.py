@@ -5,12 +5,12 @@
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
+POSTQUEUE_COMMAND = 'postqueue -p'
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['qemails', 'qsize']
+ORDER = [
+    'qemails',
+    'qsize',
+]
 
 CHARTS = {
     'qemails': {
@@ -20,7 +20,7 @@ CHARTS = {
         ]
     },
     'qsize': {
-        'options': [None, 'Postfix Queue Emails Size', 'emails size in KB', 'queue', 'postfix.qsize', 'area'],
+        'options': [None, 'Postfix Queue Emails Size', 'KiB', 'queue', 'postfix.qsize', 'area'],
         'lines': [
             ['size', None, 'absolute']
         ]
@@ -31,9 +31,9 @@ CHARTS = {
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(self, configuration=configuration, name=name)
-        self.command = 'postqueue -p'
         self.order = ORDER
         self.definitions = CHARTS
+        self.command = POSTQUEUE_COMMAND
 
     def _get_data(self):
         """

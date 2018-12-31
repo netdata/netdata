@@ -558,7 +558,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.disk"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_DISK
@@ -614,7 +614,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.data"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_DATA
@@ -655,7 +655,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.metadata"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_METADATA
@@ -698,7 +698,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.system"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_SYSTEM

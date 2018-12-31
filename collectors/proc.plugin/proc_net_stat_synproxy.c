@@ -101,7 +101,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
                     , RRD_TYPE_NET_STAT_SYNPROXY
                     , NULL
                     , "SYNPROXY SYN Packets received"
-                    , "SYN/s"
+                    , "packets/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_SYNPROXY_NAME
                     , NETDATA_CHART_PRIO_SYNPROXY_SYN_RECEIVED

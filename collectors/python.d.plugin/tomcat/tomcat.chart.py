@@ -8,12 +8,18 @@ import xml.etree.ElementTree as ET
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
+MiB = 1 << 20
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['accesses', 'bandwidth', 'processing_time', 'threads', 'jvm', 'jvm_eden', 'jvm_survivor', 'jvm_tenured']
+ORDER = [
+    'accesses',
+    'bandwidth',
+    'processing_time',
+    'threads',
+    'jvm',
+    'jvm_eden',
+    'jvm_survivor',
+    'jvm_tenured',
+]
 
 CHARTS = {
     'accesses': {
@@ -24,7 +30,7 @@ CHARTS = {
         ]
     },
     'bandwidth': {
-        'options': [None, 'Bandwidth', 'KB/s', 'statistics', 'tomcat.bandwidth', 'area'],
+        'options': [None, 'Bandwidth', 'KiB/s', 'statistics', 'tomcat.bandwidth', 'area'],
         'lines': [
             ['bytesSent', 'sent', 'incremental', 1, 1024],
             ['bytesReceived', 'received', 'incremental', 1, 1024],
@@ -44,39 +50,39 @@ CHARTS = {
         ]
     },
     'jvm': {
-        'options': [None, 'JVM Memory Pool Usage', 'MB', 'memory', 'tomcat.jvm', 'stacked'],
+        'options': [None, 'JVM Memory Pool Usage', 'MiB', 'memory', 'tomcat.jvm', 'stacked'],
         'lines': [
-            ['free', 'free', 'absolute', 1, 1048576],
-            ['eden_used', 'eden', 'absolute', 1, 1048576],
-            ['survivor_used', 'survivor', 'absolute', 1, 1048576],
-            ['tenured_used', 'tenured', 'absolute', 1, 1048576],
-            ['code_cache_used', 'code cache', 'absolute', 1, 1048576],
-            ['compressed_used', 'compressed', 'absolute', 1, 1048576],
-            ['metaspace_used', 'metaspace', 'absolute', 1, 1048576],
+            ['free', 'free', 'absolute', 1, MiB],
+            ['eden_used', 'eden', 'absolute', 1, MiB],
+            ['survivor_used', 'survivor', 'absolute', 1, MiB],
+            ['tenured_used', 'tenured', 'absolute', 1, MiB],
+            ['code_cache_used', 'code cache', 'absolute', 1, MiB],
+            ['compressed_used', 'compressed', 'absolute', 1, MiB],
+            ['metaspace_used', 'metaspace', 'absolute', 1, MiB],
         ]
     },
     'jvm_eden': {
-        'options': [None, 'Eden Memory Usage', 'MB', 'memory', 'tomcat.jvm_eden', 'area'],
+        'options': [None, 'Eden Memory Usage', 'MiB', 'memory', 'tomcat.jvm_eden', 'area'],
         'lines': [
-            ['eden_used', 'used', 'absolute', 1, 1048576],
-            ['eden_committed', 'committed', 'absolute', 1, 1048576],
-            ['eden_max', 'max', 'absolute', 1, 1048576]
+            ['eden_used', 'used', 'absolute', 1, MiB],
+            ['eden_committed', 'committed', 'absolute', 1, MiB],
+            ['eden_max', 'max', 'absolute', 1, MiB]
         ]
     },
     'jvm_survivor': {
-        'options': [None, 'Survivor Memory Usage', 'MB', 'memory', 'tomcat.jvm_survivor', 'area'],
+        'options': [None, 'Survivor Memory Usage', 'MiB', 'memory', 'tomcat.jvm_survivor', 'area'],
         'lines': [
-            ['survivor_used', 'used', 'absolute', 1, 1048576],
-            ['survivor_committed', 'committed', 'absolute', 1, 1048576],
-            ['survivor_max', 'max', 'absolute', 1, 1048576]
+            ['survivor_used', 'used', 'absolute', 1, MiB],
+            ['survivor_committed', 'committed', 'absolute', 1, MiB],
+            ['survivor_max', 'max', 'absolute', 1, MiB],
         ]
     },
     'jvm_tenured': {
-        'options': [None, 'Tenured Memory Usage', 'MB', 'memory', 'tomcat.jvm_tenured', 'area'],
+        'options': [None, 'Tenured Memory Usage', 'MiB', 'memory', 'tomcat.jvm_tenured', 'area'],
         'lines': [
-            ['tenured_used', 'used', 'absolute', 1, 1048576],
-            ['tenured_committed', 'committed', 'absolute', 1, 1048576],
-            ['tenured_max', 'max', 'absolute', 1, 1048576]
+            ['tenured_used', 'used', 'absolute', 1, MiB],
+            ['tenured_committed', 'committed', 'absolute', 1, MiB],
+            ['tenured_max', 'max', 'absolute', 1, MiB]
         ]
     }
 }
@@ -85,10 +91,10 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
-        self.connector_name = self.configuration.get('connector_name', None)
         self.order = ORDER
         self.definitions = CHARTS
+        self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
+        self.connector_name = self.configuration.get('connector_name', None)
 
     def _get_data(self):
         """

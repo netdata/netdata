@@ -74,8 +74,6 @@ if [ "${GIT_TAG}" != "$(git tag --points-at)" ]; then
 	echo "ERROR! Current commit is not tagged. Stopping release creation."
 	exit 1
 fi
-if [ -z ${RC+x} ]; then
-	hub release create --prerelease --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
-else
+if [ ! -z ${RC+x} ]; then
 	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
 fi

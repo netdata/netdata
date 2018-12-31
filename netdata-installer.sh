@@ -34,10 +34,10 @@ cd "${netdata_source_dir}" || exit 1
 # -----------------------------------------------------------------------------
 # load the required functions
 
-if [ -f "${installer_dir}/installer/functions.sh" ]; then
-	source "${installer_dir}/installer/functions.sh" || exit 1
+if [ -f "${installer_dir}/packaging/installer/functions.sh" ]; then
+	source "${installer_dir}/packaging/installer/functions.sh" || exit 1
 else
-	source "${netdata_source_dir}/installer/functions.sh" || exit 1
+	source "${netdata_source_dir}/packaging/installer/functions.sh" || exit 1
 fi
 
 # make sure we save all commands we run
@@ -885,7 +885,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Create netdata-uninstaller.sh"
 
-cp ./installer/netdata-uninstaller.sh netdata-uninstaller.sh
+cp ./packaging/installer/netdata-uninstaller.sh netdata-uninstaller.sh
 chmod 750 netdata-uninstaller.sh
 
 # -----------------------------------------------------------------------------
@@ -911,7 +911,7 @@ END
 echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ -d .git ]; then
-	cp ./installer/netdata-updater.sh netdata-updater.sh
+	cp ./packaging/installer/netdata-updater.sh netdata-updater.sh
 	sed -i "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" netdata-updater.sh
 	chmod 755 netdata-updater.sh
 	echo >&2 "Update script is located at: ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
@@ -956,7 +956,7 @@ else
 fi
 
 # Save environment variables
-cat <<EOF > installer/.environment.sh
+cat <<EOF > packaging/installer/.environment.sh
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
