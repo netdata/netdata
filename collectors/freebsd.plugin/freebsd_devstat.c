@@ -360,10 +360,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                     disk,
                                                                     "disk.io",
                                                                     "Disk I/O Bandwidth",
-                                                                    "kilobytes/s",
-                                        "freebsd.plugin",
+                                                                    "KiB/s",
+                                                                    "freebsd.plugin",
                                                                     "devstat",
-                                        NETDATA_CHART_PRIO_DISK_IO,
+                                                                    NETDATA_CHART_PRIO_DISK_IO,
                                                                     update_every,
                                                                     RRDSET_TYPE_AREA
                                 );
@@ -398,9 +398,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      "disk.ops",
                                                                      "Disk Completed I/O Operations",
                                                                      "operations/s",
-                                        "freebsd.plugin",
-                                                                    "devstat",
-                                        NETDATA_CHART_PRIO_DISK_OPS,
+                                                                     "freebsd.plugin",
+                                                                     "devstat",
+                                                                     NETDATA_CHART_PRIO_DISK_OPS,
                                                                      update_every,
                                                                      RRDSET_TYPE_LINE
                                 );
@@ -437,9 +437,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       "disk.qops",
                                                                       "Disk Current I/O Operations",
                                                                       "operations",
-                                        "freebsd.plugin",
+                                                                      "freebsd.plugin",
                                                                       "devstat",
-                                        NETDATA_CHART_PRIO_DISK_QOPS,
+                                                                      NETDATA_CHART_PRIO_DISK_QOPS,
                                                                       update_every,
                                                                       RRDSET_TYPE_LINE
                                 );
@@ -466,9 +466,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       "disk.util",
                                                                       "Disk Utilization Time",
                                                                       "% of time working",
-                                        "freebsd.plugin",
+                                                                      "freebsd.plugin",
                                                                       "devstat",
-                                        NETDATA_CHART_PRIO_DISK_UTIL,
+                                                                      NETDATA_CHART_PRIO_DISK_UTIL,
                                                                       update_every,
                                                                       RRDSET_TYPE_AREA
                                 );
@@ -499,9 +499,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                         "disk.iotime",
                                                                         "Disk Total I/O Time",
                                                                         "milliseconds/s",
-                                        "freebsd.plugin",
+                                                                        "freebsd.plugin",
                                                                         "devstat",
-                                        NETDATA_CHART_PRIO_DISK_IOTIME,
+                                                                        NETDATA_CHART_PRIO_DISK_IOTIME,
                                                                         update_every,
                                                                         RRDSET_TYPE_LINE
                                 );
@@ -546,10 +546,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            disk,
                                                                            "disk.await",
                                                                            "Average Completed I/O Operation Time",
-                                                                           "ms per operation",
-                                            "freebsd.plugin",
+                                                                           "milliseconds/operation",
+                                                                           "freebsd.plugin",
                                                                            "devstat",
-                                            NETDATA_CHART_PRIO_DISK_AWAIT,
+                                                                           NETDATA_CHART_PRIO_DISK_AWAIT,
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
                                     );
@@ -611,10 +611,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                             disk,
                                                                             "disk.avgsz",
                                                                             "Average Completed I/O Operation Bandwidth",
-                                                                            "kilobytes per operation",
-                                            "freebsd.plugin",
+                                                                            "KiB/operation",
+                                                                            "freebsd.plugin",
                                                                             "devstat",
-                                            NETDATA_CHART_PRIO_DISK_AVGSZ,
+                                                                            NETDATA_CHART_PRIO_DISK_AVGSZ,
                                                                             update_every,
                                                                             RRDSET_TYPE_AREA
                                     );
@@ -668,10 +668,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            disk,
                                                                            "disk.svctm",
                                                                            "Average Service Time",
-                                                                           "ms per operation",
-                                            "freebsd.plugin",
+                                                                           "milliseconds/operation",
+                                                                           "freebsd.plugin",
                                                                            "devstat",
-                                            NETDATA_CHART_PRIO_DISK_SVCTM,
+                                                                           NETDATA_CHART_PRIO_DISK_SVCTM,
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
                                     );
@@ -728,10 +728,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                      "disk",
                                                      NULL,
                                                      "Disk I/O",
-                                                     "kilobytes/s",
-                                "freebsd.plugin",
+                                                     "KiB/s",
+                                                     "freebsd.plugin",
                                                      "devstat",
-                                NETDATA_CHART_PRIO_SYSTEM_IO,
+                                                     NETDATA_CHART_PRIO_SYSTEM_IO,
                                                      update_every,
                                                      RRDSET_TYPE_AREA
                         );

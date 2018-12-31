@@ -5,37 +5,30 @@
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'url': 'http://localhost/stub_status'
-#          }}
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['connections', 'requests', 'connection_status', 'connect_rate']
+ORDER = [
+    'connections',
+    'requests',
+    'connection_status',
+    'connect_rate',
+]
 
 CHARTS = {
     'connections': {
-        'options': [None, 'nginx Active Connections', 'connections', 'active connections',
+        'options': [None, 'Active Connections', 'connections', 'active connections',
                     'nginx.connections', 'line'],
         'lines': [
             ['active']
         ]
     },
     'requests': {
-        'options': [None, 'nginx Requests', 'requests/s', 'requests', 'nginx.requests', 'line'],
+        'options': [None, 'Requests', 'requests/s', 'requests', 'nginx.requests', 'line'],
         'lines': [
             ['requests', None, 'incremental']
         ]
     },
     'connection_status': {
-        'options': [None, 'nginx Active Connections by Status', 'connections', 'status',
+        'options': [None, 'Active Connections by Status', 'connections', 'status',
                     'nginx.connection_status', 'line'],
         'lines': [
             ['reading'],
@@ -44,7 +37,7 @@ CHARTS = {
         ]
     },
     'connect_rate': {
-        'options': [None, 'nginx Connections Rate', 'connections/s', 'connections rate',
+        'options': [None, 'Connections Rate', 'connections/s', 'connections rate',
                     'nginx.connect_rate', 'line'],
         'lines': [
             ['accepts', 'accepted', 'incremental'],
@@ -57,9 +50,9 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = self.configuration.get('url', 'http://localhost/stub_status')
         self.order = ORDER
         self.definitions = CHARTS
+        self.url = self.configuration.get('url', 'http://localhost/stub_status')
 
     def _get_data(self):
         """

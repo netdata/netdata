@@ -46,7 +46,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
                     , ZFS_FAMILY_SIZE
                     , NULL
                     , "ZFS ARC Size"
-                    , "MB"
+                    , "MiB"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_ARC_SIZE
@@ -84,7 +84,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
                     , ZFS_FAMILY_SIZE
                     , NULL
                     , "ZFS L2 ARC Size"
-                    , "MB"
+                    , "MiB"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_L2_SIZE
@@ -166,7 +166,7 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
                     , ZFS_FAMILY_ACCESSES
                     , NULL
                     , "ZFS ARC L2 Read/Write Rate"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , plugin
                     , module
                     , NETDATA_CHART_PRIO_ZFS_IO

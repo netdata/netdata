@@ -8,7 +8,13 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 priority = 59999
 disabled_by_default = True
 
-ORDER = ['sessions', 'users', 'seats']
+LOGINCTL_COMMAND = 'loginctl list-sessions --no-legend'
+
+ORDER = [
+    'sessions',
+    'users',
+    'seats',
+]
 
 CHARTS = {
     'sessions': {
@@ -39,9 +45,9 @@ CHARTS = {
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(self, configuration=configuration, name=name)
-        self.command = 'loginctl list-sessions --no-legend'
         self.order = ORDER
         self.definitions = CHARTS
+        self.command = LOGINCTL_COMMAND
 
     def _get_data(self):
         ret = {

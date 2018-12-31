@@ -3,24 +3,37 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from re import findall
+import re
 from subprocess import Popen, PIPE
 
 from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
 update_every = 15
+
+PARSER = re.compile(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)')
 
 RADIUS_MSG = 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept'
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['authentication', 'accounting', 'proxy-auth', 'proxy-acct']
+RADCLIENT_RETRIES = 1
+RADCLIENT_TIMEOUT = 1
+
+DEFAULT_HOST = 'localhost'
+DEFAULT_PORT = 18121
+DEFAULT_DO_ACCT = False
+DEFAULT_DO_PROXY_AUTH = False
+DEFAULT_DO_PROXY_ACCT = False
+
+ORDER = [
+    'authentication',
+    'accounting',
+    'proxy-auth',
+    'proxy-acct',
+]
 
 CHARTS = {
     'authentication': {
-        'options': [None, 'Authentication', 'packets/s', 'Authentication', 'freerad.auth', 'line'],
+        'options': [None, 'Authentication', 'packets/s', 'authentication', 'freerad.auth', 'line'],
         'lines': [
             ['access-accepts', None, 'incremental'],
             ['access-rejects', None, 'incremental'],
@@ -32,7 +45,7 @@ CHARTS = {
         ]
     },
     'accounting': {
-        'options': [None, 'Accounting', 'packets/s', 'Accounting', 'freerad.acct', 'line'],
+        'options': [None, 'Accounting', 'packets/s', 'accounting', 'freerad.acct', 'line'],
         'lines': [
             ['accounting-requests', 'requests', 'incremental'],
             ['accounting-responses', 'responses', 'incremental'],
@@ -44,7 +57,7 @@ CHARTS = {
         ]
     },
     'proxy-auth': {
-        'options': [None, 'Proxy Authentication', 'packets/s', 'Authentication', 'freerad.proxy.auth', 'line'],
+        'options': [None, 'Proxy Authentication', 'packets/s', 'authentication', 'freerad.proxy.auth', 'line'],
         'lines': [
             ['proxy-access-accepts', 'access-accepts', 'incremental'],
             ['proxy-access-rejects', 'access-rejects', 'incremental'],
@@ -56,7 +69,7 @@ CHARTS = {
         ]
     },
     'proxy-acct': {
-        'options': [None, 'Proxy Accounting', 'packets/s', 'Accounting', 'freerad.proxy.acct', 'line'],
+        'options': [None, 'Proxy Accounting', 'packets/s', 'accounting', 'freerad.proxy.acct', 'line'],
         'lines': [
             ['proxy-accounting-requests', 'requests', 'incremental'],
             ['proxy-accounting-responses', 'responses', 'incremental'],
@@ -70,46 +83,80 @@ CHARTS = {
 }
 
 
+def radclient_status(radclient, retries, timeout, host, port, secret):
+    # radclient -r 1 -t 1 -x 127.0.0.1:18121 status secret
+
+    return '{radclient} -r {num_retries} -t {timeout} -x {host}:{port} status {secret}'.format(
+        radclient=radclient,
+        num_retries=retries,
+        timeout=timeout,
+        host=host,
+        port=port,
+        secret=secret,
+    ).split()
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
         self.definitions = CHARTS
-        self.host = self.configuration.get('host', 'localhost')
-        self.port = self.configuration.get('port', '18121')
+        self.host = self.configuration.get('host', DEFAULT_HOST)
+        self.port = self.configuration.get('port', DEFAULT_PORT)
         self.secret = self.configuration.get('secret')
-        self.acct = self.configuration.get('acct', False)
-        self.proxy_auth = self.configuration.get('proxy_auth', False)
-        self.proxy_acct = self.configuration.get('proxy_acct', False)
-        chart_choice = [True, bool(self.acct), bool(self.proxy_auth), bool(self.proxy_acct)]
-        self.order = [chart for chart, choice in zip(ORDER, chart_choice) if choice]
+        self.do_acct = self.configuration.get('acct', DEFAULT_DO_ACCT)
+        self.do_proxy_auth = self.configuration.get('proxy_auth', DEFAULT_DO_PROXY_AUTH)
+        self.do_proxy_acct = self.configuration.get('proxy_acct', DEFAULT_DO_PROXY_ACCT)
         self.echo = find_binary('echo')
         self.radclient = find_binary('radclient')
         self.sub_echo = [self.echo, RADIUS_MSG]
-        self.sub_radclient = [self.radclient, '-r', '1', '-t', '1', '-x',
-                              ':'.join([self.host, self.port]), 'status', self.secret]
+        self.sub_radclient = radclient_status(
+            self.radclient, RADCLIENT_RETRIES, RADCLIENT_TIMEOUT, self.host, self.port, self.secret,
+        )
 
     def check(self):
-        if not all([self.echo, self.radclient]):
-            self.error('Can\'t locate "radclient" binary or binary is not executable by netdata')
+        if not self.radclient:
+            self.error("Can't locate 'radclient' binary or binary is not executable by netdata user")
             return False
-        if not self.secret:
-            self.error('"secret" not set')
+
+        if not self.echo:
+            self.error("Can't locate 'echo' binary or binary is not executable by netdata user")
             return None
 
-        if self._get_raw_data():
-            return True
-        self.error('Request returned no data. Is server alive?')
-        return False
+        if not self.secret:
+            self.error("'secret' isn't set")
+            return None
 
-    def _get_data(self):
+        if not self.get_raw_data():
+            self.error('Request returned no data. Is server alive?')
+            return False
+
+        if not self.do_acct:
+            self.order.remove('accounting')
+
+        if not self.do_proxy_auth:
+            self.order.remove('proxy-auth')
+
+        if not self.do_proxy_acct:
+            self.order.remove('proxy-acct')
+
+        return True
+
+    def get_data(self):
         """
         Format data received from shell command
         :return: dict
         """
-        result = self._get_raw_data()
-        return dict([(elem[0].lower(), int(elem[1])) for elem in findall(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)', result)])
+        result = self.get_raw_data()
 
-    def _get_raw_data(self):
+        if not result:
+            return None
+
+        return dict(
+            (key.lower(), value) for key, value in PARSER.findall(result)
+        )
+
+    def get_raw_data(self):
         """
         The following code is equivalent to
         'echo "Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept"
@@ -123,6 +170,8 @@ class Service(SimpleService):
             raw_result = process_rad.communicate()[0]
         except OSError:
             return None
+
         if process_rad.returncode is 0:
             return raw_result.decode()
+
         return None

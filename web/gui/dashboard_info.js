@@ -436,10 +436,10 @@ netdataDashboard.menu = {
         info: undefined
     },
 
-    'linux_power_supply': {
+    'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: 'Statistics for the various system power supplies.'
+        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
     }
 };
 
@@ -647,7 +647,7 @@ netdataDashboard.context = {
     },
 
     'system.swapio': {
-        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).'
+        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of the metrics <code>in</code> or <code>out</code> is not shown in the chart, the reason is that the metric is zero. - you can change the page settings to always render all the available dimensions on all charts).'
     },
 
     'system.pgfaults': {
@@ -2315,6 +2315,25 @@ netdataDashboard.context = {
 
     'proxysql.commands_duration': {
         info: 'The total time spent executing commands of that type, in ms'
+    },
+
+    // ------------------------------------------------------------------------
+    // Power Supplies
+
+    'powersupply.capacity': {
+        info: undefined
+    },
+
+    'powersupply.charge': {
+        info: undefined
+    },
+
+    'powersupply.energy': {
+        info: undefined
+    },
+
+    'powersupply.voltage': {
+        info: undefined
     }
 
     // ------------------------------------------------------------------------

@@ -19,14 +19,16 @@ from copy import deepcopy
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-priority = 60000
-retries = 60
 
-ORDER = ['pools_utilization', 'pools_active_leases', 'leases_total']
+ORDER = [
+    'pools_utilization',
+    'pools_active_leases',
+    'leases_total',
+]
 
 CHARTS = {
     'pools_utilization': {
-        'options': [None, 'Pools Utilization', '%', 'utilization', 'isc_dhcpd.utilization', 'line'],
+        'options': [None, 'Pools Utilization', 'percentage', 'utilization', 'isc_dhcpd.utilization', 'line'],
         'lines': []
     },
     'pools_active_leases': {
@@ -120,7 +122,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
         lease_path = self.configuration.get('leases_path', '/var/lib/dhcp/dhcpd.leases')
         self.dhcpd_leases = DhcpdLeasesFile(path=lease_path)
         self.pools = list()
@@ -131,7 +132,7 @@ class Service(SimpleService):
 
     def check(self):
         if not HAVE_IP_ADDRESS:
-            self.error("'python-ipaddress' module is needed")
+            self.error("'python-ipaddress' package is needed")
             return False
 
         if not self.dhcpd_leases.is_valid():
@@ -190,6 +191,17 @@ class Service(SimpleService):
 
     def create_charts(self):
         for pool in self.pools:
-            self.definitions['pools_utilization']['lines'].append([pool.id + '_utilization', pool.name,
-                                                                   'absolute', 1, 100])
-            self.definitions['pools_active_leases']['lines'].append([pool.id + '_active_leases', pool.name])
+            dim = [
+                pool.id + '_utilization',
+                pool.name,
+                'absolute',
+                1,
+                100,
+            ]
+            self.definitions['pools_utilization']['lines'].append(dim)
+
+            dim = [
+                pool.id + '_active_leases',
+                pool.name,
+            ]
+            self.definitions['pools_active_leases']['lines'].append(dim)

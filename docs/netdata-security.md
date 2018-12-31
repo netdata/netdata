@@ -89,17 +89,17 @@ In Netdata v1.9+ there is also access list support, like this:
 
 #### Use an authenticating web server in proxy mode
 
-Use **one nginx** (or one apache) server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](Running-behind-nginx.md#netdata-via-nginx).
+Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](Running-behind-nginx.md#netdata-via-nginx), [Apache](Running-behind-apache.md), [lighthttpd](Running-behind-lighttpd.md#netdata-via-lighttpd-v14x) and [Caddy](Running-behind-caddy.md#netdata-via-caddy).
 
-To use this method, you should firewall protect all your Netdata servers, so that only the nginx IP will allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
+To use this method, you should firewall protect all your Netdata servers, so that only the web server IP will allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
 
 ```sh
-NGINX_IP="1.2.3.4"
-iptables -t filter -I INPUT -p tcp --dport 19999 \! -s ${NGINX_IP} -m conntrack --ctstate NEW -j DROP
+PROXY_IP="1.2.3.4"
+iptables -t filter -I INPUT -p tcp --dport 19999 \! -s ${PROXY_IP} -m conntrack --ctstate NEW -j DROP
 ```
-_commands to allow direct access to Netdata from an nginx proxy_
+_commands to allow direct access to Netdata from a web server proxy_
 
-The above will prevent anyone except your nginx server to access a Netdata dashboard running on the host.
+The above will prevent anyone except your web server to access a Netdata dashboard running on the host.
 
 For Netdata v1.9+ you can also use `netdata.conf`:
 

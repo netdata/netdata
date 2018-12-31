@@ -16,6 +16,11 @@ make dist
 echo "--- Create self-extractor ---"
 ./makeself/build-x86_64-static.sh
 
+# Needed fo GCS
+echo "--- Copy artifacts to bin ---"
+mkdir upload
+cp ./*.tar.gz ./*.gz.run upload/
+
 echo "--- Create checksums ---"
 GIT_TAG=$(git tag --points-at)
 if [ "${GIT_TAG}" != "" ]; then

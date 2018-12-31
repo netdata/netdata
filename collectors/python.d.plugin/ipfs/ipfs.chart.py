@@ -7,24 +7,17 @@ import json
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#     'update_every': update_every,
-#     'retries': retries,
-#     'priority': priority,
-#     'url': 'http://localhost:5001'
-# }}
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['bandwidth', 'peers', 'repo_size', 'repo_objects']
+ORDER = [
+    'bandwidth',
+    'peers',
+    'repo_size',
+    'repo_objects',
+]
 
 CHARTS = {
     'bandwidth': {
-        'options': [None, 'IPFS Bandwidth', 'kbits/s', 'Bandwidth', 'ipfs.bandwidth', 'line'],
+        'options': [None, 'IPFS Bandwidth', 'kilobits/s', 'Bandwidth', 'ipfs.bandwidth', 'line'],
         'lines': [
             ['in', None, 'absolute', 8, 1000],
             ['out', None, 'absolute', -8, 1000]
@@ -37,10 +30,10 @@ CHARTS = {
         ]
     },
     'repo_size': {
-        'options': [None, 'IPFS Repo Size', 'GB', 'Size', 'ipfs.repo_size', 'area'],
+        'options': [None, 'IPFS Repo Size', 'GiB', 'Size', 'ipfs.repo_size', 'area'],
         'lines': [
-            ['avail', None, 'absolute', 1, 1e9],
-            ['size', None, 'absolute', 1, 1e9],
+            ['avail', None, 'absolute', 1, 1 << 30],
+            ['size', None, 'absolute', 1, 1 << 30],
         ]
     },
     'repo_objects': {
@@ -68,11 +61,11 @@ SI_zeroes = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.baseurl = self.configuration.get('url', 'http://localhost:5001')
         self.order = ORDER
         self.definitions = CHARTS
-        self.__storage_max = None
+        self.baseurl = self.configuration.get('url', 'http://localhost:5001')
         self.do_pinapi = self.configuration.get('pinapi')
+        self.__storage_max = None
 
     def _get_json(self, sub_url):
         """

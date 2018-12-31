@@ -5,10 +5,6 @@
 
 from bases.FrameworkServices.MySQLService import MySQLService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 3
-priority = 60000
-
 
 def query(table, *params):
     return 'SELECT {params} FROM {table}'.format(table=table, params=', '.join(params))
@@ -132,8 +128,8 @@ CHARTS = {
         'options': [None, 'ProxySQL Backend Overall Bandwidth', 'kilobits/s', 'overall_bandwidth',
                     'proxysql.pool_overall_net', 'area'],
         'lines': [
-            ['bytes_data_recv', 'in', 'incremental', 8, 1024],
-            ['bytes_data_sent', 'out', 'incremental', -8, 1024]
+            ['bytes_data_recv', 'in', 'incremental', 8, 1000],
+            ['bytes_data_sent', 'out', 'incremental', -8, 1000]
         ]
     },
     'questions': {
@@ -155,7 +151,7 @@ CHARTS = {
         ]
     },
     'pool_latency': {
-        'options': [None, 'ProxySQL Backend Latency', 'ms', 'latency', 'proxysql.latency', 'line'],
+        'options': [None, 'ProxySQL Backend Latency', 'milliseconds', 'latency', 'proxysql.latency', 'line'],
         'lines': []
     },
     'connections': {
@@ -193,7 +189,7 @@ CHARTS = {
         'lines': []
     },
     'commands_duration': {
-        'options': [None, 'ProxySQL Commands Duration', 'ms', 'commands', 'proxysql.commands_duration', 'line'],
+        'options': [None, 'ProxySQL Commands Duration', 'milliseconds', 'commands', 'proxysql.commands_duration', 'line'],
         'lines': []
     }
 }

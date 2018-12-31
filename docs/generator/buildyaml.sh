@@ -125,10 +125,10 @@ echo -ne "    - 'docs/Why-Netdata.md'
     - CHANGELOG.md
     - CONTRIBUTING.md
 - Installation:
-    - 'installer/README.md'
+    - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'
-    - 'installer/UPDATE.md'
-    - 'installer/UNINSTALL.md'
+    - 'packaging/installer/UPDATE.md'
+    - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
 - Running netdata:
     - 'daemon/README.md'

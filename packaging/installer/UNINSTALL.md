@@ -8,7 +8,7 @@ To uninstall netdata, run:
 
 ```
 cd /path/to/netdata.git
-./netdata-uninstaller.sh --force
+./netdata-uninstaller.sh --yes
 ```
 
 The uninstaller will ask you to confirm all deletions.

@@ -1,3 +1,6 @@
+# Secrets
+gcs-credentials.json
+
 .deps
 .libs
 .dirstamp
@@ -35,6 +38,7 @@ sha256sums.txt
 # netdata binaries
 netdata
 !netdata/
+upload/
 
 apps.plugin
 !apps.plugin/
@@ -47,6 +51,7 @@ cgroup-network
 
 # installation artifacts
 installer/.environment.sh
+packaging/installer/.environment.sh
 *.tar.*
 *.run
 

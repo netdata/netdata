@@ -257,6 +257,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/plugin_proc.c
         collectors/proc.plugin/plugin_proc.h
         collectors/proc.plugin/proc_diskstats.c
+        collectors/proc.plugin/proc_mdstat.c
         collectors/proc.plugin/proc_interrupts.c
         collectors/proc.plugin/proc_softirqs.c
         collectors/proc.plugin/proc_loadavg.c
@@ -287,6 +288,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/sys_devices_system_edac_mc.c
         collectors/proc.plugin/sys_devices_system_node.c
         collectors/proc.plugin/sys_fs_btrfs.c
+        collectors/proc.plugin/sys_class_power_supply.c
         )
 
 set(TC_PLUGIN_FILES

@@ -12,7 +12,7 @@ pidfile="${pidfile}/netdata.pid"
 command="@sbindir_POST@/netdata"
 command_args="-P ${pidfile}"
 
-required_files="@sysconfdir_POST@/netdata/netdata.conf"
+required_files="@configdir_POST@/netdata.conf"
 
 start_precmd="netdata_prestart"
 stop_postcmd="netdata_poststop"
