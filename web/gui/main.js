@@ -2803,7 +2803,7 @@ function notifyForUpdate(force) {
             save = true;
             var compare = 'https://github.com/netdata/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
 
-            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/tree/master/installer/UPDATE.md" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
+            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/tree/master/packaging/installer/UPDATE.md" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
 
             document.getElementById('update_badge').innerHTML = '!';
         }

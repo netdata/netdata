@@ -221,7 +221,7 @@ DIMENSION Innodb_buffer_pool_pages_flushed flushed incremental -1 1
 DIMENSION Innodb_buffer_pool_pages_misc misc absolute -1 1
 DIMENSION Innodb_buffer_pool_pages_total total absolute 1 1
 
-CHART mysql_$x.innodb_buffer_pool_bytes '' "mysql InnoDB Buffer Pool Bytes" "MB" innodb mysql.innodb_buffer_pool_bytes area $((mysql_priority + 21)) $mysql_update_every
+CHART mysql_$x.innodb_buffer_pool_bytes '' "mysql InnoDB Buffer Pool Bytes" "MiB" innodb mysql.innodb_buffer_pool_bytes area $((mysql_priority + 21)) $mysql_update_every
 DIMENSION Innodb_buffer_pool_bytes_data data absolute 1 $((1024 * 1024))
 DIMENSION Innodb_buffer_pool_bytes_dirty dirty absolute -1 $((1024 * 1024))
 
@@ -247,7 +247,7 @@ DIMENSION Qcache_not_cached 'not cached' incremental -1 1
 CHART mysql_$x.qcache '' "mysql QCache Queries in Cache" "queries" qcache mysql.qcache line $((mysql_priority + 26)) $mysql_update_every
 DIMENSION Qcache_queries_in_cache queries absolute 1 1
 
-CHART mysql_$x.qcache_freemem '' "mysql QCache Free Memory" "MB" qcache mysql.qcache_freemem area $((mysql_priority + 27)) $mysql_update_every
+CHART mysql_$x.qcache_freemem '' "mysql QCache Free Memory" "MiB" qcache mysql.qcache_freemem area $((mysql_priority + 27)) $mysql_update_every
 DIMENSION Qcache_free_memory free absolute 1 $((1024 * 1024))
 
 CHART mysql_$x.qcache_memblocks '' "mysql QCache Memory Blocks" "blocks" qcache mysql.qcache_memblocks line $((mysql_priority + 28)) $mysql_update_every
