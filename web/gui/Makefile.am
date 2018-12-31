@@ -77,7 +77,6 @@ dist_weblib_DATA = \
 	lib/bootstrap-table-export-1.11.0.min.js \
 	lib/bootstrap-toggle-2.2.2.min.js \
 	lib/clipboard-polyfill-be05dad.js \
-	lib/c3-0.4.18.min.js \
 	lib/d3-4.12.2.min.js \
 	lib/d3pie-0.2.1-netdata-3.js \
 	lib/dygraph-c91c859.min.js \
@@ -89,10 +88,8 @@ dist_weblib_DATA = \
 	lib/jquery.peity-3.2.0.min.js \
 	lib/jquery.sparkline-2.1.2.min.js \
 	lib/lz-string-1.4.4.min.js \
-	lib/morris-0.5.1.min.js \
 	lib/pako-1.0.6.min.js \
 	lib/perfect-scrollbar-0.6.15.min.js \
-	lib/raphael-2.2.4-min.js \
 	lib/tableExport-1.6.0.min.js \
 	$(NULL)
 

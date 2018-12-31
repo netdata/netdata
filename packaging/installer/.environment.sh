@@ -1,0 +1,8 @@
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+CFLAGS="-O2"
+NETDATA_PREFIX=""
+NETDATA_CONFIGURE_OPTIONS=" --disable-lto"
+NETDATA_ADDED_TO_GROUPS=" adm proxy"
+INSTALL_UID="0"
+REINSTALL_PWD="/home/developer/netdata"
+REINSTALL_COMMAND="./netdata-installer.sh --disable-lto "
