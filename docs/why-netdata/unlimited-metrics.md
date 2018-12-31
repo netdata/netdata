@@ -27,7 +27,7 @@ So, why monitoring solutions and SaaS providers filter out metrics?
 
 Well... they can't do otherwise!
 
-1. Time-series databases limit the number of metrics collected, since the number of metrics influences their performance significantly. They get congested at scale.
+1. Time-series databases limit the number of metrics collected, because the number of metrics influences their performance significantly. They get congested at scale.
 
 3. SaaS providers centralize all the metrics so they depend on metrics filtering to control their costs.
 

@@ -80,32 +80,38 @@ img {
 }
 
 a:active, a:focus, a:hover {
-    text-decoration: underline
+    text-decoration: underline;
 }
 
 ::-moz-selection {
     background-color: #b3d4fc;
-    text-shadow: none
+    text-shadow: none;
 }
 
 ::selection {
     background-color: #b3d4fc;
-    text-shadow: none
+    text-shadow: none;
 }
 
 h2 {
     font-size: 2em;
-    margin: 1.5em 0
+    margin: 1.5em 0;
 }
 
 h3 {
     color: #555;
-    font-size: 1.25em;
-    margin: 0 0 .5em
+    font-size: 1.5em;
+    margin: 0 0 .5em;
 }
 
 p {
-    margin: 0 0 2em
+    margin: 0 0 2em;
+}
+
+.quote {
+    font-size: 1.15em;
+    margin: 0 0 .5em;
+    text-align: center;
 }
 
 .title {
@@ -669,7 +675,7 @@ p {
             <li><a href=https://docs.netdata.cloud data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Docs target="_blank">Docs</a>
         </ul>
     </div>
-    <div class=site-promo><h1><span class="title">Monitor your systems and applications, the right way!</span></h1>
+    <div class=site-promo><h1><span class="title">Monitor your infrastructure<br/>the right way!</span></h1>
         <p class=description>
             <strong>Unparalleled</strong> insights, in <strong>real-time</strong>,
             of <strong>everything</strong> happening on your systems and applications,
@@ -690,32 +696,62 @@ p {
                 <p>
                     <b>Per second</b> data collection and visualization, for all metrics!
                 </p>
-                <p><i>
-                    High resolution metrics are required to effectively monitor and troubleshoot systems and applications.
-                    <br/>
+                <p>
                     Netdata <b>zooms into the problems</b> by providing higher resolution information, compared to any other monitoring solution.
-                </i></p>
-                <p><small>
-                    Netdata will not slow down your systems or applications. It is highly efficient (<a href="https://github.com/netdata/netdata/tree/master/libnetdata/adaptive_resortable_list#performance" target="_blank">optimization is a key feature</a>).
-                    <br/>
-                    On modern systems, for 2k metrics per second, it consumes just 1% CPU of a single core (4% of a single core on a Raspberry Pi), a few MB of RAM (you size it) and no disk I/O at all.
-                </small></p>
+                </p>
+                <p>
+                    <a href="">Learn more about high resolution metrics</a>
+                </p>
             </div>
+            <div class=grid-cell><h3>&nbsp;</h3>
+                <p class="quote"><i>
+                    The world goes real-time.
+                    <br/>&nbsp;<br/>
+                    High resolution metrics are required to effectively monitor and troubleshoot systems and applications, especially on virtual environments.
+                </i></p>
+            </div>
+
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Unlimited metrics</h3>
                 <p>
                     Collect everything, all metrics, from all available sources!
                 </p>
-                <p><i>
-                    All metrics are important and all should be available when you need them.
-                    Filtering out metrics is like trying to understand a book by reading only few of its pages.
-                    <br/>
-                    Netdata collects all the metrics console tools do. It has been designed to kill the console for performance troubleshooting.
-                </i></p>
-                <p><small>
-                    Thanks to its distributed and lockless design, Netdata cannot be congested by the number of metrics collected.
-                    Even tens of thousands of metrics per node can be collected and Netdata will still consume ignorable resources, while being snazzy.
-                </small></p>
+                <p>
+                    Netdata collects all the metrics native console tools do. It has been <b>designed to kill the console</b> for troubleshooting infrastructure slowdowns and outages.
+                </p>
+                <p>
+                    <a href="">Learn more about unlimited metrics</a>
+                </p>
             </div>
+            <div class=grid-cell><h3>&nbsp;</h3>
+                <p class="quote"><i>
+                    Filtering out most metrics is like reading a book by skipping most of its pages.
+                    <br/>&nbsp;<br/>
+                    All metrics are important and all should be available when you need them.
+                </i></p>
+            </div>
+
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Zero configuration</h3>
+                <p>
+                    Install and use immediately! Get fully functional visualization and alarms, in just a couple of seconds after installation!
+                </p>
+                <p>
+                    Netdata <b>decouples your skills from your monitoring infrastructure</b>.
+                    No matter how skillful or novice you are, Netdata will apply all the community knowledge and expertise to your monitoring infrastructure.
+                </p>
+                <p>
+                    <a href="">Learn more about zero configuration</a>
+                </p>
+            </div>
+            <div class=grid-cell><h3>&nbsp;</h3>
+                <p class="quote"><i>
+                    Most of our infrastructure is based and standardized systems and applications.
+                    <br/>&nbsp;<br/>
+                    It is a tremendous waste of time and effort, in a global scale, to require from all users to configure their infrastructure dashboards and alarms metric by metric.
+                </i></p>
+            </div>
+
+
+
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Meaningful presentation</h3>
                 <p>
                     Explore all metrics in a meaningful, easy to understand way.
@@ -726,18 +762,6 @@ p {
                 </i></p>
                 <p><small>
                     Netdata engineers and experts on our community organize metrics in a meaningful way, so that you can learn and understand them right on the job, while troubleshooting your infrastructure.
-                </small></p>
-            </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Immediate results</h3>
-                <p>
-                    Install and use immediately! Netdata is fully functional, both for visualization and alarms, in just a couple of seconds after it is started.
-                </p>
-                <p><i>
-                    It is a tremendous waste of time and effort, in a global scale, to require from all users to configure their dashboards and alarms metric by metric.
-                    After all, most of our monitoring needs are about standardized systems and applications.
-                </i></p>
-                <p><small>
-                    Netdata decouples your skills from your monitoring infrastructure. No matter how skillful or novice you are, Netdata will apply all the community knowledge and expertise to your infrastructure.
                 </small></p>
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Reverted economics</h3>
@@ -1089,7 +1113,18 @@ p {
 <div class=site-section><h2>Who uses netdata?</h2>
     <div class="content">
         <div class="container" style="text-align: center;">
-            <small>Figures come from users using the <a href="https://github.com/netdata/netdata/tree/master/registry" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures may be a lot higher.<br/></small>
+            <small>
+            <p>
+                Netdata is used by hundreds of thousands of users all over the world.
+                <br/>
+                Check our <a href="https://github.com/netdata/netdata/watchers">GitHub watchers</a> list.
+                <br/>
+                You will find people working for <b>Amazon</b>, <b>Atos</b>, <b>Baidu</b>, <b>Cisco Systems</b>, <b>Citrix</b>,
+                <b>Deutsche Telekom</b>, <b>DigitalOcean</b>, <b>Elastic</b>, <b>EPAM Systems</b>, <b>Ericsson</b>, <b>Google</b>,
+                <b>Groupon</b>, <b>Hortonworks</b>, <b>HP</b>, <b>Huawei</b>, <b>IBM</b>, <b>Microsoft</b>, <b>NewRelic</b>,
+                <b>Nvidia</b>, <b>Red Hat</b>, <b>SAP</b>, <b>Selectel</b>, <b>TicketMaster</b>, <b>Vimeo</b>, and many more!
+            </p>
+            The following figures come from users using the <a href="https://github.com/netdata/netdata/tree/master/registry" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures may be a lot higher.<br/></small>
             <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 220px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
@@ -1219,6 +1254,7 @@ p {
     </p>
     <p>
         <strong>netdata</strong><br/>
+        &copy; Copyright 2018-2019, <a href="https://github.com/netdata" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=NetdataInc>Netdata, Inc.</a><br/>
         &copy; Copyright 2016-2018, <a href="https://github.com/ktsaou" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=CostaTsaousis>Costa Tsaousis</a><br/>
         Released under <a href="https://github.com/netdata/netdata/blob/master/LICENSE.md" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=License>GPL v3+</a><br/>
     </p>
