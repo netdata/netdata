@@ -9,10 +9,14 @@ This module is able to monitor an application specific log file and then create 
 chart_name:
     log_path: path/log/file
     dimensions:
-      dimension: regex_pattern
+      dimension: search_type=pattern
 ```
 
 By default, the plugin does not read any files or produce any charts. To configure it, edit python.d/logparser.conf.
+
+We have two different search types 
+ - string : fetching metrics by finding string in each line of log file
+ - regexp : fetching metrics by regexp pattern 
 
 The sample config below shows the general definition of a chart named chart_name with a single dimension with name dimension_name. The metric for that dimension is a counter of the occurrences of lines matching the python regular expression regex_pattern in file path/logfile:
 
@@ -27,15 +31,15 @@ A final config for more than one chart and more than one dimension could be some
 chart1_name:
     log_path: /path/logs/log.file
     dimensions:
-      dimension_name1: .*GET.*
-      dimension_name2: .*POST.*
-      dimension_name3: .*PATCH.*
+      dimension_name1: 'string=GET'
+      dimension_name2: 'string=POST'
+      dimension_name3: 'string=PATCH'
 chart2_name:
     log_path: /path/logs/log2.file
     dimensions:
-      dimension_name1: [0-9]+
-      dimension_name2: [A-Z]+
-      dimension_name3: [a-z]+
+      dimension_name1: 'regexp=[A-Z]+'
+      dimension_name2: 'regexp=[A-Z]+'
+      dimension_name3: 'regexp=[A-Z]+'
 
 ```
 
