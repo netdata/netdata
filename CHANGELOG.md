@@ -10,6 +10,7 @@
 - Docker-compose: a lot of errors; Connection refused, Can't establish connection to MySQL... [\#4956](https://github.com/netdata/netdata/issues/4956)
 - Log flooding with new proc plugin [\#4945](https://github.com/netdata/netdata/issues/4945)
 - Free memory shows as 'inactive' in FreeBSD [\#4737](https://github.com/netdata/netdata/issues/4737)
+- Should use IEC-compliant abbreviations, e.g. KiB, MiB, etc. [\#4711](https://github.com/netdata/netdata/issues/4711)
 - FreeBSD: \(apps.cpu\) not show a specific program [\#4037](https://github.com/netdata/netdata/issues/4037)
 - Apcupsd: Connection loss further collects data, but it should stop [\#3927](https://github.com/netdata/netdata/issues/3927)
 - FreeBSD: apps.plugin reports spikes and apps.cpu less user CPU [\#3245](https://github.com/netdata/netdata/issues/3245)
@@ -19,10 +20,15 @@
 - move freeradius module to go.d [\#5063](https://github.com/netdata/netdata/issues/5063)
 - move python module dns\_query\_time to go.d [\#5047](https://github.com/netdata/netdata/issues/5047)
 - move python module web\_log to go.d [\#5046](https://github.com/netdata/netdata/issues/5046)
+- R&D: Collectors landscape page [\#5045](https://github.com/netdata/netdata/issues/5045)
 
 **Merged pull requests:**
 
+- fix web site install link [\#5092](https://github.com/netdata/netdata/pull/5092) ([ktsaou](https://github.com/ktsaou))
+- Removed c3, morris and raphael JS libraries \(\#5086\) [\#5088](https://github.com/netdata/netdata/pull/5088) ([gmosx](https://github.com/gmosx))
+- Improve instructions on how to view the slave UI [\#5083](https://github.com/netdata/netdata/pull/5083) ([cakrit](https://github.com/cakrit))
 - smartd\_log: skip non-CSVs early [\#5081](https://github.com/netdata/netdata/pull/5081) ([kevlar1818](https://github.com/kevlar1818))
+- Dashboard grammar change [\#5080](https://github.com/netdata/netdata/pull/5080) ([Xalaxis](https://github.com/Xalaxis))
 - Add systemd pattern list parameter to the documentation [\#5077](https://github.com/netdata/netdata/pull/5077) ([vlvkobal](https://github.com/vlvkobal))
 - Fix update instructions URL in frontend [\#5076](https://github.com/netdata/netdata/pull/5076) ([jorisvervuurt](https://github.com/jorisvervuurt))
 - Add how to add new alarm [\#5069](https://github.com/netdata/netdata/pull/5069) ([cakrit](https://github.com/cakrit))
@@ -31,6 +37,7 @@
 - Disable cpuidle module if schedstat file is missing [\#5059](https://github.com/netdata/netdata/pull/5059) ([vlvkobal](https://github.com/vlvkobal))
 - Fixed typo [\#5054](https://github.com/netdata/netdata/pull/5054) ([samnela](https://github.com/samnela))
 - New option clear\_alarm\_always [\#5050](https://github.com/netdata/netdata/pull/5050) ([dex4er](https://github.com/dex4er))
+- fix IEC units in bash modules [\#5049](https://github.com/netdata/netdata/pull/5049) ([paulfantom](https://github.com/paulfantom))
 - Gracefully ignore the offset if the value is not a number [\#5040](https://github.com/netdata/netdata/pull/5040) ([cakrit](https://github.com/cakrit))
 - Fix process statistics collection for FreeBSD in apps.plugin [\#5038](https://github.com/netdata/netdata/pull/5038) ([vlvkobal](https://github.com/vlvkobal))
 - Apcupsd add check for UPS online [\#5037](https://github.com/netdata/netdata/pull/5037) ([cakrit](https://github.com/cakrit))
