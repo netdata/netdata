@@ -4,6 +4,8 @@
 
 import re
 
+from copy import deepcopy
+
 from bases.FrameworkServices.LogService import LogService
 
 
@@ -25,7 +27,7 @@ class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
-        self.definitions = CHARTS
+        self.definitions = deepcopy(CHARTS)
         self.dimensions = self.configuration.get('dimensions')
         self.log_path = self.configuration.get('log_path')
 
@@ -76,7 +78,7 @@ class Service(LogService):
                     self.data[matcher.name] += 1
                     break
 
-        return self.data    
+        return self.data
 
 class DimensionMatcher:
     def __init__(self, name, matcher):
