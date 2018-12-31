@@ -76,8 +76,7 @@ class Service(LogService):
                     self.data[matcher.name] += 1
                     break
 
-        return self.data
-    
+        return self.data    
 
 class DimensionMatcher:
     def __init__(self, name, matcher):
