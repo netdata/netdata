@@ -21,6 +21,8 @@
 - move python module dns\_query\_time to go.d [\#5047](https://github.com/netdata/netdata/issues/5047)
 - move python module web\_log to go.d [\#5046](https://github.com/netdata/netdata/issues/5046)
 - R&D: Collectors landscape page [\#5045](https://github.com/netdata/netdata/issues/5045)
+- Activemq monitoring [\#4818](https://github.com/netdata/netdata/issues/4818)
+- Solr monitoring [\#3218](https://github.com/netdata/netdata/issues/3218)
 
 **Merged pull requests:**
 
