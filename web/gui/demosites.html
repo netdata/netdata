@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<html lang=en-us>
+<html lang=en-us xmlns="http://www.w3.org/1999/html">
 <head>
     <meta charset=utf-8>
     <title>NetData: Get control of your Linux Servers. Simple. Effective. Awesome.</title>
@@ -60,7 +60,7 @@ strong {
 }
 
 h1 {
-    font-size: 3em;
+    font-size: 2.9em;
     line-height: 1.2em;
     margin: 0 .5em .75em
 }
@@ -129,6 +129,10 @@ p {
     letter-spacing: -.31em;
     word-spacing: -.43em;
     text-rendering: optimizespeed
+}
+
+.grid-title {
+    text-align: left;
 }
 
 .grid-cell {
@@ -359,24 +363,34 @@ p {
     background-color: #f9f9f9;
     color: #333;
     overflow: hidden;
-    padding: 2em 0 6em
+    padding: 2em 0 2em
 }
 
-.site-section-video {
+.site-section-gray {
+    background-color: #f5f5f5;
+    color: #333;
+    overflow: hidden;
+    padding: 2em 0 2em
+}
+
+.site-section-dark {
     background-color: transparent;
     color: #fff;
     text-align: center;
     padding: 2em 0 3em
 }
 
-.site-section-video .content {
+.site-section-dark .content {
     max-width: 720px;
     margin: auto;
     padding: 10px
 }
 
-.site-section-video h2 {
+.site-section-dark h2 {
     margin: 1em 0
+}
+.site-section-dark h3 {
+    color: white;
 }
 
 .in-the-wild {
@@ -475,7 +489,7 @@ p {
         margin: 2em 1em
     }
 
-    .site-section-video {
+    .site-section-dark {
         display: none
     }
 
@@ -675,7 +689,7 @@ p {
             <li><a href=https://docs.netdata.cloud data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Docs target="_blank">Docs</a>
         </ul>
     </div>
-    <div class=site-promo><h1><span class="title">Monitor your infrastructure<br/>the right way!</span></h1>
+    <div class=site-promo><h1><span class="title">Monitor your systems and applications like never before!</span></h1>
         <p class=description>
             <strong>Unparalleled</strong> insights, in <strong>real-time</strong>,
             of <strong>everything</strong> happening on your systems and applications,
@@ -691,46 +705,94 @@ p {
 </div>
 <div class=site-section>
     <div class=container><h2>Enter the world of Netdata!</h2>
+        <div class="grid-title">
+            <h3><span class=star>&#x2605;</span> 1s granularity</h3>
+        </div>
         <div class=grid>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> 1s granularity</h3>
+            <div class=grid-cell>
                 <p>
                     <b>Per second</b> data collection and visualization, for all metrics!
                 </p>
                 <p>
                     Netdata <b>zooms into the problems</b> by providing higher resolution information, compared to any other monitoring solution.
                 </p>
-                <p>
-                    <a href="">Learn more about high resolution metrics</a>
-                </p>
             </div>
-            <div class=grid-cell><h3>&nbsp;</h3>
+            <div class=grid-cell>
                 <p class="quote"><i>
                     The world goes real-time.
                     <br/>&nbsp;<br/>
                     High resolution metrics are required to effectively monitor and troubleshoot systems and applications, especially on virtual environments.
                 </i></p>
             </div>
+        </div>
+    </div>
+    <div>
+        <a href="">Learn more about high resolution metrics</a>
+    </div>
+</div>
 
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Unlimited metrics</h3>
+<div class="site-section site-section-gray">
+    <div class=container>
+        <div class="grid-title">
+            <h3><span class=star>&#x2605;</span> Unlimited metrics</h3>
+        </div>
+        <div class=grid>
+            <div class=grid-cell>
                 <p>
-                    Collect everything, all metrics, from all available sources!
+                    Use all the metrics, from all available sources!
                 </p>
                 <p>
                     Netdata collects all the metrics native console tools do. It has been <b>designed to kill the console</b> for troubleshooting infrastructure slowdowns and outages.
                 </p>
-                <p>
-                    <a href="">Learn more about unlimited metrics</a>
-                </p>
             </div>
-            <div class=grid-cell><h3>&nbsp;</h3>
+            <div class=grid-cell>
                 <p class="quote"><i>
-                    Filtering out most metrics is like reading a book by skipping most of its pages.
-                    <br/>&nbsp;<br/>
                     All metrics are important and all should be available when you need them.
+                    <br/>&nbsp;<br/>
+                    Filtering out most metrics is like reading a book by skipping most of its pages.
                 </i></p>
             </div>
+        </div>
+    </div>
+    <div>
+        <a href="">Learn more about unlimited metrics</a>
+    </div>
+</div>
+<div class="site-section">
+    <div class=container>
+        <div class="grid-title">
+            <h3><span class=star>&#x2605;</span> Meaningful presentation</h3>
+        </div>
+        <div class=grid>
+            <div class=grid-cell>
+                <p>
+                    Explore all metrics in a meaningful, easy to understand way!
+                </p>
+                <p>
+                    Netdata engineers and experts on our community organize metrics in a meaningful way, so that you can learn and understand them right on the job, while troubleshooting issues of your infrastructure.
+                </p>
+            </div>
+            <div class=grid-cell>
+                <p class="quote"><i>
+                    Metrics are a lot more than name-value pairs over time.
+                    <br/> <br/>
+                    It is just not practical to require from all users to have a deep understanding of all metrics for monitoring their systems and applications.
+                </i></p>
+            </div>
+        </div>
+    </div>
+    <div>
+        <a href="">Learn more about meaningful presentation</a>
+    </div>
+</div>
 
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Zero configuration</h3>
+<div class="site-section site-section-gray">
+    <div class=container>
+        <div class="grid-title">
+            <h3><span class=star>&#x2605;</span> Immediate results</h3>
+        </div>
+        <div class=grid>
+            <div class=grid-cell>
                 <p>
                     Install and use immediately! Get fully functional visualization and alarms, in just a couple of seconds after installation!
                 </p>
@@ -738,50 +800,93 @@ p {
                     Netdata <b>decouples your skills from your monitoring infrastructure</b>.
                     No matter how skillful or novice you are, Netdata will apply all the community knowledge and expertise to your monitoring infrastructure.
                 </p>
-                <p>
-                    <a href="">Learn more about zero configuration</a>
-                </p>
             </div>
-            <div class=grid-cell><h3>&nbsp;</h3>
+            <div class=grid-cell>
                 <p class="quote"><i>
-                    Most of our infrastructure is based and standardized systems and applications.
+                    Most of our infrastructure is based on standardized systems and applications.
                     <br/>&nbsp;<br/>
                     It is a tremendous waste of time and effort, in a global scale, to require from all users to configure their infrastructure dashboards and alarms metric by metric.
                 </i></p>
             </div>
+        </div>
+    </div>
+    <div>
+        <a href="">Learn how to get immediate results</a>
+    </div>
+</div>
 
-
-
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Meaningful presentation</h3>
+<div class="site-section site-section-dark">
+    <div class=container><h2>How it works</h2>
+        <div style="padding-bottom: 1em">
+            <p>
+            Netdata is a monitoring agent you install on all your systems:
+            <br/>
+            <b>physical servers</b>, <b>virtual servers</b>, <b>containers</b>, <b>IoT</b>.
+            </p>
+            <p>
+            Netdata is lightweight, designed to permanently run on all systems without disrupting their core function.
+            By default, it needs just 1% CPU of a single core, a few MB or RAM and no disk I/O at all.
+            </p>
+        </div>
+        <div class=grid>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Collect</h3>
                 <p>
-                    Explore all metrics in a meaningful, easy to understand way.
+                    Netdata automatically detects data collection sources on the host it runs.
+                    It comes with hundreds of integrations for collecting system and application metrics,
+                    including databases, web servers, and commonly used application servers.
+                    <br/> <br/>
+                    Netdata is also a high performance, distributed <b>statsd</b> server, allowing custom
+                    application metrics to be collected and visualized.
                 </p>
-                <p><i>
-                    Metrics may be network related, system related, application related, database related, etc.
-                    It is just not practical to require from all users to have a deep understanding of all metrics to design the monitoring for their systems and applications.
-                </i></p>
-                <p><small>
-                    Netdata engineers and experts on our community organize metrics in a meaningful way, so that you can learn and understand them right on the job, while troubleshooting your infrastructure.
-                </small></p>
             </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Reverted economics</h3>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Check (alarms)</h3>
                 <p>
-                    No dedicated resources for monitoring.
+                    Each Netdata spawns a thread that examines the metrics as they get collected,
+                    evaluates pre-configured alarm expressions and triggers alarm notifications.
+                    <br/> <br/>
+                    Netdata comes with hundreds of pre-configured alarms, that are automatically
+                    attached to the collected metrics and supports dozens of alarm notification integrations.
                 </p>
-                <p><i>
-                    Monitoring can be quite expensive. It usually requires a lot of dedicated resources and skills. But it shouldn't!
-                    Most of the costs are due to bad design decisions.
-                </i></p>
-                <p><small>
-                    Netdata is eliminating the need for centralizing all the metrics,
-                    and shortens significantly the time required to setup an effective monitoring for systems and applications.
-                </small></p>
+            </div>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Stream (replicate)</h3>
+                <p>
+                    Each Netdata can stream its metrics, in real-time, to any other Netdata.
+                    Streaming allows Netdata to be used in ephemeral nodes and containers in auto-scaled environments,
+                    but is also allows building Netdata hierarchies for aggregating the metrics of multiple Netdata nodes.
+                </p>
+            </div>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Store (db)</h3>
+                <p>
+                    Each Netdata has its own internal metrics database. This database is optimized
+                    for minimal memory footprint, and due to its lockless design allows one writer
+                    and multiple readers per metric, concurrently, contributing significantly to
+                    the performance of Netdata.
+                </p>
+            </div>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Archive</h3>
+                <p>
+                    Netdata can archive its metrics to time-series databases (prometheus, graphite, opentsdb, json document dbs, etc)
+                    so that Netdata can be integrated to existing monitoring tool-chains.
+                </p>
+            </div>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Visualize</h3>
+                <p>
+                    The best part of Netdata is its visualization. Low latency, speedy and snazzy.
+                    <br/> <br/>
+                    Netdata dashboards are optimized for visual anomaly detection, a powerful tool to troubleshoot
+                    performance issues.
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-<div id="demosites" class="site-section site-section-video"><h2>netdata live demo sites</h2>
+<div class="site-section">
+    &nbsp;
+</div>
+
+
+<div id="demosites" class="site-section site-section-dark"><h2>netdata live demo sites</h2>
     <div class="content">
         <div class="container" style="text-align: center;">
 
@@ -1113,10 +1218,9 @@ p {
 <div class=site-section><h2>Who uses netdata?</h2>
     <div class="content">
         <div class="container" style="text-align: center;">
-            <small>
             <p>
                 Netdata is used by hundreds of thousands of users all over the world.
-                <br/>
+                <br/>&nbsp;<br/>
                 Check our <a href="https://github.com/netdata/netdata/watchers">GitHub watchers</a> list.
                 <br/>
                 You will find people working for <b>Amazon</b>, <b>Atos</b>, <b>Baidu</b>, <b>Cisco Systems</b>, <b>Citrix</b>,
@@ -1124,6 +1228,7 @@ p {
                 <b>Groupon</b>, <b>Hortonworks</b>, <b>HP</b>, <b>Huawei</b>, <b>IBM</b>, <b>Microsoft</b>, <b>NewRelic</b>,
                 <b>Nvidia</b>, <b>Red Hat</b>, <b>SAP</b>, <b>Selectel</b>, <b>TicketMaster</b>, <b>Vimeo</b>, and many more!
             </p>
+            <small>
             The following figures come from users using the <a href="https://github.com/netdata/netdata/tree/master/registry" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures may be a lot higher.<br/></small>
             <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 220px; display: inline-block;">
                 <div class="mysparkline">
@@ -1254,7 +1359,7 @@ p {
     </p>
     <p>
         <strong>netdata</strong><br/>
-        &copy; Copyright 2018-2019, <a href="https://github.com/netdata" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=NetdataInc>Netdata, Inc.</a><br/>
+        &copy; Copyright 2018-2019, <a href="https://github.com/netdata" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=NetdataInc>Netdata</a><br/>
         &copy; Copyright 2016-2018, <a href="https://github.com/ktsaou" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=CostaTsaousis>Costa Tsaousis</a><br/>
         Released under <a href="https://github.com/netdata/netdata/blob/master/LICENSE.md" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=License>GPL v3+</a><br/>
     </p>
