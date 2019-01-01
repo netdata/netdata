@@ -4357,12 +4357,12 @@ let associatedAgents = [];
 
 // -------------------------------------------------------------------------------------------------
 
-function getURLParameter(name) {
-    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
-    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
-    var results = regex.exec(location.search)
-    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
-}
+// function getURLParameter(name) {
+//     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
+//     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
+//     var results = regex.exec(location.search)
+//     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
+// }
 
 function closeModal() {
     $(".modal-header button.close").click();
@@ -4401,7 +4401,7 @@ function getAgentsList() {
     ).then((response)  => {
         return response.json();
     }).then((payload) => {
-        agents = payload.result ? payload.result.agents : null;
+        const agents = payload.result ? payload.result.agents : null;
 
         if (!agents) {
             // TODO: handle this!
