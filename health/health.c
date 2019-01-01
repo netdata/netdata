@@ -153,7 +153,29 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *exec      = (ae->exec)      ? ae->exec      : host->health_default_exec;
     const char *recipient = (ae->recipient) ? ae->recipient : host->health_default_recipient;
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
+	int n_warn=0, n_crit=0;
+	RRDCALC *rc;
+    EVAL_EXPRESSION *expr=NULL;
+
+	for(rc = host->alarms; rc ; rc = rc->next) {
+		if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+			continue;
+
+		if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
+            n_warn++;
+            if (ae->alarm_id == rc->id)
+                expr=rc->warning;
+        } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
+            n_crit++;
+            if (ae->alarm_id == rc->id)
+                expr=rc->critical;
+        } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
+            if (ae->alarm_id == rc->id)
+                expr=rc->warning;
+		}
+	}
+
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d'",
               exec,
               recipient,
               host->registry_hostname,
@@ -162,7 +184,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->alarm_event_id,
               (unsigned long)ae->when,
               ae->name,
-              ae->chart?ae->chart:"NOCAHRT",
+              ae->chart?ae->chart:"NOCHART",
               ae->family?ae->family:"NOFAMILY",
               rrdcalc_status2string(ae->new_status),
               rrdcalc_status2string(ae->old_status),
@@ -174,7 +196,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->units?ae->units:"",
               ae->info?ae->info:"",
               ae->new_value_string,
-              ae->old_value_string
+              ae->old_value_string,
+              (expr && expr->source)?expr->source:"NOSOURCE",
+              (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
+              n_warn,
+              n_crit
     );
 
     ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
