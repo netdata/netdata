@@ -9677,6 +9677,7 @@ NETDATA.alarms = {
 
 NETDATA.registry = {
     server: null,         // the netdata registry server
+    isCloudEnabled: false,// is netdata.cloud functionality enabled?
     cloudBaseURL: null,   // the netdata cloud base url
     person_guid: null,    // the unique ID of this browser / user
     machine_guid: null,   // the unique ID the netdata server that served dashboard.js
@@ -9739,7 +9740,13 @@ NETDATA.registry = {
         NETDATA.registry.hello(NETDATA.serverDefault, function (data) {
             if (data) {
                 NETDATA.registry.server = data.registry;
-                NETDATA.registry.cloudBaseURL = data.cloud_base_url;
+                if (data.cloud_base_url != "") {
+                    NETDATA.registry.isCloudEnabled = true;
+                    NETDATA.registry.cloudBaseURL = data.cloud_base_url;
+                } else {
+                    NETDATA.registry.isCloudEnabled = false;
+                    NETDATA.registry.cloudBaseURL = "";
+                }
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
 

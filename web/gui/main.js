@@ -672,21 +672,6 @@ function renderMyNetdataMenu(machinesArray) {
     gotoServerInit();
 }
 
-// This callback is called after NETDATA.registry is initialized.
-function netdataRegistryCallback(machinesArray) {
-    if (isSignedIn() && isRegistryMigrated()) {
-        // We call getAgentsList() here because it requires that 
-        // NETDATA.registry is initialized.
-        getAgentsList().then((agents) => {
-            associatedAgents = agents; // TODO: Is this needed?
-            renderMyNetdataMenu(agents);
-        });
-    } else {
-        registryKnownAgents = machinesArray;  
-        renderMyNetdataMenu(machinesArray)
-    }
-};
-
 function isdemo() {
     if (this_is_demo !== null) {
         return this_is_demo;
@@ -4501,6 +4486,10 @@ function signOut() {
 }
 
 function renderAccountUI() {
+    if (!NETDATA.registry.isCloudEnabled) {
+        return
+    }
+
     const container = document.getElementById("account-menu-container");
     if (isSignedIn()) {
         const accountName = localStorage.getItem("cloud.accountName");
@@ -4570,16 +4559,38 @@ function deinitSignInModal() {
     }
 }
 
-function initUI() {
+function initCloud() {
+    if (!NETDATA.registry.isCloudEnabled) {
+        localStorage.removeItem("cloud.token");
+        return;
+    }
+
     renderAccountUI();
 }
 
-if (document.readyState === "complete") {
-    initUI();
-} else {
-    document.addEventListener("readystatechange", () => {
-        if (document.readyState === "complete") {
-            initUI();
-        }
-    })
-}
+// This callback is called after NETDATA.registry is initialized.
+function netdataRegistryCallback(machinesArray) {
+    initCloud();
+
+    if (isSignedIn() && isRegistryMigrated()) {
+        // We call getAgentsList() here because it requires that 
+        // NETDATA.registry is initialized.
+        getAgentsList().then((agents) => {
+            associatedAgents = agents; // TODO: Is this needed?
+            renderMyNetdataMenu(agents);
+        });
+    } else {
+        registryKnownAgents = machinesArray;  
+        renderMyNetdataMenu(machinesArray)
+    }
+};
+
+// if (document.readyState === "complete") {
+//     initCloud();
+// } else {
+//     document.addEventListener("readystatechange", () => {
+//         if (document.readyState === "complete") {
+//             initCloud();
+//         }
+//     })
+// }
