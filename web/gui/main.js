@@ -4390,7 +4390,7 @@ function getAgentsList() {
     }
     
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/agents/list?accountID=${accountID}`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents`,
         {
             method: "GET",
             mode: "cors",
@@ -4441,7 +4441,7 @@ function postAgentsMigrate() {
     };
     
     fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/agents/migrate`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents`,
         {
             method: "POST",
             mode: "cors",
