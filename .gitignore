@@ -104,7 +104,6 @@ collectors/fping.plugin/fping.plugin
 
 # installer generated files
 netdata-uninstaller.sh
-netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
