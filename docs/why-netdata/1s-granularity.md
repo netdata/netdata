@@ -3,18 +3,18 @@
 High resolution metrics are required to effectively monitor and troubleshoot
 systems and applications.
 
-## why?
+## Why?
 
 - The world is going real-time. Today, customers' experience is significantly affected by response time, so SLAs are tighten. It is just not practical to monitor a 2-second SLA with 10-second metrics.
 
-- IT goes virtual. Unlike real hardware, virtual environments are not predictable. You cannot expect resources to be there when your applications need them. They will eventually be, but not exactly at the time they are needed. The latency of virtual environments is affected by many factors, most of which are outside our control, like: the maintenance policy of the hosting provider, the work load of third party virtual machines running on the same physical servers combined with the resource allocation and throttling policy among virtual machines, the provisioning system of the hosting provider, etc.
+- IT goes virtual. Unlike real hardware, virtual environments are not predictable. You cannot expect resources to be available when your applications need them. They will eventually be, but not exactly at the time they are needed. The latency of virtual environments is affected by many factors, most of which are outside our control, like: the maintenance policy of the hosting provider, the work load of third party virtual machines running on the same physical servers combined with the resource allocation and throttling policy among virtual machines, the provisioning system of the hosting provider, etc.
 
-## what others do?
+## What others do?
 
 So, why most monitoring platforms and monitoring SaaS providers do not offer
 high resolution metrics?
 
-Well... they want to... but they can't, at least not massively...
+They want to, but they can't, at least not massively.
 
 The reasons lie at their design decisions:
 
@@ -22,7 +22,7 @@ The reasons lie at their design decisions:
 
 2. SaaS providers base their business models on centralizing all the metrics. On top of the time-series database bottleneck they also have increased bandwidth costs. So, massively supporting high resolution metrics, destroys their business model.
 
-The funny thing, is that since a couple of decades, the world has fixed this kind
+Of course, since a couple of decades the world has fixed this kind
 of scaling problems: instead of scaling up, scale out, horizontally. That is,
 instead of investing on bigger and bigger central components, decentralize the
 application so that it can scale by adding more smaller nodes to it.
@@ -48,7 +48,7 @@ So, the monitoring industry fails to massively provide high resolution metrics, 
 2. Data collection needs optimization, otherwise it will significantly affect the monitored systems.
 3. Data collection is a lot harder, especially on busy virtual environments.
 
-## what netdata does?
+## What Netdata does?
 
 Netdata decentralizes monitoring completely. Each Netdata node is autonomous.
 It collects metrics locally, it stores them locally, it runs checks against them
@@ -64,10 +64,10 @@ infrastructure there may be many centralization points.
 To eliminate the error introduced by data collection latencies on busy virtual
 environments, Netdata interpolates collected metrics. It does this using
 microsecond timings, per data source, offering measurements with an error rate
-of 0.00001%.
+of 0.0001%.
 
 Finally, Netdata is really fast. Optimization is a core product feature.
-On modern hardware, Netdata can collect metrics with a rate of above 1M metrics
+On modern hardware (any VPS you can get on AWS, GC, Azure, DO), Netdata can collect metrics with a rate of above 1M metrics
 per second per core (this includes everything, parsing data sources, interpolating
 data, storing data in the time series database, etc). So, for a few thousands
 metrics per second per node, Netdata needs negligible CPU resources

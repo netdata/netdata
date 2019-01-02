@@ -12,11 +12,11 @@ Netdata is built around 4 principles:
 
 2. **[Collect and visualize all the metrics from all possible sources.](unlimited-metrics.md)**
 
-    *To troubleshoot slowdowns, we need all the available metrics. The console should provide nothing more.*
+    *To troubleshoot slowdowns, we need all the available metrics. The console should not provide more metrics.*
 
 3. **[Meaningful presentation, optimized for visual anomaly detection.](meaningful-presentation.md)**
 
-    *Metrics are a lot more than name-value pairs over time. The monitoring tool should know all the metrics. We should not!*
+    *Metrics are a lot more than name-value pairs over time. The monitoring tool should know all the metrics. Users should not!*
 
 4. **[Immediate results, just install and use.](immediate-results.md)**
 

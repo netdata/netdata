@@ -2,7 +2,7 @@
 
 All metrics are important and all metrics should be available when you need them.  
 
-## why?
+## Why?
 
 Collecting all the metrics breaks the first rule of every monitoring text book: "collect only the metrics you need", "collect only the metrics you understand".
 
@@ -21,22 +21,21 @@ To troubleshoot a slowdown, a lot more metrics are needed.
 Actually all the metrics are needed, since the real cause of a slowdown is most probably quite complex.
 If we knew the possible reasons, chances are we should have fixed them before they becomes a problem...
 
-## what others do?
+## What others do?
 
 So, why monitoring solutions and SaaS providers filter out metrics?
 
-Well... they can't do otherwise!
+They can't do otherwise!
 
 1. Time-series databases limit the number of metrics collected, because the number of metrics influences their performance significantly. They get congested at scale.
 
-3. SaaS providers centralize all the metrics so they depend on metrics filtering to control their costs.
+2. SaaS providers centralize all the metrics so they depend on metrics filtering to control their costs.
 
-At the end of the day, most monitoring solutions provide just a hint
-(e.g. "hey, there is a 20% drop in requests per second over the last minute")
+Most monitoring solutions provide just a hint (e.g. "there is a 20% drop in requests per second over the last minute")
 and they expect us to use the console for determining the root cause.
 
 Of course this introduces a lot more problems: how to troubleshoot a slowdown
-using the console, if the slowdown lifetime is just a few seconds, randomly spread
+using the console, if the slowdown lifetime is just a few seconds randomly spread
 throughout the day?
 
 You can't! You will spend your entire day on the console, waiting for the problem
@@ -51,7 +50,7 @@ So, the monitoring industry limits the number of metrics for 3 reasons:
 2. It is a lot easier to provide an illusion of monitoring by using a few basic metrics.
 3. Troubleshooting slowdowns is the hardest IT problem to solve, so most solutions just avoid it.
 
-## what netdata does?
+## What netdata does?
 
 Netdata collects, stores and visualizes everything, every single metric exposed
 by systems and applications.
