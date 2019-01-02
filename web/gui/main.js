@@ -4487,7 +4487,7 @@ function signOut() {
     deinitSignInModal();
 
     // Update `My Agents` menu.
-    // netdataRegistryCallback(registryKnownAgents);
+    netdataRegistryCallback(registryKnownAgents);
 }
 
 function renderAccountUI() {
