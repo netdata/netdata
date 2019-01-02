@@ -4,7 +4,7 @@
 # Run me with:
 #
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-# 
+#
 # or (to install all netdata dependencies):
 #
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
