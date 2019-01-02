@@ -211,7 +211,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/log/%{name}
+%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 
 %dir %{_datadir}/%{name}
@@ -242,3 +242,5 @@ rm -rf "${RPM_BUILD_ROOT}"
 %changelog
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
+- Fix permissions for log files
