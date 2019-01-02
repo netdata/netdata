@@ -83,6 +83,17 @@ void web_client_api_v1_init(void) {
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
 
     web_client_api_v1_init_grouping();
+
+	uuid_t uuid;
+
+	// generate
+	uuid_generate(uuid);
+
+	// unparse (to string)
+	char uuid_str[37];
+	uuid_unparse_lower(uuid, uuid_str);
+
+	api_secret = config_get(CONFIG_SECTION_WEB, "api authorization token", uuid_str);
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -682,22 +693,22 @@ static struct api_command {
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_info            },
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_data            },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_chart           },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_charts          },
 
         // registry checks the ACL by itself, so we allow everything
         { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
-
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_alarms          },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_alarm_log       },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_alarm_variables },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_allmetrics      },
+        { "health",          0, WEB_CLIENT_ACL_MGMT,                          web_client_api_request_v1_mgmt_health     },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
@@ -721,7 +732,7 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 
         for(i = 0; api_commands[i].command ;i++) {
             if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && ( !(w->acl & api_commands[i].acl) || !(w->port_acl & api_commands[i].acl)))
                     return web_client_permission_denied(w);
 
                 return api_commands[i].callback(host, w, url);

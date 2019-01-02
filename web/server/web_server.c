@@ -45,20 +45,44 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 // API sockets
 
 LISTEN_SOCKETS api_sockets = {
-        .config          = &netdata_config,
-        .config_section  = CONFIG_SECTION_WEB,
-        .default_bind_to = "*",
-        .default_port    = API_LISTEN_PORT,
-        .backlog         = API_LISTEN_BACKLOG
+		.config          = &netdata_config,
+		.config_section  = CONFIG_SECTION_WEB,
+		.default_bind_to = "*",
+		.default_port    = API_LISTEN_PORT,
+		.backlog         = API_LISTEN_BACKLOG
 };
 
-int api_listen_sockets_setup(void) {
-    int socks = listen_sockets_setup(&api_sockets);
+void debug_sockets() {
+	BUFFER *wb = buffer_create(256 * sizeof(char));
+	int i;
 
-    if(!socks)
-        fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+	for(i = 0 ; i < (int)api_sockets.opened ; i++) {
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NOCHECK)?"NONE ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_DASHBOARD)?"dashboard ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_REGISTRY)?"registry ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_BADGE)?"badges ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_MGMT)?"management ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_STREAMING)?"streaming ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NETDATACONF)?"netdata.conf ":"");
+		debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
+			  i,
+			  api_sockets.fds_names[i],
+			  buffer_tostring(wb));
+		buffer_reset(wb);
+	}
+	buffer_free(wb);
+}
 
-    return socks;
+void api_listen_sockets_setup(void) {
+	int socks = listen_sockets_setup(&api_sockets);
+
+	if(!socks)
+		fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+
+	if(unlikely(debug_flags & D_WEB_CLIENT))
+		debug_sockets();
+
+	return;
 }
 
 
@@ -66,13 +90,14 @@ int api_listen_sockets_setup(void) {
 // access lists
 
 SIMPLE_PATTERN *web_allow_connections_from = NULL;
-SIMPLE_PATTERN *web_allow_streaming_from = NULL;
-SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 
 // WEB_CLIENT_ACL
 SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
 SIMPLE_PATTERN *web_allow_registry_from = NULL;
 SIMPLE_PATTERN *web_allow_badges_from = NULL;
+SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
+SIMPLE_PATTERN *web_allow_streaming_from = NULL;
+SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 
 void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
@@ -85,6 +110,15 @@ void web_client_update_acl_matches(struct web_client *w) {
 
     if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
         w->acl |= WEB_CLIENT_ACL_BADGE;
+
+    if(!web_allow_mgmt_from || simple_pattern_matches(web_allow_mgmt_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_MGMT;
+
+    if(!web_allow_streaming_from || simple_pattern_matches(web_allow_streaming_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_STREAMING;
+
+    if(!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_NETDATACONF;
 }
 
 

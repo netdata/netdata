@@ -183,6 +183,8 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
+	w->port_acl = pi->port_acl;
+
     if(unlikely(web_client_receive(w) < 0))
         return -1;
 
@@ -201,6 +203,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                         pi->p
                         , w->ifd
                         , 0
+                        , pi->port_acl
                         , POLLINFO_FLAG_CLIENT_SOCKET
                         , "FILENAME"
                         , ""

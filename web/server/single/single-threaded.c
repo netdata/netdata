@@ -126,6 +126,8 @@ void *socket_listen_main_single_threaded(void *ptr) {
                     else
                         web_client_set_tcp(w);
 
+                    w->port_acl = api_sockets.fds_acl_flags[i];
+
                     if (single_threaded_link_client(w, &ifds, &ofds, &ifds, &fdmax) != 0) {
                         web_client_release(w);
                     }

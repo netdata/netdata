@@ -22,6 +22,7 @@ typedef struct listen_sockets {
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
     int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets (SOCK_STREAM, SOCK_DGRAM)
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
+    int fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management)
 } LISTEN_SOCKETS;
 
 extern char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
@@ -73,6 +74,7 @@ typedef struct pollinfo {
 
     int fd;                 // the file descriptor
     int socktype;           // the client socket type
+    int port_acl;           // the access lists permitted on this web server port (it's -1 for client sockets)
     char *client_ip;        // the connected client IP
     char *client_port;      // the connected client port
 
@@ -138,6 +140,7 @@ extern void *poll_default_add_callback(POLLINFO *pi, short int *events, void *da
 extern POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
+                             , int port_acl
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port

@@ -293,6 +293,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "WEB_CLIENT[%llu,[%s]:%s]", w->id, w->client_ip, w->client_port);
 
                         w->running = 1;
+                        w->port_acl = api_sockets.fds_acl_flags[i];
                         if(netdata_thread_create(&w->thread, tag, NETDATA_THREAD_OPTION_DONT_LOG, multi_threaded_web_client_worker_main, w) != 0) {
                             w->running = 0;
                             web_client_release(w);

@@ -79,6 +79,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+                        "\t%d"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -112,6 +113,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
                             , ae->new_value
                             , ae->old_value
+
+                            , ae->silenced
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -270,6 +273,12 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
 
+            if(entries > 27) {
+                ae->silenced = str2i(pointers[27]);
+            } else {
+                ae->silenced = 0;
+            }
+
             char value_string[100 + 1];
             freez(ae->old_value_string);
             freez(ae->new_value_string);
@@ -358,7 +367,8 @@ inline void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
+        uint32_t flags,
+        int silenced
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
@@ -396,8 +406,8 @@ inline void health_alarm_log(
     ae->duration = duration;
     ae->delay = delay;
     ae->delay_up_to_timestamp = when + delay;
-
     ae->flags |= flags;
+    ae->silenced = silenced;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;

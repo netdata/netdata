@@ -336,6 +336,8 @@ API_PLUGIN_FILES = \
     web/api/formatters/charts2json.h \
     web/api/formatters/rrdset2json.c \
     web/api/formatters/rrdset2json.h \
+    web/api/health/health_cmdapi.c \
+    web/api/health/health_cmdapi.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
     $(NULL)

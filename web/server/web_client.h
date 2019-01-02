@@ -109,22 +109,23 @@ struct response {
 };
 
 typedef enum web_client_acl {
-    WEB_CLIENT_ACL_NONE      = 0,
-    WEB_CLIENT_ACL_NOCHECK   = 0,
-    WEB_CLIENT_ACL_DASHBOARD = 1 << 0,
-    WEB_CLIENT_ACL_REGISTRY  = 1 << 1,
-    WEB_CLIENT_ACL_BADGE     = 1 << 2
+    WEB_CLIENT_ACL_NONE        = 0,
+    WEB_CLIENT_ACL_NOCHECK     = 0,
+    WEB_CLIENT_ACL_DASHBOARD   = 1 << 0,
+    WEB_CLIENT_ACL_REGISTRY    = 1 << 1,
+    WEB_CLIENT_ACL_BADGE       = 1 << 2,
+    WEB_CLIENT_ACL_MGMT        = 1 << 3,
+    WEB_CLIENT_ACL_STREAMING   = 1 << 4,
+    WEB_CLIENT_ACL_NETDATACONF = 1 << 5
 } WEB_CLIENT_ACL;
 
-#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
-#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY)
-#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE)
+#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD && (w)->port_acl & WEB_CLIENT_ACL_DASHBOARD)
+#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY && (w)->port_acl & WEB_CLIENT_ACL_REGISTRY)
+#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE && (w)->port_acl & WEB_CLIENT_ACL_BADGE)
+#define web_client_can_access_mgmt(w) ((w)->acl & WEB_CLIENT_ACL_MGMT && (w)->port_acl & WEB_CLIENT_ACL_MGMT)
+#define web_client_can_access_stream(w) ((w)->acl & WEB_CLIENT_ACL_STREAMING && (w)->port_acl & WEB_CLIENT_ACL_STREAMING)
+#define web_client_can_access_netdataconf(w) ((w)->acl & WEB_CLIENT_ACL_NETDATACONF && (w)->port_acl & WEB_CLIENT_ACL_NETDATACONF)
 
-#define web_client_can_access_stream(w) \
-    (!web_allow_streaming_from || simple_pattern_matches(web_allow_streaming_from, (w)->client_ip))
-
-#define web_client_can_access_netdataconf(w) \
-    (!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, (w)->client_ip))
 
 struct web_client {
     unsigned long long id;
@@ -132,7 +133,8 @@ struct web_client {
     WEB_CLIENT_FLAGS flags;         // status flags for the client
     WEB_CLIENT_MODE mode;           // the operational mode of the client
     WEB_CLIENT_ACL acl;             // the access list of the client
-
+    int port_acl;                   // the operations permitted on the port the client connected to
+    char *auth_bearer_token;        // the Bearer auth token (if sent)
     size_t header_parse_tries;
     size_t header_parse_last_size;
 

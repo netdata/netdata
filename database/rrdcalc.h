@@ -46,6 +46,9 @@ struct rrdcalc {
 
     int update_every;               // update frequency for the alarm
 
+    int disabled_flag;              // whether health checks are running for this alarm
+    int silenced_flag;              // whether notifications are sent for this alarm
+
     // the red and green threshold of this alarm (to be set to the chart)
     calculated_number green;
     calculated_number red;
