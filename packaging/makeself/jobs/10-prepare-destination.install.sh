@@ -14,4 +14,3 @@ run cd "${NETDATA_INSTALL_PATH}/usr"
 run ln -s ../bin bin
 run ln -s ../sbin sbin
 run ln -s . local
-

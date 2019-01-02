@@ -6,9 +6,9 @@
 # allow running the jobs by hand
 [ -z "${NETDATA_BUILD_WITH_DEBUG}" ] && export NETDATA_BUILD_WITH_DEBUG=0
 [ -z "${NETDATA_INSTALL_PATH}" ] && export NETDATA_INSTALL_PATH="${1-/opt/netdata}"
-[ -z "${NETDATA_MAKESELF_PATH}" ] && export NETDATA_MAKESELF_PATH="$(dirname "${0}")/.."
+[ -z "${NETDATA_MAKESELF_PATH}" ] && export NETDATA_MAKESELF_PATH="$(dirname "${0}")/../.."
 [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ] && export NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
-[ -z "${NETDATA_SOURCE_PATH}" ] && export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/.."
+[ -z "${NETDATA_SOURCE_PATH}" ] && export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/../.."
 export NULL=
 
 # make sure the path does not end with /
@@ -35,7 +35,7 @@ fetch() {
         then
         run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
     fi
-    
+
     if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]
         then
         cd "${NETDATA_MAKESELF_PATH}/tmp"
