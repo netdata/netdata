@@ -76,3 +76,5 @@ metrics per second per node, Netdata needs negligible CPU resources
 Netdata has been designed to solve the centralization problem of monitoring.
 Has been designed to replace the console for performance troubleshooting.
 So, for Netdata 1s granularity is easy, the natural outcome...
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fwhy-netdata%2F1s-granularity&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
