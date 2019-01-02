@@ -4,7 +4,7 @@ To build the static binary 64-bit distribution package, run:
 
 ```bash
 $ cd /path/to/netdata.git
-$ ./makeself/build-x86_64-static.sh
+$ ./packaging/makeself/build-x86_64-static.sh
 ```
 
 The program will:
@@ -24,7 +24,7 @@ To build netdata binaries with debugging / tracing information in them, use:
 
 ```bash
 $ cd /path/to/netdata.git
-$ ./makeself/build-x86_64-static.sh debug
+$ ./packaging/makeself/build-x86_64-static.sh debug
 ```
 
 These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).
