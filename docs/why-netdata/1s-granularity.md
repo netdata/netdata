@@ -44,7 +44,7 @@ This allows Netdata to scale to infinity.
 
 Of course, Netdata can centralize metrics when needed. For example, it is not practical to keep metrics locally on ephemeral nodes. For these cases, Netdata streams the metrics in real-time, from the ephemeral nodes to one or more non-ephemeral nodes nearby. This centralization is again distributed. On a large infrastructure, there may be many centralization points.
 
-To eliminate the error introduced by data collection latencies on busy virtual environments, Netdata interpolates collected metrics. It does this using microsecond timings, per data source, offering measurements with an error rate of 0.00001%.
+To eliminate the error introduced by data collection latencies on busy virtual environments, Netdata interpolates collected metrics. It does this using microsecond timings, per data source, offering measurements with an error rate of 0.0001%.
 
 Finally, Netdata is really fast. Optimization is a core product feature. On modern hardware, Netdata can collect metrics with a rate of above 1M metrics per second per core (this includes everything, parsing data sources, interpolating data, storing data in the time series database, etc). So, for a few thousands metrics per second per node, Netdata needs negligible CPU resources (just 1-2% of a single core). 
 
