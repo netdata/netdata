@@ -33,10 +33,9 @@ problem is somehow managed, it is still the key problem of all monitoring
 platforms and one of the key reasons for increased monitoring costs.
 
 Another important factor, is how resource efficient data collection can be when
-running per second. Most solutions fail miserably. The data collection agent is
+running per second. Most solutions fail to do it properly. The data collection agent is
 consuming significant system resources when running "per second", influencing the
-monitored systems and applications to a great degree. It seems that most of the
-world is a feature factory, so optimization is "left for later"...
+monitored systems and applications to a great degree.
 
 Last, per second data collection is a lot harder. In busy virtual environments,
 there is constantly a latency of about 100ms spread randomly to all data sources.

@@ -832,10 +832,10 @@ p {
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Collect</h3>
                 <p>
                     Netdata automatically detects data collection sources on the host it runs.
-                    It comes with hundreds of integrations for collecting system and application metrics,
+                    It comes with hundreds of plugins for collecting system and application metrics,
                     including databases, web servers, and commonly used application servers.
                     <br/> <br/>
-                    Netdata is also a high performance, distributed <b>statsd</b> server, allowing custom
+                    Netdata is also a high performance, distributed <b>statsd server</b>, allowing custom
                     application metrics to be collected and visualized.
                 </p>
             </div>
@@ -844,18 +844,19 @@ p {
                     Each Netdata spawns a thread that examines the metrics as they get collected,
                     evaluates pre-configured alarm expressions and triggers alarm notifications.
                     <br/> <br/>
-                    Netdata comes with hundreds of pre-configured alarms, that are automatically
-                    attached to the collected metrics and supports dozens of alarm notification integrations.
+                    Netdata comes with hundreds of alarms to detect common system and application issues,
+                    that are automatically attached to the collected metrics,
+                    supporting dozens of alarm notification integrations.
                 </p>
             </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Stream (replicate)</h3>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Stream</h3>
                 <p>
                     Each Netdata can stream its metrics, in real-time, to any other Netdata.
                     Streaming allows Netdata to be used in ephemeral nodes and containers in auto-scaled environments,
                     but it also allows building Netdata hierarchies for aggregating the metrics of multiple Netdata nodes.
                 </p>
             </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Store (db)</h3>
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Store</h3>
                 <p>
                     Each Netdata has its own internal metrics database. This database is optimized
                     for minimal memory footprint, and due to its lockless design allows one writer
