@@ -4352,15 +4352,6 @@ let registryKnownAgents = [];
 // The known agents associated with the current cloud account.
 let cloudKnownAgents = [];
 
-// -------------------------------------------------------------------------------------------------
-
-// function getURLParameter(name) {
-//     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]')
-//     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)')
-//     var results = regex.exec(location.search)
-//     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "))
-// }
-
 function closeModal() {
     $(".modal-header button.close").click();
 }
@@ -4477,7 +4468,6 @@ function signOutDidClick() {
     signOut();
 }
 
-
 function signOut() {
     localStorage.removeItem("cloud.accountID");
     localStorage.removeItem("cloud.accountName");
@@ -4485,9 +4475,7 @@ function signOut() {
     
     renderAccountUI();
     deinitSignInModal();
-
-    // Update `My Agents` menu.
-    netdataRegistryCallback(registryKnownAgents);
+    renderMyNetdataMenu(registryKnownAgents);
 }
 
 function renderAccountUI() {
