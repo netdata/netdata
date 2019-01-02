@@ -664,9 +664,6 @@ function renderMyNetdataMenu(machinesArray) {
 
     const el = document.getElementById('my-netdata-dropdown-content')
     el.classList.add(`theme-${netdataTheme}`);
-    if (!isRegistryMigrated()) {
-        el.classList.add("non-migrated");
-    }
     el.innerHTML = html;
 
     gotoServerInit();
@@ -4352,8 +4349,8 @@ var netdataCallback = initializeDynamicDashboard;
 // The known agents in the legacy global registry.
 let registryKnownAgents = [];
 
-// The agents associated with the current cloud account.
-let associatedAgents = [];
+// The known agents associated with the current cloud account.
+let cloudKnownAgents = [];
 
 // -------------------------------------------------------------------------------------------------
 
@@ -4386,7 +4383,7 @@ function getAgentsList() {
     const accountID = localStorage.getItem("cloud.accountID");
     const token = localStorage.getItem("cloud.token");
     if (accountID == null || token == null) {
-        return;
+        return [];
     }
     
     return fetch(
@@ -4404,8 +4401,7 @@ function getAgentsList() {
         const agents = payload.result ? payload.result.agents : null;
 
         if (!agents) {
-            // TODO: handle this!
-            return;
+            return [];
         }
 
         return agents.map((a) => {
@@ -4424,7 +4420,7 @@ function postAgentsMigrate() {
     const accountID = localStorage.getItem("cloud.accountID");
     const token = localStorage.getItem("cloud.token");
     if (accountID == null || token == null) {
-        return;
+        return [];
     }
 
     const agents = registryKnownAgents.map((a) => {
@@ -4440,7 +4436,7 @@ function postAgentsMigrate() {
         "agents": agents
     };
     
-    fetch(
+    return fetch(
         `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents`,
         {
             method: "POST",
@@ -4454,7 +4450,20 @@ function postAgentsMigrate() {
     ).then((response) => {
         return response.json();
     }).then((payload) => {
-        localStorage.setItem("cloud.registryMigrated", true);
+        const agents = payload.result ? payload.result.agents : null;
+
+        if (!agents) {
+            return [];
+        }
+
+        return agents.map((a) => {
+            return {
+                "guid": a.id,
+                "name": a.name,
+                "url": a.urls[0],
+                "alternate_urls": a.urls
+            }
+        })        
     });
 }
 
@@ -4468,15 +4477,11 @@ function signOutDidClick() {
     signOut();
 }
 
-function migrateRegistryDidClick() {
-    postAgentsMigrate();
-}
 
 function signOut() {
     localStorage.removeItem("cloud.accountID");
     localStorage.removeItem("cloud.accountName");
     localStorage.removeItem("cloud.token");
-    // localStorage.removeItem("cloud.registryMigrated");
     
     renderAccountUI();
     deinitSignInModal();
@@ -4529,18 +4534,32 @@ function handleMessage(e) {
 
     // Update `My Agents` menu.
     netdataRegistryCallback(registryKnownAgents);
-
-    if (!isRegistryMigrated()) {
-        postAgentsMigrate();
-    }
 }
 
 function isSignedIn() {
     return localStorage.getItem("cloud.token") != null;
 }
 
-function isRegistryMigrated() {
-    return localStorage.getItem("cloud.registryMigrated") == "true";
+function sortedArraysEqual(a, b) {
+    if (a.length != b.length) return false;
+
+    for (var i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+
+    return true;
+}
+
+function migrateAgents() {
+    const registryIds = registryKnownAgents.map((a) => a.guid).sort();
+    const cloudIds = cloudKnownAgents.map((a) => a.guid).sort();
+
+    if (!sortedArraysEqual(registryIds, cloudIds)) {
+        console.log("change, migrating!");
+        postAgentsMigrate();
+    } else {
+        console.log("no change!");
+    }
 }
 
 function initSignInModal() {
@@ -4572,15 +4591,17 @@ function initCloud() {
 function netdataRegistryCallback(machinesArray) {
     initCloud();
 
-    if (isSignedIn() && isRegistryMigrated()) {
+    registryKnownAgents = machinesArray;  
+
+    if (isSignedIn()) {
         // We call getAgentsList() here because it requires that 
         // NETDATA.registry is initialized.
         getAgentsList().then((agents) => {
-            associatedAgents = agents; // TODO: Is this needed?
+            cloudKnownAgents = agents; // TODO: Is this needed?
+            migrateAgents();
             renderMyNetdataMenu(agents);
         });
     } else {
-        registryKnownAgents = machinesArray;  
         renderMyNetdataMenu(machinesArray)
     }
 };
