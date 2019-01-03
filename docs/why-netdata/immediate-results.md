@@ -48,7 +48,7 @@ Monitoring SaaS providers offer a very basic set of pre-configured metrics, dash
 2. Metrics are converted to human readable units.
 3. Metrics are structured, organized in charts, families and applications.
 4. Dashboards are automatically generated, so all metrics are available for exploration immediately.
-5. Dashboards are optimized for visual anomaly detection.
+5. Dashboards are not just visualizing metrics; they are a tool, optimized for visual anomaly detection.
 6. Hundreds of pre-configured alarm templates are automatically attached to collected metrics.
 
 The result is that Netdata can be used immediately after installation. Netdata:
