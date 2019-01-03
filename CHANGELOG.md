@@ -1,12 +1,13 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.0-rc2](https://github.com/netdata/netdata/tree/v1.12.0-rc2) (2019-01-03)
 
 **Fixed bugs:**
 
 - smartd\_log: check\(\) unhandled exception: list index out of range [\#5079](https://github.com/netdata/netdata/issues/5079)
 - Additional character in Counter64 hex string [\#5028](https://github.com/netdata/netdata/issues/5028)
 - Error every second PLUGIN\[proc\] [\#4994](https://github.com/netdata/netdata/issues/4994)
+- Inconsistency in netdata.spec.in when comparing logdir permission with git-installation [\#4963](https://github.com/netdata/netdata/issues/4963)
 - Docker-compose: a lot of errors; Connection refused, Can't establish connection to MySQL... [\#4956](https://github.com/netdata/netdata/issues/4956)
 - Log flooding with new proc plugin [\#4945](https://github.com/netdata/netdata/issues/4945)
 - Free memory shows as 'inactive' in FreeBSD [\#4737](https://github.com/netdata/netdata/issues/4737)
@@ -17,18 +18,30 @@
 
 **Closed issues:**
 
+- disable respect `Retry-After` response header in python UrlService by default [\#5078](https://github.com/netdata/netdata/issues/5078)
 - move freeradius module to go.d [\#5063](https://github.com/netdata/netdata/issues/5063)
 - move python module dns\_query\_time to go.d [\#5047](https://github.com/netdata/netdata/issues/5047)
 - move python module web\_log to go.d [\#5046](https://github.com/netdata/netdata/issues/5046)
 - R&D: Collectors landscape page [\#5045](https://github.com/netdata/netdata/issues/5045)
+- Copy updater script instead of linking it [\#4924](https://github.com/netdata/netdata/issues/4924)
 - Activemq monitoring [\#4818](https://github.com/netdata/netdata/issues/4818)
+- Move packaging related code into `packaging/` directory [\#4611](https://github.com/netdata/netdata/issues/4611)
+- Simplify makeself [\#4527](https://github.com/netdata/netdata/issues/4527)
+- new netdata logo [\#4476](https://github.com/netdata/netdata/issues/4476)
+- Add info on disabling alarms for specific target - part 2 [\#4324](https://github.com/netdata/netdata/issues/4324)
+- Add info on disabling alarms for specific target - part 1 [\#4323](https://github.com/netdata/netdata/issues/4323)
+- Document how to monitor log files [\#4318](https://github.com/netdata/netdata/issues/4318)
 - Solr monitoring [\#3218](https://github.com/netdata/netdata/issues/3218)
 
 **Merged pull requests:**
 
+- postgres : fix WAL query [\#5105](https://github.com/netdata/netdata/pull/5105) ([anayrat](https://github.com/anayrat))
+- Correct memory usage statement in memory=none [\#5100](https://github.com/netdata/netdata/pull/5100) ([cakrit](https://github.com/cakrit))
+- fix permissions for log files when building rpms [\#5099](https://github.com/netdata/netdata/pull/5099) ([paulfantom](https://github.com/paulfantom))
 - fix web site install link [\#5092](https://github.com/netdata/netdata/pull/5092) ([ktsaou](https://github.com/ktsaou))
 - Removed c3, morris and raphael JS libraries \(\#5086\) [\#5088](https://github.com/netdata/netdata/pull/5088) ([gmosx](https://github.com/gmosx))
 - Improve instructions on how to view the slave UI [\#5083](https://github.com/netdata/netdata/pull/5083) ([cakrit](https://github.com/cakrit))
+- UrlService dont respect Retry-After header by default [\#5082](https://github.com/netdata/netdata/pull/5082) ([ilyam8](https://github.com/ilyam8))
 - smartd\_log: skip non-CSVs early [\#5081](https://github.com/netdata/netdata/pull/5081) ([kevlar1818](https://github.com/kevlar1818))
 - Dashboard grammar change [\#5080](https://github.com/netdata/netdata/pull/5080) ([Xalaxis](https://github.com/Xalaxis))
 - Add systemd pattern list parameter to the documentation [\#5077](https://github.com/netdata/netdata/pull/5077) ([vlvkobal](https://github.com/vlvkobal))
@@ -45,6 +58,7 @@
 - Apcupsd add check for UPS online [\#5037](https://github.com/netdata/netdata/pull/5037) ([cakrit](https://github.com/cakrit))
 - Add warning for offset in Counter64 metrics [\#5032](https://github.com/netdata/netdata/pull/5032) ([cakrit](https://github.com/cakrit))
 - Add other web servers to proxy instructions [\#5027](https://github.com/netdata/netdata/pull/5027) ([cakrit](https://github.com/cakrit))
+- copy updater script instead of linking it [\#5010](https://github.com/netdata/netdata/pull/5010) ([paulfantom](https://github.com/paulfantom))
 
 ## [v1.12.0-rc1](https://github.com/netdata/netdata/tree/v1.12.0-rc1) (2018-12-19)
 
