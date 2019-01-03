@@ -15,6 +15,8 @@
 #   - GITHUB_TOKEN variable set with GitHub token. Access level: repo.public_repo
 #   - git-semver python package (pip install git-semver)
 
+# exported variables are needed by releaser.sh
+
 set -e
 
 if [ ! -f .gitignore ]; then
@@ -49,6 +51,7 @@ function release_candidate() {
 	fi
 	GIT_TAG="v$VERSION-rc$RC"
 	export GIT_TAG
+	export RC
 }
 
 # Check if current commit is tagged or not
