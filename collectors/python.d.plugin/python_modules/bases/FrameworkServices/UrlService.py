@@ -112,9 +112,12 @@ class UrlService(SimpleService):
         """
         url = url or self.url
         manager = manager or self._manager
-        retry = urllib3.Retry(retries)
-        if hasattr(retry, 'respect_retry_after_header'):
-            retry.respect_retry_after_header = bool(self.respect_retry_after_header)
+
+        retry = retries
+        if hasattr(urllib3, 'Retry'):
+            retry = urllib3.Retry(retries)
+            if hasattr(retry, 'respect_retry_after_header'):
+                retry.respect_retry_after_header = bool(self.respect_retry_after_header)
 
         response = manager.request(
             method=self.method,
