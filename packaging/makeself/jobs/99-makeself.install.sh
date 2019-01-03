@@ -8,8 +8,12 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # find the netdata version
 
-FILE_VERSION="$(git describe 2>/dev/null)"
-if [ -z "${FILE_VERSION}" ]; then
+VERSION="$(git describe 2>/dev/null)"
+if [ -z "${VERSION}" ]; then
+    VERSION=$(cat packaging/version)
+fi
+
+if [ "${VERSION}" == "" ]; then
     echo >&2 "Cannot find version number. Create makeself executable from source code with git tree structure."
     exit 1
 fi
@@ -61,7 +65,7 @@ run rm "${NETDATA_INSTALL_PATH}/sbin" \
 # -----------------------------------------------------------------------------
 # create the makeself archive
 
-run sed "s|NETDATA_VERSION|${FILE_VERSION}|g" <"${NETDATA_MAKESELF_PATH}/makeself.lsm" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
+run sed "s|NETDATA_VERSION|${VERSION}|g" <"${NETDATA_MAKESELF_PATH}/makeself.lsm" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
@@ -84,7 +88,7 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
 
-FILE="netdata-${FILE_VERSION}.gz.run"
+FILE="netdata-${VERSION}.gz.run"
 
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
 echo >&2 "Self-extracting installer moved to '${FILE}'"
