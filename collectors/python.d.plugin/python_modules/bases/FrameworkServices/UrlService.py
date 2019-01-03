@@ -6,6 +6,12 @@
 
 import urllib3
 
+try:
+    from urllib3 import Retry
+    HAS_RETRY = True
+except ImportError:
+    HAS_RETRY = False
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 try:
@@ -113,17 +119,16 @@ class UrlService(SimpleService):
         url = url or self.url
         manager = manager or self._manager
 
-        retry = retries
-        if hasattr(urllib3, 'Retry'):
-            retry = urllib3.Retry(retries)
-            if hasattr(retry, 'respect_retry_after_header'):
-                retry.respect_retry_after_header = bool(self.respect_retry_after_header)
+        if HAS_RETRY:
+            retries = Retry(retries)
+            if hasattr(retries, 'respect_retry_after_header'):
+                retries.respect_retry_after_header = bool(self.respect_retry_after_header)
 
         response = manager.request(
             method=self.method,
             url=url,
             timeout=self.request_timeout,
-            retries=retry,
+            retries=retries,
             headers=manager.headers,
             redirect=redirect,
         )
