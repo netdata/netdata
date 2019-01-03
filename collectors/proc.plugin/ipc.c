@@ -57,10 +57,10 @@ struct message_queue {
     unsigned long long id;
     int found;
 
+    RRDDIM *rd_messages;
     RRDDIM *rd_bytes;
-    RRDDIM *rd_number;
+    unsigned long long messages;
     unsigned long long bytes;
-    unsigned long long number;
 
     struct message_queue * next;
 };
@@ -222,9 +222,9 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
             msq->id = id;
         }
 
-        msq->number = str2ull(procfile_lineword(ff, l, 4));
-        msq->bytes  = str2ull(procfile_lineword(ff, l, 3));
-        msq->found  = 1;
+        msq->messages = str2ull(procfile_lineword(ff, l, 4));
+        msq->bytes    = str2ull(procfile_lineword(ff, l, 3));
+        msq->found    = 1;
     }
 
     return 0;
@@ -349,10 +349,10 @@ int do_ipc(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_msg != CONFIG_BOOLEAN_NO && !ipc_msq_get_info(msg_filename, &message_queue_root))) {
-        static RRDSET *st_msq_number = NULL, *st_msq_bytes = NULL;
+        static RRDSET *st_msq_messages = NULL, *st_msq_bytes = NULL;
 
-        if(unlikely(!st_msq_number))
-            st_msq_number = rrdset_create_localhost(
+        if(unlikely(!st_msq_messages))
+            st_msq_messages = rrdset_create_localhost(
                     "system"
                     , "message_queue_messages"
                     , NULL
@@ -367,7 +367,7 @@ int do_ipc(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         else
-            rrdset_next(st_msq_number);
+            rrdset_next(st_msq_messages);
 
         if(unlikely(!st_msq_bytes))
             st_msq_bytes = rrdset_create_localhost(
@@ -390,22 +390,21 @@ int do_ipc(int update_every, usec_t dt) {
         struct message_queue *msq = message_queue_root, *msq_prev = NULL;
         while(likely(msq)){
             if(likely(msq->found)) {
-                if(unlikely(!msq->rd_number || !msq->rd_bytes)) {
+                if(unlikely(!msq->rd_messages || !msq->rd_bytes)) {
                     char id[RRD_ID_LENGTH_MAX + 1];
                     snprintfz(id, RRD_ID_LENGTH_MAX, "%llu", msq->id);
-                    if(likely(!msq->rd_number)) msq->rd_number = rrddim_add(st_msq_number, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    if(likely(!msq->rd_messages)) msq->rd_messages = rrddim_add(st_msq_messages, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     if(likely(!msq->rd_bytes)) msq->rd_bytes = rrddim_add(st_msq_bytes, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
 
-                rrddim_set_by_pointer(st_msq_number, msq->rd_number, msq->number);
+                rrddim_set_by_pointer(st_msq_messages, msq->rd_messages, msq->messages);
                 rrddim_set_by_pointer(st_msq_bytes, msq->rd_bytes, msq->bytes);
 
                 msq->found = 0;
             }
             else {
-                // TODO:
-                // rrddim_is_obsolete(msq->rd_number);
-                // rrddim_is_obsolete(msq->rd_bytes);
+                rrddim_is_obsolete(st_msq_messages, msq->rd_messages);
+                rrddim_is_obsolete(st_msq_bytes, msq->rd_bytes);
 
                 // remove message queue from the linked list
                 if(!msq_prev)
@@ -425,7 +424,7 @@ int do_ipc(int update_every, usec_t dt) {
                 msq = msq_prev->next;
         }
 
-        rrdset_done(st_msq_number);
+        rrdset_done(st_msq_messages);
         rrdset_done(st_msq_bytes);
     }
 

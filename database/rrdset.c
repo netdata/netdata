@@ -1303,6 +1303,11 @@ void rrdset_done(RRDSET *st) {
             continue;
         }
 
+        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rd->name, st->id);
+            rrddim_isnot_obsolete(st, rd);
+        }
+
         #ifdef NETDATA_INTERNAL_CHECKS
         rrdset_debug(st, "%s: START "
                 " last_collected_value = " COLLECTED_NUMBER_FORMAT
