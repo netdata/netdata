@@ -4461,7 +4461,11 @@ function postAgentsMigrate() {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    initSignInModal();
+    // initSignInModal();
+    
+    window.addEventListener("message", handleMessage, false);    
+    url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+    window.open(url);
 }
 
 function signOutDidClick() {
@@ -4474,7 +4478,7 @@ function signOut() {
     localStorage.removeItem("cloud.token");
     
     renderAccountUI();
-    deinitSignInModal();
+    // deinitSignInModal();
     renderMyNetdataMenu(registryKnownAgents);
 }
 
@@ -4503,8 +4507,13 @@ function renderAccountUI() {
         container.setAttribute("title", "sign in");
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
+        // container.innerHTML = (
+        //     `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal" onclick="signInDidClick();">
+        //         <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
+        //     </a>`
+        // )
         container.innerHTML = (
-            `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal" onclick="signInDidClick();">
+            `<a href="#" class="btn" onclick="signInDidClick();">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
@@ -4518,7 +4527,9 @@ function handleMessage(e) {
 
     renderAccountUI();
     closeModal();
-    deinitSignInModal();
+    // deinitSignInModal();
+
+    window.removeEventListener("message", handleMessage, false);
 
     // Update `My Agents` menu.
     netdataRegistryCallback(registryKnownAgents);
@@ -4550,21 +4561,21 @@ function migrateAgents() {
     }
 }
 
-function initSignInModal() {
-    if (!isSignedIn()) {
-        const iframeEl = document.getElementById("sign-in-iframe");
-        iframeEl.src = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
-        window.addEventListener("message", handleMessage, false);    
-    }
-}
+// function initSignInModal() {
+//     if (!isSignedIn()) {
+//         const iframeEl = document.getElementById("sign-in-iframe");
+//         iframeEl.src = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+//         window.addEventListener("message", handleMessage, false);    
+//     }
+// }
 
-function deinitSignInModal() {
-    if (isSignedIn()) {
-        const iframeEl = document.getElementById("sign-in-iframe");
-        iframeEl.src = "";
-        window.removeEventListener("message", handleMessage, false); 
-    }
-}
+// function deinitSignInModal() {
+//     if (isSignedIn()) {
+//         const iframeEl = document.getElementById("sign-in-iframe");
+//         iframeEl.src = "";
+//         window.removeEventListener("message", handleMessage, false); 
+//     }
+// }
 
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
