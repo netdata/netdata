@@ -4461,8 +4461,6 @@ function postAgentsMigrate() {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    // initSignInModal();
-    
     window.addEventListener("message", handleMessage, false);    
     url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.open(url);
@@ -4478,7 +4476,6 @@ function signOut() {
     localStorage.removeItem("cloud.token");
     
     renderAccountUI();
-    // deinitSignInModal();
     renderMyNetdataMenu(registryKnownAgents);
 }
 
@@ -4507,11 +4504,6 @@ function renderAccountUI() {
         container.setAttribute("title", "sign in");
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
-        // container.innerHTML = (
-        //     `<a href="#" class="btn" data-toggle="modal" data-target="#signInModal" onclick="signInDidClick();">
-        //         <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
-        //     </a>`
-        // )
         container.innerHTML = (
             `<a href="#" class="btn" onclick="signInDidClick();">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
@@ -4527,7 +4519,6 @@ function handleMessage(e) {
 
     renderAccountUI();
     closeModal();
-    // deinitSignInModal();
 
     window.removeEventListener("message", handleMessage, false);
 
@@ -4554,28 +4545,14 @@ function migrateAgents() {
     const cloudIds = cloudKnownAgents.map((a) => a.guid).sort();
 
     if (!sortedArraysEqual(registryIds, cloudIds)) {
-        console.log("change, migrating!");
-        postAgentsMigrate();
-    } else {
-        console.log("no change!");
+        console.log("Synchronizing with netdata.cloud");
+        postAgentsMigrate().then((agents) => {
+            cloudKnownAgents = agents; // TODO: Is this needed?
+            migrateAgents();
+            renderMyNetdataMenu(agents);
+        });        
     }
 }
-
-// function initSignInModal() {
-//     if (!isSignedIn()) {
-//         const iframeEl = document.getElementById("sign-in-iframe");
-//         iframeEl.src = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
-//         window.addEventListener("message", handleMessage, false);    
-//     }
-// }
-
-// function deinitSignInModal() {
-//     if (isSignedIn()) {
-//         const iframeEl = document.getElementById("sign-in-iframe");
-//         iframeEl.src = "";
-//         window.removeEventListener("message", handleMessage, false); 
-//     }
-// }
 
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
