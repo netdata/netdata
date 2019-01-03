@@ -54,7 +54,7 @@ then
         echo >&2
         echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
 
-        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work" "new value" "old value"
+        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work" "new value" "old value" "evaluated expression" "expression variable values" 0 0
         if [ $? -ne 0 ]
         then
             echo >&2 "# FAILED"
@@ -218,7 +218,12 @@ else
     info="${18}"               # a short description of the alarm
     value_string="${19}"       # friendly value (with units)
     old_value_string="${20}"   # friendly old value (with units)
+    calc_expression="${21}"	   # contains the expression that was evaluated to trigger the alarm
+    calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
+    total_warnings="${23}"     # Total number of alarms in WARNING state
+    total_critical="${24}"     # Total number of alarms in CRITICAL state
 fi
+
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -2074,6 +2079,11 @@ Source  : ${src}
 Date    : ${date}
 Notification generated on ${host}
 
+Evaluated Expression :  ${calc_expression}
+Expression Variables :  ${calc_param_values}
+
+The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
+
 --multipart-boundary
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
@@ -2134,6 +2144,24 @@ Content-Transfer-Encoding: 8bit
                                             <span>${raised_for_html}</span> <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Time</span>
                                         </td>
                                     </tr>
+                                    <tr style="margin: 0; padding: 0;">
+                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
+                                            <span>${calc_expression}</span>
+                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Evaluated Expression</span>
+                                        </td>
+                                    </tr>
+                                     <tr style="margin: 0; padding: 0;">
+                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
+                                            <span>${calc_param_values}</span>
+                                            <span style="display: block; color: #666666; font-size: 12px; font-weight: 300; line-height: 1; text-transform: uppercase;">Expression Variables</span>
+                                        </td>
+                                    </tr>
+                                     <tr style="margin: 0; padding: 0;">
+                                        <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;" align="left" valign="top">
+                                            The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
+                                         </td>
+                                    </tr>
+
                                     <tr style="margin: 0; padding: 0;">
                                         <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; vertical-align: top; margin: 0; padding: 0 0 20px;">
                                             <a href="${goto_url}" style="font-size: 14px; color: #ffffff; text-decoration: none; line-height: 1.5; font-weight: bold; text-align: center; display: inline-block; text-transform: capitalize; background: #35568d; border-width: 1px; border-style: solid; border-color: #2b4c86; margin: 0; padding: 10px 15px;" target="_blank">View Netdata</a>
