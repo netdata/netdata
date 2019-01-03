@@ -154,7 +154,7 @@ FROM
           ELSE 'written'
         END AS type
     FROM pg_catalog.pg_ls_dir('pg_wal') AS wal(name)
-    WHERE name ~ '^[0-9A-F]{{24}}$'
+    WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
         (pg_stat_file('pg_wal/'||name)).modification,
         wal.name DESC) sub;
@@ -181,7 +181,7 @@ FROM
           ELSE 'written'
         END AS type
     FROM pg_catalog.pg_ls_dir('pg_xlog') AS wal(name)
-    WHERE name ~ '^[0-9A-F]{{24}}$'
+    WHERE name ~ '^[0-9A-F]{24}$'
     ORDER BY
         (pg_stat_file('pg_xlog/'||name)).modification,
         wal.name DESC) sub;
