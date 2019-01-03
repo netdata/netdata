@@ -30,8 +30,8 @@ So, why do monitoring solutions and SaaS providers filter out metrics?
 They can't do otherwise!
 
 1. Centralization of metrics depends on metrics filtering, to control monitoring costs. Time-series databases limit the number of metrics collected, because the number of metrics influences their performance significantly. They get congested at scale.
-3. It is a lot easier to provide an illusion of monitoring by using a few basic metrics.
-4. Troubleshooting slowdowns is the hardest IT problem to solve, so most solutions just avoid it.
+2. It is a lot easier to provide an illusion of monitoring by using a few basic metrics.
+3. Troubleshooting slowdowns is the hardest IT problem to solve, so most solutions just avoid it.
 
 ## What does netdata do?
 
