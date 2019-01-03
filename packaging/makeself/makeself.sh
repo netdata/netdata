@@ -21,13 +21,13 @@
 #         support for non-temporary archives. Ideas thanks to Francois Petitjean
 # - 1.3 : More patches from Bjarni R. Einarsson and Francois Petitjean:
 #         Support for no compression (--nocomp), script is no longer mandatory,
-#         automatic launch in an xterm, optional verbose output, and -target 
+#         automatic launch in an xterm, optional verbose output, and -target
 #         archive option to indicate where to extract the files.
 # - 1.4 : Improved UNIX compatibility (Francois Petitjean)
 #         Automatic integrity checking, support of LSM files (Francois Petitjean)
 # - 1.5 : Many bugfixes. Optionally disable xterm spawning.
 # - 1.5.1 : More bugfixes, added archive options -list and -check.
-# - 1.5.2 : Cosmetic changes to inform the user of what's going on with big 
+# - 1.5.2 : Cosmetic changes to inform the user of what's going on with big
 #           archives (Quake III demo)
 # - 1.5.3 : Check for validity of the DISPLAY variable before launching an xterm.
 #           More verbosity in xterms and check for embedded command's return value.
@@ -204,9 +204,9 @@ do
 	shift
 	;;
     --pigz)
-    	COMPRESS=pigz
-    	shift
-    	;;
+	COMPRESS=pigz
+	shift
+	;;
     --xz)
 	COMPRESS=xz
 	shift
@@ -434,7 +434,7 @@ gzip)
     GZIP_CMD="gzip -c$COMPRESS_LEVEL"
     GUNZIP_CMD="gzip -cd"
     ;;
-pigz) 
+pigz)
     GZIP_CMD="pigz -$COMPRESS_LEVEL"
     GUNZIP_CMD="gzip -cd"
     ;;
@@ -497,7 +497,7 @@ if test -f "$HEADER"; then
 	SKIP=`expr $SKIP`
 	rm -f "$tmpfile"
     if test "$QUIET" = "n";then
-    	echo Header is $SKIP lines long >&2
+	echo Header is $SKIP lines long >&2
     fi
 
 	archname="$oldarchname"
@@ -506,7 +506,7 @@ else
     exit 1
 fi
 
-if test "$QUIET" = "n";then 
+if test "$QUIET" = "n";then
     echo
 fi
 
@@ -598,7 +598,7 @@ if test "$APPEND" = y; then
     chmod +x "$archname"
     rm -f "$archname".bak
     if test "$QUIET" = "n";then
-    	echo Self-extractable archive \"$archname\" successfully updated.
+	echo Self-extractable archive \"$archname\" successfully updated.
     fi
 else
     filesizes="$fsize"
@@ -610,12 +610,12 @@ else
 
     # Append the compressed tar data after the stub
     if test "$QUIET" = "n";then
-    	echo
+	echo
     fi
     cat "$tmpfile" >> "$archname"
     chmod +x "$archname"
     if test "$QUIET" = "n";then
-    	echo Self-extractable archive \"$archname\" successfully created.
+	echo Self-extractable archive \"$archname\" successfully created.
     fi
 fi
 rm -f "$tmpfile"

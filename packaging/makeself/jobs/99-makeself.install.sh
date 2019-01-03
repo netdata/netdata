@@ -43,8 +43,8 @@ FILE_VERSION="${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}"
 run mkdir -p "${NETDATA_INSTALL_PATH}/system"
 
 run cp \
-    makeself/post-installer.sh \
-    makeself/install-or-update.sh \
+    packaging/makeself/post-installer.sh \
+    packaging/makeself/install-or-update.sh \
     packaging/installer/functions.sh \
     configs.signatures \
     system/netdata-init-d \

@@ -1,7 +1,7 @@
 
   ^
-  |.-.   .-.   .-.   .-.   .  netdata                                        
-  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!  
+  |.-.   .-.   .-.   .-.   .  netdata
+  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!
   +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
   (C) Copyright 2017, Costa Tsaousis
@@ -32,7 +32,7 @@
 
    - /etc/init.d/netdata         will be created
 
-  
+
   This package can also update a netdata installation that has been
   created with another version of it.
 
@@ -42,5 +42,3 @@
   netdata re-distributes a lot of open source software components.
   Check its full license at:
   https://github.com/netdata/netdata/blob/master/LICENSE.md
-
-

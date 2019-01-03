@@ -47,7 +47,6 @@ EXTRA_DIST = \
 
 SUBDIRS = \
 	diagrams \
-	makeself \
 	system \
 	tests \
 	$(NULL)
@@ -92,8 +91,8 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	kickstart.sh \
-	kickstart-static64.sh \
+	packaging/installer/kickstart.sh \
+	packaging/installer/kickstart-static64.sh \
 	netdata-installer.sh \
 	packaging/installer/functions.sh \
 	docs/generator/buildhtml.sh \

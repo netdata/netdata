@@ -14,7 +14,7 @@ autoreconf -ivf
 ./configure
 make dist
 echo "--- Create self-extractor ---"
-./makeself/build-x86_64-static.sh
+./packaging/makeself/build-x86_64-static.sh
 
 # Needed fo GCS
 echo "--- Copy artifacts to bin ---"
