@@ -4458,7 +4458,7 @@ function postAgentsMigrate() {
 
 function signInDidClick() {
     window.addEventListener("message", handleMessage, false);    
-    url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.open(url);
 }
 
