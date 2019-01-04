@@ -8,34 +8,15 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # find the netdata version
 
-NOWNER="unknown"
-ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
-if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/git@github.com:/}"
-    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
-
-elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/https:\/\/github.com\//}"
-    NOWNER="$( echo ${NOWNER} | cut -d '/' -f 1 )"
+VERSION="$(git describe 2>/dev/null)"
+if [ -z "${VERSION}" ]; then
+    VERSION=$(cat packaging/version)
 fi
 
-# make sure it does not have any slashes in it
-NOWNER="${NOWNER//\//_}"
-
-if [ "${NOWNER}" = "netdata" ]
-    then
-    NOWNER=
-else
-    NOWNER="-${NOWNER}"
+if [ "${VERSION}" == "" ]; then
+    echo >&2 "Cannot find version number. Create makeself executable from source code with git tree structure."
+    exit 1
 fi
-
-VERSION="$(git describe || echo "undefined")"
-[ -z "${VERSION}" ] && VERSION="undefined"
-
-FILE_VERSION="${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}"
-
 
 # -----------------------------------------------------------------------------
 # copy the files needed by makeself installation
@@ -84,7 +65,7 @@ run rm "${NETDATA_INSTALL_PATH}/sbin" \
 # -----------------------------------------------------------------------------
 # create the makeself archive
 
-run sed "s|NETDATA_VERSION|${FILE_VERSION}|g" <"${NETDATA_MAKESELF_PATH}/makeself.lsm" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
+run sed "s|NETDATA_VERSION|${VERSION}|g" <"${NETDATA_MAKESELF_PATH}/makeself.lsm" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
@@ -107,11 +88,7 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
 
-FILE="netdata-${FILE_VERSION}.gz.run"
+FILE="netdata-${VERSION}.gz.run"
 
-run cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
-echo >&2 "Self-extracting installer copied to '${FILE}'"
-
-[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
-run ln -s "${FILE}" netdata-latest.gz.run
-echo >&2 "Self-extracting installer linked to 'netdata-latest.gz.run'"
+run mv "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
+echo >&2 "Self-extracting installer moved to '${FILE}'"

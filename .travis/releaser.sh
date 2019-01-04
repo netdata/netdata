@@ -42,8 +42,13 @@ echo "---- FIGURING OUT TAGS ----"
 #shellcheck source=/dev/null
 source .travis/tagger.sh || exit 0
 
-echo "---- GENERATING CHANGELOG -----"
+echo "---- UPDATE VERSION FILE ----"
+echo "$GIT_TAG" >packaging/version
+git add packaging/version
+
+echo "---- GENERATE CHANGELOG -----"
 ./.travis/generate_changelog.sh
+git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
 git commit -m "[ci skip] release $GIT_TAG"
