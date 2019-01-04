@@ -56,6 +56,11 @@ git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
 
+if [ -z ${RC+x} ]; then
+	echo "This is a release candidate tag, exiting without artifact building"
+	exit 0
+fi
+
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
 ./packaging/docker/build.sh
@@ -79,6 +84,4 @@ if [ "${GIT_TAG}" != "$(git tag --points-at)" ]; then
 	echo "ERROR! Current commit is not tagged. Stopping release creation."
 	exit 1
 fi
-if [ ! -z ${RC+x} ]; then
-	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
-fi
+hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
