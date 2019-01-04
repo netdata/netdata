@@ -24,19 +24,6 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
-# Embed new version in files which need it.
-# This wouldn't be needed if we could use `git tag` everywhere.
-function embed_version() {
-	VERSION="$1"
-	MAJOR=$(echo "$GIT_TAG" | cut -d . -f 1 | cut -d v -f 2)
-	MINOR=$(echo "$GIT_TAG" | cut -d . -f 2)
-	PATCH=$(echo "$GIT_TAG" | cut -d . -f 3 | cut -d '-' -f 1)
-	sed -i "s/\\[VERSION_MAJOR\\], \\[.*\\]/\\[VERSION_MAJOR\\], \\[$MAJOR\\]/" configure.ac
-	sed -i "s/\\[VERSION_MINOR\\], \\[.*\\]/\\[VERSION_MINOR\\], \\[$MINOR\\]/" configure.ac
-	sed -i "s/\\[VERSION_PATCH\\], \\[.*\\]/\\[VERSION_PATCH\\], \\[$PATCH\\]/" configure.ac
-	git add configure.ac
-}
-
 # Figure out what will be new release candidate tag based only on previous ones.
 # This assumes that RELEASES are in format of "v0.1.2" and prereleases (RCs) are using "v0.1.2-rc0"
 function release_candidate() {
@@ -71,5 +58,4 @@ if [ -z "${GIT_TAG}" ]; then
 		;;
 	esac
 fi
-embed_version "$GIT_TAG"
 export GIT_TAG
