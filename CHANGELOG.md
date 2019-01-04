@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
 
 **Closed issues:**
@@ -13,8 +14,10 @@
 
 **Merged pull requests:**
 
+- force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
 - Add variables to alarm-notify.sh  [\#5096](https://github.com/netdata/netdata/pull/5096) ([cakrit](https://github.com/cakrit))
 - do not report stale metrics to prometheus [\#5084](https://github.com/netdata/netdata/pull/5084) ([ktsaou](https://github.com/ktsaou))
+- Unify versioning [\#5051](https://github.com/netdata/netdata/pull/5051) ([paulfantom](https://github.com/paulfantom))
 - Generate a configure script for RPM build \(\#4570\) [\#4571](https://github.com/netdata/netdata/pull/4571) ([ananace](https://github.com/ananace))
 
 ## [v1.12.0-rc2](https://github.com/netdata/netdata/tree/v1.12.0-rc2) (2019-01-03)
