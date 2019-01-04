@@ -4366,7 +4366,7 @@ function truncateString(str, maxLength) {
 // -------------------------------------------------------------------------------------------------
 
 // https://github.com/netdata/hub/issues/146
-function getAgentsList() {
+function getCloudAccountKnownAgents() {
     const accountID = localStorage.getItem("cloud.accountID");
     const token = localStorage.getItem("cloud.token");
     if (accountID == null || token == null) {
@@ -4403,14 +4403,14 @@ function getAgentsList() {
 }
 
 // https://github.com/netdata/hub/issues/128
-function postAgentsMigrate() {
+function postCloudAccountKnownAgents(agentsToSync) {
     const accountID = localStorage.getItem("cloud.accountID");
     const token = localStorage.getItem("cloud.token");
     if (accountID == null || token == null) {
         return [];
     }
 
-    const agents = registryKnownAgents.map((a) => {
+    const agents = agentsToSync.map((a) => {
         return {
             "id": a.guid,
             "name": a.name,
@@ -4537,15 +4537,31 @@ function sortedArraysEqual(a, b) {
     return true;
 }
 
-function migrateAgents() {
-    const registryIds = registryKnownAgents.map((a) => a.guid).sort();
-    const cloudIds = cloudKnownAgents.map((a) => a.guid).sort();
+// Computes the set of agents that are included in `source` but not in `target`.
+function computeDiff(target, source) {
+    const tset = new Set();
 
-    if (!sortedArraysEqual(registryIds, cloudIds)) {
+    for (let agent of target) {
+        tset.add(agent.guid);
+    }
+
+    const diff = [];
+
+    for (let agent of source) {
+        if (!tset.has(agent.guid)) {
+            diff.push(agent);
+        }
+    }
+
+    return diff;
+}
+
+function syncAgents() {
+    const agentsToSync = computeDiff(cloudKnownAgents, registryKnownAgents);
+    if (agentsToSync.length > 0) {
         console.log("Synchronizing with netdata.cloud");
-        postAgentsMigrate().then((agents) => {
+        postCloudAccountKnownAgents(agentsToSync).then((agents) => {
             cloudKnownAgents = agents; // TODO: Is this needed?
-            migrateAgents();
             renderMyNetdataMenu(agents);
         });        
     }
@@ -4574,9 +4590,9 @@ function netdataRegistryCallback(machinesArray) {
     if (isSignedIn()) {
         // We call getAgentsList() here because it requires that 
         // NETDATA.registry is initialized.
-        getAgentsList().then((agents) => {
+        getCloudAccountKnownAgents().then((agents) => {
             cloudKnownAgents = agents; // TODO: Is this needed?
-            migrateAgents();
+            syncAgents();
             renderMyNetdataMenu(agents);
         });
     } else {
