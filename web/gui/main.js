@@ -631,9 +631,9 @@ function renderMachines(machinesArray) {
 
 function renderMyNetdataMenu(machinesArray) {
     if (machinesArray == registryKnownAgents) {
-        console.log("Rendering my-netdata menu from netdata.cloud");
-    } else {
         console.log("Rendering my-netdata menu from global registry");
+    } else {
+        console.log("Rendering my-netdata menu from netdata.cloud");
     }
 
     let html = '';
@@ -4428,7 +4428,8 @@ function postCloudAccountKnownAgents(agentsToSync) {
 
     const payload = {
         "accountID": accountID,
-        "agents": agents
+        "agents": agents,
+        "merge": false,
     };
     
     return fetch(
