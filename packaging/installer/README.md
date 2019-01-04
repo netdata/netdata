@@ -236,7 +236,7 @@ Do this to install and run Netdata:
 ```sh
 
 # download it - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=1
+git clone https://github.com/netdata/netdata.git --depth=100
 cd netdata
 
 # run script with root privileges to build, install, start Netdata
@@ -271,7 +271,7 @@ This is how to install the latest Netdata version from sources on FreeBSD:
 pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof
 
 # download Netdata
-git clone https://github.com/netdata/netdata.git --depth=1
+git clone https://github.com/netdata/netdata.git --depth=100
 
 # install Netdata in /opt/netdata
 cd netdata
@@ -339,7 +339,7 @@ click `Install` in the software update popup window, then
 brew install ossp-uuid autoconf automake pkg-config
 
 # download Netdata
-git clone https://github.com/netdata/netdata.git --depth=1
+git clone https://github.com/netdata/netdata.git --depth=100
 
 # install Netdata in /usr/local/netdata
 cd netdata
@@ -360,7 +360,7 @@ apk add alpine-sdk bash curl zlib-dev util-linux-dev libmnl-dev gcc make git aut
 apk add nodejs
 
 # download Netdata - the directory 'netdata' will be created
-git clone https://github.com/netdata/netdata.git --depth=1
+git clone https://github.com/netdata/netdata.git --depth=100
 cd netdata
 
 
