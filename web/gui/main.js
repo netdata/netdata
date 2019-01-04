@@ -628,6 +628,12 @@ function renderMachines(machinesArray) {
 }
 
 function renderMyNetdataMenu(machinesArray) {
+    if (machinesArray == registryKnownAgents) {
+        console.log("Rendering my-netdata menu from netdata.cloud");
+    } else {
+        console.log("Rendering my-netdata menu from global registry");
+    }
+
     let html = '';
 
     if (options.hosts.length > 1) {
