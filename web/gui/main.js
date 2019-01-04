@@ -639,6 +639,16 @@ function clearMyNetdataMenu() {
     el.innerHTML = html;
 }
 
+function errorMyNetdataMenu() {
+    const html = `<div class="agent-item" style="white-space: nowrap">
+        <i class="fas fa-exclamation-triangle" style="color: red"></i>
+        Cannot load known agents from netdata.cloud!
+        <div></div>
+    </div>`;
+    const el = document.getElementById('my-netdata-dropdown-content')
+    el.innerHTML = html;
+}
+
 function renderMyNetdataMenu(machinesArray) {
     if (machinesArray == registryKnownAgents) {
         console.log("Rendering my-netdata menu from global registry");
@@ -4401,6 +4411,9 @@ function getCloudAccountKnownAgents() {
             }
         }
     ).then((response)  => {
+        if (!response.ok) {
+            throw Error("Cannot fetch known accounts");
+        }
         return response.json();
     }).then((payload) => {
         const agents = payload.result ? payload.result.agents : null;
@@ -4417,6 +4430,9 @@ function getCloudAccountKnownAgents() {
                 "alternate_urls": a.urls
             }
         })
+    }).catch(function (error) {
+        console.log(error);
+        return null;
     });
 }
 
@@ -4616,6 +4632,10 @@ function netdataRegistryCallback(machinesArray) {
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountKnownAgents().then((agents) => {
+            if (!agents) {
+                errorMyNetdataMenu();
+                return;
+            }
             cloudKnownAgents = agents; // TODO: Is this needed?
             syncAgents();
             renderMyNetdataMenu(agents);
