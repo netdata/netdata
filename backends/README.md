@@ -36,18 +36,20 @@ X seconds (though, it can send them per second if you need it to).
 
 3. Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
 
-4. Three modes of operation (for all backends):
+4. Netdata supports three modes of operation for all backends. **If you can't decide which mode to use, 
+   we suggest `as collected` for Prometheus and `average` for all other backends**
 
    - `as collected`: the latest collected value is sent to the backend. This means that if netdata
      is configured to send data to the backend every 10 seconds, only 1 out of 10 values will appear
-     at the backend server. The values are sent exactly as collected, before any multipliers or
-     dividers applied and before any interpolation. This mode emulates other data collectors,
-     such as `collectd` or `telegraf`.
+     at the backend server. The values are sent exactly as collected, i.e. raw, unprocessed values, 
+     before any multipliers or dividers applied and without any interpolation/calculation of average 
+     values etc. As a result, the values may not match what you would see via the Netdata UI. This mode 
+     emulates other data collectors, such as `collectd` or `telegraf` and is the suggested method for a 
+     Prometheus backend.
 
    - `average`: the average of the interpolated values shown on the netdata graphs is sent to the
      backend. So, if netdata is configured to send data to the backend server every 10 seconds,
-     the average of the 10 values shown on the netdata charts will be used. **If you can't decide
-      which mode to use, use `average`.**
+     the average of the 10 values shown on the netdata charts will be used. 
 
    - `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to
      the backend. So, if netdata is configured to send data to the backend every 10 seconds, the
