@@ -617,7 +617,7 @@ function renderMachines(machinesArray) {
         for (var server of demoServers) {
             html += (
                 `<div class="agent-item">
-                    <i class="fas fa-chart-bar" color: #fff"></i>
+                    <i class="fas fa-chart-bar" style="color: #fff"></i>
                     <a href="${server.url}">${server.title}</a>
                     <div></div>
                 </div>
@@ -627,6 +627,16 @@ function renderMachines(machinesArray) {
     }
 
     return html;
+}
+
+function clearMyNetdataMenu() {
+    const html = `<div class="agent-item" style="white-space: nowrap">
+        <i class="fas fa-hourglass-half"></i>
+        Loading, please wait...
+        <div></div>
+    </div>`;
+    const el = document.getElementById('my-netdata-dropdown-content')
+    el.innerHTML = html;
 }
 
 function renderMyNetdataMenu(machinesArray) {
@@ -662,7 +672,7 @@ function renderMyNetdataMenu(machinesArray) {
     } else {
         html += (
             `<div class="agent-item">
-                <i class="fas fa-question-circle""></i>
+                <i class="fas fa-question-circle"></i>
                 <a href="https://netdata.cloud" target="_blank">What is this?</a>
                 <div></div>
             </div>`
@@ -4504,12 +4514,12 @@ function renderAccountUI() {
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                     <li>
                         <a href="${NETDATA.registry.cloudBaseURL}" class="btn" target="_blank">
-                            <i class="fas fa-cloud"></i>&nbsp;<span class="hidden-sm hidden-md">Netdata Cloud</span>
+                            <i class="fas fa-cloud"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Netdata Cloud</span>
                         </a>
                     </li>
                     <li>
                         <a href="#" class="btn" onclick="signOutDidClick();">
-                        <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
+                        <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
                     </a>
                 </li>
             </ul>`
@@ -4575,8 +4585,8 @@ function syncAgents() {
     if (agentsToSync.length > 0) {
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
-            cloudKnownAgents = agents; // TODO: Is this needed?
-            renderMyNetdataMenu(agents);
+            cloudKnownAgents = agents;
+            renderMyNetdataMenu(cloudKnownAgents);
         });        
     }
 }
@@ -4604,6 +4614,7 @@ function netdataRegistryCallback(machinesArray) {
     if (isSignedIn()) {
         // We call getAgentsList() here because it requires that 
         // NETDATA.registry is initialized.
+        clearMyNetdataMenu();
         getCloudAccountKnownAgents().then((agents) => {
             cloudKnownAgents = agents; // TODO: Is this needed?
             syncAgents();
