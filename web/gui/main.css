@@ -532,7 +532,7 @@ body.modal-open {
     transition: 0s
 }
 
-/* --- */
+/* -------------------------------------------------------------------------- */
 
 #my-netdata-dropdown-content a:hover {
     color: #fff;
@@ -619,4 +619,11 @@ body.modal-open {
 #sign-in-iframe {
     background-color: #fff;
     border: none;
+}
+
+#cloud-menu {
+}
+
+#cloud-menu.dropdown-menu > li > a {
+    text-align: left;
 }
