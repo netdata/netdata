@@ -5,7 +5,7 @@
 AC_PREREQ(2.60)
 
 # We do not use m4_esyscmd_s to support older autoconf.
-define([VERSION_STRING], m4_esyscmd([git describe 2>/dev/null | tr -d '\n']))
+define([VERSION_STRING], m4_esyscmd([git describe --always 2>/dev/null | tr -d '\n']))
 define([VERSION_FROM_FILE], m4_esyscmd([cat packaging/version | tr -d '\n']))
 m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_FROM_FILE)])
 
