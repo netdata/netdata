@@ -4456,16 +4456,10 @@ function postAgentsMigrate() {
 
 // -------------------------------------------------------------------------------------------------
 
-function trackAnalyticsEvent(event) {
-    dataLayer.push({"event": event});
-    console.log(`TRACE: ${event}`);
-}
-
 function signInDidClick() {
     window.addEventListener("message", handleMessage, false);    
     url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.open(url);
-    trackAnalyticsEvent("signupstarted");
 }
 
 function signOutDidClick() {
@@ -4523,8 +4517,6 @@ function handleMessage(e) {
     localStorage.setItem("cloud.accountID", e.data.accountID);
     localStorage.setItem("cloud.accountName", e.data.accountName);
     localStorage.setItem("cloud.token", e.data.token);
-
-    trackAnalyticsEvent("signupcompleted");
 
     window.removeEventListener("message", handleMessage, false);
 
