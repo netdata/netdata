@@ -4352,10 +4352,6 @@ let registryKnownAgents = [];
 // The known agents associated with the current cloud account.
 let cloudKnownAgents = [];
 
-function closeModal() {
-    $(".modal-header button.close").click();
-}
-
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
 function truncateString(str, maxLength) {
@@ -4470,11 +4466,15 @@ function signOutDidClick() {
     signOut();
 }
 
-function signOut() {
+function clearCloudLocalStorageItems() {
+    localStorage.removeItem("cloud.baseURL");
     localStorage.removeItem("cloud.accountID");
     localStorage.removeItem("cloud.accountName");
     localStorage.removeItem("cloud.token");
-    
+}
+
+function signOut() {
+    clearCloudLocalStorageItems();    
     renderAccountUI();
     renderMyNetdataMenu(registryKnownAgents);
 }
@@ -4513,16 +4513,13 @@ function renderAccountUI() {
 }
 
 function handleMessage(e) {
+    localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
     localStorage.setItem("cloud.accountID", e.data.accountID);
     localStorage.setItem("cloud.accountName", e.data.accountName);
     localStorage.setItem("cloud.token", e.data.token);
 
-    renderAccountUI();
-    closeModal();
-
     window.removeEventListener("message", handleMessage, false);
 
-    // Update `My Agents` menu.
     netdataRegistryCallback(registryKnownAgents);
 }
 
@@ -4556,8 +4553,13 @@ function migrateAgents() {
 
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
-        localStorage.removeItem("cloud.token");
+        clearCloudLocalStorageItems();
         return;
+    }
+
+    if (NETDATA.registry.cloudBaseURL != localStorage.getItem("cloud.baseURL")) {
+        clearCloudLocalStorageItems();
+        localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
     }
 
     renderAccountUI();
@@ -4583,11 +4585,9 @@ function netdataRegistryCallback(machinesArray) {
 };
 
 // if (document.readyState === "complete") {
-//     initCloud();
 // } else {
 //     document.addEventListener("readystatechange", () => {
 //         if (document.readyState === "complete") {
-//             initCloud();
 //         }
 //     })
 // }
