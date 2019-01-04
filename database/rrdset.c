@@ -1587,54 +1587,44 @@ void rrdset_done(RRDSET *st) {
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
-/*
-    // find if there are any obsolete dimensions (not updated recently)
-    if(unlikely(rrd_delete_unupdated_dimensions)) {
+    // find if there are any obsolete dimensions
+    time_t now = now_realtime_sec();
 
-        for( rd = st->dimensions; likely(rd) ; rd = rd->next )
-            if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)
-                break;
+    rrddim_foreach_read(rd, st)
+        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+            break;
 
-        if(unlikely(rd)) {
-            RRDDIM *last;
-            // there is dimension to free
-            // upgrade our read lock to a write lock
-            rrdset_unlock(st);
-            rrdset_wrlock(st);
+    if(unlikely(rd)) {
+        RRDDIM *last;
+        // there is dimension to free
+        // upgrade our read lock to a write lock
+        rrdset_unlock(st);
+        rrdset_wrlock(st);
 
-            for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                // remove it only it is not updated in rrd_delete_unupdated_dimensions seconds
+        for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
+            if(unlikely(rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now)) {
+                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-                if(unlikely((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)) {
-                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
-
-                    if(unlikely(!last)) {
-                        st->dimensions = rd->next;
-                        rd->next = NULL;
-                        rrddim_free(st, rd);
-                        rd = st->dimensions;
-                        continue;
-                    }
-                    else {
-                        last->next = rd->next;
-                        rd->next = NULL;
-                        rrddim_free(st, rd);
-                        rd = last->next;
-                        continue;
-                    }
+                if(unlikely(!last)) {
+                    rrddim_free(st, rd);
+                    rd = st->dimensions;
+                    continue;
                 }
-
-                last = rd;
-                rd = rd->next;
+                else {
+                    rrddim_free(st, rd);
+                    rd = last->next;
+                    continue;
+                }
             }
 
-            if(unlikely(!st->dimensions)) {
-                info("Disabling chart %s (%s) since it does not have any dimensions", st->name, st->id);
-                st->enabled = 0;
-            }
+            last = rd;
+            rd = rd->next;
+        }
+        if(unlikely(!st->dimensions)) {
+            info("Making chart %s (%s) obsolete since it does not have any dimensions", st->name, st->id);
+            rrdset_is_obsolete(st);
         }
     }
-*/
 
     rrdset_unlock(st);
 

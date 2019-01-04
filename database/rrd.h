@@ -31,6 +31,7 @@ typedef struct alarm_entry ALARM_ENTRY;
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
+extern time_t rrdset_free_obsolete_time;
 
 #define RRD_ID_LENGTH_MAX 200
 
