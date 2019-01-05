@@ -14,7 +14,7 @@ Most charts depict more than one dimensions. The dimensions of a chart are calle
 
 ## Families
 
-When you have several instances of a monitored hardware or software (e.g. network interfaces, mysql instances etc.), you need to be able to identify each one separately. Netdata uses "families" to identify such instances. For example, if I have the network interfaces `eth0` and `eth1`, `eth0` will be one family, and `eth1` will be another. 
+When you have several instances of a monitored hardware or software resource (e.g. network interfaces, mysql instances etc.), you need to be able to identify each one separately. Netdata uses "families" to identify such instances. For example, if I have the network interfaces `eth0` and `eth1`, `eth0` will be one family, and `eth1` will be another. 
 
 The reasoning behind calling these instances "families" is that different charts for the same instance can and many times are related (relatives, family, you get it). The family of a chart is usually the name of the netdata dashboard submenu that you see selected on the right navigation pane, when you are looking at a chart. For the example of the two network interfaces, you would see a submenu `eth0` and a submenu `eth1` under the "Network Interfaces" menu on the right navigation pane. 
 
