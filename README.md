@@ -42,7 +42,8 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 11. [Documentation](#documentation) - read the docs
 12. [Community](#community) - discuss with others and get support
 13. [License](#license) - check the license of netdata
-
+14. [Is it any good?](#is-it-any-good) - Yes
+15. [Is it awesome?](#is-it-awesome) - Yes
 
 ## How it looks
 
@@ -487,9 +488,22 @@ You can also find netdata on:
 - [Repology](https://repology.org/metapackage/netdata/versions)
 - [StackShare](https://stackshare.io/netdata)
 
-## License  
+## License
   
 netdata is [GPLv3+](LICENSE).  
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](REDISTRIBUTED.md).
 
+## Is it any good?
+
+Yes.
+
+*When people first hear about a new product, they frequently ask if it is any good. A Hacker News user [remarked](https://news.ycombinator.com/item?id=3067434):*
+
+> Note to self: Starting immediately, all raganwald projects will have a “Is it any good?” section in the readme, and the answer shall be “yes.".
+
+So, we follow the tradition...
+
+## Is it awesome?
+
+[These people](https://github.com/netdata/netdata/stargazers) seem to like it.
