@@ -58,29 +58,7 @@ dist_noinst_DATA= \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
-	docs/Add-more-charts-to-netdata.md \
-	docs/Demo-Sites.md \
-	docs/Donations-netdata-has-received.md \
-	docs/Netdata-Security-and-Disclosure-Information.md \
-	docs/Performance.md \
-	docs/Running-behind-apache.md \
-	docs/Running-behind-caddy.md \
-	docs/Running-behind-lighttpd.md \
-	docs/Running-behind-nginx.md \
-	docs/Third-Party-Plugins.md \
-	docs/a-github-star-is-important.md \
-	docs/high-performance-netdata.md \
-	docs/netdata-for-IoT.md \
-	docs/netdata-security.md \
-	docs/why-netdata/README.md \
-	docs/why-netdata/1s-granularity.md \
-	docs/why-netdata/unlimited-metrics.md \
-	docs/why-netdata/meaningful-presentation.md \
-	docs/why-netdata/immediate-results.md \
-	docs/GettingStarted.md \
-	docs/Charts.md \
-	docs/configuration-guide.md \
-	docs/generator/custom \
+	docs \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
 	packaging/installer/UPDATE.md \
