@@ -72,7 +72,11 @@ dist_noinst_DATA= \
 	docs/high-performance-netdata.md \
 	docs/netdata-for-IoT.md \
 	docs/netdata-security.md \
-	docs/Why-Netdata.md \
+	docs/why-netdata/README.md \
+	docs/why-netdata/1s-granularity.md \
+	docs/why-netdata/unlimited-metrics.md \
+	docs/why-netdata/meaningful-presentation.md \
+	docs/why-netdata/immediate-results.md \
 	docs/GettingStarted.md \
 	docs/Charts.md \
 	docs/configuration-guide.md \
