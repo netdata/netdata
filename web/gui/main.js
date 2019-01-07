@@ -886,30 +886,45 @@ function notifyForSwitchRegistry() {
     }
 }
 
+var deleteRegistryGuid = null; 
 var deleteRegistryUrl = null;
 
 function deleteRegistryModalHandler(guid, name, url) {
-    void (guid);
+    // void (guid);
 
+    deleteRegistryGuid = guid;
     deleteRegistryUrl = url;
+
     document.getElementById('deleteRegistryServerName').innerHTML = name;
     document.getElementById('deleteRegistryServerName2').innerHTML = name;
     document.getElementById('deleteRegistryServerURL').innerHTML = url;
     document.getElementById('deleteRegistryResponse').innerHTML = '';
+ 
     $('#deleteRegistryModal').modal('show');
 }
 
 function notifyForDeleteRegistry() {
+    const responseEl = document.getElementById('deleteRegistryResponse');
+
     if (deleteRegistryUrl) {
-        NETDATA.registry.delete(deleteRegistryUrl, function (result) {
-            if (result !== null) {
-                deleteRegistryUrl = null;
-                $('#deleteRegistryModal').modal('hide');
-                NETDATA.registry.init();
-            } else {
-                document.getElementById('deleteRegistryResponse').innerHTML = "<b>Sorry! this command was rejected by the registry server.</b>";
-            }
-        });
+        if (isSignedIn()) {
+            deleteCloudKnownAgentURL(deleteRegistryGuid, deleteRegistryUrl)
+                .then((count) => {
+                    if (!count) {
+                        responseEl.innerHTML = "<b>Sorry, this command was rejected by netdata.cloud!</b>";
+                        return;
+                    }
+                    NETDATA.registry.delete(deleteRegistryUrl, function (result) {
+                        if (result !== null) {
+                            deleteRegistryUrl = null;
+                            $('#deleteRegistryModal').modal('hide');
+                            NETDATA.registry.init();
+                        } else {
+                            responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
+                        }
+                    });    
+                });
+        }
     }
 }
 
@@ -4392,6 +4407,8 @@ function truncateString(str, maxLength) {
 }
 
 // -------------------------------------------------------------------------------------------------
+// netdata.cloud API Client
+// -------------------------------------------------------------------------------------------------
 
 // https://github.com/netdata/hub/issues/146
 function getCloudAccountKnownAgents() {
@@ -4486,6 +4503,31 @@ function postCloudAccountKnownAgents(agentsToSync) {
                 "alternate_urls": a.urls
             }
         })        
+    });
+}
+
+function deleteCloudKnownAgentURL(agentID, url) {
+    const accountID = localStorage.getItem("cloud.accountID");
+    const token = localStorage.getItem("cloud.token");
+    if (accountID == null || token == null) {
+        return 0;
+    }
+
+    return fetch(
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents/${agentID}/url?value=${encodeURIComponent(url)}`,
+        {
+            method: "DELETE",
+            mode: "cors",
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Bearer ${token}`
+            },
+        }
+    ).then((response) => {
+        return response.json();
+    }).then((payload) => {
+        const count = payload.result ? payload.result.count : 0;
+        return count;
     });
 }
 
