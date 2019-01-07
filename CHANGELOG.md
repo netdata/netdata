@@ -5,10 +5,12 @@
 **Fixed bugs:**
 
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
+- Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
 
 **Closed issues:**
 
+- SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
 - alarm notifications should state a count of active alarms per state [\#946](https://github.com/netdata/netdata/issues/946)
 
@@ -16,6 +18,7 @@
 
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
+- Clarify backend modes of operation [\#5116](https://github.com/netdata/netdata/pull/5116) ([cakrit](https://github.com/cakrit))
 - web-site content; why-netdata content [\#5097](https://github.com/netdata/netdata/pull/5097) ([ktsaou](https://github.com/ktsaou))
 - Add variables to alarm-notify.sh  [\#5096](https://github.com/netdata/netdata/pull/5096) ([cakrit](https://github.com/cakrit))
 - do not report stale metrics to prometheus [\#5084](https://github.com/netdata/netdata/pull/5084) ([ktsaou](https://github.com/ktsaou))
