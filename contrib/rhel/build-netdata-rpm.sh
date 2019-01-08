@@ -26,7 +26,7 @@ build() {
 
   rpmbuild --rebuild "${srpm}"
 
-  cp /root/rpmbuild/RPMS/x86_64/netdata-* ./
+  cp /root/rpmbuild/RPMS/x86_64/netdata-* /code
 
   echo >&2 "All done!"
 }

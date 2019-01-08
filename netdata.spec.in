@@ -4,115 +4,108 @@
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
-%global __os_install_post %{nil}
+#%global __os_install_post %{nil}
 
-#
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     nfacct   # build with nfacct plugin
-%bcond_with     freeipmi # build with freeipmi plugin
 %bcond_with     netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
-%undefine	with_systemd
-%undefine	with_netns
+  %undefine with_systemd
+  %undefine with_netns
 %endif
 
 %if %{with systemd}
-%if 0%{?suse_version}
-%global netdata_initd_buildrequires \
-BuildRequires: systemd-rpm-macros \
-%{nil}
-%global netdata_initd_requires \
-%{?systemd_requires} \
-%{nil}
-%global netdata_init_post %service_add_post netdata.service
-%global netdata_init_preun %service_del_preun netdata.service
-%global netdata_init_postun %service_del_postun netdata.service
+  %if 0%{?suse_version}
+    %global netdata_initd_buildrequires \
+    BuildRequires: systemd-rpm-macros
+    %global netdata_initd_requires \
+    %{?systemd_requires} \
+    %{nil}
+    %global netdata_init_post %service_add_post netdata.service
+    %global netdata_init_preun %service_del_preun netdata.service
+    %global netdata_init_postun %service_del_postun netdata.service
+  %else
+    %global netdata_initd_buildrequires \
+    BuildRequires: systemd
+    %global netdata_initd_requires \
+    Requires(preun):  systemd-units \
+    Requires(postun): systemd-units \
+    Requires(post):   systemd-units \
+    %{nil}
+    %global netdata_init_post %systemd_post netdata.service
+    %global netdata_init_preun %systemd_preun netdata.service
+    %global netdata_init_postun %systemd_postun_with_restart netdata.service
+  %endif
 %else
-%global netdata_initd_buildrequires \
-BuildRequires: systemd
-%global netdata_initd_requires \
-Requires(preun):  systemd-units \
-Requires(postun): systemd-units \
-Requires(post):   systemd-units \
-%{nil}
-%global netdata_init_post %systemd_post netdata.service
-%global netdata_init_preun %systemd_preun netdata.service
-%global netdata_init_postun %systemd_postun_with_restart netdata.service
-%endif
-%else
-%global netdata_initd_buildrequires %{nil}
-%global netdata_initd_requires \
-Requires(post):   chkconfig \
-%{nil}
-%global netdata_init_post \
-/sbin/chkconfig --add netdata \
-%{nil}
-%global netdata_init_preun %{nil} \
-if [ $1 = 0 ]; then \
-        /sbin/service netdata stop > /dev/null 2>&1 \
-        /sbin/chkconfig --del netdata \
-fi \
-%{nil}
-%global netdata_init_postun %{nil} \
-if [ $1 != 0 ]; then \
-        /sbin/service netdata condrestart 2>&1 > /dev/null \
-fi \
-%{nil}
-%endif
-
-%if 0%{?_fedora}
-%global netdata_recommends \
-Recommends:	curl \
-Recommends:	iproute-tc \
-Recommends:	lm_sensors \
-Recommends:	nmap-ncat \
-Recommends:	nodejs \
-Recommends:	python \
-Recommends:	PyYAML \
-Recommends:	python2-PyMySQL \
-Recommends:	python2-psycopg2 \
-%{nil}
-%else
-%global netdata_recommends %{nil}
+  %global netdata_initd_buildrequires %{nil}
+  %global netdata_initd_requires \
+  Requires(post):   chkconfig \
+  %{nil}
+  %global netdata_init_post \
+  /sbin/chkconfig --add netdata \
+  %{nil}
+  %global netdata_init_preun %{nil} \
+  if [ $1 = 0 ]; then \
+          /sbin/service netdata stop > /dev/null 2>&1 \
+          /sbin/chkconfig --del netdata \
+  fi \
+  %{nil}
+  %global netdata_init_postun %{nil} \
+  if [ $1 != 0 ]; then \
+          /sbin/service netdata condrestart 2>&1 > /dev/null \
+  fi \
+  %{nil}
 %endif
 
-Summary:	Real-time performance monitoring, done right
-Name:		netdata
-Version:	1.12.0
-Release:	1%{?dist}
-License:	GPLv3+
-Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.gz
-URL:		http://my-netdata.io
-BuildRequires:	pkgconfig
-BuildRequires:	xz
-BuildRequires:	zlib-devel
-BuildRequires:	libuuid-devel
-Requires:	zlib
-Requires:	libuuid
+Summary:        Real-time performance monitoring, done right
+Name:           netdata
+
+Version:        @PACKAGE_RPM_VERSION@
+#Release:        @PACKAGE_RPM_RELEASE@%{?dist}
+Release:        0.1%{?dist}
+License:        GPLv3+
+Group:          Applications/System
+Source0:        %(ls netdata*.tar.gz)
+#Source0:       https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
+#Source1:        'https://www.googleapis.com/storage/v1/b/%{name}-stable/o/%{name}-%{version}.tar.gz?alt=media'
+#Source2:        'https://www.googleapis.com/storage/v1/b/%{name}-nightly/o/%{name}-latest.tar.gz?alt=media'
+
+URL:            http://my-netdata.io
+BuildRequires:  pkgconfig
+BuildRequires:  xz
+BuildRequires:  zlib-devel
+BuildRequires:  libuuid-devel
+Requires:       zlib
+Requires:       libuuid
 
 # Packages can be found in the EPEL repo
-%if %{with nfacct}
-BuildRequires:	libmnl-devel
-BuildRequires:	libnetfilter_acct-devel
-Requires: libmnl
-Requires: libnetfilter_acct
-%endif
+BuildRequires:  libmnl-devel
+BuildRequires:  libnetfilter_acct-devel
+Recommends: libmnl
+Recommends: libnetfilter_acct
 
-%if %{with freeipmi}
-BuildRequires:	freeipmi-devel
-Requires: freeipmi
-%endif
+BuildRequires:  freeipmi-devel
+Recommends: freeipmi
 
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 Requires(post): libcap
 
+%if 0%{?_fedora}
+Recommends: curl
+Recommends: iproute-tc
+Recommends: lm_sensors
+Recommends: nmap-ncat
+Recommends: nodejs
+Recommends: python
+Recommends: PyYAML
+Recommends: python2-PyMySQL
+Recommends: python2-psycopg2
+%endif
+
 %{netdata_initd_buildrequires}
-%{netdata_recommends}
 %{netdata_initd_requires}
 
 %description
@@ -126,16 +119,16 @@ so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
 %prep
-%setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
+%setup -q -n %(ls netdata*.tar.gz | cut -d. -f1-3)
 
 %build
 autoreconf -i
 %configure \
-	--with-zlib \
-	--with-math \
-	%{?with_nfacct:--enable-plugin-nfacct} \
-	%{?with_freeipmi:--enable-plugin-freeipmi} \
-	--with-user=netdata
+        --with-zlib \
+        --with-math \
+        --enable-plugin-nfacct \
+        --enable-plugin-freeipmi \
+        --with-user=netdata
 %{__make} %{?_smp_mflags}
 
 %install
@@ -185,11 +178,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}
 
 %config %{_sysconfdir}/%{name}/*.conf
-#%config %{_sysconfdir}/%{name}/charts.d/*.conf
-#%config %{_sysconfdir}/%{name}/health.d/*.conf
-#%config %{_sysconfdir}/%{name}/node.d/*.conf
-#%config %{_sysconfdir}/%{name}/python.d/*.conf
-#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
@@ -226,7 +214,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-#%dir %{_libdir}/%{name}/conf.d/node.d
+%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
@@ -241,12 +229,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.1-0
+- Make spec file independent from build system (spec file should execute build system commands not the other way around).
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
-- Comment-out node.d configuration directory 
+- Comment-out node.d configuration directory
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
-

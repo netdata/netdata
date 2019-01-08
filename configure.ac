@@ -16,7 +16,7 @@ if test x"$USE_MAINTAINER_MODE" = xyes; then
 AC_MSG_NOTICE(***************** MAINTAINER MODE *****************)
 fi
 
-PACKAGE_RPM_VERSION="VERSION_STRING"
+define([PACKAGE_RPM_VERSION], m4_esyscmd([cat packaging/version | cut -dv -f2 | cut -d- -f-2 --output-delimiter='' | tr -d '\n']))
 AC_SUBST([PACKAGE_RPM_VERSION])
 
 # -----------------------------------------------------------------------------
@@ -537,6 +537,7 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
+    netdata.spec
     backends/graphite/Makefile
     backends/json/Makefile
     backends/Makefile
