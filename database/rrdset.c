@@ -1596,7 +1596,7 @@ void rrdset_done(RRDSET *st) {
 
     if(unlikely(rd)) {
         RRDDIM *last;
-        // there is dimension to free
+        // there is a dimension to free
         // upgrade our read lock to a write lock
         rrdset_unlock(st);
         rrdset_wrlock(st);
@@ -1604,6 +1604,12 @@ void rrdset_done(RRDSET *st) {
         for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
             if(unlikely(rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now)) {
                 info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+
+                if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                    info("Deleting dimension file '%s'.", rd->cache_filename);
+                    if(unlikely(unlink(rd->cache_filename) == -1))
+                        error("Cannot delete dimension file '%s'", rd->cache_filename);
+                }
 
                 if(unlikely(!last)) {
                     rrddim_free(st, rd);
@@ -1620,6 +1626,7 @@ void rrdset_done(RRDSET *st) {
             last = rd;
             rd = rd->next;
         }
+
         if(unlikely(!st->dimensions)) {
             info("Making chart %s (%s) obsolete since it does not have any dimensions", st->name, st->id);
             rrdset_is_obsolete(st);

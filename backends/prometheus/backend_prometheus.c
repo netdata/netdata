@@ -291,7 +291,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
 
