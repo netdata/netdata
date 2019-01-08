@@ -81,16 +81,15 @@ Recommends:	python2-psycopg2 \
 
 Summary:	Real-time performance monitoring, done right
 Name:		netdata
-Version:	%(git describe --abbrev=0 --tags | cut -dv -f2)
-%if %(git describe --tags --exact-match HEAD 2>/dev/null | wc -l) == 0
-Release:        git_%(git rev-parse --short HEAD)%{?dist}
-%else
-Release:	1%{?dist}
-%endif
+
+Version:	%(cat packaging/version | cut -d- -f1)
+Release:        %(cat packaging/version | cut -d- -f4)%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-#Source0:	https://github.com/netdata/%{name}/releases/download/v%{version}/%{name}-%{version}.tar.gz
-Source0:        %(ls netdata*.tar.gz)
+Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
+Source1:        https://www.googleapis.com/storage/v1/b/%{name}-stable/o/%{name}-%{version}.tar.gz?alt=media
+Source2:        https://www.googleapis.com/storage/v1/b/%{name}-nightly/o/%{name}-latest.tar.gz?alt=media
+#Source0:        %(ls netdata*.tar.gz)
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
@@ -134,6 +133,7 @@ happened, on your systems and applications.
 %setup -q -n %(ls netdata*.tar.gz | cut -d. -f1-3)
 
 %build
+autoreconf -i
 %configure \
 	--with-zlib \
 	--with-math \
@@ -216,7 +216,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/log/%{name}
+%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 
 %dir %{_datadir}/%{name}
@@ -230,7 +230,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-%dir %{_libdir}/%{name}/conf.d/node.d
+#%dir %{_libdir}/%{name}/conf.d/node.d #TODO(paulfantom) figure out why this directory is not present
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
@@ -245,70 +245,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
-* Tue Mar 27 2018 Costa Tsaousis <costa@tsaousis.gr> - 1.10.0-1
-  Please check full changelog at github.
-  https://github.com/netdata/netdata/releases
-* Sun Dec 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.9.0-1
-  Please check full changelog at github.
-  https://github.com/netdata/netdata/releases
-* Sun Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
-  This is mainly a bugfix release.
-  Please check full changelog at github.
-* Sun Jul 16 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.7.0-1
-- netdata is now a fully featured statsd server
-- new installation options
-- metrics streaming and replication improvements
-- backends improvements - prometheus support rewritten
-- netdata now monitors ZFS (on Linux and FreeBSD)
-- netdata now monitors ElasticSearch
-- netdata now monitors RabbitMQ
-- netdata now monitors Go applications (via expvar)
-- netdata now monitors ipfw (on FreeBSD 11)
-- netdata now monitors samba
-- netdata now monitors squid logs
-- netdata dashboard loading times have been improved significantly
-- netdata alarms now support custom hooks
-- dozens more improvements and bug fixes
-* Mon Mar 20 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.6.0-1
-- central netdata
-- monitoring ephemeral nodes
-- monitoring ephemeral containers and VM guests
-- apps.plugin ported for FreeBSD
-- web_log plugin
-- JSON backends
-- IPMI monitoring
-- several new and improved plugins
-- several new and improved alarms and notifications
-- dozens more improvements and bug fixes
-* Sun Jan 22 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.5.0-1
-- FreeBSD, MacOS, FreeNAS
-- Backends support
-- dozens of new and improved plugins
-- dozens of new and improved alarms and notification methods
-* Tue Oct 4 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.4.0-1
-- the fastest netdata ever (with a better look too)!
-- improved IoT and containers support!
-- alarms improved in almost every way!
-- Several more improvements, new features and bugfixes.
-* Sun Aug 28 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.3.0-1
-- netdata now has health monitoring
-- netdata now generates badges
-- netdata now has python plugins
-- Several more improvements, new features and bugfixes.
-* Tue Jul 26 2016 Jason Barnett <J@sonBarnett.com> - 1.2.0-2
-- Added support for EL6
-- Corrected several Requires statements
-- Changed default to build without nfacct
-- Removed --docdir from configure
-* Mon May 16 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.2.0-1
-- netdata is now 30% faster.
-- netdata now has a registry (my-netdata menu on the dashboard).
-- netdata now monitors Linux containers.
-- Several more improvements, new features and bugfixes.
-* Wed Apr 20 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.1.0-1
-- Several new features (IPv6, SYNPROXY, Users, Users Groups).
-- A lot of bug fixes and optimizations.
-* Tue Mar 22 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.0.0-1
-- First public release.
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.1-0
+- Make spec file independent from build system (spec file should execute build system commands not the other way around).
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
+- Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
