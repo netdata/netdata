@@ -22,10 +22,9 @@ The `my-netdata` menu shows a list of all "databases streamed to" the master. Cl
 
 Alarms for the `slave` are served by the `master`.
 
-In this mode the `slave` is just a plain data collector.
-It runs with... **5MB** of RAM (yes, you read correct), spawns all external plugins, but instead
+In this mode the `slave` is just a plain data collector. It spawns all external plugins, but instead
 of maintaining a local database and accepting dashboard requests, it streams all metrics to the
-`master`.
+`master`. The memory footprint is reduced significantly, to between 6 MiB and 40 MiB, depending on the enabled plugins. To reduce the memory usage as much as possible, refer to [running netdata in embedded devices](../docs/Performance.md#running-netdata-in-embedded-devices).
 
 The same `master` can collect data for any number of `slaves`.
 

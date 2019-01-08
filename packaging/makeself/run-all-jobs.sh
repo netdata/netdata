@@ -21,7 +21,7 @@ if [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ]
 fi
 
 # netdata source directory
-export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/.."
+export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/../.."
 
 # make sure ${NULL} is empty
 export NULL=

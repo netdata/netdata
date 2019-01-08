@@ -56,17 +56,15 @@ jobs:
       depth: false
 
   - stage: nightlies
-    name: docker images
+    name: Nightly build
+    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
     install:
-    - sudo apt update
+    - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
-    script: "packaging/docker/build.sh"
-    env: REPOSITORY="netdata/netdata"
-  - name: tarball and self-extractor build
-    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
-    install: sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-    script: ".travis/create_artifacts.sh"
+    script: ".travis/nightlies.sh"
+    git:
+      depth: false
     deploy:
       provider: gcs
       edge:
@@ -76,11 +74,6 @@ jobs:
       bucket: "netdata-nightlies"
       skip_cleanup: true
       local_dir: "upload"
-  - name: changelog generation
-    script: ".travis/generate_changelog.sh"
-    env: COMMIT_AND_PUSH=1
-    git:
-      depth: false
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci

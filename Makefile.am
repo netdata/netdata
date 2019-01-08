@@ -47,7 +47,6 @@ EXTRA_DIST = \
 
 SUBDIRS = \
 	diagrams \
-	makeself \
 	system \
 	tests \
 	$(NULL)
@@ -73,7 +72,11 @@ dist_noinst_DATA= \
 	docs/high-performance-netdata.md \
 	docs/netdata-for-IoT.md \
 	docs/netdata-security.md \
-	docs/Why-Netdata.md \
+	docs/why-netdata/README.md \
+	docs/why-netdata/1s-granularity.md \
+	docs/why-netdata/unlimited-metrics.md \
+	docs/why-netdata/meaningful-presentation.md \
+	docs/why-netdata/immediate-results.md \
 	docs/GettingStarted.md \
 	docs/Charts.md \
 	docs/configuration-guide.md \
@@ -88,8 +91,8 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	kickstart.sh \
-	kickstart-static64.sh \
+	packaging/installer/kickstart.sh \
+	packaging/installer/kickstart-static64.sh \
 	netdata-installer.sh \
 	packaging/installer/functions.sh \
 	docs/generator/buildhtml.sh \

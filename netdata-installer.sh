@@ -911,44 +911,35 @@ END
 echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ -d .git ]; then
-	cp ./packaging/installer/netdata-updater.sh netdata-updater.sh
-	sed -i "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" netdata-updater.sh
-	chmod 755 netdata-updater.sh
-	echo >&2 "Update script is located at: ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
-	echo >&2
-	echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} can work from cron. It will trigger an email from cron"
-	echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
-	if [ "${UID}" -eq "0" ]; then
+	if [ "${UID}" -ne "0" ]; then
+		[ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
+	else
 		crondir=
 		[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
 		[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
 
-		if [ ! -z "${crondir}" ]; then
-			if [ -f "${crondir}/netdata-updater.sh" -a ! -f "${crondir}/netdata-updater" ]; then
-				# remove .sh from the filename under cron
-				progress "Fixing netdata-updater filename at cron"
-				mv -f "${crondir}/netdata-updater.sh" "${crondir}/netdata-updater"
+		if [ -z "${crondir}" ]; then
+			[ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater"
+		else
+			if [ -f "${crondir}/netdata-updater.sh" ]; then
+				progress "Removing incorrect netdata-updater filename in cron"
+				rm -f "${crondir}/netdata-updater.sh"
 			fi
 
-			if [ ! -f "${crondir}/netdata-updater" ]; then
-				if [ "${AUTOUPDATE}" = "1" ]; then
-					progress "Installing netdata-updater at cron"
-					run ln -fs "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
-				else
-					echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
-					echo >&2
-					echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ln -fs ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
-				fi
+			if [ "${AUTOUPDATE}" = "1" ]; then
+				progress "Installing new netdata-updater in cron"
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
+				chmod 0755 ${crondir}/netdata-updater
+				echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
+				echo >&2
+				echo >&2 "By default ${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+				echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
 			else
-				progress "Refreshing netdata-updater at cron"
-				run rm "${crondir}/netdata-updater"
-				run ln -fs "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
+				echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
+				echo >&2
+				echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ${crondir}/netdata-updater${TPUT_RESET}"
 			fi
-		else
-			[ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater."
 		fi
-	else
-		[ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
 	fi
 else
 	[ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"

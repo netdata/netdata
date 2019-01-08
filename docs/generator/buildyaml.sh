@@ -116,14 +116,19 @@ nav:'
 
 navpart 1 . README "About"
 
-echo -ne "    - 'docs/Why-Netdata.md'
-    - 'docs/Demo-Sites.md'
+echo -ne "    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/Donations-netdata-has-received.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
+- Why Netdata:
+    - 'docs/why-netdata/README.md'
+    - 'docs/why-netdata/1s-granularity.md'
+    - 'docs/why-netdata/unlimited-metrics.md'
+    - 'docs/why-netdata/meaningful-presentation.md'
+    - 'docs/why-netdata/immediate-results.md'
 - Installation:
     - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'

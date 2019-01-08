@@ -35,7 +35,7 @@ run ./configure \
 #	--enable-prompt-string-decoding \
 #	--enable-readline \
 #	--enable-select \
-		
+
 
 run make clean
 run make -j${SYSTEM_CPUS}
