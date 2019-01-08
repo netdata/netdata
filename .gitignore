@@ -39,6 +39,7 @@ sha256sums.txt
 netdata
 !netdata/
 upload/
+artifacts/
 
 apps.plugin
 !apps.plugin/
