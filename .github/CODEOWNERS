@@ -39,6 +39,7 @@ web/gui/ @ktsaou @gmosx
 *.am @paulfantom @ktsaou
 
 # Ownership of specific files
+.gitignore @paulfantom @cakrit
 .travis.yml @paulfantom
 .lgtm.yml @paulfantom
 .eslintrc @paulfantom
