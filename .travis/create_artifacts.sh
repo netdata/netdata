@@ -17,10 +17,17 @@ echo "--- Create self-extractor ---"
 ./packaging/makeself/build-x86_64-static.sh
 
 # Needed fo GCS
-echo "--- Copy artifacts to bin ---"
-mkdir upload
-cp ./*.tar.gz ./*.gz.run upload/
+echo "--- Copy artifacts to separate directory ---"
+mkdir -p artifacts
+BASENAME="netdata-$(git describe)"
+mv "${BASENAME}".* artifacts/
+cd artifacts
+ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
+ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+sha256sum -b ./* >"sha256sums.txt"
+cd ../
 
+# TODO(paulfantom): remove this section after releasing v1.12 and always use "artifacts" directory
 echo "--- Create checksums ---"
 GIT_TAG=$(git tag --points-at)
 if [ "${GIT_TAG}" != "" ]; then
