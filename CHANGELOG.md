@@ -16,6 +16,7 @@
 
 **Merged pull requests:**
 
+- change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
 - Clarify backend modes of operation [\#5116](https://github.com/netdata/netdata/pull/5116) ([cakrit](https://github.com/cakrit))
