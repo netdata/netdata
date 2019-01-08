@@ -1,3 +1,6 @@
+# Files which shouldn't be changed manually are owned by @netdatabot.
+# This way we prevent modifications which will be overwriten by automation.
+
 # Global (default) code owner
 * @ktsaou
 
@@ -50,6 +53,7 @@ web/gui/ @ktsaou @gmosx
 netdata.spec.in @paulfantom
 netlify.toml @cakrit
 package.json @gmosx
+packaging/version @netdatabot
 
 LICENSE.md @ktsaou
-CHANGELOG.md @netdatabot @paulfantom
+CHANGELOG.md @netdatabot
