@@ -8,6 +8,12 @@
 
 Running netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running netdata on the host.
 
+## Package scrambling in runtime (x86_64 only)
+
+By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
+
+For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
+
 ## Run netdata with docker command
 
 Quickly start netdata with the docker command line.
