@@ -8,6 +8,7 @@ SUBDIRS = \
     cgroups.plugin \
     charts.d.plugin \
     checks.plugin \
+    cups.plugin \
     diskspace.plugin \
     fping.plugin \
     freebsd.plugin \
