@@ -43,6 +43,7 @@ EXTRA_DIST = \
 	LICENSE \
 	REDISTRIBUTED.md \
 	CONTRIBUTING.md \
+	netdata.spec \
 	$(NULL)
 
 SUBDIRS = \

@@ -82,14 +82,15 @@ Recommends:	python2-psycopg2 \
 Summary:	Real-time performance monitoring, done right
 Name:		netdata
 
-Version:	%(cat packaging/version | cut -d- -f1)
-Release:        %(cat packaging/version | cut -d- -f4)%{?dist}
+Version:	v1.12.0rc2_git124sdfa
+Release:        1%{?dist}
+Epoch:          %(date +%Y%m%d)
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
-Source1:        https://www.googleapis.com/storage/v1/b/%{name}-stable/o/%{name}-%{version}.tar.gz?alt=media
-Source2:        https://www.googleapis.com/storage/v1/b/%{name}-nightly/o/%{name}-latest.tar.gz?alt=media
-#Source0:        %(ls netdata*.tar.gz)
+Source0:        %(ls netdata*.tar.gz)
+#Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
+#Source1:        https://www.googleapis.com/storage/v1/b/%{name}-stable/o/%{name}-%{version}.tar.gz?alt=media
+#Source2:        https://www.googleapis.com/storage/v1/b/%{name}-nightly/o/%{name}-latest.tar.gz?alt=media
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
@@ -189,11 +190,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}
 
 %config %{_sysconfdir}/%{name}/*.conf
-#%config %{_sysconfdir}/%{name}/charts.d/*.conf
-#%config %{_sysconfdir}/%{name}/health.d/*.conf
-#%config %{_sysconfdir}/%{name}/node.d/*.conf
-#%config %{_sysconfdir}/%{name}/python.d/*.conf
-#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
+#config %{_sysconfdir}/%{name}/charts.d/*.conf
+#config %{_sysconfdir}/%{name}/health.d/*.conf
+#config %{_sysconfdir}/%{name}/node.d/*.conf
+#config %{_sysconfdir}/%{name}/python.d/*.conf
+#config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
@@ -230,7 +231,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-#%dir %{_libdir}/%{name}/conf.d/node.d #TODO(paulfantom) figure out why this directory is not present
+#dir %{_libdir}/%{name}/conf.d/node.d #TODO(paulfantom) figure out why this directory is not present
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
