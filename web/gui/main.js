@@ -4570,11 +4570,13 @@ function renderAccountUI() {
         container.innerHTML = (
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${accountName} <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+                    <!--
                     <li>
                         <a href="${NETDATA.registry.cloudBaseURL}" class="btn" target="_blank">
                             <i class="fas fa-cloud"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Netdata Cloud</span>
                         </a>
                     </li>
+                    -->
                     <li>
                         <a href="#" class="btn" onclick="signOutDidClick();">
                         <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
