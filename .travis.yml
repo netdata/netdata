@@ -73,7 +73,7 @@ jobs:
       credentials: .travis/gcs-credentials.json
       bucket: "netdata-nightlies"
       skip_cleanup: true
-      local_dir: "upload"
+      local_dir: "artifacts"
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci

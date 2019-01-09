@@ -6,6 +6,8 @@
 from __future__ import division
 import json
 
+from collections import namedtuple
+
 from bases.FrameworkServices.UrlService import UrlService
 
 
@@ -72,6 +74,15 @@ MEMSTATS_CHARTS = {
     }
 }
 
+EXPVAR = namedtuple(
+    "EXPVAR",
+    [
+        "key",
+        "type",
+        "id",
+    ]
+)
+
 
 def flatten(d, top='', sep='.'):
     items = []
@@ -119,7 +130,7 @@ class Service(UrlService):
     def _parse_extra_charts_config(self, extra_charts_config):
 
         # a place to store the expvar keys and their types
-        self.expvars = dict()
+        self.expvars = list()
 
         for chart in extra_charts_config:
 
@@ -157,11 +168,8 @@ class Service(UrlService):
                     self.info('Unsupported expvar_type "{0}". Must be "int" or "float"'.format(ev_type))
                     continue
 
-                if ev_key in self.expvars:
-                    self.info('Duplicate expvar key {0}: skipping line.'.format(ev_key))
-                    continue
-
-                self.expvars[ev_key] = (ev_type, line_id)
+                # self.expvars[ev_key] = (ev_type, line_id)
+                self.expvars.append(EXPVAR(ev_key, ev_type, line_id))
 
                 chart_dict['lines'].append(
                     [
@@ -198,21 +206,21 @@ class Service(UrlService):
             #   the rest of the data, thus avoiding needless iterating over the multiply nested memstats dict.
             del (data['memstats'])
             flattened = flatten(data)
-            for k, v in flattened.items():
-                ev = self.expvars.get(k)
-                if not ev:
-                    # expvar is not defined in config, skip it
+
+            for ev in self.expvars:
+                v = flattened.get(ev.key)
+
+                if v is None:
                     continue
+
                 try:
-                    key_type, line_id = ev
-                    if key_type == 'int':
-                        expvars[line_id] = int(v)
-                    elif key_type == 'float':
-                        # if the value type is float, multiply it by 1000 and set line divisor to 1000
-                        expvars[line_id] = float(v) * 100
+                    if ev.type == 'int':
+                        expvars[ev.id] = int(v)
+                    elif ev.type == 'float':
+                        expvars[ev.id] = float(v) * 100
                 except ValueError:
-                    self.info('Failed to parse value for key {0} as {1}, ignoring key.'.format(k, key_type))
-                    del self.expvars[k]
+                    self.info('Failed to parse value for key {0} as {1}, ignoring key.'.format(ev.key, ev.type))
+                    return None
 
         return expvars
 
