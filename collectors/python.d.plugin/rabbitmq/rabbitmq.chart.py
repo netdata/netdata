@@ -123,7 +123,7 @@ class Service(UrlService):
         )
         self.node_name = str()
 
-    def get_data(self):
+    def _get_data(self):
         data = dict()
 
         stats = self.get_overview_stats()
