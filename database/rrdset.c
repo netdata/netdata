@@ -1590,41 +1590,47 @@ void rrdset_done(RRDSET *st) {
     // find if there are any obsolete dimensions
     time_t now = now_realtime_sec();
 
-    rrddim_foreach_read(rd, st)
-        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
-            break;
+    if(unlikely(rrddim_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
+        info("RRDSET_FLAG_OBSOLETE_DIMENSIONS");
+        rrddim_foreach_read(rd, st)
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+                break;
 
-    if(unlikely(rd)) {
-        RRDDIM *last;
-        // there is a dimension to free
-        // upgrade our read lock to a write lock
-        rrdset_unlock(st);
-        rrdset_wrlock(st);
+        if(unlikely(rd)) {
+            RRDDIM *last;
+            // there is a dimension to free
+            // upgrade our read lock to a write lock
+            rrdset_unlock(st);
+            rrdset_wrlock(st);
 
-        for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-            if(unlikely(rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now)) {
-                info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
+            for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
+                if(unlikely(rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now)) {
+                    info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
-                if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
-                    info("Deleting dimension file '%s'.", rd->cache_filename);
-                    if(unlikely(unlink(rd->cache_filename) == -1))
-                        error("Cannot delete dimension file '%s'", rd->cache_filename);
+                    if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                        info("Deleting dimension file '%s'.", rd->cache_filename);
+                        if(unlikely(unlink(rd->cache_filename) == -1))
+                            error("Cannot delete dimension file '%s'", rd->cache_filename);
+                    }
+
+                    if(unlikely(!last)) {
+                        rrddim_free(st, rd);
+                        rd = st->dimensions;
+                        continue;
+                    }
+                    else {
+                        rrddim_free(st, rd);
+                        rd = last->next;
+                        continue;
+                    }
                 }
 
-                if(unlikely(!last)) {
-                    rrddim_free(st, rd);
-                    rd = st->dimensions;
-                    continue;
-                }
-                else {
-                    rrddim_free(st, rd);
-                    rd = last->next;
-                    continue;
-                }
+                last = rd;
+                rd = rd->next;
             }
-
-            last = rd;
-            rd = rd->next;
+        }
+        else {
+            rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
         }
     }
 

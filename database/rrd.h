@@ -244,21 +244,22 @@ struct rrddim {
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED           = 1 << 0, // enables or disables a chart
-    RRDSET_FLAG_DETAIL            = 1 << 1, // if set, the data set should be considered as a detail of another
-                                         // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG             = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE          = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_BACKEND_SEND      = 1 << 4, // if set, this chart should be sent to backends
-    RRDSET_FLAG_BACKEND_IGNORE    = 1 << 5, // if set, this chart should not be sent to backends
-    RRDSET_FLAG_UPSTREAM_SEND     = 1 << 6, // if set, this chart should be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_IGNORE   = 1 << 7, // if set, this chart should not be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_EXPOSED  = 1 << 8, // if set, we have sent this chart definition to netdata master (streaming)
-    RRDSET_FLAG_STORE_FIRST       = 1 << 9, // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS     = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK = 1 << 11, // if set, the chart should be checked to determine if the dimensions as homogeneous
-    RRDSET_FLAG_HIDDEN            = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
-    RRDSET_FLAG_SYNC_CLOCK        = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_ENABLED             = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL              = 1 << 1, // if set, the data set should be considered as a detail of another
+                                              // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG               = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE            = 1 << 3, // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_BACKEND_SEND        = 1 << 4, // if set, this chart should be sent to backends
+    RRDSET_FLAG_BACKEND_IGNORE      = 1 << 5, // if set, this chart should not be sent to backends
+    RRDSET_FLAG_UPSTREAM_SEND       = 1 << 6, // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE     = 1 << 7, // if set, this chart should not be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_EXPOSED    = 1 << 8, // if set, we have sent this chart definition to netdata master (streaming)
+    RRDSET_FLAG_STORE_FIRST         = 1 << 9, // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS       = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMEGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
+    RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC

@@ -372,6 +372,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
+    rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 }
 
 inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
