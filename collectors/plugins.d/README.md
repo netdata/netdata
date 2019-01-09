@@ -15,7 +15,7 @@ plugin|language|O/S|description
 [node.d.plugin](../node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.
 [python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
 
-Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator). 
+Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
 
 ## Motivation
@@ -49,9 +49,9 @@ Plugins can create any number of charts with any number of dimensions each. Each
 
 ## Configuration
 
-Netdata will supply the environment variables `NETDATA_USER_CONFIG_DIR` (for user supplied) and `NETDATA_STOCK_CONFIG_DIR` (for netdata supplied) configuration files to identify the directory where configuration files are stored. It is up to the plugin to read the configuration it needs. 
+Netdata will supply the environment variables `NETDATA_USER_CONFIG_DIR` (for user supplied) and `NETDATA_STOCK_CONFIG_DIR` (for netdata supplied) configuration files to identify the directory where configuration files are stored. It is up to the plugin to read the configuration it needs.
 
-The `netdata.conf` section [plugins] section contains a list of all the plugins found at the system where netdata runs, with a boolean setting to enable them or not. 
+The `netdata.conf` section [plugins] section contains a list of all the plugins found at the system where netdata runs, with a boolean setting to enable them or not.
 
 Example:
 
@@ -59,7 +59,7 @@ Example:
 [plugins]
 	# enable running new plugins = yes
 	# check for new plugins every = 60
-	
+
 	# charts.d = yes
 	# fping = yes
 	# node.d = yes
@@ -70,7 +70,7 @@ The setting `enable running new plugins` changes the default behavior for all ex
 So if set to `no`, only the plugins that are explicitly set to `yes` will be run.
 
 The setting `check for new plugins every` controls the time the directory `/usr/libexec/netdata/plugins.d`
-will be rescanned for new plugins. So, new plugins can give added anytime. 
+will be rescanned for new plugins. So, new plugins can give added anytime.
 
 For each of the external plugins enabled, another `netdata.conf` section
 is created, in the form of `[plugin:NAME]`, where `NAME` is the name of the external plugin.
@@ -82,7 +82,7 @@ For example, for `apps.plugin` the following section is available:
 ```
 [plugin:apps]
 	# update every = 1
-	# command options = 
+	# command options =
 ```
 
 - `update every` controls the granularity of the external plugin.
@@ -193,7 +193,7 @@ the template is:
     is used to group charts together
     (for example all eth0 charts should say: eth0),
     if empty or missing, the `id` part of `type.id` will be used
-    
+
     this controls the sub-menu on the dashboard
 
   - `context`
@@ -233,7 +233,7 @@ the template is:
 
 the template is:
 
-> DIMENSION id [name [algorithm [multiplier [divisor [hidden]]]]]
+> DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
 
  where:
 
@@ -283,10 +283,9 @@ the template is:
     an integer value to divide the collected value,
     if empty or missing, `1` is used
 
-  - `hidden`
+  - `options`
 
-    giving the keyword `hidden` will make this dimension hidden,
-    it will take part in the calculations but will not be presented in the chart
+    a space separated list of options, enclosed in quotes. Options supported: `obsolete` to mark a dimension as obsolete (netdata will delete it after some time) and `hidden` to make this dimension hidden, it will take part in the calculations but will not be presented in the chart.
 
 
 #### VARIABLE
@@ -390,7 +389,7 @@ or do not output the line at all.
 4. **C**
 
    Of course, C is the most efficient way of collecting data. This is why netdata itself is written in C.
-   
+
 ## Writing Plugins Properly
 
 There are a few rules for writing plugins properly:
@@ -411,7 +410,7 @@ There are a few rules for writing plugins properly:
    var update_every = argv[1] * 1000; /* seconds * 1000 = milliseconds */
 
    readConfiguration();
-   
+
    if(!verifyWeCanCollectValues()) {
       print "DISABLE";
       exit(1);
@@ -445,7 +444,7 @@ There are a few rules for writing plugins properly:
            sleepMilliseconds(next_run - now);
            now = currentTimeStampInMilliseconds();
        }
-       
+
        /* calculate the time passed since the last run */
        if ( loops > 0 )
            dt_since_last_run = (now - last_run) * 1000; /* in microseconds */

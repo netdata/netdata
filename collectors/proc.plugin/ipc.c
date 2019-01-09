@@ -179,7 +179,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     struct message_queue *msq;
 
     if(unlikely(!ff)) {
-        ff = procfile_open(config_get("plugin:proc:/proc/ipc", "msg filename to monitor", msg_filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get("plugin:proc:ipc", "msg filename to monitor", msg_filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -245,14 +245,14 @@ int do_ipc(int update_every, usec_t dt) {
     static long long dimensions_limit;
 
     if(unlikely(do_sem == -1)) {
-        do_sem = config_get_boolean("plugin:proc:/proc/ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
-        do_msg = config_get_boolean("plugin:proc:/proc/ipc", "message queues", CONFIG_BOOLEAN_YES);
+        do_sem = config_get_boolean("plugin:proc:ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
+        do_msg = config_get_boolean("plugin:proc:ipc", "message queues", CONFIG_BOOLEAN_YES);
 
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/msg");
-        msg_filename = config_get("plugin:proc:/proc/ipc", "msg filename to monitor", filename);
+        msg_filename = config_get("plugin:proc:ipc", "msg filename to monitor", filename);
 
-        dimensions_limit = config_get_number("plugin:proc:/proc/ipc", "max dimensions in memory allowed", 50);
+        dimensions_limit = config_get_number("plugin:proc:ipc", "max dimensions in memory allowed", 50);
 
         // make sure it works
         if(ipc_sem_get_limits(&limits) == -1) {
