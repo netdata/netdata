@@ -91,8 +91,7 @@ class Service(SocketService):
             return False
 
         for d in disks:
-            n = d.id if d.id.startswith('sd') else d.name
-            dim = [d.id, n]
+            dim = [d.id]
             self.definitions['temperatures']['lines'].append(dim)
 
         return True
