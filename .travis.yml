@@ -46,7 +46,7 @@ jobs:
     script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
 
   - stage: packaging
-    name: Create release
+    name: Create release (only on special commit msg)
     install:
     - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
     - sudo apt install -y --only-upgrade docker-ce
