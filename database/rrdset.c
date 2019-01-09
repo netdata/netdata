@@ -1591,7 +1591,6 @@ void rrdset_done(RRDSET *st) {
     time_t now = now_realtime_sec();
 
     if(unlikely(rrddim_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
-        info("RRDSET_FLAG_OBSOLETE_DIMENSIONS");
         rrddim_foreach_read(rd, st)
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
                 break;

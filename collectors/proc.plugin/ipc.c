@@ -242,6 +242,7 @@ int do_ipc(int update_every, usec_t dt) {
     static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
     static char *msg_filename = NULL;
     static struct message_queue *message_queue_root = NULL;
+    static long long dimensions_limit;
 
     if(unlikely(do_sem == -1)) {
         do_sem = config_get_boolean("plugin:proc:/proc/ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
@@ -250,6 +251,8 @@ int do_ipc(int update_every, usec_t dt) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/msg");
         msg_filename = config_get("plugin:proc:/proc/ipc", "msg filename to monitor", filename);
+
+        dimensions_limit = config_get_number("plugin:proc:/proc/ipc", "max dimensions in memory allowed", 50);
 
         // make sure it works
         if(ipc_sem_get_limits(&limits) == -1) {
@@ -430,7 +433,22 @@ int do_ipc(int update_every, usec_t dt) {
             rrdset_done(st_msq_messages);
             rrdset_done(st_msq_bytes);
 
-            if(unlikely(!message_queue_root)) {
+            long long dimensions_num = 0;
+            RRDDIM *rd;
+            rrdset_rdlock(st_msq_messages);
+            rrddim_foreach_read(rd, st_msq_messages) dimensions_num++;
+            rrdset_unlock(st_msq_messages);
+
+            if(unlikely(dimensions_num > dimensions_limit)) {
+                info("Message queue statistics has been disabled");
+                info("There are %lld dimensions in memory but limit was set to %lld", dimensions_num, dimensions_limit);
+                rrdset_is_obsolete(st_msq_messages);
+                rrdset_is_obsolete(st_msq_bytes);
+                st_msq_messages = NULL;
+                st_msq_bytes = NULL;
+                do_msg = CONFIG_BOOLEAN_NO;
+            }
+            else if(unlikely(!message_queue_root)) {
                 info("Making chart %s (%s) obsolete since it does not have any dimensions", st_msq_messages->name, st_msq_messages->id);
                 rrdset_is_obsolete(st_msq_messages);
                 st_msq_messages = NULL;
