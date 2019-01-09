@@ -348,84 +348,98 @@ int do_ipc(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(likely(do_msg != CONFIG_BOOLEAN_NO && !ipc_msq_get_info(msg_filename, &message_queue_root))) {
+    if(likely(do_msg != CONFIG_BOOLEAN_NO)) {
         static RRDSET *st_msq_messages = NULL, *st_msq_bytes = NULL;
 
-        if(unlikely(!st_msq_messages))
-            st_msq_messages = rrdset_create_localhost(
-                    "system"
-                    , "message_queue_messages"
-                    , NULL
-                    , "ipc message queues"
-                    , NULL
-                    , "IPC Message Queue Number of Messages"
-                    , "messages"
-                    , PLUGIN_PROC_NAME
-                    , "ipc"
-                    , NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        else
-            rrdset_next(st_msq_messages);
+        int ret = ipc_msq_get_info(msg_filename, &message_queue_root);
 
-        if(unlikely(!st_msq_bytes))
-            st_msq_bytes = rrdset_create_localhost(
-                    "system"
-                    , "message_queue_bytes"
-                    , NULL
-                    , "ipc message queues"
-                    , NULL
-                    , "IPC Message Queue Used Bytes"
-                    , "bytes"
-                    , PLUGIN_PROC_NAME
-                    , "ipc"
-                    , NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
-        else
-            rrdset_next(st_msq_bytes);
-
-        struct message_queue *msq = message_queue_root, *msq_prev = NULL;
-        while(likely(msq)){
-            if(likely(msq->found)) {
-                if(unlikely(!msq->rd_messages || !msq->rd_bytes)) {
-                    char id[RRD_ID_LENGTH_MAX + 1];
-                    snprintfz(id, RRD_ID_LENGTH_MAX, "%llu", msq->id);
-                    if(likely(!msq->rd_messages)) msq->rd_messages = rrddim_add(st_msq_messages, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    if(likely(!msq->rd_bytes)) msq->rd_bytes = rrddim_add(st_msq_bytes, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-
-                rrddim_set_by_pointer(st_msq_messages, msq->rd_messages, msq->messages);
-                rrddim_set_by_pointer(st_msq_bytes, msq->rd_bytes, msq->bytes);
-
-                msq->found = 0;
-            }
-            else {
-                rrddim_is_obsolete(st_msq_messages, msq->rd_messages);
-                rrddim_is_obsolete(st_msq_bytes, msq->rd_bytes);
-
-                // remove message queue from the linked list
-                if(!msq_prev)
-                    message_queue_root = msq->next;
-                else
-                    msq_prev->next = msq->next;
-                freez(msq);
-                msq = NULL;
-            }
-            if(likely(msq)) {
-                msq_prev = msq;
-                msq = msq->next;
-            }
-            else if(!msq_prev)
-                msq = message_queue_root;
+        if(!ret && message_queue_root) {
+            if(unlikely(!st_msq_messages))
+                st_msq_messages = rrdset_create_localhost(
+                        "system"
+                        , "message_queue_messages"
+                        , NULL
+                        , "ipc message queues"
+                        , NULL
+                        , "IPC Message Queue Number of Messages"
+                        , "messages"
+                        , PLUGIN_PROC_NAME
+                        , "ipc"
+                        , NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             else
-                msq = msq_prev->next;
-        }
+                rrdset_next(st_msq_messages);
 
-        rrdset_done(st_msq_messages);
-        rrdset_done(st_msq_bytes);
+            if(unlikely(!st_msq_bytes))
+                st_msq_bytes = rrdset_create_localhost(
+                        "system"
+                        , "message_queue_bytes"
+                        , NULL
+                        , "ipc message queues"
+                        , NULL
+                        , "IPC Message Queue Used Bytes"
+                        , "bytes"
+                        , PLUGIN_PROC_NAME
+                        , "ipc"
+                        , NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
+            else
+                rrdset_next(st_msq_bytes);
+
+            struct message_queue *msq = message_queue_root, *msq_prev = NULL;
+            while(likely(msq)){
+                if(likely(msq->found)) {
+                    if(unlikely(!msq->rd_messages || !msq->rd_bytes)) {
+                        char id[RRD_ID_LENGTH_MAX + 1];
+                        snprintfz(id, RRD_ID_LENGTH_MAX, "%llu", msq->id);
+                        if(likely(!msq->rd_messages)) msq->rd_messages = rrddim_add(st_msq_messages, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        if(likely(!msq->rd_bytes)) msq->rd_bytes = rrddim_add(st_msq_bytes, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    }
+
+                    rrddim_set_by_pointer(st_msq_messages, msq->rd_messages, msq->messages);
+                    rrddim_set_by_pointer(st_msq_bytes, msq->rd_bytes, msq->bytes);
+
+                    msq->found = 0;
+                }
+                else {
+                    rrddim_is_obsolete(st_msq_messages, msq->rd_messages);
+                    rrddim_is_obsolete(st_msq_bytes, msq->rd_bytes);
+
+                    // remove message queue from the linked list
+                    if(!msq_prev)
+                        message_queue_root = msq->next;
+                    else
+                        msq_prev->next = msq->next;
+                    freez(msq);
+                    msq = NULL;
+                }
+                if(likely(msq)) {
+                    msq_prev = msq;
+                    msq = msq->next;
+                }
+                else if(!msq_prev)
+                    msq = message_queue_root;
+                else
+                    msq = msq_prev->next;
+            }
+
+            rrdset_done(st_msq_messages);
+            rrdset_done(st_msq_bytes);
+
+            if(unlikely(!message_queue_root)) {
+                info("Making chart %s (%s) obsolete since it does not have any dimensions", st_msq_messages->name, st_msq_messages->id);
+                rrdset_is_obsolete(st_msq_messages);
+                st_msq_messages = NULL;
+
+                info("Making chart %s (%s) obsolete since it does not have any dimensions", st_msq_bytes->name, st_msq_bytes->id);
+                rrdset_is_obsolete(st_msq_bytes);
+                st_msq_bytes = NULL;
+            }
+        }
     }
 
     return 0;

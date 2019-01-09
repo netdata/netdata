@@ -1591,7 +1591,7 @@ void rrdset_done(RRDSET *st) {
     time_t now = now_realtime_sec();
 
     rrddim_foreach_read(rd, st)
-        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
             break;
 
     if(unlikely(rd)) {
@@ -1625,11 +1625,6 @@ void rrdset_done(RRDSET *st) {
 
             last = rd;
             rd = rd->next;
-        }
-
-        if(unlikely(!st->dimensions)) {
-            info("Making chart %s (%s) obsolete since it does not have any dimensions", st->name, st->id);
-            rrdset_is_obsolete(st);
         }
     }
 
