@@ -157,10 +157,6 @@ class Service(UrlService):
                     self.info('Unsupported expvar_type "{0}". Must be "int" or "float"'.format(ev_type))
                     continue
 
-                if ev_key in self.expvars:
-                    self.info('Duplicate expvar key {0}: skipping line.'.format(ev_key))
-                    continue
-
                 self.expvars[ev_key] = (ev_type, line_id)
 
                 chart_dict['lines'].append(
