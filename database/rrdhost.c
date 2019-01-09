@@ -665,6 +665,8 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 
         if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
             rrdset_delete(st);
+        else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
+            rrdset_delete_obsolete_dimensions(st);
         else
             rrdset_save(st);
 

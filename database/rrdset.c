@@ -417,6 +417,24 @@ void rrdset_delete(RRDSET *st) {
     recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
+void rrdset_delete_obsolete_dimensions(RRDSET *st) {
+    RRDDIM *rd;
+
+    rrdset_check_rdlock(st);
+
+    info("Deleting dimensions of chart '%s' ('%s') from disk...", st->id, st->name);
+
+    rrddim_foreach_read(rd, st) {
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                info("Deleting dimension file '%s'.", rd->cache_filename);
+                if(unlikely(unlink(rd->cache_filename) == -1))
+                    error("Cannot delete dimension file '%s'", rd->cache_filename);
+            }
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 

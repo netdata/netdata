@@ -885,6 +885,7 @@ extern void rrdset_free(RRDSET *st);
 extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
 extern void rrdset_delete(RRDSET *st);
+extern void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
 
