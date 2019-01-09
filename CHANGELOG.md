@@ -4,18 +4,24 @@
 
 **Fixed bugs:**
 
+- python go\_expvar: reuse same expvar key in different charts [\#5133](https://github.com/netdata/netdata/issues/5133)
+- hddtemp.chart.py is hardcoded to only use /dev/sdX [\#5129](https://github.com/netdata/netdata/issues/5129)
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
 
 **Closed issues:**
 
+- Introduce Polymorphic Linux in the Docker Image [\#5034](https://github.com/netdata/netdata/issues/5034)
 - SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
 - alarm notifications should state a count of active alarms per state [\#946](https://github.com/netdata/netdata/issues/946)
 
 **Merged pull requests:**
 
+- go\_expavar fix: don't check for duplicate expvars [\#5141](https://github.com/netdata/netdata/pull/5141) ([ilyam8](https://github.com/ilyam8))
+- hddtemp fix: don't use disk model as dim name [\#5140](https://github.com/netdata/netdata/pull/5140) ([ilyam8](https://github.com/ilyam8))
+- Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
