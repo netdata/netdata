@@ -58,7 +58,7 @@ RUN mkdir -p /app/usr/sbin/ \
 ARG ARCH
 FROM multiarch/alpine:${ARCH}
 
-# Reinstall some prerequisites
+# Install some prerequisites
 RUN apk --no-cache add curl \
                        fping \
                        jq \
@@ -70,6 +70,11 @@ RUN apk --no-cache add curl \
                        py-psycopg2 \
                        py-yaml \
                        python
+
+# Subscribe to Polyverse's Polymorphic Linux repositories and reinstall all packages, so they are scrambled
+RUN curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io && \
+    sed -n -i '/repo.polyverse.io/p' /etc/apk/repositories && \
+    apk upgrade --update-cache --available
 
 # Copy files over
 COPY --from=builder /app /
