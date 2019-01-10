@@ -24,6 +24,7 @@ extern int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 extern int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
 
 extern void web_client_api_v1_init(void);
+extern void web_client_api_v1_management_init(void);
 
 char *api_secret;
 

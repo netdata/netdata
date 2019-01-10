@@ -503,8 +503,6 @@ struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
     uint32_t hash_machine_guid;                     // the hash of the unique ID
 
-    char mgmt_api_key[GUID_LEN + 1];                // the management API key of this host
-
     const char *os;                                 // the O/S type of the host
     const char *tags;                               // tags for this host
     const char *timezone;                           // the timezone of the host

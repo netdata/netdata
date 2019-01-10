@@ -1041,7 +1041,6 @@ int main(int argc, char **argv) {
 
     rrd_init(netdata_configured_hostname);
 
-
     // ------------------------------------------------------------------------
     // enable log flood protection
 
