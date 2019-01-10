@@ -144,7 +144,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
     (void)dt;
 
 #define DEFAULT_EXLUDED_INTERFACES "lo*"
-#define DEFAULT_PHYSICAL_INTERFACES "igb* ix* cxl* em* ixl* ixlv* bge* ixgbe*"
+#define DEFAULT_PHYSICAL_INTERFACES "igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet*"
 #define CONFIG_SECTION_GETIFADDRS "plugin:freebsd:getifaddrs"
 
     static int enable_new_interfaces = -1;
