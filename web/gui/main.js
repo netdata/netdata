@@ -660,7 +660,7 @@ function restrictMyNetdataMenu() {
 
 function renderMyNetdataMenu(machinesArray) {
     if (!isSignedIn()) {
-        if (isUsingGlobalRegistry()) {
+        if (!NETDATA.registry.isRegistryEnabled()) {
             restrictMyNetdataMenu();
             return;
         }
@@ -4667,10 +4667,6 @@ function syncAgents() {
     }
 }
 
-function isUsingGlobalRegistry() {
-    return NETDATA.registry.server == "https://registry.my-netdata.io";
-}
-
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
         clearCloudLocalStorageItems();
@@ -4702,6 +4698,15 @@ function netdataRegistryCallback(machinesArray) {
             }
             cloudKnownAgents = agents; // TODO: Is this needed?
             syncAgents();
+
+            const agentsMap = {}
+            for (const agent of agents) {
+                agentsMap[agent.guid] = agent;
+            }
+
+            NETDATA.registry.machines = agentsMap;
+            NETDATA.registry.machines_array = agents;
+
             renderMyNetdataMenu(agents);
         });
     } else {

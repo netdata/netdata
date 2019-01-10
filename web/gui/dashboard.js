@@ -9686,6 +9686,14 @@ NETDATA.registry = {
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
 
+    isUsingGlobalRegistry: function() {
+        return NETDATA.registry.server == "https://registry.my-netdata.io";
+    },
+
+    isRegistryEnabled: function() {
+        return !(NETDATA.registry.isUsingGlobalRegistry() || isSignedIn())
+    },
+
     parsePersonUrls: function (person_urls) {
         // console.log(person_urls);
         NETDATA.registry.person_urls = person_urls;
@@ -9750,10 +9758,18 @@ NETDATA.registry = {
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
 
-                NETDATA.registry.access(2, function (person_urls) {
-                    NETDATA.registry.parsePersonUrls(person_urls);
-
-                });
+                if (NETDATA.registry.isRegistryEnabled()) {
+                    NETDATA.registry.access(2, function (person_urls) {
+                        NETDATA.registry.parsePersonUrls(person_urls);
+                    });    
+                } else {
+                    NETDATA.registry.machines = {};
+                    NETDATA.registry.machines_array = [];
+        
+                    if (typeof netdataRegistryCallback === 'function') {
+                        netdataRegistryCallback(NETDATA.registry.machines_array);
+                    }            
+                } 
             }
         });
     },
@@ -9796,6 +9812,8 @@ NETDATA.registry = {
     },
 
     access: function (max_redirects, callback) {
+        console.trace("--- SEND ACCESS TO GLOBAL REGISTRY!");
+
         // send ACCESS to a netdata registry:
         // 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)
         // 2. it responds with a list of netdata servers we know
