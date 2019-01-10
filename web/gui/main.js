@@ -4638,6 +4638,7 @@ function sortedArraysEqual(a, b) {
 }
 
 // Computes the set of agents that are included in `source` but not in `target`.
+// Also filters the 'masked' urls.
 function computeDiff(target, source) {
     const tset = new Set();
 
@@ -4646,8 +4647,13 @@ function computeDiff(target, source) {
     }
 
     const diff = [];
+    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
 
     for (let agent of source) {
+        if (agent.url == maskedURL) {
+            continue;
+        }
+
         if (!tset.has(agent.guid)) {
             diff.push(agent);
         }
