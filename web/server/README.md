@@ -16,7 +16,6 @@ With the web server enabled, you can control the number of threads and sockets w
 
 ```
 [web]
-    mode = static-threaded
     web server threads = 4
     web server max sockets = 512
 ```
