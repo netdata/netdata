@@ -27,7 +27,7 @@ touch new_file
 git status
 
 echo "========= UPDATE ========="
-/etc/periodic/daily/netdata-updater
+/etc/cron.daily/netdata-updater
 
 echo "========= UNINSTALL ========="
 mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh

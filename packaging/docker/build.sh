@@ -45,15 +45,17 @@ for ARCH in "${ARCHITECTURES[@]}"; do
 done
 wait
 
+# There is no reason to continue if we cannot log in to docker hub
+if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
+    echo "No docker hub username or password specified. Exiting without pushing images to registry"
+    exit 0
+fi
+
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 mkdir -p /tmp/docker
 echo '{"experimental":"enabled"}' > /tmp/docker/config.json
 
-# Login to docker hub to allow for futher operations
-if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
-    echo "No docker hub username or password specified. Exiting without pushing images to registry"
-    exit 1
-fi
+# Login to docker hub to allow futher operations
 echo "$DOCKER_PASSWORD" | docker --config /tmp/docker login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry

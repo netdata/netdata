@@ -37,17 +37,18 @@ jobs:
     name: ubuntu 14.04 (not containerized)
     install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
-  - name: alpine + lifecycle
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:alpine" ./tests/lifecycle.sh
-  - name: ubuntu 18.04
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+  - name: build container (alpine installation)
+    script: ./packaging/docker/build.sh
+    env: DEVEL="true"
+  - name: ubuntu 18.04 + lifecycle
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" ./tests/lifecycle.sh
   - name: CentOS 7
     script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
   - name: CentOS 6
     script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
 
   - stage: packaging
-    name: Create release
+    name: Create release (only on special commit msg)
     install:
     - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
     - sudo apt install -y --only-upgrade docker-ce
