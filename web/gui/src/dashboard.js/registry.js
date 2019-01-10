@@ -12,6 +12,8 @@ NETDATA.registry = {
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
 
+    MASKED_AGENT_URL: "***",
+
     isUsingGlobalRegistry: function() {
         return NETDATA.registry.server == "https://registry.my-netdata.io";
     },
@@ -84,18 +86,22 @@ NETDATA.registry = {
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
 
-                if (NETDATA.registry.isRegistryEnabled()) {
-                    NETDATA.registry.access(2, function (person_urls) {
-                        NETDATA.registry.parsePersonUrls(person_urls);
-                    });    
-                } else {
-                    NETDATA.registry.machines = {};
-                    NETDATA.registry.machines_array = [];
+                NETDATA.registry.access(2, function (person_urls) {
+                    NETDATA.registry.parsePersonUrls(person_urls);
+                });    
+                
+                // if (NETDATA.registry.isRegistryEnabled()) {
+                //     NETDATA.registry.access(2, function (person_urls) {
+                //         NETDATA.registry.parsePersonUrls(person_urls);
+                //     });    
+                // } else {
+                //     NETDATA.registry.machines = {};
+                //     NETDATA.registry.machines_array = [];
         
-                    if (typeof netdataRegistryCallback === 'function') {
-                        netdataRegistryCallback(NETDATA.registry.machines_array);
-                    }            
-                } 
+                //     if (typeof netdataRegistryCallback === 'function') {
+                //         netdataRegistryCallback(NETDATA.registry.machines_array);
+                //     }            
+                // } 
             }
         });
     },
@@ -138,13 +144,17 @@ NETDATA.registry = {
     },
 
     access: function (max_redirects, callback) {
+        const url = NETDATA.registry.isRegistryEnabled() ? NETDATA.serverDefault : NETDATA.registry.MASKED_AGENT_URL;
+
+        console.log("... ACCESS", url);
+
         // send ACCESS to a netdata registry:
         // 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)
         // 2. it responds with a list of netdata servers we know
         // the registry identifies us using a cookie it sets the first time we access it
         // the registry may respond with a redirect URL to send us to another registry
         $.ajax({
-            url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(NETDATA.serverDefault), // + '&visible_url=' + encodeURIComponent(document.location),
+            url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(url), // + '&visible_url=' + encodeURIComponent(document.location),
             async: true,
             cache: false,
             headers: {
