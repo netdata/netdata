@@ -629,29 +629,45 @@ function renderMachines(machinesArray) {
     return html;
 }
 
+function setMyNetdataMenu(html) {
+    const el = document.getElementById('my-netdata-dropdown-content')
+    el.innerHTML = html;
+}
+
 function clearMyNetdataMenu() {
-    const html = `<div class="agent-item" style="white-space: nowrap">
+    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
         <i class="fas fa-hourglass-half"></i>
         Loading, please wait...
         <div></div>
-    </div>`;
-    const el = document.getElementById('my-netdata-dropdown-content')
-    el.innerHTML = html;
+    </div>`);
 }
 
 function errorMyNetdataMenu() {
-    const html = `<div class="agent-item" style="white-space: nowrap">
+    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        Cannot load known agents from netdata.cloud!
+        Cannot load known netdata agents from netdata.cloud!
         <div></div>
-    </div>`;
-    const el = document.getElementById('my-netdata-dropdown-content')
-    el.innerHTML = html;
+    </div>`);
+}
+
+function restrictMyNetdataMenu() {
+    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+        <i class="fas fa-exclamation-triangle" style="color: red"></i>
+        <span>Please <a href="#" onclick="signInDidClick()">sign in</a> to view your netdata agents!</span>
+        <div></div>
+    </div>`);
 }
 
 function renderMyNetdataMenu(machinesArray) {
+    if (!isSignedIn()) {
+        if (isUsingGlobalRegistry()) {
+            restrictMyNetdataMenu();
+            return;
+        }
+    }
+
     if (machinesArray == registryKnownAgents) {
-        console.log("Rendering my-netdata menu from global registry");
+        console.log("Rendering my-netdata menu from registry");
     } else {
         console.log("Rendering my-netdata menu from netdata.cloud");
     }
@@ -4649,6 +4665,10 @@ function syncAgents() {
             renderMyNetdataMenu(cloudKnownAgents);
         });        
     }
+}
+
+function isUsingGlobalRegistry() {
+    return NETDATA.registry.server == "https://registry.my-netdata.io";
 }
 
 function initCloud() {
