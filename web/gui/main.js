@@ -4680,7 +4680,9 @@ function initCloud() {
 
     if (NETDATA.registry.cloudBaseURL != localStorage.getItem("cloud.baseURL")) {
         clearCloudLocalStorageItems();
-        localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
+        if (NETDATA.registry.cloudBaseURL) {
+            localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
+        }
     }
 
     renderAccountUI();
@@ -4719,10 +4721,28 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// if (document.readyState === "complete") {
-// } else {
-//     document.addEventListener("readystatechange", () => {
-//         if (document.readyState === "complete") {
-//         }
-//     })
-// }
+// If we know the cloudBaseURL from local storage render the account ui before
+// receiving the definitive information from the web server to improve perceived
+// performance.
+function tryFastInitCloud() {
+    const baseURL = localStorage.getItem("cloud.baseURL");
+    if (!baseURL) {
+        return
+    }
+
+    NETDATA.registry.cloudBaseURL = baseURL;
+    NETDATA.registry.isCloudEnabled = true;
+
+    initCloud();
+}
+
+
+if (document.readyState === "complete") {
+    tryFastInitCloud();
+} else {
+    document.addEventListener("readystatechange", () => {
+        if (document.readyState === "complete") {
+            tryFastInitCloud();
+        }
+    })
+}
