@@ -88,7 +88,7 @@ For example, for `apps.plugin` the following section is available:
 - `command options` allows giving additional command line options to the plugin.
 
 
-Netdata will provide to the extrenal plugins the environment variable `NETDATA_UPDATE_EVERY`, in seconds (the default is 1). This is the **minimum update frequency** for all charts. A plugin that is updating values more frequently than this, is just wasting resources.
+Netdata will provide to the external plugins the environment variable `NETDATA_UPDATE_EVERY`, in seconds (the default is 1). This is the **minimum update frequency** for all charts. A plugin that is updating values more frequently than this, is just wasting resources.
 
 Netdata will call the plugin with just one command line parameter: the number of seconds the user requested this plugin to update its data (by default is also 1).
 
@@ -403,7 +403,7 @@ There are a few rules for writing plugins properly:
       - Initialize everything once, at the beginning. Initialization is not an expensive operation. Your plugin will most probably be started once and run forever. So, do whatever heavy operation is needed at the beginning, just once.
       - Do the absolutely minimum while iterating to collect values repeatedly.
       - If you need to connect to another server to collect values, avoid re-connects if possible. Connect just once, with keep-alive (for HTTP) enabled and collect values using the same connection.
-      - Avoid any CPU or memory heavy operation while collecting data. If you control memory allocation, avoid any memory allocation white iterating to collect values.
+      - Avoid any CPU or memory heavy operation while collecting data. If you control memory allocation, avoid any memory allocation while iterating to collect values.
       - Avoid running external commands when possible. If you are writing shell scripts avoid especially pipes (each pipe is another fork, a very expensive operation).
 
 2. The best way to iterate at a constant pace is this pseudo code:
