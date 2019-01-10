@@ -40,7 +40,7 @@ The ports to bind are controlled via `[web].bind to`, like this:
 Using the above, netdata will bind to:
 
 - IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. 
-- IPv4 10.1.1.1 at port 19998. The management API (which includes the read API and badges) and netdata.conf will be accessible on this port.
+- IPv4 10.1.1.1 at port 19998. The management API and netdata.conf will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
 - All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port.
 - All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
@@ -56,7 +56,7 @@ The access lists themselves and the general setting `allow connections from` in 
 The API requests are serviced as follows:
 - `dashboard` gives access to the UI, the read API and badges API calls.
 - `badges` gives access only to the badges API calls.
-- `management` gives access to the read API, badges and management API calls.
+- `management` gives access only to the management API calls.
 
 ### Access lists
 
