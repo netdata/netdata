@@ -4721,9 +4721,9 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL from local storage render the account ui before
-// receiving the definitive information from the web server to improve perceived
-// performance.
+// If we know the cloudBaseURL from local storage render (eagerly) the account ui 
+// before receiving the definitive response from the web server. This improves 
+// the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");
     if (!baseURL) {
@@ -4735,7 +4735,6 @@ function tryFastInitCloud() {
 
     initCloud();
 }
-
 
 if (document.readyState === "complete") {
     tryFastInitCloud();
