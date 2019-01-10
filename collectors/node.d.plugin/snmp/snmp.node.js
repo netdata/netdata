@@ -265,7 +265,7 @@ netdata.processors.snmp = {
                         if(__DEBUG === true)
                             netdata.debug(service.module.name + ': ' + service.name + ': failed ' + service.module.name + ' get for OIDs ' + varbinds[i].oid);
 
-                        service.error('OID ' + varbinds[i].oid + ' gave error: ' + snmp.varbindError(varbinds[i]));
+                        service.error('OID ' + varbinds[i].oid + ' gave error: ' + net_snmp.varbindError(varbinds[i]));
                         value = null;
                         failed++;
                     }
