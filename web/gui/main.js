@@ -549,21 +549,28 @@ function renderMachines(machinesArray) {
             return naturalSortCompare(a.name, b.name);
         });
 
+        const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
+
         for (var machine of machines) {
             found = true;
 
             const alternateUrlItems = (
                 `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
-                ${machine.alternate_urls.reduce(
-                    (str, url) => str + (
-                        `<div class="agent-item agent-item--alternate">
-                            <div></div>
-                            <a href="${url}" title="${url}">${truncateString(url, 64)}</a>
-                            <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
-                                <i class="fas fa-trash" style="color: #777;"></i>
-                            </a>
-                        </div>`
-                    ),
+                ${machine.alternate_urls.reduce((str, url) => {
+                        if (url == maskedURL) {
+                            return str
+                        }
+
+                        return str + (
+                            `<div class="agent-item agent-item--alternate">
+                                <div></div>
+                                <a href="${url}" title="${url}">${truncateString(url, 64)}</a>
+                                <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
+                                    <i class="fas fa-trash" style="color: #777;"></i>
+                                </a>
+                            </div>`
+                        )
+                    },
                     ''
                 )}
                 </div>`
@@ -4477,11 +4484,15 @@ function postCloudAccountKnownAgents(agentsToSync) {
         return [];
     }
 
+    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
+
     const agents = agentsToSync.map((a) => {
+        const urls = a.alternate_urls.filter((url) => url != maskedURL);
+
         return {
             "id": a.guid,
             "name": a.name,
-            "urls": a.alternate_urls
+            "urls": urls
         }
     })
 
@@ -4586,13 +4597,6 @@ function renderAccountUI() {
         container.innerHTML = (
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${accountName} <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-                    <!--
-                    <li>
-                        <a href="${NETDATA.registry.cloudBaseURL}" class="btn" target="_blank">
-                            <i class="fas fa-cloud"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Netdata Cloud</span>
-                        </a>
-                    </li>
-                    -->
                     <li>
                         <a href="#" class="btn" onclick="signOutDidClick();">
                         <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
@@ -4647,13 +4651,8 @@ function computeDiff(target, source) {
     }
 
     const diff = [];
-    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
 
     for (let agent of source) {
-        if (agent.url == maskedURL) {
-            continue;
-        }
-
         if (!tset.has(agent.guid)) {
             diff.push(agent);
         }
