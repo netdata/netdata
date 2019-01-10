@@ -154,7 +154,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
-	rrdhost_init_mgmt_api_key(host, mgmt_api_key);
+    // Management API key is optional because streaming will pass it as NULL
+	if (mgmt_api_key) rrdhost_init_mgmt_api_key(host, mgmt_api_key);
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
