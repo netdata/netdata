@@ -28,11 +28,13 @@ jobs:
     if: type = cron
 
   - stage: build
-    name: OSX
-    install: brew install fakeroot ossp-uuid
-    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-    os: osx
-  - name: ubuntu 14.04 (not containerized)
+# TODO(paulfantom): enable when travis OSX become stable. Probably after 12.01.2019
+#    name: OSX
+#    install: brew install fakeroot ossp-uuid
+#    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+#    os: osx
+#  - name: ubuntu 14.04 (not containerized)
+    name: ubuntu 14.04 (not containerized)
     install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
   - name: alpine + lifecycle
