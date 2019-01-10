@@ -150,12 +150,12 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name) 
         if(hash == rs->hash && strcmp(n, rs->variable) == 0) {
             rrdset_unlock(st);
             if(rs->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) {
-                free(n);
+                freez(n);
                 return rs;
             }
             else {
                 error("RRDSETVAR: custom variable '%s' on chart '%s' of host '%s', conflicts with an internal chart variable", n, st->id, host->hostname);
-                free(n);
+                freez(n);
                 return NULL;
             }
         }

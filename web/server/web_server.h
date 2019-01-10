@@ -15,9 +15,7 @@
 #endif
 
 typedef enum web_server_mode {
-    WEB_SERVER_MODE_SINGLE_THREADED,
     WEB_SERVER_MODE_STATIC_THREADED,
-    WEB_SERVER_MODE_MULTI_THREADED,
     WEB_SERVER_MODE_NONE
 } WEB_SERVER_MODE;
 
@@ -52,8 +50,6 @@ extern struct web_client *web_client_create_on_listenfd(int listener);
 #include "web_client_cache.h"
 #endif // WEB_SERVER_INTERNALS
 
-#include "single/single-threaded.h"
-#include "multi/multi-threaded.h"
 #include "static/static-threaded.h"
 
 #include "daemon/common.h"

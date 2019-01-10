@@ -1,30 +1,18 @@
 # Web server
 
-Netdata supports 3 implementations of its internal web server:
-
-- `static-threaded` is a web server with a fix (configured number of threads)
-- `single-threaded` is a simple web server running with a single thread
-- `multi-threaded` is a web server that spawns a thread for each client connection
-- `none` to disable the web server
-
-We suggest to use the `static-threaded` one. It is the most efficient.
-
-All versions of the web servers use non-blocking I/O.
-
-All web servers respect the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
+The Netdata web server runs as `static-threaded`, i.e. with a fixed, configurable number of threads.
+It uses non-blocking I/O and respects the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
 
 ## Configuration
 
-### Selecting the web server
-
-You can select the web server implementation by editing `netdata.conf` and setting:
+You can disable the web server by editing `netdata.conf` and setting:
 
 ```
 [web]
-    mode = none | single-threaded | multi-threaded | static-threaded
+    mode = none
 ```
 
-The `static` web server supports also these settings:
+With the web server enabled, you can control the number of threads and sockets with the following settings:
 
 ```
 [web]

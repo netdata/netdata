@@ -79,7 +79,7 @@ REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_M
     REGISTRY_PERSON_URL *tpu = registry_person_url_index_add(p, pu);
     if(tpu != pu) {
         error("Registry: Attempted to add duplicate person url '%s' with name '%s' to person '%s'", u->url, name, p->guid);
-        free(pu);
+        freez(pu);
         pu = tpu;
     }
     else

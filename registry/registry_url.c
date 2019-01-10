@@ -51,7 +51,7 @@ REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
         n = registry_url_index_add(u);
         if(n != u) {
             error("INTERNAL ERROR: registry_url_get(): url '%s' already exists in the registry as '%s'", u->url, n->url);
-            free(u);
+            freez(u);
             u = n;
         }
         else
