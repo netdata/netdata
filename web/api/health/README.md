@@ -51,18 +51,17 @@ Specifically, the API allows you to:
  - Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the netdata UI will show the alarms as active, but no notifications will be sent.
  - Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. 
 
-The API is available by default, but it is protected by an `api authorization token` that is produced every time netdata runs and which you can only see if you request `http://yournetdata/netdata.conf`. 
-To create a persistent token, you need to add your own in `/etc/netdata/netdata.conf`:
+The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
 
 ```bash
-[web]
-    api authorization token = Your complex token here
+[registry]
+    # netdata management api key = /var/lib/netdata/registry/netdata.api.key
 ```
 
-After you restart netdata, you will be able to access the API via GET requests, by adding the bearer token to an `Authorization` http header, like this: 
+You can access the API via GET requests, by adding the bearer token to an `Authorization` http header, like this: 
 
 ```
-curl "http://myserver/api/v1/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
 ```
 
 The command `RESET` just returns netdata to the default operation, with all health checks and notifications enabled. 
@@ -72,13 +71,13 @@ If you've configured and entered your token correclty, you should see the plain 
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 ```
-curl "http://myserver/api/v1/health?cmd=DISABLE ALL" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "Authorization: Bearer Mytoken" 
 ```
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
 ```
-curl "http://myserver/api/v1/health?cmd=SILENCE ALL" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "Authorization: Bearer Mytoken" 
 ```
 
 Alarms may then still be raised and logged in netdata, so you'll be able to see them via the UI.  
@@ -86,7 +85,7 @@ Alarms may then still be raised and logged in netdata, so you'll be able to see 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
 ```
- curl "http://myserver/api/v1/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
+ curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
 ```
 
 ### Disable or silence specific alarms
@@ -109,7 +108,7 @@ To clear all selectors and reset the mode to default, use the `RESET` command.
 The following example silences notifications for all the alarms with context=load: 
 
 ```
-curl "http://myserver/api/v1/health?cmd=SILENCE&context=load" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "Authorization: Bearer Mytoken" 
 ```
 
 #### Selection criteria 
@@ -128,19 +127,19 @@ You can add any of the selection criteria you need on the request, to ensure tha
 Example 1: Disable all health checks for context = `random`
 
 ```
-http://localhost/api/v1/health?cmd=DISABLE&context=random
+http://localhost/api/v1/manage/health?cmd=DISABLE&context=random
 ```
 
 Example 2: Silence all alarms and templates with name starting with `out_of` on host `myhost`
 
 ```
-http://localhost/api/v1/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
+http://localhost/api/v1/manage/health?cmd=SILENCE&alarm=out_of*&hosts=myhost
 ```
 
 Example 2.2: Add one more selector, to also silence alarms for cpu1 and cpu2
 
 ```
-http://localhost/api/v1/health?families=cpu1 cpu2
+http://localhost/api/v1/manage/health?families=cpu1 cpu2
 ```
 
 ### Responses

@@ -388,7 +388,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             }
             e++;
         }
-        acl_flags = acl_flags | read_acl(portconfig);
+        acl_flags |= read_acl(portconfig);
     } else {
         acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
     }

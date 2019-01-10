@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
-
+NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+NETDATA_REGISTRY_DIR="@registrydir_POST@"
 
 printhelp () {
 	echo "Usage: health-cmdapi-test.sh [OPTIONS]
@@ -15,7 +15,7 @@ printhelp () {
 }
 
 check () {
-	echo "Check: '${1}' in 2 sec"
+	echo -e "${GRAY}Check: '${1}' in 2 sec"
 	sleep 2
 	r=$(curl -s "http://$URL/api/v1/alarms?all" | \
 	python3 -c "import sys, json; d=json.load(sys.stdin); \
@@ -29,23 +29,28 @@ check () {
 	);" 2>&1)
 	
 	if [ "${r}" != "${2}" ] ; then
-		echo "ERROR: 'Got ${r}'. Expected '${2}'"
+		echo -e "${RED}ERROR: 'Got ${r}'. Expected '${2}'"
 		err=$((err+1))
 	else
-		echo "Success"
+		echo -e "${GREEN}Success"
 	fi
 }
 
 cmd () {
-	echo "Cmd '${1}', expecting '${2}'"
-	RESPONSE=$(curl -s "http://$URL/api/v1/health?${1}" -H "Authorization: Bearer $TOKEN" 2>&1)
+	echo -e "${WHITE}Cmd '${1}', expecting '${2}'"
+	RESPONSE=$(curl -s "http://$URL/api/v1/manage/health?${1}" -H "Authorization: Bearer $TOKEN" 2>&1)
 	if [ "${RESPONSE}" != "${2}" ] ; then
-		echo "ERROR: Response '${RESPONSE}' != '${2}'"
+		echo -e "${RED}ERROR: Response '${RESPONSE}' != '${2}'"
 		err=$((err+1))
 	else
-		echo "Success"
+		echo -e "${GREEN}Success"
 	fi
 }
+
+WHITE='\033[0;37m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+GRAY='\033[0;37m'
 
 SETUP=0
 RESTART=0
@@ -96,7 +101,7 @@ if [ $SETUP -eq 1 ] ; then
 	if [ -f "${NETDATA_USER_CONFIG_DIR}/netdata.conf" ] ; then
 		cp -f "${NETDATA_USER_CONFIG_DIR}/netdata.conf"  /tmp/netdata.conf
 	fi
-	printf "[health]\nrun at least every seconds = 1\n[web]\napi authorization token=Token\n" > "${NETDATA_USER_CONFIG_DIR}/netdata.conf"
+	printf "[health]\nrun at least every seconds = 1\n" > "${NETDATA_USER_CONFIG_DIR}/netdata.conf"
 
 	chmod +r "${NETDATA_USER_CONFIG_DIR}/python.d.conf" "${NETDATA_USER_CONFIG_DIR}/netdata.conf" "${NETDATA_USER_CONFIG_DIR}/health.d/python-example.conf" "${NETDATA_STOCK_CONFIG_DIR}/health.d/load.conf"
 	# Restart netdata
@@ -122,8 +127,14 @@ if [ $TEST -eq 1 ] ; then
 	HEALTH_CMDAPI_MSG_STYPEWARNING="WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command."
 	HEALTH_CMDAPI_MSG_NOSELECTORWARNING="WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors."
 
+	if [ -f "${NETDATA_REGISTRY_DIR}/netdata.api.key" ] ;then
+		read -r CORRECT_TOKEN < "${NETDATA_REGISTRY_DIR}/netdata.api.key"
+	else
+		echo "${NETDATA_REGISTRY_DIR}/netdata.api.key not found"
+		exit 1
+	fi
 	# Set correct token
-	TOKEN="Token"
+	TOKEN="${CORRECT_TOKEN}"
 
 	# Test default state
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
@@ -135,7 +146,7 @@ if [ $TEST -eq 1 ] ; then
 	check "Default State" "False False False False False False"
 
 	# Set correct token
-	TOKEN="Token"
+	TOKEN="${CORRECT_TOKEN}"
 
 	# Test disable
 	cmd "cmd=DISABLE ALL" "$HEALTH_CMDAPI_MSG_DISABLEALL"
@@ -225,7 +236,7 @@ fi
 
 # Cleanup
 if [ $CLEANUP -eq 1 ] ; then
-	echo "Restoring netdata configuration"
+	echo -e "${WHITE}Restoring netdata configuration"
 	for f in "python.d.conf" "netdata.conf" ; do
 		if [ -f "/tmp/$f" ] ; then
 			mv -f "/tmp/$f" "${NETDATA_USER_CONFIG_DIR}/"

@@ -5,6 +5,7 @@
 		-e 's#[@]configdir_POST@#$(configdir)#g' \
 		-e 's#[@]libconfigdir_POST@#$(libconfigdir)#g' \
 		-e 's#[@]cachedir_POST@#$(cachedir)#g' \
+		-e 's#[@]registrydir_POST@#$(registrydir)#g' \
 		$< > $@.tmp; then \
 		mv "$@.tmp" "$@"; \
 	else \

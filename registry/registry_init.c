@@ -26,6 +26,9 @@ int registry_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
     registry.machine_guid_filename = config_get(CONFIG_SECTION_REGISTRY, "netdata unique id file", filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/netdata.api.key", registry.pathname);
+    registry.api_key_filename = config_get(CONFIG_SECTION_REGISTRY, "netdata management api key", filename);
+
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
     registry.db_filename = config_get(CONFIG_SECTION_REGISTRY, "registry db file", filename);
 

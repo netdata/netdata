@@ -92,8 +92,6 @@ void web_client_api_v1_init(void) {
 	// unparse (to string)
 	char uuid_str[37];
 	uuid_unparse_lower(uuid, uuid_str);
-
-	api_secret = config_get(CONFIG_SECTION_WEB, "api authorization token", uuid_str);
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -708,7 +706,7 @@ static struct api_command {
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_alarm_variables },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_MGMT, web_client_api_request_v1_allmetrics      },
-        { "health",          0, WEB_CLIENT_ACL_MGMT,                          web_client_api_request_v1_mgmt_health     },
+        { "manage/health",   0, WEB_CLIENT_ACL_MGMT,                          web_client_api_request_v1_mgmt_health     },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
@@ -722,6 +720,8 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 
         for(i = 0; api_commands[i].command ; i++)
             api_commands[i].hash = simple_hash(api_commands[i].command);
+
+		api_secret = host->mgmt_api_key;
     }
 
     // get the command

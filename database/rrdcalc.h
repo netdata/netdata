@@ -25,6 +25,8 @@
 #define RRDCALC_FLAG_WARN_ERROR            0x00000010
 #define RRDCALC_FLAG_CRIT_ERROR            0x00000020
 #define RRDCALC_FLAG_RUNNABLE              0x00000040
+#define RRDCALC_FLAG_DISABLED              0x00000080
+#define RRDCALC_FLAG_SILENCED              0x00000100
 #define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 struct rrdcalc {
@@ -45,9 +47,6 @@ struct rrdcalc {
     char *info;                     // a short description of the alarm
 
     int update_every;               // update frequency for the alarm
-
-    int disabled_flag;              // whether health checks are running for this alarm
-    int silenced_flag;              // whether notifications are sent for this alarm
 
     // the red and green threshold of this alarm (to be set to the chart)
     calculated_number green;

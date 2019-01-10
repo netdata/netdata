@@ -147,8 +147,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
                    , (rc->rrdset)?"true":"false"
-                   , (rc->disabled_flag)?"true":"false"
-                   , (rc->silenced_flag)?"true":"false"
+                   , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
+                   , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
                    , rc->exec?rc->exec:host->health_default_exec
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source

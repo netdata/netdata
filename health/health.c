@@ -155,7 +155,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     // Check if alarm notifications are silenced
     if (ae->silenced == 1) {
-        debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        info("Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
@@ -408,7 +408,7 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
             if (unlikely(silencers->stype == STYPE_NONE)) {
-                info("An alarm matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.");
+                info("Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
             } else {
                 info("Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
                 		, (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
@@ -423,6 +423,23 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
         }
     }
     return STYPE_NONE;
+}
+
+int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
+	// Clear the flags
+	rc->rrdcalc_flags &= ~(RRDCALC_FLAG_DISABLED | RRDCALC_FLAG_SILENCED);
+	if (unlikely(silencers->all_alarms)) {
+		if (silencers->stype == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
+		else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
+	} else {
+		SILENCE_TYPE st = check_silenced(rc, host->hostname, silencers);
+		if (st == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
+		else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
+	}
+	if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
+		return 1;
+	else
+		return 0;
 }
 
 void *health_main(void *ptr) {
@@ -490,17 +507,8 @@ void *health_main(void *ptr) {
 			// the first loop is to lookup values from the db
 			for (rc = host->alarms; rc; rc = rc->next) {
 
-				rc->disabled_flag = 0;
-				rc->silenced_flag = 0;
-				if (unlikely(silencers->all_alarms)) {
-					if (silencers->stype == STYPE_DISABLE_ALARMS) rc->disabled_flag = 1;
-					else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->silenced_flag = 1;
-				} else {
-					SILENCE_TYPE st = check_silenced(rc, host->hostname, silencers);
-					if (st == STYPE_DISABLE_ALARMS) rc->disabled_flag = 1;
-					else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->silenced_flag = 1;
-				}
-				if (rc->disabled_flag) continue;
+				if (update_disabled_silenced(host, rc))
+					continue;
 
 				if (unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
 					if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
@@ -610,7 +618,7 @@ void *health_main(void *ptr) {
 					if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
 						continue;
 
-					if (rc->disabled_flag) {
+					if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED) {
 						continue;
 					}
 					RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
@@ -737,7 +745,7 @@ void *health_main(void *ptr) {
 								rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
 								rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
 								rc->delay_last, (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)
-												? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0, rc->silenced_flag
+												? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0, rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED
 						);
 
 						rc->last_status_change = now;
