@@ -6,6 +6,7 @@
 
 - python go\_expvar: reuse same expvar key in different charts [\#5133](https://github.com/netdata/netdata/issues/5133)
 - hddtemp.chart.py is hardcoded to only use /dev/sdX [\#5129](https://github.com/netdata/netdata/issues/5129)
+- RabbitMQ Plugin wrong metrics for nodes in cluster [\#5118](https://github.com/netdata/netdata/issues/5118)
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
@@ -19,8 +20,13 @@
 
 **Merged pull requests:**
 
+- Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
+- Fix typo in plugins.d/README.md [\#5150](https://github.com/netdata/netdata/pull/5150) ([arkamar](https://github.com/arkamar))
+- "Network Traffic \(system.net\)" is always zero on FreeBSD virtual machines if hypervisor uses VirtIO NIC [\#5149](https://github.com/netdata/netdata/pull/5149) ([vladmovchan](https://github.com/vladmovchan))
+- rabbitmq: api/nodes requests fix [\#5142](https://github.com/netdata/netdata/pull/5142) ([ilyam8](https://github.com/ilyam8))
 - go\_expavar fix: don't check for duplicate expvars [\#5141](https://github.com/netdata/netdata/pull/5141) ([ilyam8](https://github.com/ilyam8))
 - hddtemp fix: don't use disk model as dim name [\#5140](https://github.com/netdata/netdata/pull/5140) ([ilyam8](https://github.com/ilyam8))
+- add option to opt-out from telemetry program [\#5138](https://github.com/netdata/netdata/pull/5138) ([paulfantom](https://github.com/paulfantom))
 - Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
