@@ -119,12 +119,12 @@ typedef enum web_client_acl {
     WEB_CLIENT_ACL_NETDATACONF = 1 << 5
 } WEB_CLIENT_ACL;
 
-#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD && (w)->port_acl & WEB_CLIENT_ACL_DASHBOARD)
-#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY && (w)->port_acl & WEB_CLIENT_ACL_REGISTRY)
-#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE && (w)->port_acl & WEB_CLIENT_ACL_BADGE)
-#define web_client_can_access_mgmt(w) ((w)->acl & WEB_CLIENT_ACL_MGMT && (w)->port_acl & WEB_CLIENT_ACL_MGMT)
-#define web_client_can_access_stream(w) ((w)->acl & WEB_CLIENT_ACL_STREAMING && (w)->port_acl & WEB_CLIENT_ACL_STREAMING)
-#define web_client_can_access_netdataconf(w) ((w)->acl & WEB_CLIENT_ACL_NETDATACONF && (w)->port_acl & WEB_CLIENT_ACL_NETDATACONF)
+#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
+#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY)
+#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE)
+#define web_client_can_access_mgmt(w) ((w)->acl & WEB_CLIENT_ACL_MGMT)
+#define web_client_can_access_stream(w) ((w)->acl & WEB_CLIENT_ACL_STREAMING)
+#define web_client_can_access_netdataconf(w) ((w)->acl & WEB_CLIENT_ACL_NETDATACONF)
 
 
 struct web_client {

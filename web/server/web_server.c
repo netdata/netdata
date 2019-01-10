@@ -103,6 +103,8 @@ void web_client_update_acl_matches(struct web_client *w) {
 
     if(!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, w->client_ip))
         w->acl |= WEB_CLIENT_ACL_NETDATACONF;
+
+    w->acl &= w->port_acl;
 }
 
 
