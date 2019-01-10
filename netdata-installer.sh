@@ -150,6 +150,10 @@ Valid <installer options> are:
         Use this option to allow it continue
         without checking pkg-config.
 
+   --disable-telemetry
+
+        Use this flag to opt-out from our anonymous telemetry progam.
+
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
@@ -204,6 +208,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--disable-x86-sse" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"
+		shift 1
+	elif [ "$1" = "--disable-telemetry" ]; then
+		NETDATA_DISABLE_TELEMETRY=1
 		shift 1
 	elif [ "$1" = "--help" -o "$1" = "-h" ]; then
 		usage
@@ -957,6 +964,11 @@ INSTALL_UID="${UID}"
 REINSTALL_PWD="${REINSTALL_PWD}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 EOF
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+	touch ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics
+fi
 
 # -----------------------------------------------------------------------------
 echo >&2
