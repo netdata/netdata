@@ -1398,8 +1398,8 @@ send_alerta() {
     case "${status}" in
         CRITICAL) severity="critical" ;;
         WARNING)  severity="warning" ;;
-        CLEAR)    severity="cleared" ;;
-        *)        severity="indeterminate" ;;
+        CLEAR)    severity="ok" ;;
+        *)        severity="unknown" ;;
     esac
 
     if [[ "${chart}" == httpcheck* ]]
