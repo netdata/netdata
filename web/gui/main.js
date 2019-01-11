@@ -851,24 +851,29 @@ function gotoServerModalHandler(guid) {
         gotoServerValidateUrl(count++, guid, url);
     }
 
-    setTimeout(function () {
-        if (gotoServerStop === false) {
-            document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
-            NETDATA.registry.search(guid, function (data) {
-                // console.log(data);
-                len = data.urls.length;
-                while (len--) {
-                    var url = data.urls[len][1];
-                    // console.log(url);
-                    if (typeof checked[url] === 'undefined') {
-                        gotoServerValidateRemaining++;
-                        checked[url] = true;
-                        gotoServerValidateUrl(count++, guid, url);
+    if (!isSignedIn()) {
+        // When the registry is enabled, if the user's known URLs are not working
+        // we consult the registry to get additional URLs.  
+        setTimeout(function () {
+            if (gotoServerStop === false) {
+                document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                NETDATA.registry.search(guid, function (data) {
+                    // console.log(data);
+                    len = data.urls.length;
+                    while (len--) {
+                        var url = data.urls[len][1];
+                        // console.log(url);
+                        if (typeof checked[url] === 'undefined') {
+                            gotoServerValidateRemaining++;
+                            checked[url] = true;
+                            gotoServerValidateUrl(count++, guid, url);
+                        }
                     }
-                }
-            });
-        }
-    }, 2000);
+                });
+            }
+        }, 2000);
+    }
+
     return false;
 }
 
