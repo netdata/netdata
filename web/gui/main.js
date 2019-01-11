@@ -684,7 +684,7 @@ function errorMyNetdataMenu() {
 function restrictMyNetdataMenu() {
     setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        <span>Please <a href="#" onclick="signInDidClick()">sign in</a> to view your netdata agents!</span>
+        <span>Please <a href="#" onclick="signInDidClick()">sign in</a> to <strong>netdata.cloud</strong> to view your netdata agents!</span>
         <div></div>
     </div>`);
 }
@@ -709,6 +709,7 @@ function renderMyNetdataMenu(machinesArray) {
         `<input 
             id="my-netdata-menu-filter-input"
             type="text" 
+            placeholder="filter agents..."
             value="${myNetdataMenuFilterValue}" 
             onkeydown="myNetdataFilterDidChange()"
         /><i class="fas fa-filter"></i>

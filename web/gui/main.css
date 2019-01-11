@@ -534,6 +534,10 @@ body.modal-open {
 
 /* -------------------------------------------------------------------------- */
 
+#my-netdata-dropdown-content {
+    width: 500px;
+}
+
 #my-netdata-dropdown-content a:hover {
     color: #fff;
 }
