@@ -503,6 +503,12 @@ function renderStreamedHosts(options) {
         let url, icon;
         const hostname = s.hostname;
 
+        if (myNetdataMenuFilterValue !== "") {
+            if (!hostname.includes(myNetdataMenuFilterValue)) {
+                continue;
+            }
+        }
+
         if (hostname === master) {
             url = `${base}/`;
             icon = 'home';
@@ -693,11 +699,12 @@ function renderMyNetdataMenu(machinesArray) {
             type="text" 
             value="${myNetdataMenuFilterValue}" 
             onkeydown="myNetdataFilterDidChange()"
-        />`
+        /><i class="fas fa-filter"></i>
+        <hr />`
     );
 
     if (options.hosts.length > 1) {
-        html += renderStreamedHosts(options) + `<hr />`;
+        html += `<div id="my-netdata-menu-streamed">${renderStreamedHosts(options)}</div><hr />`;
     }
 
     html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div>`;
@@ -4596,8 +4603,14 @@ function myNetdataFilterDidChange() {
     const inputEl = this.event.target;
     setTimeout(() => {
         myNetdataMenuFilterValue = inputEl.value;
-        const agentsEl = document.getElementById("my-netdata-menu-machines")
-        agentsEl.innerHTML = renderMachines(cloudKnownAgents);
+        
+        const machinesEl = document.getElementById("my-netdata-menu-machines")
+        machinesEl.innerHTML = renderMachines(cloudKnownAgents);
+
+        if (options.hosts.length > 1) {
+            const streamedEl = document.getElementById("my-netdata-menu-streamed")
+            streamedEl.innerHTML = renderStreamedHosts(options);    
+        }
     }, 1);
 }
 

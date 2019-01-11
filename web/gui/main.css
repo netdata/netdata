@@ -632,11 +632,11 @@ body.modal-open {
     color: #fff;
     background: none;
     border: 1px solid #777;
-    margin-left: 14px;
-    margin-top: 5px;
+    margin: 5px 14px;
     width: 80%;
 }
 
 #my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
-    border: 1px solid #999;
+    border: 1px solid #ddd;
+    color: #555;
 }
