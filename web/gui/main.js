@@ -547,6 +547,7 @@ function renderMachines(machinesArray) {
     }
 
     let found = false;
+    let displayedAgents = false;
 
     if (machinesArray) {
         saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
@@ -558,13 +559,15 @@ function renderMachines(machinesArray) {
         const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
 
         for (var machine of machines) {
+            found = true;
+
             if (myNetdataMenuFilterValue !== "") {
                 if (!machine.name.includes(myNetdataMenuFilterValue)) {
                     continue;
                 }
             }
 
-            found = true;
+            displayedAgents = true;
 
             const alternateUrlItems = (
                 `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
@@ -599,6 +602,15 @@ function renderMachines(machinesArray) {
                     </a>
                 </div>
                 ${alternateUrlItems}`
+            )
+        }
+
+        if (!displayedAgents) {
+            html += (
+                `<div class="info-item">
+                    <i class="fas fa-filter"></i>
+                    <span style="margin-left: 8px">no agents match the filter criteria.<span>
+                </div>`
             )
         }
     }
