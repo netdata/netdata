@@ -627,3 +627,16 @@ body.modal-open {
 #cloud-menu.dropdown-menu > li > a {
     text-align: left;
 }
+
+#my-netdata-menu-filter-input {
+    color: #fff;
+    background: none;
+    border: 1px solid #777;
+    margin-left: 14px;
+    margin-top: 5px;
+    width: 80%;
+}
+
+#my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
+    border: 1px solid #999;
+}

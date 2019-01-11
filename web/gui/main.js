@@ -552,6 +552,12 @@ function renderMachines(machinesArray) {
         const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
 
         for (var machine of machines) {
+            if (myNetdataMenuFilterValue !== "") {
+                if (!machine.name.includes(myNetdataMenuFilterValue)) {
+                    continue;
+                }
+            }
+
             found = true;
 
             const alternateUrlItems = (
@@ -681,11 +687,20 @@ function renderMyNetdataMenu(machinesArray) {
 
     let html = '';
 
+    html += (
+        `<input 
+            id="my-netdata-menu-filter-input"
+            type="text" 
+            value="${myNetdataMenuFilterValue}" 
+            onkeydown="myNetdataFilterDidChange()"
+        />`
+    );
+
     if (options.hosts.length > 1) {
         html += renderStreamedHosts(options) + `<hr />`;
     }
 
-    html += renderMachines(machinesArray);
+    html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div>`;
 
     html += "<hr />"
 
@@ -4423,6 +4438,8 @@ let registryKnownAgents = [];
 // The known agents associated with the current cloud account.
 let cloudKnownAgents = [];
 
+let myNetdataMenuFilterValue = "";
+
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
 function truncateString(str, maxLength) {
@@ -4574,6 +4591,17 @@ function signInDidClick() {
 function signOutDidClick() {
     signOut();
 }
+
+function myNetdataFilterDidChange() {
+    const inputEl = this.event.target;
+    setTimeout(() => {
+        myNetdataMenuFilterValue = inputEl.value;
+        const agentsEl = document.getElementById("my-netdata-menu-machines")
+        agentsEl.innerHTML = renderMachines(cloudKnownAgents);
+    }, 1);
+}
+
+// -------------------------------------------------------------------------------------------------
 
 function clearCloudLocalStorageItems() {
     localStorage.removeItem("cloud.baseURL");
