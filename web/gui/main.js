@@ -549,14 +549,14 @@ function renderMachines(machinesArray) {
     let found = false;
     let displayedAgents = false;
 
+    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
+
     if (machinesArray) {
         saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
 
         var machines = machinesArray.sort(function (a, b) {
             return naturalSortCompare(a.name, b.name);
         });
-
-        const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
 
         for (var machine of machines) {
             found = true;
@@ -572,7 +572,7 @@ function renderMachines(machinesArray) {
             const alternateUrlItems = (
                 `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
                 ${machine.alternate_urls.reduce((str, url) => {
-                        if (url == maskedURL) {
+                        if (url === maskedURL) {
                             return str
                         }
 
@@ -721,11 +721,10 @@ function renderMyNetdataMenu(machinesArray) {
 
     html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div>`;
 
-    html += "<hr />"
-
     if (!isSignedIn()) {
         html += (
-            `<div class="agent-item">
+            `<hr />
+            <div class="agent-item">
                 <i class="fas fa-cog""></i>
                 <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
                 <div></div>
@@ -737,13 +736,14 @@ function renderMyNetdataMenu(machinesArray) {
             </div>`
         )
     } else {
-        html += (
-            `<div class="agent-item">
-                <i class="fas fa-question-circle"></i>
-                <a href="https://netdata.cloud" target="_blank">What is this?</a>
-                <div></div>
-            </div>`
-        )
+        // html += (
+        //     `<hr />
+        //     <div class="agent-item">
+        //         <i class="fas fa-question-circle"></i>
+        //         <a href="https://netdata.cloud/about" target="_blank">What is this?</a>
+        //         <div></div>
+        //     </div>`
+        // )
     
     }
 
