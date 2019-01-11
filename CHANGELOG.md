@@ -21,6 +21,7 @@
 **Merged pull requests:**
 
 - Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
+- Fix cached memory calculation [\#5151](https://github.com/netdata/netdata/pull/5151) ([vlvkobal](https://github.com/vlvkobal))
 - Fix typo in plugins.d/README.md [\#5150](https://github.com/netdata/netdata/pull/5150) ([arkamar](https://github.com/arkamar))
 - "Network Traffic \(system.net\)" is always zero on FreeBSD virtual machines if hypervisor uses VirtIO NIC [\#5149](https://github.com/netdata/netdata/pull/5149) ([vladmovchan](https://github.com/vladmovchan))
 - rabbitmq: api/nodes requests fix [\#5142](https://github.com/netdata/netdata/pull/5142) ([ilyam8](https://github.com/ilyam8))
