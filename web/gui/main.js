@@ -548,7 +548,7 @@ function renderStreamedHosts(options) {
 
 function renderMachines(machinesArray) {
     let html = isSignedIn() 
-        ? `<div class="info-item">My netdata agents&nbsp;&nbsp;<i class="fas fa-cloud"></i></div>`
+        ? `<div class="info-item">My netdata agents</div>`
         : `<div class="info-item">My netdata agents </div>`;
 
     if (machinesArray === null) {
