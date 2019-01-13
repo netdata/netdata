@@ -499,6 +499,8 @@ function renderStreamedHosts(options) {
         return naturalSortCompare(a.hostname, b.hostname);
     });
 
+    displayedDatabases = false;
+
     for (var s of sorted) {
         let url, icon;
         const hostname = s.hostname;
@@ -508,6 +510,8 @@ function renderStreamedHosts(options) {
                 continue;
             }
         }
+
+        displayedDatabases = true;
 
         if (hostname === master) {
             url = `${base}/`;
@@ -526,6 +530,15 @@ function renderStreamedHosts(options) {
                     <a class="registry_link" href="${url}#">${hostname}</a>
                 </span>
                 <div></div>
+            </div>`
+        )
+    }
+
+    if (!displayedDatabases) {
+        html += (
+            `<div class="info-item">
+                <i class="fas fa-filter"></i>
+                <span style="margin-left: 8px">no databases match the filter criteria.<span>
             </div>`
         )
     }
@@ -549,7 +562,7 @@ function renderMachines(machinesArray) {
     let found = false;
     let displayedAgents = false;
 
-    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
+    const maskedURL = NETDATA.registry.MASKED_DATA;
 
     if (machinesArray) {
         saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
@@ -4526,7 +4539,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
         return [];
     }
 
-    const maskedURL = NETDATA.registry.MASKED_AGENT_URL;
+    const maskedURL = NETDATA.registry.MASKED_DATA;
 
     const agents = agentsToSync.map((a) => {
         const urls = a.alternate_urls.filter((url) => url != maskedURL);

@@ -12,7 +12,7 @@ NETDATA.registry = {
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
 
-    MASKED_AGENT_URL: "***",
+    MASKED_DATA: "***",
 
     isUsingGlobalRegistry: function() {
         return NETDATA.registry.server == "https://registry.my-netdata.io";
@@ -144,9 +144,15 @@ NETDATA.registry = {
     },
 
     access: function (max_redirects, callback) {
-        const url = NETDATA.registry.isRegistryEnabled() ? NETDATA.serverDefault : NETDATA.registry.MASKED_AGENT_URL;
+        // let name = NETDATA.registry.MASKED_DATA;
+        // let url =  NETDATA.registry.MASKED_DATA;
 
-        console.log("... ACCESS", url);
+        // if (NETDATA.registry.isRegistryEnabled()) {
+            name = NETDATA.registry.hostname;
+            url = NETDATA.serverDefault;
+        // } 
+
+        console.log("... ACCESS", name, url);
 
         // send ACCESS to a netdata registry:
         // 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)
@@ -154,7 +160,7 @@ NETDATA.registry = {
         // the registry identifies us using a cookie it sets the first time we access it
         // the registry may respond with a redirect URL to send us to another registry
         $.ajax({
-            url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(NETDATA.registry.hostname) + '&url=' + encodeURIComponent(url), // + '&visible_url=' + encodeURIComponent(document.location),
+            url: NETDATA.registry.server + '/api/v1/registry?action=access&machine=' + NETDATA.registry.machine_guid + '&name=' + encodeURIComponent(name) + '&url=' + encodeURIComponent(url), // + '&visible_url=' + encodeURIComponent(document.location),
             async: true,
             cache: false,
             headers: {
