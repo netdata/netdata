@@ -16,8 +16,7 @@ export LC_ALL=C
 # -----------------------------------------------------------------------------
 # logging functions
 
-PROGRAM_FILE="$0"
-PROGRAM_NAME="$(basename $0)"
+PROGRAM_NAME="$(basename "$0")"
 PROGRAM_NAME="${PROGRAM_NAME/.plugin}"
 
 logdate() {
@@ -61,12 +60,14 @@ debug() {
 fireqos_run_dir="/var/run/fireqos"
 
 function realdir {
-    local r="$1"
-    local t=$(readlink "$r")
+    local r
+    local t
+    r="$1"
+    t="$(readlink "$r")"
 
     while [ "$t" ]
         do
-        r=$(cd $(dirname "$r") && cd $(dirname "$t") && pwd -P)/$(basename "$t")
+        r=$(cd "$(dirname "$r")" && cd "$(dirname "$t")" && pwd -P)/$(basename "$t")
         t=$(readlink "$r")
     done
 
@@ -77,17 +78,16 @@ if [ ! -d "${fireqos_run_dir}" ]
     then
 
     # the fireqos executable - we will use it to find its config
-    fireqos="$(which fireqos 2>/dev/null || command -v fireqos 2>/dev/null)"
+    fireqos="$(command -v fireqos 2>/dev/null)"
 
-    if [ ! -z "${fireqos}" ]
+    if [ -n "${fireqos}" ]
         then
 
-        fireqos_exec_dir="$(realdir ${fireqos})"
+        fireqos_exec_dir="$(realdir "${fireqos}")"
 
-        if [ ! -z "${fireqos_exec_dir}" -a "${fireqos_exec_dir}" != "." -a -f "${fireqos_exec_dir}/install.config" ]
-            then
-
+        if [ -n "${fireqos_exec_dir}" ] && [ "${fireqos_exec_dir}" != "." ] && [ -f "${fireqos_exec_dir}/install.config" ]; then
             LOCALSTATEDIR=
+            #shellcheck source=/dev/null
             source "${fireqos_exec_dir}/install.config"
 
             if [ -d "${LOCALSTATEDIR}/run/fireqos" ]
@@ -111,7 +111,7 @@ fi
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 plugins_dir="${NETDATA_PLUGINS_DIR}"
-tc="$(which tc 2>/dev/null || command -v tc 2>/dev/null)"
+tc="$(command -v tc 2>/dev/null)"
 
 
 # -----------------------------------------------------------------------------
@@ -139,13 +139,11 @@ update_every=$((t))
 # -----------------------------------------------------------------------------
 # allow the user to override our defaults
 
-for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"
-do
-    if [ -f "${CONFIG}" ]
-        then
+for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"; do
+    if [ -f "${CONFIG}" ]; then
         info "Loading config file '${CONFIG}'..."
-        source "${CONFIG}"
-        [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
+        #shellcheck source=/dev/null
+        source "${CONFIG}" || error "Failed to load config file '${CONFIG}'."
     else
         warning "Cannot find file '${CONFIG}'."
     fi
@@ -154,7 +152,6 @@ done
 case "${tc_show}" in
     qdisc|class)
         ;;
-
     *)
         error "tc_show variable can be either 'qdisc' or 'class' but is set to '${tc_show}'. Assuming it is 'qdisc'."
         tc_show="qdisc"
@@ -167,19 +164,19 @@ esac
 
 LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
-    sleep $1
+    sleep "$1"
 }
 
 # if found and included, this file overwrites loopsleepms()
 # with a high resolution timer function for precise looping.
+#shellcheck source=/dev/null
 . "${plugins_dir}/loopsleepms.sh.inc"
 
 
 # -----------------------------------------------------------------------------
 # final checks we can run
 
-if [ -z "${tc}" -o ! -x "${tc}" ]
-    then
+if [ -z "${tc}" ] || [  ! -x "${tc}" ]; then
     fatal "cannot find command 'tc' in this system."
 fi
 
@@ -189,8 +186,7 @@ fix_names=
 # -----------------------------------------------------------------------------
 
 setclassname() {
-    if [ "${tc_show}" = "qdisc" ]
-        then
+    if [ "${tc_show}" = "qdisc" ]; then
         echo "SETCLASSNAME $4 $2"
     else
         echo "SETCLASSNAME $3 $2"
@@ -202,12 +198,17 @@ show_tc_cls() {
 
     local x="${1}"
 
-    if [ -f /etc/iproute2/tc_cls ]
-    then
+    if [ -f /etc/iproute2/tc_cls ]; then
         local classid name rest
-        while read classid name rest
-        do
-            [ -z "${classid}" -o -z "${name}" -o "${classid}" = "#" -o "${name}" = "#" -o "${classid:0:1}" = "#" -o "${name:0:1}" = "#" ] && continue
+        while read -r classid name rest; do
+            if [ -z "${classid}" ] \
+            || [ -z "${name}" ] \
+            || [ "${classid}" = "#" ] \
+            || [ "${name}" = "#" ] \
+            || [ "${classid:0:1}" = "#" ] \
+            || [ "${name:0:1}" = "#" ]; then
+            	continue
+            fi
             setclassname "" "${name}" "${classid}"
         done </etc/iproute2/tc_cls
         return 0
@@ -216,22 +217,20 @@ show_tc_cls() {
 }
 
 show_fireqos_names() {
-    local x="${1}" name n interface_dev interface_classes interface_classes_monitor
+    local x="${1}" name n interface_dev interface_classes_monitor
 
     if [ -f "${fireqos_run_dir}/ifaces/${x}" ]
     then
         name="$(<"${fireqos_run_dir}/ifaces/${x}")"
         echo "SETDEVICENAME ${name}"
 
-        interface_dev=
-        interface_classes=
-        interface_classes_monitor=
+        #shellcheck source=/dev/null
         source "${fireqos_run_dir}/${name}.conf"
         for n in ${interface_classes_monitor}
         do
-            setclassname ${n//|/ }
+            setclassname "${n//|/ }"
         done
-        [ ! -z "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
+        [ -n "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
 
         return 0
     fi
@@ -245,10 +244,10 @@ show_tc() {
     echo "BEGIN ${x}"
 
     # netdata can parse the output of tc
-    ${tc} -s ${tc_show} show dev ${x}
+    ${tc} -s ${tc_show} show dev "${x}"
 
     # check FireQOS names for classes
-    if [ ! -z "${fix_names}" ]
+    if [ -n "${fix_names}" ]
     then
         show_fireqos_names "${x}" || show_tc_cls "${x}"
     fi
@@ -257,11 +256,11 @@ show_tc() {
 }
 
 find_tc_devices() {
-    local count=0 devs= dev rest l
+    local count=0 devs dev rest l
 
     # find all the devices in the system
     # without forking
-    while IFS=":| " read dev rest
+    while IFS=":| " read -r dev rest
     do
         count=$((count + 1))
         [ ${count} -le 2 ] && continue
@@ -274,8 +273,8 @@ find_tc_devices() {
     tc_devices=
     for dev in ${devs}
     do
-        l="$(${tc} class show dev ${dev} 2>/dev/null)"
-        [ ! -z "${l}" ] && tc_devices="${tc_devices} ${dev}"
+        l="$(${tc} class show dev "${dev}" 2>/dev/null)"
+        [ -n "${l}" ] && tc_devices="${tc_devices} ${dev}"
     done
 }
 
@@ -289,22 +288,19 @@ exit_after=$((qos_exit_every / update_every))
 
 c=0
 gc=0
-while [ 1 ]
-do
+while true; do
     fix_names=
     c=$((c + 1))
     gc=$((gc + 1))
 
-    if [ ${c} -le 1 -o ${c} -ge ${names_every} ]
-    then
+    if [ ${c} -le 1 ] || [ ${c} -ge ${names_every} ]; then
         c=1
         fix_names="YES"
         find_tc_devices
     fi
 
-    for d in ${tc_devices}
-    do
-        show_tc ${d}
+    for d in ${tc_devices}; do
+        show_tc "${d}"
     done
 
     echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}"
