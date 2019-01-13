@@ -998,10 +998,20 @@ function notifyForDeleteRegistry() {
                             $('#deleteRegistryModal').modal('hide');
                             NETDATA.registry.init();
                         } else {
-                            responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
+                            // Don't show any error.
                         }
                     });    
                 });
+        } else {
+            NETDATA.registry.delete(deleteRegistryUrl, function (result) {
+                if (result !== null) {
+                    deleteRegistryUrl = null;
+                    $('#deleteRegistryModal').modal('hide');
+                    NETDATA.registry.init();
+                } else {
+                    responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
+                }
+            });              
         }
     }
 }

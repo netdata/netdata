@@ -97,7 +97,7 @@ NETDATA.registry = {
                 // } else {
                 //     NETDATA.registry.machines = {};
                 //     NETDATA.registry.machines_array = [];
-        
+                //
                 //     if (typeof netdataRegistryCallback === 'function') {
                 //         netdataRegistryCallback(NETDATA.registry.machines_array);
                 //     }            
