@@ -499,7 +499,7 @@ function renderStreamedHosts(options) {
         return naturalSortCompare(a.hostname, b.hostname);
     });
 
-    displayedDatabases = false;
+    let displayedDatabases = false;
 
     for (var s of sorted) {
         let url, icon;
