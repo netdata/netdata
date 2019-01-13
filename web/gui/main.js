@@ -725,7 +725,7 @@ function renderMyNetdataMenu(machinesArray) {
             placeholder="filter agents..."
             value="${myNetdataMenuFilterValue}" 
             onkeydown="myNetdataFilterDidChange()"
-        /><i class="fas fa-filter"></i>
+        />
         <hr />`
     );
 
