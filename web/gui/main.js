@@ -861,6 +861,7 @@ function gotoServerValidateUrl(id, guid, url) {
                     } else {
                         document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
                         document.location = verifyURL(finalURL);
+                        $('#gotoServerModal').modal('hide');
                     }
                 }
             } else {
