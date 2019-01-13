@@ -4500,6 +4500,10 @@ function truncateString(str, maxLength) {
 // netdata.cloud API Client
 // -------------------------------------------------------------------------------------------------
 
+function isValidAgent(a) {
+    return a.urls != null;
+}
+
 // https://github.com/netdata/hub/issues/146
 function getCloudAccountKnownAgents() {
     const accountID = localStorage.getItem("cloud.accountID");
@@ -4529,7 +4533,7 @@ function getCloudAccountKnownAgents() {
             return [];
         }
 
-        return agents.map((a) => {
+        return agents.filter((a) => isValidAgent(a)).map((a) => {
             return {
                 "guid": a.id,
                 "name": a.name,
@@ -4589,7 +4593,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
             return [];
         }
 
-        return agents.map((a) => {
+        return agents.filter((a) => isValidAgent(a)).map((a) => {
             return {
                 "guid": a.id,
                 "name": a.name,
