@@ -4554,7 +4554,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
     const payload = {
         "accountID": accountID,
         "agents": agents,
-        "merge": false,
+        "merge": true,
     };
     
     return fetch(
@@ -4738,9 +4738,11 @@ function syncAgents() {
     if (agentsToSync.length > 0) {
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
-            cloudKnownAgents = agents;
+            cloudKnownAgents = agents.concat(cloudKnownAgents);
             renderMyNetdataMenu(cloudKnownAgents);
         });        
+    } else {
+        renderMyNetdataMenu(cloudKnownAgents);
     }
 }
 
@@ -4767,7 +4769,7 @@ function netdataRegistryCallback(machinesArray) {
     registryKnownAgents = machinesArray;  
 
     if (isSignedIn()) {
-        // We call getAgentsList() here because it requires that 
+        // We call getCloudAccountKnownAgents() here because it requires that 
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountKnownAgents().then((agents) => {
@@ -4775,7 +4777,7 @@ function netdataRegistryCallback(machinesArray) {
                 errorMyNetdataMenu();
                 return;
             }
-            cloudKnownAgents = agents; // TODO: Is this needed?
+            cloudKnownAgents = agents; 
             syncAgents();
 
             const agentsMap = {}
@@ -4786,7 +4788,7 @@ function netdataRegistryCallback(machinesArray) {
             NETDATA.registry.machines = agentsMap;
             NETDATA.registry.machines_array = agents;
 
-            renderMyNetdataMenu(agents);
+            // renderMyNetdataMenu(agents);
         });
     } else {
         renderMyNetdataMenu(machinesArray)
