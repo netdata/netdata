@@ -723,6 +723,7 @@ function renderMyNetdataMenu(machinesArray) {
             id="my-netdata-menu-filter-input"
             type="text" 
             placeholder="filter agents..."
+            autocomplete="off"
             value="${myNetdataMenuFilterValue}" 
             onkeydown="myNetdataFilterDidChange()"
         />
