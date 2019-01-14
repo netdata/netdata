@@ -81,6 +81,8 @@ static int registry_json_person_url_callback(void *entry, void *data) {
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
 
+    if (!strcmp(pu->url->url,"***")) return 0;
+    
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
 
@@ -99,6 +101,8 @@ static int registry_json_machine_url_callback(void *entry, void *data) {
 
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
+
+    if (!strcmp(mu->url->url,"***")) return 1;
 
     buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u ]",
             m->guid, mu->url->url, mu->last_t, mu->usages);
