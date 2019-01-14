@@ -313,7 +313,9 @@ WEB_CLIENT_ACL read_acl(char *st) {
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
-    int added = 0, acl_flags = 0;
+    int added = 0;
+    WEB_CLIENT_ACL acl_flags = WEB_CLIENT_ACL_NONE;
+
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
 
@@ -381,7 +383,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         while (*e != '\0') {
             if (*e == '|') {
                 *e = '\0';
-                acl_flags = acl_flags | read_acl(portconfig);
+                acl_flags |= read_acl(portconfig);
                 e++;
                 portconfig = e;
                 continue;
@@ -1010,7 +1012,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
-                             , int port_acl
+                             , WEB_CLIENT_ACL port_acl
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port

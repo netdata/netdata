@@ -6,18 +6,7 @@
 
 
 static SILENCER *create_silencer(void) {
-    SILENCER *t = mallocz(sizeof(SILENCER));
-    t->alarms = NULL;
-    t->alarms_pattern = NULL;
-    t->charts = NULL;
-    t->charts_pattern = NULL;
-    t->contexts = NULL;
-    t->contexts_pattern = NULL;
-    t->hosts = NULL;
-    t->hosts_pattern = NULL;
-    t->families = NULL;
-    t->families_pattern = NULL;
-    t->next = NULL;
+    SILENCER *t = callocz(1, sizeof(SILENCER));
     debug(D_HEALTH, "HEALTH command API: Created empty silencer");
 
     return t;
@@ -28,17 +17,17 @@ void free_silencers(SILENCER *t) {
     if (t->next) free_silencers(t->next);
     debug(D_HEALTH, "HEALTH command API: Freeing silencer %s:%s:%s:%s:%s", t->alarms,
           t->charts, t->contexts, t->hosts, t->families);
-    if (t->alarms_pattern) simple_pattern_free(t->alarms_pattern);
-    if (t->charts_pattern) simple_pattern_free(t->charts_pattern);
-    if (t->contexts_pattern) simple_pattern_free(t->contexts_pattern);
-    if (t->hosts_pattern) simple_pattern_free(t->hosts_pattern);
-    if (t->families_pattern) simple_pattern_free(t->families_pattern);
-    if (t->alarms) freez(t->alarms);
-    if (t->charts) freez(t->charts);
-    if (t->contexts) freez(t->contexts);
-    if (t->hosts) freez(t->hosts);
-    if (t->families) freez(t->families);
-    free(t);
+    simple_pattern_free(t->alarms_pattern);
+    simple_pattern_free(t->charts_pattern);
+    simple_pattern_free(t->contexts_pattern);
+    simple_pattern_free(t->hosts_pattern);
+    simple_pattern_free(t->families_pattern);
+    freez(t->alarms);
+    freez(t->charts);
+    freez(t->contexts);
+    freez(t->hosts);
+    freez(t->families);
+    freez(t);
     return;
 }
 

@@ -401,10 +401,12 @@ void *socket_listen_main_static_threaded(void *ptr) {
             // so, if the machine has more CPUs, avoid using resources unnecessarily
             int def_thread_count = (processors > 6)?6:processors;
 
-            if (strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded"))
-                static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
-            else
+            if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
                 info("Running web server with one thread, because mode is single-threaded");
+                config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
+                def_thread_count = 1;
+            }
+            static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
 
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 

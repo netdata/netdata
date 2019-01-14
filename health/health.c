@@ -408,9 +408,9 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
                 ) {
             debug(D_HEALTH, "Alarm matches command API silence entry %s:%s:%s:%s:%s", s->alarms,s->charts, s->contexts, s->hosts, s->families);
             if (unlikely(silencers->stype == STYPE_NONE)) {
-                info("Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
+                debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
             } else {
-                info("Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
+                debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
                 		, (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
                         , (rc->rrdset)?rc->rrdset->context:""
@@ -426,6 +426,7 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
 }
 
 int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
+	uint32_t rrdcalc_flags_old = rc->rrdcalc_flags;
 	// Clear the flags
 	rc->rrdcalc_flags &= ~(RRDCALC_FLAG_DISABLED | RRDCALC_FLAG_SILENCED);
 	if (unlikely(silencers->all_alarms)) {
@@ -435,6 +436,17 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 		SILENCE_TYPE st = check_silenced(rc, host->hostname, silencers);
 		if (st == STYPE_DISABLE_ALARMS) rc->rrdcalc_flags |= RRDCALC_FLAG_DISABLED;
 		else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->rrdcalc_flags |= RRDCALC_FLAG_SILENCED;
+	}
+
+	if (rrdcalc_flags_old != rc->rrdcalc_flags) {
+		info("Alarm silencing changed for host '%s' alarm '%s': Disabled %s->%s Silenced %s->%s",
+				host->hostname,
+				rc->name,
+			 (rrdcalc_flags_old & RRDCALC_FLAG_DISABLED)?"true":"false",
+			 (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false",
+			 (rrdcalc_flags_old & RRDCALC_FLAG_SILENCED)?"true":"false",
+			 (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
+		);
 	}
 	if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
 		return 1;
@@ -475,8 +487,12 @@ void *health_main(void *ptr) {
 		}
 
 		if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
-			info("Skipping health checks, because all alarms are disabled via a %s command.",
-				 HEALTH_CMDAPI_CMD_DISABLEALL);
+			static int logged=0;
+			if (!logged) {
+				info("Skipping health checks, because all alarms are disabled via a %s command.",
+					 HEALTH_CMDAPI_CMD_DISABLEALL);
+				logged = 1;
+			}
 		}
 
 		rrd_rdlock();
