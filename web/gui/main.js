@@ -618,7 +618,7 @@ function renderMachines(machinesArray) {
             )
         }
 
-        if (!displayedAgents) {
+        if (found && (!displayedAgents)) {
             html += (
                 `<div class="info-item">
                     <i class="fas fa-filter"></i>
@@ -4562,7 +4562,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
 
     const maskedURL = NETDATA.registry.MASKED_DATA;
 
-    const agents = agentsToSync.filter((a) => isValidAgent(a)).map((a) => {
+    const agents = agentsToSync.map((a) => {
         const urls = a.alternate_urls.filter((url) => url != maskedURL);
 
         return {
@@ -4570,7 +4570,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
             "name": a.name,
             "urls": urls
         }
-    })
+    }).filter((a) => isValidAgent(a))
 
     const payload = {
         "accountID": accountID,
