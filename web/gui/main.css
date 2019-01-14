@@ -657,6 +657,10 @@ body.modal-open {
     left: -36px;
 }
 
-.collapse a.btn {
+/* .collapse a.btn {
     text-align: left;
+} */
+
+#hostname {
+    font-size: 18px;
 }
