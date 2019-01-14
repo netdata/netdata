@@ -4771,17 +4771,17 @@ function computeDiff(target, source) {
     return diff;
 }
 
-function syncAgents() {
+function syncAgents(callback) {
     const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
     if (diff.length > 0) {
         agentsToSync = cloudKnownAgents.concat(diff);
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
-            cloudKnownAgents = agents; // agents.concat(cloudKnownAgents);
-            renderMyNetdataMenu(cloudKnownAgents);
+            cloudKnownAgents = agents;
+            callback(cloudKnownAgents);
         });        
     } else {
-        renderMyNetdataMenu(cloudKnownAgents);
+        callback(cloudKnownAgents);
     }
 }
 
@@ -4817,17 +4817,17 @@ function netdataRegistryCallback(machinesArray) {
                 return;
             }
             cloudKnownAgents = agents; 
-            syncAgents();
-
-            const agentsMap = {}
-            for (const agent of agents) {
-                agentsMap[agent.guid] = agent;
-            }
-
-            NETDATA.registry.machines = agentsMap;
-            NETDATA.registry.machines_array = agents;
-
-            // renderMyNetdataMenu(agents);
+            syncAgents((agents) => {
+                const agentsMap = {}
+                for (const agent of agents) {
+                    agentsMap[agent.guid] = agent;
+                }
+    
+                NETDATA.registry.machines = agentsMap;
+                NETDATA.registry.machines_array = agents;
+    
+                renderMyNetdataMenu(agents);    
+            });
         });
     } else {
         renderMyNetdataMenu(machinesArray)
