@@ -718,20 +718,22 @@ function renderMyNetdataMenu(machinesArray) {
 
     let html = '';
 
-    html += (
-        `<div class="filter-control">
-            <input 
-                id="my-netdata-menu-filter-input"
-                type="text" 
-                placeholder="filter agents..."
-                autocomplete="off"
-                value="${myNetdataMenuFilterValue}" 
-                onkeydown="myNetdataFilterDidChange()"
-            />
-            <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick()"><i class="fas fa-times"></i><span>
-        </div>
-        <hr />`
-    );
+    if (isSignedIn()) {
+        html += (
+            `<div class="filter-control">
+                <input 
+                    id="my-netdata-menu-filter-input"
+                    type="text" 
+                    placeholder="filter agents..."
+                    autocomplete="off"
+                    value="${myNetdataMenuFilterValue}" 
+                    onkeydown="myNetdataFilterDidChange()"
+                />
+                <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick()"><i class="fas fa-times"></i><span>
+            </div>
+            <hr />`
+        );
+    }
 
     if (options.hosts.length > 1) {
         html += `<div id="my-netdata-menu-streamed">${renderStreamedHosts(options)}</div><hr />`;
