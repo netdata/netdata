@@ -4506,7 +4506,7 @@ function truncateString(str, maxLength) {
 // -------------------------------------------------------------------------------------------------
 
 function isValidAgent(a) {
-    return a.urls != null;
+    return a.urls != null && a.urls.length > 0;
 }
 
 // https://github.com/netdata/hub/issues/146
