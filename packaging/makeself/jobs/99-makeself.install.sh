@@ -90,5 +90,6 @@ run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 FILE="netdata-${VERSION}.gz.run"
 
-run mv "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
-echo >&2 "Self-extracting installer moved to '${FILE}'"
+run mkdir -p artifacts
+run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
+echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"
