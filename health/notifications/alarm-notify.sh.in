@@ -1626,7 +1626,7 @@ send_prowl() {
         message="description=${message}"
         keys="$(urlencode "$(echo "${1}" | tr ' ' ,)")"
         keys="apikey=${keys}"
-        app="$(urlencode "application=Netdata")"
+        app="application=Netdata"
 
         case "${status}" in
             CRITICAL)
@@ -1643,9 +1643,9 @@ send_prowl() {
         event="$(urlencode "${host} ${status_message}")"
         event="event=${event}"
 
-        data="${keys}&${pri}&${alarm_url}&${application}&${event}&${message}"
+        data="${keys}&${pri}&${alarm_url}&${app}&${event}&${message}"
 
-        httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapp/add")
+        httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapi/add")
 
         if [ "${httpcode}" = "200" ]  ; then
             info "sent prowl data for: ${host} ${chart}.${name} is ${status}"
