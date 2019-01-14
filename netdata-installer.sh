@@ -935,7 +935,7 @@ if [ -d .git ]; then
 
 			if [ "${AUTOUPDATE}" = "1" ]; then
 				progress "Installing new netdata-updater in cron"
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
 				chmod 0755 ${crondir}/netdata-updater
 				echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
 				echo >&2
@@ -954,15 +954,19 @@ else
 fi
 
 # Save environment variables
-cat <<EOF > packaging/installer/.environment.sh
+cat <<EOF > ${NETDATA_USER_CONFIG_DIR}/.environment
+# Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
-REINSTALL_PWD="${REINSTALL_PWD}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+# next 3 values are meant to be populated by autoupdater (if enabled)
+NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 
 # Opt-out from telemetry program
