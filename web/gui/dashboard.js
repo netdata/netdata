@@ -9763,19 +9763,6 @@ NETDATA.registry = {
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
                 });    
-                
-                // if (NETDATA.registry.isRegistryEnabled()) {
-                //     NETDATA.registry.access(2, function (person_urls) {
-                //         NETDATA.registry.parsePersonUrls(person_urls);
-                //     });    
-                // } else {
-                //     NETDATA.registry.machines = {};
-                //     NETDATA.registry.machines_array = [];
-                //
-                //     if (typeof netdataRegistryCallback === 'function') {
-                //         netdataRegistryCallback(NETDATA.registry.machines_array);
-                //     }            
-                // } 
             }
         });
     },
@@ -9819,14 +9806,14 @@ NETDATA.registry = {
 
     access: function (max_redirects, callback) {
         let name = NETDATA.registry.MASKED_DATA;
-        let url =  NETDATA.registry.MASKED_DATA;
+        let url = NETDATA.registry.MASKED_DATA;
 
-        if (NETDATA.registry.isRegistryEnabled()) {
+        if (!NETDATA.registry.isUsingGlobalRegistry()) {
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
         } 
 
-        console.log("ACCESS", name, url);
+        // console.log("ACCESS", name, url);
 
         // send ACCESS to a netdata registry:
         // 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)

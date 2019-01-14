@@ -132,9 +132,9 @@ NETDATA.registry = {
 
     access: function (max_redirects, callback) {
         let name = NETDATA.registry.MASKED_DATA;
-        let url =  NETDATA.registry.MASKED_DATA;
+        let url = NETDATA.registry.MASKED_DATA;
 
-        if (NETDATA.registry.isRegistryEnabled()) {
+        if (!NETDATA.registry.isUsingGlobalRegistry()) {
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
         } 
