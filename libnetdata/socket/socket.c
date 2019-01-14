@@ -360,22 +360,22 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
     }
     else {
-        while(*e && *e != ':' && *e != '%') e++;
+        while(*e && *e != ':' && *e != '%' && *e != '=') e++;
     }
 
     if(*e == '%') {
         *e = '\0';
         e++;
         interface = e;
-        while(*e && *e != ':') e++;
+        while(*e && *e != ':' && *e != '=') e++;
     }
 
     if(*e == ':') {
         port = e + 1;
         *e = '\0';
+        while(*e && *e != '=') e++;
     }
-    e++;
-    while (*e!='\0' && *e!='=') e++;
+
     if(*e == '=') {
         *e='\0';
         e++;
