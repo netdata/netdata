@@ -4570,7 +4570,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
     const payload = {
         "accountID": accountID,
         "agents": agents,
-        "merge": true,
+        "merge": false,
     };
     
     return fetch(
@@ -4730,7 +4730,6 @@ function sortedArraysEqual(a, b) {
 }
 
 // Computes the set of agents that are included in `source` but not in `target`.
-// Also filters the 'masked' urls.
 function computeDiff(target, source) {
     const tset = new Set();
 
@@ -4750,11 +4749,12 @@ function computeDiff(target, source) {
 }
 
 function syncAgents() {
-    const agentsToSync = computeDiff(cloudKnownAgents, registryKnownAgents);
-    if (agentsToSync.length > 0) {
+    const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
+    if (diff.length > 0) {
+        agentsToSync = cloudKnownAgents.concat(diff);
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
-            cloudKnownAgents = agents.concat(cloudKnownAgents);
+            cloudKnownAgents = agents; // agents.concat(cloudKnownAgents);
             renderMyNetdataMenu(cloudKnownAgents);
         });        
     } else {
