@@ -4562,7 +4562,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
 
     const maskedURL = NETDATA.registry.MASKED_DATA;
 
-    const agents = agentsToSync.map((a) => {
+    const agents = agentsToSync.filter((a) => isValidAgent(a)).map((a) => {
         const urls = a.alternate_urls.filter((url) => url != maskedURL);
 
         return {
@@ -4774,7 +4774,7 @@ function computeDiff(target, source) {
 function syncAgents(callback) {
     const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
     if (diff.length > 0) {
-        agentsToSync = cloudKnownAgents.concat(diff);
+        const agentsToSync = cloudKnownAgents.concat(diff);
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
             cloudKnownAgents = agents;
