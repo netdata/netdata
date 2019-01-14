@@ -37,8 +37,6 @@ function release_candidate() {
 		RC=0
 	fi
 	GIT_TAG="v$VERSION-rc$RC"
-	export GIT_TAG
-	export RC
 }
 
 # Check if current commit is tagged or not
