@@ -639,6 +639,7 @@ body.modal-open {
     margin: 5px 14px;
     width: 80%;
     padding: 2px 5px;
+    outline: none;
 }
 
 #my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
