@@ -719,14 +719,17 @@ function renderMyNetdataMenu(machinesArray) {
     let html = '';
 
     html += (
-        `<input 
-            id="my-netdata-menu-filter-input"
-            type="text" 
-            placeholder="filter agents..."
-            autocomplete="off"
-            value="${myNetdataMenuFilterValue}" 
-            onkeydown="myNetdataFilterDidChange()"
-        />
+        `<div class="filter-control">
+            <input 
+                id="my-netdata-menu-filter-input"
+                type="text" 
+                placeholder="filter agents..."
+                autocomplete="off"
+                value="${myNetdataMenuFilterValue}" 
+                onkeydown="myNetdataFilterDidChange()"
+            />
+            <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick()"><i class="fas fa-times"></i><span>
+        </div>
         <hr />`
     );
 
@@ -4641,19 +4644,37 @@ function signOutDidClick() {
     signOut();
 }
 
+function updateMyNetdataAfterFilterChange() {
+    const machinesEl = document.getElementById("my-netdata-menu-machines")
+    machinesEl.innerHTML = renderMachines(cloudKnownAgents);
+
+    if (options.hosts.length > 1) {
+        const streamedEl = document.getElementById("my-netdata-menu-streamed")
+        streamedEl.innerHTML = renderStreamedHosts(options);    
+    }
+}
+
 function myNetdataFilterDidChange() {
     const inputEl = this.event.target;
     setTimeout(() => {
         myNetdataMenuFilterValue = inputEl.value;
-        
-        const machinesEl = document.getElementById("my-netdata-menu-machines")
-        machinesEl.innerHTML = renderMachines(cloudKnownAgents);
-
-        if (options.hosts.length > 1) {
-            const streamedEl = document.getElementById("my-netdata-menu-streamed")
-            streamedEl.innerHTML = renderStreamedHosts(options);    
-        }
+        updateMyNetdataAfterFilterChange();        
     }, 1);
+}
+
+function myNetdataFilterClearDidClick() {
+    const e = this.event;
+    
+    e.preventDefault();
+    e.stopPropagation();
+
+    const inputEl = document.getElementById("my-netdata-menu-filter-input");
+    inputEl.value = "";
+    myNetdataMenuFilterValue = "";
+    
+    updateMyNetdataAfterFilterChange();        
+    
+    inputEl.focus();
 }
 
 // -------------------------------------------------------------------------------------------------

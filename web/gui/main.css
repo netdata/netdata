@@ -645,3 +645,13 @@ body.modal-open {
     border: 1px solid #ddd;
     color: #555;
 }
+
+.filter-control {
+    position: relative;
+}
+
+.filter-control .filter-control__clear {
+    cursor: pointer;
+    position: relative;
+    left: -36px;
+}
