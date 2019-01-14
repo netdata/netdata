@@ -16,6 +16,10 @@ git config user.name "${GIT_USER}"
 echo "--- UPDATE VERSION FILE ---"
 LAST_TAG=$(git describe --abbrev=0 --tags)
 NO_COMMITS=$(git rev-list "$LAST_TAG"..HEAD --count)
+if [ "$NO_COMMITS" == "$(rev <packaging/version | cut -d- -f 2 | rev)" ]; then
+	echo "Nothing changed since last nightly build"
+	exit 0
+fi
 echo "$LAST_TAG-$((NO_COMMITS + 1))-nightly" >packaging/version
 git add packaging/version
 
