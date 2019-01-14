@@ -656,3 +656,7 @@ body.modal-open {
     position: relative;
     left: -36px;
 }
+
+.collapse a.btn {
+    text-align: left;
+}
