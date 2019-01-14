@@ -73,8 +73,10 @@ RUN apk --no-cache add curl \
 
 # Subscribe to Polyverse's Polymorphic Linux repositories and reinstall all packages, so they are scrambled
 RUN curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io && \
-    sed -n -i '/repo.polyverse.io/p' /etc/apk/repositories && \
-    apk upgrade --update-cache --available
+    apk update && \
+    apk upgrade --available --no-cache && \
+    sed -in 's/^#//g' /etc/apk/repositories
+
 
 # Copy files over
 COPY --from=builder /app /
