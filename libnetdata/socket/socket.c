@@ -1230,7 +1230,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 #ifdef NETDATA_INTERNAL_CHECKS
             // this is common - it is used for web server file copies
             if(unlikely(!(pf->events & (POLLIN|POLLOUT)))) {
-                error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+                error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from %s port %s was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
                 //poll_close_fd(pi);
                 //return;
             }
@@ -1331,7 +1331,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 #ifdef NETDATA_INTERNAL_CHECKS
         // this is common - it is used for streaming
         if(unlikely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET && !(pf->events & (POLLIN|POLLOUT)))) {
-            error("POLLFD: LISTENER: after sending, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+            error("POLLFD: LISTENER: after sending, client slot %zu (fd %d) from %s port %s was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
             //poll_close_fd(pi);
             //return;
         }
@@ -1503,7 +1503,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
                     if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
-                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' has not sent a complete request in %zu seconds - closing it. "
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
@@ -1513,7 +1513,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         poll_close_fd(pi);
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
-                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' is idle for more than %zu seconds - closing it. "
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s is idle for more than %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
