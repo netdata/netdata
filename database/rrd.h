@@ -470,8 +470,6 @@ struct alarm_entry {
     uint32_t updated_by_id;
     uint32_t updates_id;
 
-    int silenced;
-
     struct alarm_entry *next;
 };
 

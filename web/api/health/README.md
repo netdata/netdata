@@ -55,7 +55,7 @@ The API is available by default, but it is protected by an `api authorization to
 
 ```bash
 [registry]
-    # netdata management api key = /var/lib/netdata/registry/netdata.api.key
+    # netdata management api key file = /var/lib/netdata/netdata.api.key
 ```
 
 You can access the API via GET requests, by adding the bearer token to an `Authorization` http header, like this: 

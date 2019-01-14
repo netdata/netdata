@@ -94,8 +94,57 @@ void web_client_api_v1_init(void) {
 	uuid_unparse_lower(uuid, uuid_str);
 }
 
+char *get_mgmt_api_key(void) {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/netdata.api.key", netdata_configured_varlib_dir);
+    char *api_key_filename=config_get(CONFIG_SECTION_REGISTRY, "netdata management api key file", filename);
+    static char guid[GUID_LEN + 1] = "";
+
+    if(likely(guid[0]))
+        return guid;
+
+    // read it from disk
+    int fd = open(api_key_filename, O_RDONLY);
+    if(fd != -1) {
+        char buf[GUID_LEN + 1];
+        if(read(fd, buf, GUID_LEN) != GUID_LEN)
+            error("Failed to read management API key from '%s'", api_key_filename);
+        else {
+            buf[GUID_LEN] = '\0';
+            if(regenerate_guid(buf, guid) == -1) {
+                error("Failed to validate management API key '%s' from '%s'.",
+                      buf, api_key_filename);
+
+                guid[0] = '\0';
+            }
+        }
+        close(fd);
+    }
+
+    // generate a new one?
+    if(!guid[0]) {
+        uuid_t uuid;
+
+        uuid_generate_time(uuid);
+        uuid_unparse_lower(uuid, guid);
+        guid[GUID_LEN] = '\0';
+
+        // save it
+        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
+        if(fd == -1)
+            fatal("Cannot create unique management API key file '%s'. Please fix this.", api_key_filename);
+
+        if(write(fd, guid, GUID_LEN) != GUID_LEN)
+            fatal("Cannot write the unique management API key file '%s'. Please fix this.", api_key_filename);
+
+        close(fd);
+    }
+
+    return guid;
+}
+
 void web_client_api_v1_management_init(void) {
-	api_secret = registry_get_mgmt_api_key();
+	api_secret = get_mgmt_api_key();
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {

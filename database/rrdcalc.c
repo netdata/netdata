@@ -102,7 +102,6 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0,
                 0
         );
     }
@@ -163,7 +162,6 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->source,
                 rc->units,
                 rc->info,
-                0,
                 0,
                 0
         );

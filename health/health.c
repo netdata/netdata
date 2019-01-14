@@ -154,7 +154,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 
     // Check if alarm notifications are silenced
-    if (ae->silenced == 1) {
+    if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
         info("Health not sending notification for alarm '%s.%s' status %s (command API has disabled notifications)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         goto done;
     }
@@ -744,8 +744,12 @@ void *health_main(void *ptr) {
 								host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
 								rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
 								rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
-								rc->delay_last, (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)
-												? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0, rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED
+								rc->delay_last,
+								(
+								    ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+								    ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+								)
+
 						);
 
 						rc->last_status_change = now;

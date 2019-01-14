@@ -130,10 +130,10 @@ if [ $TEST -eq 1 ] ; then
 	HEALTH_CMDAPI_MSG_STYPEWARNING="WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command."
 	HEALTH_CMDAPI_MSG_NOSELECTORWARNING="WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors."
 
-	if [ -f "${NETDATA_REGISTRY_DIR}/netdata.api.key" ] ;then
-		read -r CORRECT_TOKEN < "${NETDATA_REGISTRY_DIR}/netdata.api.key"
+	if [ -f "${NETDATA_REGISTRY_DIR}/../netdata.api.key" ] ;then
+		read -r CORRECT_TOKEN < "${NETDATA_REGISTRY_DIR}/../netdata.api.key"
 	else
-		echo "${NETDATA_REGISTRY_DIR}/netdata.api.key not found"
+		echo "${NETDATA_REGISTRY_DIR}/../netdata.api.key not found"
 		exit 1
 	fi
 	# Set correct token

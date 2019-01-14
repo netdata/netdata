@@ -861,7 +861,6 @@ int main(int argc, char **argv) {
                                 load_netdata_conf(NULL, 0);
                             }
 
-                            backwards_compatible_config();
                             get_netdata_configured_variables();
 
                             const char *section = argv[optind];
