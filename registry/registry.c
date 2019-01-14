@@ -99,10 +99,10 @@ static int registry_json_machine_url_callback(void *entry, void *data) {
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
 
+    if (!strcmp(mu->url->url,"***")) return 1;
+
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
-
-    if (!strcmp(mu->url->url,"***")) return 1;
 
     buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u ]",
             m->guid, mu->url->url, mu->last_t, mu->usages);

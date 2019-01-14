@@ -9813,7 +9813,7 @@ NETDATA.registry = {
             url = NETDATA.serverDefault;
         } 
 
-        // console.log("ACCESS", name, url);
+        console.log("ACCESS", name, url);
 
         // send ACCESS to a netdata registry:
         // 1. it lets it know we are accessing a netdata server (its machine GUID and its URL)
