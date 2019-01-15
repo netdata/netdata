@@ -22,7 +22,7 @@ class PrometheusService(UrlService):
         if not raw:
             return None
 
-        lines = (line for line in raw.split('\n') if not _is_comment(line))
+        lines = (line for line in raw.split('\n'))
 
         try:
             metrics = [m for m in text_fd_to_metric_families(lines)]
@@ -37,7 +37,3 @@ class PrometheusService(UrlService):
             self.error('python-prometheus_client package is needed to use PrometheusService')
             return False
         return UrlService.check(self)
-
-
-def _is_comment(line):
-    return line.startswith('#') and not line.startswith("# TYPE")
