@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#shellcheck disable=SC2164
 
 # this script will uninstall netdata
 
@@ -12,13 +13,11 @@
 #  - NETDATA_TARBALL_CHECKSUM
 
 
-set -e
-
 # Usually stored in /etc/netdata/.environment
 : "${ENVIRONMENT_FILE:='THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT'}"
 
 # shellcheck source=/dev/null
-source "${ENVIRONMENT_VARS}" || exit 1
+source "${ENVIRONMENT_FILE}" || exit 1
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
 	echo >&2 "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
@@ -78,7 +77,7 @@ update() {
 
 	wget "${NETDATA_TARBALL_CHECKSUM_URL}" -O sha256sum.txt >&3 2>&3
 	if grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
-		# Exit cleanly when latest version is already installed
+		info "Newest version is already installed"
 		exit 0
 	fi
 
@@ -86,7 +85,7 @@ update() {
 	if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
 		failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
 	fi
-	NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz | cut -d' ' -f1)"
+	NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
 	tar -xf netdata-latest.tar.gz >&3 2>&3
 	rm netdata-latest.tar.gz >&3 2>&3
 	cd netdata-*

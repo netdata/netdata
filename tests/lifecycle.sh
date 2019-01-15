@@ -11,16 +11,17 @@ fi
 WORKSPACE=$(mktemp -d)
 cp -r ./ "${WORKSPACE}/"
 cd "${WORKSPACE}"
-git config user.email "test@example.com"
-git config user.name "test"
 
 echo "========= INSTALL ========="
 ./netdata-installer.sh  --dont-wait --dont-start-it --auto-update --install /tmp &>/dev/null
+cp netdata-uninstaller.sh /tmp/netdata-uninstaller.sh
 ls /tmp
 
+rm -rf "${WORKSPACE}"
 echo "========= UPDATE ========="
-ENVIRONMENT_FILE=/tmp/netdata/etc/.environment /etc/cron.daily/netdata-updater
+ENVIRONMENT_FILE=/tmp/netdata/etc/netdata/.environment /etc/cron.daily/netdata-updater
 
+#TODO(paulfantom): Enable with #5031
 #echo "========= UNINSTALL ========="
-#mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
-#./netdata-uninstaller.sh --yes --force
+#ENVIRONMENT_FILE=/tmp/netdata/etc/netdata/.environment /tmp/netdata-uninstaller.sh --yes --force
+#[ -f /tmp/netdata/usr/sbin/netdata ] && exit 1
