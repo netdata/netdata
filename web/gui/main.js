@@ -4753,23 +4753,23 @@ function sortedArraysEqual(a, b) {
 }
 
 // Computes the set of agents that are included in `source` but not in `target`.
-function computeDiff(target, source) {
-    const tset = new Set();
-
-    for (let agent of target) {
-        tset.add(agent.guid);
-    }
-
-    const diff = [];
-
-    for (let agent of source) {
-        if (!tset.has(agent.guid)) {
-            diff.push(agent);
-        }
-    }
-
-    return diff;
-}
+// function computeDiff(target, source) {
+//     const tset = new Set();
+// 
+//     for (let agent of target) {
+//         tset.add(agent.guid);
+//     }
+// 
+//     const diff = [];
+// 
+//     for (let agent of source) {
+//         if (!tset.has(agent.guid)) {
+//             diff.push(agent);
+//         }
+//     }
+// 
+//     return diff;
+// }
 
 function mergeAgents(cloud, registry) {
     let dirty = false;
@@ -4806,22 +4806,30 @@ function mergeAgents(cloud, registry) {
     return [];
 }
 
-function syncAgents(callback) {
-    const agentsToSync = mergeAgents(cloudKnownAgents, registryKnownAgents);
-    if (agentsToSync.length > 0) {
-        // console.log("---", agentsToSync);
+function shouldSync() {
+    return localStorage.getItem("cloud.syncTime") == null;
+}
+
+function syncAgents(callback, force) {
+    if (shouldSync() || force) {
+        console.log("Checking if sync is needed");
+        localStorage.setItem("cloud.syncTime", new Date().getTime());
         
-    // const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
-    // if (diff.length > 0) {
-    //     const agentsToSync = cloudKnownAgents.concat(diff);
-        console.log("Synchronizing with netdata.cloud");
-        postCloudAccountKnownAgents(agentsToSync).then((agents) => {
-            cloudKnownAgents = agents;
-            callback(cloudKnownAgents);
-        });        
-    } else {
-        callback(cloudKnownAgents);
+        const agentsToSync = mergeAgents(cloudKnownAgents, registryKnownAgents);
+
+        if (agentsToSync.length > 0) {
+            // console.log("---", agentsToSync);
+            console.log("Synchronizing with netdata.cloud");
+            postCloudAccountKnownAgents(agentsToSync).then((agents) => {
+                // TODO: clear syncTime on error!
+                cloudKnownAgents = agents;
+                callback(cloudKnownAgents);
+            });
+            return        
+        } 
     }
+
+    callback(cloudKnownAgents);
 }
 
 function initCloud() {
