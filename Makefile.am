@@ -59,6 +59,7 @@ dist_noinst_DATA= \
 	netdata.spec \
 	package.json \
 	docs \
+	packaging/version \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
 	packaging/installer/UPDATE.md \
