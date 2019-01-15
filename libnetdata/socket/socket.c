@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
-#include "../../web/server/web_client.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // various library calls
