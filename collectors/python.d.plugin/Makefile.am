@@ -127,6 +127,7 @@ dist_bases_framework_services_DATA = \
     python_modules/bases/FrameworkServices/SimpleService.py \
     python_modules/bases/FrameworkServices/SocketService.py \
     python_modules/bases/FrameworkServices/UrlService.py \
+    python_modules/bases/FrameworkServices/PrometheusService.py \
     $(NULL)
 
 third_partydir=$(pythonmodulesdir)/third_party
