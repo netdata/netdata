@@ -248,7 +248,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     return sock;
 }
 
-static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, uint16_t port) {
+static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, uint16_t port, int acl_flags) {
     if(sockets->opened >= MAX_LISTEN_FDS) {
         error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
         close(fd);
@@ -259,6 +259,7 @@ static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family
     sockets->fds_types[sockets->opened] = socktype;
     sockets->fds_families[sockets->opened] = family;
     sockets->fds_names[sockets->opened] = strdup_client_description(family, protocol, ip, port);
+    sockets->fds_acl_flags[sockets->opened] = acl_flags;
 
     sockets->opened++;
     return 0;
@@ -300,8 +301,20 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
+WEB_CLIENT_ACL read_acl(char *st) {
+    if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
+    if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
+    if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
+    if (!strcmp(st,"management")) return WEB_CLIENT_ACL_MGMT;
+    if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
+    if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
+    return WEB_CLIENT_ACL_NONE;
+}
+
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
     int added = 0;
+    WEB_CLIENT_ACL acl_flags = WEB_CLIENT_ACL_NONE;
+
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
 
@@ -311,10 +324,11 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     char buffer2[10 + 1];
     snprintfz(buffer2, 10, "%d", default_port);
 
-    char *ip = buffer, *port = buffer2, *interface = "";;
+    char *ip = buffer, *port = buffer2, *interface = "", *portconfig;;
 
     int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     const char *protocol_str = "tcp";
+	int unix_socket=0;
 
     if(strncmp(ip, "tcp:", 4) == 0) {
         ip += 4;
@@ -329,20 +343,10 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol_str = "udp";
     }
     else if(strncmp(ip, "unix:", 5) == 0) {
-        char *path = ip + 5;
+        ip += 5;
         socktype = SOCK_STREAM;
         protocol_str = "unix";
-
-        int fd = create_listen_socket_unix(path, listen_backlog);
-        if (fd == -1) {
-            error("LISTENER: Cannot create unix socket '%s'", path);
-            sockets->failed++;
-        }
-        else {
-            listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0);
-            added++;
-        }
-        return added;
+		unix_socket=1;
     }
 
     char *e = ip;
@@ -355,20 +359,52 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
     }
     else {
-        while(*e && *e != ':' && *e != '%') e++;
+        while(*e && *e != ':' && *e != '%' && *e != '=') e++;
     }
 
     if(*e == '%') {
         *e = '\0';
         e++;
         interface = e;
-        while(*e && *e != ':') e++;
+        while(*e && *e != ':' && *e != '=') e++;
     }
 
     if(*e == ':') {
         port = e + 1;
         *e = '\0';
+        while(*e && *e != '=') e++;
     }
+
+    if(*e == '=') {
+        *e='\0';
+        e++;
+        portconfig = e;
+        while (*e != '\0') {
+            if (*e == '|') {
+                *e = '\0';
+                acl_flags |= read_acl(portconfig);
+                e++;
+                portconfig = e;
+                continue;
+            }
+            e++;
+        }
+        acl_flags |= read_acl(portconfig);
+    } else {
+        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+    }
+
+    if (unix_socket) {
+		int fd = create_listen_socket_unix(port, listen_backlog);
+		if (fd == -1) {
+			error("LISTENER: Cannot create unix socket '%s'", port);
+			sockets->failed++;
+		} else {
+			listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, port, 0, acl_flags);
+			added++;
+		}
+		return added;
+	}
 
     uint32_t scope_id = 0;
     if(*interface) {
@@ -435,7 +471,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             sockets->failed++;
         }
         else {
-            listen_sockets_add(sockets, fd, family, socktype, protocol_str, rip, rport);
+            listen_sockets_add(sockets, fd, family, socktype, protocol_str, rip, rport, acl_flags);
             added++;
         }
     }
@@ -975,6 +1011,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
+                             , WEB_CLIENT_ACL port_acl
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port
@@ -1013,6 +1050,8 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
             p->inf[i].slot = (size_t)i;
             p->inf[i].flags = 0;
             p->inf[i].socktype = -1;
+            p->inf[i].port_acl = -1;
+
             p->inf[i].client_ip = NULL;
             p->inf[i].client_port = NULL;
             p->inf[i].del_callback = p->del_callback;
@@ -1042,6 +1081,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     pi->fd = fd;
     pi->p = p;
     pi->socktype = socktype;
+    pi->port_acl = port_acl;
     pi->flags = flags;
     pi->next = NULL;
     pi->client_ip = strdupz(client_ip);
@@ -1272,6 +1312,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                             poll_add_fd(p
                                         , nfd
                                         , SOCK_STREAM
+                                        , pi->port_acl
                                         , POLLINFO_FLAG_CLIENT_SOCKET
                                         , client_ip
                                         , client_port
@@ -1414,6 +1455,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         POLLINFO *pi = poll_add_fd(&p
                                    , sockets->fds[i]
                                    , sockets->fds_types[i]
+                                   , sockets->fds_acl_flags[i]
                                    , POLLINFO_FLAG_SERVER_SOCKET
                                    , (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN"
                                    , ""
@@ -1457,7 +1499,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
 
             usec_t dt_usec = next_timer_usec - now_usec;
-            if(dt_usec > 1000 * USEC_PER_MS)
+            if(dt_usec < 1000 * USEC_PER_MS)
                 timeout_ms = 1000;
             else
                 timeout_ms = (int)(dt_usec / USEC_PER_MS);

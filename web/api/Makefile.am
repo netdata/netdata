@@ -8,6 +8,7 @@ SUBDIRS = \
     queries \
     exporters \
     formatters \
+    health \
     $(NULL)
 
 dist_noinst_DATA = \

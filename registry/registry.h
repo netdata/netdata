@@ -72,6 +72,7 @@ extern int registry_request_hello_json(RRDHOST *host, struct web_client *w);
 extern void registry_statistics(void);
 
 extern char *registry_get_this_machine_guid(void);
+extern char *registry_get_mgmt_api_key(void);
 extern char *registry_get_this_machine_hostname(void);
 
 extern int regenerate_guid(const char *guid, char *result);

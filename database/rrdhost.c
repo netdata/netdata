@@ -103,7 +103,6 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
     host->hash_machine_guid = simple_hash(host->machine_guid);
 }
 
-
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -149,6 +148,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
+
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
@@ -442,7 +442,7 @@ restart_after_removal:
 void rrd_init(char *hostname) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
-    if(gap_when_lost_iterations_above < 1)
+    if (gap_when_lost_iterations_above < 1)
         gap_when_lost_iterations_above = 1;
 
     health_init();
@@ -471,6 +471,7 @@ void rrd_init(char *hostname) {
             , 1
     );
     rrd_unlock();
+	web_client_api_v1_management_init();
 }
 
 // ----------------------------------------------------------------------------
