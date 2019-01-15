@@ -216,7 +216,7 @@ show_fireqos_names() {
 		#shellcheck source=/dev/null
 		source "${fireqos_run_dir}/${name}.conf"
 		for n in ${interface_classes_monitor}; do
-			setclassname "${n//|/ }"
+			setclassname ${n//|/ }
 		done
 		[ -n "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
 
