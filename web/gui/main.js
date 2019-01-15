@@ -4486,13 +4486,17 @@ var netdataCallback = initializeDynamicDashboard;
 // =================================================================================================
 // netdata.cloud
 
-// The known agents in the legacy global registry.
 let registryKnownAgents = [];
 
-// The known agents associated with the current cloud account.
 let cloudKnownAgents = [];
 
 let myNetdataMenuFilterValue = "";
+
+let cloudAccountID = null;
+
+let cloudAccountName = null;
+
+let cloudToken = null;
 
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
@@ -4515,19 +4519,17 @@ function isValidAgent(a) {
 
 // https://github.com/netdata/hub/issues/146
 function getCloudAccountKnownAgents() {
-    const accountID = localStorage.getItem("cloud.accountID");
-    const token = localStorage.getItem("cloud.token");
-    if (accountID == null || token == null) {
+    if (!isSignedIn()) {
         return [];
     }
     
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents`,
         {
             method: "GET",
             mode: "cors",
             headers: {
-                "Authorization": `Bearer ${token}`
+                "Authorization": `Bearer ${cloudToken}`
             }
         }
     ).then((response)  => {
@@ -4558,9 +4560,7 @@ function getCloudAccountKnownAgents() {
 
 // https://github.com/netdata/hub/issues/128
 function postCloudAccountKnownAgents(agentsToSync) {
-    const accountID = localStorage.getItem("cloud.accountID");
-    const token = localStorage.getItem("cloud.token");
-    if (accountID == null || token == null) {
+    if (!isSignedIn()) {
         return [];
     }
 
@@ -4577,19 +4577,19 @@ function postCloudAccountKnownAgents(agentsToSync) {
     }).filter((a) => isValidAgent(a))
 
     const payload = {
-        "accountID": accountID,
+        "accountID": cloudAccountID,
         "agents": agents,
         "merge": false,
     };
     
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents`,
         {
             method: "POST",
             mode: "cors",
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
-                "Authorization": `Bearer ${token}`
+                "Authorization": `Bearer ${cloudToken}`
             },
             body: JSON.stringify(payload)
         }
@@ -4614,20 +4614,18 @@ function postCloudAccountKnownAgents(agentsToSync) {
 }
 
 function deleteCloudKnownAgentURL(agentID, url) {
-    const accountID = localStorage.getItem("cloud.accountID");
-    const token = localStorage.getItem("cloud.token");
-    if (accountID == null || token == null) {
-        return 0;
+    if (!isSignedIn()) {
+        return [];
     }
 
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${accountID}/known-agents/${agentID}/url?value=${encodeURIComponent(url)}`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents/${agentID}/url?value=${encodeURIComponent(url)}`,
         {
             method: "DELETE",
             mode: "cors",
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
-                "Authorization": `Bearer ${token}`
+                "Authorization": `Bearer ${cloudToken}`
             },
         }
     ).then((response) => {
@@ -4641,7 +4639,6 @@ function deleteCloudKnownAgentURL(agentID, url) {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    // window.addEventListener("message", handleMessage, false);    
     const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.open(url);
 }
@@ -4649,6 +4646,8 @@ function signInDidClick() {
 function signOutDidClick() {
     signOut();
 }
+
+// -------------------------------------------------------------------------------------------------
 
 function updateMyNetdataAfterFilterChange() {
     const machinesEl = document.getElementById("my-netdata-menu-machines")
@@ -4685,17 +4684,19 @@ function myNetdataFilterClearDidClick() {
 
 // -------------------------------------------------------------------------------------------------
 
+function clearCloudVariables() {
+    cloudAccountID = null;
+    cloudAccountName = null;
+    cloudToken = null;
+}
+
 function clearCloudLocalStorageItems() {
     localStorage.removeItem("cloud.baseURL");
-    localStorage.removeItem("cloud.accountID");
-    localStorage.removeItem("cloud.accountName");
-    localStorage.removeItem("cloud.token");
+    localStorage.removeItem("cloud.syncTime");
 }
 
 function signOut() {
-    clearCloudLocalStorageItems();    
-    renderAccountUI();
-    renderMyNetdataMenu(registryKnownAgents);
+    cloudSSOSignOut();
 }
 
 function renderAccountUI() {
@@ -4705,12 +4706,11 @@ function renderAccountUI() {
 
     const container = document.getElementById("account-menu-container");
     if (isSignedIn()) {
-        const accountName = localStorage.getItem("cloud.accountName");
         container.removeAttribute("title");
         container.removeAttribute("data-original-title");
         container.removeAttribute("data-placement");
         container.innerHTML = (
-            `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${accountName} <strong class="caret"></strong></a>
+            `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${cloudAccountName} <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                     <li>
                         <a href="#" class="btn" onclick="signOutDidClick();">
@@ -4732,20 +4732,38 @@ function renderAccountUI() {
 }
 
 function handleMessage(e) {
-    console.log("---!!!-", e);
+    switch (e.data.type) {
+        case "sign-in":
+            handleSignInMessage(e);
+            break;
 
+        case "sign-out":
+            handleSignOutMessage(e);
+            break;
+
+        default:
+            console.log("Unknown message", e);
+    }
+}
+
+function handleSignInMessage(e) {
     localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
-    localStorage.setItem("cloud.accountID", e.data.accountID);
-    localStorage.setItem("cloud.accountName", e.data.accountName);
-    localStorage.setItem("cloud.token", e.data.token);
 
-    // window.removeEventListener("message", handleMessage, false);
+    cloudAccountID = e.data.accountID;
+    cloudAccountName = e.data.accountName;
+    cloudToken = e.data.token;
 
     netdataRegistryCallback(registryKnownAgents);
 }
 
+function handleSignOutMessage(e) {
+    clearCloudVariables();    
+    renderAccountUI();
+    renderMyNetdataMenu(registryKnownAgents);
+}
+
 function isSignedIn() {
-    return localStorage.getItem("cloud.token") != null;
+    return cloudToken != null && cloudAccountID != null;
 }
 
 function sortedArraysEqual(a, b) {
@@ -4757,25 +4775,6 @@ function sortedArraysEqual(a, b) {
 
     return true;
 }
-
-// Computes the set of agents that are included in `source` but not in `target`.
-// function computeDiff(target, source) {
-//     const tset = new Set();
-// 
-//     for (let agent of target) {
-//         tset.add(agent.guid);
-//     }
-// 
-//     const diff = [];
-// 
-//     for (let agent of source) {
-//         if (!tset.has(agent.guid)) {
-//             diff.push(agent);
-//         }
-//     }
-// 
-//     return diff;
-// }
 
 function mergeAgents(cloud, registry) {
     let dirty = false;
@@ -4851,13 +4850,21 @@ function cloudSSOInit() {
     isCloudSSOInitialized = true;
 }
 
+function cloudSSOSignOut() {
+    const iframe = document.getElementById("ssoifrm");
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?iframe=" + encodeURIComponent(window.location.origin);
+    iframe.src = url;
+}
+
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
+        clearCloudVariables();
         clearCloudLocalStorageItems();
         return;
     }
 
     if (NETDATA.registry.cloudBaseURL != localStorage.getItem("cloud.baseURL")) {
+        clearCloudVariables();
         clearCloudLocalStorageItems();
         if (NETDATA.registry.cloudBaseURL) {
             localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
