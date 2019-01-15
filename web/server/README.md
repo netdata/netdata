@@ -1,34 +1,21 @@
 # Web server
 
-Netdata supports 3 implementations of its internal web server:
-
-- `static-threaded` is a web server with a fix (configured number of threads)
-- `single-threaded` is a simple web server running with a single thread
-- `multi-threaded` is a web server that spawns a thread for each client connection
-- `none` to disable the web server
-
-We suggest to use the `static-threaded` one. It is the most efficient.
-
-All versions of the web servers use non-blocking I/O.
-
-All web servers respect the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
+The Netdata web server runs as `static-threaded`, i.e. with a fixed, configurable number of threads.
+It uses non-blocking I/O and respects the `keep-alive` HTTP header to serve multiple HTTP requests via the same connection.
 
 ## Configuration
 
-### Selecting the web server
-
-You can select the web server implementation by editing `netdata.conf` and setting:
+You can disable the web server by editing `netdata.conf` and setting:
 
 ```
 [web]
-    mode = none | single-threaded | multi-threaded | static-threaded
+    mode = none
 ```
 
-The `static` web server supports also these settings:
+With the web server enabled, you can control the number of threads and sockets with the following settings:
 
 ```
 [web]
-    mode = static-threaded
     web server threads = 4
     web server max sockets = 512
 ```
@@ -39,27 +26,36 @@ The `web server max sockets` setting is automatically adjusted to 50% of the max
 
 ### Binding netdata to multiple ports
 
-Netdata can bind to multiple IPs and ports. Up to 100 sockets can be used (you can increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
+Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (you can increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
 
 The ports to bind are controlled via `[web].bind to`, like this:
 
 ```
 [web]
    default port = 19999
-   bind to = 127.0.0.1 10.1.1.1:19998 hostname:19997 [::]:19996 localhost:19995 *:http unix:/tmp/netdata.sock
+   bind to = 127.0.0.1=dashboard 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
 ```
 
 Using the above, netdata will bind to:
 
-- IPv4 127.0.0.1 at port 19999 (port was used from `default port`)
-- IPv4 10.1.1.1 at port 19998
-- All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997
-- All IPv6 IPs at port 19996
-- All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996
-- All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`
-- Unix domain socket `/tmp/netdata.sock`
+- IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. 
+- IPv4 10.1.1.1 at port 19998. The management API and netdata.conf will be accessible on this port.
+- All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
+- All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port.
+- All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
+- All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
+- Unix domain socket `/tmp/netdata.sock`. All requests are serviceable on this socket.
 
 The option `[web].default port` is used when an entries in `[web].bind to` do not specify a port.
+
+Note that the access permissions specified with the `=request type|request type|...` format are available from version 1.12 onwards. 
+As shown in the example above, these permissions are optional, with the default being to permit all request types on the specified port. 
+The request types are strings identical to the `allow X from` directives of the access lists, i.e. `dashboard`, `streaming`, `registry`, `netdata.conf`, `badges` and `management`. 
+The access lists themselves and the general setting `allow connections from` in the next section are applied regardless of the ports that are configured to provide these services. 
+The API requests are serviced as follows:
+- `dashboard` gives access to the UI, the read API and badges API calls.
+- `badges` gives access only to the badges API calls.
+- `management` gives access only to the management API calls.
 
 ### Access lists
 
@@ -72,6 +68,7 @@ Netdata supports access lists in `netdata.conf`:
 	allow badges from = *
 	allow streaming from = *
 	allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
+	allow management from = localhost
 ```
 
 `*` does string matches on the IPs of the clients.
@@ -91,6 +88,8 @@ Netdata supports access lists in `netdata.conf`:
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
    The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
+
+- `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
 
 ### Other netdata.conf [web] section options
 setting | default | info

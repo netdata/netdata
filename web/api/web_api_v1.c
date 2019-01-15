@@ -83,6 +83,68 @@ void web_client_api_v1_init(void) {
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
 
     web_client_api_v1_init_grouping();
+
+	uuid_t uuid;
+
+	// generate
+	uuid_generate(uuid);
+
+	// unparse (to string)
+	char uuid_str[37];
+	uuid_unparse_lower(uuid, uuid_str);
+}
+
+char *get_mgmt_api_key(void) {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/netdata.api.key", netdata_configured_varlib_dir);
+    char *api_key_filename=config_get(CONFIG_SECTION_REGISTRY, "netdata management api key file", filename);
+    static char guid[GUID_LEN + 1] = "";
+
+    if(likely(guid[0]))
+        return guid;
+
+    // read it from disk
+    int fd = open(api_key_filename, O_RDONLY);
+    if(fd != -1) {
+        char buf[GUID_LEN + 1];
+        if(read(fd, buf, GUID_LEN) != GUID_LEN)
+            error("Failed to read management API key from '%s'", api_key_filename);
+        else {
+            buf[GUID_LEN] = '\0';
+            if(regenerate_guid(buf, guid) == -1) {
+                error("Failed to validate management API key '%s' from '%s'.",
+                      buf, api_key_filename);
+
+                guid[0] = '\0';
+            }
+        }
+        close(fd);
+    }
+
+    // generate a new one?
+    if(!guid[0]) {
+        uuid_t uuid;
+
+        uuid_generate_time(uuid);
+        uuid_unparse_lower(uuid, guid);
+        guid[GUID_LEN] = '\0';
+
+        // save it
+        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
+        if(fd == -1)
+            fatal("Cannot create unique management API key file '%s'. Please fix this.", api_key_filename);
+
+        if(write(fd, guid, GUID_LEN) != GUID_LEN)
+            fatal("Cannot write the unique management API key file '%s'. Please fix this.", api_key_filename);
+
+        close(fd);
+    }
+
+    return guid;
+}
+
+void web_client_api_v1_management_init(void) {
+	api_secret = get_mgmt_api_key();
 }
 
 inline uint32_t web_client_api_request_v1_data_options(char *o) {
@@ -697,7 +759,7 @@ static struct api_command {
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
-
+        { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
@@ -721,7 +783,7 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 
         for(i = 0; api_commands[i].command ;i++) {
             if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
                     return web_client_permission_denied(w);
 
                 return api_commands[i].callback(host, w, url);

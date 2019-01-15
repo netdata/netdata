@@ -157,6 +157,10 @@ void web_client_request_done(struct web_client *w) {
     w->origin[1] = '\0';
 
     freez(w->user_agent); w->user_agent = NULL;
+    if (w->auth_bearer_token) {
+        freez(w->auth_bearer_token);
+        w->auth_bearer_token = NULL;
+    }
 
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
@@ -577,6 +581,13 @@ static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct we
     return check_host_and_call(host, w, url, func);
 }
 
+static inline int check_host_and_mgmt_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+    if(!web_client_can_access_mgmt(w))
+        return web_client_permission_denied(w);
+
+    return check_host_and_call(host, w, url, func);
+}
+
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
@@ -713,7 +724,7 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0;
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
@@ -721,6 +732,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_accept_encoding = simple_uhash("Accept-Encoding");
         hash_donottrack = simple_uhash("DNT");
         hash_useragent = simple_uhash("User-Agent");
+        hash_authorization = simple_uhash("Authorization");
     }
 
     char *e = s;
@@ -765,6 +777,15 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     }
     else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
         w->user_agent = strdupz(v);
+    } else if(hash == hash_authorization&& !strcasecmp(s, "Authorization")) {
+        if (strlen(v) > 8) { // Must contain at least "Bearer "
+            char *auth_key=v+6;
+            *auth_key='\0';
+            if (!strcasecmp(v,"Bearer")) {
+                auth_key++;
+                w->auth_bearer_token=strdupz(auth_key);
+            }
+        }
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -1239,9 +1260,15 @@ void web_client_process_request(struct web_client *w) {
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:
-                    if(unlikely(!web_client_can_access_dashboard(w) && !web_client_can_access_registry(w) && !web_client_can_access_badges(w))) {
+                    if(unlikely(
+                            !web_client_can_access_dashboard(w) &&
+                            !web_client_can_access_registry(w) &&
+                            !web_client_can_access_badges(w) &&
+                            !web_client_can_access_mgmt(w) &&
+                            !web_client_can_access_netdataconf(w)
+                    )) {
                         web_client_permission_denied(w);
-                        return;
+                        break;
                     }
 
                     w->response.data->contenttype = CT_TEXT_PLAIN;
@@ -1252,9 +1279,15 @@ void web_client_process_request(struct web_client *w) {
 
                 case WEB_CLIENT_MODE_FILECOPY:
                 case WEB_CLIENT_MODE_NORMAL:
-                    if(unlikely(!web_client_can_access_dashboard(w) && !web_client_can_access_registry(w) && !web_client_can_access_badges(w))) {
+                    if(unlikely(
+                            !web_client_can_access_dashboard(w) &&
+                            !web_client_can_access_registry(w) &&
+                            !web_client_can_access_badges(w) &&
+                            !web_client_can_access_mgmt(w) &&
+                            !web_client_can_access_netdataconf(w)
+                    )) {
                         web_client_permission_denied(w);
-                        return;
+                        break;
                     }
 
                     w->response.code = web_client_process_url(localhost, w, w->decoded_url);

@@ -13,7 +13,7 @@ find_package(PkgConfig REQUIRED)
 #set(CMAKE_BUILD_TYPE "Release")
 
 # set this to see the compilation commands
-#set(CMAKE_VERBOSE_MAKEFILE 1)
+# set(CMAKE_VERBOSE_MAKEFILE 1)
 
 
 # -----------------------------------------------------------------------------
@@ -30,8 +30,8 @@ IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
     set(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
     set(CXX_FORMAT_SECURITY "-Werror=format-security")
     set(CXX_STACK_PROTECTOR "-fstack-protector-all")
-
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR}")
+    set(CXX_FLAGS_DEBUG "-O0")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR} ${CXX_FLAGS_DEBUG}")
 ELSE()
     message(STATUS "building for: release")
     cmake_policy(SET CMP0069 "NEW")
@@ -221,8 +221,7 @@ set(HEALTH_PLUGIN_FILES
         health/health.h
         health/health_config.c
         health/health_json.c
-        health/health_log.c
-        )
+        health/health_log.c)
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c
@@ -354,10 +353,6 @@ set(WEB_PLUGIN_FILES
         web/server/web_client.h
         web/server/web_server.c
         web/server/web_server.h
-        web/server/single/single-threaded.c
-        web/server/single/single-threaded.h
-        web/server/multi/multi-threaded.c
-        web/server/multi/multi-threaded.h
         web/server/static/static-threaded.c
         web/server/static/static-threaded.h
         web/server/web_client_cache.c
@@ -411,6 +406,7 @@ set(API_PLUGIN_FILES
         web/api/formatters/charts2json.h
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
+        web/api/health/health_cmdapi.c
         )
 
 set(STREAMING_PLUGIN_FILES
@@ -479,7 +475,7 @@ add_definitions(
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
         -DLOG_DIR="/var/log/netdata"
         -DPLUGINS_DIR="/usr/libexec/netdata"
-        -DWEB_DIR="/usr/share/netdata"
+        -DWEB_DIR="/usr/share/netdata/web"
         -DVARLIB_DIR="/var/lib/netdata"
 )
 

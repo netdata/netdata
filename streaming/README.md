@@ -81,7 +81,7 @@ monitoring (there cannot be health monitoring without a database).
 
 ```
 [web]
-    mode = none | static-threaded | single-threaded | multi-threaded
+    mode = none | static-threaded 
     accept a streaming request every seconds = 0 
 ```
 

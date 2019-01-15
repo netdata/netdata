@@ -94,8 +94,6 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
- - pymdownx.emoji:
-    emoji_generator: !!python/name:pymdownx.emoji.to_svg
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -234,5 +232,5 @@ echo -ne "- Hacking netdata:
 navpart 2 makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
-navpart 2 tests
+navpart 2 tests "" "" 2
 navpart 2 diagrams/data_structures
