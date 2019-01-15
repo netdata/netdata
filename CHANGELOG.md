@@ -10,9 +10,11 @@
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
+- Review of system.ram plugin: treat Slab memory as Cached \(PR 3288\) [\#3929](https://github.com/netdata/netdata/issues/3929)
 
 **Closed issues:**
 
+- error.log: IPv6 not properly show in error messages [\#5067](https://github.com/netdata/netdata/issues/5067)
 - Introduce Polymorphic Linux in the Docker Image [\#5034](https://github.com/netdata/netdata/issues/5034)
 - SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
@@ -20,6 +22,8 @@
 
 **Merged pull requests:**
 
+- Updated Polyverse reinstall commands in Dockerfile [\#5173](https://github.com/netdata/netdata/pull/5173) ([archisgore](https://github.com/archisgore))
+- Change how the ip address and port are logged in socket.c [\#5166](https://github.com/netdata/netdata/pull/5166) ([krinfels](https://github.com/krinfels))
 - Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
 - Fix cached memory calculation [\#5151](https://github.com/netdata/netdata/pull/5151) ([vlvkobal](https://github.com/vlvkobal))
 - Fix typo in plugins.d/README.md [\#5150](https://github.com/netdata/netdata/pull/5150) ([arkamar](https://github.com/arkamar))
@@ -30,7 +34,6 @@
 - add option to opt-out from telemetry program [\#5138](https://github.com/netdata/netdata/pull/5138) ([paulfantom](https://github.com/paulfantom))
 - Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
-- Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
 - Clarify backend modes of operation [\#5116](https://github.com/netdata/netdata/pull/5116) ([cakrit](https://github.com/cakrit))
 - web-site content; why-netdata content [\#5097](https://github.com/netdata/netdata/pull/5097) ([ktsaou](https://github.com/ktsaou))
