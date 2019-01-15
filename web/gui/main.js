@@ -756,15 +756,14 @@ function renderMyNetdataMenu(machinesArray) {
             </div>`
         )
     } else {
-        // html += (
-        //     `<hr />
-        //     <div class="agent-item">
-        //         <i class="fas fa-question-circle"></i>
-        //         <a href="https://netdata.cloud/about" target="_blank">What is this?</a>
-        //         <div></div>
-        //     </div>`
-        // )
-    
+        html += (
+            `<hr />
+            <div class="agent-item">
+                <i class="fas fa-sync"></i>
+                <a href="#" onclick="forceSync(); return false">Synchronize netdata.cloud</a>
+                <div></div>
+            </div>`
+        )
     }
 
     const el = document.getElementById('my-netdata-dropdown-content')
@@ -4810,16 +4809,20 @@ function shouldSync() {
     return localStorage.getItem("cloud.syncTime") == null;
 }
 
-function syncAgents(callback, force) {
-    if (shouldSync() || force) {
-        console.log("Checking if sync is needed");
+function forceSync() {
+    localStorage.removeItem("cloud.syncTime");
+    NETDATA.registry.init();
+}
+
+function syncAgents(callback) {
+    if (shouldSync()) {
+        console.log("Checking if sync is needed.");
         localStorage.setItem("cloud.syncTime", new Date().getTime());
         
         const agentsToSync = mergeAgents(cloudKnownAgents, registryKnownAgents);
 
         if (agentsToSync.length > 0) {
-            // console.log("---", agentsToSync);
-            console.log("Synchronizing with netdata.cloud");
+            console.log("Synchronizing with netdata.cloud.");
             postCloudAccountKnownAgents(agentsToSync).then((agents) => {
                 // TODO: clear syncTime on error!
                 cloudKnownAgents = agents;
