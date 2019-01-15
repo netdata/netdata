@@ -52,6 +52,7 @@ include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include elasticsearch/Makefile.inc
 include example/Makefile.inc
+include example_prometheus/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc
 include freeradius/Makefile.inc

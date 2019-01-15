@@ -15,9 +15,11 @@ def get_metric_by_name(metrics, name):
 
 
 class PrometheusService(UrlService):
+    def _scrape(self, *args, **kwargs):
+        return UrlService._get_raw_data(self, *args,  **kwargs)
 
     def _get_raw_data(self, url=None, manager=None):
-        raw = UrlService._get_raw_data(self, url=None, manager=None)
+        raw = self._scrape(url=None, manager=None)
 
         if not raw:
             return None
