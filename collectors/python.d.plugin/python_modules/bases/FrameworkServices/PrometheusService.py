@@ -22,7 +22,7 @@ class PrometheusService(UrlService):
         if not raw:
             return None
 
-        lines = (line for line in raw.split('\n'))
+        lines = iter(raw.split('\n'))
 
         try:
             metrics = [m for m in text_fd_to_metric_families(lines)]
