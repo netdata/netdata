@@ -1,4 +1,4 @@
-# example
+# example_prometheus
 
 An example_prometheus python data collection module.
 
