@@ -8,6 +8,8 @@ from random import SystemRandom
 
 from bases.FrameworkServices.PrometheusService import PrometheusService, get_metric_by_name
 
+disabled_by_default = True
+
 
 priority = 90000
 
