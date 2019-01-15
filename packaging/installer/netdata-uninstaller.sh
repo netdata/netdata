@@ -15,7 +15,7 @@ where:
     -h           show this help text
     -y, --yes    flag needs to be set to proceed with uninstallation"
 
-FINISHED=0
+FILE_REMOVAL_STATUS=0
 ENVIRONMENT_FILE="/etc/netdata/.environment"
 INTERACTIVITY="-i"
 YES=0
@@ -61,10 +61,18 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 function quit_msg() {
-	if [ "$FINISHED" -ne 0 ]; then
-		echo "Something went wrong"
+	echo
+	if [ "$FILE_REMOVAL_STATUS" -eq 0 ]; then
+		echo "Something went wrong :("
 	else
-		echo "Netdata was successfully uninstalled from your system"
+		echo "Netdata files were successfully removed from your system"
+	fi
+}
+
+function user_input() {
+	TEXT="$1"
+	if [ "${INTERACTIVITY}" == "-i" ]; then
+		read -r -p "$TEXT" >&2
 	fi
 }
 
@@ -78,10 +86,7 @@ function rm_file() {
 function rm_dir() {
 	DIR="$1"
 	if [ -n "$DIR" ] && [ -d "$DIR" ]; then
-		if [ "${INTERACTIVITY}" == "-i" ]; then
-			# We are not using `rm -I -R` to be compatible across systems
-			read -r -p "Press ENTER to recursively delete directory '$DIR' > "
-		fi
+		user_input "Press ENTER to recursively delete directory '$DIR' > "
 		rm -v -f -R "${DIR}"
 	fi
 }
@@ -112,7 +117,6 @@ source "${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
 echo "Stopping a possibly running netdata..."
-kill "$p"
 for p in $(netdata_pids); do
 	i=0
 	while kill "${p}" 2>/dev/null; do
@@ -147,19 +151,17 @@ else
 	rm_dir "/etc/netdata"
 fi
 
-FINISHED=1
+FILE_REMOVAL_STATUS=1
 
 #### REMOVE NETDATA USER & GROUP
 if [ -n "$NETDATA_ADDED_TO_GROUPS" ]; then
-	read -r -p "Press ENTER to delete 'netdata' from following groups: '$NETDATA_ADDED_TO_GROUPS' > "
+	user_input "Press ENTER to delete 'netdata' from following groups: '$NETDATA_ADDED_TO_GROUPS' > "
 	for group in $NETDATA_ADDED_TO_GROUPS; do
 		gpasswd -d netdata "${group}"
 	done
 fi
 
-read >&2 -r -p "Press ENTER to delete 'netdata' system user > "
-userdel -f netdata
-
-read >&2 -r -p "Press ENTER to delete 'netdata' system group > "
-groupdel netdata
-
+user_input "Press ENTER to delete 'netdata' system user > "
+userdel -f netdata || :
+user_input "Press ENTER to delete 'netdata' system group > "
+groupdel -f netdata || :
