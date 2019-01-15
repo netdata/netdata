@@ -39,6 +39,7 @@ static int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
 static int cgroup_recheck_zero_mem_detailed_every_iterations = 10;
 
 static char *cgroup_cpuacct_base = NULL;
+static char *cgroup_cpuset_base = NULL;
 static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
 static char *cgroup_devices_base = NULL;
@@ -113,6 +114,16 @@ void read_cgroup_plugin_configuration() {
     else s = mi->mount_point;
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
     cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
+
+    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
+    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
+    if(!mi) {
+        error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
+        s = "/sys/fs/cgroup/cpuset";
+    }
+    else s = mi->mount_point;
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+    cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
@@ -405,14 +416,25 @@ struct cgroup {
     RRDSET *st_queued_ops;
     RRDSET *st_merged_ops;
 
-    // per cgroup used memory chart variables
+    // per cgroup chart variables
+    char *filename_cpuset_cpus;
+    unsigned long long cpuset_cpus;
+
+    char *filename_cpu_cfs_period;
+    unsigned long long cpu_cfs_period;
+
+    char *filename_cpu_cfs_quota;
+    unsigned long long cpu_cfs_quota;
+
+    RRDSETVAR *chart_var_cpu_limit;
+
     char *filename_memory_limit;
-    RRDSETVAR *chart_var_memory_limit;
     unsigned long long memory_limit;
+    RRDSETVAR *chart_var_memory_limit;
 
     char *filename_memoryswap_limit;
-    RRDSETVAR *chart_var_memoryswap_limit;
     unsigned long long memoryswap_limit;
+    RRDSETVAR *chart_var_memoryswap_limit;
 
     // services
     RRDDIM *rd_cpu;
@@ -1016,13 +1038,24 @@ static inline struct cgroup *cgroup_add(const char *id) {
 static inline void cgroup_free(struct cgroup *cg) {
     debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
+    if(cg->st_cpu) {
+        rrdset_wrlock(cg->st_cpu);
+        rrdsetvar_free(cg->chart_var_cpu_limit);
+        rrdset_unlock(cg->st_cpu);
+        rrdset_is_obsolete(cg->st_cpu);
+    }
     if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
     if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
     if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
     if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
     if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
-    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
+    if(cg->st_mem_usage) {
+        rrdset_wrlock(cg->st_mem_usage);
+        rrdsetvar_free(cg->chart_var_memory_limit);
+        rrdsetvar_free(cg->chart_var_memoryswap_limit);
+        rrdset_unlock(cg->st_mem_usage);
+        rrdset_is_obsolete(cg->st_mem_usage);
+    }
     if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
     if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
     if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
@@ -1031,10 +1064,11 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
     if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
 
+    freez(cg->filename_cpuset_cpus);
+    freez(cg->filename_cpu_cfs_period);
+    freez(cg->filename_cpu_cfs_quota);
     freez(cg->filename_memory_limit);
-    rrdsetvar_free(cg->chart_var_memory_limit);
     freez(cg->filename_memoryswap_limit);
-    rrdsetvar_free(cg->chart_var_memoryswap_limit);
 
     free_cgroup_network_interfaces(cg);
 
@@ -1286,6 +1320,12 @@ static inline void find_all_cgroups() {
             if(likely(stat(filename, &buf) != -1)) {
                 cg->cpuacct_stat.filename = strdupz(filename);
                 cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
+                cg->filename_cpuset_cpus = strdupz(filename);
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_period_us", cgroup_cpuacct_base, cg->id);
+                cg->filename_cpu_cfs_period = strdupz(filename);
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
+                cg->filename_cpu_cfs_quota = strdupz(filename);
                 debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
             }
             else
@@ -2215,6 +2255,69 @@ static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) 
     return buffer;
 }
 
+static inline void update_cpu_limits(char **filename, unsigned long long *value, struct cgroup *cg) {
+    if(*filename) {
+        int ret = -1;
+
+        if(value == &cg->cpuset_cpus) {
+            static char *buf = NULL;
+            static size_t buf_size = 0;
+
+            if(!buf) {
+                buf_size = 100U + 6 * get_system_cpus(); // taken from kernel/cgroup/cpuset.c
+                buf = mallocz(buf_size + 1);
+            }
+
+            ret = read_file(*filename, buf, buf_size);
+
+            if(!ret) {
+                char *s = buf;
+                unsigned long long ncpus = 0;
+
+                while(*s) {
+                    unsigned long long n = 0;
+                    char c;
+
+                    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+                        n *= 10;
+                        n += c - '0';
+                    }
+                    if(*s == ',') {
+                        s++;
+                        ncpus++;
+                        continue;
+                    }
+                    if(*s == '-') {
+                        unsigned long long m = 0;
+                        s++;
+                        for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+                            m *= 10;
+                            m += c - '0';
+                        }
+                        ncpus += m - n + 1;
+                    }
+                    s++;
+                }
+
+                if(likely(ncpus)) *value = ncpus;
+            }
+        }
+        else if(value == &cg->cpu_cfs_period) {
+            ret = read_single_number_file(*filename, value);
+        }
+        else if(value == &cg->cpu_cfs_quota) {
+            ret = read_single_number_file(*filename, value);
+        }
+        else ret = -1;
+
+        if(ret) {
+            error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+            freez(*filename);
+            *filename = NULL;
+        }
+    }
+}
+
 static inline void update_memory_limits(char **filename, RRDSETVAR **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
     if(*filename) {
         if(unlikely(!*chart_var)) {
@@ -2310,6 +2413,42 @@ void update_cgroup_charts(int update_every) {
             rrddim_set(cg->st_cpu, "user", cg->cpuacct_stat.user);
             rrddim_set(cg->st_cpu, "system", cg->cpuacct_stat.system);
             rrdset_done(cg->st_cpu);
+
+            update_cpu_limits(&cg->filename_cpuset_cpus, &cg->cpuset_cpus, cg);
+            update_cpu_limits(&cg->filename_cpu_cfs_period, &cg->cpu_cfs_period, cg);
+            update_cpu_limits(&cg->filename_cpu_cfs_quota, &cg->cpu_cfs_quota, cg);
+
+            if(unlikely(!cg->chart_var_cpu_limit)) {
+                cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_create(cg->st_cpu, "cpu_limit");
+                if(!cg->chart_var_cpu_limit) {
+                    error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
+                    freez(cg->filename_cpuset_cpus);
+                    cg->filename_cpuset_cpus = NULL;
+                    freez(cg->filename_cpu_cfs_period);
+                    cg->filename_cpu_cfs_period = NULL;
+                    freez(cg->filename_cpu_cfs_quota);
+                    cg->filename_cpu_cfs_quota = NULL;
+                }
+            }
+            else {
+                calculated_number value = 0, quota = 0;
+
+                if(likely(cg->filename_cpuset_cpus || (cg->cpu_cfs_period || cg->cpu_cfs_quota))) {
+                    if(unlikely(cg->cpu_cfs_quota > 0))
+                        quota = (calculated_number)cg->cpu_cfs_quota / (calculated_number)cg->cpu_cfs_period;
+
+                    if(unlikely(quota && quota > cg->cpuset_cpus)) {
+                        value = quota * 100;
+                    }
+                    else
+                        value = (calculated_number)cg->cpuset_cpus * 100;
+                }
+
+                if(likely(value))
+                    rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, value);
+                else
+                    rrdsetvar_custom_chart_variable_set(cg->chart_var_cpu_limit, NAN);
+            }
         }
 
         if(likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES)) {
