@@ -4771,10 +4771,49 @@ function computeDiff(target, source) {
     return diff;
 }
 
+function mergeAgents(cloud, registry) {
+    let dirty = false;
+
+    const union = new Map();
+
+    for (const agent of cloud) {
+        union.set(agent.guid, agent);
+    }
+
+    for (const ragent of registry) {
+        const cagent = union.get(ragent.guid);
+        if (cagent) {
+            for (const u of ragent.alternate_urls) {
+                if (u === NETDATA.registry.MASKED_DATA) { // TODO: temp until registry is updated.
+                    continue;
+                }
+
+                if (!cagent.alternate_urls.includes(u)) {
+                    dirty = true;
+                    cagent.alternate_urls.push(u);
+                }
+            }
+        } else {
+            dirty = true;
+            union.set(ragent.guid, ragent);
+        }
+    }
+
+    if (dirty) {
+        return Array.from(union.values());
+    }
+
+    return [];
+}
+
 function syncAgents(callback) {
-    const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
-    if (diff.length > 0) {
-        const agentsToSync = cloudKnownAgents.concat(diff);
+    const agentsToSync = mergeAgents(cloudKnownAgents, registryKnownAgents);
+    if (agentsToSync.length > 0) {
+        // console.log("---", agentsToSync);
+        
+    // const diff = computeDiff(cloudKnownAgents, registryKnownAgents);
+    // if (diff.length > 0) {
+    //     const agentsToSync = cloudKnownAgents.concat(diff);
         console.log("Synchronizing with netdata.cloud");
         postCloudAccountKnownAgents(agentsToSync).then((agents) => {
             cloudKnownAgents = agents;
