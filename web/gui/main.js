@@ -762,6 +762,11 @@ function renderMyNetdataMenu(machinesArray) {
                 <i class="fas fa-sync"></i>
                 <a href="#" onclick="forceSync(); return false">Synchronize netdata.cloud</a>
                 <div></div>
+            </div>
+            <div class="agent-item">
+                <i class="fas fa-question-circle""></i>
+                <a href="https://netdata.cloud/about" target="_blank">What is this?</a>
+                <div></div>
             </div>`
         )
     }
