@@ -4641,7 +4641,7 @@ function deleteCloudKnownAgentURL(agentID, url) {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    window.addEventListener("message", handleMessage, false);    
+    // window.addEventListener("message", handleMessage, false);    
     const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
     window.open(url);
 }
@@ -4732,12 +4732,14 @@ function renderAccountUI() {
 }
 
 function handleMessage(e) {
+    console.log("---!!!-", e);
+
     localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
     localStorage.setItem("cloud.accountID", e.data.accountID);
     localStorage.setItem("cloud.accountName", e.data.accountName);
     localStorage.setItem("cloud.token", e.data.token);
 
-    window.removeEventListener("message", handleMessage, false);
+    // window.removeEventListener("message", handleMessage, false);
 
     netdataRegistryCallback(registryKnownAgents);
 }
@@ -4840,6 +4842,15 @@ function syncAgents(callback) {
     callback(cloudKnownAgents);
 }
 
+let isCloudSSOInitialized = false;
+
+function cloudSSOInit() {
+    const iframe = document.getElementById("ssoifrm");
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+    iframe.src = url;
+    isCloudSSOInitialized = true;
+}
+
 function initCloud() {
     if (!NETDATA.registry.isCloudEnabled) {
         clearCloudLocalStorageItems();
@@ -4851,6 +4862,10 @@ function initCloud() {
         if (NETDATA.registry.cloudBaseURL) {
             localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
         }
+    }
+
+    if (!isCloudSSOInitialized) {
+        cloudSSOInit();
     }
 
     renderAccountUI();
@@ -4904,12 +4919,18 @@ function tryFastInitCloud() {
     initCloud();
 }
 
-if (document.readyState === "complete") {
+function initializeApp() {
+    window.addEventListener("message", handleMessage, false);    
+
     tryFastInitCloud();
+}
+
+if (document.readyState === "complete") {
+    initializeApp();
 } else {
     document.addEventListener("readystatechange", () => {
         if (document.readyState === "complete") {
-            tryFastInitCloud();
+            initializeApp();
         }
     })
 }
