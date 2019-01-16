@@ -3,19 +3,12 @@
 # Author: l2isbad
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from collections import namedtuple
 from json import loads
-from socket import gethostbyname, gaierror
-from threading import Thread
-try:
-        from queue import Queue
-except ImportError:
-        from Queue import Queue
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
-METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
+API_NODE = 'api/nodes'
+API_OVERVIEW = 'api/overview'
 
 NODE_STATS = [
     'fd_used',
@@ -123,74 +116,62 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.host = self.configuration.get('host', '127.0.0.1')
-        self.port = self.configuration.get('port', 15672)
-        self.scheme = self.configuration.get('scheme', 'http')
-
-    def check(self):
-        # We can't start if <host> AND <port> not specified
-        if not (self.host and self.port):
-            self.error('Host is not defined in the module configuration file')
-            return False
-
-        # Hostname -> ip address
-        try:
-            self.host = gethostbyname(self.host)
-        except gaierror as error:
-            self.error(str(error))
-            return False
-
-        # Add handlers (auth, self signed cert accept)
-        self.url = '{scheme}://{host}:{port}/api'.format(scheme=self.scheme,
-                                                         host=self.host,
-                                                         port=self.port)
-        # Add methods
-        api_node = self.url + '/nodes'
-        api_overview = self.url + '/overview'
-        self.methods = [METHODS(get_data=self._get_overview_stats,
-                                url=api_node,
-                                stats=NODE_STATS),
-                        METHODS(get_data=self._get_overview_stats,
-                                url=api_overview,
-                                stats=OVERVIEW_STATS)]
-        return UrlService.check(self)
+        self.url = '{0}://{1}:{2}'.format(
+            configuration.get('scheme', 'http'),
+            configuration.get('host', '127.0.0.1'),
+            configuration.get('port', 15672),
+        )
+        self.node_name = str()
 
     def _get_data(self):
-        threads = list()
-        queue = Queue()
-        result = dict()
+        data = dict()
 
-        for method in self.methods:
-            th = Thread(target=method.get_data,
-                        args=(queue, method.url, method.stats))
-            th.start()
-            threads.append(th)
+        stats = self.get_overview_stats()
 
-        for thread in threads:
-            thread.join()
-            result.update(queue.get())
+        if not stats:
+            return None
 
-        return result or None
+        data.update(stats)
 
-    def _get_overview_stats(self, queue, url, stats):
-        """
-        Format data received from http request
-        :return: dict
-        """
+        stats = self.get_nodes_stats()
 
-        raw_data = self._get_raw_data(url)
+        if not stats:
+            return None
 
-        if not raw_data:
-            return queue.put(dict())
-        data = loads(raw_data)
-        data = data[0] if isinstance(data, list) else data
+        data.update(stats)
 
-        to_netdata = fetch_data(raw_data=data, metrics=stats)
-        return queue.put(to_netdata)
+        return data or None
+
+    def get_overview_stats(self):
+        url = '{0}/{1}'.format(self.url, API_OVERVIEW)
+
+        raw = self._get_raw_data(url)
+
+        if not raw:
+            return None
+
+        data = loads(raw)
+
+        self.node_name = data['node']
+
+        return fetch_data(raw_data=data, metrics=OVERVIEW_STATS)
+
+    def get_nodes_stats(self):
+        url = '{0}/{1}/{2}'.format(self.url, API_NODE, self.node_name)
+
+        raw = self._get_raw_data(url)
+
+        if not raw:
+            return None
+
+        data = loads(raw)
+
+        return fetch_data(raw_data=data, metrics=NODE_STATS)
 
 
 def fetch_data(raw_data, metrics):
     data = dict()
+
     for metric in metrics:
         value = raw_data
         metrics_list = metric.split('.')
@@ -200,4 +181,5 @@ def fetch_data(raw_data, metrics):
         except KeyError:
             continue
         data['_'.join(metrics_list)] = value
+
     return data

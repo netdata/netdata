@@ -43,6 +43,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                     "\t\t\"updates_id\": %u,\n"
                     "\t\t\"value_string\": \"%s\",\n"
                     "\t\t\"old_value_string\": \"%s\",\n"
+                    "\t\t\"silenced\": \"%s\",\n"
                    , host->hostname
                    , ae->unique_id
                    , ae->alarm_id
@@ -70,6 +71,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->updates_id
                    , ae->new_value_string
                    , ae->old_value_string
+                   , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
@@ -120,6 +122,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"chart\": \"%s\",\n"
                     "\t\t\t\"family\": \"%s\",\n"
                     "\t\t\t\"active\": %s,\n"
+                    "\t\t\t\"disabled\": %s,\n"
+                    "\t\t\t\"silenced\": %s,\n"
                     "\t\t\t\"exec\": \"%s\",\n"
                     "\t\t\t\"recipient\": \"%s\",\n"
                     "\t\t\t\"source\": \"%s\",\n"
@@ -143,6 +147,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->chart
                    , (rc->rrdset && rc->rrdset->family)?rc->rrdset->family:""
                    , (rc->rrdset)?"true":"false"
+                   , (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
+                   , (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
                    , rc->exec?rc->exec:host->health_default_exec
                    , rc->recipient?rc->recipient:host->health_default_recipient
                    , rc->source

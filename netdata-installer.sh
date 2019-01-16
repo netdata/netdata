@@ -150,6 +150,10 @@ Valid <installer options> are:
         Use this option to allow it continue
         without checking pkg-config.
 
+   --disable-telemetry
+
+        Use this flag to opt-out from our anonymous telemetry progam.
+
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
@@ -204,6 +208,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--disable-x86-sse" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"
+		shift 1
+	elif [ "$1" = "--disable-telemetry" ]; then
+		NETDATA_DISABLE_TELEMETRY=1
 		shift 1
 	elif [ "$1" = "--help" -o "$1" = "-h" ]; then
 		usage
@@ -910,53 +917,53 @@ To start netdata run:
 END
 echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
-if [ -d .git ]; then
+
+if [ "${AUTOUPDATE}" = "1" ]; then
 	if [ "${UID}" -ne "0" ]; then
-		[ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
+		echo >&2 "You need to run the installer as root for auto-updating via cron."
 	else
 		crondir=
 		[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
 		[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
 
 		if [ -z "${crondir}" ]; then
-			[ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater"
+			echo >&2 "Cannot figure out the cron directory to install netdata-updater"
 		else
 			if [ -f "${crondir}/netdata-updater.sh" ]; then
 				progress "Removing incorrect netdata-updater filename in cron"
 				rm -f "${crondir}/netdata-updater.sh"
 			fi
-
-			if [ "${AUTOUPDATE}" = "1" ]; then
-				progress "Installing new netdata-updater in cron"
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${REINSTALL_PWD}|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
-				chmod 0755 ${crondir}/netdata-updater
-				echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
-				echo >&2
-				echo >&2 "By default ${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-				echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
-			else
-				echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
-				echo >&2
-				echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ${crondir}/netdata-updater${TPUT_RESET}"
-			fi
+			progress "Installing new netdata-updater in cron"
+			sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
+			chmod 0755 ${crondir}/netdata-updater
+			echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
+			echo >&2
+			echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+			echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
 		fi
 	fi
-else
-	[ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"
-	[ "${AUTOUPDATE}" = "1" ] && echo >&2 "Your installation method does not support daily auto-updating via cron."
 fi
 
 # Save environment variables
-cat <<EOF > packaging/installer/.environment.sh
+cat <<EOF > ${NETDATA_USER_CONFIG_DIR}/.environment
+# Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
-REINSTALL_PWD="${REINSTALL_PWD}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+# next 3 values are meant to be populated by autoupdater (if enabled)
+NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+	touch ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics
+fi
 
 # -----------------------------------------------------------------------------
 echo >&2

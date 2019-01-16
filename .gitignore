@@ -51,7 +51,6 @@ cgroup-network
 !cgroup-network/
 
 # installation artifacts
-installer/.environment.sh
 packaging/installer/.environment.sh
 *.tar.*
 *.run
@@ -140,6 +139,7 @@ tests/profile/benchmark-line-parsing
 tests/profile/benchmark-procfile-parser
 tests/profile/benchmark-value-pairs
 tests/profile/statsd-stress
+tests/health_mgmtapi/health-cmdapi-test.sh
 oprofile_data/
 vgcore.*
 callgrind.out.*

@@ -4,18 +4,43 @@
 
 **Fixed bugs:**
 
+- FireQoS name not showing due to recent change [\#5171](https://github.com/netdata/netdata/issues/5171)
+- python go\_expvar: reuse same expvar key in different charts [\#5133](https://github.com/netdata/netdata/issues/5133)
+- hddtemp.chart.py is hardcoded to only use /dev/sdX [\#5129](https://github.com/netdata/netdata/issues/5129)
+- RabbitMQ Plugin wrong metrics for nodes in cluster [\#5118](https://github.com/netdata/netdata/issues/5118)
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
+- Review of system.ram plugin: treat Slab memory as Cached \(PR 3288\) [\#3929](https://github.com/netdata/netdata/issues/3929)
 
 **Closed issues:**
 
+- Remove support for multi-threaded and single-threaded web servers [\#5154](https://github.com/netdata/netdata/issues/5154)
+- error.log: IPv6 not properly show in error messages [\#5067](https://github.com/netdata/netdata/issues/5067)
+- Introduce Polymorphic Linux in the Docker Image [\#5034](https://github.com/netdata/netdata/issues/5034)
+- Allow netdata to listen to multiple ports [\#5017](https://github.com/netdata/netdata/issues/5017)
 - SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
+- allow different ports for streaming reception and API requests [\#3830](https://github.com/netdata/netdata/issues/3830)
+- maintenance time and silence time [\#3187](https://github.com/netdata/netdata/issues/3187)
+- Suppressing alerts programatically [\#2673](https://github.com/netdata/netdata/issues/2673)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
+- allow streamed data to be received on dedicated port [\#2149](https://github.com/netdata/netdata/issues/2149)
 - alarm notifications should state a count of active alarms per state [\#946](https://github.com/netdata/netdata/issues/946)
 
 **Merged pull requests:**
 
+- fix for fireqos classname not showing [\#5176](https://github.com/netdata/netdata/pull/5176) ([psychomelet](https://github.com/psychomelet))
+- Updated Polyverse reinstall commands in Dockerfile [\#5173](https://github.com/netdata/netdata/pull/5173) ([archisgore](https://github.com/archisgore))
+- Change how the ip address and port are logged in socket.c [\#5166](https://github.com/netdata/netdata/pull/5166) ([krinfels](https://github.com/krinfels))
+- Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
+- Fix cached memory calculation [\#5151](https://github.com/netdata/netdata/pull/5151) ([vlvkobal](https://github.com/vlvkobal))
+- Fix typo in plugins.d/README.md [\#5150](https://github.com/netdata/netdata/pull/5150) ([arkamar](https://github.com/arkamar))
+- "Network Traffic \(system.net\)" is always zero on FreeBSD virtual machines if hypervisor uses VirtIO NIC [\#5149](https://github.com/netdata/netdata/pull/5149) ([vladmovchan](https://github.com/vladmovchan))
+- rabbitmq: api/nodes requests fix [\#5142](https://github.com/netdata/netdata/pull/5142) ([ilyam8](https://github.com/ilyam8))
+- go\_expavar fix: don't check for duplicate expvars [\#5141](https://github.com/netdata/netdata/pull/5141) ([ilyam8](https://github.com/ilyam8))
+- hddtemp fix: don't use disk model as dim name [\#5140](https://github.com/netdata/netdata/pull/5140) ([ilyam8](https://github.com/ilyam8))
+- add option to opt-out from telemetry program [\#5138](https://github.com/netdata/netdata/pull/5138) ([paulfantom](https://github.com/paulfantom))
+- Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
@@ -24,6 +49,7 @@
 - Add variables to alarm-notify.sh  [\#5096](https://github.com/netdata/netdata/pull/5096) ([cakrit](https://github.com/cakrit))
 - do not report stale metrics to prometheus [\#5084](https://github.com/netdata/netdata/pull/5084) ([ktsaou](https://github.com/ktsaou))
 - Unify versioning [\#5051](https://github.com/netdata/netdata/pull/5051) ([paulfantom](https://github.com/paulfantom))
+- Port ACLs, Management API and Health commands [\#4969](https://github.com/netdata/netdata/pull/4969) ([cakrit](https://github.com/cakrit))
 - Generate a configure script for RPM build \(\#4570\) [\#4571](https://github.com/netdata/netdata/pull/4571) ([ananace](https://github.com/ananace))
 
 ## [v1.12.0-rc2](https://github.com/netdata/netdata/tree/v1.12.0-rc2) (2019-01-03)
