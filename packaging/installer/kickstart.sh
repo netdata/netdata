@@ -24,37 +24,17 @@
 #
 # 3. install netdata
 
-# shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
-
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
 setup_terminal() {
 	TPUT_RESET=""
-	TPUT_BLACK=""
-	TPUT_RED=""
-	TPUT_GREEN=""
 	TPUT_YELLOW=""
-	TPUT_BLUE=""
-	TPUT_PURPLE=""
-	TPUT_CYAN=""
 	TPUT_WHITE=""
-	TPUT_BGBLACK=""
 	TPUT_BGRED=""
 	TPUT_BGGREEN=""
-	TPUT_BGYELLOW=""
-	TPUT_BGBLUE=""
-	TPUT_BGPURPLE=""
-	TPUT_BGCYAN=""
-	TPUT_BGWHITE=""
 	TPUT_BOLD=""
 	TPUT_DIM=""
-	TPUT_UNDERLINED=""
-	TPUT_BLINK=""
-	TPUT_INVERTED=""
-	TPUT_STANDOUT=""
-	TPUT_BELL=""
-	TPUT_CLEAR=""
 
 	# Is stderr on the terminal? If not, then fail
 	test -t 2 || return 1
@@ -63,30 +43,12 @@ setup_terminal() {
 		if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
 			# Enable colors
 			TPUT_RESET="$(tput sgr 0)"
-			TPUT_BLACK="$(tput setaf 0)"
-			TPUT_RED="$(tput setaf 1)"
-			TPUT_GREEN="$(tput setaf 2)"
 			TPUT_YELLOW="$(tput setaf 3)"
-			TPUT_BLUE="$(tput setaf 4)"
-			TPUT_PURPLE="$(tput setaf 5)"
-			TPUT_CYAN="$(tput setaf 6)"
 			TPUT_WHITE="$(tput setaf 7)"
-			TPUT_BGBLACK="$(tput setab 0)"
 			TPUT_BGRED="$(tput setab 1)"
 			TPUT_BGGREEN="$(tput setab 2)"
-			TPUT_BGYELLOW="$(tput setab 3)"
-			TPUT_BGBLUE="$(tput setab 4)"
-			TPUT_BGPURPLE="$(tput setab 5)"
-			TPUT_BGCYAN="$(tput setab 6)"
-			TPUT_BGWHITE="$(tput setab 7)"
 			TPUT_BOLD="$(tput bold)"
 			TPUT_DIM="$(tput dim)"
-			TPUT_UNDERLINED="$(tput smul)"
-			TPUT_BLINK="$(tput blink)"
-			TPUT_INVERTED="$(tput rev)"
-			TPUT_STANDOUT="$(tput smso)"
-			TPUT_BELL="$(tput bel)"
-			TPUT_CLEAR="$(tput clear)"
 		fi
 	fi
 
@@ -160,8 +122,8 @@ umask 022
 setup_terminal || echo >/dev/null
 
 ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+# shellcheck disable=SC2039
+printf "%q " test >/dev/null 2>&1 && ESCAPED_PRINT_METHOD="printfq"
 
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
@@ -210,7 +172,7 @@ PACKAGES_INSTALLER_OPTIONS="netdata"
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="-u"
 SOURCE_DST="/usr/src"
-while [ ! -z "${1}" ]; do
+while [ -n "${1}" ]; do
 	if [ "${1}" = "all" ]; then
 		PACKAGES_INSTALLER_OPTIONS="netdata-all"
 		shift 1
