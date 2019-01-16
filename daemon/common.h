@@ -78,5 +78,6 @@ extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
+extern int netdata_anonymous_statistics_enabled;
 
 #endif /* NETDATA_COMMON_H */

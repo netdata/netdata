@@ -94,6 +94,8 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 
+daemon/anonymous-statistics.sh
+
 health/notifications/alarm-notify.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh

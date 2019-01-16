@@ -15,6 +15,9 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    return;
+}
 // callbacks required by popen()
 void signals_block(void) {};
 void signals_unblock(void) {};

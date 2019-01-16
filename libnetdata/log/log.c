@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <daemon/main.h>
 #include "../libnetdata.h"
 
 int web_server_is_multithreaded = 1;
@@ -399,6 +400,12 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     fputc('\n', stderr);
 
     log_unlock();
+
+    static char action_data[60];
+	snprintfz(action_data, 60, "%04lu@%-10.10s:%-15.15s", line, file, function);
+	static char action_result[60];
+	snprintfz(action_result, 60, "%s:%s",program_name, netdata_thread_tag());
+	send_statistics("FATAL", action_result, action_data);
 
     netdata_cleanup_and_exit(1);
 }
