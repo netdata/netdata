@@ -6,6 +6,7 @@
 ARG ARCH=amd64-v3.8
 FROM multiarch/alpine:${ARCH} as builder
 
+ARG OUTPUT="/dev/stdout"
 # Install prerequisites
 RUN apk --no-cache add alpine-sdk \
                        autoconf \
@@ -33,8 +34,7 @@ WORKDIR /opt/netdata.git
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \
-    sync && sleep 1 && \
-    ./netdata-installer.sh --dont-wait --dont-start-it
+    ./netdata-installer.sh --dont-wait --dont-start-it &>${OUTPUT}
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
