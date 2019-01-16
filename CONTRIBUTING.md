@@ -57,7 +57,7 @@ As the project grows, an increasing share of our time is spent on supporting thi
 
 ### Improve documentation
 
-All of our documentation is in markdown (.md) files inside the netdata GitHub project. All of our [HTML documentation](https://docs.netdata.cloud) is generated from these files. At the top right of each documentation page you will see a pencil, that leads you directly to the markdown file that was used to generated it. Don't be afraid to afraid to click it and edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
+All of our documentation is in markdown (.md) files inside the netdata GitHub project. All of our [HTML documentation](https://docs.netdata.cloud) is generated from these files. At the top right of each documentation page you will see a pencil, that leads you directly to the markdown file that was used to generated it. Don't be afraid to click it and edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
 
 We also need help to [document each chart in the default dashboard](https://github.com/netdata/netdata/issues/279). 
 
