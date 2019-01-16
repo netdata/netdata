@@ -33,16 +33,6 @@ umask 022
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
-which_cmd() {
-    # shellcheck disable=SC2230
-    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
-}
-
-check_cmd() {
-    which_cmd "${1}" >/dev/null 2>&1 && return 0
-    return 1
-}
-
 setup_terminal() {
     TPUT_RESET=""
     TPUT_BLACK=""
@@ -73,7 +63,7 @@ setup_terminal() {
     # Is stderr on the terminal? If not, then fail
     test -t 2 || return 1
 
-    if check_cmd tput
+    if command -v tput >/dev/null 2>&1
     then
         if [ $(( $(tput colors 2>/dev/null) )) -ge 8 ]
         then
@@ -182,15 +172,13 @@ fatal() {
 
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
-curl="$(which_cmd curl)"
-wget="$(which_cmd wget)"
-bash="$(which_cmd bash)"
+curl="$(command -v curl 2>/dev/null)"
+wget="$(command -v wget 2>/dev/null)"
+bash="$(command -v bash 2>/dev/null)"
 
-if [ -z "${BASH_VERSION}" ]
-then
+if [ -z "${BASH_VERSION}" ]; then
     # we don't run under bash
-    if [ ! -z "${bash}" -a -x "${bash}" ]
-    then
+    if [ -n "${bash}" ] && [ -x "${bash}" ]; then
         BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
     fi
 else
@@ -274,12 +262,12 @@ then
         url="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
 
         progress "Downloading script to detect required packages..."
-        if [ ! -z "${curl}" ]
-        then
-            run ${curl} "${url}" >"${tmp}" || fatal "Cannot download ${url}"
-        elif [ ! -z "${wget}" ]
+        if [ -n "${wget}" ]
         then
             run "${wget}" -O - "${url}" >"${tmp}" || fatal "Cannot download ${url}"
+        elif [ -n "${curl}" ]
+        then
+            run ${curl} "${url}" >"${tmp}" || fatal "Cannot download ${url}"
         else
             rm "${tmp}"
             fatal "I need curl or wget to proceed, but neither is available on this system."
@@ -320,10 +308,10 @@ fi
 # download netdata source
 
 # this has to checked after we have installed the required packages
-git="$(which_cmd git)"
+git="$(command -v git 2>/dev/null)"
 
 NETDATA_SOURCE_DIR=
-if [ ! -z "${git}" -a -x "${git}" ]
+if [ -n "${git}" ] && [ -x "${git}" ]
 then
     [ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
 
@@ -347,7 +335,7 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # install netdata from source
 
-if [ ! -z "${NETDATA_SOURCE_DIR}" -a -d "${NETDATA_SOURCE_DIR}" ]
+if [ -n "${NETDATA_SOURCE_DIR}" ] && [ -d "${NETDATA_SOURCE_DIR}" ]
 then
     cd "${NETDATA_SOURCE_DIR}" || fatal "Cannot cd to netdata source tree"
 
