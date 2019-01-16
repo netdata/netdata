@@ -343,10 +343,18 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol_str = "udp";
     }
     else if(strncmp(ip, "unix:", 5) == 0) {
-        ip += 5;
+        char *path = ip + 5;
         socktype = SOCK_STREAM;
         protocol_str = "unix";
-		unix_socket=1;
+        int fd = create_listen_socket_unix(path, listen_backlog);
+        if (fd == -1) {
+            error("LISTENER: Cannot create unix socket '%s'", path);
+            sockets->failed++;
+        } else {
+            listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
+            added++;
+        }
+        return added;
     }
 
     char *e = ip;
