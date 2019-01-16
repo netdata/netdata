@@ -11,24 +11,17 @@ fi
 WORKSPACE=$(mktemp -d)
 cp -r ./ "${WORKSPACE}/"
 cd "${WORKSPACE}"
-git config user.email "test@example.com"
-git config user.name "test"
 
 echo "========= INSTALL ========="
 ./netdata-installer.sh  --dont-wait --dont-start-it --auto-update --install /tmp &>/dev/null
-# Copy uninstaller as upgrader will overwrite it with a version from master branch
 cp netdata-uninstaller.sh /tmp/netdata-uninstaller.sh
+ls /tmp
 
-echo "========= ADD GARBAGE ========="
-touch garbagefile
-git add garbagefile
-git commit -m 'test commit'
-touch new_file
-git status
-
+rm -rf "${WORKSPACE}"
 echo "========= UPDATE ========="
-/etc/cron.daily/netdata-updater
+ENVIRONMENT_FILE=/tmp/netdata/etc/netdata/.environment /etc/cron.daily/netdata-updater
 
-echo "========= UNINSTALL ========="
-mv /tmp/netdata-uninstaller.sh ./netdata-uninstaller.sh
-./netdata-uninstaller.sh --yes --force
+#TODO(paulfantom): Enable with #5031
+#echo "========= UNINSTALL ========="
+#ENVIRONMENT_FILE=/tmp/netdata/etc/netdata/.environment /tmp/netdata-uninstaller.sh --yes --force
+#[ -f /tmp/netdata/usr/sbin/netdata ] && exit 1
