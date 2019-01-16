@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- Unix Domain Socket no longer working. Permission denied [\#5181](https://github.com/netdata/netdata/issues/5181)
+- netdata-updater.sh doesn't have exec perms [\#5175](https://github.com/netdata/netdata/issues/5175)
 - FireQoS name not showing due to recent change [\#5171](https://github.com/netdata/netdata/issues/5171)
 - python go\_expvar: reuse same expvar key in different charts [\#5133](https://github.com/netdata/netdata/issues/5133)
 - hddtemp.chart.py is hardcoded to only use /dev/sdX [\#5129](https://github.com/netdata/netdata/issues/5129)
@@ -11,11 +13,15 @@
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
+- Uninstaller script should be self-contained [\#5031](https://github.com/netdata/netdata/issues/5031)
+- Netdata doesn't properly lookup docker container name when running in ECS with task level cpu/memory limits enabled [\#4981](https://github.com/netdata/netdata/issues/4981)
 - Review of system.ram plugin: treat Slab memory as Cached \(PR 3288\) [\#3929](https://github.com/netdata/netdata/issues/3929)
+- Fix for unix sockets after addition of port ACLs [\#5184](https://github.com/netdata/netdata/pull/5184) ([cakrit](https://github.com/cakrit))
 
 **Closed issues:**
 
 - Remove support for multi-threaded and single-threaded web servers [\#5154](https://github.com/netdata/netdata/issues/5154)
+- Use GCS instead of git for updating netdata [\#5110](https://github.com/netdata/netdata/issues/5110)
 - error.log: IPv6 not properly show in error messages [\#5067](https://github.com/netdata/netdata/issues/5067)
 - Introduce Polymorphic Linux in the Docker Image [\#5034](https://github.com/netdata/netdata/issues/5034)
 - Allow netdata to listen to multiple ports [\#5017](https://github.com/netdata/netdata/issues/5017)
@@ -30,6 +36,7 @@
 **Merged pull requests:**
 
 - fix for fireqos classname not showing [\#5176](https://github.com/netdata/netdata/pull/5176) ([psychomelet](https://github.com/psychomelet))
+- GCS-based updater [\#5174](https://github.com/netdata/netdata/pull/5174) ([paulfantom](https://github.com/paulfantom))
 - Updated Polyverse reinstall commands in Dockerfile [\#5173](https://github.com/netdata/netdata/pull/5173) ([archisgore](https://github.com/archisgore))
 - Change how the ip address and port are logged in socket.c [\#5166](https://github.com/netdata/netdata/pull/5166) ([krinfels](https://github.com/krinfels))
 - Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
@@ -43,6 +50,7 @@
 - Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
 - Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
+- self-contained uninstaller [\#5121](https://github.com/netdata/netdata/pull/5121) ([paulfantom](https://github.com/paulfantom))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
 - Clarify backend modes of operation [\#5116](https://github.com/netdata/netdata/pull/5116) ([cakrit](https://github.com/cakrit))
 - web-site content; why-netdata content [\#5097](https://github.com/netdata/netdata/pull/5097) ([ktsaou](https://github.com/ktsaou))
