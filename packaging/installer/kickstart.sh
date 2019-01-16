@@ -26,10 +26,6 @@
 
 # shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
 
-umask 022
-
-[ -z "${UID}" ] && UID="$(id -u)"
-
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
@@ -96,7 +92,6 @@ setup_terminal() {
 
 	return 0
 }
-setup_terminal || echo >/dev/null
 
 progress() {
 	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
@@ -110,9 +105,6 @@ run_failed() {
 	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
 }
 
-ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
 	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
@@ -156,13 +148,20 @@ run() {
 	return ${ret}
 }
 
-# ---------------------------------------------------------------------------------------------------------------------
-# collect system information
-
 fatal() {
 	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
 	exit 1
 }
+
+umask 022
+
+[ -z "${UID}" ] && UID="$(id -u)"
+
+setup_terminal || echo >/dev/null
+
+ESCAPED_PRINT_METHOD=
+printf "%q " test >/dev/null 2>&1
+[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
