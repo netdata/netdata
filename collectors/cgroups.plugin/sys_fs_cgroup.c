@@ -2255,6 +2255,16 @@ static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) 
     return buffer;
 }
 
+static inline unsigned long long cpuset_str2ull(char **s) {
+    unsigned long long n = 0;
+    char c;
+    for(c = **s; c >= '0' && c <= '9' ; c = *(++*s)) {
+        n *= 10;
+        n += c - '0';
+    }
+    return n;
+}
+
 static inline void update_cpu_limits(char **filename, unsigned long long *value, struct cgroup *cg) {
     if(*filename) {
         int ret = -1;
@@ -2274,27 +2284,18 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
                 char *s = buf;
                 unsigned long long ncpus = 0;
 
+                // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
                 while(*s) {
-                    unsigned long long n = 0;
-                    char c;
-
-                    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
-                        n *= 10;
-                        n += c - '0';
-                    }
+                    unsigned long long n = cpuset_str2ull(&s);
                     if(*s == ',') {
                         s++;
                         ncpus++;
                         continue;
                     }
                     if(*s == '-') {
-                        unsigned long long m = 0;
                         s++;
-                        for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
-                            m *= 10;
-                            m += c - '0';
-                        }
-                        ncpus += m - n + 1;
+                        unsigned long long m = cpuset_str2ull(&s);
+                        ncpus += m - n + 1; // calculate the number of cpus in the region
                     }
                     s++;
                 }
@@ -2433,13 +2434,12 @@ void update_cgroup_charts(int update_every) {
             else {
                 calculated_number value = 0, quota = 0;
 
-                if(likely(cg->filename_cpuset_cpus || (cg->cpu_cfs_period || cg->cpu_cfs_quota))) {
+                if(likely(cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota))) {
                     if(unlikely(cg->cpu_cfs_quota > 0))
                         quota = (calculated_number)cg->cpu_cfs_quota / (calculated_number)cg->cpu_cfs_period;
 
-                    if(unlikely(quota && quota > cg->cpuset_cpus)) {
+                    if(unlikely(quota > 0 && quota < cg->cpuset_cpus))
                         value = quota * 100;
-                    }
                     else
                         value = (calculated_number)cg->cpuset_cpus * 100;
                 }
