@@ -890,12 +890,6 @@ SETUID_WARNING
 fi
 
 # -----------------------------------------------------------------------------
-progress "Create netdata-uninstaller.sh"
-
-cp ./packaging/installer/netdata-uninstaller.sh netdata-uninstaller.sh
-chmod 750 netdata-uninstaller.sh
-
-# -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
 
 cat <<END
