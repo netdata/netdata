@@ -10,7 +10,6 @@
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
 #
 # Other options:
-#  --src-dir PATH    keep netdata.git at PATH/netdata.git
 #  --dont-wait       do not prompt for user input
 #  --non-interactive do not prompt for user input
 #  --no-updates      do not install script for daily updates
@@ -20,9 +19,16 @@
 # 1. install all netdata compilation dependencies
 #    using the package manager of the system
 #
-# 2. download netdata source code in /usr/src/netdata.git
+# 2. download netdata nightly package to temporary directory
 #
 # 3. install netdata
+
+# shellcheck disable=SC2039,SC2059,SC2086
+
+# External files
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
+NIGHTLY_PACKAGE_TARBALL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+NIGHTLY_PACKAGE_CHECKSUM="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -59,16 +65,8 @@ progress() {
 	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
-run_ok() {
-	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
-}
-
-run_failed() {
-	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
-}
-
 escaped_print() {
-	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
+	if printf "%q " test >/dev/null 2>&1; then
 		printf "%q " "${@}"
 	else
 		printf "%s" "${*}"
@@ -76,38 +74,37 @@ escaped_print() {
 	return 0
 }
 
-run_logfile="/dev/null"
 run() {
-	local user="${USER--}" dir="${PWD}" info info_console
+	local dir="${PWD}" info_console
 
 	if [ "${UID}" = "0" ]; then
-		info="[root ${dir}]# "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
 	else
-		info="[${user} ${dir}]$ "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	printf >>"${run_logfile}" "${info}"
-	escaped_print >>"${run_logfile}" "${@}"
-	printf >>"${run_logfile}" " ... "
-
-	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
-	escaped_print >&2 "${@}"
-	printf >&2 "${TPUT_RESET}\n"
+	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		run_failed
-		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
+		printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
 	else
-		run_ok
-		printf >>"${run_logfile}" "OK\n"
+		printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
 	fi
 
 	return ${ret}
+}
+
+warning() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*} \n\n"
+	if [ "${INTERACTIVE}" = "0" ]; then
+		fatal "Stopping due to non-interactive mode. Fix the issue or retry installation in an interactive mode."
+	else
+		read -r -p "Press ENTER to attempt netdata installation > "
+		progress "OK, let's give it a try..."
+	fi
 }
 
 fatal() {
@@ -115,54 +112,61 @@ fatal() {
 	exit 1
 }
 
+download() {
+	url="${1}"
+	dest="${2}"
+	if command -v wget >/dev/null 2>&1; then
+		run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v curl >/dev/null 2>&1; then
+		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	else
+		fatal "I need curl or wget to proceed, but neither is available on this system."
+	fi
+}
+
+detect_bash4() {
+	bash="${1}"
+	if [ -z "${BASH_VERSION}" ]; then
+		# we don't run under bash
+		if [ -n "${bash}" ] && [ -x "${bash}" ]; then
+			BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
+		fi
+	else
+		# we run under bash
+		BASH_MAJOR_VERSION="${BASH_VERSINFO[0]}"
+	fi
+
+	if [ -z "${BASH_MAJOR_VERSION}" ]; then
+		echo >&2 "No BASH is available on this system"
+		return 1
+	elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]; then
+		echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION}"
+		return 1
+	fi
+	return 0
+}
+
 umask 022
 
+sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
+[ "${UID}" -ne "0" ] && sudo="sudo"
+export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 setup_terminal || echo >/dev/null
 
-ESCAPED_PRINT_METHOD=
-# shellcheck disable=SC2039
-printf "%q " test >/dev/null 2>&1 && ESCAPED_PRINT_METHOD="printfq"
+# ---------------------------------------------------------------------------------------------------------------------
+# try to update using autoupdater in the first place
 
-export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-
-curl="$(command -v curl 2>/dev/null)"
-wget="$(command -v wget 2>/dev/null)"
-bash="$(command -v bash 2>/dev/null)"
-
-if [ -z "${BASH_VERSION}" ]; then
-	# we don't run under bash
-	if [ -n "${bash}" ] && [ -x "${bash}" ]; then
-		BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
-	fi
-else
-	# we run under bash
-	BASH_MAJOR_VERSION="${BASH_VERSINFO[0]}"
+updater=""
+[ -x /etc/periodic/daily/netdata-updater ] && updater=/etc/periodic/daily/netdata-updater
+[ -x /etc/cron.daily/netdata-updater ] && updater=/etc/cron.daily/netdata-updater
+if [ -n "${updater}" ]; then
+	# attempt to run the updater, to respect any compilation settings already in place
+	progress "Re-installing netdata..."
+	run "${sudo}" "${updater}" -f || fatal "Failed to forcefully update netdata"
+	exit 0
 fi
-
-HAS_BASH4=1
-if [ -z "${BASH_MAJOR_VERSION}" ]; then
-	echo >&2 "No BASH is available on this system"
-	HAS_BASH4=0
-elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]; then
-	echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION}"
-	HAS_BASH4=0
-fi
-
-SYSTEM="$(uname -s)"
-OS="$(uname -o)"
-MACHINE="$(uname -m)"
-
-cat <<EOF
-System            : ${SYSTEM}
-Operating System  : ${OS}
-Machine           : ${MACHINE}
-BASH major version: ${BASH_MAJOR_VERSION}
-EOF
-
-sudo=""
-[ "${UID}" -ne "0" ] && sudo="sudo"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # install required system packages
@@ -170,19 +174,14 @@ sudo=""
 INTERACTIVE=1
 PACKAGES_INSTALLER_OPTIONS="netdata"
 NETDATA_INSTALLER_OPTIONS=""
-NETDATA_UPDATES="-u"
-SOURCE_DST="/usr/src"
+NETDATA_UPDATES="--auto-update"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "all" ]; then
 		PACKAGES_INSTALLER_OPTIONS="netdata-all"
 		shift 1
-	elif [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]; then
+	elif [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ]; then
 		INTERACTIVE=0
 		shift 1
-	elif [ "${1}" = "--src-dir" ]; then
-		SOURCE_DST="${2}"
-		# echo >&2 "netdata source will be installed at ${SOURCE_DST}/netdata.git"
-		shift 2
 	elif [ "${1}" = "--no-updates" ]; then
 		# echo >&2 "netdata will not auto-update"
 		NETDATA_UPDATES=
@@ -197,101 +196,63 @@ if [ "${INTERACTIVE}" = "0" ]; then
 	NETDATA_INSTALLER_OPTIONS="--dont-wait"
 fi
 
-# echo "PACKAGES_INSTALLER_OPTIONS=${PACKAGES_INSTALLER_OPTIONS}"
-# echo "NETDATA_INSTALLER_OPTIONS=${NETDATA_INSTALLER_OPTIONS} ${*}"
+# ---------------------------------------------------------------------------------------------------------------------
+# detect system parameters and install dependencies
 
-if [ "${OS}" = "GNU/Linux" -o "${SYSTEM}" = "Linux" ]; then
-	if [ "${HAS_BASH4}" = "1" ]; then
-		tmp="$(mktemp /tmp/netdata-kickstart-XXXXXX)"
-		url="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
+SYSTEM="$(uname -s)"
+OS="$(uname -o)"
+MACHINE="$(uname -m)"
 
-		progress "Downloading script to detect required packages..."
-		if [ -n "${wget}" ]; then
-			run "${wget}" -O - "${url}" >"${tmp}" || fatal "Cannot download ${url}"
-		elif [ -n "${curl}" ]; then
-			run ${curl} "${url}" >"${tmp}" || fatal "Cannot download ${url}"
-		else
-			rm "${tmp}"
-			fatal "I need curl or wget to proceed, but neither is available on this system."
-		fi
+cat <<EOF
+System            : ${SYSTEM}
+Operating System  : ${OS}
+Machine           : ${MACHINE}
+BASH major version: ${BASH_MAJOR_VERSION}
+EOF
 
-		ask=0
-		if [ -s "${tmp}" ]; then
-			progress "Running downloaded script to detect required packages..."
-			run ${sudo} "${bash}" "${tmp}" ${PACKAGES_INSTALLER_OPTIONS} || ask=1
-			rm "${tmp}"
-		else
-			rm "${tmp}"
-			fatal "Downloaded script is empty..."
-		fi
+tmpdir="$(mktemp -d /tmp/netdata-kickstart-XXXXXX)"
+cd "${tmpdir}" || :
 
-		if [ "${ask}" = "1" ]; then
-			echo >&2 "It failed to install all the required packages, but I can try to install netdata."
-			read -p "Press ENTER to continue to netdata installation > "
-			progress "OK, let's give it a try..."
-		fi
-	else
-		echo >&2 "WARNING"
-		echo >&2 "Cannot detect the packages to be installed in this system, without BASH v4+."
-		echo >&2 "We can only attempt to install netdata..."
-		echo >&2
-	fi
+if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
+	warning "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
 else
-	echo >&2 "WARNING"
-	echo >&2 "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
-	echo >&2 "We can only attempt to install netdata..."
-	echo >&2
+	bash="$(command -v bash 2>/dev/null)"
+	if ! detect_bash4 "${bash}"; then
+		warning "Cannot detect packages to be installed in this system, without BASH v4+."
+	else
+		progress "Downloading script to detect required packages..."
+		download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"
+		if [ ! -s "${tmpdir}/install-required-packages.sh" ]; then
+			warning "Downloaded dependency installation script is empty."
+		else
+			progress "Running downloaded script to detect required packages..."
+			if run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}; then
+				warning "It failed to install all the required packages, but installation might still be possible."
+			fi
+		fi
+
+	fi
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
-# download netdata source
+# download netdata nightly package
 
-# this has to checked after we have installed the required packages
-git="$(command -v git 2>/dev/null)"
-
-NETDATA_SOURCE_DIR=
-if [ -n "${git}" ] && [ -x "${git}" ]; then
-	[ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
-
-	if [ ! -d "${SOURCE_DST}/netdata.git" ]; then
-		progress "Downloading netdata source code..."
-		run ${sudo} ${git} clone https://github.com/netdata/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
-		cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
-	else
-		progress "Updating netdata source code..."
-		cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
-		run ${sudo} ${git} fetch --all || fatal "Cannot fetch netdata source updates"
-		run ${sudo} ${git} reset --hard origin/master || fatal "Cannot update netdata source tree"
-	fi
-	NETDATA_SOURCE_DIR="${SOURCE_DST}/netdata.git"
-else
-	fatal "Cannot find the command 'git' to download the netdata source code."
+download "${NIGHTLY_PACKAGE_CHECKSUM}" "${tmpdir}/sha256sum.txt"
+download "${NIGHTLY_PACKAGE_TARBALL}" "${tmpdir}/netdata-latest.tar.gz"
+if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >/dev/null 2>&1; then
+	failed "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${tmpdir}"
 fi
+run tar -xf netdata-latest.tar.gz
+rm -rf netdata-latest.tar.gz >/dev/null 2>&1
+cd netdata-* || fatal "Cannot cd to netdata source tree"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # install netdata from source
 
-if [ -n "${NETDATA_SOURCE_DIR}" ] && [ -d "${NETDATA_SOURCE_DIR}" ]; then
-	cd "${NETDATA_SOURCE_DIR}" || fatal "Cannot cd to netdata source tree"
-
-	install=0
-	if [ -x netdata-updater.sh ]; then
-		# attempt to run the updater, to respect any compilation settings already in place
-		progress "Re-installing netdata..."
-		run ${sudo} ./netdata-updater.sh -f || install=1
-	else
-		install=1
-	fi
-
-	if [ "${install}" = "1" ]; then
-		if [ -x netdata-installer.sh ]; then
-			progress "Installing netdata..."
-			run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" ||
-				fatal "netdata-installer.sh exited with error"
-		else
-			fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
-		fi
-	fi
+if [ -x netdata-installer.sh ]; then
+	progress "Installing netdata..."
+	run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
+	rm -rf "${tmpdir}" >/dev/null 2>&1
 else
-	fatal "Cannot install netdata from source, on this system (cannot download the source code)."
+	fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}"
 fi
