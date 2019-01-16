@@ -328,7 +328,6 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
     int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     const char *protocol_str = "tcp";
-	int unix_socket=0;
 
     if(strncmp(ip, "tcp:", 4) == 0) {
         ip += 4;
@@ -343,10 +342,19 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol_str = "udp";
     }
     else if(strncmp(ip, "unix:", 5) == 0) {
-        ip += 5;
+        char *path = ip + 5;
         socktype = SOCK_STREAM;
         protocol_str = "unix";
-		unix_socket=1;
+        int fd = create_listen_socket_unix(path, listen_backlog);
+        if (fd == -1) {
+            error("LISTENER: Cannot create unix socket '%s'", path);
+            sockets->failed++;
+        } else {
+            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+            listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
+            added++;
+        }
+        return added;
     }
 
     char *e = ip;
@@ -393,18 +401,6 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     } else {
         acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
     }
-
-    if (unix_socket) {
-		int fd = create_listen_socket_unix(port, listen_backlog);
-		if (fd == -1) {
-			error("LISTENER: Cannot create unix socket '%s'", port);
-			sockets->failed++;
-		} else {
-			listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, port, 0, acl_flags);
-			added++;
-		}
-		return added;
-	}
 
     uint32_t scope_id = 0;
     if(*interface) {
