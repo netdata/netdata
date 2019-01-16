@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#shellcheck disable=SC2164
 
 # this script will uninstall netdata
 
@@ -6,33 +7,28 @@
 #  - PATH
 #  - CFLAGS
 #  - NETDATA_CONFIGURE_OPTIONS
-#  - REINSTALL_PWD
 #  - REINSTALL_COMMAND
+#  - NETDATA_TARBALL_URL
+#  - NETDATA_TARBALL_CHECKSUM_URL
+#  - NETDATA_TARBALL_CHECKSUM
 
-force=0
-[ "${1}" = "-f" ] && force=1
 
-# make sure we cd to the working directory
-REINSTALL_PWD="THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT"
-cd "${REINSTALL_PWD}" || exit 1
+# Usually stored in /etc/netdata/.environment
+: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
-#shellcheck source=/dev/null
-source packaging/installer/.environment.sh || exit 1
+# shellcheck source=/dev/null
+source "${ENVIRONMENT_FILE}" || exit 1
 
-if [ "${INSTALL_UID}" != "$(id -u)" ]
-    then
-    echo >&2 "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
-    exit 1
+if [ "${INSTALL_UID}" != "$(id -u)" ]; then
+	echo >&2 "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
+	exit 1
 fi
-
-# make sure there is .git here
-[ ${force} -eq 0 -a ! -d .git ] && echo >&2 "No git structures found at: ${REINSTALL_PWD} (use -f for force re-install)" && exit 1
 
 # signal netdata to start saving its database
 # this is handy if your database is big
 pids=$(pidof netdata)
 do_not_start=
-if [ ! -z "${pids}" ]; then
+if [ -n "${pids}" ]; then
 	#shellcheck disable=SC2086
 	kill -USR1 ${pids}
 else
@@ -57,10 +53,6 @@ info() {
 	echo >&3 "$(date) : INFO: " "${@}"
 }
 
-emptyline() {
-	echo >&3
-}
-
 error() {
 	echo >&3 "$(date) : ERROR: " "${@}"
 }
@@ -69,56 +61,46 @@ error() {
 failed() {
 	error "FAILED TO UPDATE NETDATA : ${1}"
 
-	if [ ! -z "${tmp}" ]; then
+	if [ -n "${tmp}" ]; then
 		cat >&2 "${tmp}"
 		rm "${tmp}"
 	fi
 	exit 1
 }
 
-get_latest_commit_id() {
-	git rev-parse HEAD 2>&3
-}
-
 update() {
 	[ -z "${tmp}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-	emptyline
+	dir=$(mktemp -d)
 
-	if [ -d .git ]; then
-		info "Updating netdata source from github..."
+	cd "$dir"
 
-		last_commit="$(get_latest_commit_id)"
-		if [ ${force} -eq 0 ] && [ -z "${last_commit}" ]; then
-			failed "CANNOT GET LAST COMMIT ID (use -f for force re-install)"
-		fi
-
-		popmsg="$(git stash pop 2>&1)"
-		if [ $? -eq 0 ] ; then
-			info "Stashing local git changes. You can use ${popmsg} to reapply your changes."
-		fi
-
-		git stash 2>&3 >&3
-		git fetch --all 2>&3 >&3
-		git fetch --tags 2>&3 >&3
-		git checkout master 2>&3 >&3
-		git reset --hard origin/master 2>&3 >&3
-		git pull 2>&3 >&3
-
-		new_commit="$(get_latest_commit_id)"
-		if [ ${force} -eq 0 ]; then
-			[ -z "${new_commit}" ] && failed "CANNOT GET NEW LAST COMMIT ID (use -f for force re-install)"
-			[ "${new_commit}" = "${last_commit}" ] && info "Nothing to be done! (use -f to force re-install)" && exit 0
-		fi
-	elif [ ${force} -eq 0 ]; then
-		failed "CANNOT FIND GIT STRUCTURES IN $(pwd) (use -f for force re-install)"
+	wget "${NETDATA_TARBALL_CHECKSUM_URL}" -O sha256sum.txt >&3 2>&3
+	if grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+		info "Newest version is already installed"
+		exit 0
 	fi
 
-	emptyline
+	wget "${NETDATA_TARBALL_URL}" -O netdata-latest.tar.gz >&3 2>&3
+	if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
+		failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
+	fi
+	NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
+	tar -xf netdata-latest.tar.gz >&3 2>&3
+	rm netdata-latest.tar.gz >&3 2>&3
+	cd netdata-*
+
 	info "Re-installing netdata..."
 	${REINSTALL_COMMAND} --dont-wait ${do_not_start} >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+	sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
+	cat <<EOF >>"${ENVIRONMENT_FILE}"
+NETDATA_TARBALL_URL="$NETDATA_TARBALL_URL"
+NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_CHECKSUM_URL"
+NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"
+EOF
 
-	[ ! -z "${tmp}" ] && rm "${tmp}" && tmp=
+	rm -rf "${dir}" >&3 2>&3
+	[ -n "${tmp}" ] && rm "${tmp}" && tmp=
 	return 0
 }
 
