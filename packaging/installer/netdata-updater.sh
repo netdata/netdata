@@ -14,7 +14,7 @@
 
 
 # Usually stored in /etc/netdata/.environment
-: "${ENVIRONMENT_FILE:='THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT'}"
+: "${ENVIRONMENT_FILE:=THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT}"
 
 # shellcheck source=/dev/null
 source "${ENVIRONMENT_FILE}" || exit 1
