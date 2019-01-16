@@ -135,6 +135,8 @@ sleep 2
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata
 rm_file /etc/systemd/system/netdata.service
+rm_file /lib/systemd/system/netdata.service
+rm_file /usr/lib/systemd/system/netdata.service
 rm_file /etc/init.d/netdata
 rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
