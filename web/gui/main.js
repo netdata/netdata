@@ -760,7 +760,7 @@ function renderMyNetdataMenu(machinesArray) {
             `<hr />
             <div class="agent-item">
                 <i class="fas fa-sync"></i>
-                <a href="#" onclick="forceSync(); return false">Synchronize netdata.cloud</a>
+                <a href="#" onclick="showSyncModal(); return false">Synchronize netdata.cloud</a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4815,7 +4815,12 @@ function shouldSync() {
     return localStorage.getItem("cloud.syncTime") == null;
 }
 
+function showSyncModal() {
+    $("#syncRegistryModal").modal("show");
+}
+
 function forceSync() {
+    $("#syncRegistryModal").modal("hide");
     localStorage.removeItem("cloud.syncTime");
     NETDATA.registry.init();
 }
