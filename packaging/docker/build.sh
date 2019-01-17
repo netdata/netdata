@@ -24,12 +24,10 @@ declare -A ARCH_MAP
 ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 if [ -z ${DEVEL+x} ]; then
     declare -a ARCHITECTURES=(i386 armhf aarch64 amd64)
-    BG="&"
 else
     declare -a ARCHITECTURES=(amd64)
     unset DOCKER_PASSWORD
     unset DOCKER_USERNAME
-    BG=""
 fi
 
 REPOSITORY="${REPOSITORY:-netdata}"
@@ -43,9 +41,8 @@ for ARCH in "${ARCHITECTURES[@]}"; do
      		--build-arg ARCH="${ARCH}-v3.8" \
      		--build-arg OUTPUT=/dev/null \
      		--tag "${REPOSITORY}:${VERSION}-${ARCH}" \
-     		--file packaging/docker/Dockerfile ./ ${BG}
+     		--file packaging/docker/Dockerfile ./
 done
-wait
 
 # There is no reason to continue if we cannot log in to docker hub
 if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
