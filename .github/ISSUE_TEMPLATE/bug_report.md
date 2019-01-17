@@ -25,6 +25,8 @@ When creating a bug report please:
 
 ##### OS / Environment
 
+##### Netdata version
+
 ##### Component Name
 
 ##### Steps To Reproduce
