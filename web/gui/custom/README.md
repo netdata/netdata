@@ -341,7 +341,7 @@ On charts that by default have a legend managed by `dashboard.js` you can remove
 
 ### API options
 
-You can append netdata **[[REST API v1]]** data options, using this:
+You can append netdata **[REST API v1](../../api)** data options, using this:
 
 ```html
 <div data-netdata="unique.id"
