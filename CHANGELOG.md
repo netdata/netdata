@@ -1,9 +1,10 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
 
 **Fixed bugs:**
 
+- megacli isn't included in python.d.conf [\#5191](https://github.com/netdata/netdata/issues/5191)
 - Unix Domain Socket no longer working. Permission denied [\#5181](https://github.com/netdata/netdata/issues/5181)
 - netdata-updater.sh doesn't have exec perms [\#5175](https://github.com/netdata/netdata/issues/5175)
 - FireQoS name not showing due to recent change [\#5171](https://github.com/netdata/netdata/issues/5171)
@@ -15,6 +16,7 @@
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
 - Uninstaller script should be self-contained [\#5031](https://github.com/netdata/netdata/issues/5031)
 - Netdata doesn't properly lookup docker container name when running in ECS with task level cpu/memory limits enabled [\#4981](https://github.com/netdata/netdata/issues/4981)
+- Dashboard TV white page [\#4710](https://github.com/netdata/netdata/issues/4710)
 - Review of system.ram plugin: treat Slab memory as Cached \(PR 3288\) [\#3929](https://github.com/netdata/netdata/issues/3929)
 - Fix for unix sockets after addition of port ACLs [\#5184](https://github.com/netdata/netdata/pull/5184) ([cakrit](https://github.com/cakrit))
 
@@ -27,6 +29,7 @@
 - Allow netdata to listen to multiple ports [\#5017](https://github.com/netdata/netdata/issues/5017)
 - SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
 - allow different ports for streaming reception and API requests [\#3830](https://github.com/netdata/netdata/issues/3830)
+- Consul monitoring service health checks [\#3674](https://github.com/netdata/netdata/issues/3674)
 - maintenance time and silence time [\#3187](https://github.com/netdata/netdata/issues/3187)
 - Suppressing alerts programatically [\#2673](https://github.com/netdata/netdata/issues/2673)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
@@ -35,6 +38,10 @@
 
 **Merged pull requests:**
 
+- update bug\_report.md [\#5205](https://github.com/netdata/netdata/pull/5205) ([ilyam8](https://github.com/ilyam8))
+- add missing modules to python.d.conf [\#5194](https://github.com/netdata/netdata/pull/5194) ([ilyam8](https://github.com/ilyam8))
+- remove double 'afraid to' in CONTRIBUTING.md [\#5189](https://github.com/netdata/netdata/pull/5189) ([arkamar](https://github.com/arkamar))
+- Use tarballs from GCS in kickstart.sh [\#5185](https://github.com/netdata/netdata/pull/5185) ([paulfantom](https://github.com/paulfantom))
 - fix for fireqos classname not showing [\#5176](https://github.com/netdata/netdata/pull/5176) ([psychomelet](https://github.com/psychomelet))
 - GCS-based updater [\#5174](https://github.com/netdata/netdata/pull/5174) ([paulfantom](https://github.com/paulfantom))
 - Updated Polyverse reinstall commands in Dockerfile [\#5173](https://github.com/netdata/netdata/pull/5173) ([archisgore](https://github.com/archisgore))
