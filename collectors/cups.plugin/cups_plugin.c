@@ -9,6 +9,28 @@
 #include "../../libnetdata/libnetdata.h"
 #include <limits.h>
 
+// callback required by fatal()
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
+
+// callbacks required by popen()
+void signals_block(void) {};
+void signals_unblock(void) {};
+void signals_reset(void) {};
+
+// callback required by eval()
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+    return 0;
+};
+
+// required by get_system_cpus()
+char *netdata_configured_host_prefix = "";
+
 // Variables
 
 static int debug = 0;
@@ -16,10 +38,6 @@ static int debug = 0;
 static int netdata_update_every = 1;
 static int netdata_priority = 100004;
 
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
 
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
@@ -221,7 +239,7 @@ int main(int argc, char **argv) {
     // the main loop
 
     if (debug)
-        fprintf(stderr, "cups.plugin: starting data collection\n");
+        fprintf(stderr, "starting data collection\n");
 
     time_t started_t = now_monotonic_sec();
     size_t iteration = 0;
@@ -231,7 +249,7 @@ int main(int argc, char **argv) {
     heartbeat_init(&hb);
     for (iteration = 0; 1; iteration++)
     {
-        usec_t dt = heartbeat_next(&hb, step);
+        heartbeat_next(&hb, step);
 
         if (unlikely(netdata_exit))
         {
@@ -263,7 +281,8 @@ int main(int argc, char **argv) {
 
             const char *printer_uri_supported = cupsGetOption("printer-uri-supported", curr_dest->num_options, curr_dest->options);
             if (!printer_uri_supported) {
-                debug("destination %s discovered, but not yet setup as a local printer", curr_dest->name);
+                if(debug)
+                    fprintf(stderr, "destination %s discovered, but not yet setup as a local printer", curr_dest->name);
                 continue;
             }
 
@@ -290,7 +309,8 @@ int main(int argc, char **argv) {
                     num_dest_stopped++;
                     break;
                 case INT_MIN:
-                    debug("printer state is missing for destination %s", curr_dest->name);
+                    if(debug)
+                        fprintf(stderr, "printer state is missing for destination %s", curr_dest->name);
                     break;
                 default:
                     error("Unknown printer state (%d) found.", printer_state);
