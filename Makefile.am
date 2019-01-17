@@ -498,9 +498,6 @@ endif
 if ENABLE_PLUGIN_CUPS
     plugins_PROGRAMS += cups.plugin
     cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
-    cups_plugin_LDFLAGS = \
-        -lcups \
-        $(NULL)
     cups_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_CUPS_LIBS) \

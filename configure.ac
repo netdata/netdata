@@ -430,13 +430,32 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
     [have_cups=no]
 )
 
- test "${enable_plugin_cups}" = "yes" -a "${have_cups}" != "yes" && \
+test "${enable_plugin_cups}" = "yes" -a "${have_cups}" != "yes" && \
     AC_MSG_ERROR([cups required but not found. Try installing 'cups'])
 
- AC_MSG_CHECKING([if cups.plugin should be enabled])
+AC_ARG_WITH([cups-config],
+    [AS_HELP_STRING([--with-cups-config=path], [Specify path to cups-config executable.])],
+    [with_cups_config="$withval"],
+    [with_cups_config=system]
+    )
+
+AS_IF([test "x$with_cups_config" != "xsystem"], [
+	CUPSCONFIG=$with_cups_config
+], [
+	AC_PATH_TOOL(CUPSCONFIG, [cups-config])
+	AS_IF([test -z "$CUPSCONFIG"], [
+		AC_MSG_ERROR([Required cups-config is missing. Please install CUPS developer packages.])
+	])
+])
+
+AC_MSG_CHECKING([if cups.plugin should be enabled])
 if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
     enable_plugin_cups="yes"
     AC_DEFINE([HAVE_CUPS], [1], [cups usability])
+    
+    CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
+    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
+
     OPTIONAL_CUPS_CLFAGS="${CUPS_CFLAGS}"
     OPTIONAL_CUPS_LIBS="${CUPS_LIBS}"
 else
