@@ -21,11 +21,11 @@ When creating a bug report please:
 - Provide a clear and concise description of what you expected to happen.
 -->
 
-##### Netdata version
-
 ##### Bug report summary
 
 ##### OS / Environment
+
+##### Netdata version
 
 ##### Component Name
 
