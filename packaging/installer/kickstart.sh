@@ -129,6 +129,7 @@ detect_bash4() {
 	if [ -z "${BASH_VERSION}" ]; then
 		# we don't run under bash
 		if [ -n "${bash}" ] && [ -x "${bash}" ]; then
+			# shellcheck disable=SC2016
 			BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
 		fi
 	else
