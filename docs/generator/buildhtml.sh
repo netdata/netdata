@@ -14,6 +14,8 @@ if [ "$currentdir" = "generator" ]; then
 fi
 GENERATOR_DIR="docs/generator"
 
+git clone https://github.com/netdata/go.d.plugin.git ./collectors/go.d.plugin
+
 # Copy all netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
 rm -rf ${GENERATOR_DIR}/src
@@ -21,6 +23,8 @@ find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o 
 
 # Copy netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
+
+
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
