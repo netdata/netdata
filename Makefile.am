@@ -70,10 +70,11 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
+	packaging/installer/netdata-updater.sh \
 	packaging/installer/kickstart.sh \
 	packaging/installer/kickstart-static64.sh \
-	netdata-installer.sh \
 	packaging/installer/functions.sh \
+	netdata-installer.sh \
 	docs/generator/buildhtml.sh \
 	docs/generator/buildyaml.sh \
 	docs/generator/checklinks.sh \

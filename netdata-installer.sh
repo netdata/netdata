@@ -909,8 +909,6 @@ To start netdata run:
 
 
 END
-echo >&2 "Uninstall script is located at: ${TPUT_RED}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
-
 
 if [ "${AUTOUPDATE}" = "1" ]; then
 	if [ "${UID}" -ne "0" ]; then
@@ -928,7 +926,11 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 				rm -f "${crondir}/netdata-updater.sh"
 			fi
 			progress "Installing new netdata-updater in cron"
-			sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" ./packaging/installer/netdata-updater.sh > ${crondir}/netdata-updater
+			if [ -f "${installer_dir}/packaging/installer/netdata-updater.sh" ]; then
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
+			else
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${netdata_source_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
+			fi
 			chmod 0755 ${crondir}/netdata-updater
 			echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
 			echo >&2
