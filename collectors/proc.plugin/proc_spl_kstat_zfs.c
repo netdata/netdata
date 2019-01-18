@@ -187,8 +187,8 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     if(unlikely(arcstats.l2exist == -1))
         arcstats.l2exist = 0;
 
-    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
-    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
+    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
+    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
 
     return 0;
 }

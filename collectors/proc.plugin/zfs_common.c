@@ -4,7 +4,13 @@
 
 struct arcstats arcstats = { 0 };
 
-void generate_charts_arcstats(const char *plugin, const char *module, int update_every) {
+void generate_charts_arcstats(const char *plugin, const char *module, int show_zero_charts, int update_every) {
+    static int do_arc_size = -1, do_l2_size = -1, do_reads = -1, do_l2bytes = -1, do_ahits = -1, do_dhits = -1, \
+               do_phits = -1, do_mhits = -1, do_l2hits = -1, do_list_hits = -1;
+
+    if(unlikely(do_arc_size == -1))
+        do_arc_size = do_l2_size = do_reads = do_l2bytes = do_ahits = do_dhits = do_phits = do_mhits \
+        = do_l2hits = do_list_hits = show_zero_charts;
 
     // ARC reads
     unsigned long long aread = arcstats.hits + arcstats.misses;
@@ -31,7 +37,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(do_arc_size == CONFIG_BOOLEAN_YES || arcstats.size || arcstats.c || arcstats.c_min || arcstats.c_max) {
+        do_arc_size = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_arc_size = NULL;
         static RRDDIM *rd_arc_size = NULL;
         static RRDDIM *rd_arc_target_size = NULL;
@@ -71,7 +79,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist)) {
+    if(likely(arcstats.l2exist) && (do_l2_size == CONFIG_BOOLEAN_YES || arcstats.l2_size || arcstats.l2_asize)) {
+        do_l2_size = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_l2_size = NULL;
         static RRDDIM *rd_l2_size = NULL;
         static RRDDIM *rd_l2_asize = NULL;
@@ -105,7 +115,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_reads == CONFIG_BOOLEAN_YES || aread || dread || pread || mread || l2read)) {
+        do_reads = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_reads = NULL;
         static RRDDIM *rd_aread = NULL;
         static RRDDIM *rd_dread = NULL;
@@ -153,7 +165,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist)) {
+    if(likely(arcstats.l2exist && (do_l2bytes == CONFIG_BOOLEAN_YES || arcstats.l2_read_bytes || arcstats.l2_write_bytes))) {
+        do_l2bytes = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_l2bytes = NULL;
         static RRDDIM *rd_l2_read_bytes = NULL;
         static RRDDIM *rd_l2_write_bytes = NULL;
@@ -187,7 +201,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_ahits == CONFIG_BOOLEAN_YES || arcstats.hits || arcstats.misses)) {
+        do_ahits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_ahits = NULL;
         static RRDDIM *rd_ahits = NULL;
         static RRDDIM *rd_amisses = NULL;
@@ -221,7 +237,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_dhits == CONFIG_BOOLEAN_YES || dhit || dmiss)) {
+        do_dhits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_dhits = NULL;
         static RRDDIM *rd_dhits = NULL;
         static RRDDIM *rd_dmisses = NULL;
@@ -255,7 +273,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_phits == CONFIG_BOOLEAN_YES || phit || pmiss)) {
+        do_phits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_phits = NULL;
         static RRDDIM *rd_phits = NULL;
         static RRDDIM *rd_pmisses = NULL;
@@ -289,7 +309,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_mhits == CONFIG_BOOLEAN_YES || mhit || mmiss)) {
+        do_mhits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_mhits = NULL;
         static RRDDIM *rd_mhits = NULL;
         static RRDDIM *rd_mmisses = NULL;
@@ -323,7 +345,9 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    if(likely(arcstats.l2exist)) {
+    if(likely(arcstats.l2exist && (do_l2hits == CONFIG_BOOLEAN_YES || l2hit || l2miss))) {
+        do_l2hits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_l2hits = NULL;
         static RRDDIM *rd_l2hits = NULL;
         static RRDDIM *rd_l2misses = NULL;
@@ -357,7 +381,12 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_list_hits == CONFIG_BOOLEAN_YES || arcstats.mfu_hits \
+                                                 || arcstats.mru_hits \
+                                                 || arcstats.mfu_ghost_hits \
+                                                 || arcstats.mru_ghost_hits)) {
+        do_list_hits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_list_hits = NULL;
         static RRDDIM *rd_mfu = NULL;
         static RRDDIM *rd_mru = NULL;
@@ -396,7 +425,14 @@ void generate_charts_arcstats(const char *plugin, const char *module, int update
     }
 }
 
-void generate_charts_arc_summary(const char *plugin, const char *module, int update_every) {
+void generate_charts_arc_summary(const char *plugin, const char *module, int show_zero_charts, int update_every) {
+    static int do_arc_size_breakdown = -1, do_memory = -1, do_important_ops = -1, do_actual_hits = -1, \
+               do_demand_data_hits = -1, do_prefetch_data_hits = -1, do_hash_elements = -1, do_hash_chains = -1;
+
+    if(unlikely(do_arc_size_breakdown == -1))
+        do_arc_size_breakdown = do_memory = do_important_ops = do_actual_hits = do_demand_data_hits \
+        = do_prefetch_data_hits = do_hash_elements = do_hash_chains = show_zero_charts;
+
     unsigned long long arc_accesses_total = arcstats.hits + arcstats.misses;
     unsigned long long real_hits = arcstats.mfu_hits + arcstats.mru_hits;
     unsigned long long real_misses = arc_accesses_total - real_hits;
@@ -418,7 +454,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_arc_size_breakdown == CONFIG_BOOLEAN_YES || mru_size || mfu_size)) {
+        do_arc_size_breakdown = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_arc_size_breakdown = NULL;
         static RRDDIM *rd_most_recent = NULL;
         static RRDDIM *rd_most_frequent = NULL;
@@ -452,7 +490,11 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_memory == CONFIG_BOOLEAN_YES || arcstats.memory_direct_count \
+                                              || arcstats.memory_throttle_count \
+                                              || arcstats.memory_indirect_count)) {
+        do_memory = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_memory = NULL;
 #ifndef __FreeBSD__
         static RRDDIM *rd_direct = NULL;
@@ -501,7 +543,12 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_important_ops == CONFIG_BOOLEAN_YES || arcstats.deleted \
+                                                     || arcstats.evict_skip \
+                                                     || arcstats.mutex_miss \
+                                                     || arcstats.hash_collisions)) {
+        do_important_ops = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_important_ops = NULL;
         static RRDDIM *rd_deleted = NULL;
         static RRDDIM *rd_mutex_misses = NULL;
@@ -541,7 +588,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_actual_hits == CONFIG_BOOLEAN_YES || real_hits || real_misses)) {
+        do_actual_hits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_actual_hits = NULL;
         static RRDDIM *rd_actual_hits = NULL;
         static RRDDIM *rd_actual_misses = NULL;
@@ -575,7 +624,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_demand_data_hits == CONFIG_BOOLEAN_YES || arcstats.demand_data_hits || arcstats.demand_data_misses)) {
+        do_demand_data_hits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_demand_data_hits = NULL;
         static RRDDIM *rd_demand_data_hits = NULL;
         static RRDDIM *rd_demand_data_misses = NULL;
@@ -609,7 +660,10 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_prefetch_data_hits == CONFIG_BOOLEAN_YES || arcstats.prefetch_data_hits \
+                                                          || arcstats.prefetch_data_misses)) {
+        do_prefetch_data_hits = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_prefetch_data_hits = NULL;
         static RRDDIM *rd_prefetch_data_hits = NULL;
         static RRDDIM *rd_prefetch_data_misses = NULL;
@@ -643,7 +697,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_hash_elements == CONFIG_BOOLEAN_YES || arcstats.hash_elements || arcstats.hash_elements_max)) {
+        do_hash_elements = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_hash_elements = NULL;
         static RRDDIM *rd_hash_elements_current = NULL;
         static RRDDIM *rd_hash_elements_max = NULL;
@@ -677,7 +733,9 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
 
     // --------------------------------------------------------------------
 
-    {
+    if(likely(do_hash_chains == CONFIG_BOOLEAN_YES || arcstats.hash_chains || arcstats.hash_chain_max)) {
+        do_hash_chains = CONFIG_BOOLEAN_YES;
+
         static RRDSET *st_hash_chains = NULL;
         static RRDDIM *rd_hash_chains_current = NULL;
         static RRDDIM *rd_hash_chains_max = NULL;
