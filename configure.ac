@@ -444,7 +444,7 @@ AS_IF([test "x$with_cups_config" != "xsystem"], [
 ], [
 	AC_PATH_TOOL(CUPSCONFIG, [cups-config])
 	AS_IF([test -z "$CUPSCONFIG"], [
-		AC_MSG_ERROR([Required cups-config is missing. Please install CUPS developer packages.])
+		have_cups=no
 	])
 ])
 
