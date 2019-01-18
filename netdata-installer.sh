@@ -40,6 +40,18 @@ else
 	source "${netdata_source_dir}/packaging/installer/functions.sh" || exit 1
 fi
 
+download() {
+	url="${1}"
+	dest="${2}"
+	if command -v wget >/dev/null 2>&1; then
+		run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v curl >/dev/null 2>&1; then
+		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	else
+		fatal "I need curl or wget to proceed, but neither is available on this system."
+	fi
+}
+
 # make sure we save all commands we run
 run_logfile="netdata-installer.log"
 
@@ -791,8 +803,8 @@ install_go() {
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
 		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
-		run wget "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" -O "${tmp}/$GO_PACKAGE_BASENAME"
-		run wget "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" -O "${tmp}/config.tar.gz"
+		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
 		grep "${GO_PACKAGE_BASENAME}" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
@@ -806,8 +818,10 @@ install_go() {
 		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
 		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
+		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
 		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 	fi
 	return 0
