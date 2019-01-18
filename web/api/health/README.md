@@ -61,7 +61,7 @@ The API is available by default, but it is protected by an `api authorization to
 You can access the API via GET requests, by adding the bearer token to an `Authorization` http header, like this: 
 
 ```
-curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken" 
 ```
 
 The command `RESET` just returns netdata to the default operation, with all health checks and notifications enabled. 
@@ -71,13 +71,13 @@ If you've configured and entered your token correclty, you should see the plain 
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 ```
-curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken" 
 ```
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
 ```
-curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken" 
 ```
 
 Alarms may then still be raised and logged in netdata, so you'll be able to see them via the UI.  
@@ -85,7 +85,7 @@ Alarms may then still be raised and logged in netdata, so you'll be able to see 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
 ```
- curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "Authorization: Bearer Mytoken" 
+ curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken" 
 ```
 
 ### Disable or silence specific alarms
@@ -108,7 +108,7 @@ To clear all selectors and reset the mode to default, use the `RESET` command.
 The following example silences notifications for all the alarms with context=load: 
 
 ```
-curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "Authorization: Bearer Mytoken" 
+curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-Token: Mytoken" 
 ```
 
 #### Selection criteria 
