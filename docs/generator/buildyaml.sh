@@ -173,6 +173,8 @@ navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
 navpart 2 collectors/plugins.d "" "External plugins"
+echo -ne "        - go.d modules: 'https://github.com/netdata/go.d.plugin#godplugin'
+"
 navpart 3 collectors/python.d.plugin "" "Python modules" 3
 navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
 echo -ne "        - BASH modules:
@@ -229,7 +231,7 @@ echo -ne "- Hacking netdata:
     - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
-navpart 2 makeself "" "" 4
+navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests "" "" 2
