@@ -778,13 +778,10 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
         w->user_agent = strdupz(v);
     } else if(hash == hash_authorization&& !strcasecmp(s, "Authorization")) {
-        if (strlen(v) > 8) { // Must contain at least "Bearer "
-            char *auth_key=v+6;
-            *auth_key='\0';
-            if (!strcasecmp(v,"Bearer")) {
-                auth_key++;
-                w->auth_bearer_token=strdupz(auth_key);
-            }
+        char *auth_type = strstr(v, "Bearer");
+        if(auth_type) {
+            auth_type += 7;
+            w->auth_bearer_token = strdupz(auth_type);
         }
     }
 #ifdef NETDATA_WITH_ZLIB
