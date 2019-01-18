@@ -1,5 +1,17 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
+- Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
+
+**Merged pull requests:**
+
+- add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
+- Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
+
 ## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
 
 **Fixed bugs:**
