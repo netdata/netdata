@@ -926,6 +926,7 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 				rm -f "${crondir}/netdata-updater.sh"
 			fi
 			progress "Installing new netdata-updater in cron"
+			rm -f "${crondir}/netdata-updater"
 			if [ -f "${installer_dir}/packaging/installer/netdata-updater.sh" ]; then
 				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
 			else
