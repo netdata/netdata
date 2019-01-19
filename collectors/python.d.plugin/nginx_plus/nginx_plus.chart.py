@@ -16,11 +16,7 @@ except ImportError:
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-update_every = 1
-priority = 60000
 
-# charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'requests_total',
     'requests_current',
@@ -75,7 +71,7 @@ CHARTS = {
         ]
     },
     'ssl_memory_usage': {
-        'options': [None, 'Memory Usage', '%', 'ssl', 'nginx_plus.ssl_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', 'percentage', 'ssl', 'nginx_plus.ssl_memory_usage', 'area'],
         'lines': [
             ['ssl_memory_usage', 'usage', 'absolute', 1, 100]
         ]
@@ -94,7 +90,7 @@ def cache_charts(cache):
     charts = OrderedDict()
 
     charts['{0}_traffic'.format(cache.name)] = {
-        'options': [None, 'Traffic', 'KB', family, 'nginx_plus.cache_traffic', 'stacked'],
+        'options': [None, 'Traffic', 'KiB', family, 'nginx_plus.cache_traffic', 'stacked'],
         'lines': [
             ['_'.join([cache.name, 'hit_bytes']), 'served', 'absolute', 1, 1024],
             ['_'.join([cache.name, 'miss_bytes_written']), 'written', 'absolute', 1, 1024],
@@ -102,7 +98,7 @@ def cache_charts(cache):
         ]
     }
     charts['{0}_memory_usage'.format(cache.name)] = {
-        'options': [None, 'Memory Usage', '%', family, 'nginx_plus.cache_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', 'percentage', family, 'nginx_plus.cache_memory_usage', 'area'],
         'lines': [
             ['_'.join([cache.name, 'memory_usage']), 'usage', 'absolute', 1, 100],
         ]
@@ -199,7 +195,8 @@ def web_upstream_charts(wu):
         'lines': dimensions('active')
     }
     charts['web_upstream_{name}_connections_usage'.format(name=wu.name)] = {
-        'options': [None, 'Peers Connections Usage', '%', family, 'nginx_plus.web_upstream_connections_usage', 'line'],
+        'options': [None, 'Peers Connections Usage', 'percentage', family,
+                    'nginx_plus.web_upstream_connections_usage', 'line'],
         'lines': dimensions('connections_usage', d=100)
     }
     # Traffic
@@ -222,7 +219,7 @@ def web_upstream_charts(wu):
     # Response Time
     for peer in wu:
         charts['web_upstream_{0}_{1}_timings'.format(wu.name, peer.server)] = {
-            'options': [None, 'Peer "{0}" Timings'.format(peer.real_server), 'ms', family,
+            'options': [None, 'Peer "{0}" Timings'.format(peer.real_server), 'milliseconds', family,
                         'nginx_plus.web_upstream_peer_timings', 'line'],
             'lines': [
                 ['_'.join([wu.name, peer.server, 'header_time']), 'header'],
@@ -231,7 +228,7 @@ def web_upstream_charts(wu):
         }
     # Memory Usage
     charts['web_upstream_{name}_memory_usage'.format(name=wu.name)] = {
-        'options': [None, 'Memory Usage', '%', family, 'nginx_plus.web_upstream_memory_usage', 'area'],
+        'options': [None, 'Memory Usage', 'percentage', family, 'nginx_plus.web_upstream_memory_usage', 'area'],
         'lines': [
             ['_'.join([wu.name, 'memory_usage']), 'usage', 'absolute', 1, 100]
         ]

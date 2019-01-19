@@ -9,6 +9,24 @@
 #define MAX_LISTEN_FDS 50
 #endif
 
+typedef enum web_client_acl {
+    WEB_CLIENT_ACL_NONE        = 0,
+    WEB_CLIENT_ACL_NOCHECK     = 0,
+    WEB_CLIENT_ACL_DASHBOARD   = 1 << 0,
+    WEB_CLIENT_ACL_REGISTRY    = 1 << 1,
+    WEB_CLIENT_ACL_BADGE       = 1 << 2,
+    WEB_CLIENT_ACL_MGMT        = 1 << 3,
+    WEB_CLIENT_ACL_STREAMING   = 1 << 4,
+    WEB_CLIENT_ACL_NETDATACONF = 1 << 5
+} WEB_CLIENT_ACL;
+
+#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
+#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY)
+#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE)
+#define web_client_can_access_mgmt(w) ((w)->acl & WEB_CLIENT_ACL_MGMT)
+#define web_client_can_access_stream(w) ((w)->acl & WEB_CLIENT_ACL_STREAMING)
+#define web_client_can_access_netdataconf(w) ((w)->acl & WEB_CLIENT_ACL_NETDATACONF)
+
 typedef struct listen_sockets {
     struct config *config;              // the config file to use
     const char *config_section;         // the netdata configuration section to read settings from
@@ -22,6 +40,7 @@ typedef struct listen_sockets {
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
     int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets (SOCK_STREAM, SOCK_DGRAM)
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
+    WEB_CLIENT_ACL fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management)
 } LISTEN_SOCKETS;
 
 extern char *strdup_client_description(int family, const char *protocol, const char *ip, uint16_t port);
@@ -73,6 +92,7 @@ typedef struct pollinfo {
 
     int fd;                 // the file descriptor
     int socktype;           // the client socket type
+    WEB_CLIENT_ACL port_acl; // the access lists permitted on this web server port (it's -1 for client sockets)
     char *client_ip;        // the connected client IP
     char *client_port;      // the connected client port
 
@@ -138,6 +158,7 @@ extern void *poll_default_add_callback(POLLINFO *pi, short int *events, void *da
 extern POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
+                             , WEB_CLIENT_ACL port_acl
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port

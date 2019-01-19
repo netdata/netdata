@@ -5,10 +5,9 @@
 - GITHUB_TOKEN - GitHub token with push access to repository
 - DOCKER_USERNAME - Username (netdatabot) with write access to docker hub repository
 - DOCKER_PASSWORD - Password to docker hub
-- encrypted_decb6f6387c4_key - Something to do with package releasing (soon to be deprecated)
-- encrypted_decb6f6387c4_iv - Something to do with package releasing (soon to be deprecated)
-- OLD_DOCKER_USERNAME - Username used to push images to firehol/netdata # TODO: remove after deprecating that repo
-- OLD_DOCKER_PASSWORD - Password used to push images to firehol/netdata # TODO: remove after deprecating that repo
+- encrypted_8daf19481253_key - key needed by openssl to decrypt GCS credentials file
+- encrypted_8daf19481253_iv - IV needed by openssl to decrypt GCS credentials file
+- COVERITY_SCAN_TOKEN - Token to allow coverity test analysis uploads
 
 ## Stages
 
@@ -16,6 +15,7 @@
 
 Unit tests and coverage tests are executed here. Stage consists of 2 parallel jobs:
   - C tests - executed every time
+  - dashboard.js - test if source files create the same file as it is in current repo
   - coverity test - executed only when pipeline was triggered from cron
 
 ### Build
@@ -38,12 +38,14 @@ This stage is executed only on "master" brach and allows us to create a new tag 
 It executes one script called `releaser.sh` which is responsible for creating a release on GitHub by using
 [hub](https://github.com/github/hub). This script is also executing other scripts which can also be used in other
 CI jobs:
-  - `tagger.sh`
-  - `generate_changelog.sh`
-  - `build.sh`
-  - `create_artifacts.sh`
+  - `.travis/tagger.sh`
+  - `.travis/generate_changelog.sh`
+  - `packaging/docker/build.sh`
+  - `.travis/create_artifacts.sh`
 
 Alternatively new release can be also created by pushing new tag to master branch.
+Additionally this step is also executing `.travis/labeler.sh` which is a temporary workaround to automatically label 
+issues and PR. This script should be replaced with GitHub Actions when they are available to public.
 
 ##### tagger.sh
 
@@ -80,12 +82,10 @@ This is achieved by running 2 scripts described earlier:
   - `create_artifacts.sh`
   - `build.sh`
 
+Artifacts are pushed to GCS and container images are stored in docker hub.
+
 ##### Changelog generation
 
 This job is responsible for regenerating changelog every day by executing `generate_changelog.sh` script. This is done
 only once a day due to github rate limiter.
 
-##### Labeler
-
-Once a day we are doing automatic label assignment by executing `labeler.sh`. This script is a temporary workaround until
-we start using GitHub Actions. For more information what it is currently doing go to its code.

@@ -25,7 +25,9 @@ from bases.collection import read_last_line
 from bases.FrameworkServices.LogService import LogService
 
 
-ORDER_APACHE_CACHE = ['apache_cache']
+ORDER_APACHE_CACHE = [
+    'apache_cache',
+]
 
 ORDER_WEB = [
     'response_statuses',
@@ -182,7 +184,7 @@ CHARTS_WEB = {
 
 CHARTS_APACHE_CACHE = {
     'apache_cache': {
-        'options': [None, 'Apache Cached Responses', 'percent cached', 'cached', 'web_log.apache_cache_cache',
+        'options': [None, 'Apache Cached Responses', 'percentage', 'cached', 'web_log.apache_cache_cache',
                     'stacked'],
         'lines': [
             ['hit', 'cache', 'percentage-of-absolute-row'],

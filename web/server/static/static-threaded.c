@@ -3,10 +3,14 @@
 #define WEB_SERVER_INTERNALS 1
 #include "static-threaded.h"
 
+int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
+long web_client_streaming_rate_t = 0L;
+
 // ----------------------------------------------------------------------------
 // high level web clients connection management
 
-static struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
+static struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port, int port_acl) {
     struct web_client *w;
 
     w = web_client_get_from_cache_or_allocate();
@@ -17,6 +21,7 @@ static struct web_client *web_client_create_on_fd(int fd, const char *client_ip,
 
     if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
     if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+	w->port_acl = port_acl;
 
     web_client_initialize_connection(w);
     return(w);
@@ -44,6 +49,7 @@ struct web_server_static_threaded_worker {
 };
 
 static long long static_threaded_workers_count = 1;
+
 static struct web_server_static_threaded_worker *static_workers_private_data = NULL;
 static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
@@ -143,7 +149,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     *events = POLLIN;
 
     debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
-    struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port);
+    struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port, pi->port_acl);
     w->pollinfo_slot = pi->slot;
 
     if(unlikely(pi->socktype == AF_UNIX))
@@ -200,6 +206,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                 POLLINFO *fpi = poll_add_fd(
                         pi->p
                         , w->ifd
+                        , pi->port_acl
                         , 0
                         , POLLINFO_FLAG_CLIENT_SOCKET
                         , "FILENAME"
@@ -394,7 +401,13 @@ void *socket_listen_main_static_threaded(void *ptr) {
             // so, if the machine has more CPUs, avoid using resources unnecessarily
             int def_thread_count = (processors > 6)?6:processors;
 
+            if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
+                info("Running web server with one thread, because mode is single-threaded");
+                config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
+                def_thread_count = 1;
+            }
             static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
+
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
             size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 2));

@@ -137,7 +137,7 @@ static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *t
 
     RRDVAR *rv = rrdvar_create_and_index(scope, tree_lock, name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_ALLOCATED, v);
     if(unlikely(!rv)) {
-        free(v);
+        freez(v);
         debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
 
         char *variable = strdupz(name);

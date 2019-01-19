@@ -382,7 +382,7 @@ void global_statistics_charts(void) {
                     , "netdata"
                     , NULL
                     , "NetData API Response Time"
-                    , "ms/request"
+                    , "milliseconds/request"
                     , "netdata"
                     , "stats"
                     , 130400

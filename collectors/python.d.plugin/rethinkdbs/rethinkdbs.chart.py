@@ -136,13 +136,11 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = cluster_charts()
-
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 28015)
         self.user = self.configuration.get('user', 'admin')
         self.password = self.configuration.get('password')
         self.timeout = self.configuration.get('timeout', 2)
-
         self.conn = None
         self.alive = True
 

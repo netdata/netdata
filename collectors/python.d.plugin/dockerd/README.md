@@ -3,7 +3,7 @@
 Module monitor docker health metrics.
 
 **Requirement:**
-* `docker` package
+* `docker` package, required version 3.2.0+
 
 Following charts are drawn:
 

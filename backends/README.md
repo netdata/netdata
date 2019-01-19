@@ -36,22 +36,25 @@ X seconds (though, it can send them per second if you need it to).
 
 3. Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
 
-4. Three modes of operation (for all backends):
+4. Netdata supports three modes of operation for all backends:
 
-   - `as collected`: the latest collected value is sent to the backend. This means that if netdata
-     is configured to send data to the backend every 10 seconds, only 1 out of 10 values will appear
-     at the backend server. The values are sent exactly as collected, before any multipliers or
-     dividers applied and before any interpolation. This mode emulates other data collectors,
-     such as `collectd` or `telegraf`.
+   - `as-collected` sends to backends the metrics as they are collected, in the units they are collected. 
+   So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do. 
+   For example, to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
 
-   - `average`: the average of the interpolated values shown on the netdata graphs is sent to the
-     backend. So, if netdata is configured to send data to the backend server every 10 seconds,
-     the average of the 10 values shown on the netdata charts will be used. **If you can't decide
-      which mode to use, use `average`.**
+   - `average` sends to backends normalized metrics from the netdata database. 
+   In this mode, all metrics are sent as gauges, in the units netdata uses. This abstracts data collection 
+   and simplifies visualization, but you will not be able to copy and paste queries from other sources to convert units. 
+   For example, CPU utilization percentage is calculated by netdata, so netdata will convert ticks to percentage and 
+   send the average percentage to the backend.
 
-   - `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to
-     the backend. So, if netdata is configured to send data to the backend every 10 seconds, the
-     sum of the 10 values shown on the netdata charts will be used.
+   - `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to the backend. 
+   So, if netdata is configured to send data to the backend every 10 seconds, the sum of the 10 values shown on the 
+   netdata charts will be used.
+
+Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your monitoring around a time-series database and you already know (or you will invest in learning) how to convert units and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
+
+If, on the other hand, you just need long term archiving of netdata metrics and you plan to mainly work with netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in Netdata, which is not necessarily true for the other modes of operation.
 
 5. This code is smart enough, not to slow down netdata, independently of the speed of the backend server.
 

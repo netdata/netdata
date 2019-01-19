@@ -12,7 +12,9 @@ from copy import deepcopy
 from bases.FrameworkServices.SocketService import SocketService
 
 
-ORDER = ['temperatures']
+ORDER = [
+    'temperatures',
+]
 
 CHARTS = {
     'temperatures': {
@@ -39,11 +41,11 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
+        self.do_only = self.configuration.get('devices')
         self._keep_alive = False
         self.request = ""
         self.host = "127.0.0.1"
         self.port = 7634
-        self.do_only = self.configuration.get('devices')
 
     def get_disks(self):
         r = self._get_raw_data()
@@ -89,8 +91,7 @@ class Service(SocketService):
             return False
 
         for d in disks:
-            n = d.id if d.id.startswith('sd') else d.name
-            dim = [d.id, n]
+            dim = [d.id]
             self.definitions['temperatures']['lines'].append(dim)
 
         return True

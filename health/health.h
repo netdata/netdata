@@ -22,8 +22,73 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
 #define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
 #define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
+#define HEALTH_ENTRY_FLAG_SILENCED              0x00000008
+
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
+
+#ifndef HEALTH_LISTEN_PORT
+#define HEALTH_LISTEN_PORT 19998
+#endif
+
+#ifndef HEALTH_LISTEN_BACKLOG
+#define HEALTH_LISTEN_BACKLOG 4096
+#endif
+
+#define HEALTH_ALARM_KEY "alarm"
+#define HEALTH_TEMPLATE_KEY "template"
+#define HEALTH_ON_KEY "on"
+#define HEALTH_CONTEXT_KEY "context"
+#define HEALTH_CHART_KEY "chart"
+#define HEALTH_HOST_KEY "hosts"
+#define HEALTH_OS_KEY "os"
+#define HEALTH_FAMILIES_KEY "families"
+#define HEALTH_LOOKUP_KEY "lookup"
+#define HEALTH_CALC_KEY "calc"
+#define HEALTH_EVERY_KEY "every"
+#define HEALTH_GREEN_KEY "green"
+#define HEALTH_RED_KEY "red"
+#define HEALTH_WARN_KEY "warn"
+#define HEALTH_CRIT_KEY "crit"
+#define HEALTH_EXEC_KEY "exec"
+#define HEALTH_RECIPIENT_KEY "to"
+#define HEALTH_UNITS_KEY "units"
+#define HEALTH_INFO_KEY "info"
+#define HEALTH_DELAY_KEY "delay"
+#define HEALTH_OPTIONS_KEY "options"
+
+typedef struct silencer {
+    char *alarms;
+    SIMPLE_PATTERN *alarms_pattern;
+
+    char *hosts;
+    SIMPLE_PATTERN *hosts_pattern;
+
+    char *contexts;
+    SIMPLE_PATTERN *contexts_pattern;
+
+    char *charts;
+    SIMPLE_PATTERN *charts_pattern;
+
+    char *families;
+    SIMPLE_PATTERN *families_pattern;
+
+    struct silencer *next;
+} SILENCER;
+
+typedef enum silence_type {
+    STYPE_NONE,
+    STYPE_DISABLE_ALARMS,
+    STYPE_SILENCE_NOTIFICATIONS
+} SILENCE_TYPE;
+
+typedef struct silencers {
+    int all_alarms;
+    SILENCE_TYPE stype;
+    SILENCER *silencers;
+} SILENCERS;
+
+SILENCERS *silencers;
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
@@ -62,8 +127,7 @@ extern void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
-);
+        uint32_t flags);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);
@@ -72,5 +136,7 @@ extern void health_reload_host(RRDHOST *host);
 extern void health_alarm_log_free(RRDHOST *host);
 
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
+
+extern void *health_cmdapi_thread(void *ptr);
 
 #endif //NETDATA_HEALTH_H

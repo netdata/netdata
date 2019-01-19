@@ -3,12 +3,6 @@
 #define WEB_SERVER_INTERNALS 1
 #include "web_server.h"
 
-// this file includes 3 web servers:
-//
-// 1. single-threaded, based on select()
-// 2. multi-threaded, based on poll() that spawns threads to handle the requests, based on select()
-// 3. static-threaded, based on poll() using a fixed number of threads (configured at netdata.conf)
-
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
 // --------------------------------------------------------------------------------------
@@ -16,28 +10,18 @@ WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 WEB_SERVER_MODE web_server_mode_id(const char *mode) {
     if(!strcmp(mode, "none"))
         return WEB_SERVER_MODE_NONE;
-    else if(!strcmp(mode, "single") || !strcmp(mode, "single-threaded"))
-        return WEB_SERVER_MODE_SINGLE_THREADED;
-    else if(!strcmp(mode, "static") || !strcmp(mode, "static-threaded"))
+    else
         return WEB_SERVER_MODE_STATIC_THREADED;
-    else // if(!strcmp(mode, "multi") || !strcmp(mode, "multi-threaded"))
-        return WEB_SERVER_MODE_MULTI_THREADED;
+
 }
 
 const char *web_server_mode_name(WEB_SERVER_MODE id) {
     switch(id) {
         case WEB_SERVER_MODE_NONE:
             return "none";
-
-        case WEB_SERVER_MODE_SINGLE_THREADED:
-            return "single-threaded";
-
+        default:
         case WEB_SERVER_MODE_STATIC_THREADED:
             return "static-threaded";
-
-        default:
-        case WEB_SERVER_MODE_MULTI_THREADED:
-            return "multi-threaded";
     }
 }
 
@@ -45,20 +29,44 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 // API sockets
 
 LISTEN_SOCKETS api_sockets = {
-        .config          = &netdata_config,
-        .config_section  = CONFIG_SECTION_WEB,
-        .default_bind_to = "*",
-        .default_port    = API_LISTEN_PORT,
-        .backlog         = API_LISTEN_BACKLOG
+		.config          = &netdata_config,
+		.config_section  = CONFIG_SECTION_WEB,
+		.default_bind_to = "*",
+		.default_port    = API_LISTEN_PORT,
+		.backlog         = API_LISTEN_BACKLOG
 };
 
-int api_listen_sockets_setup(void) {
-    int socks = listen_sockets_setup(&api_sockets);
+void debug_sockets() {
+	BUFFER *wb = buffer_create(256 * sizeof(char));
+	int i;
 
-    if(!socks)
-        fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+	for(i = 0 ; i < (int)api_sockets.opened ; i++) {
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NOCHECK)?"NONE ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_DASHBOARD)?"dashboard ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_REGISTRY)?"registry ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_BADGE)?"badges ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_MGMT)?"management ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_STREAMING)?"streaming ":"");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & WEB_CLIENT_ACL_NETDATACONF)?"netdata.conf ":"");
+		debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
+			  i,
+			  api_sockets.fds_names[i],
+			  buffer_tostring(wb));
+		buffer_reset(wb);
+	}
+	buffer_free(wb);
+}
 
-    return socks;
+void api_listen_sockets_setup(void) {
+	int socks = listen_sockets_setup(&api_sockets);
+
+	if(!socks)
+		fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+
+	if(unlikely(debug_flags & D_WEB_CLIENT))
+		debug_sockets();
+
+	return;
 }
 
 
@@ -66,13 +74,14 @@ int api_listen_sockets_setup(void) {
 // access lists
 
 SIMPLE_PATTERN *web_allow_connections_from = NULL;
-SIMPLE_PATTERN *web_allow_streaming_from = NULL;
-SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 
 // WEB_CLIENT_ACL
 SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
 SIMPLE_PATTERN *web_allow_registry_from = NULL;
 SIMPLE_PATTERN *web_allow_badges_from = NULL;
+SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
+SIMPLE_PATTERN *web_allow_streaming_from = NULL;
+SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 
 void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
@@ -85,6 +94,17 @@ void web_client_update_acl_matches(struct web_client *w) {
 
     if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
         w->acl |= WEB_CLIENT_ACL_BADGE;
+
+    if(!web_allow_mgmt_from || simple_pattern_matches(web_allow_mgmt_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_MGMT;
+
+    if(!web_allow_streaming_from || simple_pattern_matches(web_allow_streaming_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_STREAMING;
+
+    if(!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_NETDATACONF;
+
+    w->acl &= w->port_acl;
 }
 
 
@@ -119,28 +139,4 @@ void web_client_initialize_connection(struct web_client *w) {
     web_client_cache_verify(0);
 }
 
-struct web_client *web_client_create_on_listenfd(int listener) {
-    struct web_client *w;
-
-    w = web_client_get_from_cache_or_allocate();
-    w->ifd = w->ofd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
-
-    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
-    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
-
-    if (w->ifd == -1) {
-        if(errno == EPERM)
-            web_server_log_connection(w, "ACCESS DENIED");
-        else {
-            web_server_log_connection(w, "CONNECTION FAILED");
-            error("%llu: Failed to accept new incoming connection.", w->id);
-        }
-
-        web_client_release(w);
-        return NULL;
-    }
-
-    web_client_initialize_connection(w);
-    return(w);
-}
 

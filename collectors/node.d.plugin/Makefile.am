@@ -23,12 +23,11 @@ dist_noinst_DATA = \
 
 usernodeconfigdir=$(configdir)/node.d
 dist_usernodeconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
+    .keep \
     $(NULL)
 
 nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
     $(NULL)
 
 dist_node_DATA = \

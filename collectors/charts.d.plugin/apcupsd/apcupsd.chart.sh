@@ -97,6 +97,9 @@ DIMENSION temp temp absolute 1 100
 CHART apcupsd_${host}.time '' "UPS Time Remaining for ${host} on ${src}" "Minutes" ups apcupsd.time area $((apcupsd_priority + 2)) $apcupsd_update_every
 DIMENSION time time absolute 1 100
 
+CHART apcupsd_${host}.online '' "UPS ONLINE flag for ${host} on ${src}" "boolean" ups apcupsd.online line $((apcupsd_priority + 8)) $apcupsd_update_every
+DIMENSION online online absolute 0 1
+
 EOF
 	done
 	return 0
@@ -122,60 +125,67 @@ BEGIN {
 	input_voltage_min = 0;
 	input_voltage_max = 0;
 	input_frequency = 0;
-        output_voltage = 0;
+	output_voltage = 0;
  	output_voltage_nominal = 0;
 	load = 0;
 	temp = 0;
 	time = 0;
 }
-/^BCHARGE.*/		{ battery_charge = \$3 * 100 };
-/^BATTV.*/		{ battery_voltage = \$3 * 100 };
-/^NOMBATTV.*/		{ battery_voltage_nominal = \$3 * 100 };
-/^LINEV.*/		{ input_voltage = \$3 * 100 };
-/^MINLINEV.*/		{ input_voltage_min = \$3 * 100 };
-/^MAXLINEV.*/		{ input_voltage_max = \$3 * 100 };
-/^LINEFREQ.*/		{ input_frequency = \$3 * 100 };
-/^OUTPUTV.*/		{ output_voltage = \$3 * 100 };
-/^NOMOUTV.*/		{ output_voltage_nominal = \$3 * 100 };
-/^LOADPCT.*/		{ load = \$3 * 100 };
-/^ITEMP.*/		{ temp = \$3 * 100 };
-/^TIMELEFT.*/		{ time = \$3 * 100 };
+/^BCHARGE.*/   { battery_charge = \$3 * 100 };
+/^BATTV.*/     { battery_voltage = \$3 * 100 };
+/^NOMBATTV.*/  { battery_voltage_nominal = \$3 * 100 };
+/^LINEV.*/     { input_voltage = \$3 * 100 };
+/^MINLINEV.*/  { input_voltage_min = \$3 * 100 };
+/^MAXLINEV.*/  { input_voltage_max = \$3 * 100 };
+/^LINEFREQ.*/  { input_frequency = \$3 * 100 };
+/^OUTPUTV.*/   { output_voltage = \$3 * 100 };
+/^NOMOUTV.*/   { output_voltage_nominal = \$3 * 100 };
+/^LOADPCT.*/   { load = \$3 * 100 };
+/^ITEMP.*/     { temp = \$3 * 100 };
+/^TIMELEFT.*/  { time = \$3 * 100 };
+/^STATUS.*/    { online=(\$3 == \"ONLINE\")?1:0 };
 END {
-	print \"BEGIN apcupsd_${host}.charge $1\";
-	print \"SET battery_charge = \" battery_charge;
+	print \"BEGIN apcupsd_${host}.online $1\";
+	print \"SET online = \" online;
 	print \"END\"
 
-	print \"BEGIN apcupsd_${host}.battery_voltage $1\";
-	print \"SET battery_voltage = \" battery_voltage;
-	print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
-	print \"END\"
+	if (online == 1) {
+		print \"BEGIN apcupsd_${host}.charge $1\";
+		print \"SET battery_charge = \" battery_charge;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.input_voltage $1\";
-	print \"SET input_voltage = \" input_voltage;
-	print \"SET input_voltage_min = \" input_voltage_min;
-	print \"SET input_voltage_max = \" input_voltage_max;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.battery_voltage $1\";
+		print \"SET battery_voltage = \" battery_voltage;
+		print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.input_frequency $1\";
-	print \"SET input_frequency = \" input_frequency;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.input_voltage $1\";
+		print \"SET input_voltage = \" input_voltage;
+		print \"SET input_voltage_min = \" input_voltage_min;
+		print \"SET input_voltage_max = \" input_voltage_max;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.output_voltage $1\";
-	print \"SET output_voltage = \" output_voltage;
-        print \"SET output_voltage_nominal = \" output_voltage_nominal;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.input_frequency $1\";
+		print \"SET input_frequency = \" input_frequency;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.load $1\";
-	print \"SET load = \" load;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.output_voltage $1\";
+		print \"SET output_voltage = \" output_voltage;
+		print \"SET output_voltage_nominal = \" output_voltage_nominal;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.temp $1\";
-	print \"SET temp = \" temp;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.load $1\";
+		print \"SET load = \" load;
+		print \"END\"
 
-	print \"BEGIN apcupsd_${host}.time $1\";
-	print \"SET time = \" time;
-	print \"END\"
+		print \"BEGIN apcupsd_${host}.temp $1\";
+		print \"SET temp = \" temp;
+		print \"END\"
+
+		print \"BEGIN apcupsd_${host}.time $1\";
+		print \"SET time = \" time;
+		print \"END\"
+	}
 }"
 		# shellcheck disable=SC2181
 		if [ $? -ne 0 ]; then

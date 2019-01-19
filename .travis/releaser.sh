@@ -41,21 +41,34 @@ echo "---- FIGURING OUT TAGS ----"
 # tagger.sh is sourced since we need environment variables it sets
 #shellcheck source=/dev/null
 source .travis/tagger.sh || exit 0
+# variable GIT_TAG is produced by tagger.sh script
 
-echo "---- GENERATING CHANGELOG -----"
+echo "---- UPDATE VERSION FILE ----"
+echo "$GIT_TAG" >packaging/version
+git add packaging/version
+
+echo "---- GENERATE CHANGELOG -----"
 ./.travis/generate_changelog.sh
+git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
 git commit -m "[ci skip] release $GIT_TAG"
 git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
+# After those operations output of command `git describe` should be identical with a value of GIT_TAG
+
+if [[ $(git describe) =~ -rc* ]]; then
+	echo "This is a release candidate tag, exiting without artifact building"
+	exit 0
+fi
 
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
 ./packaging/docker/build.sh
 
 echo "---- CREATING RELEASE ARTIFACTS -----"
+# Artifacts are stored in `artifacts/` directory
 ./.travis/create_artifacts.sh
 
 echo "---- CREATING RELEASE DRAFT WITH ASSETS -----"
@@ -74,8 +87,8 @@ if [ "${GIT_TAG}" != "$(git tag --points-at)" ]; then
 	echo "ERROR! Current commit is not tagged. Stopping release creation."
 	exit 1
 fi
-if [ -z ${RC+x} ]; then
-	hub release create --prerelease --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
-else
-	hub release create --draft -a "netdata-${GIT_TAG}.tar.gz" -a "netdata-${GIT_TAG}.gz.run" -a "sha256sums.txt" -m "${GIT_TAG}" "${GIT_TAG}"
-fi
+hub release create --draft \
+		-a "artifacts/netdata-${GIT_TAG}.tar.gz" \
+		-a "artifacts/netdata-${GIT_TAG}.gz.run" \
+		-a "artifacts/sha256sums.txt" \
+		-m "${GIT_TAG}" "${GIT_TAG}"

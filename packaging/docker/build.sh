@@ -20,32 +20,41 @@ if [ "${VERSION}" == "" ]; then
     VERSION="latest"
 fi
 
-REPOSITORY="${REPOSITORY:-netdata}"
-
-echo "Building $VERSION of netdata container"
-
 declare -A ARCH_MAP
 ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
+if [ -z ${DEVEL+x} ]; then
+    declare -a ARCHITECTURES=(i386 armhf aarch64 amd64)
+else
+    declare -a ARCHITECTURES=(amd64)
+    unset DOCKER_PASSWORD
+    unset DOCKER_USERNAME
+fi
+
+REPOSITORY="${REPOSITORY:-netdata}"
+echo "Building ${VERSION} of ${REPOSITORY} container"
 
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 # Build images using multi-arch Dockerfile.
-for ARCH in i386 armhf aarch64 amd64; do
-     docker build --build-arg ARCH="${ARCH}-v3.8" \
-                  --tag "${REPOSITORY}:${VERSION}-${ARCH}" \
-                  --file packaging/docker/Dockerfile ./ &
+for ARCH in "${ARCHITECTURES[@]}"; do
+     eval docker build \
+     		--build-arg ARCH="${ARCH}-v3.8" \
+     		--build-arg OUTPUT=/dev/null \
+     		--tag "${REPOSITORY}:${VERSION}-${ARCH}" \
+     		--file packaging/docker/Dockerfile ./
 done
-wait
+
+# There is no reason to continue if we cannot log in to docker hub
+if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
+    echo "No docker hub username or password specified. Exiting without pushing images to registry"
+    exit 0
+fi
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 mkdir -p /tmp/docker
 echo '{"experimental":"enabled"}' > /tmp/docker/config.json
 
-# Login to docker hub to allow for futher operations
-if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
-    echo "No docker hub username or password specified. Exiting without pushing images to registry"
-    exit 1
-fi
+# Login to docker hub to allow futher operations
 echo "$DOCKER_PASSWORD" | docker --config /tmp/docker login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry

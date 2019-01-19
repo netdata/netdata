@@ -279,7 +279,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         , "swap"
                         , NULL
                         , "System Swap"
-                        , "MB"
+                        , "MiB"
                         , "macos"
                         , "sysctl"
                         , 201
@@ -965,7 +965,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
- 
+
     // --------------------------------------------------------------------
 
     if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {

@@ -2,6 +2,11 @@
 
 #set -e
 
+if [ ${RESCRAMBLE+x} ]; then
+    echo "Reinstalling all packages to get the latest Polymorphic Linux scramble"
+    apk upgrade --update-cache --available
+fi
+
 if [ ${PGID+x} ]; then
   echo "Adding user netdata to group with id ${PGID}"
   addgroup -g "${PGID}" -S hostgroup 2>/dev/null

@@ -26,6 +26,7 @@ class UrlService(SimpleService):
         self.method = self.configuration.get('method', 'GET')
         self.header = self.configuration.get('header')
         self.request_timeout = self.configuration.get('timeout', 1)
+        self.respect_retry_after_header = self.configuration.get('respect_retry_after_header')
         self.tls_verify = self.configuration.get('tls_verify')
         self.tls_ca_file = self.configuration.get('tls_ca_file')
         self.tls_key_file = self.configuration.get('tls_key_file')
@@ -111,12 +112,18 @@ class UrlService(SimpleService):
         """
         url = url or self.url
         manager = manager or self._manager
-        response = manager.request(method=self.method,
-                                   url=url,
-                                   timeout=self.request_timeout,
-                                   retries=retries,
-                                   headers=manager.headers,
-                                   redirect=redirect)
+        retry = urllib3.Retry(retries)
+        if hasattr(retry, 'respect_retry_after_header'):
+            retry.respect_retry_after_header = bool(self.respect_retry_after_header)
+
+        response = manager.request(
+            method=self.method,
+            url=url,
+            timeout=self.request_timeout,
+            retries=retry,
+            headers=manager.headers,
+            redirect=redirect,
+        )
         if isinstance(response.data, str):
             return response.status, response.data
         return response.status, response.data.decode()

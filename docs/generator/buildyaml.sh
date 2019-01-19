@@ -94,8 +94,6 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
- - pymdownx.emoji:
-    emoji_generator: !!python/name:pymdownx.emoji.to_svg
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -116,19 +114,24 @@ nav:'
 
 navpart 1 . README "About"
 
-echo -ne "    - 'docs/Why-Netdata.md'
-    - 'docs/Demo-Sites.md'
+echo -ne "    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/Donations-netdata-has-received.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
+- Why Netdata:
+    - 'docs/why-netdata/README.md'
+    - 'docs/why-netdata/1s-granularity.md'
+    - 'docs/why-netdata/unlimited-metrics.md'
+    - 'docs/why-netdata/meaningful-presentation.md'
+    - 'docs/why-netdata/immediate-results.md'
 - Installation:
-    - 'installer/README.md'
+    - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'
-    - 'installer/UPDATE.md'
-    - 'installer/UNINSTALL.md'
+    - 'packaging/installer/UPDATE.md'
+    - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
 - Running netdata:
     - 'daemon/README.md'
@@ -229,5 +232,5 @@ echo -ne "- Hacking netdata:
 navpart 2 makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
-navpart 2 tests
+navpart 2 tests "" "" 2
 navpart 2 diagrams/data_structures

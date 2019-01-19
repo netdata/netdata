@@ -16,7 +16,10 @@ update_every = 5
 
 PRECISION = 100
 
-ORDER = ['tps', 'users']
+ORDER = [
+    'tps',
+    'users',
+]
 
 CHARTS = {
     'tps': {

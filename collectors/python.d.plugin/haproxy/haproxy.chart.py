@@ -14,11 +14,6 @@ except ImportError:
 from bases.FrameworkServices.SocketService import SocketService
 from bases.FrameworkServices.UrlService import UrlService
 
-
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
-
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'fbin',
@@ -55,11 +50,11 @@ ORDER = [
 
 CHARTS = {
     'fbin': {
-        'options': [None, 'Kilobytes In', 'KB/s', 'frontend', 'haproxy_f.bin', 'line'],
+        'options': [None, 'Kilobytes In', 'KiB/s', 'frontend', 'haproxy_f.bin', 'line'],
         'lines': []
     },
     'fbout': {
-        'options': [None, 'Kilobytes Out', 'KB/s', 'frontend', 'haproxy_f.bout', 'line'],
+        'options': [None, 'Kilobytes Out', 'KiB/s', 'frontend', 'haproxy_f.bout', 'line'],
         'lines': []
     },
     'fscur': {
@@ -100,11 +95,11 @@ CHARTS = {
         'lines': []
     },
     'bbin': {
-        'options': [None, 'Kilobytes In', 'KB/s', 'backend', 'haproxy_b.bin', 'line'],
+        'options': [None, 'Kilobytes In', 'KiB/s', 'backend', 'haproxy_b.bin', 'line'],
         'lines': []
     },
     'bbout': {
-        'options': [None, 'Kilobytes Out', 'KB/s', 'backend', 'haproxy_b.bout', 'line'],
+        'options': [None, 'Kilobytes Out', 'KiB/s', 'backend', 'haproxy_b.bout', 'line'],
         'lines': []
     },
     'bscur': {
@@ -145,41 +140,39 @@ CHARTS = {
         'lines': []
     },
     'bqtime': {
-        'options': [None, 'The average queue time over the 1024 last requests', 'ms', 'backend',
+        'options': [None, 'The average queue time over the 1024 last requests', 'milliseconds', 'backend',
                     'haproxy_b.qtime', 'line'],
         'lines': []
     },
     'bctime': {
-        'options': [None, 'The average connect time over the 1024 last requests', 'ms', 'backend',
+        'options': [None, 'The average connect time over the 1024 last requests', 'milliseconds', 'backend',
                     'haproxy_b.ctime', 'line'],
         'lines': []
     },
     'brtime': {
-        'options': [None, 'The average response time over the 1024 last requests', 'ms', 'backend',
+        'options': [None, 'The average response time over the 1024 last requests', 'milliseconds', 'backend',
                     'haproxy_b.rtime', 'line'],
         'lines': []
     },
     'bttime': {
-        'options': [None, 'The average total session time over the 1024 last requests', 'ms', 'backend',
+        'options': [None, 'The average total session time over the 1024 last requests', 'milliseconds', 'backend',
                     'haproxy_b.ttime', 'line'],
         'lines': []
     },
     'health_sdown': {
-        'options': [None, 'Backend Servers In DOWN State', 'failed servers', 'health',
-                    'haproxy_hs.down', 'line'],
+        'options': [None, 'Backend Servers In DOWN State', 'failed servers', 'health', 'haproxy_hs.down', 'line'],
         'lines': []
     },
     'health_sup': {
-        'options': [None, 'Backend Servers In UP State', 'health servers', 'health',
-                    'haproxy_hs.up', 'line'],
+        'options': [None, 'Backend Servers In UP State', 'health servers', 'health', 'haproxy_hs.up', 'line'],
         'lines': []
     },
     'health_bdown': {
-        'options': [None, 'Is Backend Alive? 1 = DOWN', 'failed backend', 'health', 'haproxy_hb.down', 'line'],
+        'options': [None, 'Is Backend Failed?', 'boolean', 'health', 'haproxy_hb.down', 'line'],
         'lines': []
     },
     'health_idle': {
-        'options': [None, 'The Ratio Of Polling Time Vs Total Time', 'percent', 'health', 'haproxy.idle', 'line'],
+        'options': [None, 'The Ratio Of Polling Time Vs Total Time', 'percentage', 'health', 'haproxy.idle', 'line'],
         'lines': [
             ['idle', None, 'absolute']
         ]
@@ -213,6 +206,7 @@ REGEX = dict(url=re_compile(r'idle = (?P<idle>[0-9]+)'),
              socket=re_compile(r'Idle_pct: (?P<idle>[0-9]+)'))
 
 
+# TODO: the code is unreadable
 class Service(UrlService, SocketService):
     def __init__(self, configuration=None, name=None):
         if 'socket' in configuration:

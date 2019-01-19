@@ -4,24 +4,19 @@
 #
 AC_PREREQ(2.60)
 
-define([VERSION_MAJOR], [1])
-define([VERSION_MINOR], [12])
-define([VERSION_FIX], [1])
-define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
-
 # We do not use m4_esyscmd_s to support older autoconf.
-define([VERSION_STRING], m4_esyscmd(git describe 2>/dev/null | sed 's/^v//' | tr -d '\n'))
-m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_NUMBER)])
+define([VERSION_STRING], m4_esyscmd([git describe --always 2>/dev/null | tr -d '\n']))
+define([VERSION_FROM_FILE], m4_esyscmd([cat packaging/version | tr -d '\n']))
+m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_FROM_FILE)])
 
 AC_INIT([netdata], VERSION_STRING[])
 
 AM_MAINTAINER_MODE([disable])
 if test x"$USE_MAINTAINER_MODE" = xyes; then
 AC_MSG_NOTICE(***************** MAINTAINER MODE *****************)
-PACKAGE_BUILT_DATE=$(date '+%d %b %Y')
 fi
 
-PACKAGE_RPM_VERSION="VERSION_NUMBER"
+PACKAGE_RPM_VERSION="VERSION_STRING"
 AC_SUBST([PACKAGE_RPM_VERSION])
 
 # -----------------------------------------------------------------------------
@@ -594,7 +589,6 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
-    makeself/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile
@@ -620,10 +614,9 @@ AC_CONFIG_FILES([
     web/api/queries/ses/Makefile
     web/api/queries/stddev/Makefile
     web/api/queries/sum/Makefile
+    web/api/health/Makefile
     web/gui/Makefile
     web/server/Makefile
-    web/server/single/Makefile
-    web/server/multi/Makefile
     web/server/static/Makefile
 ])
 AC_OUTPUT

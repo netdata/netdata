@@ -8,7 +8,7 @@ new_labels() {
 	ISSUE="$1"
 	URL="https://api.github.com/repos/netdata/netdata/issues/$ISSUE/labels"
 	# deduplicate array and add quotes
-	SET=( $(for i in "${@:2}"; do echo "\"$i\""; done | sort -u) )
+	SET=( $(for i in "${@:2}"; do [ "$i" != "" ] && echo "\"$i\""; done | sort -u) )
 	# implode array to string
 	LABELS="${SET[*]}"
 	# add commas between quotes (replace spaces)
@@ -41,7 +41,7 @@ echo "===== Categorizing issues ====="
 for STATE in "open" "closed"; do
 	for ISSUE in $(hub issue -f "%I %l%n" -s "$STATE" -d "$(date +%F -d '1 day ago')" | grep -v -f $LABELS_FILE); do
 		echo "-------- Processing $STATE issue no. $ISSUE --------"
-		BODY="$(curl "https://api.github.com/repos/netdata/netdata/issues/$ISSUE" 2>/dev/null | jq .body)"
+		BODY="$(curl -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/netdata/netdata/issues/$ISSUE" 2>/dev/null | jq .body)"
 		case "${BODY}" in
 		*"# Question summary"*) new_labels "$ISSUE" "question" "no changelog" ;;
 		*"# Bug report summary"*) new_labels "$ISSUE" "needs triage" "bug" ;;
@@ -91,8 +91,7 @@ for PR in $(hub pr list -s all -f "%I%n" -L 10); do
 	done
 	NEW_SET=$(sort $NEW_LABELS | uniq)
 	if [ ! -z "$NEW_SET" ]; then
-		PREV=$(curl "https://api.github.com/repos/netdata/netdata/issues/$PR/labels" 2>/dev/null | jq '.[].name' | grep -v "area")
+		PREV=$(curl -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/netdata/netdata/issues/$PR/labels" 2>/dev/null | jq '.[].name' | grep -v "area")
 		new_labels "$PR" ${NEW_SET} "${PREV[*]}"
-		exit 0
 	fi
 done
