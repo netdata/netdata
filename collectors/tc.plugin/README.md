@@ -6,15 +6,11 @@ Live demo - **[see it in action here](https://registry.my-netdata.io/#menu_tc)**
 
 Netdata monitors `tc` QoS classes for all interfaces.
 
-If you also use [FireQOS](http://firehol.org/tutorial/fireqos-new-user/) it will collect
-interface and class names.
+If you also use [FireQOS](http://firehol.org/tutorial/fireqos-new-user/) it will collect interface and class names.
 
-There is a [shell helper](tc-qos-helper.sh.in) for this (all parsing is done by the plugin
-in `C` code - this shell script is just a configuration for the command to run to get `tc` output).
+There is a [shell helper](tc-qos-helper.sh.in) for this (all parsing is done by the plugin in `C` code - this shell script is just a configuration for the command to run to get `tc` output).
 
-The source of the tc plugin is [here](plugin_tc.c). It is somewhat complex, because a state
-machine was needed to keep track of all the `tc` classes, including the pseudo classes tc
-dynamically creates.
+The source of the tc plugin is [here](plugin_tc.c). It is somewhat complex, because a state machine was needed to keep track of all the `tc` classes, including the pseudo classes tc dynamically creates.
 
 ## Motivation
 
@@ -80,11 +76,16 @@ Once **traffic classification** is applied, we can use **[netdata](https://githu
 
 QoS, is extremely light. You will configure it once, and this is it. It will not bother you again and it will not use any noticeable CPU resources, especially on application and database servers.
 
+This is QoS from a home linux router. Check these features:
+
+1. It is real-time (per second updates)
+2. QoS really works in Linux - check that the `background` traffic is squeezed when `surfing` needs it.
+
+![test2](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
+
 ---
 
-## QoS in Linux? Have you lost your mind?
-
-Yes I know... but no, I have not!
+## QoS in Linux?
 
 Of course, `tc` is probably **the most undocumented, complicated and unfriendly** command in Linux. 
 
@@ -108,17 +109,13 @@ For example, do you know that for matching a simple port range in `tc`, e.g. all
 32768/0x8000
 ```
 
-I know what you are thinking right now! **And I agree!**
+To do it the hard way, you can go through the [tc configuration steps](#qos-configuration-example-with-tc). An easier way is to use  **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, a tool that simplifies QoS management in Linux.
 
-This is why I wrote **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, a tool to simplify QoS management in Linux.
+## Qos Configuration with FireHOL
 
 The **[FireHOL](https://firehol.org/)** package already distributes **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**. Check the **[FireQOS tutorial](https://firehol.org/tutorial/fireqos-new-user/)** to learn how to write your own QoS configuration.
 
-With **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, it is **really simple for everyone to use QoS in Linux**. Just install the package `firehol`. It should already be available for your distribution. If not, check the **[FireHOL Installation Guide](https://firehol.org/installing/)**. After that, you will have the `fireqos` command which uses a configuration like the following:
-
-## QoS Configuration
-
-This is the file `/etc/firehol/fireqos.conf` we use at the netdata demo site:
+With **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, it is **really simple for everyone to use QoS in Linux**. Just install the package `firehol`. It should already be available for your distribution. If not, check the **[FireHOL Installation Guide](https://firehol.org/installing/)**. After that, you will have the `fireqos` command which uses a configuration like the following `/etc/firehol/fireqos.conf`, used at the netdata demo site:
 
 ```sh
     # configure the netdata ports
@@ -166,16 +163,89 @@ And this is what you are going to get:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14436322/c91d90a4-0024-11e6-9fb1-57cdef1580df.png)
 
----
+## QoS Configuration example with tc
 
-## More examples:
+_Example provided in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973)_
 
-This is QoS from my home linux router. Check these features:
+First, setup the tc rules in rc.local using the following commands to assign different DSCP markings to different classids In the particular example, `netem` is used on these interfaces to inject impairments, which is why the root `qdisc` is created that way:
 
-1. It is real-time (per second updates)
-2. QoS really works in Linux - check that the `background` traffic is squeezed when `surfing` needs it.
+```tc qdisc add dev eth5 root handle 1: netem loss 0%
+tc qdisc add dev eth5 parent 1: handle 2: htb default 1
+tc class add dev eth5 parent 2: classid 2:1 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:8 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:10 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:16 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:18 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:24 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:26 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:32 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:34 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:40 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:46 htb rate 1gbit burst 1gbit
+tc class add dev eth5 parent 2: classid 2:48 htb rate 1gbit burst 1gbit
 
-![test2](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x20 0xff classid 2:8
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x28 0xff classid 2:10
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x40 0xff classid 2:16
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x48 0xff classid 2:18
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x60 0xff classid 2:24
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x68 0xff classid 2:26
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x80 0xff classid 2:32
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x88 0xff classid 2:34
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xa0 0xff classid 2:40
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xb8 0xff classid 2:46
+tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xc0 0xff classid 2:48
+
+tc qdisc add dev eth6 root handle 1: netem loss 0%
+tc qdisc add dev eth6 parent 1: handle 2: htb default 1
+tc class add dev eth6 parent 2: classid 2:1 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:8 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:10 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:16 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:18 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:24 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:26 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:32 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:34 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:40 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:46 htb rate 1gbit burst 1gbit
+tc class add dev eth6 parent 2: classid 2:48 htb rate 1gbit burst 1gbit
+
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x20 0xff classid 2:8
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x28 0xff classid 2:10
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x40 0xff classid 2:16
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x48 0xff classid 2:18
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x60 0xff classid 2:24
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x68 0xff classid 2:26
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x80 0xff classid 2:32
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x88 0xff classid 2:34
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xa0 0xff classid 2:40
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xb8 0xff classid 2:46
+tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xc0 0xff classid 2:48
+```
+
+Then map the classids to names by creating `/etc/iproute2/tc_cls`:
+```2:1 Standard
+2:8 LowPriorityData
+2:10 HighThroughputData
+2:16 OAM
+2:18 LowLatencyData
+2:24 BroadcastVideo
+2:26 MultimediaStreaming
+2:32 RealTimeInteractive
+2:34 MultimediaConferencing
+2:40 Signalling
+2:46 Telephony
+2:48 NetworkControl
+```
+
+Add the following configuration option in `/etc/netdata.conf`:
+```[plugin:tc]
+        enable show all classes and qdiscs for all interfaces = yes
+```
+
+Finally, create `/etc/netdata/tc-qos-helper.conf` with this content:
+```tc_show="class"```
 
 
 
