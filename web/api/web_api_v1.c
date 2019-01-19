@@ -457,8 +457,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         );
 
         buffer_sprintf(w->response.data,
-                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%zd',table:",
-                responseHandler, google_version, google_reqId, st->last_updated.tv_sec);
+                "%s({version:'%s',reqId:'%s',status:'ok',sig:'%lld',table:",
+                responseHandler, google_version, google_reqId, (long long)(st->last_updated.tv_sec));
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)

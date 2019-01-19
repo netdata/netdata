@@ -10,6 +10,7 @@
 #define OS_LINUX   1
 #define OS_FREEBSD 2
 #define OS_MACOS   3
+#define OS_OPENBSD 4
 
 
 // ----------------------------------------------------------------------------
@@ -30,9 +31,9 @@
 
 #else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
+#if !(defined(__FreeBSD__) || defined(__APPLE__)) || defined(__OpenBSD__)
 #include <malloc.h>
-#endif /* __FreeBSD__ || __APPLE__ */
+#endif /* __FreeBSD__ || __APPLE__ || __OpenBSD__ */
 
 #endif /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
 
@@ -43,9 +44,11 @@
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
 #define NETDATA_OS_TYPE "macos"
+#elif defined(__OpenBSD__)
+#define NETDATA_OS_TYPE "openbsd"
 #else
 #define NETDATA_OS_TYPE "linux"
-#endif /* __FreeBSD__, __APPLE__*/
+#endif /* __FreeBSD__, __APPLE__ || __OpenBSD__ */
 
 #include <pthread.h>
 #include <errno.h>

@@ -170,54 +170,30 @@ int mypclose(FILE *fp, pid_t pid) {
     if(waitpid(pid, &proc_status, 0) > 0) {
         if(WIFSIGNALED(proc_status)) {
             int term_sig = WTERMSIG(proc_status);
-            // These classifications are derived from:
-            // https://en.wikipedia.org/wiki/Unix_signal#POSIX_signals
-            // and from the OpenBSD and FreeBSD manual pages
-            switch(term_sig) {
-                case SIGINT:
-                case SIGKILL:
-                case SIGALRM:
-                case SIGPIPE:
-                case SIGPROF:
-                case SIGUSR1:
-                case SIGUSR2:
-                case SIGVTALRM:
-                    error("child pid %d killed by signal %d.", pid, term_sig);
-                    return(-1);
-                case SIGABRT:
-                case SIGSEGV:
-                case SIGILL:
-                case SIGBUS:
-                case SIGFPE:
-                case SIGQUIT:
-                case SIGSYS:
-                case SIGXCPU:
-                case SIGXFSZ:
-                    error("child pid %d core dumped by signal %d.", pid, term_sig);
-                    return(-2);
-                case SIGSTOP:
-                case SIGTSTP:
-                case SIGTTIN:
-                case SIGTTOU:
-                    error("child pid %d stopped by signal %d.", pid, term_sig);
-                    return(0);
-                case SIGTRAP:
-                    error("child pid %d trapped by signal %d.", pid, term_sig);
-                    return(-4);
-                case SIGCHLD:
-                default:
-                    error("child pid %d gave us signal %d.", pid, term_sig);
-                    return(-5);
+            if(WCOREDUMP(proc_status)) {
+                error("child pid %d core dumped by signal %d.", pid, term_sig);
+                return -2;
+            } else {
+                error("child pid %d killed by signal %d.", pid, term_sig);
+                return -1;
             }
+        } else if(WIFSTOPPED(proc_status)) {
+            error("child pid %d stopped by signal %d.", pid, WSTOPSIG(proc_status));
+            return 0;
+        } else if(WIFCONTINUED(proc_status)) {
+            error("child pid %d continued by signal %d.", pid, SIGCONT);
+            return 0;
         } else if(WIFEXITED(proc_status)) {
             int exit_status = WEXITSTATUS(proc_status);
             if(exit_status)
                 error("child pid %d exited with code %d.", pid, exit_status);
-            return(exit_status);
+            return exit_status;
+        } else {
+            error("this shouldn't have happened");
         }
     }
     else
-        error("Cannot waitid() for pid %d", pid);
-    
+        error("Cannot waitpid() for pid %d", pid);
+
     return 0;
 }

@@ -2,13 +2,13 @@
 
 #include "libnetdata.h"
 
-#ifdef __APPLE__
+#ifdef __APPLE__ || defined(__OpenBSD__)
 #define INHERIT_NONE 0
-#endif /* __APPLE__ */
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#endif /* __APPLE__ || __OpenBSD__ */
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__OpenBSD__)
 #    define O_NOATIME     0
 #    define MADV_DONTFORK INHERIT_NONE
-#endif /* __FreeBSD__ || __APPLE__*/
+#endif /* __FreeBSD__ || __APPLE__ || __OpenBSD__ */
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 int enable_ksm = 1;
@@ -1179,7 +1179,7 @@ int recursively_delete_dir(const char *path, const char *reason) {
 
 static int is_virtual_filesystem(const char *path, char **reason) {
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
     (void)path;
     (void)reason;
 #else

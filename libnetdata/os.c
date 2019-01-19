@@ -30,6 +30,20 @@ long get_system_cpus(void) {
         }
 
         return processors;
+#elif __OpenBSD__
+        int mib[2], tmp_processors;
+        size_t len;
+
+        mib[0] = CTL_HW;
+        mib[1] = HW_NCPU;
+        len = sizeof(tmp_processors);
+        if (unlikely(sysctl(mib, 2, &tmp_processors, &len, NULL, 0) == -1)) {
+            error("Assuming system has %d processors.", processors);
+        } else {
+            processors = tmp_processors;
+        }
+
+        return processors;
 #else
 
     char filename[FILENAME_MAX + 1];
@@ -62,7 +76,7 @@ long get_system_cpus(void) {
     debug(D_SYSTEM, "System has %d processors.", processors);
     return processors;
 
-#endif /* __APPLE__, __FreeBSD__ */
+#endif /* __APPLE__, __FreeBSD__, __OpenBSD__ */
 }
 
 pid_t pid_max = 32768;
@@ -82,6 +96,12 @@ pid_t get_system_pid_max(void) {
             pid_max = tmp_pid_max;
         }
 
+        return pid_max;
+#elif __OpenBSD__
+        // The maximum PID is not configurable on OpenBSD. This value can be
+        // found in https://cvsweb.openbsd.org/src/sys/sys/proc.h?rev=1.261 as
+        // PID_MAX.
+        pid_max = 99999;
         return pid_max;
 #else
 
@@ -106,7 +126,7 @@ pid_t get_system_pid_max(void) {
     pid_max = (pid_t) max;
     return pid_max;
 
-#endif /* __APPLE__, __FreeBSD__ */
+#endif /* __APPLE__, __FreeBSD__, __OpenBSD__ */
 }
 
 unsigned int system_hz;

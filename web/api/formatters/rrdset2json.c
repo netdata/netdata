@@ -23,8 +23,8 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
             "\t\t\t\"chart_type\": \"%s\",\n"
             "\t\t\t\"duration\": %ld,\n"
-            "\t\t\t\"first_entry\": %ld,\n"
-            "\t\t\t\"last_entry\": %ld,\n"
+            "\t\t\t\"first_entry\": %lld,\n"
+            "\t\t\t\"last_entry\": %lld,\n"
             "\t\t\t\"update_every\": %d,\n"
             "\t\t\t\"dimensions\": {\n"
                    , st->id
@@ -41,8 +41,8 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                    , st->name
                    , rrdset_type_name(st->chart_type)
                    , st->entries * st->update_every
-                   , rrdset_first_entry_t(st)
-                   , rrdset_last_entry_t(st)
+                   , (long long)(rrdset_first_entry_t(st))
+                   , (long long)(rrdset_last_entry_t(st))
                    , st->update_every
     );
 

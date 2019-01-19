@@ -37,6 +37,14 @@ extern int getsysctl(const char *name, int *mib, size_t miblen, void *ptr, size_
 
 
 // =====================================================================================================================
+// OpenBSD
+
+#elif (TARGET_OS == OS_OPENBSD)
+
+#include <sys/sysctl.h>
+
+
+// =====================================================================================================================
 // MacOS
 
 #elif (TARGET_OS == OS_MACOS)

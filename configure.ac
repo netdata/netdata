@@ -172,6 +172,7 @@ freebsd*)
     ;;
 openbsd*)
     build_target=openbsd
+    build_target_id=4
     CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
 darwin*)
