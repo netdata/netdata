@@ -5,10 +5,13 @@
 **Fixed bugs:**
 
 - It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
+- python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 
 **Merged pull requests:**
 
+- python dockerd module: check version [\#5217](https://github.com/netdata/netdata/pull/5217) ([ilyam8](https://github.com/ilyam8))
+- Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
 - add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
 - Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
 
