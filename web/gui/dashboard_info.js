@@ -440,6 +440,11 @@ netdataDashboard.menu = {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
         info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
+    },
+    'mail_log': {
+        title: undefined,
+        icon: '<i class="fas fa-file-alt"></i>',
+        info: 'Information extracted from a server log file.'
     }
 };
 
