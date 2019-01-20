@@ -10,6 +10,7 @@
 
 **Merged pull requests:**
 
+- Fix nightly builds and cron autoupdater [\#5232](https://github.com/netdata/netdata/pull/5232) ([paulfantom](https://github.com/paulfantom))
 - python dockerd module: check version [\#5217](https://github.com/netdata/netdata/pull/5217) ([ilyam8](https://github.com/ilyam8))
 - Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
 - add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
