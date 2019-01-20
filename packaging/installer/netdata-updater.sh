@@ -71,7 +71,14 @@ failed() {
 update() {
 	[ -z "${tmp}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-	dir=$(mktemp -d)
+	# Check if tmp is mounted as noexec
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+		pattern="/opt/netdata-updater-XXXXXX"
+	else
+		pattern="/tmp/netdata-updater-XXXXXX"
+	fi
+
+	dir=$(mktemp -d "$pattern")
 
 	cd "$dir"
 
