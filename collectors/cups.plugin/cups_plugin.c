@@ -356,7 +356,7 @@ int main(int argc, char **argv) {
                     global_job_metrics.size_processing += curr_job->size;
                     break;
                 default:
-                    error("Unsupported job state (%d) found.", curr_job->state);
+                    error("Unsupported job state (%u) found.", curr_job->state);
                     break;
             }
         }
