@@ -4639,7 +4639,7 @@ function deleteCloudKnownAgentURL(agentID, url) {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?iframe=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin);
     window.open(url);
 }
 
