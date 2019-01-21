@@ -4639,7 +4639,7 @@ function deleteCloudKnownAgentURL(agentID, url) {
 // -------------------------------------------------------------------------------------------------
 
 function signInDidClick() {
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin + "/");
     window.open(url);
 }
 
@@ -4860,14 +4860,14 @@ let isCloudSSOInitialized = false;
 
 function cloudSSOInit() {
     const iframe = document.getElementById("ssoifrm");
-    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent?origin=${encodeURIComponent(window.location.origin)}&id=${NETDATA.registry.machine_guid}`;
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent?origin=${encodeURIComponent(window.location.origin + "/")}&id=${NETDATA.registry.machine_guid}`;
     iframe.src = url;
     isCloudSSOInitialized = true;
 }
 
 function cloudSSOSignOut() {
     const iframe = document.getElementById("ssoifrm");
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?origin=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?origin=" + encodeURIComponent(window.location.origin + "/");
     iframe.src = url;
 }
 
