@@ -4785,10 +4785,20 @@ function mergeAgents(cloud, registry) {
         union.set(agent.guid, agent);
     }
 
-    for (const ragent of registry) {
-        const cagent = union.get(ragent.guid);
+    const current = {
+        guid: NETDATA.registry.machine_guid,
+        name: NETDATA.registry.hostname,
+        url: NETDATA.serverDefault,
+        alternate_urls: [NETDATA.serverDefault],
+    }
+
+    // Make sure that the current netdata agent is merged!
+    const known = registry.concat([current]);
+
+    for (const kagent of known) {
+        const cagent = union.get(kagent.guid);
         if (cagent) {
-            for (const u of ragent.alternate_urls) {
+            for (const u of kagent.alternate_urls) {
                 if (u === NETDATA.registry.MASKED_DATA) { // TODO: temp until registry is updated.
                     continue;
                 }
@@ -4800,7 +4810,7 @@ function mergeAgents(cloud, registry) {
             }
         } else {
             dirty = true;
-            union.set(ragent.guid, ragent);
+            union.set(kagent.guid, kagent);
         }
     }
 
