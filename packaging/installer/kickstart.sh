@@ -227,7 +227,8 @@ else
 			warning "Downloaded dependency installation script is empty."
 		else
 			progress "Running downloaded script to detect required packages..."
-			if run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}; then
+			run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+			if [ $? -ne 0 ] ; then
 				warning "It failed to install all the required packages, but installation might still be possible."
 			fi
 		fi
