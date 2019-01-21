@@ -4850,7 +4850,7 @@ let isCloudSSOInitialized = false;
 
 function cloudSSOInit() {
     const iframe = document.getElementById("ssoifrm");
-    const url = NETDATA.registry.cloudBaseURL + "/account/sso-agent?origin=" + encodeURIComponent(window.location.origin);
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent?origin=${encodeURIComponent(window.location.origin)}&id=${NETDATA.registry.machine_guid}`;
     iframe.src = url;
     isCloudSSOInitialized = true;
 }
@@ -4934,7 +4934,7 @@ function tryFastInitCloud() {
 function initializeApp() {
     window.addEventListener("message", handleMessage, false);    
 
-    tryFastInitCloud();
+    // tryFastInitCloud();
 }
 
 if (document.readyState === "complete") {
