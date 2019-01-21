@@ -4850,14 +4850,14 @@ let isCloudSSOInitialized = false;
 
 function cloudSSOInit() {
     const iframe = document.getElementById("ssoifrm");
-    const url = NETDATA.registry.cloudBaseURL + "/account/sso-agent?iframe=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sso-agent?origin=" + encodeURIComponent(window.location.origin);
     iframe.src = url;
     isCloudSSOInitialized = true;
 }
 
 function cloudSSOSignOut() {
     const iframe = document.getElementById("ssoifrm");
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?iframe=" + encodeURIComponent(window.location.origin);
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?origin=" + encodeURIComponent(window.location.origin);
     iframe.src = url;
 }
 
