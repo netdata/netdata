@@ -10,36 +10,36 @@
 
 The section `server` provides these charts:
 
-- destinations by state
-  - idle
-  - printing
-  - stopped
+1. **destinations by state**
+ * idle
+ * printing
+ * stopped
 
-- destinations by options
-  - total
-  - accepting jobs
-  - shared
+2. **destinations by options**
+ * total
+ * accepting jobs
+ * shared
 
-- total job number by status
-  - pending
-  - processing
-  - held
+3. **total job number by status**
+ * pending
+ * processing
+ * held
 
-- total job size by status
-  - pending
-  - processing
-  - held
+4. **total job size by status**
+ * pending
+ * processing
+ * held
 
 For each destination the plugin provides these charts:
 
-- job number by status
-  - pending
-  - held
-  - processing
+1. **job number by status**
+ * pending
+ * held
+ * processing
 
-- job size by status
-  - pending
-  - held
-  - processing
+3. **job size by status**
+ * pending
+ * held
+ * processing
   
 At the moment only job status pending, processing, and held are reported because we do not have a method to collect stopped, canceled, aborted and completed jobs which scales.
