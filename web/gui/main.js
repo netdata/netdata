@@ -4692,6 +4692,7 @@ function clearCloudVariables() {
 
 function clearCloudLocalStorageItems() {
     localStorage.removeItem("cloud.baseURL");
+    localStorage.removeItem("cloud.agentID");
     localStorage.removeItem("cloud.syncTime");
 }
 
@@ -4895,6 +4896,8 @@ function initCloud() {
 
 // This callback is called after NETDATA.registry is initialized.
 function netdataRegistryCallback(machinesArray) {
+    localStorage.setItem("cloud.agentID", NETDATA.registry.machine_guid);
+
     initCloud();
 
     registryKnownAgents = machinesArray;  
@@ -4926,25 +4929,26 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL from local storage render (eagerly) the account ui 
-// before receiving the definitive response from the web server. This improves 
-// the perceived performance.
+// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
+// the account ui before receiving the definitive response from the web server. 
+// This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");
-    if (!baseURL) {
-        return
+    const agentID = localStorage.getItem("cloud.agentID");
+
+    if (baseURL && agentID) {
+        NETDATA.registry.cloudBaseURL = baseURL;
+        NETDATA.registry.machine_guid = agentID;
+        NETDATA.registry.isCloudEnabled = true;
+    
+        initCloud();
     }
-
-    NETDATA.registry.cloudBaseURL = baseURL;
-    NETDATA.registry.isCloudEnabled = true;
-
-    initCloud();
 }
 
 function initializeApp() {
     window.addEventListener("message", handleMessage, false);    
 
-    // tryFastInitCloud();
+    tryFastInitCloud();
 }
 
 if (document.readyState === "complete") {
