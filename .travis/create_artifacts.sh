@@ -17,7 +17,7 @@ BASENAME="netdata-$(git describe)"
 python -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'
 echo "--- Create tarball ---"
 autoreconf -ivf
-./configure
+./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2 
 make dist
 mv "${BASENAME}.tar.gz" artifacts/
 
