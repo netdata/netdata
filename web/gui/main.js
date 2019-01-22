@@ -710,7 +710,7 @@ function renderMyNetdataMenu(machinesArray) {
         }
     }
 
-    if (machinesArray == registryKnownAgents) {
+    if (machinesArray == registryAgents) {
         console.log("Rendering my-netdata menu from registry");
     } else {
         console.log("Rendering my-netdata menu from netdata.cloud");
@@ -4486,9 +4486,9 @@ var netdataCallback = initializeDynamicDashboard;
 // =================================================================================================
 // netdata.cloud
 
-let registryKnownAgents = [];
+let registryAgents = [];
 
-let cloudKnownAgents = [];
+let cloudAgents = [];
 
 let myNetdataMenuFilterValue = "";
 
@@ -4524,7 +4524,7 @@ function getCloudAccountKnownAgents() {
     }
     
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
         {
             method: "GET",
             mode: "cors",
@@ -4583,7 +4583,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
     };
     
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
         {
             method: "POST",
             mode: "cors",
@@ -4619,7 +4619,7 @@ function deleteCloudKnownAgentURL(agentID, url) {
     }
 
     return fetch(
-        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/known-agents/${agentID}/url?value=${encodeURIComponent(url)}`,
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents/${agentID}/url?value=${encodeURIComponent(url)}`,
         {
             method: "DELETE",
             mode: "cors",
@@ -4651,7 +4651,7 @@ function signOutDidClick() {
 
 function updateMyNetdataAfterFilterChange() {
     const machinesEl = document.getElementById("my-netdata-menu-machines")
-    machinesEl.innerHTML = renderMachines(cloudKnownAgents);
+    machinesEl.innerHTML = renderMachines(cloudAgents);
 
     if (options.hosts.length > 1) {
         const streamedEl = document.getElementById("my-netdata-menu-streamed")
@@ -4754,13 +4754,13 @@ function handleSignInMessage(e) {
     cloudAccountName = e.data.accountName;
     cloudToken = e.data.token;
 
-    netdataRegistryCallback(registryKnownAgents);
+    netdataRegistryCallback(registryAgents);
 }
 
 function handleSignOutMessage(e) {
     clearCloudVariables();    
     renderAccountUI();
-    renderMyNetdataMenu(registryKnownAgents);
+    renderMyNetdataMenu(registryAgents);
 }
 
 function isSignedIn() {
@@ -4841,20 +4841,20 @@ function syncAgents(callback) {
         console.log("Checking if sync is needed.");
         localStorage.setItem("cloud.syncTime", new Date().getTime());
         
-        const agentsToSync = mergeAgents(cloudKnownAgents, registryKnownAgents);
+        const agentsToSync = mergeAgents(cloudAgents, registryAgents);
 
         if (agentsToSync.length > 0) {
             console.log("Synchronizing with netdata.cloud.");
             postCloudAccountKnownAgents(agentsToSync).then((agents) => {
                 // TODO: clear syncTime on error!
-                cloudKnownAgents = agents;
-                callback(cloudKnownAgents);
+                cloudAgents = agents;
+                callback(cloudAgents);
             });
             return        
         } 
     }
 
-    callback(cloudKnownAgents);
+    callback(cloudAgents);
 }
 
 let isCloudSSOInitialized = false;
@@ -4900,7 +4900,7 @@ function netdataRegistryCallback(machinesArray) {
 
     initCloud();
 
-    registryKnownAgents = machinesArray;  
+    registryAgents = machinesArray;  
 
     if (isSignedIn()) {
         // We call getCloudAccountKnownAgents() here because it requires that 
@@ -4911,7 +4911,7 @@ function netdataRegistryCallback(machinesArray) {
                 errorMyNetdataMenu();
                 return;
             }
-            cloudKnownAgents = agents; 
+            cloudAgents = agents; 
             syncAgents((agents) => {
                 const agentsMap = {}
                 for (const agent of agents) {
