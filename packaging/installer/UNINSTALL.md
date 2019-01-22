@@ -1,38 +1,22 @@
-# Uninstalling netdata
+## Uninstalling netdata
 
-## netdata was installed from source (or `kickstart.sh`)
-
-The script `netdata-installer.sh` generates another script called `netdata-uninstaller.sh`.
-
-To uninstall netdata, run:
-
+Our self-contained uninstaller is able to remove netdata installations created with shell installer. It doesn't need any other netdata repository files to be run. All it needs is an .environment file, which is created during installation (with shell installer) and put in ${NETDATA_USER_CONFIG_DIR}/.environment (by default /etc/netdata/.environment). That file contains some parameters which are passed to our installer and which are needed during uninstallation process. Mainly two parameters are needed:
 ```
-cd /path/to/netdata.git
-./netdata-uninstaller.sh --yes
+NETDATA_PREFIX
+NETDATA_ADDED_TO_GROUPS
 ```
 
-The uninstaller will ask you to confirm all deletions.
+A workflow for uninstallation looks like this:
 
-## netdata was installed with `kickstart-static64.sh` package
+1. Find your .environment file
+2. If you cannot find that file and would like to uninstall netdata, then create new file with following content:
+```
+NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
+NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running netdata process
+```
+3. Run ./packaging/installer/netdata-uninstaller.sh --yes --env <path_to_environment_file>
+4. Done
 
-Stop netdata with one of the following:
-
-- `service netdata stop` (non-systemd systems)
-- `systemctl stop netdata` (systemd systems)
-
-Disable running netdata at startup, with one of the following (based on your distro):
-
-- `rc-update del netdata`
-- `update-rc.d netdata disable`
-- `chkconfig netdata off`
-- `systemctl disable netdata`
-
-Delete the netdata files:
-
-1. `rm -rf /opt/netdata`
-2. `groupdel netdata`
-3. `userdel netdata`
-4. `rm /etc/logrotate.d/netdata`
-5. `rm /etc/systemd/system/netdata.service` or `rm /etc/init.d/netdata`, depending on the distro.
+Note: This uninstallation method assumes previous installation with netdata-installer.sh or kickstart script. Currently using it when netdata was installed by a package manager can work or cause unexpected results.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FUNINSTALL&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

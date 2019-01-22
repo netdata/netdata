@@ -41,7 +41,7 @@ check () {
 
 cmd () {
 	echo -e "${WHITE}Cmd '${1}', expecting '${2}'"
-	RESPONSE=$(curl -s "http://$URL/api/v1/manage/health?${1}" -H "Authorization: Bearer $TOKEN" 2>&1)
+	RESPONSE=$(curl -s "http://$URL/api/v1/manage/health?${1}" -H "X-Auth-Token: $TOKEN" 2>&1)
 	if [ "${RESPONSE}" != "${2}" ] ; then
 		echo -e "${RED}ERROR: Response '${RESPONSE}' != '${2}'"
 		err=$((err+1))
