@@ -2,6 +2,10 @@
 
 `cups.plugin` collects Common Unix Printing System (CUPS) metrics.
 
+## Prerequisites
+
+This plugin needs a running local CUPS daemon (`cupsd`). This plugin does not need any configuration.
+
 ## Charts
 
 `cups.plugin` provides one common section `destinations` and one section per destination. 
