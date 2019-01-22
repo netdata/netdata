@@ -390,8 +390,6 @@ or do not output the line at all.
 
    Of course, C is the most efficient way of collecting data. This is why netdata itself is written in C.
    
-## Properly Writing Plugins
-
 ## Writing Plugins Properly
 
 There are a few rules for writing plugins properly:
