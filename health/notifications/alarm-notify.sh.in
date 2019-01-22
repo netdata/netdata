@@ -27,6 +27,7 @@
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
 #  - fleep notifications by @Ferroin
+#  - prowlapp.com notifications by @Ferroin
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
@@ -164,6 +165,7 @@ syslog
 custom
 msteam
 kavenegar
+prowl
 "
 
 # -----------------------------------------------------------------------------
@@ -519,6 +521,7 @@ if [ \( \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
         -o "${SEND_FLEEP}"       = "YES" \
+        -o "${SEND_PROWL}"       = "YES" \
         -o "${SEND_CUSTOM}"      = "YES" \
         -o "${SEND_MSTEAM}"        = "YES" \
     \) -a -z "${curl}" ]
@@ -543,6 +546,7 @@ if [ \( \
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
         SEND_FLEEP="NO"
+        SEND_PROWL="NO"
         SEND_CUSTOM="NO"
     fi
 fi
@@ -662,6 +666,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_AWSSNS}"         != "YES" \
+    -o "${SEND_PROWL}"          != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
     -a "${SEND_MSTEAM}"         != "YES" \
     ]
@@ -1612,6 +1617,50 @@ send_fleep() {
 }
 
 # -----------------------------------------------------------------------------
+# Prowl sender
+
+send_prowl() {
+    local httpcode sent=0 data message keys prio=0 alarm_url event
+    if [ "${SEND_PROWL}" = "YES" ] ; then
+        message="$(urlencode "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}")"
+        message="description=${message}"
+        keys="$(urlencode "$(echo "${1}" | tr ' ' ,)")"
+        keys="apikey=${keys}"
+        app="application=Netdata"
+
+        case "${status}" in
+            CRITICAL)
+                prio=2
+                ;;
+            WARNING)
+                prio=1
+                ;;
+        esac
+        pri="priority=${pri}"
+
+        alarm_url="$(urlencode ${goto_url})"
+        alarm_url="url=${alarm_url}"
+        event="$(urlencode "${host} ${status_message}")"
+        event="event=${event}"
+
+        data="${keys}&${pri}&${alarm_url}&${app}&${event}&${message}"
+
+        httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapi/add")
+
+        if [ "${httpcode}" = "200" ]  ; then
+            info "sent prowl data for: ${host} ${chart}.${name} is ${status}"
+            sent=1
+        else
+            error "failed to send prowl data for: ${host} ${chart}.${name} is ${status} with with error code ${httpcode}."
+        fi
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # irc sender
 
 send_irc() {
@@ -1990,6 +2039,12 @@ send_fleep "${to_fleep}"
 SENT_FLEEP=$?
 
 # -----------------------------------------------------------------------------
+# send the Prowl message
+
+send_prowl "${to_prowl}"
+SENT_PROWL=$?
+
+# -----------------------------------------------------------------------------
 # send the irc message
 
 send_irc "${IRC_NICKNAME}" "${IRC_REALNAME}" "${to_irc}" "${IRC_NETWORK}" "${host}" "${host} ${status_message} - ${name//_/ } - ${chart} ----- ${alarm}
@@ -2215,6 +2270,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
     -o ${SENT_FLEEP}        -eq 0 \
+    -o ${SENT_PROWL}        -eq 0 \
     -o ${SENT_IRC}          -eq 0 \
     -o ${SENT_AWSSNS}       -eq 0 \
     -o ${SENT_CUSTOM}       -eq 0 \
