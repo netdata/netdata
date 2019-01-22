@@ -168,16 +168,19 @@ ORDER = [
     'binlog_cache',
     'binlog_stmt_cache',
     'threads',
+    'threads_creation_rate',
     'thread_cache_misses',
     'innodb_io',
     'innodb_io_ops',
     'innodb_io_pending_ops',
     'innodb_log',
     'innodb_os_log',
+    'innodb_os_log_fsync_writes',
     'innodb_os_log_io',
     'innodb_cur_row_lock',
     'innodb_rows',
     'innodb_buffer_pool_pages',
+    'innodb_buffer_pool_flush_pages_requests',
     'innodb_buffer_pool_bytes',
     'innodb_buffer_pool_read_ahead',
     'innodb_buffer_pool_reqs',
@@ -302,12 +305,17 @@ CHARTS = {
         ]
     },
     'threads': {
-        'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
+        'options': [None, 'Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
             ['Threads_connected', 'connected', 'absolute'],
-            ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
             ['Threads_running', 'running', 'absolute'],
+        ]
+    },
+    'threads_creation_rate': {
+        'options': [None, 'Threads Creation Rate', 'threads', 'threads/s', 'mysql.threads', 'line'],
+        'lines': [
+            ['Threads_created', 'created', 'incremental'],
         ]
     },
     'thread_cache_misses': {
@@ -349,11 +357,16 @@ CHARTS = {
         ]
     },
     'innodb_os_log': {
-        'options': [None, 'InnoDB OS Log Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'options': [None, 'InnoDB OS Log Pending Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'lines': [
+            ['Innodb_os_log_pending_fsyncs', 'fsyncs', 'absolute'],
+            ['Innodb_os_log_pending_writes', 'writes', 'absolute', -1, 1],
+        ]
+    },
+    'innodb_os_log_fsync_writes': {
+        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log', 'line'],
         'lines': [
             ['Innodb_os_log_fsyncs', 'fsyncs', 'incremental'],
-            ['Innodb_os_log_pending_fsyncs', 'pending_fsyncs', 'absolute'],
-            ['Innodb_os_log_pending_writes', 'pending_writes', 'absolute', -1, 1],
         ]
     },
     'innodb_os_log_io': {
@@ -385,9 +398,15 @@ CHARTS = {
             ['Innodb_buffer_pool_pages_data', 'data', 'absolute'],
             ['Innodb_buffer_pool_pages_dirty', 'dirty', 'absolute', -1, 1],
             ['Innodb_buffer_pool_pages_free', 'free', 'absolute'],
-            ['Innodb_buffer_pool_pages_flushed', 'flushed', 'incremental', -1, 1],
             ['Innodb_buffer_pool_pages_misc', 'misc', 'absolute', -1, 1],
             ['Innodb_buffer_pool_pages_total', 'total', 'absolute']
+        ]
+    },
+    'innodb_buffer_pool_flush_pages_requests': {
+        'options': [None, 'InnoDB Buffer Pool Flush Pages Requests', 'requests/s', 'innodb',
+                    'mysql.innodb_buffer_pool_pages', 'line'],
+        'lines': [
+            ['Innodb_buffer_pool_pages_flushed', 'flush pages', 'incremental'],
         ]
     },
     'innodb_buffer_pool_bytes': {
