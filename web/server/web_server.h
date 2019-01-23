@@ -15,9 +15,7 @@
 #endif
 
 typedef enum web_server_mode {
-    WEB_SERVER_MODE_SINGLE_THREADED,
     WEB_SERVER_MODE_STATIC_THREADED,
-    WEB_SERVER_MODE_MULTI_THREADED,
     WEB_SERVER_MODE_NONE
 } WEB_SERVER_MODE;
 
@@ -27,13 +25,14 @@ extern SIMPLE_PATTERN *web_allow_registry_from;
 extern SIMPLE_PATTERN *web_allow_badges_from;
 extern SIMPLE_PATTERN *web_allow_streaming_from;
 extern SIMPLE_PATTERN *web_allow_netdataconf_from;
+extern SIMPLE_PATTERN *web_allow_mgmt_from;
 
 extern WEB_SERVER_MODE web_server_mode;
 
 extern WEB_SERVER_MODE web_server_mode_id(const char *mode);
 extern const char *web_server_mode_name(WEB_SERVER_MODE id);
 
-extern int api_listen_sockets_setup(void);
+extern void api_listen_sockets_setup(void);
 
 #define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST 60
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
@@ -51,8 +50,6 @@ extern struct web_client *web_client_create_on_listenfd(int listener);
 #include "web_client_cache.h"
 #endif // WEB_SERVER_INTERNALS
 
-#include "single/single-threaded.h"
-#include "multi/multi-threaded.h"
 #include "static/static-threaded.h"
 
 #include "daemon/common.h"

@@ -357,6 +357,75 @@ paths:
           description: 'All the metrics returned in the format requested'
         '400':
           description: 'The format requested is not supported'
+  /alarms:
+    get:
+      summary: 'Get a list of active or raised alarms on the server'
+      description: 'The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing "?all", all the enabled alarms are returned.'
+      parameters:
+        - name: all
+          in: query
+          description: 'If passed, all enabled alarms are returned'
+          required: false
+          type: boolean
+          allowEmptyValue: true
+      responses:
+        '200':
+          description: 'An object containing general info and a linked list of alarms'
+          schema:
+            $ref: '#/definitions/alarms'
+  /alarm_log:
+    get:
+      summary: 'Retrieves the entries of the alarm log'
+      description: 'Returns an array of alarm_log entries, with historical information on raised and cleared alarms.'
+      parameters:
+        - name: after
+          in: query
+          description: 'Passing the parameter after=UNIQUEID returns all the events in the alarm log that occurred after UNIQUEID. An automated series of calls would call the interface once without after=, store the last UNIQUEID of the returned set, and give it back to get incrementally the next events'
+          required: false
+          type: integer
+      responses:
+        '200':
+          description: 'An array of alarm log entries'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/alarm_log_entry'
+  /manage/health:
+    get:
+      summary: 'Accesses the health management API to control health checks and notifications at runtime.'
+      description: 'Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenaria, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.'
+      parameters:
+        - name: cmd
+          in: query
+          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors.'
+          required: false
+          type: string
+          enum: ['DISABLE ALL', 'SILENCE ALL', 'DISABLE', 'SILENCE', 'RESET']
+        - name: alarm
+          in: query
+          description: 'The expression provided will match both `alarm` and `template` names.'
+          type: string
+        - name: chart
+          in: query
+          description: 'Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`'
+          type: string
+        - name: context
+          in: query
+          description: 'Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.'
+          type: string     
+        - name: hosts
+          in: query
+          description: 'The hostnames that will need to match.'
+          type: string     
+        - name: families
+          in: query
+          description: 'The alarm families.'
+          type: string     
+      responses:
+        '200':
+          description: 'A plain text response based on the result of the command'
+        '403':
+          description: 'Bearer authentication error.'
 definitions:
   info:
     type: object
@@ -491,7 +560,6 @@ definitions:
       name:
         type: string
         description: 'The name of the dimension'
-
   json_wrap:
     type: object
     properties:
@@ -559,3 +627,204 @@ definitions:
         description: 'The format of the result returned.'
       result:
         description: 'The result requested, in the format requested.'
+  alarms:
+    type: object
+    properties: 
+      hostname: 
+        type: string
+      latest_alarm_log_unique_id: 
+        type: integer
+        format: int32
+      status: 
+        type: boolean
+      now: 
+        type: integer
+        format: int32
+      alarms: 
+        type: object
+        properties: 
+          chart-name.alarm-name: 
+            type: object
+            properties: 
+              id: 
+                type: integer
+                format: int32
+              name: 
+                type: string
+                description: Full alarm name
+              chart: 
+                type: string
+              family: 
+                type: string
+              active: 
+                type: boolean
+                description: Will be false only if the alarm is disabled in the configuration
+              disabled: 
+                type: boolean
+                description: Whether the health check for this alarm has been disabled via a health command API DISABLE command.
+              silenced: 
+                type: boolean
+                description: Whether notifications for this alarm have been silenced via a health command API SILENCE command.
+              exec: 
+                type: string
+              recipient: 
+                type: string
+              source: 
+                type: string
+              units: 
+                type: string
+              info: 
+                type: string
+              status: 
+                type: string
+              last_status_change: 
+                type: integer
+                format: int32
+              last_updated: 
+                type: integer
+                format: int32
+              next_update: 
+                type: integer
+                format: int32
+              update_every: 
+                type: integer
+                format: int32
+              delay_up_duration: 
+                type: integer
+                format: int32
+              delay_down_duration: 
+                type: integer
+                format: int32
+              delay_max_duration: 
+                type: integer
+                format: int32
+              delay_multiplier: 
+                type: integer
+                format: int32
+              delay: 
+                type: integer
+                format: int32
+              delay_up_to_timestamp: 
+                type: integer
+                format: int32
+              value_string: 
+                type: string
+              no_clear_notification: 
+                type: boolean
+              lookup_dimensions: 
+                type: string
+              db_after: 
+                type: integer
+                format: int32
+              db_before: 
+                type: integer
+                format: int32
+              lookup_method: 
+                type: string
+              lookup_after: 
+                type: integer
+                format: int32
+              lookup_before: 
+                type: integer
+                format: int32
+              lookup_options: 
+                type: string
+              calc: 
+                type: string
+              calc_parsed: 
+                type: string
+              warn: 
+                type: string
+              warn_parsed: 
+                type: string
+              crit: 
+                type: string
+              crit_parsed: 
+                type: string
+              green: 
+                type: string
+                format: nullable
+              red: 
+                type: string
+                format: nullable
+              value: 
+                type: number
+  alarm_log_entry:
+    type: object
+    properties: 
+      hostname: 
+        type: string
+      unique_id: 
+        type: integer
+        format: int32
+      alarm_id: 
+        type: integer
+        format: int32
+      alarm_event_id: 
+        type: integer
+        format: int32
+      name: 
+        type: string
+      chart: 
+        type: string
+      family: 
+        type: string
+      processed: 
+        type: boolean
+      updated: 
+        type: boolean
+      exec_run: 
+        type: integer
+        format: int32
+      exec_failed: 
+        type: boolean
+      exec: 
+        type: string
+      recipient: 
+        type: string
+      exec_code: 
+        type: integer
+        format: int32
+      source: 
+        type: string
+      units: 
+        type: string
+      when: 
+        type: integer
+        format: int32
+      duration: 
+        type: integer
+        format: int32
+      non_clear_duration: 
+        type: integer
+        format: int32
+      status: 
+        type: string
+      old_status: 
+        type: string
+      delay: 
+        type: integer
+        format: int32
+      delay_up_to_timestamp: 
+        type: integer
+        format: int32
+      updated_by_id: 
+        type: integer
+        format: int32
+      updates_id: 
+        type: integer
+        format: int32
+      value_string: 
+        type: string
+      old_value_string: 
+        type: string
+      silenced: 
+        type: string
+      info: 
+        type: string
+      value: 
+        type: string
+        format: nullable
+      old_value: 
+        type: string
+        format: nullable

@@ -70,10 +70,11 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
+	packaging/installer/netdata-updater.sh \
 	packaging/installer/kickstart.sh \
 	packaging/installer/kickstart-static64.sh \
-	netdata-installer.sh \
 	packaging/installer/functions.sh \
+	netdata-installer.sh \
 	docs/generator/buildhtml.sh \
 	docs/generator/buildyaml.sh \
 	docs/generator/checklinks.sh \
@@ -337,6 +338,8 @@ API_PLUGIN_FILES = \
     web/api/formatters/charts2json.h \
     web/api/formatters/rrdset2json.c \
     web/api/formatters/rrdset2json.h \
+    web/api/health/health_cmdapi.c \
+    web/api/health/health_cmdapi.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
     $(NULL)
@@ -374,10 +377,6 @@ WEB_PLUGIN_FILES = \
     web/server/web_server.h \
     web/server/web_client_cache.c \
     web/server/web_client_cache.h \
-    web/server/single/single-threaded.c \
-    web/server/single/single-threaded.h \
-    web/server/multi/multi-threaded.c \
-    web/server/multi/multi-threaded.h \
     web/server/static/static-threaded.c \
     web/server/static/static-threaded.h \
     $(NULL)

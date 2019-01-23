@@ -10,9 +10,8 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 1
-priority = 60000
+from distutils.version import StrictVersion
+
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
@@ -46,6 +45,9 @@ CHARTS = {
 }
 
 
+MIN_REQUIRED_VERSION = '3.2.0'
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -55,7 +57,14 @@ class Service(SimpleService):
 
     def check(self):
         if not HAS_DOCKER:
-            self.error("'docker' package is needed to use docker.chart.py")
+            self.error("'docker' package is needed to use dockerd module")
+            return False
+
+        if StrictVersion(docker.__version__) < StrictVersion(MIN_REQUIRED_VERSION):
+            self.error("installed 'docker' package version {0}, minimum required version {1}, please upgrade".format(
+                docker.__version__,
+                MIN_REQUIRED_VERSION,
+            ))
             return False
 
         self.client = docker.DockerClient(base_url=self.configuration.get('url', 'unix://var/run/docker.sock'))

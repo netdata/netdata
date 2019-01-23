@@ -4,24 +4,75 @@
 
 **Fixed bugs:**
 
+- Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
+- It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
+- Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
+- python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
+- Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
+
+**Closed issues:**
+
+- Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
+- \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
+
+**Merged pull requests:**
+
+- plugins.d doc: Remove empty similar headline [\#5245](https://github.com/netdata/netdata/pull/5245) ([simonnagl](https://github.com/simonnagl))
+- Pass correct options to the configure command [\#5244](https://github.com/netdata/netdata/pull/5244) ([cakrit](https://github.com/cakrit))
+- Update kickstart.sh md5sum in docs [\#5242](https://github.com/netdata/netdata/pull/5242) ([cakrit](https://github.com/cakrit))
+- Fix check for install-required-packages.sh [\#5241](https://github.com/netdata/netdata/pull/5241) ([cakrit](https://github.com/cakrit))
+- Fix nightly builds and cron autoupdater [\#5232](https://github.com/netdata/netdata/pull/5232) ([paulfantom](https://github.com/paulfantom))
+- Remove v before the version [\#5223](https://github.com/netdata/netdata/pull/5223) ([cakrit](https://github.com/cakrit))
+- python dockerd module: check version [\#5217](https://github.com/netdata/netdata/pull/5217) ([ilyam8](https://github.com/ilyam8))
+- Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
+- add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
+- Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
+- alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
+
+**Fixed bugs:**
+
+- megacli isn't included in python.d.conf [\#5191](https://github.com/netdata/netdata/issues/5191)
+- Unix Domain Socket no longer working. Permission denied [\#5181](https://github.com/netdata/netdata/issues/5181)
+- netdata-updater.sh doesn't have exec perms [\#5175](https://github.com/netdata/netdata/issues/5175)
+- FireQoS name not showing due to recent change [\#5171](https://github.com/netdata/netdata/issues/5171)
 - python go\_expvar: reuse same expvar key in different charts [\#5133](https://github.com/netdata/netdata/issues/5133)
 - hddtemp.chart.py is hardcoded to only use /dev/sdX [\#5129](https://github.com/netdata/netdata/issues/5129)
 - RabbitMQ Plugin wrong metrics for nodes in cluster [\#5118](https://github.com/netdata/netdata/issues/5118)
 - cannot install netdata [\#5117](https://github.com/netdata/netdata/issues/5117)
 - Anomalous \(big\) values on graphite/carbon  [\#5104](https://github.com/netdata/netdata/issues/5104)
 - \[Bug\] Stale metrics being exported to prometheus [\#5064](https://github.com/netdata/netdata/issues/5064)
+- Uninstaller script should be self-contained [\#5031](https://github.com/netdata/netdata/issues/5031)
+- Netdata doesn't properly lookup docker container name when running in ECS with task level cpu/memory limits enabled [\#4981](https://github.com/netdata/netdata/issues/4981)
+- Dashboard TV white page [\#4710](https://github.com/netdata/netdata/issues/4710)
 - Review of system.ram plugin: treat Slab memory as Cached \(PR 3288\) [\#3929](https://github.com/netdata/netdata/issues/3929)
+- Fix for unix sockets after addition of port ACLs [\#5184](https://github.com/netdata/netdata/pull/5184) ([cakrit](https://github.com/cakrit))
 
 **Closed issues:**
 
+- Remove support for multi-threaded and single-threaded web servers [\#5154](https://github.com/netdata/netdata/issues/5154)
+- Use GCS instead of git for updating netdata [\#5110](https://github.com/netdata/netdata/issues/5110)
 - error.log: IPv6 not properly show in error messages [\#5067](https://github.com/netdata/netdata/issues/5067)
 - Introduce Polymorphic Linux in the Docker Image [\#5034](https://github.com/netdata/netdata/issues/5034)
+- Allow netdata to listen to multiple ports [\#5017](https://github.com/netdata/netdata/issues/5017)
 - SNMP section not visible [\#4021](https://github.com/netdata/netdata/issues/4021)
+- allow different ports for streaming reception and API requests [\#3830](https://github.com/netdata/netdata/issues/3830)
+- Consul monitoring service health checks [\#3674](https://github.com/netdata/netdata/issues/3674)
+- maintenance time and silence time [\#3187](https://github.com/netdata/netdata/issues/3187)
+- Suppressing alerts programatically [\#2673](https://github.com/netdata/netdata/issues/2673)
 - include chart values in alarm info text [\#2351](https://github.com/netdata/netdata/issues/2351)
+- allow streamed data to be received on dedicated port [\#2149](https://github.com/netdata/netdata/issues/2149)
 - alarm notifications should state a count of active alarms per state [\#946](https://github.com/netdata/netdata/issues/946)
 
 **Merged pull requests:**
 
+- update bug\_report.md [\#5205](https://github.com/netdata/netdata/pull/5205) ([ilyam8](https://github.com/ilyam8))
+- add missing modules to python.d.conf [\#5194](https://github.com/netdata/netdata/pull/5194) ([ilyam8](https://github.com/ilyam8))
+- remove double 'afraid to' in CONTRIBUTING.md [\#5189](https://github.com/netdata/netdata/pull/5189) ([arkamar](https://github.com/arkamar))
+- Use tarballs from GCS in kickstart.sh [\#5185](https://github.com/netdata/netdata/pull/5185) ([paulfantom](https://github.com/paulfantom))
+- fix for fireqos classname not showing [\#5176](https://github.com/netdata/netdata/pull/5176) ([psychomelet](https://github.com/psychomelet))
+- GCS-based updater [\#5174](https://github.com/netdata/netdata/pull/5174) ([paulfantom](https://github.com/paulfantom))
 - Updated Polyverse reinstall commands in Dockerfile [\#5173](https://github.com/netdata/netdata/pull/5173) ([archisgore](https://github.com/archisgore))
 - Change how the ip address and port are logged in socket.c [\#5166](https://github.com/netdata/netdata/pull/5166) ([krinfels](https://github.com/krinfels))
 - Correct SNMP module name in plugin error handling [\#5153](https://github.com/netdata/netdata/pull/5153) ([pablerass](https://github.com/pablerass))
@@ -34,12 +85,15 @@
 - add option to opt-out from telemetry program [\#5138](https://github.com/netdata/netdata/pull/5138) ([paulfantom](https://github.com/paulfantom))
 - Scramble packages in docker images with polymorphic linux [\#5137](https://github.com/netdata/netdata/pull/5137) ([paulfantom](https://github.com/paulfantom))
 - change ownership of .gitignore [\#5131](https://github.com/netdata/netdata/pull/5131) ([paulfantom](https://github.com/paulfantom))
+- Update Charts.md [\#5124](https://github.com/netdata/netdata/pull/5124) ([mfundul](https://github.com/mfundul))
+- self-contained uninstaller [\#5121](https://github.com/netdata/netdata/pull/5121) ([paulfantom](https://github.com/paulfantom))
 - force git describe to always create a version [\#5119](https://github.com/netdata/netdata/pull/5119) ([paulfantom](https://github.com/paulfantom))
 - Clarify backend modes of operation [\#5116](https://github.com/netdata/netdata/pull/5116) ([cakrit](https://github.com/cakrit))
 - web-site content; why-netdata content [\#5097](https://github.com/netdata/netdata/pull/5097) ([ktsaou](https://github.com/ktsaou))
 - Add variables to alarm-notify.sh  [\#5096](https://github.com/netdata/netdata/pull/5096) ([cakrit](https://github.com/cakrit))
 - do not report stale metrics to prometheus [\#5084](https://github.com/netdata/netdata/pull/5084) ([ktsaou](https://github.com/ktsaou))
 - Unify versioning [\#5051](https://github.com/netdata/netdata/pull/5051) ([paulfantom](https://github.com/paulfantom))
+- Port ACLs, Management API and Health commands [\#4969](https://github.com/netdata/netdata/pull/4969) ([cakrit](https://github.com/cakrit))
 - Generate a configure script for RPM build \(\#4570\) [\#4571](https://github.com/netdata/netdata/pull/4571) ([ananace](https://github.com/ananace))
 
 ## [v1.12.0-rc2](https://github.com/netdata/netdata/tree/v1.12.0-rc2) (2019-01-03)

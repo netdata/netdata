@@ -159,7 +159,7 @@ The simple pattern syntax and operation is explained in [simple patterns](../lib
 
 #### Alarm line `lookup`
 
-This lines makes a database lookup to find a value. This result of this lookup is available as `$this`.
+This line makes a database lookup to find a value. This result of this lookup is available as `$this`.
 
 The format is:
   
@@ -465,7 +465,7 @@ Although the `alarm_variables` link shows you variables for a particular chart, 
      - `$status`, which is resolved to the current status of the alarm (the current = the last
         status, i.e. before the current database lookup and the evaluation of the `calc` line).
         This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
-        `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAL` works as
+        `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
         expected.
         
      - `$now`, which is resolved to current unix timestamp.
@@ -653,5 +653,11 @@ You can find the context of charts by looking up the chart in either
 
 You can find how netdata interpreted the expressions by examining the alarm at `http://your.netdata:19999/api/v1/alarms?all`. For each expression, netdata will return the expression as given in its config file, and the same expression with additional parentheses added to indicate the evaluation flow of the expression.
 
+## Disabling health checks or silencing notifications at runtime
+
+The health checks can be controlled at runtime via the [health management api](../web/api/health/#health-management-api).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+
+
+

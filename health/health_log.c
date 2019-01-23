@@ -411,7 +411,6 @@ inline void health_alarm_log(
     ae->duration = duration;
     ae->delay = delay;
     ae->delay_up_to_timestamp = when + delay;
-
     ae->flags |= flags;
 
     ae->repeat_every = repeat_every;

@@ -6,6 +6,7 @@
 ARG ARCH=amd64-v3.8
 FROM multiarch/alpine:${ARCH} as builder
 
+ARG OUTPUT="/dev/stdout"
 # Install prerequisites
 RUN apk --no-cache add alpine-sdk \
                        autoconf \
@@ -33,8 +34,7 @@ WORKDIR /opt/netdata.git
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \
-    sync && sleep 1 && \
-    ./netdata-installer.sh --dont-wait --dont-start-it
+    ./netdata-installer.sh --dont-wait --dont-start-it &>${OUTPUT}
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -71,11 +71,13 @@ RUN apk --no-cache add curl \
                        py-yaml \
                        python
 
-# Subscribe to Polyverse's Polymorphic Linux repositories and reinstall all packages, so they are scrambled
-RUN curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io && \
-    apk update && \
-    apk upgrade --available --no-cache && \
-    sed -in 's/^#//g' /etc/apk/repositories
+# Conditional subscribiton to Polyverse's Polymorphic Linux repositories
+RUN if [ "$(uname -m)" == "x86_64" ]; then \
+        curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
+        apk update; \
+        apk upgrade --available --no-cache; \
+        sed -in 's/^#//g' /etc/apk/repositories; \
+    fi
 
 
 # Copy files over
