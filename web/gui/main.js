@@ -697,7 +697,7 @@ function errorMyNetdataMenu() {
 function restrictMyNetdataMenu() {
     setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        <span>Please <a href="#" onclick="signInDidClick()">sign in</a> to <strong>netdata.cloud</strong> to view your netdata agents!</span>
+        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in</a> to <strong>netdata.cloud</strong> to view your netdata agents!</span>
         <div></div>
     </div>`);
 }
@@ -4638,12 +4638,16 @@ function deleteCloudAgentURL(agentID, url) {
 
 // -------------------------------------------------------------------------------------------------
 
-function signInDidClick() {
+function signInDidClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
     const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin + "/");
     window.open(url);
 }
 
-function signOutDidClick() {
+function signOutDidClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
     signOut();
 }
 
@@ -4712,18 +4716,18 @@ function renderAccountUI() {
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${cloudAccountName} <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                     <li>
-                        <a href="#" class="btn" onclick="signOutDidClick();">
+                        <a href="#" class="btn" onclick="signOutDidClick(event); return false">
                         <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
                     </a>
                 </li>
             </ul>`
         )
     } else {
-        container.setAttribute("title", "sign in");
+        // container.setAttribute("title", "sign in");
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signInDidClick();">
+            `<a href="#" class="btn" onclick="signInDidClick(event); return false">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
