@@ -62,7 +62,8 @@ extern void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
+        uint32_t flags,
+        uint32_t repeat_every;
 );
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);

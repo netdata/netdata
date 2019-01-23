@@ -76,6 +76,12 @@ struct rrdcalc {
     // while now < delay_up_to
 
     // ------------------------------------------------------------------------
+    // notification repeat settings
+    time_t   repeat_every;             // interval for notification repetition
+    uint32_t repeat_count;             // count of notifications repetition
+    time_t last_notification;          // last notification timestamp
+
+    // ------------------------------------------------------------------------
     // runtime information
 
     RRDCALC_STATUS status;          // the current status of the alarm

@@ -389,6 +389,7 @@ void *health_main(void *ptr) {
 
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
+    time_t repeat_every       = config_get_number(CONFIG_SECTION_HEALTH, "repeat notification alarms every seconds", 0);
 
     unsigned int loop = 0;
     while(!netdata_exit) {
@@ -430,6 +431,18 @@ void *health_main(void *ptr) {
 
                 info("Resuming health checks on host '%s'.", host->hostname);
                 host->health_delay_up_to = 0;
+            }
+
+            if(unlikely(repeat_every)) {
+              if((host->health_repeat_notifications == 0) || (host->health_repeat_notifications < now)){
+                host->health_repeat_notifications = now + repeat_every;
+                /* continue; */
+              }
+
+              info("Repeat notifications every %ld seconds, on host '%s'."
+                   , repeat_every
+                   , host->hostname
+                   );
             }
 
             rrdhost_rdlock(host);
@@ -706,7 +719,7 @@ void *health_main(void *ptr) {
                         rc->delay_up_to_timestamp = now + delay;
 
                         // add the alarm into the log
-
+                        rc->last_notification = now;
                         health_alarm_log(
                                 host
                                 , rc->id
@@ -727,10 +740,76 @@ void *health_main(void *ptr) {
                                 , rc->info
                                 , rc->delay_last
                                 , (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION) ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
+                                , repeat_every
                         );
 
                         rc->last_status_change = now;
                         rc->status = status;
+                    }
+                    else if( unlikely(repeat_every ) ) {
+                      if(unlikely(now < host->health_repeat_notifications))
+                        continue;
+
+                      if(unlikely(rc->status != RRDCALC_STATUS_CRITICAL && rc->status != RRDCALC_STATUS_WARNING ))
+                        continue;
+                      // add the alarm into the log
+                      rc->last_notification = now;
+                      health_alarm_log(
+                                       host
+                                       , rc->id
+                                       , rc->next_event_id++
+                                       , now
+                                       , rc->name
+                                       , rc->rrdset->id
+                                       , rc->rrdset->family
+                                       , rc->exec
+                                       , rc->recipient
+                                       , now - rc->last_status_change
+                                       , rc->old_value
+                                       , rc->value
+                                       , rc->status
+                                       , status
+                                       , rc->source
+                                       , rc->units
+                                       , rc->info
+                                       , rc->delay_last
+                                       , (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION) ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
+                                       , repeat_every
+                                       );
+                    }
+                    else if( unlikely(rc->repeat_every) ) {
+                      /* info("Alarm entry repeats every %lu seconds.", rc->repeat_every); */
+                      if(unlikely(now < rc->last_notification + rc->repeat_every)) {
+                        info("Next alarm notification in %lu seconds.", rc->last_notification + rc->repeat_every - now);
+                        continue;
+                      } // check this
+
+                      if(unlikely(rc->status != RRDCALC_STATUS_CRITICAL && rc->status != RRDCALC_STATUS_WARNING))
+                        continue;
+                      // add the alarm into the log
+                      rc->last_notification = now;
+                      health_alarm_log(
+                                       host
+                                       , rc->id
+                                       , rc->next_event_id++
+                                       , now
+                                       , rc->name
+                                       , rc->rrdset->id
+                                       , rc->rrdset->family
+                                       , rc->exec
+                                       , rc->recipient
+                                       , now - rc->last_status_change
+                                       , rc->old_value
+                                       , rc->value
+                                       , rc->status
+                                       , status
+                                       , rc->source
+                                       , rc->units
+                                       , rc->info
+                                       , rc->delay_last
+                                       , (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION) ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
+                                       , rc->repeat_every
+                                       );
                     }
 
                     rc->last_updated = now;

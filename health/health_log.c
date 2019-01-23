@@ -78,6 +78,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%08x\t%08x\t%08x"
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
+                        "\t%08x\t%08x"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
@@ -112,6 +113,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
                             , ae->new_value
                             , ae->old_value
+
+                            , (uint32_t)ae->repeat_every
+                            , (uint32_t)ae->repeat_count
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -270,6 +274,16 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
 
+            if(unlikely(pointers[27]))
+              ae->repeat_count = (uint32_t)strtoul(pointers[27], NULL, 16);
+            else
+              ae->repeat_count = 0;
+
+            if(unlikely(pointers[28]))
+              ae->repeat_every = (uint32_t)strtoul(pointers[28], NULL, 16);
+            else
+              ae->repeat_every = 0;
+
             char value_string[100 + 1];
             freez(ae->old_value_string);
             freez(ae->new_value_string);
@@ -358,7 +372,8 @@ inline void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
+        uint32_t flags,
+        uint32_t repeat_every
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
@@ -399,6 +414,9 @@ inline void health_alarm_log(
 
     ae->flags |= flags;
 
+    ae->repeat_every = repeat_every;
+    ae->repeat_count = 1;
+
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
 
@@ -423,7 +441,12 @@ inline void health_alarm_log(
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
+
                 health_alarm_log_save(host, t);
+            }
+            if(t->repeat_every){
+              t->repeat_count++;
+              ae->repeat_count = t->repeat_count;
             }
 
             // no need to continue

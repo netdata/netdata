@@ -435,6 +435,8 @@ struct alarm_entry {
     time_t when;
     time_t duration;
     time_t non_clear_duration;
+    uint32_t repeat_count;
+    time_t repeat_every;
 
     char *name;
     uint32_t hash_name;
@@ -562,6 +564,7 @@ struct rrdhost {
     char *health_log_filename;                      // the alarms event log filename
     size_t health_log_entries_written;              // the number of alarm events writtern to the alarms event log
     FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
+    time_t health_repeat_notifications;             // a timestamp to repeat alarms notifications
 
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point

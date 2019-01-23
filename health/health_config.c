@@ -23,6 +23,7 @@
 #define HEALTH_INFO_KEY "info"
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
+#define HEALTH_REPEAT_KEY "repeat"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
@@ -285,6 +286,35 @@ static inline uint32_t health_parse_options(const char *s) {
     return options;
 }
 
+static inline uint32_t health_parse_repeat(const char *s) {
+  uint32_t repeat = 0;
+  char buf[100+1] = "";
+
+  while(*s) {
+    buf[0] = '\0';
+
+    // skip spaces
+    while(*s && isspace(*s))
+      s++;
+
+    // find the next space
+    size_t count = 0;
+    while(*s && count < 100 && !isspace(*s))
+      buf[count++] = *s++;
+
+    if(buf[0]) {
+      buf[count] = '\0';
+
+      if(strtoul(buf, NULL, 16) != 0)
+        repeat = strtoul(buf, NULL, 10);
+      else
+        error("Ignoring unknown alarm option '%s'", buf);
+    }
+  }
+
+  return repeat;
+}
+
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
@@ -430,7 +460,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_info = 0,
             hash_recipient = 0,
             hash_delay = 0,
-            hash_options = 0;
+			      hash_options = 0,
+			      hash_repeat = 0;
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -454,6 +485,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_recipient = simple_hash(HEALTH_RECIPIENT_KEY);
         hash_delay = simple_uhash(HEALTH_DELAY_KEY);
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
+        hash_repeat = simple_uhash(HEALTH_REPEAT_KEY);
     }
 
     FILE *fp = fopen(filename, "r");
@@ -532,6 +564,8 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
+						/* rc->repeat_every = 0; */
+						/* rc->repeat_count = 0; */
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -556,6 +590,8 @@ static int health_readfile(const char *filename, void *data) {
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
+						/* rt->repeat_every = 0; */
+						/* rt->repeat_count = 0; */
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -707,6 +743,10 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
             }
+						else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
+							  rc->repeat_every = health_parse_repeat(value);
+								error("Health repeat every %lu",rc->repeat_every);
+						}
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rc->name, key);
@@ -831,6 +871,10 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rt->options |= health_parse_options(value);
             }
+						else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
+							  rt->repeat_every = health_parse_repeat(value);
+								error("Health2 repeat every %lu", rt->repeat_every);
+						}
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
                         line, filename, rt->name, key);

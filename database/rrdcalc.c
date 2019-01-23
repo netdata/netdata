@@ -102,7 +102,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0
+                0,
+                rc->repeat_every
         );
     }
 }
@@ -163,7 +164,8 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0
+                0,
+                rc->repeat_every
         );
     }
 
@@ -333,6 +335,8 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
     rc->before = rt->before;
     rc->update_every = rt->update_every;
     rc->options = rt->options;
+    rc->repeat_every = rt->repeat_every;
+    rc->repeat_count = rt->repeat_count;
 
     if(rt->exec) rc->exec = strdupz(rt->exec);
     if(rt->recipient) rc->recipient = strdupz(rt->recipient);
