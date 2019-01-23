@@ -727,9 +727,9 @@ function renderMyNetdataMenu(machinesArray) {
                     placeholder="filter agents..."
                     autocomplete="off"
                     value="${myNetdataMenuFilterValue}" 
-                    onkeydown="myNetdataFilterDidChange()"
+                    onkeydown="myNetdataFilterDidChange(event)"
                 />
-                <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick()"><i class="fas fa-times"></i><span>
+                <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick(event)"><i class="fas fa-times"></i><span>
             </div>
             <hr />`
         );
@@ -4659,17 +4659,15 @@ function updateMyNetdataAfterFilterChange() {
     }
 }
 
-function myNetdataFilterDidChange() {
-    const inputEl = this.event.target;
+function myNetdataFilterDidChange(e) {
+    const inputEl = e.target;
     setTimeout(() => {
         myNetdataMenuFilterValue = inputEl.value;
         updateMyNetdataAfterFilterChange();        
     }, 1);
 }
 
-function myNetdataFilterClearDidClick() {
-    const e = this.event;
-    
+function myNetdataFilterClearDidClick(e) {
     e.preventDefault();
     e.stopPropagation();
 
