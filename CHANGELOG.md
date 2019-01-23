@@ -9,6 +9,7 @@
 - Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
+- alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
 
 **Closed issues:**
 
@@ -17,17 +18,20 @@
 
 **Merged pull requests:**
 
+- Mysql charts fix [\#5250](https://github.com/netdata/netdata/pull/5250) ([ilyam8](https://github.com/ilyam8))
 - plugins.d doc: Remove empty similar headline [\#5245](https://github.com/netdata/netdata/pull/5245) ([simonnagl](https://github.com/simonnagl))
 - Pass correct options to the configure command [\#5244](https://github.com/netdata/netdata/pull/5244) ([cakrit](https://github.com/cakrit))
 - Update kickstart.sh md5sum in docs [\#5242](https://github.com/netdata/netdata/pull/5242) ([cakrit](https://github.com/cakrit))
 - Fix check for install-required-packages.sh [\#5241](https://github.com/netdata/netdata/pull/5241) ([cakrit](https://github.com/cakrit))
 - Fix nightly builds and cron autoupdater [\#5232](https://github.com/netdata/netdata/pull/5232) ([paulfantom](https://github.com/paulfantom))
 - Remove v before the version [\#5223](https://github.com/netdata/netdata/pull/5223) ([cakrit](https://github.com/cakrit))
+- Instruct users to use edit-config [\#5222](https://github.com/netdata/netdata/pull/5222) ([cakrit](https://github.com/cakrit))
 - python dockerd module: check version [\#5217](https://github.com/netdata/netdata/pull/5217) ([ilyam8](https://github.com/ilyam8))
 - Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
 - add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
 - Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
 - alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
+- Update info on plugins in performance doc [\#5101](https://github.com/netdata/netdata/pull/5101) ([cakrit](https://github.com/cakrit))
 
 ## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
 
