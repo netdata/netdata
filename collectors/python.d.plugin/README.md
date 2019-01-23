@@ -188,11 +188,42 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 _Examples: `apache`, `nginx`, `tomcat`_
 
-_Variables from config file_: `url`, `user`, `pass`.
+_Variables from config file_:
+ - `url`
+ - `user`
+ - `pass`
+ - `proxy_user`
+ - `proxy_pass`
+ - `proxy_url`
+ - `method`
+ - `header`
+ - `timeout`
+ - `respect_retry_after_header`
+ - `tls_verify`
+ - `tls_ca_verify`
+ - `tls_key_verify`
+ - `tls_cert_verify`
 
 If data is grabbed by accessing service via HTTP protocol, this class can be used. It can handle HTTP Basic Auth when specified with `user` and `pass` credentials.
 
 `_get_raw_data` returns list of utf-8 decoded strings (lines).
+
+### PrometheusService
+
+**Requirements:**
+  * `python-prometheus_client` package
+
+_Examples_: [example_prometheus](#https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/example_prometheus)
+
+_Variables from config file_: all from [UrlService](#urlservice)
+
+Use it to extract data from HTTP endpoints that exposes metrics in openmetrics format.
+
+The service is a `UrlService` wrapper.  It reads HTTP response body, parses data using [text_fd_to_metric_families](#https://github.com/prometheus/client_python/blob/master/prometheus_client/parser.py) parser
+from [prometheus client_python](#https://github.com/prometheus/client_python) package.
+
+`_get_raw_data` returns returns list of
+[Metrics](#https://github.com/prometheus/client_python/blob/master/prometheus_client/metrics_core.py).
 
 ### SocketService
 
