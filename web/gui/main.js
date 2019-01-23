@@ -1003,13 +1003,13 @@ function notifyForDeleteRegistry() {
                         return;
                     }
                     NETDATA.registry.delete(deleteRegistryUrl, function (result) {
-                        if (result !== null) {
-                            deleteRegistryUrl = null;
-                            $('#deleteRegistryModal').modal('hide');
-                            NETDATA.registry.init();
-                        } else {
-                            // Don't show any error.
+                        if (result === null) {
+                            console.log("Received error from registry", result);
                         }
+
+                        deleteRegistryUrl = null;
+                        $('#deleteRegistryModal').modal('hide');
+                        NETDATA.registry.init();
                     });    
                 });
         } else {
