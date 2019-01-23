@@ -20,6 +20,8 @@ When asking a new question please:
 
 ##### OS / Environment
 
+##### Netdata version (ouput of `netdata -V`)
+
 ##### Component Name
 
 ##### Expected results
