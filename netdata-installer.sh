@@ -841,7 +841,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Check version.txt"
 
-if [ ! -s webserver/gui/version.txt ]; then
+if [ ! -s web/gui/version.txt ]; then
 	cat <<VERMSG
 
 ${TPUT_BOLD}Version update check warning${TPUT_RESET}
@@ -852,7 +852,7 @@ Update check on the dashboard, will not work.
 If you want to have version update check, please re-install it
 following the procedure in:
 
-https://github.com/netdata/netdata/tree/master/installer#installation
+https://docs.netdata.cloud/packaging/installer/
 
 VERMSG
 fi
