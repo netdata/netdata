@@ -995,7 +995,7 @@ function notifyForDeleteRegistry() {
 
     if (deleteRegistryUrl) {
         if (isSignedIn()) {
-            deleteCloudKnownAgentURL(deleteRegistryGuid, deleteRegistryUrl)
+            deleteCloudAgentURL(deleteRegistryGuid, deleteRegistryUrl)
                 .then((count) => {
                     if (!count) {
                         responseEl.innerHTML = "<b>Sorry, this command was rejected by netdata.cloud!</b>";
@@ -4518,7 +4518,7 @@ function isValidAgent(a) {
 }
 
 // https://github.com/netdata/hub/issues/146
-function getCloudAccountKnownAgents() {
+function getCloudAccountAgents() {
     if (!isSignedIn()) {
         return [];
     }
@@ -4559,7 +4559,7 @@ function getCloudAccountKnownAgents() {
 }
 
 // https://github.com/netdata/hub/issues/128
-function postCloudAccountKnownAgents(agentsToSync) {
+function postCloudAccountAgents(agentsToSync) {
     if (!isSignedIn()) {
         return [];
     }
@@ -4613,7 +4613,7 @@ function postCloudAccountKnownAgents(agentsToSync) {
     });
 }
 
-function deleteCloudKnownAgentURL(agentID, url) {
+function deleteCloudAgentURL(agentID, url) {
     if (!isSignedIn()) {
         return [];
     }
@@ -4693,7 +4693,7 @@ function clearCloudVariables() {
 function clearCloudLocalStorageItems() {
     localStorage.removeItem("cloud.baseURL");
     localStorage.removeItem("cloud.agentID");
-    localStorage.removeItem("cloud.syncTime");
+    localStorage.removeItem("cloud.sync");
 }
 
 function signOut() {
@@ -4822,30 +4822,36 @@ function mergeAgents(cloud, registry) {
     return [];
 }
 
-function shouldSync() {
-    return localStorage.getItem("cloud.syncTime") == null;
-}
-
 function showSyncModal() {
     $("#syncRegistryModal").modal("show");
 }
 
 function forceSync() {
     $("#syncRegistryModal").modal("hide");
-    localStorage.removeItem("cloud.syncTime");
+
+    const json = localStorage.getItem("cloud.sync");
+    const sync = json ? JSON.parse(json): {};
+    delete sync[cloudAccountID];
+    localStorage.setItem("cloud.sync", JSON.stringify(sync));
+    
     NETDATA.registry.init();
 }
 
 function syncAgents(callback) {
-    if (shouldSync()) {
+    const json = localStorage.getItem("cloud.sync");
+    const sync = json ? JSON.parse(json): {};
+
+    if (!sync[cloudAccountID]) {
         console.log("Checking if sync is needed.");
-        localStorage.setItem("cloud.syncTime", new Date().getTime());
+
+        sync[cloudAccountID] = new Date().getTime();
+        localStorage.setItem("cloud.sync", JSON.stringify(sync));
         
         const agentsToSync = mergeAgents(cloudAgents, registryAgents);
 
         if (agentsToSync.length > 0) {
             console.log("Synchronizing with netdata.cloud.");
-            postCloudAccountKnownAgents(agentsToSync).then((agents) => {
+            postCloudAccountAgents(agentsToSync).then((agents) => {
                 // TODO: clear syncTime on error!
                 cloudAgents = agents;
                 callback(cloudAgents);
@@ -4903,10 +4909,10 @@ function netdataRegistryCallback(machinesArray) {
     registryAgents = machinesArray;  
 
     if (isSignedIn()) {
-        // We call getCloudAccountKnownAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that 
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
-        getCloudAccountKnownAgents().then((agents) => {
+        getCloudAccountAgents().then((agents) => {
             if (!agents) {
                 errorMyNetdataMenu();
                 return;
