@@ -714,6 +714,7 @@ function renderMyNetdataMenu(machinesArray) {
         console.log("Rendering my-netdata menu from registry");
     } else {
         console.log("Rendering my-netdata menu from netdata.cloud");
+        console.log(machinesArray);
     }
 
     let html = '';
