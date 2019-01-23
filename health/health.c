@@ -496,6 +496,29 @@ void *health_main(void *ptr) {
 			}
 		}
 
+        rrd_rdlock();
+
+		RRDHOST *host;
+		rrdhost_foreach_read(host) {
+          if (unlikely(!host->health_enabled))
+            continue;
+
+          if (unlikely(apply_hibernation_delay)) {
+
+            info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname
+                 );
+
+            host->health_delay_up_to = now + hibernation_delay;
+          }
+
+          if (unlikely(host->health_delay_up_to)) {
+            if (unlikely(now < host->health_delay_up_to))
+              continue;
+
+            info("Resuming health checks on host '%s'.", host->hostname);
+            host->health_delay_up_to = 0;
+          }
+
   
   if(unlikely(repeat_every)) {
               if((host->health_repeat_notifications == 0) || (host->health_repeat_notifications < now)){
@@ -508,6 +531,8 @@ void *health_main(void *ptr) {
                    , host->hostname
                    );
             }
+
+  rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
             for(rc = host->alarms; rc; rc = rc->next) {
