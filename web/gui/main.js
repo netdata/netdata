@@ -4957,7 +4957,7 @@ function tryFastInitCloud() {
 function initializeApp() {
     window.addEventListener("message", handleMessage, false);    
 
-    tryFastInitCloud();
+    // tryFastInitCloud();
 }
 
 if (document.readyState === "complete") {
