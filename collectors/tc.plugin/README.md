@@ -163,68 +163,11 @@ And this is what you are going to get:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14436322/c91d90a4-0024-11e6-9fb1-57cdef1580df.png)
 
-## QoS Configuration example with tc
+## QoS Configuration with tc
 
-_Example provided in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973)_
+First, setup the tc rules in rc.local using commands to assign different DSCP markings to different classids. You can see one such example in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973). 
 
-First, setup the tc rules in rc.local using the following commands to assign different DSCP markings to different classids In the particular example, `netem` is used on these interfaces to inject impairments, which is why the root `qdisc` is created that way:
-
-```tc qdisc add dev eth5 root handle 1: netem loss 0%
-tc qdisc add dev eth5 parent 1: handle 2: htb default 1
-tc class add dev eth5 parent 2: classid 2:1 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:8 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:10 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:16 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:18 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:24 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:26 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:32 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:34 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:40 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:46 htb rate 1gbit burst 1gbit
-tc class add dev eth5 parent 2: classid 2:48 htb rate 1gbit burst 1gbit
-
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x20 0xff classid 2:8
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x28 0xff classid 2:10
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x40 0xff classid 2:16
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x48 0xff classid 2:18
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x60 0xff classid 2:24
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x68 0xff classid 2:26
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x80 0xff classid 2:32
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0x88 0xff classid 2:34
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xa0 0xff classid 2:40
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xb8 0xff classid 2:46
-tc filter add dev eth5 protocol ip parent 2: prio 1 u32 match ip dsfield 0xc0 0xff classid 2:48
-
-tc qdisc add dev eth6 root handle 1: netem loss 0%
-tc qdisc add dev eth6 parent 1: handle 2: htb default 1
-tc class add dev eth6 parent 2: classid 2:1 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:8 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:10 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:16 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:18 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:24 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:26 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:32 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:34 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:40 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:46 htb rate 1gbit burst 1gbit
-tc class add dev eth6 parent 2: classid 2:48 htb rate 1gbit burst 1gbit
-
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x20 0xff classid 2:8
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x28 0xff classid 2:10
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x40 0xff classid 2:16
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x48 0xff classid 2:18
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x60 0xff classid 2:24
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x68 0xff classid 2:26
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x80 0xff classid 2:32
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0x88 0xff classid 2:34
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xa0 0xff classid 2:40
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xb8 0xff classid 2:46
-tc filter add dev eth6 protocol ip parent 2: prio 1 u32 match ip dsfield 0xc0 0xff classid 2:48
-```
-
-Then map the classids to names by creating `/etc/iproute2/tc_cls`:
+Then, map the classids to names by creating `/etc/iproute2/tc_cls`. For example:
 ```2:1 Standard
 2:8 LowPriorityData
 2:10 HighThroughputData
