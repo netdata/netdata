@@ -666,7 +666,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_CUSTOM}"         != "YES" \
     -a "${SEND_IRC}"            != "YES" \
     -a "${SEND_AWSSNS}"         != "YES" \
-    -o "${SEND_PROWL}"          != "YES" \
+    -a "${SEND_PROWL}"          != "YES" \
     -a "${SEND_SYSLOG}"         != "YES" \
     -a "${SEND_MSTEAM}"         != "YES" \
     ]
