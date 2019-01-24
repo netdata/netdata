@@ -10,7 +10,9 @@ extern struct arcstats arcstats;
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
+    static int show_zero_charts = 0, do_zfs_stats = 0;
     static procfile *ff = NULL;
+    static char *dirname = NULL;
     static ARL_BASE *arl_base = NULL;
 
     arcstats.l2exist = -1;
@@ -117,7 +119,44 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         ff = procfile_open(config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
             return 1;
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
+        dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
+
+        show_zero_charts = config_get_boolean_ondemand("plugin:proc:" ZFS_PROC_ARCSTATS, "show zero charts", CONFIG_BOOLEAN_NO);
+        if(unlikely(show_zero_charts == CONFIG_BOOLEAN_YES))
+            do_zfs_stats = 1;
     }
+
+    // check if any pools exist
+    if(likely(!do_zfs_stats)) {
+        DIR *dir = opendir(dirname);
+        if(unlikely(!dir)) {
+            error("Cannot read directory '%s'", dirname);
+            return 1;
+        }
+
+        struct dirent *de = NULL;
+        while(likely(de = readdir(dir))) {
+            if(likely(de->d_type == DT_DIR
+                && (
+                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+                    )))
+                continue;
+
+            if(unlikely(de->d_type == DT_LNK || de->d_type == DT_DIR)) {
+                do_zfs_stats = 1;
+                break;
+            }
+        }
+
+        closedir(dir);
+    }
+
+    // do not show ZFS filesystem metrics if there haven't been any pools in the system yet
+    if(unlikely(!do_zfs_stats))
+        return 0;
 
     ff = procfile_readall(ff);
     if(unlikely(!ff))
@@ -148,8 +187,8 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     if(unlikely(arcstats.l2exist == -1))
         arcstats.l2exist = 0;
 
-    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
-    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, update_every);
+    generate_charts_arcstats(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
+    generate_charts_arc_summary(PLUGIN_PROC_NAME, ZFS_PROC_ARCSTATS, show_zero_charts, update_every);
 
     return 0;
 }
