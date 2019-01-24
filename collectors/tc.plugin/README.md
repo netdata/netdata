@@ -109,7 +109,7 @@ For example, do you know that for matching a simple port range in `tc`, e.g. all
 32768/0x8000
 ```
 
-To do it the hard way, you can go through the [tc configuration steps](#qos-configuration-example-with-tc). An easier way is to use  **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, a tool that simplifies QoS management in Linux.
+To do it the hard way, you can go through the [tc configuration steps](#qos-configuration-with-tc). An easier way is to use  **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, a tool that simplifies QoS management in Linux.
 
 ## Qos Configuration with FireHOL
 
