@@ -421,7 +421,7 @@ trap - EXIT
 # -----------------------------------------------------------------------------
 progress "Cleanup compilation directory"
 
-[ -f src/netdata ] && run make clean
+run make clean
 
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
