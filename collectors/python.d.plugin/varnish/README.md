@@ -64,7 +64,13 @@ It produces:
 
 ### configuration
 
-No configuration is needed.
+Only one parameter is supported:
+
+```yaml
+instance_name: 'name'
+```
+
+The name of the varnishd instance to get logs from. If not specified, the host name is used.
 
 ---
 
