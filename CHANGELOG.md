@@ -4,20 +4,31 @@
 
 **Fixed bugs:**
 
+- alarm-notify.sh not working with latest update of netdata [\#5261](https://github.com/netdata/netdata/issues/5261)
+- /etc/netdata/edit-config charts.d.conf [\#5252](https://github.com/netdata/netdata/issues/5252)
 - Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
 - It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
 - Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 - alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
+- zfs charts appear, even when they are zero [\#4115](https://github.com/netdata/netdata/issues/4115)
+- Ceph - No JSON object could be decoded [\#3563](https://github.com/netdata/netdata/issues/3563)
 
 **Closed issues:**
 
+- Developing a new plugin questions [\#5235](https://github.com/netdata/netdata/issues/5235)
 - Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
 - \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
 
 **Merged pull requests:**
 
+- Always run make clean before make [\#5265](https://github.com/netdata/netdata/pull/5265) ([cakrit](https://github.com/cakrit))
+- Bug fix for 5261 [\#5263](https://github.com/netdata/netdata/pull/5263) ([cakrit](https://github.com/cakrit))
+- ceph module bugfix: fix invalid json response [\#5260](https://github.com/netdata/netdata/pull/5260) ([ilyam8](https://github.com/ilyam8))
+- Fix typo in docs/configuration-guide.md [\#5259](https://github.com/netdata/netdata/pull/5259) ([u32i64](https://github.com/u32i64))
+- SUSE addition [\#5258](https://github.com/netdata/netdata/pull/5258) ([dannysauer](https://github.com/dannysauer))
+- Check version.txt in correct directory and fix link to docs [\#5256](https://github.com/netdata/netdata/pull/5256) ([cakrit](https://github.com/cakrit))
 - Mysql charts fix [\#5250](https://github.com/netdata/netdata/pull/5250) ([ilyam8](https://github.com/ilyam8))
 - plugins.d doc: Remove empty similar headline [\#5245](https://github.com/netdata/netdata/pull/5245) ([simonnagl](https://github.com/simonnagl))
 - Pass correct options to the configure command [\#5244](https://github.com/netdata/netdata/pull/5244) ([cakrit](https://github.com/cakrit))
@@ -26,9 +37,11 @@
 - Fix nightly builds and cron autoupdater [\#5232](https://github.com/netdata/netdata/pull/5232) ([paulfantom](https://github.com/paulfantom))
 - Remove v before the version [\#5223](https://github.com/netdata/netdata/pull/5223) ([cakrit](https://github.com/cakrit))
 - Instruct users to use edit-config [\#5222](https://github.com/netdata/netdata/pull/5222) ([cakrit](https://github.com/cakrit))
+- Improvements to QoS \(tc\) documentation [\#5221](https://github.com/netdata/netdata/pull/5221) ([cakrit](https://github.com/cakrit))
 - python dockerd module: check version [\#5217](https://github.com/netdata/netdata/pull/5217) ([ilyam8](https://github.com/ilyam8))
 - Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
 - add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
+- Don't show zero charts for ZFS filesystem [\#5211](https://github.com/netdata/netdata/pull/5211) ([vlvkobal](https://github.com/vlvkobal))
 - Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
 - alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
 - Update info on plugins in performance doc [\#5101](https://github.com/netdata/netdata/pull/5101) ([cakrit](https://github.com/cakrit))
