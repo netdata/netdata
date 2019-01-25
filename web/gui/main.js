@@ -4826,6 +4826,7 @@ function mergeAgents(cloud, registry) {
 }
 
 function showSyncModal() {
+    document.getElementById("sync-registry-modal-registry").innerHTML = NETDATA.registry.server;
     $("#syncRegistryModal").modal("show");
 }
 
