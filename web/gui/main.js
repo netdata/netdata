@@ -695,14 +695,16 @@ function errorMyNetdataMenu() {
 }
 
 function restrictMyNetdataMenu() {
-    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
-        <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in</a> to <strong>netdata.cloud</strong> to view your netdata agents!</span>
+    setMyNetdataMenu(`<div class="info-item" style="white-space: nowrap">
+        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your netdata agents!</span>
         <div></div>
     </div>`);
 }
 
 function renderMyNetdataMenu(machinesArray) {
+    const el = document.getElementById('my-netdata-dropdown-content');
+    el.classList.add(`theme-${netdataTheme}`);
+
     if (!isSignedIn()) {
         if (!NETDATA.registry.isRegistryEnabled()) {
             restrictMyNetdataMenu();
@@ -772,8 +774,6 @@ function renderMyNetdataMenu(machinesArray) {
         )
     }
 
-    const el = document.getElementById('my-netdata-dropdown-content')
-    el.classList.add(`theme-${netdataTheme}`);
     el.innerHTML = html;
 
     gotoServerInit();

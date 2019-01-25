@@ -613,7 +613,7 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content.theme-white a {
-    color: #555;
+    color: #888;
 }
 
 #my-netdata-dropdown-content.theme-white a:hover {
@@ -650,7 +650,7 @@ body.modal-open {
 
 #my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
     /* border: 1px solid #ddd; */
-    background-color: #ddd;
+    background-color: #e7e7e7;
     color: #555;
 }
 
@@ -671,3 +671,4 @@ body.modal-open {
 #hostname {
     font-size: 18px;
 }
+
