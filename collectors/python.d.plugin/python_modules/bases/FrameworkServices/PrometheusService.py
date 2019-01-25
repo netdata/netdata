@@ -27,7 +27,7 @@ class PrometheusService(UrlService):
         lines = iter(raw.split('\n'))
 
         try:
-            metrics = [m for m in text_fd_to_metric_families(lines)]
+            metrics = list(text_fd_to_metric_families(lines))
         except AttributeError as error:
             self.error('parse error: {0}'.format(error))
             return None
