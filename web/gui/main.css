@@ -634,16 +634,23 @@ body.modal-open {
 
 #my-netdata-menu-filter-input {
     color: #fff;
-    background: none;
-    border: 1px solid #616161;
+    /* background: none; */
+    /* border: 1px solid #616161; */
+    border: none;
+    background-color: #4b4f55;
     margin: 5px 14px;
-    width: 80%;
+    width: 90%;
     padding: 2px 5px;
     outline: none;
 }
 
+#my-netdata-menu-filter-input::placeholder {
+    opacity: 0.7;
+}
+
 #my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
-    border: 1px solid #ddd;
+    /* border: 1px solid #ddd; */
+    background-color: #ddd;
     color: #555;
 }
 
