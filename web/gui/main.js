@@ -547,9 +547,11 @@ function renderStreamedHosts(options) {
 }
 
 function renderMachines(machinesArray) {
-    let html = isSignedIn() 
-        ? `<div class="info-item">My netdata agents</div>`
-        : `<div class="info-item">My netdata agents </div>`;
+    // let html = isSignedIn() 
+    //     ? `<div class="info-item">My nodes</div>`
+    //     : `<div class="info-item">My nodes</div>`;
+
+    let html = `<div class="info-item">My nodes</div>`;
 
     if (machinesArray === null) {
         let ret = loadLocalStorage("registryCallback");
@@ -622,7 +624,7 @@ function renderMachines(machinesArray) {
             html += (
                 `<div class="info-item">
                     <i class="fas fa-filter"></i>
-                    <span style="margin-left: 8px">no agents match the filter criteria.<span>
+                    <span style="margin-left: 8px">zero nodes are matching the filter value.<span>
                 </div>`
             )
         }
@@ -644,7 +646,7 @@ function renderMachines(machinesArray) {
         }
 
         html += `<hr />`;
-        html += `<div class="info-item">Demo netdata agents</div>`;
+        html += `<div class="info-item">Demo netdata nodes</div>`;
 
         const demoServers = [
             {url: "//london.netdata.rocks/default.html", title: "UK - London (DigitalOcean.com)"},
@@ -696,7 +698,7 @@ function errorMyNetdataMenu() {
 
 function restrictMyNetdataMenu() {
     setMyNetdataMenu(`<div class="info-item" style="white-space: nowrap">
-        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your netdata agents!</span>
+        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your nodes!</span>
         <div></div>
     </div>`);
 }
@@ -727,7 +729,7 @@ function renderMyNetdataMenu(machinesArray) {
                 <input 
                     id="my-netdata-menu-filter-input"
                     type="text" 
-                    placeholder="filter agents..."
+                    placeholder="filter nodes..."
                     autocomplete="off"
                     value="${myNetdataMenuFilterValue}" 
                     onkeydown="myNetdataFilterDidChange(event)"
