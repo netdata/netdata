@@ -61,7 +61,7 @@ example_memory_used_bytes{type="service",name="Example"} %d
 '''
 
 
-class MockOpenmetricsExporter:
+class MockPrometheusExporter:
     def __init__(self):
         self.p = 0
         self.random = SystemRandom()
@@ -82,7 +82,7 @@ class Service(PrometheusService):
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
         self.random = SystemRandom()
-        self.exp = MockOpenmetricsExporter()
+        self.exp = MockPrometheusExporter()
         self.url = "http://127.0.0.1"
 
     def _scrape(self, *args, **kwargs):

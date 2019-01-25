@@ -217,7 +217,7 @@ _Examples_: [example_prometheus](https://github.com/netdata/netdata/tree/master/
 
 _Variables from config file_: all from [UrlService](#urlservice)
 
-Use it to extract data from HTTP endpoints that exposes metrics in openmetrics format.
+Use it to extract data from HTTP endpoints that exposes metrics in prometheus format.
 
 The service is a `UrlService` wrapper.  It reads HTTP response body, parses data using [text_fd_to_metric_families](https://github.com/prometheus/client_python/blob/master/prometheus_client/parser.py) parser
 from [prometheus client_python](https://github.com/prometheus/client_python) package.
