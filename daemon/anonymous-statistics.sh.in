@@ -121,10 +121,14 @@ fi
 
 # -------------------------------------------------------------------------------------------------
 # check netdata unique id
-NETDATA_REGISTRY_UNIQUE_ID="unknown"
-if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
-	NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
+if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
+	if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
+		NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
+	else
+		NETDATA_REGISTRY_UNIQUE_ID="unknown"
+	fi
 fi
+
 
 # -------------------------------------------------------------------------------------------------
 # send the anonymous statistics to GA
