@@ -436,7 +436,7 @@ int main(int argc, char **argv) {
 
 int main(int argc, char **argv)
 {
-    fatal("freeipmi.plugin is not compiled.");
+    fatal("cups.plugin is not compiled.");
 }
 
 #endif // !HAVE_CUPS
