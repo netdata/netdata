@@ -634,7 +634,7 @@ function renderMachines(machinesArray) {
         if (machines) {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty</a>
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your nodes list is empty</a>
                 </div>`
             )
         } else {
@@ -4501,7 +4501,7 @@ let cloudAccountName = null;
 
 let cloudToken = null;
 
-let forceCloudSync = true;
+let forceCloudSync = false;
 
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
@@ -4850,6 +4850,7 @@ function explicitlySyncAgents() {
 function syncAgents(callback) {
     if ((!NETDATA.registry.isUsingGlobalRegistry()) && (!forceCloudSync)) {
         // Don't synchronize custom registries implicitly.
+        registryAgents = mergeAgents(cloudAgents, registryAgents);
         callback(registryAgents);
         return;
     }
