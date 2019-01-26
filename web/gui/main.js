@@ -765,7 +765,7 @@ function renderMyNetdataMenu(machinesArray) {
             `<hr />
             <div class="agent-item">
                 <i class="fas fa-sync"></i>
-                <a href="#" onclick="showSyncModal(); return false">Synchronize netdata.cloud</a>
+                <a href="#" onclick="showSyncModal(); return false">Synchronize with netdata.cloud</a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4850,6 +4850,7 @@ function explicitlySyncAgents() {
 function syncAgents(callback) {
     if ((!NETDATA.registry.isUsingGlobalRegistry()) && (!forceCloudSync)) {
         // Don't synchronize custom registries implicitly.
+        callback(registryAgents);
         return;
     }
 
