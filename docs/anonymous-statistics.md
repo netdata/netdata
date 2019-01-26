@@ -29,8 +29,16 @@ To ensure anonymity of the stored information, we have configured GTM's GA varia
 |title|netdata dashboard
 |campaignSource|{{machine_guid}}
 |campaignMedium|web
+|referrer|http://dashboard.my-netdata.io
+|Page URL|http://dashboard.my-netdata.io/netdata-dashboard
+|Page Hostname|http://dashboard.my-netdata.io
+|Page Path|/netdata-dashboard
+|location|http://dashboard.my-netdata.io
 
 In addition, the netdata-generated unique machine guid is sent to GA via a custom dimension.
+You can verify the effect of these settings by examining the GA `collect` request parameters.
+
+The only thing that's impossible for us to prevent from being **sent** is the URL in the "Referrer" Header of the browser request to GA. However, the settings above ensure that all **stored** URLs and host names are anonymized.
 
 ## Anonymous Statistics Script
 
