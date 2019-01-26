@@ -4501,6 +4501,8 @@ let cloudAccountName = null;
 
 let cloudToken = null;
 
+let forceCloudSync = true;
+
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
 function truncateString(str, maxLength) {
@@ -4832,8 +4834,10 @@ function showSyncModal() {
     $("#syncRegistryModal").modal("show");
 }
 
-function forceSync() {
+function explicitlySyncAgents() {
     $("#syncRegistryModal").modal("hide");
+
+    forceCloudSync = true;
 
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
@@ -4844,6 +4848,13 @@ function forceSync() {
 }
 
 function syncAgents(callback) {
+    if ((!NETDATA.registry.isUsingGlobalRegistry()) && (!forceCloudSync)) {
+        // Don't synchronize custom registries implicitly.
+        return;
+    }
+
+    forceCloudSync = false;
+
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
 

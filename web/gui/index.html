@@ -1246,11 +1246,13 @@
                         You are about to synchronize your netdata.cloud account with data from the registry at <strong><span id="sync-registry-modal-registry"></span></strong>.
                         This may include server hostnames, urls and identification GUIDs.
                     </p>
-                    Are you sure you want to do this?
+                    <p>
+                        Are you sure you want to do this?
+                    </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" data-dismiss="modal">Cancel</button>
-                    <a href="#" onclick="forceSync(); return false;" type="button" class="btn btn-danger">Synchronize</a>
+                    <a href="#" onclick="explicitlySyncAgents(); return false;" type="button" class="btn btn-danger">Synchronize</a>
                 </div>
             </div>
         </div>
