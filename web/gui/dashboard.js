@@ -1246,7 +1246,7 @@ if (typeof netdataShowAlarms === 'undefined') {
 }
 
 if (typeof netdataRegistryAfterMs !== 'number' || netdataRegistryAfterMs < 0) {
-    netdataRegistryAfterMs = 1500;
+    netdataRegistryAfterMs = 0; // 1500;
 }
 
 if (typeof netdataRegistry === 'undefined') {
@@ -9808,6 +9808,8 @@ NETDATA.registry = {
         let url = NETDATA.registry.MASKED_DATA;
 
         if (!NETDATA.registry.isUsingGlobalRegistry()) {
+            // If the user is using a private registry keep sending identifiable
+            // data.
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
         } 
