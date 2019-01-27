@@ -165,6 +165,7 @@ updater=""
 if [ -L "${updater}" ]; then
 	# remove old updater (symlink)
 	run "${sudo}" rm -f "${updater}"
+	updater=""
 fi
 if [ -n "${updater}" ]; then
 	# attempt to run the updater, to respect any compilation settings already in place
