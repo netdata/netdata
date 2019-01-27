@@ -4709,7 +4709,7 @@ function clearCloudLocalStorageItems() {
 }
 
 function signIn() {
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin + "/");
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?origin=${encodeURIComponent(window.location.origin + "/")}`;
     window.open(url);
 }
 
@@ -4895,24 +4895,14 @@ let isCloudSSOInitialized = false;
 
 function cloudSSOInit() {
     const iframeEl = document.getElementById("ssoifrm");
-    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent-precheck`;
-    iframeEl.onload = function () {
-        iframeEl.contentWindow.postMessage(
-            {
-                type: "sso",
-                origin: `${window.location.origin}/`,
-                agentID: NETDATA.registry.machine_guid,
-            }, 
-            url
-        );
-    }
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent?id=${NETDATA.registry.machine_guid}`;
     iframeEl.src = url;
     isCloudSSOInitialized = true;
 }
 
 function cloudSSOSignOut() {
     const iframe = document.getElementById("ssoifrm");
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-out-agent?origin=" + encodeURIComponent(window.location.origin + "/");
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-out-agent`;
     iframe.src = url;
 }
 
