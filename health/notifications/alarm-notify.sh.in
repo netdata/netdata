@@ -1812,15 +1812,16 @@ urlencode "${name}" >/dev/null; url_name="${REPLY}"
 
 redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
 GOTOCLOUD=0
-NETDATA_REGISTRY_UNIQUE_ID="unknown"
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ] ; then
-	if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
-		NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
-	fi
-	if [ "${NETDATA_REGISTRY_UNIQUE_ID}" != "unknown" ] ; then
-		GOTOCLOUD=1
-	fi
+   if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
+      if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
+         NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
+      fi
+   fi
+   if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
+      GOTOCLOUD=1
+   fi
 fi
 
 if [ ${GOTOCLOUD} -eq 0 ] ; then
