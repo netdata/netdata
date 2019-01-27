@@ -717,8 +717,7 @@ function renderMyNetdataMenu(machinesArray) {
     if (machinesArray == registryAgents) {
         console.log("Rendering my-netdata menu from registry");
     } else {
-        console.log("Rendering my-netdata menu from netdata.cloud");
-        console.log(machinesArray);
+        console.log("Rendering my-netdata menu from netdata.cloud", machinesArray);
     }
 
     let html = '';
@@ -4794,29 +4793,20 @@ function sortedArraysEqual(a, b) {
     return true;
 }
 
-function mergeAgents(cloud, registry) {
+// If merging is needed returns the merged agents set, otherwise returns null.
+function mergeAgents(cloud, local) {
     let dirty = false;
 
     const union = new Map();
 
-    for (const agent of cloud) {
-        union.set(agent.guid, agent);
+    for (const cagent of cloud) {
+        union.set(cagent.guid, cagent);
     }
 
-    const current = {
-        guid: NETDATA.registry.machine_guid,
-        name: NETDATA.registry.hostname,
-        url: NETDATA.serverDefault,
-        alternate_urls: [NETDATA.serverDefault],
-    }
-
-    // Make sure that the current netdata agent is merged!
-    const known = registry.concat([current]);
-
-    for (const kagent of known) {
-        const cagent = union.get(kagent.guid);
+    for (const lagent of local) {
+        const cagent = union.get(lagent.guid);
         if (cagent) {
-            for (const u of kagent.alternate_urls) {
+            for (const u of lagent.alternate_urls) {
                 if (u === NETDATA.registry.MASKED_DATA) { // TODO: temp until registry is updated.
                     continue;
                 }
@@ -4828,7 +4818,7 @@ function mergeAgents(cloud, registry) {
             }
         } else {
             dirty = true;
-            union.set(kagent.guid, kagent);
+            union.set(lagent.guid, lagent);
         }
     }
 
@@ -4836,7 +4826,7 @@ function mergeAgents(cloud, registry) {
         return Array.from(union.values());
     }
 
-    return [];
+    return null;
 }
 
 function showSignInModal() {
@@ -4868,25 +4858,38 @@ function explicitlySyncAgents() {
 function syncAgents(callback) {
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
+    
+    const currentAgent = {
+        guid: NETDATA.registry.machine_guid,
+        name: NETDATA.registry.hostname,
+        url: NETDATA.serverDefault,
+        alternate_urls: [NETDATA.serverDefault],
+    }
 
-    if (!sync[cloudAccountID]) {
-        console.log("Checking if sync is needed.");
+    const localAgents = sync[cloudAccountID] 
+        ? [currentAgent] 
+        : registryAgents.concat([currentAgent]);
+    
+    console.log("Checking if sync is needed.", localAgents);
 
+    const agentsToSync = mergeAgents(cloudAgents, localAgents);
+
+    if ((!sync[cloudAccountID]) || agentsToSync)  {
         sync[cloudAccountID] = new Date().getTime();
         localStorage.setItem("cloud.sync", JSON.stringify(sync));
-        
-        const agentsToSync = mergeAgents(cloudAgents, registryAgents);
-
-        if (agentsToSync.length > 0) {
-            console.log("Synchronizing with netdata.cloud.");
-            postCloudAccountAgents(agentsToSync).then((agents) => {
-                // TODO: clear syncTime on error!
-                cloudAgents = agents;
-                callback(cloudAgents);
-            });
-            return        
-        } 
     }
+
+    if (agentsToSync) {
+        console.log("Synchronizing with netdata.cloud.");
+        
+        postCloudAccountAgents(agentsToSync).then((agents) => {
+            // TODO: clear syncTime on error!
+            cloudAgents = agents;
+            callback(cloudAgents);
+        });
+
+        return        
+    } 
 
     callback(cloudAgents);
 }
