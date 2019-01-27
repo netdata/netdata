@@ -380,6 +380,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     if(*e == ':') {
         port = e + 1;
         *e = '\0';
+        e++;
         while(*e && *e != '=') e++;
     }
 
