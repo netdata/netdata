@@ -116,6 +116,7 @@ navpart 1 . README "About"
 
 echo -ne "    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
+    - 'docs/anonymous-statistics.md'
     - 'docs/Donations-netdata-has-received.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
@@ -229,7 +230,7 @@ echo -ne "- Hacking netdata:
     - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
-navpart 2 makeself "" "" 4
+navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
 navpart 2 tests "" "" 2
