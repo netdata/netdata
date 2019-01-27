@@ -17,12 +17,14 @@
 
 **Closed issues:**
 
+- Slack Notifications Ignored by alarm-notify.sh [\#5267](https://github.com/netdata/netdata/issues/5267)
 - Developing a new plugin questions [\#5235](https://github.com/netdata/netdata/issues/5235)
 - Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
 - \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
 
 **Merged pull requests:**
 
+- Fix incorrect parsing of ACLs [\#5275](https://github.com/netdata/netdata/pull/5275) ([cakrit](https://github.com/cakrit))
 - Always run make clean before make [\#5265](https://github.com/netdata/netdata/pull/5265) ([cakrit](https://github.com/cakrit))
 - Bug fix for 5261 [\#5263](https://github.com/netdata/netdata/pull/5263) ([cakrit](https://github.com/cakrit))
 - ceph module bugfix: fix invalid json response [\#5260](https://github.com/netdata/netdata/pull/5260) ([ilyam8](https://github.com/ilyam8))
@@ -44,6 +46,7 @@
 - Don't show zero charts for ZFS filesystem [\#5211](https://github.com/netdata/netdata/pull/5211) ([vlvkobal](https://github.com/vlvkobal))
 - Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
 - alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
+- Anonymous statistics [\#5113](https://github.com/netdata/netdata/pull/5113) ([cakrit](https://github.com/cakrit))
 - Update info on plugins in performance doc [\#5101](https://github.com/netdata/netdata/pull/5101) ([cakrit](https://github.com/cakrit))
 
 ## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
