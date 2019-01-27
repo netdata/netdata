@@ -9697,7 +9697,6 @@ NETDATA.registry = {
     },
 
     parsePersonUrls: function (person_urls) {
-        // console.log(person_urls);
         NETDATA.registry.person_urls = person_urls;
 
         if (person_urls) {

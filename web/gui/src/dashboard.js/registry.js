@@ -23,7 +23,6 @@ NETDATA.registry = {
     },
 
     parsePersonUrls: function (person_urls) {
-        // console.log(person_urls);
         NETDATA.registry.person_urls = person_urls;
 
         if (person_urls) {
@@ -135,6 +134,8 @@ NETDATA.registry = {
         let url = NETDATA.registry.MASKED_DATA;
 
         if (!NETDATA.registry.isUsingGlobalRegistry()) {
+            // If the user is using a private registry keep sending identifiable
+            // data.
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
         } 

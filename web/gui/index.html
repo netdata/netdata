@@ -629,26 +629,6 @@
         </div>
     </div>
 
-    <div class="modal fade" id="signInModal" tabindex="-1" role="dialog" aria-labelledby="signInModalLabel">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="singInModalLabel">netdata sign in</h4>
-                </div>
-                <div class="modal-body">
-                    <iframe 
-                        id="sign-in-iframe"
-                        src="" 
-                        width="100%" 
-                        height="300px"
-                    >
-                    </iframe>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="modal fade" id="optionsModal" tabindex="-1" role="dialog" aria-labelledby="optionsModalLabel">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -1234,6 +1214,37 @@
         </div>
     </div>
 
+    <div class="modal fade" id="signInModal" tabindex="-1" role="dialog" aria-labelledby="signInModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="syncRegistryModalLabel">Sign In</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Signing-in to netdata.cloud will synchronize the list of 
+                        your netdata monitored nodes known at registry 
+                        <strong><span id="sim-registry"></span></strong>. This 
+                        may include server hostnames, urls and identification 
+                        GUIDs.
+                    </p>
+                    <p>
+                        After you upgrade all your netdata servers, your private 
+                        registry will not be needed any more.
+                    </p>
+                    <p>
+                        Are you sure you want to proceed?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal">Cancel</button>
+                    <a href="#" onclick="explicitlySignIn(); return false;" type="button" class="btn btn-danger">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="syncRegistryModal" tabindex="-1" role="dialog" aria-labelledby="syncRegistryModalLabel">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -1247,7 +1258,7 @@
                         This may include server hostnames, urls and identification GUIDs.
                     </p>
                     <p>
-                        Are you sure you want to do this?
+                        Are you sure you want to proceed?
                     </p>
                 </div>
                 <div class="modal-footer">

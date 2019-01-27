@@ -4501,8 +4501,6 @@ let cloudAccountName = null;
 
 let cloudToken = null;
 
-let forceCloudSync = false;
-
 /// Enforces a maximum string length while retaining the prefix and the postfix of
 /// the string.
 function truncateString(str, maxLength) {
@@ -4646,8 +4644,15 @@ function deleteCloudAgentURL(agentID, url) {
 function signInDidClick(e) {
     e.preventDefault();
     e.stopPropagation();
-    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin + "/");
-    window.open(url);
+
+    if (!NETDATA.registry.isUsingGlobalRegistry()) {
+        // If user is using a private registry, request his consent for
+        // synchronizing with cloud.
+        showSignInModal();
+        return;
+    }
+
+    signIn();
 }
 
 function signOutDidClick(e) {
@@ -4701,6 +4706,11 @@ function clearCloudLocalStorageItems() {
     localStorage.removeItem("cloud.baseURL");
     localStorage.removeItem("cloud.agentID");
     localStorage.removeItem("cloud.sync");
+}
+
+function signIn() {
+    const url = NETDATA.registry.cloudBaseURL + "/account/sign-in-agent?origin=" + encodeURIComponent(window.location.origin + "/");
+    window.open(url);
 }
 
 function signOut() {
@@ -4829,6 +4839,16 @@ function mergeAgents(cloud, registry) {
     return [];
 }
 
+function showSignInModal() {
+    document.getElementById("sim-registry").innerHTML = NETDATA.registry.server;
+    $("#signInModal").modal("show");
+}
+
+function explicitlySignIn() {
+    $("#signInModal").modal("hide");
+    signIn();
+}
+
 function showSyncModal() {
     document.getElementById("sync-registry-modal-registry").innerHTML = NETDATA.registry.server;
     $("#syncRegistryModal").modal("show");
@@ -4836,8 +4856,6 @@ function showSyncModal() {
 
 function explicitlySyncAgents() {
     $("#syncRegistryModal").modal("hide");
-
-    forceCloudSync = true;
 
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
@@ -4848,15 +4866,6 @@ function explicitlySyncAgents() {
 }
 
 function syncAgents(callback) {
-    if ((!NETDATA.registry.isUsingGlobalRegistry()) && (!forceCloudSync)) {
-        // Don't synchronize custom registries implicitly.
-        registryAgents = mergeAgents(cloudAgents, registryAgents);
-        callback(registryAgents);
-        return;
-    }
-
-    forceCloudSync = false;
-
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
 
