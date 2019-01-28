@@ -81,6 +81,8 @@ static int registry_json_person_url_callback(void *entry, void *data) {
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
 
+    if (!strcmp(pu->url->url,"***")) return 0;
+    
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
 
@@ -96,6 +98,8 @@ static int registry_json_machine_url_callback(void *entry, void *data) {
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
     REGISTRY_MACHINE *m = c->m;
+
+    if (!strcmp(mu->url->url,"***")) return 1;
 
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
@@ -132,9 +136,9 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
     buffer_sprintf(w->response.data,
-            ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\"",
+            ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\",\n\t\"anonymous_statistics\": %s",
             registry.registry_to_announce,
-            registry.cloud_base_url);
+            registry.cloud_base_url, netdata_anonymous_statistics_enabled?"true":"false");
 
     registry_json_footer(w);
     return 200;

@@ -319,7 +319,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd df',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].replace('-nan', '"-nan"'))
 
     def _get_osd_perf(self):
         """

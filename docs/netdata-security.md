@@ -149,13 +149,25 @@ Of course, there are many more methods you could use to protect Netdata:
 
 - install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a master Netdata server, which will be protected with authentication using an nginx server running locally at the master Netdata server. This requires more resources (you will need a bigger master Netdata server), but does not require any firewall changes, since all the slave Netdata servers will not be listening for incoming connections.
 
-## Registry or how to not send any information to a third party server
+## Anonymous Statistics
+
+### Registry or how to not send any information to a third party server
 
 The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
 - The url where you open the web-ui in the browser (via http request referer)
 - The hostnames of the Netdata servers
 
 If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
+
+### Opt out of anonymous statistics
+
+Starting with v1.12 Netdata also collects [anonymous statistics](anonymous-statistics.md) on certain events for: 
+
+1. **Quality assurance**, to help us understand if netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
+
+2. **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
+
+To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). 
 
 ## Netdata directories
 

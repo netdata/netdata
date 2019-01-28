@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+int netdata_anonymous_statistics_enabled;
+
 struct config netdata_config = {
         .sections = NULL,
         .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -21,6 +23,8 @@ void netdata_cleanup_and_exit(int ret) {
 
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
+
+	send_statistics("EXIT", ret?"ERROR":"OK","-");
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
@@ -458,6 +462,7 @@ static void get_netdata_configured_variables() {
         netdata_configured_plugins_dir_base = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
         quoted_strings_splitter(netdata_configured_plugins_dir_base, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
         netdata_configured_plugins_dir = plugin_directories[0];
+
     }
 
     // ------------------------------------------------------------------------
@@ -581,6 +586,7 @@ void set_global_environment() {
         setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 
+    setenv("NETDATA_VERSION"          , program_version, 1);
     setenv("NETDATA_HOSTNAME"         , netdata_configured_hostname, 1);
     setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
@@ -641,6 +647,47 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     }
 
     return ret;
+}
+
+
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    static char *as_script;
+    if (netdata_anonymous_statistics_enabled == -1) {
+        char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
+        sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
+        if (likely(access(optout_file, R_OK) != 0)) {
+            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
+            sprintf(as_script, "%s/%s", netdata_configured_plugins_dir, "anonymous-statistics.sh");
+			if (unlikely(access(as_script, R_OK) != 0)) {
+				netdata_anonymous_statistics_enabled=0;
+				info("Anonymous statistics script %s not found.",as_script);
+				freez(as_script);
+			} else {
+				netdata_anonymous_statistics_enabled=1;
+			}
+		} else {
+            netdata_anonymous_statistics_enabled = 0;
+            as_script = NULL;
+        }
+        freez(optout_file);
+    }
+	if(!netdata_anonymous_statistics_enabled) return;
+    if (!action) return;
+    if (!action_result) action_result="";
+    if (!action_data) action_data="";
+    char *command_to_run=mallocz(sizeof(char) * (strlen(action) + strlen(action_result) + strlen(action_data) + strlen(as_script) + 10));
+    pid_t command_pid;
+
+    sprintf(command_to_run,"%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
+    info("%s", command_to_run);
+
+    FILE *fp = mypopen(command_to_run, &command_pid);
+    if(fp) {
+        char buffer[100 + 1];
+        while (fgets(buffer, 100, fp) != NULL);
+        mypclose(fp, command_pid);
+    }
+    freez(command_to_run);
 }
 
 int main(int argc, char **argv) {
@@ -914,6 +961,9 @@ int main(int argc, char **argv) {
 
         get_netdata_configured_variables();
         set_global_environment();
+
+        netdata_anonymous_statistics_enabled=-1;
+        send_statistics("START","-", "-");
 
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
