@@ -92,4 +92,8 @@ FILE="netdata-${VERSION}.gz.run"
 
 run mkdir -p artifacts
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
+
+[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
+run ln -s "artifacts/${FILE}" netdata-latest.gz.run
+
 echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"
