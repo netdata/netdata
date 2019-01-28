@@ -431,8 +431,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_info = 0,
             hash_recipient = 0,
             hash_delay = 0,
-			      hash_options = 0,
-			      hash_repeat = 0;
+            hash_options = 0,
+            hash_repeat = 0;
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -535,8 +535,6 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
-						/* rc->repeat_every = 0; */
-						/* rc->repeat_count = 0; */
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -561,8 +559,6 @@ static int health_readfile(const char *filename, void *data) {
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
-						/* rt->repeat_every = 0; */
-						/* rt->repeat_count = 0; */
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);

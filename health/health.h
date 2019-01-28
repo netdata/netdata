@@ -128,7 +128,7 @@ extern void health_alarm_log(
         const char *info,
         int delay,
         uint32_t flags,
-        uint32_t repeat_every;
+        uint32_t repeat_every
 );
 
 
