@@ -4727,7 +4727,7 @@ function renderAccountUI() {
         container.removeAttribute("data-original-title");
         container.removeAttribute("data-placement");
         container.innerHTML = (
-            `<a href="#" class="dropdown-toggle" data-toggle="dropdown">${cloudAccountName} <strong class="caret"></strong></a>
+            `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                     <li>
                         <a href="#" class="btn" onclick="signOutDidClick(event); return false">
@@ -4736,6 +4736,7 @@ function renderAccountUI() {
                 </li>
             </ul>`
         )
+        document.getElementById("amc-account-name").textContent = cloudAccountName; // Anti-XSS
     } else {
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
