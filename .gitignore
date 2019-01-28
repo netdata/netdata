@@ -156,3 +156,6 @@ python.d/python-modules-installer.sh
 docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
+
+netdata-updater.sh
+.environment.sh
