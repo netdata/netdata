@@ -1809,7 +1809,27 @@ urlencode "${args_host}" >/dev/null; url_host="${REPLY}"
 urlencode "${chart}" >/dev/null; url_chart="${REPLY}"
 urlencode "${family}" >/dev/null; url_family="${REPLY}"
 urlencode "${name}" >/dev/null; url_name="${REPLY}"
-goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
+
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
+GOTOCLOUD=0
+
+if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ] ; then
+   if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
+      if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
+         NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
+      fi
+   fi
+   if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
+      GOTOCLOUD=1
+   fi
+fi
+
+if [ ${GOTOCLOUD} -eq 0 ] ; then
+	goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
+else
+	urlencode "${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html" >/dev/null; url_registrypath="${REPLY}"
+	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&registrypath=${url_registrypath}&${redirect_params}"
+fi
 
 # the severity of the alarm
 severity="${status}"

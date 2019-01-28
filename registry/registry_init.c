@@ -37,9 +37,11 @@ int registry_init(void) {
     registry.persons_expiration = config_get_number(CONFIG_SECTION_REGISTRY, "registry expire idle persons days", 365) * 86400;
     registry.registry_domain = config_get(CONFIG_SECTION_REGISTRY, "registry domain", "");
     registry.registry_to_announce = config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
-    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
     registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", netdata_configured_hostname);
     registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
+
+    // netdata.cloud configuration, if cloud_base_url == "", cloud functionality is disabled.
+    registry.cloud_base_url = config_get(CONFIG_SECTION_CLOUD, "cloud base url", "https://netdata.cloud");
 
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
     setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);

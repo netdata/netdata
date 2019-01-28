@@ -38,7 +38,7 @@ if (typeof netdataShowAlarms === 'undefined') {
 }
 
 if (typeof netdataRegistryAfterMs !== 'number' || netdataRegistryAfterMs < 0) {
-    netdataRegistryAfterMs = 1500;
+    netdataRegistryAfterMs = 0; // 1500;
 }
 
 if (typeof netdataRegistry === 'undefined') {

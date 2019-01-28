@@ -88,18 +88,23 @@
     </script>
     <nav class="navbar navbar-default navbar-fixed-top" role="banner">
         <div class="container">
-            <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left hidden-sm hidden-xs" role="navigation" style="padding-right: 20px;">
+            <!-- <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left" role="navigation" style="padding-right: 20px;">
                 <ul class="nav navbar-nav">
                     <li data-placement="right" style="line-height: 50px; margin-right: 15px" title="Netdata Agent">
                        <img src="images/netdata-logomark.svg" height="32"/>
                     </li>
                     <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <a href="#" id="hostname" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
+                            <div class="agent-item" style="white-space: nowrap">
+                                <i class="fas fa-hourglass-half"></i>
+                                Loading, please wait...
+                                <div></div>
+                            </div>                            
                         </div>
                     </li>
                 </ul>
-            </nav>
+            </nav> -->
             <div class="navbar-header">
                 <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse">
                     <span class="sr-only">Toggle navigation</span>
@@ -107,26 +112,56 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a href="/" class="navbar-brand" id="hostname" title="server hostname<br/>click it to reload the dashboard" data-toggle="tooltip" data-placement="bottom">netdata</a>
+                <!-- <a href="/" class="navbar-brand" id="1hostname" title="server hostname<br/>click it to reload the dashboard" data-toggle="tooltip" data-placement="bottom">netdata</a> -->
+                <ul class="nav navbar-nav" style="display: inline-block; max-width: 300px">
+                    <li data-placement="right" class="hidden-xs hidden-sm" style="line-height: 50px; margin-right: 15px" title="Netdata Agent">
+                       <img src="images/netdata-logomark.svg" height="32"/>
+                    </li>
+                    <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
+                        <a href="#" id="hostname" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
+                            <div class="agent-item" style="white-space: nowrap">
+                                <i class="fas fa-hourglass-half"></i>
+                                Loading, please wait...
+                                <div></div>
+                            </div>                            
+                        </div>
+                    </li>
+                </ul>
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
                     <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
                     <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/netdata/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
-                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
-                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://github.com/netdata/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
+                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
                     <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fas fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
                     <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fas fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
                     <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fas fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
                     <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
-                    <li class="dropdown hidden-sm hidden-md hidden-lg">
+                    <li id="account-menu-container" class="dropdown" data-toggle="tooltip"></li>
+                    <!--
+                    <li class="dropdown hidden-sm hidden-md hidden-lg" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
+                            <div class="agent-item" style="white-space: nowrap">
+                                <i class="fas fa-hourglass-half"></i>
+                                Loading, please wait...
+                                <div></div>
+                            </div>                            
+                        </div>
+                    </li>
+                    -->
+                    <!--
+                    <li class="dropdown hidden-sm hidden-md hidden-lg">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">My Nodes <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                             <li><a href="#" onclick="return false;" style="color: #999;">loading...</a></li>
                         </ul>
                     </li>
+                    -->
                 </ul>
             </nav>
         </div>
@@ -1186,6 +1221,61 @@
         </div>
     </div>
 
+    <div class="modal fade" id="signInModal" tabindex="-1" role="dialog" aria-labelledby="signInModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="signInModalLabel">Sign In</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Signing-in to netdata.cloud will synchronize the list of 
+                        your netdata monitored nodes known at registry 
+                        <strong><span id="sim-registry"></span></strong>. This 
+                        may include server hostnames, urls and identification 
+                        GUIDs.
+                    </p>
+                    <p>
+                        After you upgrade all your netdata servers, your private 
+                        registry will not be needed any more.
+                    </p>
+                    <p>
+                        Are you sure you want to proceed?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal">Cancel</button>
+                    <a href="#" onclick="explicitlySignIn(); return false;" type="button" class="btn btn-danger">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="syncRegistryModal" tabindex="-1" role="dialog" aria-labelledby="syncRegistryModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="syncRegistryModalLabel">Synchronize netdata.cloud with registry?</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        You are about to synchronize your netdata.cloud account with data from the registry at <strong><span id="sync-registry-modal-registry"></span></strong>.
+                        This may include server hostnames, urls and identification GUIDs.
+                    </p>
+                    <p>
+                        Are you sure you want to proceed?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-dismiss="modal">Cancel</button>
+                    <a href="#" onclick="explicitlySyncAgents(); return false;" type="button" class="btn btn-danger">Synchronize</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="deleteRegistryModal" tabindex="-1" role="dialog" aria-labelledby="deleteRegistryModalLabel">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -1275,6 +1365,7 @@
             </div>
         </div>
     </div>
+    <iframe id="ssoifrm" width="0" height="0"></iframe>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
     <script type="text/javascript" src="dashboard.js?v20181211-1"></script>
 </body>
