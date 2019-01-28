@@ -11,6 +11,10 @@ extern struct arcstats arcstats;
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
+    static int show_zero_charts = -1;
+    if(unlikely(show_zero_charts == -1))
+        show_zero_charts = config_get_boolean_ondemand("plugin:freebsd:zfs_arcstats", "show zero charts", CONFIG_BOOLEAN_NO);
+
     unsigned long long l2_size;
     size_t uint64_t_size = sizeof(uint64_t);
     static struct mibs {
@@ -209,8 +213,8 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_need_free", mibs.arc_need_free, arcstats.arc_need_free);
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_sys_free", mibs.arc_sys_free, arcstats.arc_sys_free);
 
-    generate_charts_arcstats("freebsd", "zfs", update_every);
-    generate_charts_arc_summary("freebsd", "zfs", update_every);
+    generate_charts_arcstats("freebsd", "zfs", show_zero_charts, update_every);
+    generate_charts_arc_summary("freebsd", "zfs", show_zero_charts, update_every);
 
     return 0;
 }
@@ -261,7 +265,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
 
         rrddim_set_by_pointer(st_bytes, rd_bytes, bytes);
         rrdset_done(st_bytes);
-        
+
         // --------------------------------------------------------------------
 
         static RRDSET *st_requests = NULL;
@@ -293,7 +297,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_requests, rd_failed,      failed);
         rrddim_set_by_pointer(st_requests, rd_unsupported, unsupported);
         rrdset_done(st_requests);
-        
+
      }
 
     return 0;

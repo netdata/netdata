@@ -9758,7 +9758,7 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
-
+                if (data.anonymous_statistics) dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
                 });    
