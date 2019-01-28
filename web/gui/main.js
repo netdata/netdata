@@ -4737,7 +4737,6 @@ function renderAccountUI() {
             </ul>`
         )
     } else {
-        // container.setAttribute("title", "sign in");
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
