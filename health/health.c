@@ -462,7 +462,7 @@ void *health_main(void *ptr) {
 
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
-    time_t repeat_every       = config_get_number(CONFIG_SECTION_HEALTH, "repeat notification alarms every seconds", 0);
+    time_t repeat_every       = config_get_duration(CONFIG_SECTION_HEALTH, "repeat notification alarms every", 0);
 
     unsigned int loop = 0;
 
@@ -520,7 +520,7 @@ void *health_main(void *ptr) {
           }
 
   
-  if(unlikely(repeat_every)) {
+          if(unlikely(repeat_every)) {
               if((host->health_repeat_notifications == 0) || (host->health_repeat_notifications < now)){
                 host->health_repeat_notifications = now + repeat_every;
                 /* continue; */
@@ -805,8 +805,11 @@ void *health_main(void *ptr) {
                         rc->delay_last = delay;
                         rc->delay_up_to_timestamp = now + delay;
 
-                        // add the alarm into the log
                         rc->last_notification = now;
+                        rc->repeat_count++;
+                        /* if( unlikely(repeat_every && !rc->repeat_every) ) */
+                        /*     rc->repeat_every = repeat_every; */
+                        // add the alarm into the log
                         health_alarm_log(
                                 host
                                 , rc->id
@@ -833,14 +836,15 @@ void *health_main(void *ptr) {
                         rc->last_status_change = now;
                         rc->status = status;
                     }
-                    else if( unlikely(repeat_every ) ) {
+                    else if( unlikely(repeat_every && !rc->repeat_every) ) {
                       if(unlikely(now < host->health_repeat_notifications))
                         continue;
 
                       if(unlikely(rc->status != RRDCALC_STATUS_CRITICAL && rc->status != RRDCALC_STATUS_WARNING ))
                         continue;
-                      // add the alarm into the log
+                      rc->repeat_count++;
                       rc->last_notification = now;
+                      // add the alarm into the log
                       health_alarm_log(
                                        host
                                        , rc->id
@@ -865,16 +869,17 @@ void *health_main(void *ptr) {
                                        );
                     }
                     else if( unlikely(rc->repeat_every) ) {
-                      /* info("Alarm entry repeats every %lu seconds.", rc->repeat_every); */
                       if(unlikely(now < rc->last_notification + rc->repeat_every)) {
-                        info("Next alarm notification in %lu seconds.", rc->last_notification + rc->repeat_every - now);
+                        debug(D_HEALTH, "Next alarm notification in %u seconds.", (uint32_t)(rc->last_notification + rc->repeat_every - now));
                         continue;
                       } // check this
 
                       if(unlikely(rc->status != RRDCALC_STATUS_CRITICAL && rc->status != RRDCALC_STATUS_WARNING))
                         continue;
-                      // add the alarm into the log
+
+                      rc->repeat_count++;
                       rc->last_notification = now;
+                      // add the alarm into the log
                       health_alarm_log(
                                        host
                                        , rc->id
@@ -899,28 +904,27 @@ void *health_main(void *ptr) {
                                        );
                     }
 
-		
-					rc->last_updated = now;
-					rc->next_update = now + rc->update_every;
+                    rc->last_updated = now;
+                    rc->next_update = now + rc->update_every;
 
-					if (next_run > rc->next_update)
-						next_run = rc->next_update;
-				}
+                    if (next_run > rc->next_update)
+                      next_run = rc->next_update;
+                }
 
-				rrdhost_unlock(host);
-			}
+                rrdhost_unlock(host);
+            }
 
-			if (unlikely(netdata_exit))
-				break;
+            if (unlikely(netdata_exit))
+              break;
 
-			// execute notifications
-			// and cleanup
-			health_alarm_log_process(host);
+            // execute notifications
+            // and cleanup
+            health_alarm_log_process(host);
 
-			if (unlikely(netdata_exit))
-				break;
+            if (unlikely(netdata_exit))
+              break;
 
-		} /* rrdhost_foreach */
+        } /* rrdhost_foreach */
 
 		rrd_unlock();
 

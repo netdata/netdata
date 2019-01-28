@@ -286,35 +286,6 @@ static inline uint32_t health_parse_options(const char *s) {
     return options;
 }
 
-static inline uint32_t health_parse_repeat(const char *s) {
-  uint32_t repeat = 0;
-  char buf[100+1] = "";
-
-  while(*s) {
-    buf[0] = '\0';
-
-    // skip spaces
-    while(*s && isspace(*s))
-      s++;
-
-    // find the next space
-    size_t count = 0;
-    while(*s && count < 100 && !isspace(*s))
-      buf[count++] = *s++;
-
-    if(buf[0]) {
-      buf[count] = '\0';
-
-      if(strtoul(buf, NULL, 16) != 0)
-        repeat = strtoul(buf, NULL, 10);
-      else
-        error("Ignoring unknown alarm option '%s'", buf);
-    }
-  }
-
-  return repeat;
-}
-
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
@@ -743,10 +714,12 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
             }
-						else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
-							  rc->repeat_every = health_parse_repeat(value);
-								error("Health repeat every %lu",rc->repeat_every);
-						}
+            else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
+                if(!health_parse_duration(value, (int *)&rc->repeat_every))
+                    error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
+                          line, filename, rc->name, key, value);
+                debug(D_HEALTH, "Health configuration alarm %s repeat every %u", rc->name, (uint32_t)rc->repeat_every);
+            }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rc->name, key);
@@ -779,106 +752,108 @@ static int health_readfile(const char *filename, void *data) {
                 if(!health_parse_duration(value, &rt->update_every))
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rt->name, key, value);
-            }
-            else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
-                char *e;
-                rt->green = str2ld(value, &e);
-                if(e && *e) {
-                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rt->name, key, e);
-                }
-            }
-            else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
-                char *e;
-                rt->red = str2ld(value, &e);
-                if(e && *e) {
-                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
-                            line, filename, rt->name, key, e);
-                }
-            }
-            else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
-                const char *failed_at = NULL;
-                int error = 0;
-                rt->calculation = expression_parse(value, &failed_at, &error);
-                if(!rt->calculation) {
-                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
-                }
-            }
-            else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
-                const char *failed_at = NULL;
-                int error = 0;
-                rt->warning = expression_parse(value, &failed_at, &error);
-                if(!rt->warning) {
-                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
-                }
-            }
-            else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
-                const char *failed_at = NULL;
-                int error = 0;
-                rt->critical = expression_parse(value, &failed_at, &error);
-                if(!rt->critical) {
-                    error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
-                            line, filename, rt->name, key, value, expression_strerror(error), failed_at);
-                }
-            }
-            else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
-                if(rt->exec) {
-                    if(strcmp(rt->exec, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->exec, value, value);
+    }
+          else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
+              char *e;
+              rt->green = str2ld(value, &e);
+              if(e && *e) {
+                  error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                          line, filename, rt->name, key, e);
+              }
+          }
+          else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
+              char *e;
+              rt->red = str2ld(value, &e);
+              if(e && *e) {
+                  error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
+                          line, filename, rt->name, key, e);
+              }
+          }
+          else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
+              const char *failed_at = NULL;
+              int error = 0;
+              rt->calculation = expression_parse(value, &failed_at, &error);
+              if(!rt->calculation) {
+                  error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+              }
+          }
+          else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
+              const char *failed_at = NULL;
+              int error = 0;
+              rt->warning = expression_parse(value, &failed_at, &error);
+              if(!rt->warning) {
+                  error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+              }
+          }
+          else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
+              const char *failed_at = NULL;
+              int error = 0;
+              rt->critical = expression_parse(value, &failed_at, &error);
+              if(!rt->critical) {
+                  error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
+                          line, filename, rt->name, key, value, expression_strerror(error), failed_at);
+              }
+          }
+          else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
+              if(rt->exec) {
+                  if(strcmp(rt->exec, value) != 0)
+                      error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->exec, value, value);
 
-                    freez(rt->exec);
-                }
-                rt->exec = strdupz(value);
-            }
-            else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
-                if(rt->recipient) {
-                    if(strcmp(rt->recipient, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->recipient, value, value);
+                  freez(rt->exec);
+              }
+              rt->exec = strdupz(value);
+          }
+          else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
+              if(rt->recipient) {
+                  if(strcmp(rt->recipient, value) != 0)
+                      error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->recipient, value, value);
 
-                    freez(rt->recipient);
-                }
-                rt->recipient = strdupz(value);
-            }
-            else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
-                if(rt->units) {
-                    if(strcmp(rt->units, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->units, value, value);
+                  freez(rt->recipient);
+              }
+              rt->recipient = strdupz(value);
+          }
+          else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
+              if(rt->units) {
+                  if(strcmp(rt->units, value) != 0)
+                      error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->units, value, value);
 
-                    freez(rt->units);
-                }
-                rt->units = strdupz(value);
-                strip_quotes(rt->units);
-            }
-            else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
-                if(rt->info) {
-                    if(strcmp(rt->info, value) != 0)
-                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                                line, filename, rt->name, key, rt->info, value, value);
+                  freez(rt->units);
+              }
+              rt->units = strdupz(value);
+              strip_quotes(rt->units);
+          }
+          else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
+              if(rt->info) {
+                  if(strcmp(rt->info, value) != 0)
+                      error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->info, value, value);
 
-                    freez(rt->info);
-                }
-                rt->info = strdupz(value);
-                strip_quotes(rt->info);
-            }
-            else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
-                health_parse_delay(line, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
-            }
-            else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
-                rt->options |= health_parse_options(value);
-            }
-						else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
-							  rt->repeat_every = health_parse_repeat(value);
-								error("Health2 repeat every %lu", rt->repeat_every);
-						}
-            else {
-                error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
-                        line, filename, rt->name, key);
-            }
+                  freez(rt->info);
+              }
+              rt->info = strdupz(value);
+              strip_quotes(rt->info);
+          }
+          else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
+              health_parse_delay(line, filename, value, &rt->delay_up_duration, &rt->delay_down_duration, &rt->delay_max_duration, &rt->delay_multiplier);
+          }
+          else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
+              rt->options |= health_parse_options(value);
+          }
+          else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY )){
+              if(!health_parse_duration(value, (int *)&rt->repeat_every))
+                  error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
+                        line, filename, rt->name, key, value);
+              debug(D_HEALTH, "Health configuration alarm %s repeat every %u", rt->name, (uint32_t)rt->repeat_every);
+          }
+          else {
+            error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",
+                  line, filename, rt->name, key);
+          }
         }
         else {
             error("Health configuration at line %zu of file '%s' has unknown key '%s'. Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",

@@ -119,6 +119,7 @@ extern long long appconfig_get_number(struct config *root, const char *section, 
 extern LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
+extern int appconfig_get_duration(struct config *root, const char *section, const char *name, char *value);
 
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);

@@ -749,6 +749,12 @@ definitions:
                 format: nullable
               value: 
                 type: number
+              repeat_every: 
+                type: integer
+                format: int32
+              repeat_count: 
+                type: integer
+                format: int32
   alarm_log_entry:
     type: object
     properties: 
@@ -828,3 +834,9 @@ definitions:
       old_value: 
         type: string
         format: nullable
+      repeat_every: 
+        type: integer
+        format: int32
+      repeat_count: 
+        type: integer
+        format: int32

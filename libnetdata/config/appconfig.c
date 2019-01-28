@@ -280,6 +280,54 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
+int appconfig_get_duration(struct config *root, const char *section, const char *name, char * value)
+{
+    char buffer[100], *s;
+    int duration = 0;
+    sprintf(buffer, "%s", value);
+
+    s = appconfig_get(root, section, name, buffer);
+    if(!s) return 0;
+
+    if(!(isdigit(*s) || *s == '+' || *s == '-')) {
+        return 0;
+    }
+
+    char *e = NULL;
+    calculated_number n = str2ld(s, &e);
+    if(e && *e) {
+        switch (*e) {
+        case 'Y':
+            duration = (int) (n * 86400 * 365);
+            break;
+        case 'M':
+            duration = (int) (n * 86400 * 30);
+            break;
+        case 'w':
+            duration = (int) (n * 86400 * 7);
+            break;
+        case 'd':
+            duration = (int) (n * 86400);
+            break;
+        case 'h':
+            duration = (int) (n * 3600);
+            break;
+        case 'm':
+            duration = (int) (n * 60);
+            break;
+
+        default:
+        case 's':
+            duration = (int) (n);
+            break;
+        }
+    }
+    else
+        duration = (int)(n);
+
+    return duration;
+}
+
 LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
 {
     char buffer[100], *s;
