@@ -4,9 +4,11 @@
 
 **Fixed bugs:**
 
+- Certificate error while running netdata kickstart script [\#5273](https://github.com/netdata/netdata/issues/5273)
 - alarm-notify.sh not working with latest update of netdata [\#5261](https://github.com/netdata/netdata/issues/5261)
 - /etc/netdata/edit-config charts.d.conf [\#5252](https://github.com/netdata/netdata/issues/5252)
 - Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
+- Automatic updates \(via CRON\) giving error [\#5229](https://github.com/netdata/netdata/issues/5229)
 - It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
 - Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
@@ -24,6 +26,8 @@
 
 **Merged pull requests:**
 
+- Correct auto-updater to netdata-updater [\#5281](https://github.com/netdata/netdata/pull/5281) ([cakrit](https://github.com/cakrit))
+- netdata update instructions after recent changes [\#5277](https://github.com/netdata/netdata/pull/5277) ([cakrit](https://github.com/cakrit))
 - Fix incorrect parsing of ACLs [\#5275](https://github.com/netdata/netdata/pull/5275) ([cakrit](https://github.com/cakrit))
 - Always run make clean before make [\#5265](https://github.com/netdata/netdata/pull/5265) ([cakrit](https://github.com/cakrit))
 - Bug fix for 5261 [\#5263](https://github.com/netdata/netdata/pull/5263) ([cakrit](https://github.com/cakrit))
@@ -48,6 +52,7 @@
 - alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
 - Anonymous statistics [\#5113](https://github.com/netdata/netdata/pull/5113) ([cakrit](https://github.com/cakrit))
 - Update info on plugins in performance doc [\#5101](https://github.com/netdata/netdata/pull/5101) ([cakrit](https://github.com/cakrit))
+- Cloud Sign-In [\#5095](https://github.com/netdata/netdata/pull/5095) ([gmosx](https://github.com/gmosx))
 
 ## [v1.12.0-rc3](https://github.com/netdata/netdata/tree/v1.12.0-rc3) (2019-01-17)
 
