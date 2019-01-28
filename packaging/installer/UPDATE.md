@@ -11,7 +11,7 @@ The update procedure depends on how you installed it:
 
 ### Manual update to get the latest git commit
 
-netdata versions older than `v1.12.0-rc2-52` had a `netdata-updater.sh` script in the root directory of the source code, which has now been deprecated. The manual process that works for all versions to get the latest commit in git is to use the `netdata-installer.sh`. The installer preserves your configuration. You just need to be mindful of any installer options you may have used to customize your original installation. 
+netdata versions older than `v1.12.0-rc2-52` had a `netdata-updater.sh` script in the root directory of the source code, which has now been deprecated. The manual process that works for all versions to get the latest commit in git is to use the `netdata-installer.sh`. The installer preserves your custom configuration and updates the the information of the installation in the `.environment` file under the user configuration directory.
 
 ```sh
 # go to the git downloaded directory
@@ -39,8 +39,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh --no-updates)
 
 _Please, consider the risks of running an auto-update. Something can always go wrong. Keep an eye on your installation, and run a manual update if something ever fails._
 
-Calling the `netdata-installer.sh` with the `--auto-update` or `-u` option will create an `auto-updater` script under 
-either  `/etc/cron.daily/`, or `/etc/periodic/daily/`. Whenever the `auto-updater` is executed, it checks if a newer nightly build is available and then handles the download, installation and netdata restart.  
+Calling the `netdata-installer.sh` with the `--auto-update` or `-u` option will create the `netdata-updater` script under 
+either  `/etc/cron.daily/`, or `/etc/periodic/daily/`. Whenever the `netdata-updater` is executed, it checks if a newer nightly build is available and then handles the download, installation and netdata restart.  
 
 Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://my-netdata.io/kickstart.sh)` calls the `netdata-installer.sh` with the auto-update option. So if you just run the one-liner without options once, your netdata will be kept auto-updated.
 
