@@ -377,6 +377,8 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 }
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    // save a copy of errno - just in case this function generates a new error
+    int __errno = errno;
     va_list args;
 
     if(error_log_syslog) {
@@ -401,9 +403,9 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
     log_unlock();
 
-    static char action_data[60];
-	snprintfz(action_data, 60, "%04lu@%-10.10s:%-15.15s", line, file, function);
-	static char action_result[60];
+    char action_data[70+1];
+	snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
+	char action_result[60+1];
 	snprintfz(action_result, 60, "%s:%s",program_name, netdata_thread_tag());
 	send_statistics("FATAL", action_result, action_data);
 
