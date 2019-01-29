@@ -162,6 +162,11 @@ setup_terminal || echo >/dev/null
 updater=""
 [ -x /etc/periodic/daily/netdata-updater ] && updater=/etc/periodic/daily/netdata-updater
 [ -x /etc/cron.daily/netdata-updater ] && updater=/etc/cron.daily/netdata-updater
+if [ -L "${updater}" ]; then
+	# remove old updater (symlink)
+	run "${sudo}" rm -f "${updater}"
+	updater=""
+fi
 if [ -n "${updater}" ]; then
 	# attempt to run the updater, to respect any compilation settings already in place
 	progress "Re-installing netdata..."
