@@ -41,7 +41,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 Verify the integrity of the script with this:
 
 ```bash
-[ "fad7227872a0afd07b74ac8d23cef017" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "f16d433f3fc86264fa2e05808369c54b" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 *It should print `OK, VALID` if the script is the one we ship.*
 
@@ -60,6 +60,8 @@ For automated installs, append a space + `--dont-wait` to the command line. You 
 ```bash
   bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it
 ```
+
+If you don't want to receive automatic updates, add `--no-updates` when executing `kickstart.sh` script.
 
 </details>&nbsp;<br/>
 
