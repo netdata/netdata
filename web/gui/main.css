@@ -579,7 +579,7 @@ body.modal-open {
 
 #my-netdata-dropdown-content .agent-item :nth-child(2) {
     min-width: 420px;
-    line-height: 14px;
+    line-height: 32px;
 }
 
 .agent-item--separated {
