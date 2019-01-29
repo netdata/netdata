@@ -9,8 +9,10 @@
 - /etc/netdata/edit-config charts.d.conf [\#5252](https://github.com/netdata/netdata/issues/5252)
 - Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
 - Automatic updates \(via CRON\) giving error [\#5229](https://github.com/netdata/netdata/issues/5229)
+- Cron Update fails \(again\) [\#5208](https://github.com/netdata/netdata/issues/5208)
 - It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
 - Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
+- Version checker shouldn't compare commits [\#5201](https://github.com/netdata/netdata/issues/5201)
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 - alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
@@ -21,11 +23,16 @@
 
 - Slack Notifications Ignored by alarm-notify.sh [\#5267](https://github.com/netdata/netdata/issues/5267)
 - Developing a new plugin questions [\#5235](https://github.com/netdata/netdata/issues/5235)
+- move python module nvidia\_smi to go.d [\#5190](https://github.com/netdata/netdata/issues/5190)
 - Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
 - \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
 
 **Merged pull requests:**
 
+- Add errno to fatal event for statistics [\#5291](https://github.com/netdata/netdata/pull/5291) ([cakrit](https://github.com/cakrit))
+- updated cncf landscape url [\#5288](https://github.com/netdata/netdata/pull/5288) ([ktsaou](https://github.com/ktsaou))
+- Additional UI fixes [\#5284](https://github.com/netdata/netdata/pull/5284) ([gmosx](https://github.com/gmosx))
+- GUI Update check - use version instead of commit [\#5283](https://github.com/netdata/netdata/pull/5283) ([cakrit](https://github.com/cakrit))
 - Correct auto-updater to netdata-updater [\#5281](https://github.com/netdata/netdata/pull/5281) ([cakrit](https://github.com/cakrit))
 - netdata update instructions after recent changes [\#5277](https://github.com/netdata/netdata/pull/5277) ([cakrit](https://github.com/cakrit))
 - Fix incorrect parsing of ACLs [\#5275](https://github.com/netdata/netdata/pull/5275) ([cakrit](https://github.com/cakrit))
