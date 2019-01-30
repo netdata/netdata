@@ -781,11 +781,13 @@ install_go() {
 	GO_PACKAGE_VERSION="v0.0.2"
 	ARCH_MAP=(
 		'i386::386'
+		'i686::386'
 		'x86_64::amd64'
 		'aarch64::arm64'
 		'armv64::arm64'
 		'armv6l::arm'
 		'armv7l::arm'
+		'armv5tel::arm'
 	)
 
 	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
@@ -828,9 +830,7 @@ install_go() {
 	fi
 	return 0
 }
-#install_go
-# For a testing purposes:
-if ! install_go; then exit 1; fi
+install_go
 
 # --- fix #1292 bug ---
 
