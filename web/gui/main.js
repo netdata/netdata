@@ -4112,6 +4112,7 @@ function runOnceOnDashboardWithjQuery() {
         })
         .on('shown.bs.dropdown', function () {
             Ps.update(document.getElementById('my-netdata-dropdown-content'));
+            myNetdataMenuDidShow();
         })
         .on('hidden.bs.dropdown', function () {
             NETDATA.unpause();
@@ -4670,6 +4671,13 @@ function updateMyNetdataAfterFilterChange() {
     if (options.hosts.length > 1) {
         const streamedEl = document.getElementById("my-netdata-menu-streamed")
         streamedEl.innerHTML = renderStreamedHosts(options);    
+    }
+}
+
+function myNetdataMenuDidShow() {
+    const filterEl = document.getElementById("my-netdata-menu-filter-input");
+    if (filterEl) {
+        filterEl.focus();
     }
 }
 
