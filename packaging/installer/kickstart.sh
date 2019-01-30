@@ -216,7 +216,14 @@ Machine           : ${MACHINE}
 BASH major version: ${BASH_MAJOR_VERSION}
 EOF
 
-tmpdir="$(mktemp -d /tmp/netdata-kickstart-XXXXXX)"
+# Check if tmp is mounted as noexec
+if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+	pattern="/opt/netdata-kickstart-XXXXXX"
+else
+	pattern="/tmp/netdata-kickstart-XXXXXX"
+fi
+
+tmpdir="$(mktemp -d $pattern)"
 cd "${tmpdir}" || :
 
 if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
