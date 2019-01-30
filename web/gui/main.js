@@ -729,6 +729,7 @@ function renderMyNetdataMenu(machinesArray) {
                     id="my-netdata-menu-filter-input"
                     type="text" 
                     placeholder="filter nodes..."
+                    autofocus
                     autocomplete="off"
                     value="${myNetdataMenuFilterValue}" 
                     onkeydown="myNetdataFilterDidChange(event)"
