@@ -4,14 +4,19 @@
 
 **Fixed bugs:**
 
+- Netdata update in a /tmp hardened system [\#5289](https://github.com/netdata/netdata/issues/5289)
 - Certificate error while running netdata kickstart script [\#5273](https://github.com/netdata/netdata/issues/5273)
+- Netdata won't update anymore [\#5272](https://github.com/netdata/netdata/issues/5272)
 - alarm-notify.sh not working with latest update of netdata [\#5261](https://github.com/netdata/netdata/issues/5261)
 - /etc/netdata/edit-config charts.d.conf [\#5252](https://github.com/netdata/netdata/issues/5252)
+- Cannot install netdata from source \(the source directory does not include netdata-installer.sh\) [\#5251](https://github.com/netdata/netdata/issues/5251)
 - Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
 - Automatic updates \(via CRON\) giving error [\#5229](https://github.com/netdata/netdata/issues/5229)
+- Updater script no longer seems to be working after a recent update [\#5228](https://github.com/netdata/netdata/issues/5228)
 - Cron Update fails \(again\) [\#5208](https://github.com/netdata/netdata/issues/5208)
 - It is netdata instalation hacked ? [\#5207](https://github.com/netdata/netdata/issues/5207)
 - Wrong version string in GUI [\#5204](https://github.com/netdata/netdata/issues/5204)
+- GUI links to github wiki [\#5202](https://github.com/netdata/netdata/issues/5202)
 - Version checker shouldn't compare commits [\#5201](https://github.com/netdata/netdata/issues/5201)
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
@@ -29,8 +34,12 @@
 
 **Merged pull requests:**
 
+- Minor updates to anonymous statistics [\#5295](https://github.com/netdata/netdata/pull/5295) ([cakrit](https://github.com/cakrit))
+- kickstart: noexec detection [\#5293](https://github.com/netdata/netdata/pull/5293) ([paulfantom](https://github.com/paulfantom))
+- Correct info on what kickstart.sh does [\#5292](https://github.com/netdata/netdata/pull/5292) ([cakrit](https://github.com/cakrit))
 - Add errno to fatal event for statistics [\#5291](https://github.com/netdata/netdata/pull/5291) ([cakrit](https://github.com/cakrit))
 - updated cncf landscape url [\#5288](https://github.com/netdata/netdata/pull/5288) ([ktsaou](https://github.com/ktsaou))
+- Add back the symlink netdata-latest.gz.run [\#5286](https://github.com/netdata/netdata/pull/5286) ([cakrit](https://github.com/cakrit))
 - Additional UI fixes [\#5284](https://github.com/netdata/netdata/pull/5284) ([gmosx](https://github.com/gmosx))
 - GUI Update check - use version instead of commit [\#5283](https://github.com/netdata/netdata/pull/5283) ([cakrit](https://github.com/cakrit))
 - Correct auto-updater to netdata-updater [\#5281](https://github.com/netdata/netdata/pull/5281) ([cakrit](https://github.com/cakrit))
@@ -575,7 +584,6 @@
 - Web\_log doesn't support response times in nanoseconds [\#4003](https://github.com/netdata/netdata/issues/4003)
 - 400 error when netdata tries to send slack notification [\#3989](https://github.com/netdata/netdata/issues/3989)
 - Disable probing device mapper [\#3974](https://github.com/netdata/netdata/issues/3974)
-- docker container names not resolved when using firehol/netdata:alpine [\#3972](https://github.com/netdata/netdata/issues/3972)
 - MySQL Python Plugin not work  [\#3968](https://github.com/netdata/netdata/issues/3968)
 - How to enable sensor plugin? [\#3953](https://github.com/netdata/netdata/issues/3953)
 - netdata does not appear to send host tags via graphite backend [\#3936](https://github.com/netdata/netdata/issues/3936)
