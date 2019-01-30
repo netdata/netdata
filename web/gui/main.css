@@ -634,12 +634,11 @@ body.modal-open {
 
 #my-netdata-menu-filter-input {
     color: #fff;
-    /* background: none; */
-    /* border: 1px solid #616161; */
     border: none;
     background-color: #4b4f55;
+    width: 472px;
     margin: 5px 14px;
-    width: 90%;
+    margin-right: 0;
     padding: 2px 5px;
     outline: none;
 }
@@ -649,7 +648,6 @@ body.modal-open {
 }
 
 #my-netdata-dropdown-content.theme-white #my-netdata-menu-filter-input {
-    /* border: 1px solid #ddd; */
     background-color: #e7e7e7;
     color: #555;
 }
@@ -660,13 +658,10 @@ body.modal-open {
 
 .filter-control .filter-control__clear {
     cursor: pointer;
-    position: relative;
-    left: -36px;
+    position: absolute;
+    top: 7px;
+    right: 19px;
 }
-
-/* .collapse a.btn {
-    text-align: left;
-} */
 
 #hostname {
     font-size: 18px;

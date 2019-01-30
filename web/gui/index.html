@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="author" content="costa@tsaousis.gr">
 
-    <link rel="stylesheet" type="text/css" href="main.css?v=2">
+    <link rel="stylesheet" type="text/css" href="main.css?v=4">
 
     <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAA7EAAAOxAGVKw4bAAACyklEQVRYhcWXz0sUYRjHP8+wLItImEhnEfEgEVJk+56CbCECQWezOkTQTTp6kejgKUSoEAoK/wAhaaeDBkLoIahZIWIJo0U8hHQJJBYJERGfDrOju7PjuO5u6/c0PM/7zvfzvvP+eEaoVu6wBZIA3cW82wtvY7cD1xEWSTpb1bxWjm2RtbtQxoF7iLSA7gO/UL4A74G3mBIzNz0Peg1hFmUK46zXBuDaCYQJlDFE4ke/QreAZyhPMc42rt2PyEoxt4cyDUxgnO3qAVy7C8gg0hdFHwBZA0ZIOt9w7e+I9B6mdBVhmGTlbFQCuPYFhA8g56o3P3D6CwyiDCIyFshtgqRIZnKlUStg3lW7OYC0AvPATkiuA9U3uOlEOEDWTgCZ2s3LIMbCU9ID3A8HUCZO9s2jGCRxdFIflDUF/EX3I3q1N0iq+8BZf+v6MzDeFHMAEQvoJpuOAwiu3Qr89g6ZJkm5CnoHeBwDbjTV3CPoRRhF+WQBA801B+AJiAUMWMDFptuLtBef+iygs+kAh+q0gDOnCNBmETyOmywLKJyifyEG/ATqPP+LUt0FZoAlIA6MgNyKqDo2YkAO6G+QeQrjfCyJzuHaoyCvjuiVs4q0jdBMwNyTcV6j+jm0h7BkAYuohpZLJ1TUQJYrIqo7KAtW8VaabQBA1GVWmROZwzgFfwtOoRpealevdGg0a8eAoUB0D9VJ8M8A46yDTNdlL9wmaz8MMX9RrIQOpfoS4+S9br7cdAvoCiLn6wLxFtwyQhxlKMQ8j3CJpFeml+9QN90N6iLSURfEkXD8AQwms+aHyo9hk1kHSaG6+Z/MU6XmlQAeRA7EoLraQPM83si/BlPhF5E3E1dQfY5S++5Q/9dMLwdH7uv4n1PX7gEeAXejy+0y4x2QOWASk8lHNT0e4AAk3QZ6E6+E68MrZNqK2QKwgXevLCEskHSqumX/AUXU5QBtOC5FAAAAAElFTkSuQmCC">
 
@@ -58,7 +58,7 @@
     <meta name="twitter:description"       content="Unparalleled insights, in real-time, of everything happening on your Linux systems and applications, with stunning, interactive web dashboards and powerful performance and health alarms." />
     <meta name="twitter:image"             content="https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif" />
 
-    <script src="main.js?v=2"></script>
+    <script src="main.js?v=4"></script>
 </head>
 
 <body data-spy="scroll" data-target="#sidebar" data-offset="100">
@@ -134,7 +134,7 @@
                     <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
                     <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://github.com/netdata/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://github.com/netdata/netdata" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
                     <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
                     <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-xs hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
                     <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fas fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
@@ -1366,6 +1366,6 @@
     </div>
     <iframe id="ssoifrm" width="0" height="0"></iframe>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20181211-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20190130-1"></script>
 </body>
 </html>
