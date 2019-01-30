@@ -67,10 +67,14 @@ ARCHITECTURE="$(uname -m)"
 
 VIRTUALIZATION="unknown"
 VIRT_DETECTION="none"
+CONTAINER="unknown"
+CONT_DETECTION="none"
 
 if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-	VIRTUALIZATION="$(systemd-detect-virt)"
+	VIRTUALIZATION="$(systemd-detect-virt -v)"
 	VIRT_DETECTION="systemd-detect-virt"
+	CONTAINER="$(systemd-detect-virt -c)"
+	CONT_DETECTION="systemd-detect-virt"
 else
 	if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
 		VIRTUALIZATION="hypervisor"
@@ -79,36 +83,35 @@ else
 fi
 
 # -------------------------------------------------------------------------------------------------
-# detect containers
+# detect containers with heuristics
 
-CONTAINER="none"
-CONT_DETECTION="none"
+if [ "${CONTAINER}" = "unknown" ] ; then
+	IFS='(, ' read -r process _ </proc/1/sched
+	if [ "${process}" = "netdata" ]; then
+		CONTAINER="container"
+		CONT_DETECTION="process"
+	fi
 
-IFS='(, ' read -r process _ </proc/1/sched
-if [ "${process}" = "netdata" ]; then
-	CONTAINER="container"
-	CONT_DETECTION="process"
-fi
+	# ubuntu and debian supply /bin/running-in-container
+	# https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
+	if /bin/running-in-container >/dev/null 2>&1; then
+		CONTAINER="container"
+		CONT_DETECTION="/bin/running-in-container"
+	fi
 
-# ubuntu and debian supply /bin/running-in-container
-# https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
-if /bin/running-in-container >/dev/null 2>&1; then
-	CONTAINER="container"
-	CONT_DETECTION="/bin/running-in-container"
-fi
+	# lxc sets environment variable 'container'
+	#shellcheck disable=SC2154
+	if [ -n "${container}" ]; then
+		CONTAINER="lxc"
+		CONT_DETECTION="containerenv"
+	fi
 
-# lxc sets environment variable 'container'
-#shellcheck disable=SC2154
-if [ -n "${container}" ]; then
-	CONTAINER="lxc"
-	CONT_DETECTION="containerenv"
-fi
-
-# docker creates /.dockerenv
-# http://stackoverflow.com/a/25518345
-if [ -f "/.dockerenv" ]; then
-	CONTAINER="docker"
-	CONT_DETECTION="dockerenv"
+	# docker creates /.dockerenv
+	# http://stackoverflow.com/a/25518345
+	if [ -f "/.dockerenv" ]; then
+		CONTAINER="docker"
+		CONT_DETECTION="dockerenv"
+	fi
 fi
 
 # -------------------------------------------------------------------------------------------------
