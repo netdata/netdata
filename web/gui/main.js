@@ -729,6 +729,7 @@ function renderMyNetdataMenu(machinesArray) {
                     id="my-netdata-menu-filter-input"
                     type="text" 
                     placeholder="filter nodes..."
+                    autofocus
                     autocomplete="off"
                     value="${myNetdataMenuFilterValue}" 
                     onkeydown="myNetdataFilterDidChange(event)"
@@ -4064,6 +4065,7 @@ function runOnceOnDashboardWithjQuery() {
         })
         .on('shown.bs.dropdown', function () {
             Ps.update(document.getElementById('my-netdata-dropdown-content'));
+            myNetdataMenuDidShow();
         })
         .on('hidden.bs.dropdown', function () {
             NETDATA.unpause();
@@ -4625,6 +4627,13 @@ function updateMyNetdataAfterFilterChange() {
     }
 }
 
+function myNetdataMenuDidShow() {
+    const filterEl = document.getElementById("my-netdata-menu-filter-input");
+    if (filterEl) {
+        filterEl.focus();
+    }
+}
+
 function myNetdataFilterDidChange(e) {
     const inputEl = e.target;
     setTimeout(() => {
@@ -4712,7 +4721,7 @@ function handleMessage(e) {
             break;
 
         default:
-            console.log("Unknown message", e);
+            return;
     }
 }
 
