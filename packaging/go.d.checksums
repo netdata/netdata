@@ -1,20 +1,16 @@
-# File should be updated manually to ensure proper checksums
-# After updating checksums ensure correct value for GO_PACKAGE_VERSION in shell installer script
-# Checksums should be the same as https://github.com/netdata/go.d.plugin/releases/download/<GO_D_PLUGIN_VERSION>/sha256sum.txt
-#
-d5fe3071e2ab129ac8cee7f48f21f251bfb4d64a190cfd557e15f743d04cd103 *config.tar.gz
-5873372605f45078881c22ae8d5d12111f8fa787c456dd43185954da4ad57581 *go.d.plugin-v0.0.1.darwin-386
-0aa02df4221a532dc8b65d9cee3581d57c7d28729274830f3c43c742640b5ffc *go.d.plugin-v0.0.1.darwin-amd64
-dcfd4f9b1e6735c984765c4a1e5a3b55a9bd4b077979752d560ab883aca1706e *go.d.plugin-v0.0.1.freebsd-386
-ae0df5122938cb6ef04c56256f9e47051f635eee17292ccd45ecd2a6ee29974d *go.d.plugin-v0.0.1.freebsd-amd64
-d9fddc9e4dd56e3fde52d55f4c92c3933d803f2c93a1e0dc268d6679ee45a711 *go.d.plugin-v0.0.1.freebsd-arm
-dfef22fd64374f0289af61664ac97327bb6284e3e45e243fc10ab76785ef2351 *go.d.plugin-v0.0.1.linux-386
-61735c09a7fe274350eb0e5286a7a9f0717bb69ddda2140905f033b5e1877e55 *go.d.plugin-v0.0.1.linux-amd64
-e03438d47ba353e1ffcc87d9c1955efba2b1e8864972826c642df74d4c78d334 *go.d.plugin-v0.0.1.linux-arm
-39b7836a0e0368c880fa044a257ab7fdc870d54bf4c56c6b4018705fa9f1c7fd *go.d.plugin-v0.0.1.linux-arm64
-29274a2841f788b001d29904f8aa61f38a7e0d49ae98b148b74d62716506fb5a *go.d.plugin-v0.0.1.linux-mips
-1a080148ac2955dda6e3e56f746ed683094eb5834527515f06b97eb00ccbc22b *go.d.plugin-v0.0.1.linux-mips64
-a682fec4a07bc9efa3245b6464244d65bfb1d9deb6dcad4a8491989571fd919f *go.d.plugin-v0.0.1.linux-mips64le
-fac5a9b86787feded9d683e64a9ab9205efaa3951c49be2833418b0b62280187 *go.d.plugin-v0.0.1.linux-mipsle
-607e05eb454a785e5f5cc4bef57da8a3679e4ed345009dc1a937756dbaad25fb *go.d.plugin-v0.0.1.linux-ppc64
-99bb44d622d90c778bfe0308aa9d11b7cb289cdd56106af6a04cb4265c066f4a *go.d.plugin-v0.0.1.linux-ppc64le
+ef1d47b5e36d48c5cc99a837899d74625aec6c5e7a6d810254c56f9e58b9463f *config.tar.gz
+ac4df4040e4b1c1f55613e9c9ea0cea8100a36669ff976e30e90dbb7968337ff *go.d.plugin-v0.0.2.darwin-386
+f0a5938df322336a36c177972d3d328c4fbad927a0abc6edbc7159537a7da870 *go.d.plugin-v0.0.2.darwin-amd64
+aff5a560d2acc5717ee83cf5751062d704050e9a993968c093de284c313f0390 *go.d.plugin-v0.0.2.freebsd-386
+8a0abf3901b25fc37a7c65b931e3a7e4386b46c2b0c37d1f77c05f67eb68c1e9 *go.d.plugin-v0.0.2.freebsd-amd64
+b4a1715435983e60fefed1ca016fa55831ebfed419298cd93961d13a8ce8ee53 *go.d.plugin-v0.0.2.freebsd-arm
+e85e6bc0614d625d2c3f5d89182a640c3adabdb7ad9f2ad6a6d1d0fcef8d8761 *go.d.plugin-v0.0.2.linux-386
+f8b7d17402cfebb20431a2dedb9a7a1097a6be379a6eb187f9df4f39d69dc286 *go.d.plugin-v0.0.2.linux-amd64
+da9a1f5d083c09c644e5234ad73b523202fca5e5872645f8e3d33e3a01b11e71 *go.d.plugin-v0.0.2.linux-arm
+bc8d834840a723472ad116c7a44c5b93dd770356810912ca86cdcb517de076d8 *go.d.plugin-v0.0.2.linux-arm64
+556ec76fea17922ac413916f16061973ad20997cdce18be9ba6da22ddcc4d82d *go.d.plugin-v0.0.2.linux-mips
+9197b386863a48b9c00138fec885049448a5b85582db4e91668d5e21ef207b1a *go.d.plugin-v0.0.2.linux-mips64
+531795a69e5e6f2243a5ee19ed3221e7c6dfdcd690066af678fda505c8b3d81d *go.d.plugin-v0.0.2.linux-mips64le
+bb07367de065958ac429c694acb638c6151a80685081be74aafb65bd72a86022 *go.d.plugin-v0.0.2.linux-mipsle
+b78fa18407b3be1aa29657ea793fec5050c7fefc75ccc88168c7c2d4d4313def *go.d.plugin-v0.0.2.linux-ppc64
+50d37f290ebe0df8d08acff6c8f3f8df0c95d619ebe8b7f592973410b42a23ac *go.d.plugin-v0.0.2.linux-ppc64le

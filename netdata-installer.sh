@@ -778,7 +778,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.0.1"
+	GO_PACKAGE_VERSION="v0.0.2"
 	ARCH_MAP=(
 		'i386::386'
 		'x86_64::amd64'
