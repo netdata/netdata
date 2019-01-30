@@ -4759,7 +4759,7 @@ function handleMessage(e) {
             break;
 
         default:
-            console.log("Unknown message", e);
+            return;
     }
 }
 
