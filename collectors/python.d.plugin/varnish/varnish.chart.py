@@ -198,7 +198,7 @@ class Service(ExecutableService):
         # STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error("No output from 'varnishstat'. Not enough privileges?")
+            self.error("No output from 'varnishstat'. Is it running? Not enough privileges?")
             return False
 
         self.parser.init(reply)
