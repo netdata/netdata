@@ -1827,8 +1827,7 @@ fi
 if [ ${GOTOCLOUD} -eq 0 ] ; then
 	goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
-	urlencode "${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html" >/dev/null; url_registrypath="${REPLY}"
-	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&registrypath=${url_registrypath}&${redirect_params}"
+	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
 fi
 
 # the severity of the alarm
