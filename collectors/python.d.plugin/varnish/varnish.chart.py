@@ -186,9 +186,9 @@ class Service(ExecutableService):
             return False
 
         if self.instance_name:
-            self.command = [varnishstat, '-1', '-n', self.instance_name]
+            self.command = [varnishstat, '-1', '-n', self.instance_name, '-t', '1']
         else:
-            self.command = [varnishstat, '-1']
+            self.command = [varnishstat, '-1', '-t', '1']
         return True
 
     def check(self):
