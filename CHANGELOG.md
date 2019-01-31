@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Slack alert displaying URL after manual update of net-data [\#5301](https://github.com/netdata/netdata/issues/5301)
 - Netdata update in a /tmp hardened system [\#5289](https://github.com/netdata/netdata/issues/5289)
 - Certificate error while running netdata kickstart script [\#5273](https://github.com/netdata/netdata/issues/5273)
 - Netdata won't update anymore [\#5272](https://github.com/netdata/netdata/issues/5272)
@@ -11,6 +12,7 @@
 - /etc/netdata/edit-config charts.d.conf [\#5252](https://github.com/netdata/netdata/issues/5252)
 - Cannot install netdata from source \(the source directory does not include netdata-installer.sh\) [\#5251](https://github.com/netdata/netdata/issues/5251)
 - Non-interactive install fails if required packages are already present [\#5240](https://github.com/netdata/netdata/issues/5240)
+- apps.plugin memory usage bug [\#5237](https://github.com/netdata/netdata/issues/5237)
 - Automatic updates \(via CRON\) giving error [\#5229](https://github.com/netdata/netdata/issues/5229)
 - Updater script no longer seems to be working after a recent update [\#5228](https://github.com/netdata/netdata/issues/5228)
 - Cron Update fails \(again\) [\#5208](https://github.com/netdata/netdata/issues/5208)
@@ -26,14 +28,19 @@
 
 **Closed issues:**
 
+- Update not working or UI just showing wrong information? How to uninstall? [\#5285](https://github.com/netdata/netdata/issues/5285)
 - Slack Notifications Ignored by alarm-notify.sh [\#5267](https://github.com/netdata/netdata/issues/5267)
+- varnish plugin doesn't support custom varnishd working directory [\#5262](https://github.com/netdata/netdata/issues/5262)
 - Developing a new plugin questions [\#5235](https://github.com/netdata/netdata/issues/5235)
+- Split go.d plugin into two packages [\#5195](https://github.com/netdata/netdata/issues/5195)
 - move python module nvidia\_smi to go.d [\#5190](https://github.com/netdata/netdata/issues/5190)
 - Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
+- new database format design [\#4687](https://github.com/netdata/netdata/issues/4687)
 - \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
 
 **Merged pull requests:**
 
+- Remove registrypath from alarm-notify [\#5302](https://github.com/netdata/netdata/pull/5302) ([cakrit](https://github.com/cakrit))
 - Minor updates to anonymous statistics [\#5295](https://github.com/netdata/netdata/pull/5295) ([cakrit](https://github.com/cakrit))
 - kickstart: noexec detection [\#5293](https://github.com/netdata/netdata/pull/5293) ([paulfantom](https://github.com/paulfantom))
 - Correct info on what kickstart.sh does [\#5292](https://github.com/netdata/netdata/pull/5292) ([cakrit](https://github.com/cakrit))
@@ -45,7 +52,9 @@
 - Correct auto-updater to netdata-updater [\#5281](https://github.com/netdata/netdata/pull/5281) ([cakrit](https://github.com/cakrit))
 - netdata update instructions after recent changes [\#5277](https://github.com/netdata/netdata/pull/5277) ([cakrit](https://github.com/cakrit))
 - Fix incorrect parsing of ACLs [\#5275](https://github.com/netdata/netdata/pull/5275) ([cakrit](https://github.com/cakrit))
+- Improve apps grouping config and docs [\#5269](https://github.com/netdata/netdata/pull/5269) ([vlvkobal](https://github.com/vlvkobal))
 - Always run make clean before make [\#5265](https://github.com/netdata/netdata/pull/5265) ([cakrit](https://github.com/cakrit))
+- varnish module: add instance\_name option [\#5264](https://github.com/netdata/netdata/pull/5264) ([ilyam8](https://github.com/ilyam8))
 - Bug fix for 5261 [\#5263](https://github.com/netdata/netdata/pull/5263) ([cakrit](https://github.com/cakrit))
 - ceph module bugfix: fix invalid json response [\#5260](https://github.com/netdata/netdata/pull/5260) ([ilyam8](https://github.com/ilyam8))
 - Fix typo in docs/configuration-guide.md [\#5259](https://github.com/netdata/netdata/pull/5259) ([u32i64](https://github.com/u32i64))
