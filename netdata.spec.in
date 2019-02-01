@@ -80,8 +80,8 @@ Recommends:	python2-psycopg2 \
 %endif
 
 Summary:	Real-time performance monitoring, done right
-Name:		@PACKAGE_NAME@
-Version:	@PACKAGE_RPM_VERSION@
+Name:		netdata
+Version:	1.12.0
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
@@ -226,7 +226,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-%dir %{_libdir}/%{name}/conf.d/node.d
+#%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
@@ -241,7 +241,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
-* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
-- Initial add.
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
+- Temporary set version statically
+- Fix changelog ordering
+- Comment-out node.d configuration directory 
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
+* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
+- Initial add.
+
