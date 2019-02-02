@@ -36,6 +36,9 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    (void)action;
+    (void)action_result;
+    (void)action_data;
     return;
 }
 
