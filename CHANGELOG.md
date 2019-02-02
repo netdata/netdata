@@ -40,6 +40,7 @@
 
 **Merged pull requests:**
 
+- Clarify that uninstaller.sh needs to be downloaded [\#5315](https://github.com/netdata/netdata/pull/5315) ([cakrit](https://github.com/cakrit))
 - Remove registrypath from alarm-notify [\#5302](https://github.com/netdata/netdata/pull/5302) ([cakrit](https://github.com/cakrit))
 - Minor updates to anonymous statistics [\#5295](https://github.com/netdata/netdata/pull/5295) ([cakrit](https://github.com/cakrit))
 - kickstart: noexec detection [\#5293](https://github.com/netdata/netdata/pull/5293) ([paulfantom](https://github.com/paulfantom))
