@@ -757,6 +757,50 @@ struct test test5d = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
+// test5e - 64 bit prevent overflow on gaps
+
+struct feed_values test5e_feed[] = {
+        { 0,       0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 2000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
+};
+
+calculated_number test5e_results[] = {
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0,
+        0xFFFFFFFFFFFFFFFFULL / 6,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 3,
+};
+
+struct test test5e = {
+        "test5e",            // name
+        "test 64-bit incremental values overflow prevention",
+        1,                  // update_every
+        1,                  // multiplier
+        1,                  // divisor
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
+        10,                 // feed entries
+        10,                  // result entries
+        test5e_feed,        // feed
+        test5e_results,     // results
+        NULL,               // feed2
+        NULL                // results2
+};
+
+// --------------------------------------------------------------------------------------------------------------------
 // test6
 
 struct feed_values test6_feed[] = {
@@ -1421,6 +1465,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(run_test(&test5d))
+        return 1;
+
+    if(run_test(&test5e))
         return 1;
 
     if(run_test(&test6))
