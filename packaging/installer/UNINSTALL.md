@@ -1,4 +1,4 @@
-## Uninstalling netdata
+# Uninstalling netdata
 
 Our self-contained uninstaller is able to remove netdata installations created with shell installer. It doesn't need any other netdata repository files to be run. All it needs is an .environment file, which is created during installation (with shell installer) and put in ${NETDATA_USER_CONFIG_DIR}/.environment (by default /etc/netdata/.environment). That file contains some parameters which are passed to our installer and which are needed during uninstallation process. Mainly two parameters are needed:
 ```
@@ -14,8 +14,8 @@ A workflow for uninstallation looks like this:
 NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
 NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running netdata process
 ```
-3. Run ./packaging/installer/netdata-uninstaller.sh --yes --env <path_to_environment_file>
-4. Done
+3. Download [netdata-uninstaller.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/netdata-uninstaller.sh) and run it as follows: `netdata-uninstaller.sh --yes --env <path_to_environment_file>`. The default `path_to_environment_file` is `/etc/netdata`, it's the location of the file `.environment` that is used by the uninstaller.
+
 
 Note: This uninstallation method assumes previous installation with netdata-installer.sh or kickstart script. Currently using it when netdata was installed by a package manager can work or cause unexpected results.
 
