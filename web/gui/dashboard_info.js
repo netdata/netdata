@@ -619,8 +619,8 @@ netdataDashboard.submenu = {
 // height: the ratio of the chart height relative to the default
 //
 
-var cgroup_cpu_limit_is_set = 0;
-var cgroup_mem_limit_is_set = 0;
+var cgroupCPULimitIsSet = 0;
+var cgroupMemLimitIsSet = 0;
 
 netdataDashboard.context = {
     'system.cpu': {
@@ -1424,7 +1424,7 @@ netdataDashboard.context = {
         mainheads: [
             function (os, id) {
                 void(os);
-                cgroup_cpu_limit_is_set = 1;
+                cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
                     + ' data-append-options="percentage"'
@@ -1447,7 +1447,7 @@ netdataDashboard.context = {
         mainheads: [
             function (os, id) {
                 void(os);
-                if (cgroup_cpu_limit_is_set === 0) {
+                if (cgroupCPULimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
                         + ' data-title="CPU"'
@@ -1459,7 +1459,8 @@ netdataDashboard.context = {
                         + ' data-points="CHART_DURATION"'
                         + ' data-colors="' + NETDATA.colors[4] + '"'
                         + ' role="application"></div>';
-                } else
+                }
+                else
                     return '';
             }
         ]
@@ -1469,7 +1470,7 @@ netdataDashboard.context = {
         mainheads: [
             function (os, id) {
                 void(os);
-                cgroup_mem_limit_is_set = 1;
+                cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
                     + ' data-append-options="percentage"'
@@ -1492,7 +1493,7 @@ netdataDashboard.context = {
         mainheads: [
             function (os, id) {
                 void(os);
-                if (cgroup_mem_limit_is_set === 0) {
+                if (cgroupMemLimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
                         + ' data-title="Memory"'
@@ -1504,7 +1505,8 @@ netdataDashboard.context = {
                         + ' data-points="CHART_DURATION"'
                         + ' data-colors="' + NETDATA.colors[1] + '"'
                         + ' role="application"></div>';
-                } else
+                }
+                else
                     return '';
             }
         ]
