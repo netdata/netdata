@@ -40,6 +40,18 @@ else
 	source "${netdata_source_dir}/packaging/installer/functions.sh" || exit 1
 fi
 
+download() {
+	url="${1}"
+	dest="${2}"
+	if command -v wget >/dev/null 2>&1; then
+		run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v curl >/dev/null 2>&1; then
+		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	else
+		fatal "I need curl or wget to proceed, but neither is available on this system."
+	fi
+}
+
 # make sure we save all commands we run
 run_logfile="netdata-installer.log"
 
@@ -154,6 +166,10 @@ Valid <installer options> are:
 
         Use this flag to opt-out from our anonymous telemetry progam.
 
+   --disable-go
+
+        Flag to disable installation of go.d.plugin
+
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
@@ -211,6 +227,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--disable-telemetry" ]; then
 		NETDATA_DISABLE_TELEMETRY=1
+		shift 1
+	elif [ "$1" = "--disable-go" ]; then
+		NETDATA_DISABLE_GO=1
 		shift 1
 	elif [ "$1" = "--help" -o "$1" = "-h" ]; then
 		usage
@@ -638,7 +657,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"; do
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d"; do
 	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
 		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
 		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
@@ -754,6 +773,64 @@ else
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 fi
+
+# -----------------------------------------------------------------------------
+
+install_go() {
+	# When updating this value, ensure correct checksums in packaging/go.d.checksums
+	GO_PACKAGE_VERSION="v0.0.2"
+	ARCH_MAP=(
+		'i386::386'
+		'i686::386'
+		'x86_64::amd64'
+		'aarch64::arm64'
+		'armv64::arm64'
+		'armv6l::arm'
+		'armv7l::arm'
+		'armv5tel::arm'
+	)
+
+	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
+		progress "Install go.d.plugin"
+		ARCH=$(uname -m)
+		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+		for index in "${ARCH_MAP[@]}" ; do
+			KEY="${index%%::*}"
+			VALUE="${index##*::}"
+			if [ "$KEY" == "$ARCH" ]; then
+				ARCH="${VALUE}"
+				break
+			fi
+		done
+		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
+		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
+		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
+		grep "${GO_PACKAGE_BASENAME}" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+
+		# Checksum validation
+		if ! (cd "${tmp}" && sha256sum -c "sha256sums.txt"); then
+			run_failed "go.d.plugin package files checksum validation failed."
+			return 1
+		fi
+
+		# Install new files
+		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
+		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
+		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
+		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+
+		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		if [ ${UID} -eq 0 ]; then
+			run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		fi
+		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+	fi
+	return 0
+}
+install_go
 
 # --- fix #1292 bug ---
 
