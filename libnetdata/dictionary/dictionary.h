@@ -44,5 +44,6 @@ extern void *dictionary_get(DICTIONARY *dict, const char *name);
 extern int dictionary_del(DICTIONARY *dict, const char *name);
 
 extern int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *d), void *data);
+extern int dictionary_get_all_name_value(DICTIONARY *dict, int (*callback)(char *name, void *entry, void *d), void *data);
 
 #endif /* NETDATA_DICTIONARY_H */

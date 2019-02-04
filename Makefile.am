@@ -105,6 +105,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
+	$(OPTIONAL_CUPS_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -211,6 +212,11 @@ FREEIPMI_PLUGIN_FILES = \
     collectors/freeipmi.plugin/freeipmi_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
+
+CUPS_PLUGIN_FILES = \
+	collectors/cups.plugin/cups_plugin.c \
+	$(LIBNETDATA_FILES) \
+	$(NULL)
 
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
@@ -486,5 +492,14 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_CUPS
+    plugins_PROGRAMS += cups.plugin
+    cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
+    cups_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_CUPS_LIBS) \
         $(NULL)
 endif

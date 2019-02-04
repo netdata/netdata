@@ -27,6 +27,7 @@ plugin|lang|O/S|runs as|modular|description
 [cgroups.plugin](cgroups.plugin/)|`C`|linux|internal|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems
 [charts.d.plugin](charts.d.plugin/)|`BASH` v4+|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
 [checks.plugin](checks.plugin/)|`C`|any|internal|-|a debugging plugin (by default it is disabled)
+[cups.plugin](cups.plugin/)|`C`|any|external|-|monitors **CUPS**
 [diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points
 [fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
 [freebsd.plugin](freebsd.plugin/)|`C`|freebsd|internal|yes|collects resource usage and performance data on FreeBSD systems

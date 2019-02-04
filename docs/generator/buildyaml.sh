@@ -203,6 +203,7 @@ echo -ne "        - BASH modules:
 
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
+navpart 3 collectors/cups.plugin
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "

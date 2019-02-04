@@ -57,6 +57,13 @@ AC_ARG_ENABLE(
     ,
     [enable_plugin_freeipmi="detect"]
 )
+ AC_ARG_ENABLE(
+    [plugin-cups],
+    [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
+    ,
+    [enable_plugin_cups="detect"]
+  )
+
 AC_ARG_ENABLE(
     [pedantic],
     [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
@@ -400,6 +407,65 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 
 
 # -----------------------------------------------------------------------------
+# cups.plugin - libmnl, libnetfilter_acct
+
+ AC_CHECK_LIB([cups], [
+    cupsEncryption,
+    cupsFreeDests,
+    cupsFreeJobs,
+    cupsGetDests2,
+    cupsGetIntegerOption,
+    cupsGetJobs2,
+    cupsGetOption,
+    cupsServer,
+    httpClose,
+    httpConnect2,
+    ippPort
+],
+    [AC_CHECK_HEADER(
+        [cups/cups.h],
+        [have_cups=yes],
+        [have_cups=no]
+    )],
+    [have_cups=no]
+)
+
+test "${enable_plugin_cups}" = "yes" -a "${have_cups}" != "yes" && \
+    AC_MSG_ERROR([cups required but not found. Try installing 'cups'])
+
+AC_ARG_WITH([cups-config],
+    [AS_HELP_STRING([--with-cups-config=path], [Specify path to cups-config executable.])],
+    [with_cups_config="$withval"],
+    [with_cups_config=system]
+    )
+
+AS_IF([test "x$with_cups_config" != "xsystem"], [
+	CUPSCONFIG=$with_cups_config
+], [
+	AC_PATH_TOOL(CUPSCONFIG, [cups-config])
+	AS_IF([test -z "$CUPSCONFIG"], [
+		have_cups=no
+	])
+])
+
+AC_MSG_CHECKING([if cups.plugin should be enabled])
+if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
+    enable_plugin_cups="yes"
+    AC_DEFINE([HAVE_CUPS], [1], [cups usability])
+    
+    CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
+    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
+
+    OPTIONAL_CUPS_CLFAGS="${CUPS_CFLAGS}"
+    OPTIONAL_CUPS_LIBS="${CUPS_LIBS}"
+else
+    enable_plugin_cups="no"
+fi
+AC_MSG_RESULT([${enable_plugin_cups}])
+AM_CONDITIONAL([ENABLE_PLUGIN_CUPS], [test "${enable_plugin_cups}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
 AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
@@ -463,7 +529,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS}"
+    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CLFAGS}"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -534,6 +600,9 @@ AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
+AC_SUBST([OPTIONAL_CUPS_CFLAGS])
+AC_SUBST([OPTIONAL_CUPS_LIBS])
+
 
 AC_CONFIG_FILES([
     Makefile
@@ -552,6 +621,7 @@ AC_CONFIG_FILES([
     collectors/fping.plugin/Makefile
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile
+    collectors/cups.plugin/Makefile
     collectors/idlejitter.plugin/Makefile
     collectors/macos.plugin/Makefile
     collectors/nfacct.plugin/Makefile

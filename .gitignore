@@ -47,6 +47,9 @@ apps.plugin
 freeipmi.plugin
 !freeipmi.plugin/
 
+cups.plugin
+!cups.plugin/
+
 cgroup-network
 !cgroup-network/
 
