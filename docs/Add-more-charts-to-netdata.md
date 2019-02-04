@@ -19,6 +19,7 @@ To collect non-system metrics, netdata supports a plugin architecture. The follo
 - **[RAID](#raid)**, such as linux software raid (mdadm), MegaRAID
 - **[Mail Servers](#mail-servers)**, like postfix, exim, dovecot
 - **[File Servers](#file-servers)**, like samba, NFS, ftp, sftp, WebDAV
+- **[Print Servers](#print-servers)**, like CUPS
 - **[System](#system)**, for processes and other system metrics
 - **[Sensors](#sensors)**, like temperature, fans speed, voltage, humidity, HDD/SSD S.M.A.R.T attributes
 - **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time
@@ -55,6 +56,7 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# proc = yes
 	# diskspace = yes
 	# cgroups = yes
+	# cups = yes
 	# tc = yes
 	# nfacct = yes
 	# idlejitter = yes
@@ -292,6 +294,11 @@ NFS Client|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Co
 NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
 samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
+### Print Servers
+
+application|language|notes|
+:---------:|:------:|:----|
+CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: cups.plugin
 
 ---
 

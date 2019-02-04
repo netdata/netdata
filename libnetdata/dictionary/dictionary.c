@@ -292,3 +292,38 @@ int dictionary_get_all(DICTIONARY *dict, int (*callback)(void *entry, void *data
 
     return ret;
 }
+
+static int dictionary_walker_name_value(avl *a, int (*callback)(char *name, void *entry, void *data), void *data) {
+    int total = 0, ret = 0;
+
+    if(a->avl_link[0]) {
+        ret = dictionary_walker_name_value(a->avl_link[0], callback, data);
+        if(ret < 0) return ret;
+        total += ret;
+    }
+
+    ret = callback(((NAME_VALUE *)a)->name, ((NAME_VALUE *)a)->value, data);
+    if(ret < 0) return ret;
+    total += ret;
+
+    if(a->avl_link[1]) {
+        ret = dictionary_walker_name_value(a->avl_link[1], callback, data);
+        if (ret < 0) return ret;
+        total += ret;
+    }
+
+    return total;
+}
+
+int dictionary_get_all_name_value(DICTIONARY *dict, int (*callback)(char *name, void *entry, void *data), void *data) {
+    int ret = 0;
+
+    dictionary_read_lock(dict);
+
+    if(likely(dict->values_index.root))
+        ret = dictionary_walker_name_value(dict->values_index.root, callback, data);
+
+    dictionary_unlock(dict);
+
+    return ret;
+}
