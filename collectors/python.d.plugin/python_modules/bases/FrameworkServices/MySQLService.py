@@ -131,20 +131,22 @@ class MySQLService(SimpleService):
         raw_data = dict()
         queries = dict(self.queries)
         try:
-            with self.__connection as cursor:
-                for name, query in queries.items():
-                    try:
-                        cursor.execute(query)
-                    except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
-                        if self.__is_error_critical(err_class=exc_info()[0], err_text=str(error)):
-                            raise RuntimeError
-                        self.error('Removed query: {name}[{query}]. Error: error'.format(name=name,
-                                                                                         query=query,
-                                                                                         error=error))
-                        self.queries.pop(name)
-                        continue
-                    else:
-                        raw_data[name] = (cursor.fetchall(), cursor.description) if description else cursor.fetchall()
+            cursor = self.__connection.cursor()
+            for name, query in queries.items():
+                try:
+                    cursor.execute(query)
+                except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
+                    if self.__is_error_critical(err_class=exc_info()[0], err_text=str(error)):
+                        cursor.close()
+                        raise RuntimeError
+                    self.error('Removed query: {name}[{query}]. Error: error'.format(name=name,
+                                                                                     query=query,
+                                                                                     error=error))
+                    self.queries.pop(name)
+                    continue
+                else:
+                    raw_data[name] = (cursor.fetchall(), cursor.description) if description else cursor.fetchall()
+            cursor.close()
             self.__connection.commit()
         except (MySQLdb.MySQLError, RuntimeError, TypeError, AttributeError):
             self.__connection.close()
