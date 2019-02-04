@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Slack alert displaying URL after manual update of net-data [\#5301](https://github.com/netdata/netdata/issues/5301)
 - Netdata update in a /tmp hardened system [\#5289](https://github.com/netdata/netdata/issues/5289)
 - Certificate error while running netdata kickstart script [\#5273](https://github.com/netdata/netdata/issues/5273)
@@ -35,11 +36,14 @@
 - Split go.d plugin into two packages [\#5195](https://github.com/netdata/netdata/issues/5195)
 - move python module nvidia\_smi to go.d [\#5190](https://github.com/netdata/netdata/issues/5190)
 - Logstash monitoring [\#5147](https://github.com/netdata/netdata/issues/5147)
+- integrate go.d into netdata [\#5006](https://github.com/netdata/netdata/issues/5006)
 - new database format design [\#4687](https://github.com/netdata/netdata/issues/4687)
 - \[REQUEST\] Prowl integration for iOS users? [\#3788](https://github.com/netdata/netdata/issues/3788)
+- CUPS information [\#857](https://github.com/netdata/netdata/issues/857)
 
 **Merged pull requests:**
 
+- fix compilation of cups.plugin; fixes \#5324 [\#5325](https://github.com/netdata/netdata/pull/5325) ([ktsaou](https://github.com/ktsaou))
 - Clarify that uninstaller.sh needs to be downloaded [\#5315](https://github.com/netdata/netdata/pull/5315) ([cakrit](https://github.com/cakrit))
 - Remove registrypath from alarm-notify [\#5302](https://github.com/netdata/netdata/pull/5302) ([cakrit](https://github.com/cakrit))
 - Minor updates to anonymous statistics [\#5295](https://github.com/netdata/netdata/pull/5295) ([cakrit](https://github.com/cakrit))
@@ -74,7 +78,9 @@
 - Bug fix for netdata behind authenticated proxies [\#5216](https://github.com/netdata/netdata/pull/5216) ([cakrit](https://github.com/cakrit))
 - add go.d.plugin to apps\_groups.conf [\#5214](https://github.com/netdata/netdata/pull/5214) ([ilyam8](https://github.com/ilyam8))
 - Don't show zero charts for ZFS filesystem [\#5211](https://github.com/netdata/netdata/pull/5211) ([vlvkobal](https://github.com/vlvkobal))
+- install go.d.plugin [\#5199](https://github.com/netdata/netdata/pull/5199) ([paulfantom](https://github.com/paulfantom))
 - Correct link to Rest API [\#5193](https://github.com/netdata/netdata/pull/5193) ([cakrit](https://github.com/cakrit))
+- CUPS plugin [\#5188](https://github.com/netdata/netdata/pull/5188) ([simonnagl](https://github.com/simonnagl))
 - alarm-notify: Add Prowl integration for iOS users. [\#5132](https://github.com/netdata/netdata/pull/5132) ([Ferroin](https://github.com/Ferroin))
 - Anonymous statistics [\#5113](https://github.com/netdata/netdata/pull/5113) ([cakrit](https://github.com/cakrit))
 - Update info on plugins in performance doc [\#5101](https://github.com/netdata/netdata/pull/5101) ([cakrit](https://github.com/cakrit))
