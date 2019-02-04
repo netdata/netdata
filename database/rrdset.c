@@ -1394,7 +1394,7 @@ void rrdset_done(RRDSET *st) {
                     uint64_t delta = cap - last + new;
 
                     // when there will be gaps in the charts, don't wrap overflown incremental values
-                    if((next_store_ut - last_stored_ut) > (gap_when_lost_iterations_above * update_every_ut))
+                    if((st->counter_done < 3) || ((next_store_ut - last_stored_ut) > (gap_when_lost_iterations_above * update_every_ut)))
                         delta = 0;
 
                     rd->calculated_value +=
