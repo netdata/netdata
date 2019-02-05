@@ -1,3 +1,5 @@
+// Codacy declarations
+/* global netdataTheme */
 
 NETDATA.themes = {
     white: {
