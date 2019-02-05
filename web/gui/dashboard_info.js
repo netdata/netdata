@@ -1421,13 +1421,13 @@ netdataDashboard.context = {
     // containers
 
     'cgroup.cpu_limit': {
+        valueRange: "[0, null]",
         mainheads: [
             function (os, id) {
                 void(os);
                 cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
-                    + ' data-append-options="percentage"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="CPU"'

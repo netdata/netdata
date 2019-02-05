@@ -2468,22 +2468,19 @@ void update_cgroup_charts(int update_every) {
                                     , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                                     , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS - 1
                                     , update_every
-                                    , RRDSET_TYPE_STACKED
+                                    , RRDSET_TYPE_LINE
                             );
 
-                            rrddim_add(cg->st_cpu_limit, "available", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
-                            rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
+                            rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         }
                         else
                             rrdset_next(cg->st_cpu_limit);
 
                         calculated_number cpu_usage = (cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
-                        calculated_number cpu_available = value * 100 / system_hz * update_every - (cpu_usage - cg->prev_cpu_usage);
-                        calculated_number cpu_used = cpu_usage - cg->prev_cpu_usage;
+                        calculated_number cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
                         rrdset_isnot_obsolete(cg->st_cpu_limit);
 
-                        rrddim_set(cg->st_cpu_limit, "available", (cpu_available > 0)?cpu_available:0);
                         rrddim_set(cg->st_cpu_limit, "used", (cpu_used > 0)?cpu_used:0);
 
                         cg->prev_cpu_usage = cpu_usage;
