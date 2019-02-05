@@ -2736,7 +2736,7 @@ void update_cgroup_charts(int update_every) {
                                 , "mem"
                                 , "cgroup.mem_usage_limit"
                                 , title
-                                , "percentage"
+                                , "MiB"
                                 , PLUGIN_CGROUPS_NAME
                                 , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
                                 , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 199
@@ -2744,8 +2744,8 @@ void update_cgroup_charts(int update_every) {
                                 , RRDSET_TYPE_STACKED
                         );
 
-                        rrddim_add(cg->st_mem_usage_limit, "available", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
-                        rrddim_add(cg->st_mem_usage_limit, "used", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
+                        rrddim_add(cg->st_mem_usage_limit, "available", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                        rrddim_add(cg->st_mem_usage_limit, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                     }
                     else
                         rrdset_next(cg->st_mem_usage_limit);
