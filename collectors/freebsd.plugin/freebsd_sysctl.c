@@ -580,7 +580,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
     (void)dt;
     static int mib_hw_intrcnt[2] = {0, 0};
     size_t intrcnt_size = 0;
-    unsigned long i;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
         error("DISABLED: system.intr chart");
@@ -591,7 +590,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
         unsigned long nintr = 0;
         static unsigned long old_nintr = 0;
         static unsigned long *intrcnt = NULL;
-        unsigned long long totalintr = 0;
+        unsigned long i;
 
         nintr = intrcnt_size / sizeof(u_long);
         if (unlikely(nintr != old_nintr))
@@ -602,6 +601,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             error("DISABLED: hw.intrcnt module");
             return 1;
         } else {
+            unsigned long long totalintr = 0;
+
             for (i = 0; i < nintr; i++)
                 totalintr += intrcnt[i];
 
@@ -653,7 +654,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 static RRDSET *st_interrupts = NULL;
-                void *p;
 
                 if (unlikely(!st_interrupts))
                     st_interrupts = rrdset_create_localhost(
@@ -674,6 +674,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                     rrdset_next(st_interrupts);
 
                 for (i = 0; i < nintr; i++) {
+                    void *p;
+
                     p = intrnames + i * (MAXCOMLEN + 1);
                     if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
                         RRDDIM *rd_interrupts = rrddim_find(st_interrupts, p);
@@ -965,10 +967,13 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
-               mib_cache_count[4] = {0, 0, 0, 0}, mib_laundry_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0},
-               mib_free_count[4] = {0, 0, 0, 0};
+               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
     vmmeter_t vmmeter_data;
     int vfs_bufspace_count;
+
+#if defined(NETDATA_COLLECT_LAUNDRY)
+    static int mib_laundry_count[4] = {0, 0, 0, 0};
+#endif
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_inactive_count", mib_inactive_count, vmmeter_data.v_inactive_count) ||
@@ -990,7 +995,11 @@ int do_system_ram(int update_every, usec_t dt) {
 
         static RRDSET *st = NULL;
         static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL, *rd_wired = NULL,
-                      *rd_cache = NULL, *rd_laundry = NULL, *rd_buffers = NULL;
+                      *rd_cache = NULL, *rd_buffers = NULL;
+
+#if defined(NETDATA_COLLECT_LAUNDRY)
+        static RRDDIM *rd_laundry = NULL;
+#endif
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -1155,7 +1164,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
 
 int do_kern_ipc_sem(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_semmni[3] = {0, 0, 0}, mib_sema[3] = {0, 0, 0};
+    static int mib_semmni[3] = {0, 0, 0};
     struct ipc_sem {
         int semmni;
         collected_number sets;
@@ -1170,6 +1179,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
     } else {
         static struct semid_kernel *ipc_sem_data = NULL;
         static int old_semmni = 0;
+        static int mib_sema[3] = {0, 0, 0};
 
         if (unlikely(ipc_sem.semmni != old_semmni)) {
             ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
@@ -1253,7 +1263,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
 
 int do_kern_ipc_shm(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_shmmni[3] = {0, 0, 0}, mib_shmsegs[3] = {0, 0, 0};
+    static int mib_shmmni[3] = {0, 0, 0};
     struct ipc_shm {
         u_long shmmni;
         collected_number segs;
@@ -1268,6 +1278,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
     } else {
         static struct shmid_kernel *ipc_shm_data = NULL;
         static u_long old_shmmni = 0;
+        static int mib_shmsegs[3] = {0, 0, 0};
 
         if (unlikely(ipc_shm.shmmni != old_shmmni)) {
             ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
@@ -1352,7 +1363,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
 
 int do_kern_ipc_msq(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_msgmni[3] = {0, 0, 0}, mib_msqids[3] = {0, 0, 0};
+    static int mib_msgmni[3] = {0, 0, 0};
     struct ipc_msq {
         int msgmni;
         collected_number queues;
@@ -1370,6 +1381,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
     } else {
         static struct msqid_kernel *ipc_msq_data = NULL;
         static int old_msgmni = 0;
+        static int mib_msqids[3] = {0, 0, 0};
 
         if (unlikely(ipc_msq.msgmni != old_msgmni)) {
             ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
@@ -1531,12 +1543,6 @@ int do_net_isr(int update_every, usec_t dt) {
         do_netisr_per_core = config_get_boolean("plugin:freebsd:net.isr", "netisr per core", 1);
     }
 
-    static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
-    int common_error = 0;
-    size_t netisr_workstream_size = 0, netisr_work_size = 0;
-    unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
-    static struct sysctl_netisr_workstream *netisr_workstream = NULL;
-    static struct sysctl_netisr_work *netisr_work = NULL;
     static struct netisr_stats {
         collected_number dispatched;
         collected_number hybrid_dispatched;
@@ -1545,6 +1551,13 @@ int do_net_isr(int update_every, usec_t dt) {
     } *netisr_stats = NULL;
 
     if (likely(do_netisr || do_netisr_per_core)) {
+        static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
+        size_t netisr_workstream_size = 0, netisr_work_size = 0;
+        static struct sysctl_netisr_workstream *netisr_workstream = NULL;
+        static struct sysctl_netisr_work *netisr_work = NULL;
+        unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
+        int common_error = 0;
+
         if (unlikely(GETSYSCTL_SIZE("net.isr.workstream", mib_workstream, netisr_workstream_size))) {
             common_error = 1;
         } else if (unlikely(GETSYSCTL_SIZE("net.isr.work", mib_work, netisr_work_size))) {
@@ -2243,7 +2256,6 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
     if (likely(do_icmp_packets || do_icmp_errors || do_icmpmsg)) {
         static int mib[4] = {0, 0, 0, 0};
         struct icmpstat icmpstat;
-        int i;
         struct icmp_total {
             u_long  msgs_in;
             u_long  msgs_out;
@@ -2259,6 +2271,8 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
             error("DISABLED: net.inet.icmp.stats module");
             return 1;
         } else {
+            int i;
+
             for (i = 0; i <= ICMP_MAXTYPE; i++) {
                 icmp_total.msgs_in += icmpstat.icps_inhist[i];
                 icmp_total.msgs_out += icmpstat.icps_outhist[i];
