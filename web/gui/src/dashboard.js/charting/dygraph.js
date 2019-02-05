@@ -1,5 +1,9 @@
 // dygraph
 
+// Codacy declarations
+/* global smoothPlotter */
+/* global Dygraph */
+
 NETDATA.dygraph = {
     smooth: false
 };
