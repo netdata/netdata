@@ -1,6 +1,9 @@
 
 // *** src/dashboard.js/main.js
 
+// Codacy declarations
+/* global clipboard */
+
 if (NETDATA.options.debug.main_loop) {
     console.log('welcome to NETDATA');
 }

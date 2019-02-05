@@ -1704,6 +1704,8 @@ NETDATA.timeout = {
 };
 
 NETDATA.timeout.init();
+// Codacy declarations
+/* global netdataTheme */
 
 NETDATA.themes = {
     white: {
@@ -1795,6 +1797,10 @@ NETDATA.colors = NETDATA.themes.current.colors;
 //                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
 //NETDATA.colors        = [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
 // dygraph
+
+// Codacy declarations
+/* global smoothPlotter */
+/* global Dygraph */
 
 NETDATA.dygraph = {
     smooth: false
@@ -4979,6 +4985,9 @@ NETDATA.commonColors = {
 };
 
 // *** src/dashboard.js/main.js
+
+// Codacy declarations
+/* global clipboard */
 
 if (NETDATA.options.debug.main_loop) {
     console.log('welcome to NETDATA');
