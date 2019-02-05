@@ -75,7 +75,9 @@ class SocketService(SimpleService):
                                              keyfile=self.key,
                                              certfile=self.cert,
                                              server_side=False,
-                                             cert_reqs=ssl.CERT_NONE)
+                                             cert_reqs=ssl.CERT_NONE,
+                                             ssl_version=ssl.PROTOCOL_TLS,
+                                             )
             except (socket.error, ssl.SSLError) as error:
                 self.error('Failed to wrap socket.')
                 self._disconnect()
