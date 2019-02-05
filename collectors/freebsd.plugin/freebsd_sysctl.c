@@ -1543,9 +1543,6 @@ int do_net_isr(int update_every, usec_t dt) {
         do_netisr_per_core = config_get_boolean("plugin:freebsd:net.isr", "netisr per core", 1);
     }
 
-    static int mib_work[3] = {0, 0, 0};
-    size_t netisr_work_size = 0;
-    unsigned long num_netisr_works = 0;
     static struct netisr_stats {
         collected_number dispatched;
         collected_number hybrid_dispatched;
@@ -1554,11 +1551,11 @@ int do_net_isr(int update_every, usec_t dt) {
     } *netisr_stats = NULL;
 
     if (likely(do_netisr || do_netisr_per_core)) {
-        static int mib_workstream[3] = {0, 0, 0};
+        static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
+        size_t netisr_workstream_size = 0, netisr_work_size = 0;
         static struct sysctl_netisr_workstream *netisr_workstream = NULL;
         static struct sysctl_netisr_work *netisr_work = NULL;
-        size_t netisr_workstream_size = 0;
-        unsigned long num_netisr_workstreams = 0;
+        unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
         int common_error = 0;
 
         if (unlikely(GETSYSCTL_SIZE("net.isr.workstream", mib_workstream, netisr_workstream_size))) {
