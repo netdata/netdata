@@ -75,9 +75,11 @@ class SocketService(SimpleService):
                                              keyfile=self.key,
                                              certfile=self.cert,
                                              server_side=False,
-                                             cert_reqs=ssl.CERT_NONE)
+                                             cert_reqs=ssl.CERT_NONE,
+                                             ssl_version=ssl.PROTOCOL_TLS,
+                                             )
             except (socket.error, ssl.SSLError) as error:
-                self.error('Failed to wrap socket.')
+                self.error('failed to wrap socket : {0}'.format(error))
                 self._disconnect()
                 self.__socket_config = None
                 return False
@@ -169,8 +171,8 @@ class SocketService(SimpleService):
                 self.debug('closing socket')
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
-            except Exception:
-                pass
+            except Exception as error:
+                self.error(error)
             self._sock = None
 
     def _send(self, request=None):

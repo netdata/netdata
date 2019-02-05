@@ -127,6 +127,6 @@ class Service(UrlService):
             for new_key, orig_key, xmute in cfg[suburl]:
                 try:
                     r[new_key] = xmute(in_json[orig_key])
-                except Exception:
-                    continue
+                except Exception as error:
+                    self.debug(error)
         return r or None
