@@ -256,7 +256,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                 disks_found = 0;
 
-                dstat = devstat_data + sizeof(long); // skip generation number
+                dstat = (struct devstat*)((char*)devstat_data + sizeof(long)); // skip generation number
 
                 for (i = 0; i < numdevs; i++) {
                     if (likely(do_system_io)) {
