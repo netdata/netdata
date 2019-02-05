@@ -103,7 +103,7 @@ NETDATA.encodeURIComponent = function (s) {
 };
 
 /// A heuristic for detecting slow devices.
-let isSlowDeviceResult = undefined;
+let isSlowDeviceResult = null;
 const isSlowDevice = function () {
     if (!isSlowDeviceResult) {
         return isSlowDeviceResult;
@@ -297,7 +297,7 @@ NETDATA.fastNumberFormat = {
         let key = max;
         if (min === max) {
             if (typeof this.formattersFixed[key] === 'undefined') {
-                this.formattersFixed[key] = new Intl.NumberFormat(undefined, {
+                this.formattersFixed[key] = new Intl.NumberFormat({
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -311,7 +311,7 @@ NETDATA.fastNumberFormat = {
             return this.formattersFixed[key];
         } else if (min === 0) {
             if (typeof this.formattersZeroBased[key] === 'undefined') {
-                this.formattersZeroBased[key] = new Intl.NumberFormat(undefined, {
+                this.formattersZeroBased[key] = new Intl.NumberFormat({
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -326,7 +326,7 @@ NETDATA.fastNumberFormat = {
         } else {
             // this is never used
             // it is added just for completeness
-            return new Intl.NumberFormat(undefined, {
+            return new Intl.NumberFormat({
                 // style: 'decimal',
                 // minimumIntegerDigits: 1,
                 // minimumSignificantDigits: 1,

@@ -2324,19 +2324,19 @@ netdataDashboard.context = {
     // Power Supplies
 
     'powersupply.capacity': {
-        info: undefined
+        info: 'The capacity of the power supply, expressed as a percentage'
     },
 
     'powersupply.charge': {
-        info: undefined
+        info: 'The charge of the power supply, expressed as amphours'
     },
 
     'powersupply.energy': {
-        info: undefined
+        info: 'The energy of the power supply, expressed as watthours.'
     },
 
     'powersupply.voltage': {
-        info: undefined
+        info: 'The voltage of the power supply, expressed as volts'
     }
 
     // ------------------------------------------------------------------------
