@@ -118,7 +118,7 @@ class Service(SimpleService):
         :return: dict
         """
 
-        af, _, proto, _, sa = socket_config
+        _, _, proto, _, sa = socket_config
         port = str(sa[1])
         try:
             self.debug('Connecting socket to "{address}", port {port}'.format(address=sa[0], port=port))
