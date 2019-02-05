@@ -213,7 +213,7 @@ NETDATA.fastNumberFormat = {
         let key = max;
         if (min === max) {
             if (typeof this.formattersFixed[key] === 'undefined') {
-                this.formattersFixed[key] = new Intl.NumberFormat({
+                this.formattersFixed[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -227,7 +227,7 @@ NETDATA.fastNumberFormat = {
             return this.formattersFixed[key];
         } else if (min === 0) {
             if (typeof this.formattersZeroBased[key] === 'undefined') {
-                this.formattersZeroBased[key] = new Intl.NumberFormat({
+                this.formattersZeroBased[key] = new Intl.NumberFormat(undefined, {
                     // style: 'decimal',
                     // minimumIntegerDigits: 1,
                     // minimumSignificantDigits: 1,
@@ -242,7 +242,7 @@ NETDATA.fastNumberFormat = {
         } else {
             // this is never used
             // it is added just for completeness
-            return new Intl.NumberFormat({
+            return new Intl.NumberFormat(undefined, {
                 // style: 'decimal',
                 // minimumIntegerDigits: 1,
                 // minimumSignificantDigits: 1,
