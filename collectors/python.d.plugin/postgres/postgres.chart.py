@@ -1068,7 +1068,7 @@ def add_replication_delta_chart(order, definitions, name, application_name):
     chart_name = '_'.join([application_name, name])
     position = order.index('database_size')
     order.insert(position, chart_name)
-    name, title, units, family, context, chart_type = chart_template['options']
+    name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
                'options': [name, title + ': ' + application_name,  units, 'replication delta', context,  chart_type],
                'lines': create_lines(application_name, chart_template['lines'])}
@@ -1086,7 +1086,7 @@ def add_replication_slot_chart(order, definitions, name, slot_name):
     chart_name = '_'.join([slot_name, name])
     position = order.index('database_size')
     order.insert(position, chart_name)
-    name, title, units, family, context, chart_type = chart_template['options']
+    name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
                'options': [name, title + ': ' + slot_name,  units, 'replication slot files', context,  chart_type],
                'lines': create_lines(slot_name, chart_template['lines'])}
