@@ -73,13 +73,11 @@ var webbox = {
             if(found > 0 && service.added !== true)
                 service.commit();
 
-            var id;
-            var chart;
 
             // Grid Current Power Chart
             if(d['GriPwr'].value !== null) {
-                id = 'smawebbox_' + service.name + '.current';
-                chart = webbox.charts[id];
+                const id = 'smawebbox_' + service.name + '.current';
+                let chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
                     chart = {
@@ -114,8 +112,8 @@ var webbox = {
             }
 
             if(d['GriEgyTdy'].value !== null) {
-                id = 'smawebbox_' + service.name + '.today';
-                chart = webbox.charts[id];
+                const id = 'smawebbox_' + service.name + '.today';
+                let chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
                     chart = {
@@ -150,8 +148,8 @@ var webbox = {
             }
 
             if(d['GriEgyTot'].value !== null) {
-                id = 'smawebbox_' + service.name + '.total';
-                chart = webbox.charts[id];
+                const id = 'smawebbox_' + service.name + '.total';
+                let chart = webbox.charts[id];
 
                 if(typeof chart === 'undefined') {
                     chart = {
