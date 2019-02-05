@@ -19,7 +19,7 @@ NETDATA.encodeURIComponent = function (s) {
 };
 
 /// A heuristic for detecting slow devices.
-let isSlowDeviceResult = null;
+let isSlowDeviceResult = undefined;
 const isSlowDevice = function () {
     if (!isSlowDeviceResult) {
         return isSlowDeviceResult;
