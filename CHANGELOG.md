@@ -24,11 +24,13 @@
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 - alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
+- Netdata w/ Docker Container not show Disk space utilization for mounts [\#5071](https://github.com/netdata/netdata/issues/5071)
 - zfs charts appear, even when they are zero [\#4115](https://github.com/netdata/netdata/issues/4115)
 - Ceph - No JSON object could be decoded [\#3563](https://github.com/netdata/netdata/issues/3563)
 
 **Closed issues:**
 
+- integrate go-orchestrator into go.d.plugin [\#5308](https://github.com/netdata/netdata/issues/5308)
 - Update not working or UI just showing wrong information? How to uninstall? [\#5285](https://github.com/netdata/netdata/issues/5285)
 - Slack Notifications Ignored by alarm-notify.sh [\#5267](https://github.com/netdata/netdata/issues/5267)
 - varnish plugin doesn't support custom varnishd working directory [\#5262](https://github.com/netdata/netdata/issues/5262)
@@ -43,6 +45,12 @@
 
 **Merged pull requests:**
 
+- Fix Codacy issues for FreeBSD plugin [\#5334](https://github.com/netdata/netdata/pull/5334) ([vlvkobal](https://github.com/vlvkobal))
+- portcheck: remove unused var [\#5332](https://github.com/netdata/netdata/pull/5332) ([ilyam8](https://github.com/ilyam8))
+- fix some python codacy errors [\#5331](https://github.com/netdata/netdata/pull/5331) ([ilyam8](https://github.com/ilyam8))
+- Remove codacy warnings from sma\_webbox [\#5330](https://github.com/netdata/netdata/pull/5330) ([cakrit](https://github.com/cakrit))
+- Allow user to override the default behavior for read-only mounts [\#5327](https://github.com/netdata/netdata/pull/5327) ([vlvkobal](https://github.com/vlvkobal))
+- Remove deprecated API call [\#5326](https://github.com/netdata/netdata/pull/5326) ([Aisbergg](https://github.com/Aisbergg))
 - fix compilation of cups.plugin; fixes \#5324 [\#5325](https://github.com/netdata/netdata/pull/5325) ([ktsaou](https://github.com/ktsaou))
 - Clarify that uninstaller.sh needs to be downloaded [\#5315](https://github.com/netdata/netdata/pull/5315) ([cakrit](https://github.com/cakrit))
 - Remove registrypath from alarm-notify [\#5302](https://github.com/netdata/netdata/pull/5302) ([cakrit](https://github.com/cakrit))
