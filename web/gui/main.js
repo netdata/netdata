@@ -1,5 +1,8 @@
 // Main JavaScript file for the Netdata GUI.
 
+// Codacy declarations
+/* global NETDATA */
+
 // netdata snapshot data
 var netdataSnapshotData = null;
 

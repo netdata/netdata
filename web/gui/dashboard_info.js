@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Codacy declarations
+/* global NETDATA */
+
 var netdataDashboard = window.netdataDashboard || {};
 
 // Informational content for the various sections of the GUI (menus, sections, charts, etc.)
