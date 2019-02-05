@@ -169,8 +169,8 @@ class SocketService(SimpleService):
                 self.debug('closing socket')
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
-            except Exception:
-                pass
+            except Exception as error:
+                self.error(error)
             self._sock = None
 
     def _send(self, request=None):
