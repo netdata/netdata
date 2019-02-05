@@ -79,7 +79,7 @@ class SocketService(SimpleService):
                                              ssl_version=ssl.PROTOCOL_TLS,
                                              )
             except (socket.error, ssl.SSLError) as error:
-                self.error('Failed to wrap socket.')
+                self.error('failed to wrap socket : {0}'.format(error))
                 self._disconnect()
                 self.__socket_config = None
                 return False
