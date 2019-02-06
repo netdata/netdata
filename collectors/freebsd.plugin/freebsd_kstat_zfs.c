@@ -104,11 +104,11 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         // int arc_loaned_bytes[5];
         // int arc_prune[5];
         // int arc_meta_used[5];
-        int arc_meta_limit[5];
-        int arc_meta_max[5];
-        int arc_meta_min[5];
-        int arc_need_free[5];
-        int arc_sys_free[5];
+        // int arc_meta_limit[5];
+        // int arc_meta_max[5];
+        // int arc_meta_min[5];
+        // int arc_need_free[5];
+        // int arc_sys_free[5];
     } mibs;
 
     arcstats.l2exist = -1;
