@@ -422,7 +422,8 @@ int send_devices(void) {
 // since it switches namespaces, so after this call, everything is different!
 
 void detect_veth_interfaces(pid_t pid) {
-    struct iface *host = NULL, *cgroup = NULL, *h, *c;
+    struct iface *cgroup = NULL;
+    struct iface *host, *h, *c;
 
     host = read_proc_net_dev(netdata_configured_host_prefix);
     if(!host) {
