@@ -3,6 +3,7 @@
 
 // Codacy declarations
 /* global clipboard */
+/* global Ps */
 
 if (NETDATA.options.debug.main_loop) {
     console.log('welcome to NETDATA');
@@ -1271,6 +1272,21 @@ let chartState = function (element) {
         this.tm.last_dom_created = 0;
     };
 
+    const showMessageIcon = (icon) => {
+        this.element_message.innerHTML = icon;
+        maxMessageFontSize();
+        $(this.element_message).removeClass('hidden');
+        this.tmp.___messageHidden___ = undefined;
+    };
+
+    const showLoading = () => {
+        if (!this.chart_created) {
+            showMessageIcon(NETDATA.icons.loading + ' netdata');
+            return true;
+        }
+        return false;
+    };
+
     let createDOM = () => {
         if (!this.enabled) {
             return;
@@ -1378,13 +1394,6 @@ let chartState = function (element) {
         this.element_message.style.paddingTop = paddingTop.toString() + 'px';
     };
 
-    const showMessageIcon = (icon) => {
-        this.element_message.innerHTML = icon;
-        maxMessageFontSize();
-        $(this.element_message).removeClass('hidden');
-        this.tmp.___messageHidden___ = undefined;
-    };
-
     const hideMessage = () => {
         if (typeof this.tmp.___messageHidden___ === 'undefined') {
             this.tmp.___messageHidden___ = true;
@@ -1406,14 +1415,6 @@ let chartState = function (element) {
         }
 
         showMessageIcon(icon + ' netdata' + invisibleSearchableText());
-    };
-
-    const showLoading = () => {
-        if (!this.chart_created) {
-            showMessageIcon(NETDATA.icons.loading + ' netdata');
-            return true;
-        }
-        return false;
     };
 
     const isHidden = () => {
@@ -3843,7 +3844,7 @@ NETDATA.resetAllCharts = function (state) {
     // if (NETDATA.globalPanAndZoom.isMaster(state) === false) {
     //     master = false;
     // }
-    const master = NETDATA.globalPanAndZoom.isMaster(state)
+    const master = NETDATA.globalPanAndZoom.isMaster(state);
 
     // clear the global Pan and Zoom
     // this will also refresh the master

@@ -75,7 +75,7 @@ NETDATA.registry = {
         NETDATA.registry.hello(NETDATA.serverDefault, function (data) {
             if (data) {
                 NETDATA.registry.server = data.registry;
-                if (data.cloud_base_url != "") {
+                if (data.cloud_base_url !== "") {
                     NETDATA.registry.isCloudEnabled = true;
                     NETDATA.registry.cloudBaseURL = data.cloud_base_url;
                 } else {
