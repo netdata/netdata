@@ -174,31 +174,46 @@ navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
 navpart 2 collectors/plugins.d "" "External plugins"
-navpart 3 collectors/python.d.plugin "" "Python modules" 3
-navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
-echo -ne "        - BASH modules:
+
+echo -ne "        - Go:
+            - 'collectors/go.d.plugin/README.md'
+"
+navpart 4 collectors/go.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - Python:
+            - 'collectors/python.d.plugin/README.md'
+"
+navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - Node.js:
+            - 'collectors/node.d.plugin/README.md'
+"
+navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - BASH:
             - 'collectors/charts.d.plugin/README.md'
-            - 'collectors/charts.d.plugin/ap/README.md'
-            - 'collectors/charts.d.plugin/apcupsd/README.md'
-            - 'collectors/charts.d.plugin/example/README.md'
-            - 'collectors/charts.d.plugin/libreswan/README.md'
-            - 'collectors/charts.d.plugin/nut/README.md'
-            - 'collectors/charts.d.plugin/opensips/README.md'
-        - Obsolete BASH modules:
-            - 'collectors/charts.d.plugin/mem_apps/README.md'
-            - 'collectors/charts.d.plugin/postfix/README.md'
-            - 'collectors/charts.d.plugin/tomcat/README.md'
-            - 'collectors/charts.d.plugin/sensors/README.md'
-            - 'collectors/charts.d.plugin/cpu_apps/README.md'
-            - 'collectors/charts.d.plugin/squid/README.md'
-            - 'collectors/charts.d.plugin/nginx/README.md'
-            - 'collectors/charts.d.plugin/hddtemp/README.md'
-            - 'collectors/charts.d.plugin/cpufreq/README.md'
-            - 'collectors/charts.d.plugin/mysql/README.md'
-            - 'collectors/charts.d.plugin/exim/README.md'
-            - 'collectors/charts.d.plugin/apache/README.md'
-            - 'collectors/charts.d.plugin/load_average/README.md'
-            - 'collectors/charts.d.plugin/phpfpm/README.md'
+            - Modules:
+                - 'collectors/charts.d.plugin/ap/README.md'
+                - 'collectors/charts.d.plugin/apcupsd/README.md'
+                - 'collectors/charts.d.plugin/example/README.md'
+                - 'collectors/charts.d.plugin/libreswan/README.md'
+                - 'collectors/charts.d.plugin/nut/README.md'
+                - 'collectors/charts.d.plugin/opensips/README.md'
+            - Obsolete Modules:
+                - 'collectors/charts.d.plugin/mem_apps/README.md'
+                - 'collectors/charts.d.plugin/postfix/README.md'
+                - 'collectors/charts.d.plugin/tomcat/README.md'
+                - 'collectors/charts.d.plugin/sensors/README.md'
+                - 'collectors/charts.d.plugin/cpu_apps/README.md'
+                - 'collectors/charts.d.plugin/squid/README.md'
+                - 'collectors/charts.d.plugin/nginx/README.md'
+                - 'collectors/charts.d.plugin/hddtemp/README.md'
+                - 'collectors/charts.d.plugin/cpufreq/README.md'
+                - 'collectors/charts.d.plugin/mysql/README.md'
+                - 'collectors/charts.d.plugin/exim/README.md'
+                - 'collectors/charts.d.plugin/apache/README.md'
+                - 'collectors/charts.d.plugin/load_average/README.md'
+                - 'collectors/charts.d.plugin/phpfpm/README.md'
 "
 
 navpart 3 collectors/fping.plugin
