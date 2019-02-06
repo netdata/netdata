@@ -174,7 +174,7 @@ navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
 navpart 2 collectors/plugins.d "" "External plugins"
-navpart 3 collectors/go.d.plugin "" "go modules" 3
+navpart 3 collectors/go.d.plugin "" "Go modules" 3
 navpart 3 collectors/python.d.plugin "" "Python modules" 3
 navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
 echo -ne "        - BASH modules:
