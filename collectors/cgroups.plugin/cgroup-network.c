@@ -240,7 +240,7 @@ int switch_namespace(const char *prefix, pid_t pid) {
     // This code cannot switch user namespace (it can all the other namespaces)
     // Fortunately, we don't need to switch user namespaces.
 
-    int pass, errors = 0;
+    int pass;
     for(pass = 0; pass < 2 ;pass++) {
         for(i = 0; all_ns[i].name ; i++) {
             if (all_ns[i].fd != -1 && all_ns[i].status == -1) {
@@ -248,7 +248,6 @@ int switch_namespace(const char *prefix, pid_t pid) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
                         error("Cannot switch to %s namespace of pid %d", all_ns[i].name, (int) pid);
-                        errors++;
                     }
                 }
                 else
