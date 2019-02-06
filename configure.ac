@@ -47,9 +47,9 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE(
     [plugin-nfacct],
-    [AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires running netdata as root @<:@default disabled@:>@])],
+    [AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin @<:@default autodetect@:>@])],
     ,
-    [enable_plugin_nfacct="no"]
+    [enable_plugin_nfacct="detect"]
 )
 AC_ARG_ENABLE(
     [plugin-freeipmi],
@@ -452,7 +452,7 @@ AC_MSG_CHECKING([if cups.plugin should be enabled])
 if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
     enable_plugin_cups="yes"
     AC_DEFINE([HAVE_CUPS], [1], [cups usability])
-    
+
     CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
     CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
 

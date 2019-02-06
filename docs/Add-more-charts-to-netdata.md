@@ -22,7 +22,7 @@ To collect non-system metrics, netdata supports a plugin architecture. The follo
 - **[Print Servers](#print-servers)**, like CUPS
 - **[System](#system)**, for processes and other system metrics
 - **[Sensors](#sensors)**, like temperature, fans speed, voltage, humidity, HDD/SSD S.M.A.R.T attributes
-- **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time
+- **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time, nfacct
 - **[Time Servers](#time-servers)**, like chrony
 - **[Security](#security)**, like FreeRADIUS, OpenVPN, Fail2ban
 - **[Telephony Servers](#telephony-servers)**, like openSIPS
@@ -43,7 +43,7 @@ netdata comes with **internal** and **external** plugins:
 1. The **internal** ones are written in `C` and run as threads within the netdata daemon.
 2. The **external** ones can be written in any computer language. The netdata daemon spawns these as processes (shown with `ps fax`) and reads their metrics using pipes (so the `stdout` of external plugins is connected to netdata for metrics collection and the `stderr` of external plugins is connected to `/var/log/netdata/error.log`).
 
-To make it easier to develop plugins, and minimize the number of threads and processes running, netdata supports **plugin orchestrators**, each of them supporting one or more data collection **modules**. Currently we ship plugin orchestrators for 4 languages: `C`, `python`, `node.js` and `bash` and 2 more are under development (`go` and `java`). 
+To make it easier to develop plugins, and minimize the number of threads and processes running, netdata supports **plugin orchestrators**, each of them supporting one or more data collection **modules**. Currently we ship plugin orchestrators for 4 languages: `C`, `python`, `node.js` and `bash` and 2 more are under development (`go` and `java`).
 
 #### enabling and disabling plugins
 
@@ -338,6 +338,7 @@ application|language|notes|
 ap|BASH<br/>Shell Script|Uses the `iw` command to provide statistics of wireless clients connected to a wireless access point running on this host (works well with `hostapd`).<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [ap.chart.sh](../collectors/charts.d.plugin/ap)<br/>configuration file: [charts.d/ap.conf](../collectors/charts.d.plugin/ap)|
 fping|C|Charts network latency statistics for any number of nodes, using the `fping` command. A recent (probably unreleased) version of fping is required. The plugin supplied can install it in `/usr/local`.<br/>&nbsp;<br/>netdata plugin: [fping.plugin](../collectors/fping.plugin) (this is a shell wrapper to start fping - once fping is started, netdata and fping communicate directly - it can also install the right version of fping)<br/>configuration file: [fping.conf](../collectors/fping.plugin)|
 snmp|node.js|Connects to multiple snmp servers to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [node.d.plugin](../collectors/node.d.plugin#nodedplugin)<br/>plugin module: [snmp.node.js](../collectors/node.d.plugin/snmp)<br/>configuration file: [node.d/snmp.conf](../collectors/node.d.plugin/snmp)|
+nfacct|C|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`|
 dns_query_time|python<br/>v2 or v3|Provides DNS query time statistics.<br/>&nbsp;<br/>Requires package `dnspython` (`pip install dnspython` or install package `python-dnspython`).<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [dns_query_time.chart.py](../collectors/python.d.plugin/dns_query_time)<br/>configuration file: [python.d/dns_query_time.conf](../collectors/python.d.plugin/dns_query_time)|
 http|python<br />v2 or v3|Monitors a generic web page for status code and returned content in HTML
 port|ptyhon<br />v2 or v3|Checks if a generic TCP port for its availability and response time
