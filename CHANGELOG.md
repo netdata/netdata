@@ -2,7 +2,7 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-**Fixed bugs:**
+**Fixed bugs:** 
 
 - cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Slack alert displaying URL after manual update of net-data [\#5301](https://github.com/netdata/netdata/issues/5301)
