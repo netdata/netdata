@@ -590,7 +590,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
         unsigned long nintr = 0;
         static unsigned long old_nintr = 0;
         static unsigned long *intrcnt = NULL;
-        unsigned long i;
 
         nintr = intrcnt_size / sizeof(u_long);
         if (unlikely(nintr != old_nintr))
@@ -602,6 +601,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             return 1;
         } else {
             unsigned long long totalintr = 0;
+            unsigned long i;
 
             for (i = 0; i < nintr; i++)
                 totalintr += intrcnt[i];
