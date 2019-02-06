@@ -1,5 +1,12 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Merged pull requests:**
+
+- Fix FreeBSD plugin Codacy issues [\#5338](https://github.com/netdata/netdata/pull/5338) ([vlvkobal](https://github.com/vlvkobal))
+- Add go.d documentation [\#5215](https://github.com/netdata/netdata/pull/5215) ([cakrit](https://github.com/cakrit))
+
 ## [v1.12.0](https://github.com/netdata/netdata/tree/v1.12.0) (2019-02-06)
 
 **Fixed bugs:**
