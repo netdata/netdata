@@ -106,6 +106,7 @@ collectors/charts.d.plugin/charts.d.plugin
 collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
+collectors/go.d.plugin
 
 # installer generated files
 netdata-uninstaller.sh
