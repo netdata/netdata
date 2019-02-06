@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.0](https://github.com/netdata/netdata/tree/v1.12.0) (2019-02-06)
 
-**Fixed bugs:** 
+**Fixed bugs:**
 
 - cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Slack alert displaying URL after manual update of net-data [\#5301](https://github.com/netdata/netdata/issues/5301)
