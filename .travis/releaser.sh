@@ -87,8 +87,10 @@ if [ "${GIT_TAG}" != "$(git tag --points-at)" ]; then
 	echo "ERROR! Current commit is not tagged. Stopping release creation."
 	exit 1
 fi
-hub release create --draft \
+until hub release create --draft \
 		-a "artifacts/netdata-${GIT_TAG}.tar.gz" \
 		-a "artifacts/netdata-${GIT_TAG}.gz.run" \
 		-a "artifacts/sha256sums.txt" \
-		-m "${GIT_TAG}" "${GIT_TAG}"
+		-m "${GIT_TAG}" "${GIT_TAG}"; do
+	sleep 5
+done
