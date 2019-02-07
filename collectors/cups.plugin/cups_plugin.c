@@ -136,6 +136,37 @@ void parse_command_line(int argc, char **argv) {
     }
 }
 
+/*
+ * 'cupsGetIntegerOption()' - Get an integer option value.
+ *
+ * INT_MIN is returned when the option does not exist, is not an integer, or
+ * exceeds the range of values for the "int" type.
+ *
+ * @since CUPS 2.2.4/macOS 10.13@
+ */
+
+int					/* O - Option value or @code INT_MIN@ */
+getIntegerOption(
+    const char    *name,		/* I - Name of option */
+    int           num_options,		/* I - Number of options */
+    cups_option_t *options)		/* I - Options */
+{
+  const char	*value = cupsGetOption(name, num_options, options);
+					/* String value of option */
+  char		*ptr;			/* Pointer into string value */
+  long		intvalue;		/* Integer value */
+
+
+  if (!value || !*value)
+    return (INT_MIN);
+
+  intvalue = strtol(value, &ptr, 10);
+  if (intvalue < INT_MIN || intvalue > INT_MAX || *ptr)
+    return (INT_MIN);
+
+  return ((int)intvalue);
+}
+
 int reset_job_metrics(void *entry, void *data) {
     (void)data;
 
@@ -303,8 +334,7 @@ int main(int argc, char **argv) {
                 num_dest_shared++;
             }
 
-            // TODO use cupsGetIntegerOption
-            int printer_state = cupsGetIntegerOption("printer-state", curr_dest->num_options, curr_dest->options);
+            int printer_state = getIntegerOption("printer-state", curr_dest->num_options, curr_dest->options);
             switch (printer_state) {
                 case 3:
                     num_dest_idle++;
