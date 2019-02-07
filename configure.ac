@@ -409,19 +409,7 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 # -----------------------------------------------------------------------------
 # cups.plugin - libmnl, libnetfilter_acct
 
- AC_CHECK_LIB([cups], [
-    cupsEncryption,
-    cupsFreeDests,
-    cupsFreeJobs,
-    cupsGetDests2,
-    cupsGetIntegerOption,
-    cupsGetJobs2,
-    cupsGetOption,
-    cupsServer,
-    httpClose,
-    httpConnect2,
-    ippPort
-],
+ AC_CHECK_LIB([cups], [cupsGetIntegerOption],
     [AC_CHECK_HEADER(
         [cups/cups.h],
         [have_cups=yes],
