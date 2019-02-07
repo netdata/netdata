@@ -12,7 +12,6 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
-#include "nfacct.plugin/plugin_nfacct.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"

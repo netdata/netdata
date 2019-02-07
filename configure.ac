@@ -495,7 +495,6 @@ if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes"
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
-    AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin usability])
     OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
     OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 else

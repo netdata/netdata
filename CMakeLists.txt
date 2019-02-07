@@ -248,7 +248,6 @@ set(FREEIPMI_PLUGIN_FILES
 
 set(NFACCT_PLUGIN_FILES
         collectors/nfacct.plugin/plugin_nfacct.c
-        collectors/nfacct.plugin/plugin_nfacct.h
         )
 
 set(PROC_PLUGIN_FILES

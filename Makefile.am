@@ -107,7 +107,6 @@ AM_CFLAGS = \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
 	$(OPTIONAL_CUPS_CFLAGS) \
-    $(OPTIONAL_NFACCT_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -222,7 +221,6 @@ CUPS_PLUGIN_FILES = \
 
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
-	collectors/nfacct.plugin/plugin_nfacct.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -451,7 +449,6 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(NFACCT_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -469,7 +466,6 @@ sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
 
 if ENABLE_PLUGIN_APPS
