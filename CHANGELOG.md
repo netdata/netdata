@@ -2,8 +2,19 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
+- Codacy is unconfigured [\#5320](https://github.com/netdata/netdata/issues/5320)
+
+**Closed issues:**
+
+- move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
+
 **Merged pull requests:**
 
+- fix AC\_CHECK\_LIB to work correctly with cups library [\#5349](https://github.com/netdata/netdata/pull/5349) ([mfundul](https://github.com/mfundul))
+- Fix cgroups Codacy issue [\#5340](https://github.com/netdata/netdata/pull/5340) ([vlvkobal](https://github.com/vlvkobal))
 - Fix FreeBSD plugin Codacy issues [\#5338](https://github.com/netdata/netdata/pull/5338) ([vlvkobal](https://github.com/vlvkobal))
 - Add go.d documentation [\#5215](https://github.com/netdata/netdata/pull/5215) ([cakrit](https://github.com/cakrit))
 
@@ -11,7 +22,6 @@
 
 **Fixed bugs:**
 
-- cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Slack alert displaying URL after manual update of net-data [\#5301](https://github.com/netdata/netdata/issues/5301)
 - Netdata update in a /tmp hardened system [\#5289](https://github.com/netdata/netdata/issues/5289)
 - Certificate error while running netdata kickstart script [\#5273](https://github.com/netdata/netdata/issues/5273)
