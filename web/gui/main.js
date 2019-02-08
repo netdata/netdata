@@ -2847,7 +2847,7 @@ function getGithubLatestVersion(callback) {
         cache: false
     })
         .done(function (data) {
-            data = atob(data.content.replace(/(\r\n|\n|\r| |\t)/gm, ""));
+            data = atob(data.content).replace(/(\r\n|\n|\r| |\t)/gm, "");
             versionLog('Latest version from github is ' + data);
             callback(data);
         })
