@@ -4,16 +4,22 @@
 
 **Fixed bugs:**
 
+- Update checker false positive [\#5352](https://github.com/netdata/netdata/issues/5352)
 - cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Codacy is unconfigured [\#5320](https://github.com/netdata/netdata/issues/5320)
 
 **Closed issues:**
 
+- Alert alarm flapping [\#5346](https://github.com/netdata/netdata/issues/5346)
 - move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
 
 **Merged pull requests:**
 
+- Fix replacement of whitespace for versions retrieved from github [\#5355](https://github.com/netdata/netdata/pull/5355) ([cakrit](https://github.com/cakrit))
+- fix warning condition for mem.available [\#5353](https://github.com/netdata/netdata/pull/5353) ([cakrit](https://github.com/cakrit))
 - fix AC\_CHECK\_LIB to work correctly with cups library [\#5349](https://github.com/netdata/netdata/pull/5349) ([mfundul](https://github.com/mfundul))
+- Add link to writing a new module in example readme [\#5348](https://github.com/netdata/netdata/pull/5348) ([cakrit](https://github.com/cakrit))
+- Provide more precise uninstall instructions [\#5347](https://github.com/netdata/netdata/pull/5347) ([cakrit](https://github.com/cakrit))
 - Fix cgroups Codacy issue [\#5340](https://github.com/netdata/netdata/pull/5340) ([vlvkobal](https://github.com/vlvkobal))
 - Fix FreeBSD plugin Codacy issues [\#5338](https://github.com/netdata/netdata/pull/5338) ([vlvkobal](https://github.com/vlvkobal))
 - Add go.d documentation [\#5215](https://github.com/netdata/netdata/pull/5215) ([cakrit](https://github.com/cakrit))
