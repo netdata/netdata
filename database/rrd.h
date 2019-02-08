@@ -259,7 +259,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_HOMEGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions as homogeneous
     RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
     RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14, // this is marked by the collector/module when a chart has obsolete dimensions
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14  // this is marked by the collector/module when a chart has obsolete dimensions
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
