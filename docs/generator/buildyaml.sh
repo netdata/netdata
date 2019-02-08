@@ -1,7 +1,12 @@
 #!/bin/bash
 
 GENERATOR_DIR="docs/generator"
-cd ${GENERATOR_DIR}/src
+
+docs_dir="${1}"
+site_dir="${2}"
+language="${3}"
+
+cd ${GENERATOR_DIR}/${docs_dir}
 
 # create yaml nav subtree with all the files directly under a specific directory
 # arguments:
@@ -48,8 +53,8 @@ repo_name: GitHub
 edit_uri: blob/master
 site_description: Netdata Documentation
 copyright: Netdata, 2018
-docs_dir: src
-site_dir: build
+docs_dir: '${docs_dir}'
+site_dir: '${site_dir}'
 #use_directory_urls: false
 strict: true
 extra:
@@ -64,6 +69,7 @@ theme:
     name: "material"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
+    language: '${language}'
 extra_css:
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
   - "custom/css/netdata.css"
