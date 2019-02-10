@@ -4,6 +4,15 @@
 
 #define PLUGIN_NFACCT_NAME "nfacct.plugin"
 
+#define NETDATA_CHART_PRIO_NETFILTER_NEW              8701
+#define NETDATA_CHART_PRIO_NETFILTER_CHANGES          8702
+#define NETDATA_CHART_PRIO_NETFILTER_EXPECT           8703
+#define NETDATA_CHART_PRIO_NETFILTER_ERRORS           8705
+#define NETDATA_CHART_PRIO_NETFILTER_SEARCH           8710
+
+#define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
+#define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
+
 #ifdef HAVE_LIBMNL
 #include <libmnl/libmnl.h>
 
@@ -47,7 +56,6 @@ char *netdata_configured_host_prefix = "";
 static int debug = 0;
 
 static int netdata_update_every = 1;
-static int netdata_priority = 100004;
 
 // ----------------------------------------------------------------------------
 // DO_NFSTAT - collect netfilter connection tracker statistics via netlink
@@ -315,196 +323,211 @@ static int nfstat_collect() {
 }
 
 static void nfstat_send_metrics() {
+    static int new_chart_generated = 0, changes_chart_generated = 0, search_chart_generated = 0, errors_chart_generated = 0, expect_chart_generated = 0;
 
-    {
-        // TODO: define the chart and set dimensions
-        // static RRDSET *st_new = NULL;
-        // static RRDDIM *rd_new = NULL, *rd_ignore = NULL, *rd_invalid = NULL;
+    if(!new_chart_generated) {
+        new_chart_generated = 1;
 
-        // if(!st_new) {
-        //     st_new = rrdset_create_localhost(
-        //             RRD_TYPE_NET_STAT_NETFILTER
-        //             , RRD_TYPE_NET_STAT_CONNTRACK "_new"
-        //             , NULL
-        //             , RRD_TYPE_NET_STAT_CONNTRACK
-        //             , NULL
-        //             , "Connection Tracker New Connections"
-        //             , "connections/s"
-        //             , PLUGIN_NFACCT_NAME
-        //             , NULL
-        //             , NETDATA_CHART_PRIO_NETFILTER_NEW
-        //             , nfstat_root.update_every
-        //             , RRDSET_TYPE_LINE
-        //     );
-
-        //     rd_new     = rrddim_add(st_new, nfstat_root.attr2name[CTA_STATS_NEW], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_ignore  = rrddim_add(st_new, nfstat_root.attr2name[CTA_STATS_IGNORE], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_invalid = rrddim_add(st_new, nfstat_root.attr2name[CTA_STATS_INVALID], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        // }
-        // else
-        //     rrdset_next(st_new);
-
-        // rrddim_set_by_pointer(st_new, rd_new, (collected_number) nfstat_root.metrics[CTA_STATS_NEW]);
-        // rrddim_set_by_pointer(st_new, rd_ignore, (collected_number) nfstat_root.metrics[CTA_STATS_IGNORE]);
-        // rrddim_set_by_pointer(st_new, rd_invalid, (collected_number) nfstat_root.metrics[CTA_STATS_INVALID]);
-
-        // rrdset_done(st_new);
+        printf("CHART %s.%s '' 'Connection Tracker New Connections' 'connections/s' %s '' line %d %d %s\n"
+               , RRD_TYPE_NET_STAT_NETFILTER
+               , RRD_TYPE_NET_STAT_CONNTRACK "_new"
+               , RRD_TYPE_NET_STAT_CONNTRACK
+               , NETDATA_CHART_PRIO_NETFILTER_NEW
+               , nfstat_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+        printf("DIMENSION %s '' incremental 1 1\n", nfstat_root.attr2name[CTA_STATS_NEW]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_IGNORE]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_INVALID]);
     }
+
+    printf(
+           "BEGIN %s.%s\n"
+           , RRD_TYPE_NET_STAT_NETFILTER
+           , RRD_TYPE_NET_STAT_CONNTRACK "_new"
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_NEW]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_NEW]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_IGNORE]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_IGNORE]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_INVALID]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_INVALID]
+    );
+    printf("END\n");
 
     // ----------------------------------------------------------------
 
-    {
-        // TODO: define the chart and set dimensions
-        // static RRDSET *st_changes = NULL;
-        // static RRDDIM *rd_inserted = NULL, *rd_deleted = NULL, *rd_delete_list = NULL;
+    if(!changes_chart_generated) {
+        changes_chart_generated = 1;
 
-        // if(!st_changes) {
-        //     st_changes = rrdset_create_localhost(
-        //             RRD_TYPE_NET_STAT_NETFILTER
-        //             , RRD_TYPE_NET_STAT_CONNTRACK "_changes"
-        //             , NULL
-        //             , RRD_TYPE_NET_STAT_CONNTRACK
-        //             , NULL
-        //             , "Connection Tracker Changes"
-        //             , "changes/s"
-        //             , PLUGIN_NFACCT_NAME
-        //             , NULL
-        //             , NETDATA_CHART_PRIO_NETFILTER_CHANGES
-        //             , nfstat_root.update_every
-        //             , RRDSET_TYPE_LINE
-        //     );
-        //     rrdset_flag_set(st_changes, RRDSET_FLAG_DETAIL);
-
-        //     rd_inserted = rrddim_add(st_changes, nfstat_root.attr2name[CTA_STATS_INSERT], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_deleted = rrddim_add(st_changes, nfstat_root.attr2name[CTA_STATS_DELETE], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_delete_list = rrddim_add(st_changes, nfstat_root.attr2name[CTA_STATS_DELETE_LIST], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        // }
-        // else
-        //     rrdset_next(st_changes);
-
-        // rrddim_set_by_pointer(st_changes, rd_inserted, (collected_number) nfstat_root.metrics[CTA_STATS_INSERT]);
-        // rrddim_set_by_pointer(st_changes, rd_deleted, (collected_number) nfstat_root.metrics[CTA_STATS_DELETE]);
-        // rrddim_set_by_pointer(st_changes, rd_delete_list, (collected_number) nfstat_root.metrics[CTA_STATS_DELETE_LIST]);
-
-        // rrdset_done(st_changes);
+        printf("CHART %s.%s '' 'Connection Tracker Changes' 'changes/s' %s '' line %d %d detail %s\n"
+               , RRD_TYPE_NET_STAT_NETFILTER
+               , RRD_TYPE_NET_STAT_CONNTRACK "_changes"
+               , RRD_TYPE_NET_STAT_CONNTRACK
+               , NETDATA_CHART_PRIO_NETFILTER_CHANGES
+               , nfstat_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_INSERT]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_DELETE]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_DELETE_LIST]);
     }
+
+    printf(
+           "BEGIN %s.%s\n"
+           , RRD_TYPE_NET_STAT_NETFILTER
+           , RRD_TYPE_NET_STAT_CONNTRACK "_changes"
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_INSERT]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_INSERT]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_DELETE]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_DELETE]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_DELETE_LIST]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_DELETE_LIST]
+    );
+    printf("END\n");
 
     // ----------------------------------------------------------------
 
-    {
-        // TODO: define the chart and set dimensions
-        // static RRDSET *st_search = NULL;
-        // static RRDDIM *rd_searched = NULL, *rd_restarted = NULL, *rd_found = NULL;
+    if(!search_chart_generated) {
+        search_chart_generated = 1;
 
-        // if(!st_search) {
-        //     st_search = rrdset_create_localhost(
-        //             RRD_TYPE_NET_STAT_NETFILTER
-        //             , RRD_TYPE_NET_STAT_CONNTRACK "_search"
-        //             , NULL
-        //             , RRD_TYPE_NET_STAT_CONNTRACK
-        //             , NULL
-        //             , "Connection Tracker Searches"
-        //             , "searches/s"
-        //             , PLUGIN_NFACCT_NAME
-        //             , NULL
-        //             , NETDATA_CHART_PRIO_NETFILTER_SEARCH
-        //             , nfstat_root.update_every
-        //             , RRDSET_TYPE_LINE
-        //     );
-        //     rrdset_flag_set(st_search, RRDSET_FLAG_DETAIL);
-
-        //     rd_searched = rrddim_add(st_search, nfstat_root.attr2name[CTA_STATS_SEARCHED], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_restarted = rrddim_add(st_search, nfstat_root.attr2name[CTA_STATS_SEARCH_RESTART], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_found = rrddim_add(st_search, nfstat_root.attr2name[CTA_STATS_FOUND], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        // }
-        // else
-        //     rrdset_next(st_search);
-
-        // rrddim_set_by_pointer(st_search, rd_searched, (collected_number) nfstat_root.metrics[CTA_STATS_SEARCHED]);
-        // rrddim_set_by_pointer(st_search, rd_restarted, (collected_number) nfstat_root.metrics[CTA_STATS_SEARCH_RESTART]);
-        // rrddim_set_by_pointer(st_search, rd_found, (collected_number) nfstat_root.metrics[CTA_STATS_FOUND]);
-
-        // rrdset_done(st_search);
+        printf("CHART %s.%s '' 'Connection Tracker Searches' 'searches/s' %s '' line %d %d detail %s\n"
+               , RRD_TYPE_NET_STAT_NETFILTER
+               , RRD_TYPE_NET_STAT_CONNTRACK "_search"
+               , RRD_TYPE_NET_STAT_CONNTRACK
+               , NETDATA_CHART_PRIO_NETFILTER_SEARCH
+               , nfstat_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_SEARCHED]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_SEARCH_RESTART]);
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_FOUND]);
     }
+
+    printf(
+           "BEGIN %s.%s\n"
+           , RRD_TYPE_NET_STAT_NETFILTER
+           , RRD_TYPE_NET_STAT_CONNTRACK "_search"
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_SEARCHED]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_SEARCHED]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_SEARCH_RESTART]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_SEARCH_RESTART]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_FOUND]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_FOUND]
+    );
+    printf("END\n");
 
     // ----------------------------------------------------------------
 
-    {
-        // TODO: define the chart and set dimensions
-        // static RRDSET *st_errors = NULL;
-        // static RRDDIM *rd_error = NULL, *rd_insert_failed = NULL, *rd_drop = NULL, *rd_early_drop = NULL;
+    if(!errors_chart_generated) {
+        errors_chart_generated = 1;
 
-        // if(!st_errors) {
-        //     st_errors = rrdset_create_localhost(
-        //             RRD_TYPE_NET_STAT_NETFILTER
-        //             , RRD_TYPE_NET_STAT_CONNTRACK "_errors"
-        //             , NULL
-        //             , RRD_TYPE_NET_STAT_CONNTRACK
-        //             , NULL
-        //             , "Connection Tracker Errors"
-        //             , "events/s"
-        //             , PLUGIN_NFACCT_NAME
-        //             , NULL
-        //             , NETDATA_CHART_PRIO_NETFILTER_ERRORS
-        //             , nfstat_root.update_every
-        //             , RRDSET_TYPE_LINE
-        //     );
-        //     rrdset_flag_set(st_errors, RRDSET_FLAG_DETAIL);
-
-        //     rd_error = rrddim_add(st_errors, nfstat_root.attr2name[CTA_STATS_ERROR], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_insert_failed = rrddim_add(st_errors, nfstat_root.attr2name[CTA_STATS_INSERT_FAILED], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_drop = rrddim_add(st_errors, nfstat_root.attr2name[CTA_STATS_DROP], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_early_drop = rrddim_add(st_errors, nfstat_root.attr2name[CTA_STATS_EARLY_DROP], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        // }
-        // else
-        //     rrdset_next(st_errors);
-
-        // rrddim_set_by_pointer(st_errors, rd_error, (collected_number) nfstat_root.metrics[CTA_STATS_ERROR]);
-        // rrddim_set_by_pointer(st_errors, rd_insert_failed, (collected_number) nfstat_root.metrics[CTA_STATS_INSERT_FAILED]);
-        // rrddim_set_by_pointer(st_errors, rd_drop, (collected_number) nfstat_root.metrics[CTA_STATS_DROP]);
-        // rrddim_set_by_pointer(st_errors, rd_early_drop, (collected_number) nfstat_root.metrics[CTA_STATS_EARLY_DROP]);
-
-        // rrdset_done(st_errors);
+        printf("CHART %s.%s '' 'Connection Tracker Errors' 'events/s' %s '' line %d %d detail %s\n"
+               , RRD_TYPE_NET_STAT_NETFILTER
+               , RRD_TYPE_NET_STAT_CONNTRACK "_errors"
+               , RRD_TYPE_NET_STAT_CONNTRACK
+               , NETDATA_CHART_PRIO_NETFILTER_ERRORS
+               , nfstat_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_ERROR]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_INSERT_FAILED]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_DROP]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_EARLY_DROP]);
     }
+
+    printf(
+           "BEGIN %s.%s\n"
+           , RRD_TYPE_NET_STAT_NETFILTER
+           , RRD_TYPE_NET_STAT_CONNTRACK "_errors"
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_ERROR]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_ERROR]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_INSERT_FAILED]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_INSERT_FAILED]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_DROP]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_DROP]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_EARLY_DROP]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_EARLY_DROP]
+    );
+    printf("END\n");
 
     // ----------------------------------------------------------------
 
-    {
-        // TODO: define the chart and set dimensions
-        // static RRDSET *st_expect = NULL;
-        // static RRDDIM *rd_new = NULL, *rd_created = NULL, *rd_deleted = NULL;
+    if(!expect_chart_generated) {
+        expect_chart_generated = 1;
 
-        // if(!st_expect) {
-        //     st_expect = rrdset_create_localhost(
-        //             RRD_TYPE_NET_STAT_NETFILTER
-        //             , RRD_TYPE_NET_STAT_CONNTRACK "_expect"
-        //             , NULL
-        //             , RRD_TYPE_NET_STAT_CONNTRACK
-        //             , NULL
-        //             , "Connection Tracker Expectations"
-        //             , "expectations/s"
-        //             , PLUGIN_NFACCT_NAME
-        //             , NULL
-        //             , NETDATA_CHART_PRIO_NETFILTER_EXPECT
-        //             , nfstat_root.update_every
-        //             , RRDSET_TYPE_LINE
-        //     );
-        //     rrdset_flag_set(st_expect, RRDSET_FLAG_DETAIL);
-
-        //     rd_created = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_CREATE], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_deleted = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_DELETE], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        //     rd_new = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_NEW], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        // }
-        // else
-        //     rrdset_next(st_expect);
-
-        // rrddim_set_by_pointer(st_expect, rd_created, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_CREATE]);
-        // rrddim_set_by_pointer(st_expect, rd_deleted, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_DELETE]);
-        // rrddim_set_by_pointer(st_expect, rd_new, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_NEW]);
-
-        // rrdset_done(st_expect);
+        printf("CHART %s.%s '' 'Connection Tracker Expectations' 'expectations/s' %s '' line %d %d detail %s\n"
+               , RRD_TYPE_NET_STAT_NETFILTER
+               , RRD_TYPE_NET_STAT_CONNTRACK "_expect"
+               , RRD_TYPE_NET_STAT_CONNTRACK
+               , NETDATA_CHART_PRIO_NETFILTER_EXPECT
+               , nfstat_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_EXP_CREATE]);
+        printf("DIMENSION %s '' incremental -1 1\n", nfstat_root.attr2name[CTA_STATS_EXP_DELETE]);
+        printf("DIMENSION %s '' incremental  1 1\n", nfstat_root.attr2name[CTA_STATS_EXP_NEW]);
     }
 
+    printf(
+           "BEGIN %s.%s\n"
+           , RRD_TYPE_NET_STAT_NETFILTER
+           , RRD_TYPE_NET_STAT_CONNTRACK "_expect"
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_EXP_CREATE]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_EXP_CREATE]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_EXP_DELETE]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_EXP_DELETE]
+    );
+    printf(
+           "SET %s = %lld\n"
+           , nfstat_root.attr2name[CTA_STATS_EXP_NEW]
+           , (collected_number) nfstat_root.metrics[CTA_STATS_EXP_NEW]
+    );
+    printf("END\n");
 }
 
 #endif // HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H
@@ -525,9 +548,8 @@ struct nfacct_data {
     uint64_t pkts;
     uint64_t bytes;
 
-    // TODO: do we need poiners for text pulled dimensions?
-    // RRDDIM *rd_bytes;
-    // RRDDIM *rd_packets;
+    int packets_dimension_added;
+    int bytes_dimension_added;
 
     int updated;
 
@@ -672,95 +694,64 @@ static int nfacct_collect() {
 }
 
 static void nfacct_send_metrics() {
-    // TODO: define the chart and set dimensions
-    // static RRDSET *st_bytes = NULL, *st_packets = NULL;
+    static int bytes_chart_generated = 0, packets_chart_generated = 0;
 
-    // if(!nfacct_root.nfacct_metrics) return;
-    // struct nfacct_data *d;
+    if(!nfacct_root.nfacct_metrics) return;
+    struct nfacct_data *d;
 
-    // if(!st_packets) {
-    //     st_packets = rrdset_create_localhost(
-    //             "netfilter"
-    //             , "nfacct_packets"
-    //             , NULL
-    //             , "nfacct"
-    //             , NULL
-    //             , "Netfilter Accounting Packets"
-    //             , "packets/s"
-    //             , PLUGIN_NFACCT_NAME
-    //             , NULL
-    //             , NETDATA_CHART_PRIO_NETFILTER_PACKETS
-    //             , nfacct_root.update_every
-    //             , RRDSET_TYPE_STACKED
-    //     );
-    // }
-    // else rrdset_next(st_packets);
+    if(!packets_chart_generated) {
+        packets_chart_generated = 1;
+        printf("CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s' 'nfacct' '' stacked %d %d %s\n"
+               , NETDATA_CHART_PRIO_NETFILTER_PACKETS
+               , nfacct_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+    }
 
-    // for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-    //     if(likely(d->updated)) {
-    //         if(unlikely(!d->rd_packets))
-    //             d->rd_packets = rrddim_add(
-    //                     st_packets
-    //                     , d->name
-    //                     , NULL
-    //                     , 1
-    //                     , nfacct_root.update_every
-    //                     , RRD_ALGORITHM_INCREMENTAL
-    //             );
-
-    //         rrddim_set_by_pointer(
-    //                 st_packets
-    //                 , d->rd_packets
-    //                 , (collected_number)d->pkts
-    //         );
-    //     }
-    // }
-
-    // rrdset_done(st_packets);
+    for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+        if(likely(d->updated)) {
+            if(unlikely(!d->packets_dimension_added)) {
+                d->packets_dimension_added = 1;
+                printf("CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s'\n");
+                printf("DIMENSION %s '' incremental 1 %d\n", d->name, nfacct_root.update_every);
+            }
+            printf(
+                    "BEGIN netfilter.nfacct_packets\n"
+                    "SET %s = %lld\n"
+                    "END\n"
+                    , d->name
+                    , (collected_number)d->pkts
+            );
+        }
+    }
 
     // ----------------------------------------------------------------
 
-    // TODO: define the chart and set dimensions
-    // st_bytes = rrdset_find_bytype_localhost("netfilter", "nfacct_bytes");
-    // if(!st_bytes) {
-    //     st_bytes = rrdset_create_localhost(
-    //             "netfilter"
-    //             , "nfacct_bytes"
-    //             , NULL
-    //             , "nfacct"
-    //             , NULL
-    //             , "Netfilter Accounting Bandwidth"
-    //             , "kilobytes/s"
-    //             , PLUGIN_NFACCT_NAME
-    //             , NULL
-    //             , NETDATA_CHART_PRIO_NETFILTER_BYTES
-    //             , nfacct_root.update_every
-    //             , RRDSET_TYPE_STACKED
-    //     );
-    // }
-    // else rrdset_next(st_bytes);
+    if(!bytes_chart_generated) {
+        bytes_chart_generated = 1;
+        printf("CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s' 'nfacct' '' stacked %d %d %s\n"
+               , NETDATA_CHART_PRIO_NETFILTER_BYTES
+               , nfacct_root.update_every
+               , PLUGIN_NFACCT_NAME
+        );
+    }
 
-    // for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
-    //     if(likely(d->updated)) {
-    //         if(unlikely(!d->rd_bytes))
-    //             d->rd_bytes = rrddim_add(
-    //                     st_bytes
-    //                     , d->name
-    //                     , NULL
-    //                     , 1
-    //                     , 1000 * nfacct_root.update_every
-    //                     , RRD_ALGORITHM_INCREMENTAL
-    //             );
-
-    //         rrddim_set_by_pointer(
-    //                 st_bytes
-    //                 , d->rd_bytes
-    //                 , (collected_number)d->bytes
-    //         );
-    //     }
-    // }
-
-    // rrdset_done(st_bytes);
+    for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+        if(likely(d->updated)) {
+            if(unlikely(!d->bytes_dimension_added)) {
+                d->bytes_dimension_added = 1;
+                printf("CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s'\n");
+                printf("DIMENSION %s '' incremental 1 %d\n", d->name, 1000 * nfacct_root.update_every);
+            }
+            printf(
+                   "BEGIN netfilter.nfacct_bytes\n"
+                   "SET %s = %lld\n"
+                   "END\n"
+                   , d->name
+                   , (collected_number)d->bytes
+            );
+        }
+    }
 }
 
 #endif // HAVE_LIBNETFILTER_ACCT
@@ -834,7 +825,7 @@ int main(int argc, char **argv) {
 
     errno = 0;
 
-    if(freq > netdata_update_every)
+    if(freq >= netdata_update_every)
         netdata_update_every = freq;
     else if(freq)
         error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
@@ -884,7 +875,11 @@ int main(int argc, char **argv) {
                 nfstat_send_metrics();
         }
 #endif
+
+        fflush(stdout);
     }
+
+    info("NFACCT process exiting");
 }
 
 #else // !HAVE_LIBMNL
