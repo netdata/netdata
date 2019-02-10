@@ -799,7 +799,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialization of netdata plugin
 
-    program_name = "cups.plugin";
+    program_name = "nfacct.plugin";
 
     // disable syslog
     error_log_syslog = 0;
@@ -808,11 +808,58 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    // TODO:
     // ------------------------------------------------------------------------
     // parse command line parameters
+    int i, freq = 0;
+    for(i = 1; i < argc ; i++) {
+        if(isdigit(*argv[i]) && !freq) {
+            int n = str2i(argv[i]);
+            if(n > 0 && n < 86400) {
+                freq = n;
+                continue;
+            }
+        }
+        else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+            printf("nfacct.plugin %s\n", VERSION);
+            exit(0);
+        }
+        else if(strcmp("debug", argv[i]) == 0) {
+            debug = 1;
+            continue;
+        }
+        else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
+            fprintf(stderr,
+                    "\n"
+                    " netdata nfacct.plugin %s\n"
+                    " Copyright (C) 2015-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " Released under GNU General Public License v3 or later.\n"
+                    " All rights reserved.\n"
+                    "\n"
+                    " This program is a data collector plugin for netdata.\n"
+                    "\n"
+                    " Available command line options:\n"
+                    "\n"
+                    "  SECONDS                 data collection frequency\n"
+                    "                          minimum: %d\n"
+                    "\n"
+                    "  debug                   enable verbose output\n"
+                    "                          default: disabled\n"
+                    "\n"
+                    "  -v\n"
+                    "  -V\n"
+                    "  version                 print version and exit\n"
+                    "\n"
+                    " For more information:\n"
+                    " https://github.com/netdata/netdata/tree/master/collectors/nfacct.plugin\n"
+                    "\n"
+                    , VERSION
+                    , netdata_update_every
+            );
+            exit(1);
+        }
 
-    int freq = 0;
+        error("nfacct.plugin: ignoring parameter '%s'", argv[i]);
+    }
 
     errno = 0;
 
