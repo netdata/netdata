@@ -137,17 +137,6 @@ static int nfstat_init(int netdata_update_every) {
     return 0;
 }
 
-static void nfstat_cleanup() {
-    if(nfstat_root.mnl) {
-        mnl_socket_close(nfstat_root.mnl);
-        nfstat_root.mnl = NULL;
-    }
-
-    freez(nfstat_root.buf);
-    nfstat_root.buf = NULL;
-    nfstat_root.buf_size = 0;
-}
-
 static struct nlmsghdr * nfct_mnl_nlmsghdr_put(char *buf, uint16_t subsys, uint16_t type, uint8_t family, uint32_t seq) {
     struct nlmsghdr *nlh;
     struct nfgenmsg *nfh;
@@ -619,24 +608,6 @@ static int nfacct_init(int netdata_update_every) {
     return 0;
 }
 
-static void nfacct_cleanup() {
-    if(nfacct_root.mnl) {
-        mnl_socket_close(nfacct_root.mnl);
-        nfacct_root.mnl = NULL;
-    }
-
-    if(nfacct_root.nfacct_buffer) {
-        nfacct_free(nfacct_root.nfacct_buffer);
-        nfacct_root.nfacct_buffer = NULL;
-    }
-
-    freez(nfacct_root.buf);
-    nfacct_root.buf = NULL;
-    nfacct_root.buf_size = 0;
-
-    // TODO: cleanup the metrics linked list
-}
-
 static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
     (void)data;
 
@@ -878,16 +849,25 @@ int main(int argc, char **argv) {
 
     // ------------------------------------------------------------------------
 
+    size_t iteration;
     usec_t step = netdata_update_every * USEC_PER_SEC;
+
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(;;) {
-        heartbeat_next(&hb, step);
+    for(iteration = 0; 1 ; iteration++) {
+        usec_t dt = heartbeat_next(&hb, step);
+
+    if(debug && iteration)
+            fprintf(stderr, "nfacct.plugin: iteration %zu, dt %llu usec\n"
+                    , iteration
+                    , dt
+            );
 
         if(unlikely(netdata_exit)) break;
 
 #ifdef DO_NFACCT
         if(likely(nfacct)) {
+            if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_collect()\n");
             nfacct = !nfacct_collect();
 
             if(likely(nfacct))
@@ -897,6 +877,7 @@ int main(int argc, char **argv) {
 
 #ifdef DO_NFSTAT
         if(likely(nfstat)) {
+            if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_collect()\n");
             nfstat = !nfstat_collect();
 
             if(likely(nfstat))
@@ -904,8 +885,6 @@ int main(int argc, char **argv) {
         }
 #endif
     }
-
-    return 0;
 }
 
 #else // !HAVE_LIBMNL
