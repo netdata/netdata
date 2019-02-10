@@ -772,6 +772,7 @@ int main(int argc, char **argv) {
 
     // ------------------------------------------------------------------------
     // parse command line parameters
+
     int i, freq = 0;
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
@@ -801,7 +802,7 @@ int main(int argc, char **argv) {
                     "\n"
                     " Available command line options:\n"
                     "\n"
-                    "  SECONDS                 data collection frequency\n"
+                    "  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
                     "                          minimum: %d\n"
                     "\n"
                     "  debug                   enable verbose output\n"
@@ -809,7 +810,10 @@ int main(int argc, char **argv) {
                     "\n"
                     "  -v\n"
                     "  -V\n"
-                    "  version                 print version and exit\n"
+                    "  --version               print version and exit\n"
+                    "\n"
+                    "  -h\n"
+                    "  --help                  print this message and exit\n"
                     "\n"
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/collectors/nfacct.plugin\n"
@@ -831,38 +835,47 @@ int main(int argc, char **argv) {
         error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
 
 #ifdef DO_NFACCT
+    if(debug) fprintf(stderr, "freeipmi.plugin: calling nfacct_init()\n");
     int nfacct = !nfacct_init(netdata_update_every);
 #endif
 
 #ifdef DO_NFSTAT
+    if(debug) fprintf(stderr, "freeipmi.plugin: calling nfstat_init()\n");
     int nfstat = !nfstat_init(netdata_update_every);
 #endif
 
     // ------------------------------------------------------------------------
+    // the main loop
+
+    if(debug) fprintf(stderr, "nfacct.plugin: starting data collection\n");
+
+    time_t started_t = now_monotonic_sec();
 
     size_t iteration;
     usec_t step = netdata_update_every * USEC_PER_SEC;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(iteration = 0; 1 ; iteration++) {
+    for(iteration = 0; 1; iteration++) {
         usec_t dt = heartbeat_next(&hb, step);
 
-    if(debug && iteration)
+        if(unlikely(netdata_exit)) break;
+
+        if(debug && iteration)
             fprintf(stderr, "nfacct.plugin: iteration %zu, dt %llu usec\n"
                     , iteration
                     , dt
             );
-
-        if(unlikely(netdata_exit)) break;
 
 #ifdef DO_NFACCT
         if(likely(nfacct)) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_collect()\n");
             nfacct = !nfacct_collect();
 
-            if(likely(nfacct))
+            if(likely(nfacct)) {
+                if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_send_metrics()\n");
                 nfacct_send_metrics();
+            }
         }
 #endif
 
@@ -871,12 +884,17 @@ int main(int argc, char **argv) {
             if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_collect()\n");
             nfstat = !nfstat_collect();
 
-            if(likely(nfstat))
+            if(likely(nfstat)) {
+                if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_send_metrics()\n");
                 nfstat_send_metrics();
+            }
         }
 #endif
 
         fflush(stdout);
+
+        // restart check (14400 seconds)
+        if(now_monotonic_sec() - started_t > 14400) break;
     }
 
     info("NFACCT process exiting");
