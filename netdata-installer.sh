@@ -44,7 +44,11 @@ download() {
 	url="${1}"
 	dest="${2}"
 	if command -v wget >/dev/null 2>&1; then
-		run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		if [ -t 1 ]; then
+			run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		else
+			run wget --progress=dot:mega -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		fi
 	elif command -v curl >/dev/null 2>&1; then
 		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
