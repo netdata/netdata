@@ -618,6 +618,10 @@ netdataDashboard.submenu = {
 // colors: the dimension colors of the chart (the default colors are appended)
 // height: the ratio of the chart height relative to the default
 //
+
+var cgroupCPULimitIsSet = 0;
+var cgroupMemLimitIsSet = 0;
+
 netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
@@ -1416,11 +1420,15 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // containers
 
-    'cgroup.cpu': {
+    'cgroup.cpu_limit': {
+        valueRange: "[0, null]",
         mainheads: [
             function (os, id) {
                 void(os);
+                cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="CPU"'
                     + ' data-units="%"'
@@ -1435,14 +1443,41 @@ netdataDashboard.context = {
         ]
     },
 
-    'cgroup.mem_usage': {
+    'cgroup.cpu': {
         mainheads: [
             function (os, id) {
                 void(os);
+                if (cgroupCPULimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="CPU"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[4] + '"'
+                        + ' role="application"></div>';
+                }
+                else
+                    return '';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage_limit': {
+        mainheads: [
+            function (os, id) {
+                void(os);
+                cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-append-options="percentage"'
+                    + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Memory"'
-                    + ' data-units="MB"'
+                    + ' data-units="%"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -1450,6 +1485,29 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage': {
+        mainheads: [
+            function (os, id) {
+                void(os);
+                if (cgroupMemLimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Memory"'
+                        + ' data-units="MB"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                }
+                else
+                    return '';
             }
         ]
     },
