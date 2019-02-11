@@ -368,6 +368,18 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     return 0;
 }
 
+inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
+    debug(D_RRD_CALLS, "rrddim_is_obsolete() for chart %s, dimension %s", st->name, rd->name);
+
+    rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
+    rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+}
+
+inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
+    debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rd->name);
+
+    rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
+}
 
 // ----------------------------------------------------------------------------
 // RRDDIM - collect values for a dimension

@@ -188,12 +188,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
                 host->rrdpush_sender_buffer
-                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
+                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
                 , rd->id
                 , rd->name
                 , rrd_algorithm_name(rd->algorithm)
                 , rd->multiplier
                 , rd->divisor
+                , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
                 , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
                 , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
@@ -737,16 +738,16 @@ void *rrdpush_sender_thread(void *ptr) {
 
                 if(host->rrdpush_sender_socket != -1) {
                     char *error = NULL;
-                    
+
                     if (unlikely(ofd->revents & POLLERR))
                         error = "socket reports errors (POLLERR)";
-                        
+
                     else if (unlikely(ofd->revents & POLLHUP))
                         error = "connection closed by remote end (POLLHUP)";
-                        
+
                     else if (unlikely(ofd->revents & POLLNVAL))
                         error = "connection is invalid (POLLNVAL)";
-                    
+
                     if(unlikely(error)) {
                         debug(D_STREAM, "STREAM: %s - closing socket...", error);
                         error("STREAM %s [send to %s]: %s - reopening socket - we have sent %zu bytes on this connection.", host->hostname, connected_to, error, sent_bytes_on_this_connection);

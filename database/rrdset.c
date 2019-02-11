@@ -417,6 +417,24 @@ void rrdset_delete(RRDSET *st) {
     recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
+void rrdset_delete_obsolete_dimensions(RRDSET *st) {
+    RRDDIM *rd;
+
+    rrdset_check_rdlock(st);
+
+    info("Deleting dimensions of chart '%s' ('%s') from disk...", st->id, st->name);
+
+    rrddim_foreach_read(rd, st) {
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                info("Deleting dimension file '%s'.", rd->cache_filename);
+                if(unlikely(unlink(rd->cache_filename) == -1))
+                    error("Cannot delete dimension file '%s'", rd->cache_filename);
+            }
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
@@ -1303,6 +1321,11 @@ void rrdset_done(RRDSET *st) {
             continue;
         }
 
+        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
+            error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rd->name, st->id);
+            rrddim_isnot_obsolete(st, rd);
+        }
+
         #ifdef NETDATA_INTERNAL_CHECKS
         rrdset_debug(st, "%s: START "
                 " last_collected_value = " COLLECTED_NUMBER_FORMAT
@@ -1582,37 +1605,37 @@ void rrdset_done(RRDSET *st) {
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
 
-/*
-    // find if there are any obsolete dimensions (not updated recently)
-    if(unlikely(rrd_delete_unupdated_dimensions)) {
+    // find if there are any obsolete dimensions
+    time_t now = now_realtime_sec();
 
-        for( rd = st->dimensions; likely(rd) ; rd = rd->next )
-            if((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)
+    if(unlikely(rrddim_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))) {
+        rrddim_foreach_read(rd, st)
+            if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
                 break;
 
         if(unlikely(rd)) {
             RRDDIM *last;
-            // there is dimension to free
+            // there is a dimension to free
             // upgrade our read lock to a write lock
             rrdset_unlock(st);
             rrdset_wrlock(st);
 
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
-                // remove it only it is not updated in rrd_delete_unupdated_dimensions seconds
-
-                if(unlikely((rd->last_collected_time.tv_sec + (rrd_delete_unupdated_dimensions * st->update_every)) < st->last_collected_time.tv_sec)) {
+                if(unlikely(rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now)) {
                     info("Removing obsolete dimension '%s' (%s) of '%s' (%s).", rd->name, rd->id, st->name, st->id);
 
+                    if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
+                        info("Deleting dimension file '%s'.", rd->cache_filename);
+                        if(unlikely(unlink(rd->cache_filename) == -1))
+                            error("Cannot delete dimension file '%s'", rd->cache_filename);
+                    }
+
                     if(unlikely(!last)) {
-                        st->dimensions = rd->next;
-                        rd->next = NULL;
                         rrddim_free(st, rd);
                         rd = st->dimensions;
                         continue;
                     }
                     else {
-                        last->next = rd->next;
-                        rd->next = NULL;
                         rrddim_free(st, rd);
                         rd = last->next;
                         continue;
@@ -1622,14 +1645,11 @@ void rrdset_done(RRDSET *st) {
                 last = rd;
                 rd = rd->next;
             }
-
-            if(unlikely(!st->dimensions)) {
-                info("Disabling chart %s (%s) since it does not have any dimensions", st->name, st->id);
-                st->enabled = 0;
-            }
+        }
+        else {
+            rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
         }
     }
-*/
 
     rrdset_unlock(st);
 
