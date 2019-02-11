@@ -91,6 +91,8 @@ BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
+BuildRequires:	autoconf
+BuildRequires:	automake
 Requires:	zlib
 Requires:	libuuid
 
