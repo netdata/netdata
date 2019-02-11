@@ -4,25 +4,35 @@
 
 **Fixed bugs:**
 
+- Missing build deps for automake and autoconf from the spec file [\#5362](https://github.com/netdata/netdata/issues/5362)
+- wget command that dowlonad go.d plugin creates lots of output in headless install [\#5356](https://github.com/netdata/netdata/issues/5356)
 - Update checker false positive [\#5352](https://github.com/netdata/netdata/issues/5352)
 - cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Codacy is unconfigured [\#5320](https://github.com/netdata/netdata/issues/5320)
+- netdata-installer.sh fails to detect netdata is restarted [\#5304](https://github.com/netdata/netdata/issues/5304)
 
 **Closed issues:**
 
 - Alert alarm flapping [\#5346](https://github.com/netdata/netdata/issues/5346)
 - move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
+- Fluentd monitoring [\#4847](https://github.com/netdata/netdata/issues/4847)
+- Feature request: ability to process detailed `ipcs -q` output [\#1890](https://github.com/netdata/netdata/issues/1890)
 
 **Merged pull requests:**
 
+- Added missing BuildRequires for autoconf, automake [\#5363](https://github.com/netdata/netdata/pull/5363) ([johnhomelan](https://github.com/johnhomelan))
+- fix: wget log spam in headless mode \(fixes \#5356\) [\#5359](https://github.com/netdata/netdata/pull/5359) ([mkg20001](https://github.com/mkg20001))
 - Fix replacement of whitespace for versions retrieved from github [\#5355](https://github.com/netdata/netdata/pull/5355) ([cakrit](https://github.com/cakrit))
 - fix warning condition for mem.available [\#5353](https://github.com/netdata/netdata/pull/5353) ([cakrit](https://github.com/cakrit))
+- cups.plugin: Support older versions [\#5350](https://github.com/netdata/netdata/pull/5350) ([simonnagl](https://github.com/simonnagl))
 - fix AC\_CHECK\_LIB to work correctly with cups library [\#5349](https://github.com/netdata/netdata/pull/5349) ([mfundul](https://github.com/mfundul))
 - Add link to writing a new module in example readme [\#5348](https://github.com/netdata/netdata/pull/5348) ([cakrit](https://github.com/cakrit))
 - Provide more precise uninstall instructions [\#5347](https://github.com/netdata/netdata/pull/5347) ([cakrit](https://github.com/cakrit))
 - Fix cgroups Codacy issue [\#5340](https://github.com/netdata/netdata/pull/5340) ([vlvkobal](https://github.com/vlvkobal))
 - Fix FreeBSD plugin Codacy issues [\#5338](https://github.com/netdata/netdata/pull/5338) ([vlvkobal](https://github.com/vlvkobal))
 - Add go.d documentation [\#5215](https://github.com/netdata/netdata/pull/5215) ([cakrit](https://github.com/cakrit))
+- Add cgroup cpu and memory limits and alarms [\#5172](https://github.com/netdata/netdata/pull/5172) ([vlvkobal](https://github.com/vlvkobal))
+- Add message queue statistics [\#5115](https://github.com/netdata/netdata/pull/5115) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.12.0](https://github.com/netdata/netdata/tree/v1.12.0) (2019-02-06)
 
