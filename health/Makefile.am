@@ -31,6 +31,7 @@ dist_healthconfig_DATA = \
     health.d/boinc.conf \
     health.d/btrfs.conf \
     health.d/ceph.conf \
+    health.d/cgroups.conf \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
