@@ -122,8 +122,8 @@ static struct {
 };
 
 
-static int nfstat_init(int netdata_update_every) {
-    nfstat_root.update_every = netdata_update_every;
+static int nfstat_init(int update_every) {
+    nfstat_root.update_every = update_every;
 
     nfstat_root.buf_size = mnl_buffer_size();
     nfstat_root.buf = mallocz(nfstat_root.buf_size);
@@ -601,8 +601,8 @@ static inline struct nfacct_data *nfacct_data_get(const char *name, uint32_t has
     return d;
 }
 
-static int nfacct_init(int netdata_update_every) {
-    nfacct_root.update_every = netdata_update_every;
+static int nfacct_init(int update_every) {
+    nfacct_root.update_every = update_every;
 
     nfacct_root.buf_size = mnl_buffer_size();
     nfacct_root.buf = mallocz(nfacct_root.buf_size);
