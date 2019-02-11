@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-This plugin needs a running local CUPS daemon (`cupsd`). This plugin does not need any configuration.
+This plugin needs a running local CUPS daemon (`cupsd`). This plugin does not need any configuration. Supports cups since version 1.7.
 
 ## Charts
 
