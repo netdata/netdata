@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#shellcheck source=/dev/null disable=SC2086,SC2154
 
 # netdata
 # real-time performance and health monitoring, done right!
@@ -35,40 +36,36 @@
 # -----------------------------------------------------------------------------
 # testing notifications
 
+if { [ "${1}" = "test" ] || [ "${2}" = "test" ]; } && [ "${#}" -le 2 ]; then
+	if [ "${2}" = "test" ]; then
+		recipient="${1}"
+	else
+		recipient="${2}"
+	fi
 
-if [ \( "${1}" = "test" -o "${2}" = "test" \) -a "${#}" -le 2 ]
-then
-    if [ "${2}" = "test" ]
-    then
-        recipient="${1}"
-    else
-        recipient="${2}"
-    fi
+	[ -z "${recipient}" ] && recipient="sysadmin"
 
-    [ -z "${recipient}" ] && recipient="sysadmin"
+	id=1
+	last="CLEAR"
+	test_res=0
+	for x in "WARNING" "CRITICAL" "CLEAR"; do
+		echo >&2
+		echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
 
-    id=1
-    last="CLEAR"
-    test_res=0
-    for x in "WARNING" "CRITICAL"  "CLEAR"
-    do
-        echo >&2
-        echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
+		"${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work" "new value" "old value" "evaluated expression" "expression variable values" 0 0
+		#shellcheck disable=SC2181
+		if [ $? -ne 0 ]; then
+			echo >&2 "# FAILED"
+			test_res=1
+		else
+			echo >&2 "# OK"
+		fi
 
-        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work" "new value" "old value" "evaluated expression" "expression variable values" 0 0
-        if [ $? -ne 0 ]
-        then
-            echo >&2 "# FAILED"
-            test_res=1
-        else
-            echo >&2 "# OK"
-        fi
+		last="${x}"
+		id=$((id + 1))
+	done
 
-        last="${x}"
-        id=$((id + 1))
-    done
-
-    exit $test_res
+	exit $test_res
 fi
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
@@ -79,68 +76,67 @@ export LC_ALL=C
 PROGRAM_NAME="$(basename "${0}")"
 
 logdate() {
-    date "+%Y-%m-%d %H:%M:%S"
+	date "+%Y-%m-%d %H:%M:%S"
 }
 
 log() {
-    local status="${1}"
-    shift
+	local status="${1}"
+	shift
 
-    echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
+	echo >&2 "$(logdate): ${PROGRAM_NAME}: ${status}: ${*}"
 
 }
 
 warning() {
-    log WARNING "${@}"
+	log WARNING "${@}"
 }
 
 error() {
-    log ERROR "${@}"
+	log ERROR "${@}"
 }
 
 info() {
-    log INFO "${@}"
+	log INFO "${@}"
 }
 
 fatal() {
-    log FATAL "${@}"
-    exit 1
+	log FATAL "${@}"
+	exit 1
 }
 
 debug=${NETDATA_ALARM_NOTIFY_DEBUG-0}
 debug() {
-    [ "${debug}" = "1" ] && log DEBUG "${@}"
+	[ "${debug}" = "1" ] && log DEBUG "${@}"
 }
 
 docurl() {
-    if [ -z "${curl}" ]
-        then
-        error "\${curl} is unset."
-        return 1
-    fi
+	if [ -z "${curl}" ]; then
+		error '${curl} is unset.'
+		return 1
+	fi
 
-    if [ "${debug}" = "1" ]
-        then
-        echo >&2 "--- BEGIN curl command ---"
-        printf >&2 "%q " ${curl} "${@}"
-        echo >&2
-        echo >&2 "--- END curl command ---"
+	if [ "${debug}" = "1" ]; then
+		echo >&2 "--- BEGIN curl command ---"
+		printf >&2 "%q " ${curl} "${@}"
+		echo >&2
+		echo >&2 "--- END curl command ---"
 
-        local out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
-        local code=$(${curl} ${curl_options} --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
-        local ret=$?
-        echo >&2 "--- BEGIN received response ---"
-        cat >&2 "${out}"
-        echo >&2
-        echo >&2 "--- END received response ---"
-        echo >&2 "RECEIVED HTTP RESPONSE CODE: ${code}"
-        rm "${out}"
-        echo "${code}"
-        return ${ret}
-    fi
+		local out code ret
+		out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
+		code=$(${curl} ${curl_options} --write-out "%{http_code}" --output "${out}" --silent --show-error "${@}")
+		ret=$?
+		echo >&2 "--- BEGIN received response ---"
+		cat >&2 "${out}"
+		echo >&2
+		echo >&2 "--- END received response ---"
+		echo >&2 "RECEIVED HTTP RESPONSE CODE: ${code}"
+		rm "${out}"
+		echo "${code}"
+		return ${ret}
+	fi
 
-    ${curl} ${curl_options} --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
-    return $?
+	${curl} ${curl_options} --write-out "%{http_code}" --output /dev/null --silent --show-error "${@}"
+	return $?
 }
 
 # -----------------------------------------------------------------------------
@@ -166,94 +162,92 @@ custom
 msteam
 kavenegar
 prowl
+awssns
 "
 
 # -----------------------------------------------------------------------------
 # this is to be overwritten by the config file
 
 custom_sender() {
-    info "not sending custom notification for ${status} of '${host}.${chart}.${name}'"
+	info "not sending custom notification for ${status} of '${host}.${chart}.${name}'"
 }
-
 
 # -----------------------------------------------------------------------------
 
 # check for BASH v4+ (required for associative arrays)
-[ $(( ${BASH_VERSINFO[0]} )) -lt 4 ] && \
-    fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
+if [ ${BASH_VERSINFO[0]} -lt 4 ]; then
+	fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
+fi
 
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
-[ -z "${NETDATA_CACHE_DIR}"        ] && NETDATA_CACHE_DIR="@cachedir_POST@"
-[ -z "${NETDATA_REGISTRY_URL}"     ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
+[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="@cachedir_POST@"
+[ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
 
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-if [ ${1} = "unittest" ] ; then
-    unittest=1                 # enable unit testing mode
-    roles="${2}"               # the role that should be used for unit testing
-    cfgfile="${3}"             # the location of the config file to use for unit testing
-    status="${4}"              # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-    old_status="${5}"          # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+if [ ${1} = "unittest" ]; then
+	unittest=1        # enable unit testing mode
+	roles="${2}"      # the role that should be used for unit testing
+	cfgfile="${3}"    # the location of the config file to use for unit testing
+	status="${4}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+	old_status="${5}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 else
-    roles="${1}"               # the roles that should be notified for this event
-    args_host="${2}"                # the host generated this event
-    unique_id="${3}"           # the unique id of this event
-    alarm_id="${4}"            # the unique id of the alarm that generated this event
-    event_id="${5}"            # the incremental id of the event, for this alarm id
-    when="${6}"                # the timestamp this event occurred
-    name="${7}"                # the name of the alarm, as given in netdata health.d entries
-    chart="${8}"               # the name of the chart (type.id)
-    family="${9}"              # the family of the chart
-    status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-    old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-    value="${12}"              # the current value of the alarm
-    old_value="${13}"          # the previous value of the alarm
-    src="${14}"                # the line number and file the alarm has been configured
-    duration="${15}"           # the duration in seconds of the previous alarm state
-    non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-    units="${17}"              # the units of the value
-    info="${18}"               # a short description of the alarm
-    value_string="${19}"       # friendly value (with units)
-    old_value_string="${20}"   # friendly old value (with units)
-    calc_expression="${21}"	   # contains the expression that was evaluated to trigger the alarm
-    calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
-    total_warnings="${23}"     # Total number of alarms in WARNING state
-    total_critical="${24}"     # Total number of alarms in CRITICAL state
+	roles="${1}"               # the roles that should be notified for this event
+	args_host="${2}"           # the host generated this event
+	unique_id="${3}"           # the unique id of this event
+	alarm_id="${4}"            # the unique id of the alarm that generated this event
+	event_id="${5}"            # the incremental id of the event, for this alarm id
+	when="${6}"                # the timestamp this event occurred
+	name="${7}"                # the name of the alarm, as given in netdata health.d entries
+	chart="${8}"               # the name of the chart (type.id)
+	family="${9}"              # the family of the chart
+	status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+	old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+	value="${12}"              # the current value of the alarm
+	old_value="${13}"          # the previous value of the alarm
+	src="${14}"                # the line number and file the alarm has been configured
+	duration="${15}"           # the duration in seconds of the previous alarm state
+	non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
+	units="${17}"              # the units of the value
+	info="${18}"               # a short description of the alarm
+	value_string="${19}"       # friendly value (with units)
+	# shellcheck disable=SC2034 variable is unused, but https://github.com/netdata/netdata/pull/5164#discussion_r255572947
+	old_value_string="${20}"   # friendly old value (with units), previously named "old_value_string"
+	calc_expression="${21}"    # contains the expression that was evaluated to trigger the alarm
+	calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
+	total_warnings="${23}"     # Total number of alarms in WARNING state
+	total_critical="${24}"     # Total number of alarms in CRITICAL state
 fi
-
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
 
-if [ -z ${args_host} ]
-    then
-    this_host=$(hostname -s 2>/dev/null)
-    host="${this_host}"
-    args_host="${this_host}"
+if [ -z ${args_host} ]; then
+	this_host=$(hostname -s 2>/dev/null)
+	host="${this_host}"
+	args_host="${this_host}"
 else
-    host="${args_host}"
+	host="${args_host}"
 fi
 
 # -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
 
 # don't do anything if this is not WARNING, CRITICAL or CLEAR
-if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
-then
-    info "not sending notification for ${status} of '${host}.${chart}.${name}'"
-    exit 1
+if [ "${status}" != "WARNING" ] && [ "${status}" != "CRITICAL" ] && [ "${status}" != "CLEAR" ]; then
+	info "not sending notification for ${status} of '${host}.${chart}.${name}'"
+	exit 1
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
-if [ "${clear_alarm_always}" != "YES" -a "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
-then
-    info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
-    exit 1
+if [ "${clear_alarm_always}" != "YES" ] && [ "${old_status}" != "WARNING" ] && [ "${old_status}" != "CRITICAL" ] && [ "${status}" = "CLEAR" ]; then
+	info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
+	exit 1
 fi
 
 # -----------------------------------------------------------------------------
@@ -277,13 +271,13 @@ curl=
 sendmail=
 
 # enable / disable features
-for method_name in ${method_names^^} ; do
-    declare SEND_${method_name}="YES"
-    declare DEFAULT_RECIPIENT_${method_name}
+for method_name in ${method_names^^}; do
+	declare SEND_${method_name}="YES"
+	declare DEFAULT_RECIPIENT_${method_name}
 done
 
-for method_name in ${method_names} ; do
-    declare -A role_recipients_${method_name}
+for method_name in ${method_names}; do
+	declare -A role_recipients_${method_name}
 done
 
 # slack configs
@@ -344,9 +338,7 @@ PD_SERVICE_KEY=
 FLEEP_SENDER="${host}"
 
 # Amazon SNS configs
-DEFAULT_RECIPIENT_AWSSNS=
 AWSSNS_MESSAGE_FORMAT=
-declare -A role_recipients_awssns=()
 
 # syslog configs
 SYSLOG_FACILITY=
@@ -355,7 +347,6 @@ SYSLOG_FACILITY=
 EMAIL_SENDER=
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 EMAIL_THREADING=
-DEFAULT_RECIPIENT_EMAIL="root"
 
 # irc configs
 IRC_NICKNAME=
@@ -365,95 +356,88 @@ IRC_NETWORK=
 # load the stock and user configuration files
 # these will overwrite the variables above
 
-if [ ${unittest} ] ;
-    then
-    source "${cfgfile}"
-    [ $? -ne 0 ] && error "Failed to load requested config file." && exit 1
+if [ ${unittest} ]; then
+	if source "${cfgfile}"; then
+		error "Failed to load requested config file."
+		exit 1
+	fi
 else
-    for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"
-    do
-        if [ -f "${CONFIG}" ]
-            then
-            debug "Loading config file '${CONFIG}'..."
-            source "${CONFIG}"
-            [ $? -ne 0 ] && error "Failed to load config file '${CONFIG}'."
-        else
-            warning "Cannot find file '${CONFIG}'."
-        fi
-    done
+	for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/health_alarm_notify.conf" "${NETDATA_USER_CONFIG_DIR}/health_alarm_notify.conf"; do
+		if [ -f "${CONFIG}" ]; then
+			debug "Loading config file '${CONFIG}'..."
+			source "${CONFIG}" || error "Failed to load config file '${CONFIG}'."
+		else
+			warning "Cannot find file '${CONFIG}'."
+		fi
+	done
 fi
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
 # should be correct for almost all modern UNIX systems.
-if [ -z ${EMAIL_CHARSET} ]
-    then
-    EMAIL_CHARSET="UTF-8"
+if [ -z ${EMAIL_CHARSET} ]; then
+	EMAIL_CHARSET="UTF-8"
 fi
 
 # If we've been asked to use FQDN's for the URL's in the alarm, do so,
 # unless we're sending an alarm for a slave system which we can't get the
 # FQDN of easily.
-if [ "${use_fqdn}" = "YES" -a "${host}" = "$(hostname -s 2>/dev/null)" ]
-    then
-    host="$(hostname -f 2>/dev/null)"
+if [ "${use_fqdn}" = "YES" ] && [ "${host}" = "$(hostname -s 2>/dev/null)" ]; then
+	host="$(hostname -f 2>/dev/null)"
 fi
 
 # -----------------------------------------------------------------------------
 # filter a recipient based on alarm event severity
 
 filter_recipient_by_criticality() {
-    local method="${1}" x="${2}" r s
-    shift
+	local method="${1}" x="${2}" r s
+	shift
 
-    r="${x/|*/}" # the recipient
-    s="${x/*|/}" # the severity required for notifying this recipient
+	r="${x/|*/}" # the recipient
+	s="${x/*|/}" # the severity required for notifying this recipient
 
-    # no severity filtering for this person
-    [ "${r}" = "${s}" ] && return 0
+	# no severity filtering for this person
+	[ "${r}" = "${s}" ] && return 0
 
-    # the severity is invalid
-    s="${s^^}"
-    if [ "${s}" != "CRITICAL" ]
-    then
-        error "SEVERITY FILTERING for ${x} VIA ${method}: invalid severity '${s,,}', only 'critical' is supported."
-        return 0
-    fi
+	# the severity is invalid
+	s="${s^^}"
+	if [ "${s}" != "CRITICAL" ]; then
+		error "SEVERITY FILTERING for ${x} VIA ${method}: invalid severity '${s,,}', only 'critical' is supported."
+		return 0
+	fi
 
-    # create the status tracking directory for this user
-    [ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] && \
-        mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
+	# create the status tracking directory for this user
+	[ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] &&
+		mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
 
-    case "${status}" in
-        CRITICAL)
-            # make sure he will get future notifications for this alarm too
-            touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
-            debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
-            return 0
-            ;;
+	case "${status}" in
+	CRITICAL)
+		# make sure he will get future notifications for this alarm too
+		touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+		debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
+		return 0
+		;;
 
-        WARNING)
-            if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
-            then
-                # we do not remove the file, so that he will get future notifications of this alarm
-                debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
-                return 0
-            fi
-            ;;
+	WARNING)
+		if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
+			# we do not remove the file, so that he will get future notifications of this alarm
+			debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
+			return 0
+		fi
+		;;
 
-        *)
-            if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
-            then
-                # remove the file, so that he will only receive notifications for CRITICAL states for this alarm
-                rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
-                debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
-                return 0
-            fi
-            ;;
-    esac
+	*)
+		if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
+			# remove the file, so that he will only receive notifications for CRITICAL states for this alarm
+			rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+			debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
+			return 0
+		fi
+		;;
+	esac
 
-    debug "SEVERITY FILTERING for ${x} VIA ${method}: BLOCK: recipient should not receive this notification"
-    return 1
+	debug "SEVERITY FILTERING for ${x} VIA ${method}: BLOCK: recipient should not receive this notification"
+	return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -481,107 +465,100 @@ filter_recipient_by_criticality() {
 [ -z "${PUSHBULLET_ACCESS_TOKEN}" ] && SEND_PUSHBULLET="NO"
 
 # check twilio
-[ -z "${TWILIO_ACCOUNT_TOKEN}" -o -z "${TWILIO_ACCOUNT_SID}" -o -z "${TWILIO_NUMBER}" ] && SEND_TWILIO="NO"
+{ [ -z "${TWILIO_ACCOUNT_TOKEN}" ] || [ -z "${TWILIO_ACCOUNT_SID}" ] || [ -z "${TWILIO_NUMBER}" ]; } && SEND_TWILIO="NO"
 
 # check hipchat
 [ -z "${HIPCHAT_AUTH_TOKEN}" ] && SEND_HIPCHAT="NO"
 
 # check messagebird
-[ -z "${MESSAGEBIRD_ACCESS_KEY}" -o -z "${MESSAGEBIRD_NUMBER}" ] && SEND_MESSAGEBIRD="NO"
+{ [ -z "${MESSAGEBIRD_ACCESS_KEY}" ] || [ -z "${MESSAGEBIRD_NUMBER}" ]; } && SEND_MESSAGEBIRD="NO"
 
 # check kavenegar
-[ -z "${KAVENEGAR_API_KEY}" -o -z "${KAVENEGAR_SENDER}" ] && SEND_KAVENEGAR="NO"
+{ [ -z "${KAVENEGAR_API_KEY}" ] || [ -z "${KAVENEGAR_SENDER}" ]; } && SEND_KAVENEGAR="NO"
 
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
 # check kafka
-[ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
+{ [ -z "${KAFKA_URL}" ] || [ -z "${KAFKA_SENDER_IP}" ]; } && SEND_KAFKA="NO"
 
 # check irc
 [ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
 # check fleep
-[ -z "${FLEEP_SERVER}" -o -z "${FLEEP_SENDER}" ] && SEND_FLEEP="NO"
+#shellcheck disable=SC2153
+{ [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
 
-# if we need curl, check for the curl command
-if [ \( \
-           "${SEND_PUSHOVER}"    = "YES" \
-        -o "${SEND_SLACK}"       = "YES" \
-        -o "${SEND_ROCKETCHAT}"  = "YES" \
-        -o "${SEND_ALERTA}"      = "YES" \
-        -o "${SEND_PD}"          = "YES" \
-        -o "${SEND_FLOCK}"       = "YES" \
-        -o "${SEND_DISCORD}"     = "YES" \
-        -o "${SEND_HIPCHAT}"     = "YES" \
-        -o "${SEND_TWILIO}"      = "YES" \
-        -o "${SEND_MESSAGEBIRD}" = "YES" \
-        -o "${SEND_KAVENEGAR}"   = "YES" \
-        -o "${SEND_TELEGRAM}"    = "YES" \
-        -o "${SEND_PUSHBULLET}"  = "YES" \
-        -o "${SEND_KAFKA}"       = "YES" \
-        -o "${SEND_FLEEP}"       = "YES" \
-        -o "${SEND_PROWL}"       = "YES" \
-        -o "${SEND_CUSTOM}"      = "YES" \
-        -o "${SEND_MSTEAM}"        = "YES" \
-    \) -a -z "${curl}" ]
-    then
-    curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
-    if [ -z "${curl}" ]
-        then
-        error "Cannot find curl command in the system path. Disabling all curl based notifications."
-        SEND_PUSHOVER="NO"
-        SEND_PUSHBULLET="NO"
-        SEND_TELEGRAM="NO"
-        SEND_SLACK="NO"
-        SEND_MSTEAM="NO"
-        SEND_ROCKETCHAT="NO"
-        SEND_ALERTA="NO"
-        SEND_PD="NO"
-        SEND_FLOCK="NO"
-        SEND_DISCORD="NO"
-        SEND_TWILIO="NO"
-        SEND_HIPCHAT="NO"
-        SEND_MESSAGEBIRD="NO"
-        SEND_KAVENEGAR="NO"
-        SEND_KAFKA="NO"
-        SEND_FLEEP="NO"
-        SEND_PROWL="NO"
-        SEND_CUSTOM="NO"
-    fi
+if [ "${SEND_PUSHOVER}" = "YES" ] ||
+	[ "${SEND_SLACK}" = "YES" ] ||
+	[ "${SEND_ROCKETCHAT}" = "YES" ] ||
+	[ "${SEND_ALERTA}" = "YES" ] ||
+	[ "${SEND_PD}" = "YES" ] ||
+	[ "${SEND_FLOCK}" = "YES" ] ||
+	[ "${SEND_DISCORD}" = "YES" ] ||
+	[ "${SEND_HIPCHAT}" = "YES" ] ||
+	[ "${SEND_TWILIO}" = "YES" ] ||
+	[ "${SEND_MESSAGEBIRD}" = "YES" ] ||
+	[ "${SEND_KAVENEGAR}" = "YES" ] ||
+	[ "${SEND_TELEGRAM}" = "YES" ] ||
+	[ "${SEND_PUSHBULLET}" = "YES" ] ||
+	[ "${SEND_KAFKA}" = "YES" ] ||
+	[ "${SEND_FLEEP}" = "YES" ] ||
+	[ "${SEND_PROWL}" = "YES" ] ||
+	[ "${SEND_CUSTOM}" = "YES" ] ||
+	[ "${SEND_MSTEAM}" = "YES" ]; then
+	# if we need curl, check for the curl command
+	if [ -z "${curl}" ]; then
+		curl="$(command -v curl 2>/dev/null)"
+	fi
+	if [ -z "${curl}" ]; then
+		error "Cannot find curl command in the system path. Disabling all curl based notifications."
+		SEND_PUSHOVER="NO"
+		SEND_PUSHBULLET="NO"
+		SEND_TELEGRAM="NO"
+		SEND_SLACK="NO"
+		SEND_MSTEAM="NO"
+		SEND_ROCKETCHAT="NO"
+		SEND_ALERTA="NO"
+		SEND_PD="NO"
+		SEND_FLOCK="NO"
+		SEND_DISCORD="NO"
+		SEND_TWILIO="NO"
+		SEND_HIPCHAT="NO"
+		SEND_MESSAGEBIRD="NO"
+		SEND_KAVENEGAR="NO"
+		SEND_KAFKA="NO"
+		SEND_FLEEP="NO"
+		SEND_PROWL="NO"
+		SEND_CUSTOM="NO"
+	fi
 fi
 
 # if we need sendmail, check for the sendmail command
-if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
-    then
-    sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
-    if [ -z "${sendmail}" ]
-        then
-        debug "Cannot find sendmail command in the system path. Disabling email notifications."
-        SEND_EMAIL="NO"
-    fi
+if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
+	sendmail="$(command -v sendmail 2>/dev/null)"
+	if [ -z "${sendmail}" ]; then
+		debug "Cannot find sendmail command in the system path. Disabling email notifications."
+		SEND_EMAIL="NO"
+	fi
 fi
 
 # if we need logger, check for the logger command
-if [ "${SEND_SYSLOG}" = "YES" -a -z "${logger}" ]
-    then
-    logger="$(which logger 2>/dev/null || command -v logger 2>/dev/null)"
-    if [ -z "${logger}" ]
-        then
-        debug "Cannot find logger command in the system path. Disabling syslog notifications."
-        SEND_SYSLOG="NO"
-    fi
+if [ "${SEND_SYSLOG}" = "YES" ] && [ -z "${logger}" ]; then
+	logger="$(command -v logger 2>/dev/null)"
+	if [ -z "${logger}" ]; then
+		debug "Cannot find logger command in the system path. Disabling syslog notifications."
+		SEND_SYSLOG="NO"
+	fi
 fi
 
 # if we need aws, check for the aws command
-if [ "${SEND_AWSSNS}" = "YES" -a -z "${aws}" ]
-    then
-    aws="$(which aws 2>/dev/null || command -v aws 2>/dev/null)"
-    if [ -z "${aws}" ]
-        then
-        debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
-        SEND_AWSSNS="NO"
-    fi
+if [ "${SEND_AWSSNS}" = "YES" ] && [ -z "${aws}" ]; then
+	aws="$(command -v aws 2>/dev/null)"
+	if [ -z "${aws}" ]; then
+		debug "Cannot find aws command in the system path.  Disabling Amazon SNS notifications."
+		SEND_AWSSNS="NO"
+	fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -589,47 +566,48 @@ fi
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
-for method_name in ${method_names} ; do
-    send_var="SEND_${method_name^^}"
-    if [ ${!send_var} = "NO" ] ; then
-        continue
-    fi
+for method_name in ${method_names}; do
+	send_var="SEND_${method_name^^}"
+	if [ "${!send_var}" = "NO" ]; then
+		continue
+	fi
 
-    declare -A arr_var=()
+	declare -A arr_var=()
 
-    for x in ${roles//,/ } ; do
-        # the roles 'silent' and 'disabled' mean:
-        # don't send a notification for this role
-        [ "${x}" = "silent" -o "${x}" = "disabled" ] && continue
+	for x in ${roles//,/ }; do
+		# the roles 'silent' and 'disabled' mean:
+		# don't send a notification for this role
+		if [ "${x}" = "silent" ] || [ "${x}" = "disabled" ]; then
+			continue
+		fi
 
-        role_recipients="role_recipients_${method_name}[$x]"
-        default_recipient_var="DEFAULT_RECIPIENT_${method_name^^}"
+		role_recipients="role_recipients_${method_name}[$x]"
+		default_recipient_var="DEFAULT_RECIPIENT_${method_name^^}"
 
-        a="${!role_recipients}"
-        [ -z "${a}" ] && a="${!default_recipient_var}"
-        for r in ${a//,/ } ; do
-            [ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr_var[${r/|*/}]="1"
-        done
-    done
+		a="${!role_recipients}"
+		[ -z "${a}" ] && a="${!default_recipient_var}"
+		for r in ${a//,/ }; do
+			[ "${r}" != "disabled" ] && filter_recipient_by_criticality ${method_name} "${r}" && arr_var[${r/|*/}]="1"
+		done
+	done
 
-    # build the list of recipients
-    to_var="to_${method_name}"
-    declare to_${method_name}="${!arr_var[*]}"
+	# build the list of recipients
+	to_var="to_${method_name}"
+	declare to_${method_name}="${!arr_var[*]}"
 
-    [ -z "${!to_var}" ] && declare ${send_var}="NO"
+	[ -z "${!to_var}" ] && declare ${send_var}="NO"
 done
 
 # -----------------------------------------------------------------------------
 # handle fixup of the email recipient list.
 
 fix_to_email() {
-  to_email=
-  while [ ! -z "${1}" ]
-  do
-    [ ! -z "${to_email}" ] && to_email="${to_email}, "
-    to_email="${to_email}${1}"
-    shift 1
-  done
+	to_email=
+	while [ -n "${1}" ]; do
+		[ -n "${to_email}" ] && to_email="${to_email}, "
+		to_email="${to_email}${1}"
+		shift 1
+	done
 }
 
 # ${to_email} without quotes here
@@ -637,41 +615,45 @@ fix_to_email ${to_email}
 
 # -----------------------------------------------------------------------------
 # handle output if we're running in unit test mode
-if [ ${unittest} ] ; then
-    for method_name in ${method_names} ; do
-        to_var="to_${method_name}"
-        echo "results: ${method_name}: ${!to_var}"
-    done
-    exit 0
+if [ ${unittest} ]; then
+	for method_name in ${method_names}; do
+		to_var="to_${method_name}"
+		echo "results: ${method_name}: ${!to_var}"
+	done
+	exit 0
 fi
 
 # -----------------------------------------------------------------------------
 # check that we have at least a method enabled
-if [   "${SEND_EMAIL}"          != "YES" \
-    -a "${SEND_PUSHOVER}"       != "YES" \
-    -a "${SEND_TELEGRAM}"       != "YES" \
-    -a "${SEND_SLACK}"          != "YES" \
-    -a "${SEND_ROCKETCHAT}"     != "YES" \
-    -a "${SEND_ALERTA}"         != "YES" \
-    -a "${SEND_FLOCK}"          != "YES" \
-    -a "${SEND_DISCORD}"        != "YES" \
-    -a "${SEND_TWILIO}"         != "YES" \
-    -a "${SEND_HIPCHAT}"        != "YES" \
-    -a "${SEND_MESSAGEBIRD}"    != "YES" \
-    -a "${SEND_KAVENEGAR}"      != "YES" \
-    -a "${SEND_PUSHBULLET}"     != "YES" \
-    -a "${SEND_KAFKA}"          != "YES" \
-    -a "${SEND_PD}"             != "YES" \
-    -a "${SEND_FLEEP}"          != "YES" \
-    -a "${SEND_CUSTOM}"         != "YES" \
-    -a "${SEND_IRC}"            != "YES" \
-    -a "${SEND_AWSSNS}"         != "YES" \
-    -a "${SEND_PROWL}"          != "YES" \
-    -a "${SEND_SYSLOG}"         != "YES" \
-    -a "${SEND_MSTEAM}"         != "YES" \
-    ]
-    then
-    fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
+proceed=0
+for method in "${SEND_EMAIL}" \
+	"${SEND_PUSHOVER}" \
+	"${SEND_TELEGRAM}" \
+	"${SEND_SLACK}" \
+	"${SEND_ROCKETCHAT}" \
+	"${SEND_ALERTA}" \
+	"${SEND_FLOCK}" \
+	"${SEND_DISCORD}" \
+	"${SEND_TWILIO}" \
+	"${SEND_HIPCHAT}" \
+	"${SEND_MESSAGEBIRD}" \
+	"${SEND_KAVENEGAR}" \
+	"${SEND_PUSHBULLET}" \
+	"${SEND_KAFKA}" \
+	"${SEND_PD}" \
+	"${SEND_FLEEP}" \
+	"${SEND_CUSTOM}" \
+	"${SEND_IRC}" \
+	"${SEND_AWSSNS}" \
+	"${SEND_SYSLOG}" \
+	"${SEND_MSTEAM}"; do
+	if [ "${method}" == "YES" ]; then
+		proceed=1
+		break
+	fi
+done
+if [ "$proceed" -eq 0 ]; then
+	fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
 fi
 
 # -----------------------------------------------------------------------------
@@ -684,36 +666,35 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
-if [ "${SEND_EMAIL}" == "YES" -a "${EMAIL_THREADING}" != "NO" ] ; then
-    email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\nReferences: <${chart}-${name}@${host}>"
+if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
+	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\nReferences: <${chart}-${name}@${host}>"
 else
-    email_thread_headers=
+	email_thread_headers=
 fi
 
 # -----------------------------------------------------------------------------
 # function to URL encode a string
 
 urlencode() {
-    local string="${1}" strlen encoded pos c o
+	local string="${1}" strlen encoded pos c o
 
-    strlen=${#string}
-    for (( pos=0 ; pos<strlen ; pos++ ))
-    do
-        c=${string:${pos}:1}
-        case "${c}" in
-            [-_.~a-zA-Z0-9])
-                o="${c}"
-                ;;
+	strlen=${#string}
+	for ((pos = 0; pos < strlen; pos++)); do
+		c=${string:pos:1}
+		case "${c}" in
+		[-_.~a-zA-Z0-9])
+			o="${c}"
+			;;
 
-            *)
-                printf -v o '%%%02x' "'${c}"
-                ;;
-        esac
-        encoded+="${o}"
-    done
+		*)
+			printf -v o '%%%02x' "'${c}"
+			;;
+		esac
+		encoded+="${o}"
+	done
 
-    REPLY="${encoded}"
-    echo "${REPLY}"
+	REPLY="${encoded}"
+	echo "${REPLY}"
 }
 
 # -----------------------------------------------------------------------------
@@ -721,238 +702,217 @@ urlencode() {
 # using DAYS, MINUTES, SECONDS
 
 duration4human() {
-    local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second" ret
-    d=$(( s / 86400 ))
-    s=$(( s - (d * 86400) ))
-    h=$(( s / 3600 ))
-    s=$(( s - (h * 3600) ))
-    m=$(( s / 60 ))
-    s=$(( s - (m * 60) ))
+	local s="${1}" d=0 h=0 m=0 ds="day" hs="hour" ms="minute" ss="second" ret
+	d=$((s / 86400))
+	s=$((s - (d * 86400)))
+	h=$((s / 3600))
+	s=$((s - (h * 3600)))
+	m=$((s / 60))
+	s=$((s - (m * 60)))
 
-    if [ ${d} -gt 0 ]
-    then
-        [ ${m} -ge 30 ] && h=$(( h + 1 ))
-        [ ${d} -gt 1 ] && ds="days"
-        [ ${h} -gt 1 ] && hs="hours"
-        if [ ${h} -gt 0 ]
-        then
-            ret="${d} ${ds} and ${h} ${hs}"
-        else
-            ret="${d} ${ds}"
-        fi
-    elif [ ${h} -gt 0 ]
-    then
-        [ ${s} -ge 30 ] && m=$(( m + 1 ))
-        [ ${h} -gt 1 ] && hs="hours"
-        [ ${m} -gt 1 ] && ms="minutes"
-        if [ ${m} -gt 0 ]
-        then
-            ret="${h} ${hs} and ${m} ${ms}"
-        else
-            ret="${h} ${hs}"
-        fi
-    elif [ ${m} -gt 0 ]
-    then
-        [ ${m} -gt 1 ] && ms="minutes"
-        [ ${s} -gt 1 ] && ss="seconds"
-        if [ ${s} -gt 0 ]
-        then
-            ret="${m} ${ms} and ${s} ${ss}"
-        else
-            ret="${m} ${ms}"
-        fi
-    else
-        [ ${s} -gt 1 ] && ss="seconds"
-        ret="${s} ${ss}"
-    fi
+	if [ ${d} -gt 0 ]; then
+		[ ${m} -ge 30 ] && h=$((h + 1))
+		[ ${d} -gt 1 ] && ds="days"
+		[ ${h} -gt 1 ] && hs="hours"
+		if [ ${h} -gt 0 ]; then
+			ret="${d} ${ds} and ${h} ${hs}"
+		else
+			ret="${d} ${ds}"
+		fi
+	elif [ ${h} -gt 0 ]; then
+		[ ${s} -ge 30 ] && m=$((m + 1))
+		[ ${h} -gt 1 ] && hs="hours"
+		[ ${m} -gt 1 ] && ms="minutes"
+		if [ ${m} -gt 0 ]; then
+			ret="${h} ${hs} and ${m} ${ms}"
+		else
+			ret="${h} ${hs}"
+		fi
+	elif [ ${m} -gt 0 ]; then
+		[ ${m} -gt 1 ] && ms="minutes"
+		[ ${s} -gt 1 ] && ss="seconds"
+		if [ ${s} -gt 0 ]; then
+			ret="${m} ${ms} and ${s} ${ss}"
+		else
+			ret="${m} ${ms}"
+		fi
+	else
+		[ ${s} -gt 1 ] && ss="seconds"
+		ret="${s} ${ss}"
+	fi
 
-    REPLY="${ret}"
-    echo "${REPLY}"
+	REPLY="${ret}"
+	echo "${REPLY}"
 }
 
 # -----------------------------------------------------------------------------
 # email sender
 
 send_email() {
-    local ret= opts=() sender_email="${EMAIL_SENDER}" sender_name=
-    if [ "${SEND_EMAIL}" = "YES" ]
-        then
+	local ret opts=() sender_email="${EMAIL_SENDER}" sender_name=
+	if [ "${SEND_EMAIL}" = "YES" ]; then
 
-        if [ ! -z "${EMAIL_SENDER}" ]
-            then
-            if [[ "${EMAIL_SENDER}" =~ ^\".*\"\ \<.*\>$ ]]
-                then
-                # the name includes double quotes
-                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
-                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '"' -f 2)"
-            elif [[ "${EMAIL_SENDER}" =~ ^\'.*\'\ \<.*\>$ ]]
-                then
-                # the name includes single quotes
-                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
-                sender_name="$(echo "${EMAIL_SENDER}" | cut -d "'" -f 2)"
-            elif [[ "${EMAIL_SENDER}" =~ ^.*\ \<.*\>$ ]]
-                then
-                # the name does not have any quotes
-                sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
-                sender_name="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
-            fi
-        fi
+		if [ -n "${EMAIL_SENDER}" ]; then
+			if [[ ${EMAIL_SENDER} =~ ^\".*\"\ \<.*\>$ ]]; then
+				# the name includes double quotes
+				sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+				sender_name="$(echo "${EMAIL_SENDER}" | cut -d '"' -f 2)"
+			elif [[ ${EMAIL_SENDER} =~ ^\'.*\'\ \<.*\>$ ]]; then
+				# the name includes single quotes
+				sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+				sender_name="$(echo "${EMAIL_SENDER}" | cut -d "'" -f 2)"
+			elif [[ ${EMAIL_SENDER} =~ ^.*\ \<.*\>$ ]]; then
+				# the name does not have any quotes
+				sender_email="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)"
+				sender_name="$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
+			fi
+		fi
 
-        [ ! -z "${sender_email}" ] && opts+=(-f "${sender_email}")
-        [ ! -z "${sender_name}" ]  && opts+=(-F "${sender_name}")
+		[ -n "${sender_email}" ] && opts+=(-f "${sender_email}")
+		[ -n "${sender_name}" ] && opts+=(-F "${sender_name}")
 
-        if [ "${debug}" = "1" ]
-            then
-            echo >&2 "--- BEGIN sendmail command ---"
-            printf >&2 "%q " "${sendmail}" -t "${opts[@]}"
-            echo >&2
-            echo >&2 "--- END sendmail command ---"
-        fi
+		if [ "${debug}" = "1" ]; then
+			echo >&2 "--- BEGIN sendmail command ---"
+			printf >&2 "%q " "${sendmail}" -t "${opts[@]}"
+			echo >&2
+			echo >&2 "--- END sendmail command ---"
+		fi
 
-        "${sendmail}" -t "${opts[@]}"
-        ret=$?
+		"${sendmail}" -t "${opts[@]}"
+		ret=$?
 
-        if [ ${ret} -eq 0 ]
-        then
-            info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
-            return 0
-        else
-            error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
-            return 1
-        fi
-    fi
+		if [ ${ret} -eq 0 ]; then
+			info "sent email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}'"
+			return 0
+		else
+			error "failed to send email notification for: ${host} ${chart}.${name} is ${status} to '${to_email}' with error code ${ret}."
+			return 1
+		fi
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # pushover sender
 
 send_pushover() {
-    local apptoken="${1}" usertokens="${2}" when="${3}" url="${4}" status="${5}" title="${6}" message="${7}" httpcode sent=0 user priority
+	local apptoken="${1}" usertokens="${2}" when="${3}" url="${4}" status="${5}" title="${6}" message="${7}" httpcode sent=0 user priority
 
-    if [ "${SEND_PUSHOVER}" = "YES" -a ! -z "${apptoken}" -a ! -z "${usertokens}" -a ! -z "${title}" -a ! -z "${message}" ]
-        then
+	if [ "${SEND_PUSHOVER}" = "YES" ] && [ -n "${apptoken}" ] && [ -n "${usertokens}" ] && [ -n "${title}" ] && [ -n "${message}" ]; then
 
-        # https://pushover.net/api
-        priority=-2
-        case "${status}" in
-            CLEAR) priority=-1;;   # low priority: no sound or vibration
-            WARNING) priority=0;;  # normal priority: respect quiet hours
-            CRITICAL) priority=1;; # high priority: bypass quiet hours
-            *) priority=-2;;       # lowest priority: no notification at all
-        esac
+		# https://pushover.net/api
+		priority=-2
+		case "${status}" in
+		CLEAR) priority=-1 ;; # low priority: no sound or vibration
+		WARNING) priority=0 ;; # normal priority: respect quiet hours
+		CRITICAL) priority=1 ;; # high priority: bypass quiet hours
+		*) priority=-2 ;; # lowest priority: no notification at all
+		esac
 
-        for user in ${usertokens}
-        do
-            httpcode=$(docurl \
-                --form-string "token=${apptoken}" \
-                --form-string "user=${user}" \
-                --form-string "html=1" \
-                --form-string "title=${title}" \
-                --form-string "message=${message}" \
-                --form-string "timestamp=${when}" \
-                --form-string "url=${url}" \
-                --form-string "url_title=Open netdata dashboard to view the alarm" \
-                --form-string "priority=${priority}" \
-                https://api.pushover.net/1/messages.json)
+		for user in ${usertokens}; do
+			httpcode=$(docurl \
+				--form-string "token=${apptoken}" \
+				--form-string "user=${user}" \
+				--form-string "html=1" \
+				--form-string "title=${title}" \
+				--form-string "message=${message}" \
+				--form-string "timestamp=${when}" \
+				--form-string "url=${url}" \
+				--form-string "url_title=Open netdata dashboard to view the alarm" \
+				--form-string "priority=${priority}" \
+				https://api.pushover.net/1/messages.json)
 
-            if [ "${httpcode}" = "200" ]
-            then
-                info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "200" ]; then
+				info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # pushbullet sender
 
 send_pushbullet() {
-    local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
-    if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
-        then
-        #https://docs.pushbullet.com/#create-push
-        for user in ${recipients}
-        do
-            httpcode=$(docurl \
-              --header 'Access-Token: '${userapikey}'' \
-              --header 'Content-Type: application/json' \
-              --data-binary  @<(cat <<EOF
+	local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
+	if [ "${SEND_PUSHBULLET}" = "YES" ] && [ -n "${userapikey}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
+		#https://docs.pushbullet.com/#create-push
+		for user in ${recipients}; do
+			httpcode=$(docurl \
+				--header 'Access-Token: '${userapikey}'' \
+				--header 'Content-Type: application/json' \
+				--data-binary @<(
+					cat <<EOF
                               {"title": "${title}",
                               "type": "link",
                               "email": "${user}",
-                              "body": "$( echo -n ${message})",
+                              "body": "$(echo -n ${message})",
                               "url": "${url}",
                               "source_device_iden": "${source_device}"}
 EOF
-               ) "https://api.pushbullet.com/v2/pushes" -X POST)
+				) "https://api.pushbullet.com/v2/pushes" -X POST)
 
-            if [ "${httpcode}" = "200" ]
-            then
-                info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "200" ]; then
+				info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # kafka sender
 
 send_kafka() {
-    local httpcode sent=0
-    if [ "${SEND_KAFKA}" = "YES" ]
-        then
-            httpcode=$(docurl -X POST \
-                --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
-                "${KAFKA_URL}")
+	local httpcode sent=0
+	if [ "${SEND_KAFKA}" = "YES" ]; then
+		httpcode=$(docurl -X POST \
+			--data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
+			"${KAFKA_URL}")
 
-            if [ "${httpcode}" = "204" ]
-            then
-                info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP error code ${httpcode}."
-            fi
+		if [ "${httpcode}" = "204" ]; then
+			info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}' with HTTP error code ${httpcode}."
+		fi
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # pagerduty.com sender
 
 send_pd() {
-    local recipients="${1}" sent=0
-    unset t
-    case ${status} in
-        CLEAR)    t='resolve';;
-        WARNING)  t='trigger';;
-        CRITICAL) t='trigger';;
-    esac
+	local recipients="${1}" sent=0
+	unset t
+	case ${status} in
+	CLEAR) t='resolve' ;;
+	WARNING) t='trigger' ;;
+	CRITICAL) t='trigger' ;;
+	esac
 
-    if [ ${SEND_PD} = "YES" -a ! -z "${t}" ]
-        then
-        for PD_SERVICE_KEY in ${recipients}
-        do
-        d="${status} ${name} = ${value_string} - ${host}, ${family}"
-            payload="$(cat << EOF
+	if [ ${SEND_PD} = "YES" ] && [ -n "${t}" ]; then
+		for PD_SERVICE_KEY in ${recipients}; do
+			d="${status} ${name} = ${value_string} - ${host}, ${family}"
+			payload="$(
+				cat <<EOF
             {
               "service_key": "${PD_SERVICE_KEY}",
               "event_type": "${t}",
@@ -978,218 +938,195 @@ send_pd() {
               }
             }
 EOF
-            )"
-         httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/generic/2010-04-15/create_event.json")
-         if [ "${httpcode}" = "200" ]
-         then
-             info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
-             sent=$((sent + 1))
-         else
-             error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
-         fi
-        done
+			)"
+			httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/generic/2010-04-15/create_event.json")
+			if [ "${httpcode}" = "200" ]; then
+				info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # twilio sender
 
 send_twilio() {
-    local accountsid="${1}" accounttoken="${2}" twilionumber="${3}" recipients="${4}"  title="${5}" message="${6}" httpcode sent=0 user
-    if [ "${SEND_TWILIO}" = "YES" -a ! -z "${accountsid}" -a ! -z "${accounttoken}" -a ! -z "${twilionumber}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
-        then
-        #https://www.twilio.com/packages/labs/code/bash/twilio-sms
-        for user in ${recipients}
-        do
-            httpcode=$(docurl -X POST \
-                --data-urlencode "From=${twilionumber}" \
-                --data-urlencode "To=${user}" \
-                --data-urlencode "Body=${title} ${message}" \
-                -u "${accountsid}:${accounttoken}" \
-                "https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
+	local accountsid="${1}" accounttoken="${2}" twilionumber="${3}" recipients="${4}" title="${5}" message="${6}" httpcode sent=0 user
+	if [ "${SEND_TWILIO}" = "YES" ] && [ -n "${accountsid}" ] && [ -n "${accounttoken}" ] && [ -n "${twilionumber}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
+		#https://www.twilio.com/packages/labs/code/bash/twilio-sms
+		for user in ${recipients}; do
+			httpcode=$(docurl -X POST \
+				--data-urlencode "From=${twilionumber}" \
+				--data-urlencode "To=${user}" \
+				--data-urlencode "Body=${title} ${message}" \
+				-u "${accountsid}:${accounttoken}" \
+				"https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
 
-            if [ "${httpcode}" = "201" ]
-            then
-                info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "201" ]; then
+				info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
-
 
 # -----------------------------------------------------------------------------
 # hipchat sender
 
 send_hipchat() {
-    local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color sender msg_format notify
+	local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color msg_format notify
 
-    # remove <small></small> from the message
-    message="${message//<small>/}"
-    message="${message//<\/small>/}"
+	# remove <small></small> from the message
+	message="${message//<small>/}"
+	message="${message//<\/small>/}"
 
-    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${HIPCHAT_SERVER}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
-    then
-        # A label to be shown in addition to the sender's name
-        # Valid length range: 0 - 64.
-        sender="netdata"
+	if [ "${SEND_HIPCHAT}" = "YES" ] && [ -n "${HIPCHAT_SERVER}" ] && [ -n "${authtoken}" ] && [ -n "${recipients}" ] && [ -n "${message}" ]; then
+		# Valid values: html, text.
+		# Defaults to 'html'.
+		msg_format="html"
 
-        # Valid values: html, text.
-        # Defaults to 'html'.
-        msg_format="html"
+		# Background color for message. Valid values: yellow, green, red, purple, gray, random. Defaults to 'yellow'.
+		case "${status}" in
+		WARNING) color="yellow" ;;
+		CRITICAL) color="red" ;;
+		CLEAR) color="green" ;;
+		*) color="gray" ;;
+		esac
 
-        # Background color for message. Valid values: yellow, green, red, purple, gray, random. Defaults to 'yellow'.
-        case "${status}" in
-            WARNING)  color="yellow" ;;
-            CRITICAL) color="red" ;;
-            CLEAR)    color="green" ;;
-            *)        color="gray" ;;
-        esac
+		# Whether this message should trigger a user notification (change the tab color, play a sound, notify mobile phones, etc).
+		# Each recipient's notification preferences are taken into account.
+		# Defaults to false.
+		notify="true"
 
-        # Whether this message should trigger a user notification (change the tab color, play a sound, notify mobile phones, etc).
-        # Each recipient's notification preferences are taken into account.
-        # Defaults to false.
-        notify="true"
+		for room in ${recipients}; do
+			httpcode=$(docurl -X POST \
+				-H "Content-type: application/json" \
+				-H "Authorization: Bearer ${authtoken}" \
+				-d "{\"color\": \"${color}\", \"from\": \"${host}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
+				"https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
 
-        for room in ${recipients}
-        do
-            httpcode=$(docurl -X POST \
-                    -H "Content-type: application/json" \
-                    -H "Authorization: Bearer ${authtoken}" \
-                    -d "{\"color\": \"${color}\", \"from\": \"${host}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
-                    "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
+			if [ "${httpcode}" = "204" ]; then
+				info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-            if [ "${httpcode}" = "204" ]
-            then
-                info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP error code ${httpcode}."
-            fi
-        done
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
-
-    return 1
+	return 1
 }
-
 
 # -----------------------------------------------------------------------------
 # messagebird sender
 
 send_messagebird() {
-    local accesskey="${1}" messagebirdnumber="${2}" recipients="${3}"  title="${4}" message="${5}" httpcode sent=0 user
-    if [ "${SEND_MESSAGEBIRD}" = "YES" -a ! -z "${accesskey}" -a ! -z "${messagebirdnumber}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
-        then
-        #https://developers.messagebird.com/docs/messaging
-        for user in ${recipients}
-        do
-            httpcode=$(docurl -X POST \
-                --data-urlencode "originator=${messagebirdnumber}" \
-                --data-urlencode "recipients=${user}" \
-                --data-urlencode "body=${title} ${message}" \
-		        --data-urlencode "datacoding=auto" \
-                -H "Authorization: AccessKey ${accesskey}" \
-                "https://rest.messagebird.com/messages")
+	local accesskey="${1}" messagebirdnumber="${2}" recipients="${3}" title="${4}" message="${5}" httpcode sent=0 user
+	if [ "${SEND_MESSAGEBIRD}" = "YES" ] && [ -n "${accesskey}" ] && [ -n "${messagebirdnumber}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
+		#https://developers.messagebird.com/docs/messaging
+		for user in ${recipients}; do
+			httpcode=$(docurl -X POST \
+				--data-urlencode "originator=${messagebirdnumber}" \
+				--data-urlencode "recipients=${user}" \
+				--data-urlencode "body=${title} ${message}" \
+				--data-urlencode "datacoding=auto" \
+				-H "Authorization: AccessKey ${accesskey}" \
+				"https://rest.messagebird.com/messages")
 
-            if [ "${httpcode}" = "201" ]
-            then
-                info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "201" ]; then
+				info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # kavenegar sender
 
 send_kavenegar() {
-    local API_KEY="${1}" kavenegarsender="${2}" recipients="${3}"  title="${4}" message="${5}" httpcode sent=0 user
-    if [ "${SEND_KAVENEGAR}" = "YES" -a ! -z "${API_KEY}" -a ! -z "${kavenegarsender}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
-        then
-        # http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
-        for user in ${recipients}
-        do
-            httpcode=$(docurl -X POST http://api.kavenegar.com/v1/${API_KEY}/sms/send.json \
-                --data-urlencode "sender=${kavenegarsender}" \
-                --data-urlencode "receptor=${user}" \
-                --data-urlencode "message=${title} ${message}")
+	local API_KEY="${1}" kavenegarsender="${2}" recipients="${3}" title="${4}" message="${5}" httpcode sent=0 user
+	if [ "${SEND_KAVENEGAR}" = "YES" ] && [ -n "${API_KEY}" ] && [ -n "${kavenegarsender}" ] && [ -n "${recipients}" ] && [ -n "${message}" ] && [ -n "${title}" ]; then
+		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
+		for user in ${recipients}; do
+			httpcode=$(docurl -X POST http://api.kavenegar.com/v1/${API_KEY}/sms/send.json \
+				--data-urlencode "sender=${kavenegarsender}" \
+				--data-urlencode "receptor=${user}" \
+				--data-urlencode "message=${title} ${message}")
 
-            if [ "${httpcode}" = "200" ]
-            then
-                info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "200" ]; then
+				info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # telegram sender
 
 send_telegram() {
-    local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid emoji disableNotification=""
+	local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid emoji disableNotification=""
 
-    if [ "${status}" = "CLEAR" ]; then disableNotification="--data-urlencode disable_notification=true"; fi
+	if [ "${status}" = "CLEAR" ]; then disableNotification="--data-urlencode disable_notification=true"; fi
 
-    case "${status}" in
-        WARNING)  emoji="⚠️" ;;
-        CRITICAL) emoji="🔴" ;;
-        CLEAR)    emoji="✅" ;;
-        *)        emoji="⚪️" ;;
-    esac
+	case "${status}" in
+	WARNING) emoji="⚠️" ;;
+	CRITICAL) emoji="🔴" ;;
+	CLEAR) emoji="✅" ;;
+	*) emoji="⚪️" ;;
+	esac
 
-    if [ "${SEND_TELEGRAM}" = "YES" -a ! -z "${bottoken}" -a ! -z "${chatids}" -a ! -z "${message}" ];
-    then
-        for chatid in ${chatids}
-        do
-            # https://core.telegram.org/bots/api#sendmessage
-            httpcode=$(docurl ${disableNotification} \
-                --data-urlencode "parse_mode=HTML" \
-                --data-urlencode "disable_web_page_preview=true" \
-                --data-urlencode "text=${emoji} ${message}" \
-                "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
+	if [ "${SEND_TELEGRAM}" = "YES" ] && [ -n "${bottoken}" ] && [ -n "${chatids}" ] && [ -n "${message}" ]; then
+		for chatid in ${chatids}; do
+			# https://core.telegram.org/bots/api#sendmessage
+			httpcode=$(docurl ${disableNotification} \
+				--data-urlencode "parse_mode=HTML" \
+				--data-urlencode "disable_web_page_preview=true" \
+				--data-urlencode "text=${emoji} ${message}" \
+				"https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
-            if [ "${httpcode}" = "200" ]
-            then
-                info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
-                sent=$((sent + 1))
-            elif [ "${httpcode}" = "401" ]
-            then
-                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
-            else
-                error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
-            fi
-        done
+			if [ "${httpcode}" = "200" ]; then
+				info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
+				sent=$((sent + 1))
+			elif [ "${httpcode}" = "401" ]; then
+				error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
+			else
+				error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
@@ -1197,22 +1134,22 @@ send_telegram() {
 
 send_msteam() {
 
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+	local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    [ "${SEND_MSTEAM}" != "YES" ] && return 1
+	[ "${SEND_MSTEAM}" != "YES" ] && return 1
 
-    case "${status}" in
-        WARNING)  icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}";;
-        CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}";;
-        CLEAR)    icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}";;
-        *)        icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}";;
-    esac
+	case "${status}" in
+	WARNING) icon="${MSTEAM_ICON_WARNING}" && color="${MSTEAM_COLOR_WARNING}" ;;
+	CRITICAL) icon="${MSTEAM_ICON_CRITICAL}" && color="${MSTEAM_COLOR_CRITICAL}" ;;
+	CLEAR) icon="${MSTEAM_ICON_CLEAR}" && color="${MSTEAM_COLOR_CLEAR}" ;;
+	*) icon="${MSTEAM_ICON_DEFAULT}" && color="${MSTEAM_COLOR_DEFAULT}" ;;
+	esac
 
-    for channel in ${channels}
-    do
-        ## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
-        ## Online designer : https://acdesignerbeta.azurewebsites.net/
-        payload="$(cat <<EOF
+	for channel in ${channels}; do
+		## More details are available here regarding the payload syntax options : https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference
+		## Online designer : https://acdesignerbeta.azurewebsites.net/
+		payload="$(
+			cat <<EOF
         {
             "@context": "http://schema.org/extensions",
             "@type": "MessageCard",
@@ -1230,57 +1167,55 @@ send_msteam() {
             ]
         }
 EOF
-        )"
+		)"
 
-	# Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
-	webhook="${webhook//CHANNEL/${channel}}"
+		# Replacing in the webhook CHANNEL string by the MS Teams channel name from conf file.
+		webhook="${webhook//CHANNEL/${channel}}"
 
-	httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
+		httpcode=$(docurl -H "Content-Type: application/json" -d "${payload}" "${webhook}")
 
-        if [ "${httpcode}" = "200" ]
-        then
-            info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
-            sent=$((sent + 1))
-        else
-            error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
-        fi
-    done
+		if [ "${httpcode}" = "200" ]; then
+			info "sent Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send Microsoft team notification for: ${host} ${chart}.${name} is ${status} to '${webhook}', with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
-
 
 # slack sender
 
 send_slack() {
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+	local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    [ "${SEND_SLACK}" != "YES" ] && return 1
+	[ "${SEND_SLACK}" != "YES" ] && return 1
 
-    case "${status}" in
-        WARNING)  color="warning" ;;
-        CRITICAL) color="danger" ;;
-        CLEAR)    color="good" ;;
-        *)        color="#777777" ;;
-    esac
+	case "${status}" in
+	WARNING) color="warning" ;;
+	CRITICAL) color="danger" ;;
+	CLEAR) color="good" ;;
+	*) color="#777777" ;;
+	esac
 
-    for channel in ${channels}
-    do
-        # Default entry in the recipient is without a hash in front (backwards-compatible). Accept specification of channel or user.
-        if [ "${channel::1}" != "#" ] && [ "${channel::1}" != "@" ] ; then channel="#$channel"; fi
-        
-        # If channel is equal to "#" then do not send the channel attribute at all. Slack also defines channels and users in webhooks.
-        if [ "${channel}" = "#" ] ; then 
-            ch=""
-            chstr="without specifying a channel"
-        else
-            ch="\"channel\": \"${channel}\","
-            chstr="to '${channel}'"
-        fi
-        
-        payload="$(cat <<EOF
+	for channel in ${channels}; do
+		# Default entry in the recipient is without a hash in front (backwards-compatible). Accept specification of channel or user.
+		if [ "${channel::1}" != "#" ] && [ "${channel::1}" != "@" ]; then channel="#$channel"; fi
+
+		# If channel is equal to "#" then do not send the channel attribute at all. Slack also defines channels and users in webhooks.
+		if [ "${channel}" = "#" ]; then
+			ch=""
+			chstr="without specifying a channel"
+		else
+			ch="\"channel\": \"${channel}\","
+			chstr="to '${channel}'"
+		fi
+
+		payload="$(
+			cat <<EOF
         {
             $ch
             "username": "netdata on ${host}",
@@ -1310,42 +1245,40 @@ send_slack() {
             ]
         }
 EOF
-        )"
+		)"
 
-        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
-        if [ "${httpcode}" = "200" ]
-        then
-            info "sent slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}"
-            sent=$((sent + 1))
-        else
-            error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP error code ${httpcode}."
-        fi
-    done
+		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+		if [ "${httpcode}" = "200" ]; then
+			info "sent slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}"
+			sent=$((sent + 1))
+		else
+			error "failed to send slack notification for: ${host} ${chart}.${name} is ${status} ${chstr}, with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
-
 
 # -----------------------------------------------------------------------------
 # rocketchat sender
 
 send_rocketchat() {
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+	local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    [ "${SEND_ROCKETCHAT}" != "YES" ] && return 1
+	[ "${SEND_ROCKETCHAT}" != "YES" ] && return 1
 
-    case "${status}" in
-        WARNING)  color="warning" ;;
-        CRITICAL) color="danger" ;;
-        CLEAR)    color="good" ;;
-        *)        color="#777777" ;;
-    esac
+	case "${status}" in
+	WARNING) color="warning" ;;
+	CRITICAL) color="danger" ;;
+	CLEAR) color="good" ;;
+	*) color="#777777" ;;
+	esac
 
-    for channel in ${channels}
-    do
-        payload="$(cat <<EOF
+	for channel in ${channels}; do
+		payload="$(
+			cat <<EOF
         {
             "channel": "#${channel}",
             "alias": "netdata on ${host}",
@@ -1375,50 +1308,48 @@ send_rocketchat() {
             ]
         }
 EOF
-        )"
+		)"
 
-        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
-        if [ "${httpcode}" = "200" ]
-        then
-            info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-            sent=$((sent + 1))
-        else
-            error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-        fi
-    done
+		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+		if [ "${httpcode}" = "200" ]; then
+			info "sent rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send rocketchat notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # alerta sender
 
 send_alerta() {
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel severity resource event payload auth
+	local webhook="${1}" channels="${2}" httpcode sent=0 channel severity resource event payload auth
 
-    [ "${SEND_ALERTA}" != "YES" ] && return 1
+	[ "${SEND_ALERTA}" != "YES" ] && return 1
 
-    case "${status}" in
-        CRITICAL) severity="critical" ;;
-        WARNING)  severity="warning" ;;
-        CLEAR)    severity="cleared" ;;
-        *)        severity="indeterminate" ;;
-    esac
+	case "${status}" in
+	CRITICAL) severity="critical" ;;
+	WARNING) severity="warning" ;;
+	CLEAR) severity="cleared" ;;
+	*) severity="indeterminate" ;;
+	esac
 
-    if [[ "${chart}" == httpcheck* ]]
-    then
-        resource=$chart
-        event=$name
-    else
-        resource="${host}:${family}"
-        event="${chart}.${name}"
-    fi
+	if [[ ${chart} == httpcheck* ]]; then
+		resource=$chart
+		event=$name
+	else
+		resource="${host}:${family}"
+		event="${chart}.${name}"
+	fi
 
-    for channel in ${channels}
-    do
-        payload="$(cat <<EOF
+	for channel in ${channels}; do
+		payload="$(
+			cat <<EOF
         {
             "resource": "${resource}",
             "event": "${event}",
@@ -1442,50 +1373,46 @@ send_alerta() {
             "rawData": "${BASH_ARGV[@]}"
         }
 EOF
-        )"
+		)"
 
-        if [[ -n "${ALERTA_API_KEY}" ]]
-        then
-            auth="Key ${ALERTA_API_KEY}"
-        fi
+		if [ -n "${ALERTA_API_KEY}" ]; then
+			auth="Key ${ALERTA_API_KEY}"
+		fi
 
-        httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: $auth" --data "${payload}")
+		httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: $auth" --data "${payload}")
 
-        if [[ "${httpcode}" = "200" || "${httpcode}" = "201" ]]
-        then
-            info "sent alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-            sent=$((sent + 1))
-        elif [[ "${httpcode}" = "202" ]]
-        then
-            info "suppressed alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-        else
-            error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-        fi
-    done
+		if [ "${httpcode}" = "200" ] || [ "${httpcode}" = "201" ]; then
+			info "sent alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			sent=$((sent + 1))
+		elif [ "${httpcode}" = "202" ]; then
+			info "suppressed alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+		else
+			error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # flock sender
 
 send_flock() {
-    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+	local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
 
-    [ "${SEND_FLOCK}" != "YES" ] && return 1
+	[ "${SEND_FLOCK}" != "YES" ] && return 1
 
-    case "${status}" in
-        WARNING)  color="warning" ;;
-        CRITICAL) color="danger" ;;
-        CLEAR)    color="good" ;;
-        *)        color="#777777" ;;
-    esac
+	case "${status}" in
+	WARNING) color="warning" ;;
+	CRITICAL) color="danger" ;;
+	CLEAR) color="good" ;;
+	*) color="#777777" ;;
+	esac
 
-    for channel in ${channels}
-    do
-        httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -d "{
+	for channel in ${channels}; do
+		httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -d "{
             \"sendAs\": {
                 \"name\" : \"netdata on ${host}\",
                 \"profileImage\" : \"${images_base_url}/images/banner-icon-144x144.png\"
@@ -1508,42 +1435,41 @@ send_flock() {
                     }
                 }
             ]
-        }" )
-        if [ "${httpcode}" = "200" ]
-        then
-            info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-            sent=$((sent + 1))
-        else
-            error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-        fi
-    done
+        }")
+		if [ "${httpcode}" = "200" ]; then
+			info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # discord sender
 
 send_discord() {
-    local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload username
+	local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload username
 
-    [ "${SEND_DISCORD}" != "YES" ] && return 1
+	[ "${SEND_DISCORD}" != "YES" ] && return 1
 
-    case "${status}" in
-        WARNING)  color="warning" ;;
-        CRITICAL) color="danger" ;;
-        CLEAR)    color="good" ;;
-        *)        color="#777777" ;;
-    esac
+	case "${status}" in
+	WARNING) color="warning" ;;
+	CRITICAL) color="danger" ;;
+	CLEAR) color="good" ;;
+	*) color="#777777" ;;
+	esac
 
-    for channel in ${channels}
-    do
-        username="netdata on ${host}"
-        [ ${#username} -gt 32 ] && username="${username:0:29}..."
+	for channel in ${channels}; do
+		username="netdata on ${host}"
+		[ ${#username} -gt 32 ] && username="${username:0:29}..."
 
-        payload="$(cat <<EOF
+		payload="$(
+			cat <<EOF
         {
             "channel": "#${channel}",
             "username": "${username}",
@@ -1569,262 +1495,262 @@ send_discord() {
             ]
         }
 EOF
-        )"
+		)"
 
-        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
-        if [ "${httpcode}" = "200" ]
-        then
-            info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
-            sent=$((sent + 1))
-        else
-            error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
-        fi
-    done
+		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+		if [ "${httpcode}" = "200" ]; then
+			info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # fleep sender
 
 send_fleep() {
-    local httpcode sent=0 webhooks="${1}" data message
-    if [ "${SEND_FLEEP}" = "YES" ] ; then
-            message="${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}"
+	local httpcode sent=0 webhooks="${1}" data message
+	if [ "${SEND_FLEEP}" = "YES" ]; then
+		message="${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}"
 
-            for hook in "${webhooks}" ; do
-                data="{ "
-                data="${data} 'message': '${message}', "
-                data="${data} 'user': '${FLEEP_SENDER}' "
-                data="${data} }"
+		for hook in ${webhooks}; do
+			data="{ "
+			data="${data} 'message': '${message}', "
+			data="${data} 'user': '${FLEEP_SENDER}' "
+			data="${data} }"
 
-                httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
+			httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
 
-                if [ "${httpcode}" = "200" ] ; then
-                    info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
-                    sent=$((sent + 1))
-                else
-                    error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP error code ${httpcode}."
-                fi
-            done
+			if [ "${httpcode}" = "200" ]; then
+				info "sent fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send fleep data for: ${host} ${chart}.${name} is ${status} and user '${FLEEP_SENDER}' with HTTP error code ${httpcode}."
+			fi
+		done
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # Prowl sender
 
 send_prowl() {
-    local httpcode sent=0 data message keys prio=0 alarm_url event
-    if [ "${SEND_PROWL}" = "YES" ] ; then
-        message="$(urlencode "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}")"
-        message="description=${message}"
-        keys="$(urlencode "$(echo "${1}" | tr ' ' ,)")"
-        keys="apikey=${keys}"
-        app="application=Netdata"
+	local httpcode sent=0 data message keys prio=0 alarm_url event
+	if [ "${SEND_PROWL}" = "YES" ]; then
+		message="$(urlencode "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*\\n${info}")"
+		message="description=${message}"
+		keys="$(urlencode "$(echo "${1}" | tr ' ' ,)")"
+		keys="apikey=${keys}"
+		app="application=Netdata"
 
-        case "${status}" in
-            CRITICAL)
-                prio=2
-                ;;
-            WARNING)
-                prio=1
-                ;;
-        esac
-        pri="priority=${pri}"
+		case "${status}" in
+		CRITICAL)
+			prio=2
+			;;
+		WARNING)
+			prio=1
+			;;
+		esac
+		prio="priority=${prio}"
 
-        alarm_url="$(urlencode ${goto_url})"
-        alarm_url="url=${alarm_url}"
-        event="$(urlencode "${host} ${status_message}")"
-        event="event=${event}"
+		alarm_url="$(urlencode ${goto_url})"
+		alarm_url="url=${alarm_url}"
+		event="$(urlencode "${host} ${status_message}")"
+		event="event=${event}"
 
-        data="${keys}&${pri}&${alarm_url}&${app}&${event}&${message}"
+		data="${keys}&${prio}&${alarm_url}&${app}&${event}&${message}"
 
-        httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapi/add")
+		httpcode=$(docurl -X POST --data "${data}" "https://api.prowlapp.com/publicapi/add")
 
-        if [ "${httpcode}" = "200" ]  ; then
-            info "sent prowl data for: ${host} ${chart}.${name} is ${status}"
-            sent=1
-        else
-            error "failed to send prowl data for: ${host} ${chart}.${name} is ${status} with with error code ${httpcode}."
-        fi
+		if [ "${httpcode}" = "200" ]; then
+			info "sent prowl data for: ${host} ${chart}.${name} is ${status}"
+			sent=1
+		else
+			error "failed to send prowl data for: ${host} ${chart}.${name} is ${status} with with error code ${httpcode}."
+		fi
 
-        [ ${sent} -gt 0 ] && return 0
-    fi
+		[ ${sent} -gt 0 ] && return 0
+	fi
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # irc sender
 
 send_irc() {
-    local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
+	local NICKNAME="${1}" REALNAME="${2}" CHANNELS="${3}" NETWORK="${4}" SERVERNAME="${5}" MESSAGE="${6}" sent=0 channel color send_alarm reply_codes error
 
-    if [ "${SEND_IRC}" = "YES" -a ! -z "${NICKNAME}" -a ! -z "${REALNAME}" -a ! -z "${CHANNELS}" -a ! -z "${NETWORK}" -a ! -z "${SERVERNAME}" ]
-    then
-        case "${status}" in
-            WARNING)  color="warning" ;;
-            CRITICAL) color="danger" ;;
-            CLEAR)    color="good" ;;
-            *)        color="#777777" ;;
-        esac
+	if [ "${SEND_IRC}" = "YES" ] && [ -n "${NICKNAME}" ] && [ -n "${REALNAME}" ] && [ -n "${CHANNELS}" ] && [ -n "${NETWORK}" ] && [ -n "${SERVERNAME}" ]; then
+		case "${status}" in
+		WARNING) color="warning" ;;
+		CRITICAL) color="danger" ;;
+		CLEAR) color="good" ;;
+		*) color="#777777" ;;
+		esac
 
-        for CHANNEL in ${CHANNELS}
-        do
-            error=0
-            send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\nNICK ${NICKNAME}\nJOIN ${CHANNEL}\nPRIVMSG ${CHANNEL} :${MESSAGE}\nQUIT\n" \ | nc ${NETWORK} 6667)
-            reply_codes=$(echo ${send_alarm} | cut -d ' ' -f 2 | grep -o '[0-9]*')
-            for code in ${reply_codes}
-            do
-                [ "${code}" -ge 400 -a "${code}" -le 599 ] && error=1 && break
-            done
+		for CHANNEL in ${CHANNELS}; do
+			error=0
+			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${MESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
+			reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
+			for code in ${reply_codes}; do
+				if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then
+					error=1
+					break
+				fi
+			done
 
-            if [ "${error}" -eq 0 ]
-            then
-                info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}'"
-                sent=$((sent + 1))
-            else
-                error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}."
-            fi
-        done
-    fi
+			if [ "${error}" -eq 0 ]; then
+				info "sent irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send irc notification for: ${host} ${chart}.${name} is ${status} to '${CHANNEL}', with error code ${code}."
+			fi
+		done
+	fi
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # Amazon SNS sender
 
 send_awssns() {
-    local targets="${1}" message='' sent=0 region=''
-    local default_format="${status} on ${host} at ${date}: ${chart} ${value_string}"
+	local targets="${1}" message='' sent=0 region=''
+	local default_format="${status} on ${host} at ${date}: ${chart} ${value_string}"
 
-    [ "${SEND_AWSSNS}" = "YES" ] || return 1
+	[ "${SEND_AWSSNS}" = "YES" ] || return 1
 
-    message=${AWSSNS_MESSAGE_FORMAT:-${default_format}}
+	message=${AWSSNS_MESSAGE_FORMAT:-${default_format}}
 
-    for target in ${targets} ; do
-        # Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
-        region="$(echo ${target} | cut -f 4 -d ':')"
-        ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null
-        if [ $? = 0 ]; then
-            info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
-            sent=$((sent + 1))
-        else
-            error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
-        fi
-    done
+	for target in ${targets}; do
+		# Extract the region from the target ARN.  We need to explicitly specify the region so that it matches up correctly.
+		region="$(echo ${target} | cut -f 4 -d ':')"
+		if ${aws} sns publish --region "${region}" --subject "${host} ${status_message} - ${name//_/ } - ${chart}" --message "${message}" --target-arn ${target} &>/dev/null; then
+			info "sent Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send Amazon SNS notification for: ${host} ${chart}.${name} is ${status} to '${target}'"
+		fi
+	done
 
-    [ ${sent} -gt 0 ] && return 0
+	[ ${sent} -gt 0 ] && return 0
 
-    return 1
+	return 1
 }
 
 # -----------------------------------------------------------------------------
 # syslog sender
 
 send_syslog() {
-    local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
-    local priority='' message='' host='' port='' prefix=''
-    local temp1='' temp2=''
+	local facility=${SYSLOG_FACILITY:-"local6"} level='info' targets="${1}"
+	local priority='' message='' host='' port='' prefix=''
+	local temp1='' temp2=''
 
-    [ "${SEND_SYSLOG}" = "YES" ] || return 1
+	[ "${SEND_SYSLOG}" = "YES" ] || return 1
 
-    if [ "${status}" = "CRITICAL" ] ; then
-        level='crit'
-    elif [ "${status}" = "WARNING" ] ; then
-        level='warning'
-    fi
+	if [ "${status}" = "CRITICAL" ]; then
+		level='crit'
+	elif [ "${status}" = "WARNING" ]; then
+		level='warning'
+	fi
 
-    for target in ${targets} ; do
-        priority="${facility}.${level}"
-        message=''
-        host=''
-        port=''
-        prefix=''
-        temp1=''
-        temp2=''
+	for target in ${targets}; do
+		priority="${facility}.${level}"
+		message=''
+		host=''
+		port=''
+		prefix=''
+		temp1=''
+		temp2=''
 
-        prefix=$(echo ${target} | cut -d '/' -f 2)
-        temp1=$(echo ${target} | cut -d '/' -f 1)
+		prefix=$(echo ${target} | cut -d '/' -f 2)
+		temp1=$(echo ${target} | cut -d '/' -f 1)
 
-        if [ ${prefix} != ${temp1} ] ; then
-            if (echo ${temp1} | grep -q '@' ) ; then
-                temp2=$(echo ${temp1} | cut -d '@' -f 1)
-                host=$(echo ${temp1} | cut -d '@' -f 2)
+		if [ ${prefix} != ${temp1} ]; then
+			if (echo ${temp1} | grep -q '@'); then
+				temp2=$(echo ${temp1} | cut -d '@' -f 1)
+				host=$(echo ${temp1} | cut -d '@' -f 2)
 
-                if [ ${temp2} != ${host} ] ; then
-                    priority=${temp2}
-                fi
+				if [ ${temp2} != ${host} ]; then
+					priority=${temp2}
+				fi
 
-                port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+				port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
 
-                if ( echo ${host} | grep -E -q '\[.*\]' ) ; then
-                    if ( echo ${port} | grep -q ']' ) ; then
-                        port=''
-                    else
-                        host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
-                    fi
-                else
-                    if [ ${port} = ${host} ] ; then
-                        port=''
-                    else
-                        host=$(echo ${host} | cut -d ':' -f 1)
-                    fi
-                fi
-            else
-                priority=${temp1}
-            fi
-        fi
+				if (echo ${host} | grep -E -q '\[.*\]'); then
+					if (echo ${port} | grep -q ']'); then
+						port=''
+					else
+						host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+					fi
+				else
+					if [ ${port} = ${host} ]; then
+						port=''
+					else
+						host=$(echo ${host} | cut -d ':' -f 1)
+					fi
+				fi
+			else
+				priority=${temp1}
+			fi
+		fi
 
-        message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
+		message="${prefix} ${status} on ${host} at ${date}: ${chart} ${value_string}"
 
-        if [ ${host} ] ; then
-            logger_options="${logger_options} -n ${host}"
-            if [ ${port} ] ; then
-                logger_options="${logger_options} -P ${port}"
-            fi
-        fi
+		if [ ${host} ]; then
+			logger_options="${logger_options} -n ${host}"
+			if [ ${port} ]; then
+				logger_options="${logger_options} -P ${port}"
+			fi
+		fi
 
-        ${logger} -p ${priority} ${logger_options} "${message}"
-    done
+		${logger} -p ${priority} ${logger_options} "${message}"
+	done
 
-    return $?
+	return $?
 }
-
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
-urlencode "${args_host}" >/dev/null; url_host="${REPLY}"
-urlencode "${chart}" >/dev/null; url_chart="${REPLY}"
-urlencode "${family}" >/dev/null; url_family="${REPLY}"
-urlencode "${name}" >/dev/null; url_name="${REPLY}"
+urlencode "${args_host}" >/dev/null
+url_host="${REPLY}"
+urlencode "${chart}" >/dev/null
+url_chart="${REPLY}"
+urlencode "${family}" >/dev/null
+url_family="${REPLY}"
+urlencode "${name}" >/dev/null
+url_name="${REPLY}"
 
 redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
 GOTOCLOUD=0
 
-if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ] ; then
-   if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
-      if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
-         NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
-      fi
-   fi
-   if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
-      GOTOCLOUD=1
-   fi
+if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
+	if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
+		if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
+			NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
+		fi
+	fi
+	if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
+		GOTOCLOUD=1
+	fi
 fi
 
-if [ ${GOTOCLOUD} -eq 0 ] ; then
+if [ ${GOTOCLOUD} -eq 0 ]; then
 	goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
 	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
@@ -1834,8 +1760,10 @@ fi
 severity="${status}"
 
 # the time the alarm was raised
-duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
-duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
+duration4human ${duration} >/dev/null
+duration_txt="${REPLY}"
+duration4human ${non_clear_duration} >/dev/null
+non_clear_duration_txt="${REPLY}"
 raised_for="(was ${old_status,,} for ${duration_txt})"
 
 # the key status message
@@ -1852,63 +1780,57 @@ image="${images_base_url}/images/banner-icon-144x144.png"
 
 # prepare the title based on status
 case "${status}" in
-	CRITICAL)
-        image="${images_base_url}/images/alert-128-red.png"
-        status_message="is critical"
-        color="#ca414b"
-        ;;
+CRITICAL)
+	image="${images_base_url}/images/alert-128-red.png"
+	status_message="is critical"
+	color="#ca414b"
+	;;
 
-    WARNING)
-        image="${images_base_url}/images/alert-128-orange.png"
-        status_message="needs attention"
-        color="#ffc107"
-		;;
+WARNING)
+	image="${images_base_url}/images/alert-128-orange.png"
+	status_message="needs attention"
+	color="#ffc107"
+	;;
 
-	CLEAR)
-        image="${images_base_url}/images/check-mark-2-128-green.png"
-    	status_message="recovered"
-		color="#77ca6d"
-		;;
+CLEAR)
+	image="${images_base_url}/images/check-mark-2-128-green.png"
+	status_message="recovered"
+	color="#77ca6d"
+	;;
 esac
 
-if [ "${status}" = "CLEAR" ]
-then
-    severity="Recovered from ${old_status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
-    then
-        raised_for="(alarm was raised for ${non_clear_duration_txt})"
-    fi
+if [ "${status}" = "CLEAR" ]; then
+	severity="Recovered from ${old_status}"
+	if [ ${non_clear_duration} -gt ${duration} ]; then
+		raised_for="(alarm was raised for ${non_clear_duration_txt})"
+	fi
 
-    # don't show the value when the status is CLEAR
-    # for certain alarms, this value might not have any meaning
-    alarm="${name//_/ } ${raised_for}"
+	# don't show the value when the status is CLEAR
+	# for certain alarms, this value might not have any meaning
+	alarm="${name//_/ } ${raised_for}"
 
-elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
-then
-    severity="Escalated to ${status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
-    then
-        raised_for="(alarm is raised for ${non_clear_duration_txt})"
-    fi
+elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
+	severity="Escalated to ${status}"
+	if [ ${non_clear_duration} -gt ${duration} ]; then
+		raised_for="(alarm is raised for ${non_clear_duration_txt})"
+	fi
 
-elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
-then
-    severity="Demoted to ${status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
-    then
-        raised_for="(alarm is raised for ${non_clear_duration_txt})"
-    fi
+elif { [ "${old_status}" = "CRITICAL" ] && [ "${status}" = "WARNING" ]; }; then
+	severity="Demoted to ${status}"
+	if [ ${non_clear_duration} -gt ${duration} ]; then
+		raised_for="(alarm is raised for ${non_clear_duration_txt})"
+	fi
 
 else
-    raised_for=
+	raised_for=
 fi
 
 # prepare HTML versions of elements
 info_html=
-[ ! -z "${info}" ] && info_html=" <small><br/>${info}</small>"
+[ -n "${info}" ] && info_html=" <small><br/>${info}</small>"
 
 raised_for_html=
-[ ! -z "${raised_for}" ] && raised_for_html="<br/><small>${raised_for}</small>"
+[ -n "${raised_for}" ] && raised_for_html="<br/><small>${raised_for}</small>"
 
 # -----------------------------------------------------------------------------
 # send the slack notification
@@ -1982,11 +1904,11 @@ SENT_PUSHOVER=$?
 # -----------------------------------------------------------------------------
 # send the pushbullet notification
 
-send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
-Severity: ${severity}\n
-Chart: ${chart}\n
-Family: ${family}\n
-$(date -d @${when})\n
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\\n
+Severity: ${severity}\\n
+Chart: ${chart}\\n
+Family: ${family}\\n
+$(date -d @${when})\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
@@ -2013,7 +1935,6 @@ ${info}"
 
 SENT_MESSAGEBIRD=$?
 
-
 # -----------------------------------------------------------------------------
 # send the kavenegar SMS
 
@@ -2024,7 +1945,6 @@ Family: ${family}
 ${info}"
 
 SENT_KAVENEGAR=$?
-
 
 # -----------------------------------------------------------------------------
 # send the telegram.org message
@@ -2037,13 +1957,11 @@ ${chart} (${family})
 
 SENT_TELEGRAM=$?
 
-
 # -----------------------------------------------------------------------------
 # send the kafka message
 
 send_kafka
 SENT_KAFKA=$?
-
 
 # -----------------------------------------------------------------------------
 # send the pagerduty.com message
@@ -2078,19 +1996,18 @@ SENT_IRC=$?
 # send the custom message
 
 send_custom() {
-    # is it enabled?
-    [ "${SEND_CUSTOM}" != "YES" ] && return 1
+	# is it enabled?
+	[ "${SEND_CUSTOM}" != "YES" ] && return 1
 
-    # do we have any sender?
-    [ -z "${1}" ] && return 1
+	# do we have any sender?
+	[ -z "${1}" ] && return 1
 
-    # call the custom_sender function
-    custom_sender "${@}"
+	# call the custom_sender function
+	custom_sender "${@}"
 }
 
 send_custom "${to_custom}"
 SENT_CUSTOM=$?
-
 
 # -----------------------------------------------------------------------------
 # send hipchat message
@@ -2106,22 +2023,19 @@ ${host} ${status_message}<br/> \
 
 SENT_HIPCHAT=$?
 
-
 # -----------------------------------------------------------------------------
 # send the Amazon SNS message
 
-send_awssns ${to_awssns}
+send_awssns "${to_awssns}"
 
 SENT_AWSSNS=$?
-
 
 # -----------------------------------------------------------------------------
 # send the syslog message
 
-send_syslog ${to_syslog}
+send_syslog "${to_syslog}"
 
 SENT_SYSLOG=$?
-
 
 # -----------------------------------------------------------------------------
 # send the email
@@ -2271,34 +2185,32 @@ SENT_EMAIL=$?
 
 # -----------------------------------------------------------------------------
 # let netdata know
-
-if [   ${SENT_EMAIL}        -eq 0 \
-    -o ${SENT_PUSHOVER}     -eq 0 \
-    -o ${SENT_TELEGRAM}     -eq 0 \
-    -o ${SENT_SLACK}        -eq 0 \
-    -o ${SENT_MSTEAM}       -eq 0 \
-    -o ${SENT_ROCKETCHAT}   -eq 0 \
-    -o ${SENT_ALERTA}       -eq 0 \
-    -o ${SENT_FLOCK}        -eq 0 \
-    -o ${SENT_DISCORD}      -eq 0 \
-    -o ${SENT_TWILIO}       -eq 0 \
-    -o ${SENT_HIPCHAT}      -eq 0 \
-    -o ${SENT_MESSAGEBIRD}  -eq 0 \
-    -o ${SENT_KAVENEGAR}    -eq 0 \
-    -o ${SENT_PUSHBULLET}   -eq 0 \
-    -o ${SENT_KAFKA}        -eq 0 \
-    -o ${SENT_PD}           -eq 0 \
-    -o ${SENT_FLEEP}        -eq 0 \
-    -o ${SENT_PROWL}        -eq 0 \
-    -o ${SENT_IRC}          -eq 0 \
-    -o ${SENT_AWSSNS}       -eq 0 \
-    -o ${SENT_CUSTOM}       -eq 0 \
-    -o ${SENT_SYSLOG}       -eq 0 \
-    ]
-    then
-    # we did send something
-    exit 0
-fi
-
+for state in "${SENT_EMAIL}" \
+	"${SENT_PUSHOVER}" \
+	"${SENT_TELEGRAM}" \
+	"${SENT_SLACK}" \
+	"${SENT_ROCKETCHAT}" \
+	"${SENT_ALERTA}" \
+	"${SENT_FLOCK}" \
+	"${SENT_DISCORD}" \
+	"${SENT_TWILIO}" \
+	"${SENT_HIPCHAT}" \
+	"${SENT_MESSAGEBIRD}" \
+	"${SENT_KAVENEGAR}" \
+	"${SENT_PUSHBULLET}" \
+	"${SENT_KAFKA}" \
+	"${SENT_PD}" \
+	"${SENT_FLEEP}" \
+	"${SENT_PROWL}" \
+	"${SENT_CUSTOM}" \
+	"${SENT_IRC}" \
+	"${SENT_AWSSNS}" \
+	"${SENT_SYSLOG}" \
+	"${SENT_MSTEAM}"; do
+	if [ "${state}" -eq 0 ]; then
+		# we sent something
+		exit 0
+	fi
+done
 # we did not send anything
 exit 1
