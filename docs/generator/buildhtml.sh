@@ -84,7 +84,7 @@ prep_html() {
 	# Fix edit buttons for the markdowns that are not on the main netdata repo
 	find "${GENERATOR_DIR}/${SITE_DIR}/${GO_D_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
 	if [ "${lang}" != "en" ] ; then
-		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master/https:\/\/github.com\/netdata\/localization\/blob\/master\/'"${lang}"'/g'
+		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
 	fi
 }
 
