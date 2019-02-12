@@ -111,7 +111,7 @@ debug() {
 
 docurl() {
 	if [ -z "${curl}" ]; then
-		error '${curl} is unset.'
+		error "${curl} is unset."
 		return 1
 	fi
 
@@ -216,7 +216,8 @@ else
 	units="${17}"              # the units of the value
 	info="${18}"               # a short description of the alarm
 	value_string="${19}"       # friendly value (with units)
-	# shellcheck disable=SC2034 variable is unused, but https://github.com/netdata/netdata/pull/5164#discussion_r255572947
+	# shellcheck disable=SC2034
+	# variable is unused, but https://github.com/netdata/netdata/pull/5164#discussion_r255572947
 	old_value_string="${20}"   # friendly old value (with units), previously named "old_value_string"
 	calc_expression="${21}"    # contains the expression that was evaluated to trigger the alarm
 	calc_param_values="${22}"  # the values of the parameters in the expression, at the time of the evaluation
