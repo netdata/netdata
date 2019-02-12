@@ -16,7 +16,6 @@ dist_libconfig_DATA = \
 dist_plugins_SCRIPTS = \
     charts.d.dryrun-helper.sh \
     charts.d.plugin \
-    loopsleepms.sh.inc \
     $(NULL)
 
 dist_noinst_DATA = \

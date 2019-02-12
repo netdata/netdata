@@ -153,15 +153,14 @@ esac
 # -----------------------------------------------------------------------------
 # default sleep function
 
+[ -z "$BASH_LOADABLES_PATH" ] &&
+  BASH_LOADABLES_PATH=$(pkg-config bash --variable=loadablesdir 2>/dev/null)  
+enable -f sleep sleep
+
 LOOPSLEEPMS_LASTWORK=0
 loopsleepms() {
 	sleep "$1"
 }
-
-# if found and included, this file overwrites loopsleepms()
-# with a high resolution timer function for precise looping.
-#shellcheck source=/dev/null
-. "${plugins_dir}/loopsleepms.sh.inc"
 
 # -----------------------------------------------------------------------------
 # final checks we can run

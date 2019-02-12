@@ -219,11 +219,12 @@ current_time_ms="current_time_ms_default"
 current_time_ms_accuracy=1
 mysleep="sleep"
 
-# if found and included, this file overwrites loopsleepms()
-# and current_time_ms() with a high resolution timer function
-# for precise looping.
-source "$pluginsd/loopsleepms.sh.inc"
-[ $? -ne 0 ] && error "Failed to load '$pluginsd/loopsleepms.sh.inc'."
+[ -z "$BASH_LOADABLES_PATH" ] &&
+  BASH_LOADABLES_PATH=$(pkg-config bash --variable=loadablesdir 2>/dev/null)  
+enable -f sleep sleep
+loopsleepms() {
+	sleep "$1"
+}
 
 # -----------------------------------------------------------------------------
 # load my configuration
