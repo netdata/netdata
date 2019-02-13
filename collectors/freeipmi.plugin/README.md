@@ -68,6 +68,12 @@ The plugin supports a few options. To see them, run:
   password PASS           connect to remote IPMI host
                           default: local IPMI processor
 
+  driver-type IPMIDRIVER
+                          Specify the driver type to use instead of doing an auto selection. 
+                          The currently available outofband drivers are LAN and  LAN_2_0,
+                          which  perform  IPMI  1.5  and  IPMI  2.0 respectively. 
+                          The currently available inband drivers are KCS, SSIF, OPENIPMI and SUNBMC.
+
   sdr-cache-dir PATH      directory for SDR cache files
                           default: /tmp
 
