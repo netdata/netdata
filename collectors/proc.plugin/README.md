@@ -250,6 +250,73 @@ each state.
 
 `schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
 
+## Monitoring Network Interfaces
+
+### Monitored network interface metrics
+
+- Physical Network Interfaces Aggregated Bandwidth (kilobits/s)
+  The amount of data received and sent through all physical interfaces in the system. This is the source of data for the Net Inbound and Net Outbound dials in the System Overview section.
+
+- Bandwidth (kilobits/s)
+  The amount of data received and sent through the interface.
+- Packets (packets/s)
+  The number of packets received, packets sent, and multicast packets transmitted through the interface.
+
+- Interface Errors (errors/s)
+  The number of errors for the inbound and outbound traffic on the interface.
+- Interface Drops (drops/s)
+  The number of packets dropped for the inbound and outbound traffic on the interface.
+- Interface FIFO Buffer Errors (errors/s)
+  The number of FIFO buffer errors encountered while receiving and transmitting data through the interface.
+- Compressed Packets (packets/s)
+  The number of compressed packets transmitted or received by the device driver.
+- Network Interface Events (events/s)
+  The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
+
+By default netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
+
+#### alarms
+
+There are several alarms defined in `health.d/net.conf`.
+
+The tricky ones are `inbound packets dropped` and `inbound_packets_dropped_ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](../../health/#alarm-line-families) line in the alarm configuration.
+
+#### configuration
+
+Module configuration:
+
+```
+[plugin:proc:/proc/net/dev]
+  # filename to monitor = /proc/net/dev
+  # path to get virtual interfaces = /sys/devices/virtual/net/%s
+  # path to get net device speed = /sys/class/net/%s/speed
+  # enable new interfaces detected at runtime = auto
+  # bandwidth for all interfaces = auto
+  # packets for all interfaces = auto
+  # errors for all interfaces = auto
+  # drops for all interfaces = auto
+  # fifo for all interfaces = auto
+  # compressed packets for all interfaces = auto
+  # frames, collisions, carrier counters for all interfaces = auto
+  # disable by default interfaces matching = lo fireqos* *-ifb
+  # refresh interface speed every seconds = 10
+```
+
+Per interface configuration:
+
+```
+[plugin:proc:/proc/net/dev:enp0s3]
+  # enabled = yes
+  # virtual = no
+  # bandwidth = auto
+  # packets = auto
+  # errors = auto
+  # drops = auto
+  # fifo = auto
+  # compressed = auto
+  # events = auto
+```
+
 ## Linux Anti-DDoS
 
 ![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)
