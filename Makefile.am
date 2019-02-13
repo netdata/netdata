@@ -221,7 +221,7 @@ CUPS_PLUGIN_FILES = \
 
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
-	collectors/nfacct.plugin/plugin_nfacct.h \
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
@@ -449,7 +449,6 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(NFACCT_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -467,7 +466,6 @@ sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
 
 if ENABLE_PLUGIN_APPS
@@ -502,5 +500,14 @@ if ENABLE_PLUGIN_CUPS
     cups_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_CUPS_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_NFACCT
+    plugins_PROGRAMS += nfacct.plugin
+    nfacct_plugin_SOURCES = $(NFACCT_PLUGIN_FILES)
+    nfacct_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_NFACCT_LIBS) \
         $(NULL)
 endif

@@ -167,7 +167,6 @@ navpart 3 collectors/statsd.plugin
 navpart 3 collectors/cgroups.plugin
 navpart 3 collectors/idlejitter.plugin
 navpart 3 collectors/tc.plugin
-navpart 3 collectors/nfacct.plugin
 navpart 3 collectors/checks.plugin
 navpart 3 collectors/diskspace.plugin
 navpart 3 collectors/freebsd.plugin
@@ -219,6 +218,7 @@ echo -ne "        - BASH:
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/cups.plugin
+navpart 3 collectors/nfacct.plugin
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "

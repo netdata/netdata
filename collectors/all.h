@@ -12,7 +12,6 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
-#include "nfacct.plugin/plugin_nfacct.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -287,9 +286,6 @@
 #define NETDATA_CHART_PRIO_NETFILTER_EXPECT           8703
 #define NETDATA_CHART_PRIO_NETFILTER_ERRORS           8705
 #define NETDATA_CHART_PRIO_NETFILTER_SEARCH           8710
-
-#define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
-#define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
 
 // SYNPROXY
 

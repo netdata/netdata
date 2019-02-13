@@ -13,7 +13,7 @@ To minimize the number of processes spawn for data collection, netdata also supp
    Instead they support data collection **modules** written in the language of the orchestrator.
    Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
    data collection modules with the minimum of code.
-   
+
    Currently netdata provides plugin orchestrators
    BASH v4+ [charts.d.plugin](charts.d.plugin/),
    node.js [node.d.plugin](node.d.plugin/) and
@@ -34,7 +34,7 @@ plugin|lang|O/S|runs as|modular|description
 [freeipmi.plugin](freeipmi.plugin/)|`C`|linux, freebsd|external|-|collects metrics from enterprise hardware sensors, on Linux and FreeBSD servers.
 [idlejitter.plugin](idlejitter.plugin/)|`C`|any|internal|-|measures CPU latency and jitter on all operating systems
 [macos.plugin](macos.plugin/)|`C`|macos|internal|yes|collects resource usage and performance data on MacOS systems
-[nfacct.plugin](nfacct.plugin/)|`C`|linux|internal|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
+[nfacct.plugin](nfacct.plugin/)|`C`|linux|external|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
 [node.d.plugin](node.d.plugin/)|`node.js`|any|external|yes|a **plugin orchestrator** for data collection modules written in `node.js`.
 [plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins
 [proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems
@@ -46,7 +46,7 @@ plugin|lang|O/S|runs as|modular|description
 
 Each plugin can be enabled or disabled via `netdata.conf`, section `[plugins]`.
 
-At this section there a list of all the plugins with a boolean setting to enable them or disable them. 
+At this section there a list of all the plugins with a boolean setting to enable them or disable them.
 
 The exception is `statsd.plugin` that has its own `[statsd]` section.
 
@@ -66,14 +66,14 @@ The internal data collection API consists of the following calls:
 ```c
 collect_data() {
     // collect data here (one iteration)
-    
+
     collected_number collected_value = collect_a_value();
-    
+
     // give the metrics to netdata
-    
+
     static RRDSET *st = NULL; // the chart
     static RRDDIM *rd = NULL; // a dimension attached to this chart
-    
+
     if(unlikely(!st)) {
         // we haven't created this chart before
         // create it now
@@ -100,10 +100,10 @@ collect_data() {
         // let netdata know we start a new iteration on it
         rrdset_next(st);
     }
-    
+
     // give the collected value(s) to the chart
     rrddim_set_by_pointer(st, rd, collected_value);
-    
+
     // signal netdata we are done with this iteration
     rrdset_done(st);
 }

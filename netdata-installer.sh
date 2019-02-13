@@ -282,7 +282,7 @@ if [ "${UID}" -ne 0 ]; then
 	if [ -z "${NETDATA_PREFIX}" ]; then
 		netdata_banner "wrong command line options!"
 		cat <<NONROOTNOPREFIX
-  
+
   ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
 
   You are attempting to install netdata as non-root, but you plan
@@ -306,7 +306,7 @@ NONROOTNOPREFIX
 
 	else
 		cat <<NONROOT
- 
+
   ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
   You are about to install netdata as a non-root user.
   Netdata will work, but a few data collection modules that
@@ -760,6 +760,11 @@ if [ ${UID} -eq 0 ]; then
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
 	fi
 
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin" ]; then
+        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+    fi
+
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
 		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -1007,7 +1012,7 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 				rm -f "${crondir}/netdata-updater.sh"
 			fi
 			progress "Installing new netdata-updater in cron"
-	
+
 			rm ${installer_dir}/netdata-updater.sh || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
 
 			rm -f "${crondir}/netdata-updater"
