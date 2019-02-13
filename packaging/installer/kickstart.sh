@@ -218,7 +218,7 @@ EOF
 
 # Check if tmp is mounted as noexec
 if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-	pattern="/opt/netdata-kickstart-XXXXXX"
+	pattern="$(pwd)/netdata-kickstart-XXXXXX"
 else
 	pattern="/tmp/netdata-kickstart-XXXXXX"
 fi
