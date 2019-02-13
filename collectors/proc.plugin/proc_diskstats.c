@@ -180,6 +180,8 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
                 return (unsigned long long int)(value * 1024.0 * 1024.0);
             else if(*end == 'G')
                 return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0);
+            else if(*end == 'T')
+                return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0 * 1024.0);
             else if(unknown_units_error > 0) {
                 error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
                 unknown_units_error--;
