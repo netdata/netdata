@@ -406,7 +406,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     char action_data[70+1];
 	snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
 	char action_result[60+1];
-	snprintfz(action_result, 60, "%s:%s",program_name, netdata_thread_tag());
+	snprintfz(action_result, 60, "%s:%s",program_name, strcmp(program_name,"STREAM_RECEIVER")?netdata_thread_tag():"[x]");
 	send_statistics("FATAL", action_result, action_data);
 
     netdata_cleanup_and_exit(1);
