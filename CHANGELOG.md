@@ -10,17 +10,25 @@
 - cups.plugin fails to be compiled [\#5324](https://github.com/netdata/netdata/issues/5324)
 - Codacy is unconfigured [\#5320](https://github.com/netdata/netdata/issues/5320)
 - netdata-installer.sh fails to detect netdata is restarted [\#5304](https://github.com/netdata/netdata/issues/5304)
+- bcache writeback\_rate unknown units [\#4719](https://github.com/netdata/netdata/issues/4719)
+- Split NFACCT handling to a dedicated helper program. [\#3749](https://github.com/netdata/netdata/issues/3749)
+- Don't send host/port in to anonymous stats in fatal of STREAM\_RECEIVER [\#5378](https://github.com/netdata/netdata/pull/5378) ([cakrit](https://github.com/cakrit))
 
 **Closed issues:**
 
+- charts.d plugin -- decimal values? [\#5382](https://github.com/netdata/netdata/issues/5382)
 - Alert alarm flapping [\#5346](https://github.com/netdata/netdata/issues/5346)
+- Localization of HTML Docs [\#5197](https://github.com/netdata/netdata/issues/5197)
 - move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
 - Fluentd monitoring [\#4847](https://github.com/netdata/netdata/issues/4847)
 - Feature request: ability to process detailed `ipcs -q` output [\#1890](https://github.com/netdata/netdata/issues/1890)
 
 **Merged pull requests:**
 
+- Correct Installation link in updating doc [\#5380](https://github.com/netdata/netdata/pull/5380) ([cakrit](https://github.com/cakrit))
+- Add support of tera-byte size for Linux bcache. [\#5373](https://github.com/netdata/netdata/pull/5373) ([kamcpp](https://github.com/kamcpp))
 - Added missing BuildRequires for autoconf, automake [\#5363](https://github.com/netdata/netdata/pull/5363) ([johnhomelan](https://github.com/johnhomelan))
+- Split nfacct plugin into separate process [\#5361](https://github.com/netdata/netdata/pull/5361) ([vlvkobal](https://github.com/vlvkobal))
 - fix: wget log spam in headless mode \(fixes \#5356\) [\#5359](https://github.com/netdata/netdata/pull/5359) ([mkg20001](https://github.com/mkg20001))
 - Fix replacement of whitespace for versions retrieved from github [\#5355](https://github.com/netdata/netdata/pull/5355) ([cakrit](https://github.com/cakrit))
 - fix warning condition for mem.available [\#5353](https://github.com/netdata/netdata/pull/5353) ([cakrit](https://github.com/cakrit))
@@ -28,8 +36,10 @@
 - fix AC\_CHECK\_LIB to work correctly with cups library [\#5349](https://github.com/netdata/netdata/pull/5349) ([mfundul](https://github.com/mfundul))
 - Add link to writing a new module in example readme [\#5348](https://github.com/netdata/netdata/pull/5348) ([cakrit](https://github.com/cakrit))
 - Provide more precise uninstall instructions [\#5347](https://github.com/netdata/netdata/pull/5347) ([cakrit](https://github.com/cakrit))
+- Localization support in HTML docs, simplification of checklinks.sh [\#5342](https://github.com/netdata/netdata/pull/5342) ([cakrit](https://github.com/cakrit))
 - Fix cgroups Codacy issue [\#5340](https://github.com/netdata/netdata/pull/5340) ([vlvkobal](https://github.com/vlvkobal))
 - Fix FreeBSD plugin Codacy issues [\#5338](https://github.com/netdata/netdata/pull/5338) ([vlvkobal](https://github.com/vlvkobal))
+- cleanup updater script and no `/opt` usage [\#5218](https://github.com/netdata/netdata/pull/5218) ([paulfantom](https://github.com/paulfantom))
 - Add go.d documentation [\#5215](https://github.com/netdata/netdata/pull/5215) ([cakrit](https://github.com/cakrit))
 - Add cgroup cpu and memory limits and alarms [\#5172](https://github.com/netdata/netdata/pull/5172) ([vlvkobal](https://github.com/vlvkobal))
 - Add message queue statistics [\#5115](https://github.com/netdata/netdata/pull/5115) ([vlvkobal](https://github.com/vlvkobal))
