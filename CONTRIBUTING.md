@@ -21,6 +21,10 @@ Community growth allows the project to attract new talent willing to contribute.
 
 Is there anything that bothers you about netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue](https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
 
+### Translate some documentation
+
+The [netdata localization project](https://github.com/netdata/localization) contains instructions on how to provide translations for parts of our documentation. Translating the entire documentation is a daunting task, but you can contribute as much as you like, even a single file. The Chinese translation effort has already begun and we are looking forward to more contributions.
+
 ### Sponsor a part of Netdata
 
 Netdata is a complex system, with many integrations for the various  collectors, backends and notification endpoints. As a result, we rely on help from "sponsors", a concept similar to "power users" or "product owners". To become a sponsor, just let us know in any Github issue and we will record your GitHub username in a "CONTRIBUTORS.md" in the appropriate directory.

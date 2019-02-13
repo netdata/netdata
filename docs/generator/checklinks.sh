@@ -36,72 +36,6 @@ fix () {
 	fi
 }
 
-ck_netdata_absolute () {
-	f=$1
-	alnk=$2
-	lnkinfile=$3
-	testURL "$alnk"
-
-	if [[ $f =~ ^(.*)/([^/]*)$ ]] ; then
-		fpath="${BASH_REMATCH[1]}"
-		dbg "-- Current file is at $fpath"
-	fi
-
-	if [ $? -eq 0 ] ; then 
-		rlnk=$(echo "$alnk" | sed 's/https:\/\/github.com\/netdata\/netdata\/....\/master\///g')
-		case $rlnk in
-			\#* ) dbg "-- (#somelink)" ;;
-			*/ ) dbg "-- # (path/)" ;;
-			*/#* ) dbg "-- # (path/#somelink)" ;;
-			*/*.md ) dbg "-- # (path/filename.md)" ;;
-			*/*.md#* ) dbg "-- # (path/filename.md#somelink)" ;;
-			*#* ) 
-				dbg "-- # (path#somelink) -> (path/#somelink)" 
-				if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
-					dbg "-- $rlnk -> ${BASH_REMATCH[1]}/#${BASH_REMATCH[2]}"
-					rlnk="${BASH_REMATCH[1]}/#${BASH_REMATCH[2]}"
-				fi
-				;;		
-			* )
-				if [ -f "$rlnk" ] ; then
-					dbg "-- # (path/someotherfile) $rlnk"
-				else
-					if [ -d "$rlnk" ] ; then
-						dbg "-- # (path) -> (path/)"
-						rlnk="$rlnk/"
-					else
-						echo "-- ERROR: $f - $alnk is neither a file nor a directory. Giving up!"
-						EXITCODE=1
-						return
-					fi
-				fi
-				;;
-		esac
-
-		if [[ $rlnk =~ ^(.*)/([^/]*)$ ]] ; then
-			abspath="${BASH_REMATCH[1]}"
-			rest="${BASH_REMATCH[2]}"
-			dbg "-- Target file is at $abspath"
-		fi
-		relativelink=$(realpath --relative-to="$fpath" "$abspath")
-		if [ $? -eq 0 ] ; then
-			srch=$(echo "$lnkinfile" | sed 's/\//\\\//g')
-			if [ "$relativelink" = "." ] ; then
-				rplc=$(echo "$rest" | sed 's/\//\\\//g')
-			else
-				rplc=$(echo "$relativelink/$rest" | sed 's/\//\\\//g')
-			fi
-			fix "sed -i 's/($srch)/($rplc)/g' $f"
-		else
-			echo "-- ERROR: $f - Can't determine relative path of $alnk" 
-		fi
-	else
-		echo "-- ERROR: $f - $alnk is a broken link"
-		EXITCODE=1
-		return
-	fi
-}
-
 testURL () {
 	if [ "$TESTURLS" -eq 0 ] ; then return 0 ; fi
 	dbg "-- Testing URL $1"
@@ -278,7 +212,7 @@ ck_netdata_relative () {
 		if [[ ! -z $s ]] ; then
 			srch=$(echo "$rlnk" | sed 's/\//\\\//g')
 			rplc=$(echo "$s" | sed 's/\//\\\//g')
-			fix "sed -i 's/($srch)/($rplc)/g' $GENERATOR_DIR/src/$f"
+			fix "sed -i 's/($srch)/($rplc)/g' $GENERATOR_DIR/doc/$f"
 		fi
 }
 
@@ -299,8 +233,8 @@ checklinks () {
 						if [ "$CHKWIKI" -eq 1 ] ; then echo "-- WARNING: $f - $lnk points to the wiki. Please replace it manually" ; fi
 					;;
 					https://github.com/netdata/netdata/????/master* )
-						dbg "-- Absolute link $lnk"
-						if [ "$CHKABSOLUTE" -eq 1 ] ; then ck_netdata_absolute "$f" "$lnk" "$lnk" ; fi
+						echo "-- ERROR: $f - $lnk is an absolute link to a netdata file. Please convert to relative."
+						EXITCODE=1
 					;;
 					http* ) 
 						dbg "-- External link $lnk"
