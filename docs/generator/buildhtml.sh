@@ -13,27 +13,27 @@ if [ "$currentdir" = "generator" ]; then
 	cd ../..
 fi
 GENERATOR_DIR="docs/generator"
-
+SRC_DIR="${GENERATOR_DIR}/src"
 # Fetch go.d.plugin docs
-rm -rf ./collectors/go.d.plugin
-git clone https://github.com/netdata/go.d.plugin.git ./collectors/go.d.plugin
+GO_D_DIR="collectors/go.d.plugin"
+rm -rf ${GO_D_DIR}
+git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
 
 # Copy all netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
-rm -rf ${GENERATOR_DIR}/src
-find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${GENERATOR_DIR}/src
+rm -rf ${SRC_DIR}
+find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${SRC_DIR}
 
 # Copy netdata html resources
-cp -a ./${GENERATOR_DIR}/custom ./${GENERATOR_DIR}/src/
-
+cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i -e '0,/# netdata /s//# Introduction\n\n/' ${GENERATOR_DIR}/src/README.md
+sed -i -e '0,/# netdata /s//# Introduction\n\n/' ${SRC_DIR}/README.md
 
 # Remove all GA tracking code
-find ${GENERATOR_DIR}/src -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
+find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
 
 # Remove specific files that don't belong in the documentation
 declare -a EXCLUDE_LIST=(
@@ -43,28 +43,62 @@ declare -a EXCLUDE_LIST=(
 )
 
 for f in "${EXCLUDE_LIST[@]}"; do
-	rm "${GENERATOR_DIR}/src/$f"
+	rm "${SRC_DIR}/$f"
 done
 
-echo "Creating mkdocs.yaml"
+echo "Fetching localization project"
+LOC_DIR=${GENERATOR_DIR}/localization
+rm -rf ${LOC_DIR}
+git clone https://github.com/netdata/localization.git ${LOC_DIR}
 
-# Generate mkdocs.yaml
-${GENERATOR_DIR}/buildyaml.sh >${GENERATOR_DIR}/mkdocs.yml
+echo "Preparing directories"
+MKDOCS_CONFIG_FILE="${GENERATOR_DIR}/mkdocs.yml"
+MKDOCS_DIR="doc"
+DOCS_DIR=${GENERATOR_DIR}/${MKDOCS_DIR}
+rm -rf ${DOCS_DIR}
+mkdir ${DOCS_DIR}
 
-echo "Fixing links"
+prep_html() {
+	lang="${1}"
+	echo "Creating ${lang} mkdocs.yaml"
 
-# Fix links (recursively, all types, executing replacements)
-${GENERATOR_DIR}/checklinks.sh -rax
+	if [ "${lang}" = "en" ] ; then
+		SITE_DIR="build"
+	else
+		SITE_DIR="build/${lang}"
+	fi
 
-echo "Calling mkdocs"
+	# Generate mkdocs.yaml
+	${GENERATOR_DIR}/buildyaml.sh ${MKDOCS_DIR} ${SITE_DIR} ${lang}>${MKDOCS_CONFIG_FILE}
 
-# Build html docs
-mkdocs build --config-file=${GENERATOR_DIR}/mkdocs.yml
+	echo "Fixing links"
 
-# Fix edit buttons for the markdowns that are not on the main netdata repo
-find ${GENERATOR_DIR}/build/collectors/go.d.plugin -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
+	# Fix links (recursively, all types, executing replacements)
+	${GENERATOR_DIR}/checklinks.sh -rax
 
-# Remove the cloned go.d.plugin project
-rm -rf ./collectors/go.d.plugin
+	echo "Calling mkdocs"
+
+	# Build html docs
+	mkdocs build --config-file="${MKDOCS_CONFIG_FILE}"
+
+	# Fix edit buttons for the markdowns that are not on the main netdata repo
+	find "${GENERATOR_DIR}/${SITE_DIR}/${GO_D_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
+	if [ "${lang}" != "en" ] ; then
+		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
+	fi
+}
+
+for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
+	echo "Preparing source for $d"
+	cp -a ${SRC_DIR}/* ${DOCS_DIR}/
+	if [ "${d}" != "en" ] ; then
+		cp -a ${LOC_DIR}/${d}/* ${DOCS_DIR}/
+	fi
+	prep_html $d
+	rm -rf ${DOCS_DIR}/*
+done
+
+# Remove cloned projects and temp directories
+rm -rf ${GO_D_DIR} ${LOC_DIR} ${DOCS_DIR} ${SRC_DIR}
 
 echo "Finished"

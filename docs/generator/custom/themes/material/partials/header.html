@@ -1,0 +1,107 @@
+<header class="md-header" data-md-component="header">
+  <nav class="md-header-nav md-grid">
+    <div class="md-flex">
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <a href="{{ config.site_url | default(nav.homepage.url, true) | url }}" title="{{ config.site_name }}" class="md-header-nav__button md-logo">
+          {% if config.theme.logo.icon %}
+            <i class="md-icon">{{ config.theme.logo.icon }}</i>
+          {% else %}
+            <img src="{{ config.theme.logo | url }}" width="24" height="24">
+          {% endif %}
+        </a>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer"></label>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch">
+        <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+          {% block site_name %}
+            {% if config.site_name == page.title %}
+              {{ config.site_name }}
+            {% else %}
+              <span class="md-header-nav__topic">
+                {{ config.site_name }}
+              </span>
+              <span class="md-header-nav__topic">
+                {{ page.title }}
+              </span>
+            {% endif %}
+          {% endblock %}
+        </div>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        {% block search_box %}
+          {% if "search" in config["plugins"] %}
+            <label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
+            {% include "partials/search.html" %}
+          {% endif %}
+        {% endblock %}
+      </div>
+
+      <!-- netdata -->
+      <style>
+        .language-selector li {
+          list-style: none;
+        }
+
+        .language-option.selected {
+          background-color: #ccc;
+        }
+      </style>
+      <script>
+        function getLanguage() {
+          const lang = window.location.pathname.split("/")[1];
+
+          if (lang.length == 0 || lang.length > 2) {
+            return "en";
+          }
+
+          return lang;
+        }
+
+        function languagePrefix(lang) {
+          if (lang === "en") {
+            return "";
+          }
+
+          return `/${lang}`;
+        }
+
+        function updatePathname(pathname, lang) {
+          if (currentLang !== "en") {
+            const parts = pathname.split("/");
+            parts.shift();
+            parts.shift();
+            pathname = `/${parts.join("/")}`;
+          }
+
+          return `${languagePrefix(lang)}${pathname}`;
+        }
+
+        function setLanguage(sel) {
+          if (sel.value === currentLang) {
+            return;
+          }
+
+          window.location.pathname = updatePathname(window.location.pathname, sel.value);
+        }
+      </script>
+
+      <div style="vertical-align: middle; white-space: nowrap; padding-left: 20px;" class="md-flex__cell md-flex__cell--shrink">
+        <img src="/custom/img/geography-16.png" style="vertical-align: middle;"/>
+        <select id="sel" onchange="setLanguage(this);" style="vertical-align: middle; background-color: #3f51b5; color: white; border: none;">
+          <option href="#" value='en'>English</option>
+          <option href="#" value='zh'>中文</option>
+        </select>
+      </div>
+
+      {% if config.repo_url %}
+        <div class="md-flex__cell md-flex__cell--shrink">
+          <div class="md-header-nav__source">
+            {% include "partials/source.html" %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </nav>
+</header>
