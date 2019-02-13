@@ -60,7 +60,6 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_MACOS
 
     // linux internal plugins
-    NETDATA_PLUGIN_HOOK_LINUX_NFACCT
     NETDATA_PLUGIN_HOOK_LINUX_PROC
     NETDATA_PLUGIN_HOOK_LINUX_DISKSPACE
     NETDATA_PLUGIN_HOOK_LINUX_CGROUPS
