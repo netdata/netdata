@@ -37,33 +37,33 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 ### Monitored disk metrics
 
-- I/O bandwidth/s (kb/s)
+- **I/O bandwidth/s (kb/s)**
   The amount of data transferred from and to the disk.
-- I/O operations/s
+- **I/O operations/s**
   The number of I/O operations completed.
-- Queued I/O operations
+- **Queued I/O operations**
   The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
-- Backlog size (time in ms)
+- **Backlog size (time in ms)**
   The expected duration of the currently queued I/O operations.
-- Utilization (time percentage)
+- **Utilization (time percentage)**
   The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
   Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
-- Average I/O operation time (ms)
+- **Average I/O operation time (ms)**
   The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
-- Average I/O operation size (kb)
+- **Average I/O operation size (kb)**
   The average amount of data of the completed I/O operations.
-- Average Service Time (ms)
+- **Average Service Time (ms)**
   The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
-- Merged I/O operations/s
+- **Merged I/O operations/s**
   The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
-- Total I/O time
+- **Total I/O time**
   The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
-- Space usage
+- **Space usage**
   For mounted disks, netdata will provide a chart for their space, with 3 dimensions:
   1. free
   2. used
   3. reserved for root
-- inode usage
+- **inode usage**
   For mounted disks, netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
   1. free
   2. used
@@ -249,6 +249,73 @@ each state.
 #### configuration
 
 `schedstat filename to monitor`, `cpuidle name filename to monitor`, and `cpuidle time filename to monitor` in the `[plugin:proc:/proc/stat]` configuration section
+
+## Monitoring Network Interfaces
+
+### Monitored network interface metrics
+
+- **Physical Network Interfaces Aggregated Bandwidth (kilobits/s)**
+  The amount of data received and sent through all physical interfaces in the system. This is the source of data for the Net Inbound and Net Outbound dials in the System Overview section.
+
+- **Bandwidth (kilobits/s)**
+  The amount of data received and sent through the interface.
+- **Packets (packets/s)**
+  The number of packets received, packets sent, and multicast packets transmitted through the interface.
+
+- **Interface Errors (errors/s)**
+  The number of errors for the inbound and outbound traffic on the interface.
+- **Interface Drops (drops/s)**
+  The number of packets dropped for the inbound and outbound traffic on the interface.
+- **Interface FIFO Buffer Errors (errors/s)**
+  The number of FIFO buffer errors encountered while receiving and transmitting data through the interface.
+- **Compressed Packets (packets/s)**
+  The number of compressed packets transmitted or received by the device driver.
+- **Network Interface Events (events/s)**
+  The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
+
+By default netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
+
+#### alarms
+
+There are several alarms defined in `health.d/net.conf`.
+
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alarms can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a slave or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alarm with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](../../health/#alarm-line-families) line in the alarm configuration. For example, if you want to disable the `inbound packets dropped` alarm for `eth0`, set `families: !eth0 *` in the alarm definition for `template: inbound_packets_dropped`.
+
+#### configuration
+
+Module configuration:
+
+```
+[plugin:proc:/proc/net/dev]
+  # filename to monitor = /proc/net/dev
+  # path to get virtual interfaces = /sys/devices/virtual/net/%s
+  # path to get net device speed = /sys/class/net/%s/speed
+  # enable new interfaces detected at runtime = auto
+  # bandwidth for all interfaces = auto
+  # packets for all interfaces = auto
+  # errors for all interfaces = auto
+  # drops for all interfaces = auto
+  # fifo for all interfaces = auto
+  # compressed packets for all interfaces = auto
+  # frames, collisions, carrier counters for all interfaces = auto
+  # disable by default interfaces matching = lo fireqos* *-ifb
+  # refresh interface speed every seconds = 10
+```
+
+Per interface configuration:
+
+```
+[plugin:proc:/proc/net/dev:enp0s3]
+  # enabled = yes
+  # virtual = no
+  # bandwidth = auto
+  # packets = auto
+  # errors = auto
+  # drops = auto
+  # fifo = auto
+  # compressed = auto
+  # events = auto
+```
 
 ## Linux Anti-DDoS
 
