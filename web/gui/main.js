@@ -2740,6 +2740,9 @@ function initializeDynamicDashboardWithData(data) {
 
         // render all charts
         renderChartsAndMenu(data);
+
+        // Ensure MyNetdata menu is rendered with latest host info #5370
+        renderMyNetdataMenu(isSignedIn() ? cloudAgents : registryAgents);
     }
 }
 
