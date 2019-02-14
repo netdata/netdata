@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Race condition in UI may result in streamed hosts not showing when not signed in [\#5370](https://github.com/netdata/netdata/issues/5370)
 - Missing build deps for automake and autoconf from the spec file [\#5362](https://github.com/netdata/netdata/issues/5362)
 - wget command that dowlonad go.d plugin creates lots of output in headless install [\#5356](https://github.com/netdata/netdata/issues/5356)
 - Update checker false positive [\#5352](https://github.com/netdata/netdata/issues/5352)
@@ -16,17 +17,21 @@
 
 **Closed issues:**
 
-- charts.d plugin -- decimal values? [\#5382](https://github.com/netdata/netdata/issues/5382)
+- How to get non average metrics in prometheus [\#5393](https://github.com/netdata/netdata/issues/5393)
 - Alert alarm flapping [\#5346](https://github.com/netdata/netdata/issues/5346)
 - Localization of HTML Docs [\#5197](https://github.com/netdata/netdata/issues/5197)
 - move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
 - Fluentd monitoring [\#4847](https://github.com/netdata/netdata/issues/4847)
+- collect CPU, memory and disk limits from cgroups and provide alarms using thresholds as percentages [\#2401](https://github.com/netdata/netdata/issues/2401)
 - Feature request: ability to process detailed `ipcs -q` output [\#1890](https://github.com/netdata/netdata/issues/1890)
+- Add multi-language support\(such as Chinese\) [\#219](https://github.com/netdata/netdata/issues/219)
 
 **Merged pull requests:**
 
+- Add documentation for network interfaces [\#5381](https://github.com/netdata/netdata/pull/5381) ([vlvkobal](https://github.com/vlvkobal))
 - Correct Installation link in updating doc [\#5380](https://github.com/netdata/netdata/pull/5380) ([cakrit](https://github.com/cakrit))
 - Add support of tera-byte size for Linux bcache. [\#5373](https://github.com/netdata/netdata/pull/5373) ([kamcpp](https://github.com/kamcpp))
+- Render MyNetdata menu after fetching hosts info \#5370 [\#5371](https://github.com/netdata/netdata/pull/5371) ([gmosx](https://github.com/gmosx))
 - Added missing BuildRequires for autoconf, automake [\#5363](https://github.com/netdata/netdata/pull/5363) ([johnhomelan](https://github.com/johnhomelan))
 - Split nfacct plugin into separate process [\#5361](https://github.com/netdata/netdata/pull/5361) ([vlvkobal](https://github.com/vlvkobal))
 - fix: wget log spam in headless mode \(fixes \#5356\) [\#5359](https://github.com/netdata/netdata/pull/5359) ([mkg20001](https://github.com/mkg20001))
