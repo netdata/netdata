@@ -10,36 +10,35 @@ NIGHTLY_PACKAGE_CHECKSUM="https://storage.googleapis.com/netdata-nightlies/sha25
 # library functions copied from packaging/installer/functions.sh
 
 setup_terminal() {
-    TPUT_RESET=""
-    TPUT_YELLOW=""
-    TPUT_WHITE=""
-    TPUT_BGRED=""
-    TPUT_BGGREEN=""
-    TPUT_BOLD=""
-    TPUT_DIM=""
+	TPUT_RESET=""
+	TPUT_YELLOW=""
+	TPUT_WHITE=""
+	TPUT_BGRED=""
+	TPUT_BGGREEN=""
+	TPUT_BOLD=""
+	TPUT_DIM=""
 
-    # Is stderr on the terminal? If not, then fail
-    test -t 2 || return 1
+	# Is stderr on the terminal? If not, then fail
+	test -t 2 || return 1
 
-    if command -v tput >/dev/null 2>&1; then
-        if [ $(( $(tput colors 2>/dev/null) )) -ge 8 ]
-        then
-            # Enable colors
-            TPUT_RESET="$(tput sgr 0)"
-            TPUT_YELLOW="$(tput setaf 3)"
-            TPUT_WHITE="$(tput setaf 7)"
-            TPUT_BGRED="$(tput setab 1)"
-            TPUT_BGGREEN="$(tput setab 2)"
-            TPUT_BOLD="$(tput bold)"
-            TPUT_DIM="$(tput dim)"
-        fi
-    fi
+	if command -v tput >/dev/null 2>&1; then
+		if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
+			# Enable colors
+			TPUT_RESET="$(tput sgr 0)"
+			TPUT_YELLOW="$(tput setaf 3)"
+			TPUT_WHITE="$(tput setaf 7)"
+			TPUT_BGRED="$(tput setab 1)"
+			TPUT_BGGREEN="$(tput setab 2)"
+			TPUT_BOLD="$(tput bold)"
+			TPUT_DIM="$(tput dim)"
+		fi
+	fi
 
-    return 0
+	return 0
 }
 
 progress() {
-    echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
 escaped_print() {
@@ -77,8 +76,8 @@ run() {
 # ---------------------------------------------------------------------------------------------------------------------
 
 fatal() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
-    exit 1
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
 }
 
 download() {
@@ -103,13 +102,11 @@ setup_terminal || echo >/dev/null
 
 # ---------------------------------------------------------------------------------------------------------------------
 
-if [ "$(uname -m)" != "x86_64" ]
-	then
+if [ "$(uname -m)" != "x86_64" ]; then
 	fatal "Static binary versions of netdata are available only for 64bit Intel/AMD CPUs (x86_64), but yours is: $(uname -m)."
 fi
 
-if [ "$(uname -s)" != "Linux" ]
-	then
+if [ "$(uname -s)" != "Linux" ]; then
 	fatal "Static binary versions of netdata are available only for Linux, but this system is $(uname -s)"
 fi
 
@@ -137,19 +134,16 @@ fi
 
 opts=
 inner_opts=
-while [ ! -z "${1}" ]
-do
-    if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]
-    then
-        opts="${opts} --accept"
-    elif [ "${1}" = "--dont-start-it" ]
-    then
-        inner_opts="${inner_opts} ${1}"
-    else
-        echo >&2 "Unknown option '${1}'"
-        exit 1
-    fi
-    shift
+while [ ! -z "${1}" ]; do
+	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
+		opts="${opts} --accept"
+	elif [ "${1}" = "--dont-start-it" ]; then
+		inner_opts="${inner_opts} ${1}"
+	else
+		echo >&2 "Unknown option '${1}'"
+		exit 1
+	fi
+	shift
 done
 [ ! -z "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
@@ -160,8 +154,7 @@ progress "Installing netdata"
 run ${sudo} sh "${tmpdir}/netdata-latest.gz.run" ${opts} ${inner_opts}
 
 #shellcheck disable=SC2181
-if [ $? -eq 0 ]
-	then
+if [ $? -eq 0 ]; then
 	rm "${tmpdir}/netdata-latest.gz.run"
 else
 	echo >&2 "NOTE: did not remove: ${tmpdir}/netdata-latest.gz.run"
