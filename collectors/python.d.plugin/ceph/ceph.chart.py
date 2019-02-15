@@ -161,7 +161,7 @@ class Service(SimpleService):
         :return: None
         """
         # Pool lines
-        for pool in sorted(self._get_df()['pools']):
+        for pool in sorted(self._get_df()['pools'], key=lambda x:sorted(x.keys())):
             self.definitions['pool_usage']['lines'].append([pool['name'],
                                                             pool['name'],
                                                             'absolute'])
@@ -182,7 +182,7 @@ class Service(SimpleService):
                                                                       'absolute'])
 
         # OSD lines
-        for osd in sorted(self._get_osd_df()['nodes']):
+        for osd in sorted(self._get_osd_df()['nodes'], key=lambda x:sorted(x.keys())):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
@@ -309,7 +309,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'df',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))
 
     def _get_osd_df(self):
         """
@@ -319,7 +319,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd df',
             'format': 'json'
-        }), '')[1].replace('-nan', '"-nan"'))
+        }), '')[1].decode('utf-8').replace('-nan', '"-nan"'))
 
     def _get_osd_perf(self):
         """
@@ -329,7 +329,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd perf',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))
 
     def _get_osd_pool_stats(self):
         """
@@ -341,4 +341,4 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd pool stats',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))
