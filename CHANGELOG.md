@@ -17,7 +17,6 @@
 
 **Closed issues:**
 
-- How to get non average metrics in prometheus [\#5393](https://github.com/netdata/netdata/issues/5393)
 - Alert alarm flapping [\#5346](https://github.com/netdata/netdata/issues/5346)
 - Localization of HTML Docs [\#5197](https://github.com/netdata/netdata/issues/5197)
 - move node.js module named to go.d [\#5048](https://github.com/netdata/netdata/issues/5048)
@@ -28,6 +27,8 @@
 
 **Merged pull requests:**
 
+- Fix ceph.chart.py for Python3 [\#5396](https://github.com/netdata/netdata/pull/5396) ([GaetanF](https://github.com/GaetanF))
+- Update CODEOWNERS [\#5389](https://github.com/netdata/netdata/pull/5389) ([cakrit](https://github.com/cakrit))
 - Add documentation for network interfaces [\#5381](https://github.com/netdata/netdata/pull/5381) ([vlvkobal](https://github.com/vlvkobal))
 - Correct Installation link in updating doc [\#5380](https://github.com/netdata/netdata/pull/5380) ([cakrit](https://github.com/cakrit))
 - Add support of tera-byte size for Linux bcache. [\#5373](https://github.com/netdata/netdata/pull/5373) ([kamcpp](https://github.com/kamcpp))
