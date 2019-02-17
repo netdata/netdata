@@ -243,6 +243,49 @@ AC_MSG_RESULT([${with_math}])
 
 
 # -----------------------------------------------------------------------------
+# librt Posix Realtime extensions
+
+AC_CHECK_LIB(
+    [rt],
+    [aio_write],
+    [RT_LIBS="-lrt"]
+)
+test -z "${RT_LIBS}" && AC_MSG_ERROR([librt required but not found])
+
+OPTIONAL_RT_CLFAGS="${RT_CFLAGS}"
+OPTIONAL_RT_LIBS="${RT_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# libuv multi-platform support library with a focus on asynchronous I/O
+# TODO: Should add check that libuv version >= 1?
+
+AC_CHECK_LIB(
+    [uv],
+    [uv_fs_write],
+    [UV_LIBS="-luv"]
+)
+test -z "${UV_LIBS}" && AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+
+OPTIONAL_UV_CLFAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# lz4 Extremely Fast Compression algorithm
+
+AC_CHECK_LIB(
+    [lz4],
+    [LZ4_decompress_safe],
+    [LZ4_LIBS="-llz4"]
+)
+test -z "${LZ4_LIBS}" && AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
+
+OPTIONAL_LZ4_CLFAGS="${LZ4_CFLAGS}"
+OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -781,7 +824,11 @@ CPPFLAGS="\
 
 AC_SUBST([OPTIONAL_MATH_CFLAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
-AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
+AC_SUBST([OPTIONAL_RT_CLFAGS])
+AC_SUBST([OPTIONAL_RT_LIBS])
+AC_SUBST([OPTIONAL_UV_LIBS])
+AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
@@ -831,6 +878,7 @@ AC_CONFIG_FILES([
     collectors/xenstat.plugin/Makefile
     daemon/Makefile
     database/Makefile
+    database/engine/Makefile
     diagrams/Makefile
     health/Makefile
     health/notifications/Makefile
