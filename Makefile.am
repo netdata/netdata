@@ -309,6 +309,8 @@ RRD_PLUGIN_FILES = \
     database/rrdsetvar.h \
     database/rrdvar.c \
     database/rrdvar.h \
+    database/engine/rrdengine.c \
+    database/engine/rrdengine.h \
     $(NULL)
 
 API_PLUGIN_FILES = \
@@ -470,6 +472,9 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
+	$(OPTIONAL_RT_LIBS) \
+	$(OPTIONAL_UV_LIBS) \
+	$(OPTIONAL_LZ4_LIBS) \
 	$(NULL)
 
 
