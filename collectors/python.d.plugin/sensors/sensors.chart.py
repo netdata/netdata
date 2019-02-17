@@ -41,7 +41,7 @@ CHARTS = {
     'power': {
         'options': [None, ' power', 'Watt', 'power', 'sensors.power', 'line'],
         'lines': [
-            [None, None, 'absolute', 1, 1000000]
+            [None, None, 'absolute', 1, 1000]
         ]
     },
     'fan': {
@@ -51,9 +51,9 @@ CHARTS = {
         ]
     },
     'energy': {
-        'options': [None, ' energy', 'Joule', 'energy', 'sensors.energy', 'areastack'],
+        'options': [None, ' energy', 'Joule', 'energy', 'sensors.energy', 'line'],
         'lines': [
-            [None, None, 'incremental', 1, 1000000]
+            [None, None, 'incremental', 1, 1000]
         ]
     },
     'humidity': {
