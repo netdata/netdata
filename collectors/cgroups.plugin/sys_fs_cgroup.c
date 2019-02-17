@@ -28,6 +28,9 @@ static int cgroup_enable_systemd_services = CONFIG_BOOLEAN_YES;
 static int cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
 static int cgroup_used_memory_without_cache = CONFIG_BOOLEAN_YES;
 
+static int cgroup_use_unified_cgroups = CONFIG_BOOLEAN_NO;
+static int cgroup_unified_exist = CONFIG_BOOLEAN_AUTO;
+
 static int cgroup_search_in_devices = 1;
 
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
@@ -43,6 +46,7 @@ static char *cgroup_cpuset_base = NULL;
 static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
 static char *cgroup_devices_base = NULL;
+static char *cgroup_unified_base = NULL;
 
 static int cgroup_root_count = 0;
 static int cgroup_root_max = 1000;
@@ -79,6 +83,8 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
+    cgroup_use_unified_cgroups = config_get_boolean_ondemand("plugin:cgroups", "use unified cgroups", cgroup_use_unified_cgroups);
+
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
 
@@ -104,56 +110,88 @@ void read_cgroup_plugin_configuration() {
 
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
+    if(!cgroup_use_unified_cgroups) {
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
+        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
+        if(!mi) {
+            error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
+            s = "/sys/fs/cgroup/cpuacct";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
-    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
-    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
-    if(!mi) {
-        error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
-        s = "/sys/fs/cgroup/cpuacct";
-    }
-    else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
-    cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
+        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
+        if(!mi) {
+            error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
+            s = "/sys/fs/cgroup/cpuset";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
 
-    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
-    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
-    if(!mi) {
-        error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
-        s = "/sys/fs/cgroup/cpuset";
-    }
-    else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
-    cgroup_cpuset_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuset", filename);
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
+        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
+        if(!mi) {
+            error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
+            s = "/sys/fs/cgroup/blkio";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
-    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
-    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
-    if(!mi) {
-        error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
-        s = "/sys/fs/cgroup/blkio";
-    }
-    else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
-    cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
+        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
+        if(!mi) {
+            error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
+            s = "/sys/fs/cgroup/memory";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
-    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
-    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
-    if(!mi) {
-        error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
-        s = "/sys/fs/cgroup/memory";
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
+        if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
+        if(!mi) {
+            error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
+            s = "/sys/fs/cgroup/devices";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
     }
-    else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
-    cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
+    else {
+        cgroup_enable_cpuacct_stat =
+        cgroup_enable_cpuacct_usage =
+        cgroup_enable_memory =
+        cgroup_enable_detailed_memory =
+        cgroup_enable_memory_failcnt =
+        cgroup_enable_swap =
+        //cgroup_enable_blkio_io =
+        cgroup_enable_blkio_ops =
+        cgroup_enable_blkio_throttle_io =
+        cgroup_enable_blkio_throttle_ops =
+        cgroup_enable_blkio_merged_ops =
+        cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
+        cgroup_search_in_devices = 0;
 
-    mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
-    if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
-    if(!mi) {
-        error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
-        s = "/sys/fs/cgroup/devices";
+        //TODO: can there be more than 1 cgroup2 mount point?
+        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw"); //there is no cgroup2 specific super option - for now use 'rw' option
+        if(mi) debug(D_CGROUP, "found unified cgroup root using super options, with path: '%s'", mi->mount_point);
+        if(!mi) {
+            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup2", "cgroup");
+            if(mi) debug(D_CGROUP, "found unified cgroup root using mountsource info, with path: '%s'", mi->mount_point);
+        }
+        if(!mi) {
+            error("CGROUP: cannot find cgroup2 mountinfo. Assuming default: /sys/fs/cgroup");
+            s = "/sys/fs/cgroup";
+        }
+        else s = mi->mount_point;
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
+        cgroup_unified_base = config_get("plugin:cgroups", "path to unified cgroups", filename);
+        debug(D_CGROUP, "using cgroup root: '%s'", cgroup_unified_base);
     }
-    else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
-    cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
     cgroup_max_depth = (int)config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
@@ -369,6 +407,7 @@ struct cgroup_network_interface {
 
 #define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
 #define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
+#define CGROUP_OPTIONS_IS_UNIFIED           0x00000004
 
 struct cgroup {
     uint32_t options;
@@ -648,6 +687,56 @@ static inline void cgroup_read_blkio(struct blkio *io) {
     }
 }
 
+static inline void cgroup2_read_blkio(struct blkio *io) {
+    debug(D_CGROUP, "cg2 blkio");
+    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
+            io->delay_counter--;
+            return;
+        }
+
+        if(likely(io->filename)) {
+            static procfile *ff = NULL;
+
+            ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
+            if(unlikely(!ff)) {
+                io->updated = 0;
+                cgroups_check = 1;
+                return;
+            }
+
+            ff = procfile_readall(ff);
+            if(unlikely(!ff)) {
+                io->updated = 0;
+                cgroups_check = 1;
+                return;
+            }
+
+            unsigned long lines = procfile_lines(ff);
+
+            if(unlikely(lines < 1)) {
+                error("CGROUP: file '%s' should have 1+ lines.", io->filename);
+                io->updated = 0;
+                return;
+            }
+
+            io->Read = str2ull(procfile_lineword(ff, 0, 2));
+            io->Write = str2ull(procfile_lineword(ff, 0, 4));
+
+            procfile_print(ff);
+            debug(D_CGROUP, "%llu %llu", io->Read, io->Write);
+            debug(D_CGROUP, "cg2 blkio  upd");
+
+            io->updated = 1;
+
+            if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
+                if(unlikely(io->Read || io->Write))
+                    io->enabled = CONFIG_BOOLEAN_YES;
+                else
+                    io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
+            }
+        }
+}
+
 static inline void cgroup_read_memory(struct memory *mem) {
     static procfile *ff = NULL;
 
@@ -758,16 +847,20 @@ memory_next:
 
 static inline void cgroup_read(struct cgroup *cg) {
     debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
-
-    cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
-    cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
-    cgroup_read_memory(&cg->memory);
-    cgroup_read_blkio(&cg->io_service_bytes);
-    cgroup_read_blkio(&cg->io_serviced);
-    cgroup_read_blkio(&cg->throttle_io_service_bytes);
-    cgroup_read_blkio(&cg->throttle_io_serviced);
-    cgroup_read_blkio(&cg->io_merged);
-    cgroup_read_blkio(&cg->io_queued);
+    if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+        cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
+        cgroup_read_cpuacct_usage(&cg->cpuacct_usage);
+        cgroup_read_memory(&cg->memory);
+        cgroup_read_blkio(&cg->io_service_bytes);
+        cgroup_read_blkio(&cg->io_serviced);
+        cgroup_read_blkio(&cg->throttle_io_service_bytes);
+        cgroup_read_blkio(&cg->throttle_io_serviced);
+        cgroup_read_blkio(&cg->io_merged);
+        cgroup_read_blkio(&cg->io_queued);
+    }
+    else {
+        cgroup2_read_blkio(&cg->io_service_bytes);
+    }
 }
 
 static inline void read_all_cgroups(struct cgroup *root) {
@@ -934,6 +1027,8 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     cg->chart_id = cgroup_chart_id_strdupz(id);
     cg->hash_chart = simple_hash(cg->chart_id);
+
+    if(cgroup_use_unified_cgroups) cg->options |= CGROUP_OPTIONS_IS_UNIFIED;
 
     if(!cgroup_root)
         cgroup_root = cg;
@@ -1266,41 +1361,48 @@ static inline void find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
 
     mark_all_cgroups_as_not_available();
+    if(!cgroup_use_unified_cgroups) {
+        if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
+            if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_cpuacct_stat =
+                cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled cpu statistics.");
+            }
+        }
 
-    if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
-        if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
-            cgroup_enable_cpuacct_stat =
-            cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled cpu statistics.");
+        if(cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io || cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
+            if(find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_blkio_io =
+                cgroup_enable_blkio_ops =
+                cgroup_enable_blkio_throttle_io =
+                cgroup_enable_blkio_throttle_ops =
+                cgroup_enable_blkio_merged_ops =
+                cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled blkio statistics.");
+            }
+        }
+
+        if(cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
+            if(find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_enable_memory =
+                cgroup_enable_detailed_memory =
+                cgroup_enable_swap =
+                cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
+                error("CGROUP: disabled memory statistics.");
+            }
+        }
+
+        if(cgroup_search_in_devices) {
+            if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
+                cgroup_search_in_devices = 0;
+                error("CGROUP: disabled devices statistics.");
+            }
         }
     }
-
-    if(cgroup_enable_blkio_io || cgroup_enable_blkio_ops || cgroup_enable_blkio_throttle_io || cgroup_enable_blkio_throttle_ops || cgroup_enable_blkio_merged_ops || cgroup_enable_blkio_queued_ops) {
-        if(find_dir_in_subdirs(cgroup_blkio_base, NULL, found_subdir_in_dir) == -1) {
-            cgroup_enable_blkio_io =
-            cgroup_enable_blkio_ops =
-            cgroup_enable_blkio_throttle_io =
-            cgroup_enable_blkio_throttle_ops =
-            cgroup_enable_blkio_merged_ops =
-            cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled blkio statistics.");
-        }
-    }
-
-    if(cgroup_enable_memory || cgroup_enable_detailed_memory || cgroup_enable_swap || cgroup_enable_memory_failcnt) {
-        if(find_dir_in_subdirs(cgroup_memory_base, NULL, found_subdir_in_dir) == -1) {
-            cgroup_enable_memory =
-            cgroup_enable_detailed_memory =
-            cgroup_enable_swap =
-            cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled memory statistics.");
-        }
-    }
-
-    if(cgroup_search_in_devices) {
-        if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
-            cgroup_search_in_devices = 0;
-            error("CGROUP: disabled devices statistics.");
+    else {
+        if (find_dir_in_subdirs(cgroup_unified_base, NULL, found_subdir_in_dir) == -1) {
+            cgroup_unified_exist = CONFIG_BOOLEAN_NO;
+            error("CGROUP: disabled unified cgroups statistics.");
         }
     }
 
@@ -1320,146 +1422,160 @@ static inline void find_all_cgroups() {
         // check for newly added cgroups
         // and update the filenames they read
         char filename[FILENAME_MAX + 1];
-        if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->cpuacct_stat.filename = strdupz(filename);
-                cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
-                snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
-                cg->filename_cpuset_cpus = strdupz(filename);
-                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_period_us", cgroup_cpuacct_base, cg->id);
-                cg->filename_cpu_cfs_period = strdupz(filename);
-                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
-                cg->filename_cpu_cfs_quota = strdupz(filename);
-                debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
+        if(!cgroup_use_unified_cgroups) {
+            if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_stat.filename = strdupz(filename);
+                    cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
+                    snprintfz(filename, FILENAME_MAX, "%s%s/cpuset.cpus", cgroup_cpuset_base, cg->id);
+                    cg->filename_cpuset_cpus = strdupz(filename);
+                    snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_period_us", cgroup_cpuacct_base, cg->id);
+                    cg->filename_cpu_cfs_period = strdupz(filename);
+                    snprintfz(filename, FILENAME_MAX, "%s%s/cpu.cfs_quota_us", cgroup_cpuacct_base, cg->id);
+                    cg->filename_cpu_cfs_quota = strdupz(filename);
+                    debug(D_CGROUP, "cpuacct.stat filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
+                }
+                else
+                    debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->cpuacct_usage.filename = strdupz(filename);
-                cg->cpuacct_usage.enabled = cgroup_enable_cpuacct_usage;
-                debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
+            if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_usage.filename = strdupz(filename);
+                    cg->cpuacct_usage.enabled = cgroup_enable_cpuacct_usage;
+                    debug(D_CGROUP, "cpuacct.usage_percpu filename for cgroup '%s': '%s'", cg->id, cg->cpuacct_usage.filename);
+                }
+                else
+                    debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory_without_cache) && !cg->memory.filename_detailed && (cgroup_used_memory_without_cache || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->memory.filename_detailed = strdupz(filename);
-                cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
-                debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
+            if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory_without_cache) && !cg->memory.filename_detailed && (cgroup_used_memory_without_cache || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_detailed = strdupz(filename);
+                    cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
+                    debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
+                }
+                else
+                    debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->memory.filename_usage_in_bytes = strdupz(filename);
-                cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
-                debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
-                snprintfz(filename, FILENAME_MAX, "%s%s/memory.limit_in_bytes", cgroup_memory_base, cg->id);
-                cg->filename_memory_limit = strdupz(filename);
+            if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_usage_in_bytes = strdupz(filename);
+                    cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
+                    debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+                    snprintfz(filename, FILENAME_MAX, "%s%s/memory.limit_in_bytes", cgroup_memory_base, cg->id);
+                    cg->filename_memory_limit = strdupz(filename);
+                }
+                else
+                    debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-                cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
-                snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
-                cg->filename_memoryswap_limit = strdupz(filename);
-                debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+            if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.usage_in_bytes", cgroup_memory_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
+                    cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
+                    snprintfz(filename, FILENAME_MAX, "%s%s/memory.memsw.limit_in_bytes", cgroup_memory_base, cg->id);
+                    cg->filename_memoryswap_limit = strdupz(filename);
+                    debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+                }
+                else
+                    debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->memory.filename_failcnt = strdupz(filename);
-                cg->memory.enabled_failcnt = cgroup_enable_memory_failcnt;
-                debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+            if(unlikely(cgroup_enable_memory_failcnt && !cg->memory.filename_failcnt)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_failcnt = strdupz(filename);
+                    cg->memory.enabled_failcnt = cgroup_enable_memory_failcnt;
+                    debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+                }
+                else
+                    debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->io_service_bytes.filename = strdupz(filename);
-                cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
-                debug(D_CGROUP, "io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+            if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->io_service_bytes.filename = strdupz(filename);
+                    cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
+                    debug(D_CGROUP, "io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                }
+                else
+                    debug(D_CGROUP, "io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->io_serviced.filename = strdupz(filename);
-                cg->io_serviced.enabled = cgroup_enable_blkio_ops;
-                debug(D_CGROUP, "io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
+            if(unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->io_serviced.filename = strdupz(filename);
+                    cg->io_serviced.enabled = cgroup_enable_blkio_ops;
+                    debug(D_CGROUP, "io_serviced filename for cgroup '%s': '%s'", cg->id, cg->io_serviced.filename);
+                }
+                else
+                    debug(D_CGROUP, "io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->throttle_io_service_bytes.filename = strdupz(filename);
-                cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
-                debug(D_CGROUP, "throttle_io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
+            if(unlikely(cgroup_enable_blkio_throttle_io && !cg->throttle_io_service_bytes.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->throttle_io_service_bytes.filename = strdupz(filename);
+                    cg->throttle_io_service_bytes.enabled = cgroup_enable_blkio_throttle_io;
+                    debug(D_CGROUP, "throttle_io_service_bytes filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_service_bytes.filename);
+                }
+                else
+                    debug(D_CGROUP, "throttle_io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "throttle_io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->throttle_io_serviced.filename = strdupz(filename);
-                cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
-                debug(D_CGROUP, "throttle_io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
+            if(unlikely(cgroup_enable_blkio_throttle_ops && !cg->throttle_io_serviced.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->throttle_io_serviced.filename = strdupz(filename);
+                    cg->throttle_io_serviced.enabled = cgroup_enable_blkio_throttle_ops;
+                    debug(D_CGROUP, "throttle_io_serviced filename for cgroup '%s': '%s'", cg->id, cg->throttle_io_serviced.filename);
+                }
+                else
+                    debug(D_CGROUP, "throttle_io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "throttle_io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_merged_ops && !cg->io_merged.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->io_merged.filename = strdupz(filename);
-                cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
-                debug(D_CGROUP, "io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
+            if(unlikely(cgroup_enable_blkio_merged_ops && !cg->io_merged.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->io_merged.filename = strdupz(filename);
+                    cg->io_merged.enabled = cgroup_enable_blkio_merged_ops;
+                    debug(D_CGROUP, "io_merged filename for cgroup '%s': '%s'", cg->id, cg->io_merged.filename);
+                }
+                else
+                    debug(D_CGROUP, "io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-        }
 
-        if(unlikely(cgroup_enable_blkio_queued_ops && !cg->io_queued.filename)) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
-            if(likely(stat(filename, &buf) != -1)) {
-                cg->io_queued.filename = strdupz(filename);
-                cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
-                debug(D_CGROUP, "io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
+            if(unlikely(cgroup_enable_blkio_queued_ops && !cg->io_queued.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->io_queued.filename = strdupz(filename);
+                    cg->io_queued.enabled = cgroup_enable_blkio_queued_ops;
+                    debug(D_CGROUP, "io_queued filename for cgroup '%s': '%s'", cg->id, cg->io_queued.filename);
+                }
+                else
+                    debug(D_CGROUP, "io_queued file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else
-                debug(D_CGROUP, "io_queued file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+        }
+        else if(likely(cgroup_unified_exist)) {
+            if(unlikely(cgroup_enable_blkio_io && !cg->io_service_bytes.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->io_service_bytes.filename = strdupz(filename);
+                    cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
+                    debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                }
+                else
+                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
         }
     }
 
