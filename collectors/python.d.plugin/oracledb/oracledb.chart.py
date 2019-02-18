@@ -18,6 +18,13 @@ CHARTS = dict()
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
+QUERY_WAIT_TIME = '''
+SELECT
+  n.wait_class,
+  round(m.time_waited/m.INTSIZE_CSEC,3)
+FROM v$waitclassmetric  m, v$system_wait_class n 
+WHERE m.wait_class_id=n.wait_class_id AND n.wait_class != 'Idle'
+'''
 QUERY_SESSION = '''
 SELECT
   status,
@@ -413,3 +420,25 @@ class Service(SimpleService):
             ['active', active],
             ['inactive', inactive],
         ]
+
+    def get_wait_time_metrics(self):
+        """
+        :return:
+
+        [['Other', 0],
+         ['Application', 0],
+         ['Configuration', 0],
+         ['Administrative', 0],
+         ['Concurrency', 0],
+         ['Commit', 0],
+         ['Network', 0],
+         ['User I/O', 0],
+         ['System I/O', 0.002],
+         ['Scheduler', 0]]
+        """
+        metrics = list()
+        with self.conn.cursor() as cursor:
+            cursor.execute(QUERY_WAIT_TIME)
+            for wait_class, value in cursor.fetchall():
+                metrics.append([wait_class, value])
+        return metrics
