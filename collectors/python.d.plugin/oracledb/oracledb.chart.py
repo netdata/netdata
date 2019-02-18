@@ -18,33 +18,39 @@ CHARTS = dict()
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
+QUERY_SESSION = '''
+SELECT
+  status,
+  type
+FROM v$session GROUP BY status, type
+'''
 QUERY_PROCESS = '''
-select
+SELECT
   program,
   pga_used_mem,
   pga_alloc_mem,
   pga_freeable_mem,
   pga_max_mem
-from
+FROM
   gv$process
 '''
 QUERY_SYSTEM = '''
-select 
+SELECT 
   metric_name,
   value,
   begin_time
-from
-  gv$sysmetric order by begin_time
+FROM
+  gv$sysmetric ORDER BY begin_time
 '''
 QUERY_TABLESPACE = '''
-select
+SELECT
   m.tablespace_name,
-  m.used_space * t.block_size as used_bytes,
-  m.tablespace_size * t.block_size as max_bytes,
+  m.used_space * t.block_size AS used_bytes,
+  m.tablespace_size * t.block_size AS max_bytes,
   m.used_percent
-from
+FROM
   dba_tablespace_usage_metrics m
-  join dba_tablespaces t on m.tablespace_name = t.tablespace_name
+  JOIN dba_tablespaces t ON m.tablespace_name = t.tablespace_name
 '''
 
 PROCESS_METRICS = [
@@ -393,3 +399,17 @@ class Service(SimpleService):
                     ]
                 )
         return metrics
+
+    def get_sessions_metrics(self):
+        with self.conn.cursor() as cursor:
+            cursor.execute(QUERY_SESSION)
+            total, active, inactive = 0, 0, 0
+            for status, _ in cursor.fetchall():
+                total += 1
+                active += status == 'ACTIVE'
+                inactive += status == 'INACTIVE'
+        return [
+            ['total', total],
+            ['active', active],
+            ['inactive', inactive],
+        ]
