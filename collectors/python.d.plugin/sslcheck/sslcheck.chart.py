@@ -16,7 +16,7 @@ except ImportError:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
-DAYS_UNTIL_EXPIRATION = 'whatisthis'
+DAYS_UNTIL_EXPIRATION = 'daysuntilexpiration'
 
 ORDER = ['daysuntilexpiration']
 
@@ -88,7 +88,7 @@ class Service(SimpleService):
     def ssl_valid_time_remaining(self, hostname, port):
         """Get the number of days left in a cert's lifetime."""
         expires = self.ssl_expiry_datetime(hostname, port)
-        return expires - datetime.datetime.utcnow()
+        return (expires - datetime.datetime.utcnow()).days
 
     # def ssl_expires_in(self, hostname, buffer_days=14):
     #    """
