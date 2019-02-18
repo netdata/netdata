@@ -162,14 +162,14 @@ void read_cgroup_plugin_configuration() {
         cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
     }
     else {
-        cgroup_enable_cpuacct_stat =
+        //cgroup_enable_cpuacct_stat =
         cgroup_enable_cpuacct_usage =
         cgroup_enable_memory =
         cgroup_enable_detailed_memory =
         cgroup_enable_memory_failcnt =
         cgroup_enable_swap =
         //cgroup_enable_blkio_io =
-        cgroup_enable_blkio_ops =
+        //cgroup_enable_blkio_ops =
         cgroup_enable_blkio_throttle_io =
         cgroup_enable_blkio_throttle_ops =
         cgroup_enable_blkio_merged_ops =
@@ -558,6 +558,45 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     }
 }
 
+static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
+    static procfile *ff = NULL;
+
+    if(likely(cp->filename)) {
+        ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) {
+            cp->updated = 0;
+            cgroups_check = 1;
+            return;
+        }
+
+        ff = procfile_readall(ff);
+        if(unlikely(!ff)) {
+            cp->updated = 0;
+            cgroups_check = 1;
+            return;
+        }
+
+        unsigned long i, lines = procfile_lines(ff);
+
+        if(unlikely(lines < 3)) {
+            error("CGROUP: file '%s' should have 3+ lines.", cp->filename);
+            cp->updated = 0;
+            return;
+        }
+
+        cp->user = str2ull(procfile_lineword(ff, 1, 1));
+        cp->system = str2ull(procfile_lineword(ff, 2, 1));
+
+        procfile_print(ff);
+        debug(D_CGROUP, "%llu %llu", cp->user, cp->system);
+        debug(D_CGROUP, "cg2 cpu upd");
+        cp->updated = 1;
+
+        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO && (cp->user || cp->system)))
+            cp->enabled = CONFIG_BOOLEAN_YES;
+    }
+}
+
 static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
     static procfile *ff = NULL;
 
@@ -687,8 +726,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
     }
 }
 
-static inline void cgroup2_read_blkio(struct blkio *io) {
-    debug(D_CGROUP, "cg2 blkio");
+static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset) {
     if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
             io->delay_counter--;
             return;
@@ -711,16 +749,21 @@ static inline void cgroup2_read_blkio(struct blkio *io) {
                 return;
             }
 
-            unsigned long lines = procfile_lines(ff);
+            unsigned long i, lines = procfile_lines(ff);
 
-            if(unlikely(lines < 1)) {
+            if (unlikely(lines < 1)) {
                 error("CGROUP: file '%s' should have 1+ lines.", io->filename);
                 io->updated = 0;
                 return;
             }
 
-            io->Read = str2ull(procfile_lineword(ff, 0, 2));
-            io->Write = str2ull(procfile_lineword(ff, 0, 4));
+            io->Read = 0;
+            io->Write = 0;
+
+            for (i = 0; i < lines; i++) {
+                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset));
+                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset));
+            }
 
             procfile_print(ff);
             debug(D_CGROUP, "%llu %llu", io->Read, io->Write);
@@ -859,7 +902,10 @@ static inline void cgroup_read(struct cgroup *cg) {
         cgroup_read_blkio(&cg->io_queued);
     }
     else {
-        cgroup2_read_blkio(&cg->io_service_bytes);
+        //TODO: io_service_bytes and io_serviced use same file merge into 1 function
+        cgroup2_read_blkio(&cg->io_service_bytes, 0);
+        cgroup2_read_blkio(&cg->io_serviced, 4);
+        cgroup2_read_cpuacct_stat(&cg->cpuacct_stat);
     }
 }
 
@@ -1572,9 +1618,30 @@ static inline void find_all_cgroups() {
                     cg->io_service_bytes.filename = strdupz(filename);
                     cg->io_service_bytes.enabled = cgroup_enable_blkio_io;
                     debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                } else
+                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+            if (unlikely(cgroup_enable_blkio_ops && !cg->io_serviced.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/io.stat", cgroup_unified_base, cg->id);
+                if (likely(stat(filename, &buf) != -1)) {
+                    cg->io_serviced.filename = strdupz(filename);
+                    cg->io_serviced.enabled = cgroup_enable_blkio_ops;
+                    debug(D_CGROUP, "io.stat filename for unified cgroup '%s': '%s'", cg->id, cg->io_service_bytes.filename);
+                } else
+                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+            if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/cpu.stat", cgroup_unified_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->cpuacct_stat.filename = strdupz(filename);
+                    cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
+                    cg->filename_cpuset_cpus = NULL;
+                    cg->filename_cpu_cfs_period = NULL;
+                    cg->filename_cpu_cfs_quota = NULL;
+                    debug(D_CGROUP, "cpu.stat filename for unified cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
                 }
                 else
-                    debug(D_CGROUP, "io.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
+                    debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
         }
     }
@@ -2526,9 +2593,14 @@ void update_cgroup_charts(int update_every) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
-
-                rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                    rrddim_add(cg->st_cpu, "user", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "system", NULL, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                }
+                else {
+                    rrddim_add(cg->st_cpu, "user", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "system", NULL, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                }
             }
             else
                 rrdset_next(cg->st_cpu);
