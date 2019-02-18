@@ -5,11 +5,20 @@
 
 import os
 import re
+import collections
 from bases.FrameworkServices.LogService import LogService
 
-ORDER = ['incoming_statuses', 'incoming_codes', 'outgoing_statuses', 'outgoing_codes']
+ORDER = ['connections', 'incoming_statuses', 'incoming_codes', 'outgoing_statuses', 'outgoing_codes']
 
 CHARTS = {
+    'connections': {
+        'options': [None, 'Incoming connections', 'connections/s', 'incoming',
+                    'mail_log.active_connections', 'line'],
+        'lines': [
+            ['mail_connections', 'connections', 'incremental', 1, 1],
+        ]
+    },
+
     'incoming_statuses': {
         'options': [None, 'Incoming email statuses', 'messages/s', 'incoming',
                     'mail_log.incoming_statuses', 'stacked'],
@@ -51,6 +60,7 @@ CHARTS = {
 
 class MailStatistics:
     # incoming
+    connections = 0
     incoming_codes = {
         "2.0.0": 0
     }
@@ -67,18 +77,21 @@ class MailStatistics:
     bounced = 0
 
 
-class MailParser:
-    """Abstract MailParser class, parsers must implement the _parse_line method"""
+class MailParser(object):
+    """Abstract MailParser class, mail log parsers must implement the _parse_line method"""
+
     def __init__(self, log_service):
         self.charts = log_service.charts
         self.stats = log_service.stats
 
+    """Increments number of incoming messages per status code, adds a new line to chart if required"""
     def increment_incoming_code(self, code):
         if code not in self.stats.incoming_codes:
             self.charts["incoming_codes"].add_dimension(['mail_incoming_codes_' + code, code, 'incremental', 1, 1])
             self.stats.incoming_codes[code] = 0
         self.stats.incoming_codes[code] += 1
 
+    """Increments number of outgoing messages per status code, adds a new line to chart if required"""
     def increment_outgoing_code(self, code):
         if code not in self.stats.outgoing_codes:
             self.charts["outgoing_codes"].add_dimension(['mail_outgoing_codes_' + code, code, 'incremental', 1, 1])
@@ -94,22 +107,30 @@ class MailParser:
 
 class PostfixParser(MailParser):
     """MailParser for Postfix"""
-    POSTFIX_RE = re.compile(r'postfix\/([a-z]+)\[\d*\]:')
-    ENQUEUED_RE = re.compile(r'from=<.*\(queue active\)')
+    POSTFIX_RE = re.compile(r'postfix(\/\w+)?\/([a-z]+)\[\d*\]: (\w+)')
+    QUEUE_RE = re.compile(r'from=<.*\(queue active\)')
     REJECT_RE = re.compile(r'reject: [^:]+: (\d{3} )?(\d+\.\d+\.\d+)')
-    STATUS_RE = re.compile(r'status=(\w+)')
-    DSN_RE = re.compile(r'dsn=(\d+\.\d+\.\d+)')
+    STATUS_RE = re.compile(r'dsn=(\d+\.\d+\.\d+).*status=(\w+)')
 
     def __init__(self, log_service):
         super().__init__(log_service)
         self.greylist_status = log_service.configuration.get("greylist_status", "Try again later")
+        # Since postfix does not log messages passing milters (only rejected ones) we store last 50 ids of messages
+        # received by the `cleanup` process and count them as accepted when queued for delivery for the first time.
+        self.queue_ids = collections.OrderedDict()
 
-    def parse_qmgr(self, line):
-        if self.ENQUEUED_RE.search(line):
+    """Parses queue manager log"""
+    def parse_qmgr(self, line, msg_id):
+        if self.QUEUE_RE.search(line) and msg_id in self.queue_ids.keys():
+            self.queue_ids.pop(msg_id)
             self.stats.accepted += 1
             self.increment_incoming_code("2.0.0")
 
-    def parse_smtpd_and_cleanup(self, line):
+    """Parses smtpd and cleanup logs"""
+    def parse_smtpd_and_cleanup(self, line, first, service):
+        if service == "smtpd" and first == "connect":
+            self.stats.connections += 1
+            return
         reject = self.REJECT_RE.search(line)
         if reject:
             code = reject.group(2)
@@ -120,30 +141,35 @@ class PostfixParser(MailParser):
                 self.stats.temp_rejected += 1
             elif code.startswith("5"):
                 self.stats.perm_rejected += 1
+            return
+        if service == "cleanup":
+            self.queue_ids[first] = None
+            if len(self.queue_ids) > 50:
+                self.queue_ids.popitem(False)
 
+    """Parses smtp client log"""
     def parse_smtp(self, line):
         status = self.STATUS_RE.search(line)
         if status:
-            code = status.group(1)
-            if code == "sent":
+            self.increment_outgoing_code(status.group(1))
+            stat = status.group(2)
+            if stat == "sent":
                 self.stats.sent += 1
-            elif code == "deferred":
+            elif stat == "deferred":
                 self.stats.deferred += 1
-            elif code == "bounced":
+            elif stat == "bounced":
                 self.stats.bounced += 1
-        dsn = self.DSN_RE.search(line)
-        if dsn:
-            self.increment_outgoing_code(dsn.group(1))
 
     def _parse_line(self, line):
         match = self.POSTFIX_RE.search(line)
         if not match:
             return
-        service = match.group(1)
+        service = match.group(2)
+        first = match.group(3)
         if service == "qmgr":
-            self.parse_qmgr(line)
+            self.parse_qmgr(line, first)
         elif service == "smtpd" or service == "cleanup":
-            self.parse_smtpd_and_cleanup(line)
+            self.parse_smtpd_and_cleanup(line, first, service)
         elif service == "smtp":
             self.parse_smtp(line)
 
@@ -187,6 +213,7 @@ class Service(LogService):
             for line in self._get_raw_data():
                 self.parse_line(line)
             data = {
+                "mail_connections": self.stats.connections,
                 "mail_accepted": self.stats.accepted,
                 "mail_greylisted": self.stats.greylisted,
                 "mail_temp_rejected": self.stats.temp_rejected,
