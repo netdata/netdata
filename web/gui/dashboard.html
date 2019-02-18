@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+    <title>NetData Dashboard</title>
+    <meta name="application-name" content="netdata">
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="author" content="costa@tsaousis.gr">
+
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://cloud.githubusercontent.com/assets/2662304/22945737/e98cd0c6-f2fd-11e6-96f1-5501934b0955.png"/>
+    <meta property="og:url" content="http://my-netdata.io/"/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:site_name" content="netdata"/>
+    <meta property="og:title" content="netdata - real-time performance monitoring, done right!"/>
+    <meta property="og:description" content="Stunning real-time dashboards, blazingly fast and extremely interactive. Zero configuration, zero dependencies, zero maintenance." />
+</head>
+<body>
+
+<div class="container-fluid">
+
+<h1>NetData Custom Dashboard <div data-netdata="system.cpu" data-chart-library="sparkline" data-height="30" data-after="-600" data-sparkline-linecolor="#888"></div></h1>
+
+This is a template for building custom dashboards. To build a dashboard you just do this:
+
+<pre>
+&lt;!DOCTYPE html>
+&lt;html lang="en">
+&lt;head>
+    &lt;meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    &lt;meta charset="utf-8">
+    &lt;meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1">
+    &lt;meta name="apple-mobile-web-app-capable" content="yes">
+    &lt;meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+&lt;/head>
+&lt;body>
+    &lt;div data-netdata="system.processes"
+        data-chart-library="dygraph"
+        data-width="600"
+        data-height="200"
+        data-after="-600"
+        >&lt;/div>
+&lt;/body>
+&lt;script type="text/javascript" src="http://netdata.server:19999/dashboard.js">&lt;/script>
+&lt;/html>
+</pre>
+
+<ul>
+    <li>You can host your dashboard anywhere.</li>
+    <li>You can add as many charts as you like.</li>
+    <li>You can have charts from many different netdata servers (add <pre>data-host="http://another.netdata.server:19999/"</pre> to each chart).</li>
+    <li>You can use different chart libraries on the same page: <b>peity</b>, <b>sparkline</b>, <b>dygraph</b>, <b>google</b></li>
+    <li>You can customize each chart to your preferences. For each chart library most of their attributes can be given in <b>data-</b> attributes.</li>
+    <li>Each chart can have each own duration - it is controlled with the <b>data-after</b> attribute to give that many seconds of data.</li>
+    <li>Depending on the width of the chart and <b>data-after</b> attribute, netdata will automatically refresh the chart when it needs to be updated. For example giving 600 pixels for width for -600 seconds of data, using a chart library that needs 3 pixels per point, will yeld in a chart updated once every 3 seconds.</li>
+</ul>
+
+
+<hr>
+<h1>Sparkline Charts</h1>
+Sparkline charts support 'NULL' values, so the charts can indicate that values are missing.
+Sparkline charts stretch the values to show the variations between values in more detail.
+They also have mouse-hover support.
+<br/>
+<b>Sparklines are fantastic</b>. You can inline charts in text. For example this
+    <div    data-netdata="system.cpu"
+            data-chart-library="sparkline"
+            data-width="5%"
+            data-height="20"
+            data-after="-30"
+            ></div> is my current cpu usage (last 30 seconds),
+    while this
+    <div    data-netdata="netdata.net"
+            data-dimensions="out"
+            data-chart-library="sparkline"
+            data-width="10%"
+            data-height="20"
+            data-after="-60"
+            ></div> is the bandwidth my netdata server is currently transmitting (last minute)
+    and this
+    <div    data-netdata="netdata.requests"
+            data-chart-library="sparkline"
+            data-width="20%"
+            data-height="20"
+            data-after="-180"
+            ></div> is the requests/sec it serves (last 3 minutes).
+
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time101"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time101">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time102"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time102">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time103"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time103">X</span> ms</small>
+</div>
+
+
+
+<hr>
+<h1>Peity Charts</h1>
+Peity charts do not support 'NULL' values, so the charts cannot indicate that values are missing.
+Peity charts cannot have multiple dimensions on the charts - so netdata will use 'min2max' to show
+the total of all dimensions.
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="peity"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time001"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time001">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="peity"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time002"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time002">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="peity"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time003"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time003">X</span> ms</small>
+</div>
+
+
+
+
+<hr>
+<h1>Dygraph Charts</h1>
+The fastest charting engine that can chart complete charts (not just sparklines).
+The charts are zoomable (drag their contents to pan, shift with mouse wheel to zoom-in or zoom-out, double click to reset it).
+<b>Netdata magic!</b> Realtime charts on your web page!
+<br/>
+Sparklines using dygraphs
+    <div data-netdata="system.processes"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-legend="no"
+        data-width="15%"
+        data-height="20"
+        data-after="-300"
+        ></div>
+    are also possible! This
+    <div data-netdata="system.net"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-legend="no"
+        data-width="15%"
+        data-height="20"
+        data-after="-300"
+        ></div>
+    is an area chart, while this
+    <div data-netdata="system.cpu"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-legend="no"
+        data-width="15%"
+        data-height="20"
+        data-after="-300"
+        ></div> is a stacked area chart!
+
+
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time501"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time501">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time502"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time502">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="dygraph"
+        data-dygraph-theme="sparkline"
+        data-width="100%"
+        data-height="30"
+        data-after="-300"
+        data-dt-element-name="time503"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time503">X</span> ms</small>
+</div>
+
+
+
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time201"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time201">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time202"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time202">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time203"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time203">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.io"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time204"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time204">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="apps.cpu"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time205"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time205">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="netdata.net"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time206"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time206">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="netdata.server_cpu"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time207"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time207">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="netdata.requests"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time208"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time208">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="net.gstag0"
+        data-chart-library="dygraph"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time209"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time209">X</span> ms</small>
+</div>
+
+
+
+<hr>
+<h1>EasyPieChart</h1>
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.processes"
+            data-chart-library="easypiechart"
+            data-width="200"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time601"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time601">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.processes"
+            data-chart-library="easypiechart"
+            data-width="150"
+            data-height="150"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time601a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time601a">X</span> ms</small>
+    </div>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.net"
+            data-chart-library="easypiechart"
+            data-width="200"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time602"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time602">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.net"
+            data-chart-library="easypiechart"
+            data-width="100"
+            data-height="100"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time602a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time602a">X</span> ms</small>
+    </div>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.cpu"
+            data-chart-library="easypiechart"
+            data-width="200"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time603"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time603">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.cpu"
+            data-chart-library="easypiechart"
+            data-width="75"
+            data-height="75"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time603a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time603a">X</span> ms</small>
+    </div>
+</div>
+
+
+<hr>
+<h1>Gauge.js</h1>
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.processes"
+            data-chart-library="gauge"
+            data-width="250"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time701"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time701">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.processes"
+            data-chart-library="gauge"
+            data-width="125"
+            data-height="100"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time701a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time701a">X</span> ms</small>
+    </div>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.net"
+            data-chart-library="gauge"
+            data-width="250"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time702"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time702">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.net"
+            data-chart-library="gauge"
+            data-width="125"
+            data-height="100"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time702a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time702a">X</span> ms</small>
+    </div>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.cpu"
+            data-chart-library="gauge"
+            data-width="250"
+            data-height="200"
+            data-after="-300"
+            data-points="300"
+            data-dt-element-name="time703"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time703">X</span> ms</small>
+    </div>
+    <div style="display: inline-block; position: relative;">
+        <div data-netdata="system.cpu"
+            data-chart-library="gauge"
+            data-width="125"
+            data-height="100"
+            data-after="-300"
+            data-points="150"
+            data-dt-element-name="time703a"
+            ></div>
+        <br/>
+        <small>rendered in <span id="time703a">X</span> ms</small>
+    </div>
+</div>
+
+
+<hr>
+<h1>Google Charts</h1>
+NetData was originaly developed with Google Charts.
+NetData is a complete Google Visualization API provider.
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="google"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time301"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time301">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="google"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time302"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time302">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="google"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time303"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time303">X</span> ms</small>
+</div>
+
+<!--
+    
+<hr>
+<h1>Morris Charts</h1>
+Unfortunatelly, Morris Charts are very slow. Here we force them to lower their detail to get acceptable results.
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="morris"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time401"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time401">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="morris"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time402"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time402">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="morris"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time403"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time403">X</span> ms</small>
+</div>
+
+
+<hr>
+<h1>C3 Charts</h1>
+C3 charts are not usable in large scale. They suffer from the following issues:
+<ul>
+ <li>extreme use of transitions (implemented with D3 instead of CSS, meaning they are javascript rendered) that cannot be disabled - even opacity is hardcoded in the javascript library</li>
+ <li>rendering is done with <code>SVG</code> instead of <code>canvas</code>, so they use DOM elements for every point, becomimg useless if more than 500 points are drawn</li>
+ <li>lack of a <code>raw</code> data format, so every time a chart is updated, data convertion in javascript is required</li>
+ <li>lack of <code>stacked</code> charts support</li>
+</ul>
+So, to avoid flashing the charts, we destroy and re-create the charts on each update. Also, since they manipulate the data with javascript we were forced to lower the detail they render to get acceptable speeds.
+<br/>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.processes"
+        data-chart-library="c3"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time801"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time801">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.net"
+        data-chart-library="c3"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time802"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time802">X</span> ms</small>
+</div>
+<div style="width: 33%; display: inline-block;">
+    <div data-netdata="system.cpu"
+        data-chart-library="c3"
+        data-width="100%"
+        data-height="200"
+        data-after="-300"
+        data-dt-element-name="time803"
+        ></div>
+    <br/>
+    <small>rendered in <span id="time803">X</span> ms</small>
+</div>
+
+-->
+
+    <hr>
+    <h1>d3pie Charts</h1>
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="apps.cpu"
+             data-chart-library="d3pie"
+             data-d3pie-pieinnerradius="70%"
+             data-d3pie-pieouterradius="90%"
+             data-width="100%"
+             data-height="300px"
+             data-after="-60"
+             data-points="60"
+             data-dt-element-name="time901"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time901">X</span> ms</small>
+    </div>
+
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="system.cpu"
+             data-chart-library="d3pie"
+             data-width="100%"
+             data-height="300px"
+             data-after="-60"
+             data-points="60"
+             data-dt-element-name="time902"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time902">X</span> ms</small>
+    </div>
+
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="apps.cpu"
+             data-width="100%"
+             data-height="300px"
+             data-after="-60"
+             data-points="60"
+             data-debug="false"
+             data-decimal-digits="0"
+             data-dt-element-name="time903"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time903">X</span> ms</small>
+    </div>
+</div> <!-- 1st container -->
+</body>
+</html>
+
+<!-- you can set your netdata server globally, by ucommenting this -->
+<!-- you can also give a different server per chart, with the attribute: data-host="http://netdata.server:19999" -->
+<!-- <script> netdataServer = "http://box:19999"; </script> -->
+
+<!-- load the dashboard manager - it will do the rest -->
+<!-- <script>var netdataTheme = 'slate';</script> -->
+<script type="text/javascript" src="dashboard.js?v20180130-1"></script>

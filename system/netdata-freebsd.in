@@ -1,16 +1,18 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 . /etc/rc.subr
 
 name=netdata
 rcvar=netdata_enable
 
-pidfile="@localstatedir_POST@/run/netdata.pid"
+piddir="@localstatedir_POST@/run/netdata"
+pidfile="${pidfile}/netdata.pid"
 
 command="@sbindir_POST@/netdata"
 command_args="-P ${pidfile}"
 
-required_files="@sysconfdir_POST@/netdata/netdata.conf"
+required_files="@configdir_POST@/netdata.conf"
 
 start_precmd="netdata_prestart"
 stop_postcmd="netdata_poststop"
@@ -22,11 +24,13 @@ savedb_cmd="netdata_savedb"
 
 netdata_prestart()
 {
+	[ ! -d "${piddir}" ] && mkdir -p "${piddir}"
 	return 0
 }
 
 netdata_poststop()
 {
+	[ -f "${pidfile}" ] && rm "${pidfile}"
 	return 0
 }
 

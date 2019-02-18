@@ -1,2 +1,0 @@
-#!/bin/sh
-test -x ./packaging/release-msg && exec ./packaging/release-msg "$@"

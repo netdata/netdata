@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 ### BEGIN INIT INFO
 # Provides:          netdata
@@ -19,7 +20,8 @@ ${DEBIAN_SCRIPT_DEBUG:+ set -v -x}
 
 DAEMON="netdata"
 DAEMON_PATH=@sbindir_POST@
-PIDFILE=@localstatedir_POST@/run/$DAEMON.pid
+PIDFILE_PATH=@localstatedir_POST@/run/netdata
+PIDFILE=$PIDFILE_PATH/$DAEMON.pid
 DAEMONOPTS="-P $PIDFILE"
 
 test -x $DAEMON_PATH/$DAEMON || exit 0
@@ -31,6 +33,10 @@ cd /
 umask 022
 
 service_start() {
+	if [ ! -d $PIDFILE_PATH ]; then
+		mkdir -p $PIDFILE_PATH
+	fi
+	
 	log_daemon_msg "Starting real-time performance monitoring" "netdata"
 	start_daemon -p $PIDFILE $DAEMON_PATH/$DAEMON $DAEMONOPTS
 	RETVAL=$?

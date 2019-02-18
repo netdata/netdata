@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html lang="en">
+<head>
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-N6CBMJD');
+    dataLayer.push({"anonymous_statistics" : "false"});
+    </script>    
+    <title>Goto a host you know...</title>
+    <meta name="application-name" content="netdata">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<script>
+    var netdataRegistry = true;
+    var netdataRegistryAfterMs = 0;
+    var netdataTheme = 'slate';
+    var netdataShowHelp = true;
+</script>
+<script type="text/javascript" src="dashboard.js?v20170724-7"></script>
+
+<script>
+function escapeUserInputHTML(s) {
+    return s.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/#/g, '&#35;')
+        .replace(/'/g, '&#39;')
+        .replace(/\(/g,'&#40;')
+        .replace(/\)/g,'&#41;')
+        .replace(/\//g,'&#47;');
+}
+
+// if string.startsWith is not defined, define it
+if(typeof String.prototype.startsWith !== 'function') {
+    String.prototype.startsWith = function(s) {
+        if(s.length > this.length) return false;
+        return this.slice(s.length) === s;
+    };
+}
+
+function verifyURL(s) {
+    if(typeof(s) === 'string' && (s.startsWith('http://') || s.startsWith('https://')))
+        return s
+            .replace(/'/g, '%22')
+            .replace(/"/g, '%27')
+            .replace(/\)/g, '%28')
+            .replace(/\(/g, '%29');
+
+    console.log('invalid URL detected:');
+    console.log(s);
+    return 'javascript:alert("invalid url");';
+}
+
+var urlOptions = {
+    host: null,
+    chart: null,
+    family: null,
+    alarm: null,
+    alarm_unique_id: 0,
+    alarm_id: 0,
+    alarm_event_id: 0,
+    hasProperty: function(property) {
+        return typeof this[property] !== 'undefined';
+    }
+};
+
+function netdataQueryParse() {
+    var query = document.location.search.split('?');
+    var variables = query[1].split('&');
+    var len = variables.length;
+    while(len--) {
+        var p = variables[len].split('=');
+        if(urlOptions.hasProperty(p[0]) && typeof p[1] !== 'undefined')
+            urlOptions[p[0]] = decodeURIComponent(p[1]);
+    }
+
+    if(typeof urlOptions.family !== 'string')
+        urlOptions.family = '';
+
+    if(typeof urlOptions.chart !== 'string')
+        urlOptions.chart = '';
+}
+
+function netdataURL(url) {
+    return url + '#top'
+        + ';nowelcome=1'
+        // + ';show_alarms=1'
+        + ';chart=' + encodeURIComponent(urlOptions.chart)
+        + ';family=' + encodeURIComponent(urlOptions.family)
+        + ';alarm=' + encodeURIComponent(urlOptions.alarm)
+        + ';alarm_unique_id=' + urlOptions.alarm_unique_id.toString()
+        + ';alarm_id=' + urlOptions.alarm_id.toString()
+        + ';alarm_event_id=' + urlOptions.alarm_event_id.toString()
+        ;
+}
+
+var gotoServerValidateRemaining = 0;
+var gotoServerMiddleClick = false;
+var gotoServerStop = false;
+var thisIsHttps = false;
+var urlsInHttp = 0;
+function gotoServerValidateUrl(id, guid, url) {
+    var penaldy = 0;
+    var error = 'failed';
+
+    if(thisIsHttps === false && url.toString().startsWith('https://'))
+        // we penalize https only if the current url is http
+        // to allow the user walk through all its servers.
+        penaldy = 500;
+
+    else if(thisIsHttps === true && url.toString().startsWith('http://')) {
+        error = 'can\'t check';
+        urlsInHttp++;
+    }
+
+    var finalURL = netdataURL(url);
+
+    setTimeout(function() {
+        document.getElementById('gotoServerList').innerHTML += '<tr><td style="padding-left: 20px;"><a href="' + verifyURL(finalURL) + '" target="_blank">' + escapeUserInputHTML(url) + '</a></td><td style="padding-left: 30px;"><code id="' + guid + '-' + id + '-status">checking...</code></td></tr>';
+
+        NETDATA.registry.hello(url, function(data) {
+            if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid === guid) {
+                // console.log('OK ' + id + ' URL: ' + url);
+                document.getElementById(guid + '-' + id + '-status').innerHTML = "OK";
+
+                if(!gotoServerStop) {
+                    gotoServerStop = true;
+
+                    if(gotoServerMiddleClick) {
+                        window.open(finalURL);
+                        gotoServerMiddleClick = false;
+                        document.getElementById('gotoServerResponse').innerHTML = '<b>Opening new window to ' + NETDATA.registry.machines[guid].name + '<br/><a href="' + verifyURL(finalURL) + '">' + escapeUserInputHTML(url) + '</a></b><br/>(check your pop-up blocker if it fails)';
+                    }
+                    else {
+                        document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
+                        document.location = verifyURL(finalURL);
+                    }
+                }
+            }
+            else {
+                if(typeof data !== 'undefined' && data !== null && typeof data.machine_guid === 'string' && data.machine_guid !== guid)
+                    error = 'wrong machine';
+
+                document.getElementById(guid + '-' + id + '-status').innerHTML = error;
+                gotoServerValidateRemaining--;
+                if(gotoServerValidateRemaining <= 0) {
+                    gotoServerMiddleClick = false;
+                    document.getElementById('gotoServerResponse').innerHTML = '<b>Sorry! I cannot find any operational URL for this server</b>';
+
+                    if(thisIsHttps === true && urlsInHttp > 0) {
+                        document.getElementById('gotoServerResponse').innerHTML += '<br/>redirecting myself to HTTP to allow checking';
+                        document.location = verifyURL(document.location.toString().replace('https://', 'http://'));
+                    }
+                }
+            }
+        });
+    }, (id * 50) + penaldy);
+}
+
+var netdataRegistryCallback = function(machines_array) {
+    if(typeof urlOptions.host !== 'string') {
+        document.getElementById('bodylog').innerHTML = "Sorry... bad request.";
+        return;
+    }
+
+    document.getElementById('message').innerHTML = 'These are the URLs this machine is known:';
+
+    if(document.location.toString().startsWith('https://'))
+        thisIsHttps = true;
+
+    if(machines_array) {
+        var guids = {};
+        var checked = {};
+        var len = machines_array.length;
+        var count = 0;
+
+        while(len--) {
+            if(machines_array[len].name === urlOptions.host) {
+                var ulen = machines_array[len].alternate_urls.length;
+                var guid = machines_array[len].guid;
+                guids[guid] = true;
+
+                gotoServerValidateRemaining = ulen;
+                while(ulen--) {
+                    var url = machines_array[len].alternate_urls[ulen];
+                    checked[url] = true;
+                    gotoServerValidateUrl(count++, guid, url);
+                }
+
+                setTimeout(function() {
+                    if(gotoServerStop === false) {
+                        document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                        var guid;
+                        for(guid in guids) {
+                            NETDATA.registry.search(guid, function(data) {
+                                // console.log(data);
+                                len = data.urls.length;
+                                while(len--) {
+                                    var url = data.urls[len][1];
+                                    // console.log(url);
+                                    if(typeof checked[url] === 'undefined') {
+                                        gotoServerValidateRemaining++;
+                                        checked[url] = true;
+                                        gotoServerValidateUrl(count++, guid, url);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }, 2000);
+
+                return false;
+            }
+        }
+    }
+
+    document.getElementById('bodylog').innerHTML = "Sorry... your account is not linked to a netdata server named: <b>" + escapeUserInputHTML(urlOptions.host) + '</b>';
+};
+
+netdataQueryParse();
+</script>
+<body>
+<div class="container">
+    <div id="bodylog" style="padding-top: 8vmax; font-size: 2.0vmax;">
+        <span id="message">Please wait...</span>
+
+        <div style="padding-top: 20px;">
+            <table id="gotoServerList" class="table">
+            </table>
+        </div>
+        <p style="padding-top: 10px;"><small>
+            This page can only find netdata URLs you have already visited and are linked to your account on this netdata registry.
+        </small></p>
+        <div id="gotoServerResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
+    </div>
+
+</div>
+</body>
+</html>

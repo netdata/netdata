@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC1117,SC2034,SC2059,SC2086,SC2181
+
+NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+NETDATA_VARLIB_DIR="@varlibdir_POST@"
+
+printhelp () {
+	echo "Usage: health-cmdapi-test.sh [OPTIONS]
+	-s SETUP config files for python example tests
+	-c CLEANUP config files from python example tests
+	-r RESTART netdata after SETUP and CLEANUP, using systemctl restart netdata.
+	-t TEST scenarios execution
+	-u <URL> changes the host:port from localhost:19999 to <URL>
+	"
+}
+
+check () {
+	echo -e "${GRAY}Check: '${1}' in 2 sec"
+	sleep 2
+	resp=$(curl -s "http://$URL/api/v1/alarms?all")
+	r=$(echo "${resp}" | \
+	python3 -c "import sys, json; d=json.load(sys.stdin); \
+	print(\
+	d['alarms']['example.random.example_alarm1']['disabled'], \
+	d['alarms']['example.random.example_alarm1']['silenced'] , \
+	d['alarms']['example.random.example_alarm2']['disabled'], \
+	d['alarms']['example.random.example_alarm2']['silenced'], \
+	d['alarms']['system.load.load_trigger']['disabled'], \
+	d['alarms']['system.load.load_trigger']['silenced'], \
+	);" 2>&1)
+	if [ $? -ne 0 ] ; then
+		echo -e "${RED}ERROR: Unexpected response '$resp'"
+		err=$((err+1))
+	elif [ "${r}" != "${2}" ] ; then
+		echo -e "${RED}ERROR: 'Got ${r}'. Expected '${2}'"
+		err=$((err+1))
+	else
+		echo -e "${GREEN}Success"
+	fi
+}
+
+cmd () {
+	echo -e "${WHITE}Cmd '${1}', expecting '${2}'"
+	RESPONSE=$(curl -s "http://$URL/api/v1/manage/health?${1}" -H "X-Auth-Token: $TOKEN" 2>&1)
+	if [ "${RESPONSE}" != "${2}" ] ; then
+		echo -e "${RED}ERROR: Response '${RESPONSE}' != '${2}'"
+		err=$((err+1))
+	else
+		echo -e "${GREEN}Success"
+	fi
+}
+
+WHITE='\033[0;37m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+GRAY='\033[0;37m'
+
+SETUP=0
+RESTART=0
+CLEANUP=0
+TEST=0
+URL="localhost:19999"
+
+while getopts :srctu: option
+do
+    case "$option" in
+    s)
+        SETUP=1
+        ;;
+	r)
+		RESTART=1
+		;;
+	c)
+		CLEANUP=1
+		;;
+	t)
+		TEST=1
+		;;
+	u)
+		URL=$OPTARG
+		;;
+	*)
+		printhelp
+		exit 1
+		;;
+	esac
+done
+
+if [ $SETUP -eq 1 ] ; then
+	echo "Preparing netdata configuration for testing"
+	# Prep netdata for tests
+	if [ -f "${NETDATA_USER_CONFIG_DIR}/python.d.conf" ] ; then
+		cp -f "${NETDATA_USER_CONFIG_DIR}/python.d.conf"  /tmp/python.d.conf
+	else
+		cp "${NETDATA_STOCK_CONFIG_DIR}/python.d.conf" "${NETDATA_USER_CONFIG_DIR}/"
+	fi
+	sed -i -e "s/example: no/example: yes/g" "${NETDATA_USER_CONFIG_DIR}/python.d.conf"
+
+	mypath=$(cd ${0%/*} && echo $PWD)
+
+	cp -f "${mypath}/python-example.conf" "${NETDATA_USER_CONFIG_DIR}/health.d/"
+
+	# netdata.conf
+	if [ -f "${NETDATA_USER_CONFIG_DIR}/netdata.conf" ] ; then
+		cp -f "${NETDATA_USER_CONFIG_DIR}/netdata.conf"  /tmp/netdata.conf
+	fi
+	printf "[health]\nrun at least every seconds = 1\n" > "${NETDATA_USER_CONFIG_DIR}/netdata.conf"
+
+	chmod +r "${NETDATA_USER_CONFIG_DIR}/python.d.conf" "${NETDATA_USER_CONFIG_DIR}/netdata.conf" "${NETDATA_USER_CONFIG_DIR}/health.d/python-example.conf" "${NETDATA_STOCK_CONFIG_DIR}/health.d/load.conf"
+	# Restart netdata
+	if [ $RESTART -eq 1 ] ; then
+		echo "Restarting netdata"
+		systemctl restart netdata
+	fi
+fi
+
+err=0
+
+# Execute tests
+if [ $TEST -eq 1 ] ; then
+
+	HEALTH_CMDAPI_MSG_AUTHERROR="Auth Error"
+	HEALTH_CMDAPI_MSG_SILENCEALL="All alarm notifications are silenced"
+	HEALTH_CMDAPI_MSG_DISABLEALL="All health checks are disabled"
+	HEALTH_CMDAPI_MSG_RESET="All health checks and notifications are enabled"
+	HEALTH_CMDAPI_MSG_DISABLE="Health checks disabled for alarms matching the selectors"
+	HEALTH_CMDAPI_MSG_SILENCE="Alarm notifications silenced for alarms matching the selectors"
+	HEALTH_CMDAPI_MSG_ADDED="Alarm selector added"
+	HEALTH_CMDAPI_MSG_INVALID_KEY="Invalid key. Ignoring it."
+	HEALTH_CMDAPI_MSG_STYPEWARNING="WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command."
+	HEALTH_CMDAPI_MSG_NOSELECTORWARNING="WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors."
+
+	if [ -f "${NETDATA_VARLIB_DIR}/netdata.api.key" ] ;then
+		read -r CORRECT_TOKEN < "${NETDATA_VARLIB_DIR}/netdata.api.key"
+	else
+		echo "${NETDATA_VARLIB_DIR}/netdata.api.key not found"
+		exit 1
+	fi
+	# Set correct token
+	TOKEN="${CORRECT_TOKEN}"
+
+	# Test default state
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+	check "Default State" "False False False False False False"
+
+	# Test auth failure
+	TOKEN="Wrong token"
+	cmd "cmd=DISABLE ALL" "$HEALTH_CMDAPI_MSG_AUTHERROR"
+	check "Default State" "False False False False False False"
+
+	# Set correct token
+	TOKEN="${CORRECT_TOKEN}"
+
+	# Test disable
+	cmd "cmd=DISABLE ALL" "$HEALTH_CMDAPI_MSG_DISABLEALL"
+	check "All disabled" "True False True False True False"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+	check "Default State" "False False False False False False"
+
+	# Test silence
+	cmd "cmd=SILENCE ALL" "$HEALTH_CMDAPI_MSG_SILENCEALL"
+	check "All silenced" "False True False True False True"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+	check "Default State" "False False False False False False"
+
+	# Add silencer by name
+	printf -v resp "$HEALTH_CMDAPI_MSG_SILENCE\n$HEALTH_CMDAPI_MSG_ADDED"
+	cmd "cmd=SILENCE&alarm=*example_alarm1 *load_trigger" "${resp}"
+	check "Silence notifications for alarm1 and load_trigger" "False True False False False True"
+
+	# Convert to disable health checks
+	cmd "cmd=DISABLE" "$HEALTH_CMDAPI_MSG_DISABLE"
+	check "Disable notifications for alarm1 and load_trigger" "True False False False True False"
+
+	# Convert back to silence notifications
+	cmd "cmd=SILENCE" "$HEALTH_CMDAPI_MSG_SILENCE"
+	check "Silence notifications for alarm1 and load_trigger" "False True False False False True"
+
+	# Add second silencer by name
+	cmd "alarm=*example_alarm2" "$HEALTH_CMDAPI_MSG_ADDED"
+	check "Silence notifications for alarm1,alarm2 and load_trigger" "False True False True False True"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+
+	# Add silencer by chart
+	printf -v resp "$HEALTH_CMDAPI_MSG_DISABLE\n$HEALTH_CMDAPI_MSG_ADDED"
+	cmd "cmd=DISABLE&chart=system.load" "${resp}"
+	check "Default State" "False False False False True False"
+
+	# Add silencer by context
+	cmd "context=random" "$HEALTH_CMDAPI_MSG_ADDED"
+	check "Default State" "True False True False True False"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+
+	# Add second condition to a selector (AND)
+	printf -v resp "$HEALTH_CMDAPI_MSG_SILENCE\n$HEALTH_CMDAPI_MSG_ADDED"
+	cmd "cmd=SILENCE&alarm=*example_alarm1 *load_trigger&chart=system.load" "${resp}"
+	check "Silence notifications load_trigger" "False False False False False True"
+
+	# Add second selector with two conditions
+	cmd "alarm=*example_alarm1 *load_trigger&context=random" "$HEALTH_CMDAPI_MSG_ADDED"
+	check "Silence notifications load_trigger" "False True False False False True"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+
+	# Add silencer without a command to disable or silence alarms
+	printf -v resp "$HEALTH_CMDAPI_MSG_ADDED\n$HEALTH_CMDAPI_MSG_STYPEWARNING"
+	cmd "families=load" "${resp}"
+	check "Family selector with no command" "False False False False False False"
+
+	# Add silence command
+	cmd "cmd=SILENCE" "$HEALTH_CMDAPI_MSG_SILENCE"
+	check "Silence family load" "False False False False False True"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+
+	# Add command without silencers
+	printf -v resp "$HEALTH_CMDAPI_MSG_SILENCE\n$HEALTH_CMDAPI_MSG_NOSELECTORWARNING"
+	cmd "cmd=SILENCE" "${resp}"
+	check "Command with no selector" "False False False False False False"
+
+	# Add hosts silencer
+	cmd "hosts=*" "$HEALTH_CMDAPI_MSG_ADDED"
+	check "Silence all hosts" "False True False True False True"
+
+	# Reset
+	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
+
+fi
+
+# Cleanup
+if [ $CLEANUP -eq 1 ] ; then
+	echo -e "${WHITE}Restoring netdata configuration"
+	for f in "python.d.conf" "netdata.conf" ; do
+		if [ -f "/tmp/$f" ] ; then
+			mv -f "/tmp/$f" "${NETDATA_USER_CONFIG_DIR}/"
+		else
+			rm -f "${NETDATA_USER_CONFIG_DIR}/$f"
+		fi
+	done
+
+	rm -f "${NETDATA_USER_CONFIG_DIR}/health.d/python-example.conf"
+
+	# Restart netdata
+	if [ $RESTART -eq 1 ] ; then
+		echo "Restarting netdata"
+		systemctl restart netdata
+	fi
+fi
+
+if [ $err -gt 0 ] ; then
+	echo "$err error(s) found"
+	exit 1
+fi
