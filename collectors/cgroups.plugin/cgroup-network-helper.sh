@@ -60,7 +60,7 @@ fatal() {
     exit 1
 }
 
-debug=0
+debug=${NETDATA_CGROUP_NETWORK_HELPER_DEBUG=0}
 debug() {
     [ "${debug}" = "1" ] && log DEBUG "${@}"
 }
@@ -132,6 +132,8 @@ find_tun_tap_interfaces_for_cgroup() {
         do
             proc_pid_fdinfo_iff "${p}"
         done
+    else
+        debug "Cannot find file '${c}/emulator/cgroup.procs', not searching for tun/tap interfaces."
     fi
 }
 
@@ -185,6 +187,39 @@ virsh_find_all_interfaces_for_cgroup() {
 }
 
 # -----------------------------------------------------------------------------
+# netnsid detected interfaces
+
+netnsid_find_all_interfaces_for_pid() {
+    local pid="${1}"
+    [ -z "${pid}" ] && return 1
+
+    local nsid=$(lsns -t net -p ${pid} -o NETNSID -nr)
+    [ -z "${nsid}" -o "${nsid}" = "unassigned" ] && return 1
+
+    set_source "netnsid"
+    ip link show |\
+        grep -B 1 -E " link-netnsid ${nsid}($| )" |\
+        ip link show | grep -B 1 -E " link-netnsid ${nsid}($| )" | sed -n -e "s|^[[:space:]]*[0-9]\+:[[:space:]]\+\([A-Za-z0-9_]\+\)\(@[A-Za-z0-9_]\+\)*:[[:space:]].*$|\1|p"
+}
+
+netnsid_find_all_interfaces_for_cgroup() {
+    local c="${1}" # the cgroup path
+
+    # for each pid of the cgroup
+    # find any tun/tap devices linked to the pid
+    if [ -f "${c}/cgroup.procs" ]
+    then
+        local p
+        for p in $(< "${c}/cgroup.procs" )
+        do
+            netnsid_find_all_interfaces_for_pid "${p}"
+        done
+    else
+        debug "Cannot find file '${c}/cgroup.procs', not searching for netnsid interfaces."
+    fi
+}
+
+# -----------------------------------------------------------------------------
 
 find_all_interfaces_of_pid_or_cgroup() {
     local p="${1}" c="${2}" # the pid and the cgroup path
@@ -194,6 +229,7 @@ find_all_interfaces_of_pid_or_cgroup() {
         # we have been called with a pid
 
         proc_pid_fdinfo_iff "${p}"
+        netnsid_find_all_interfaces_for_pid "${p}"
 
     elif [ ! -z "${c}" ]
     then
@@ -203,6 +239,7 @@ find_all_interfaces_of_pid_or_cgroup() {
 
         find_tun_tap_interfaces_for_cgroup "${c}"
         virsh_find_all_interfaces_for_cgroup "${c}"
+        netnsid_find_all_interfaces_for_cgroup "${c}"
 
     else
 
