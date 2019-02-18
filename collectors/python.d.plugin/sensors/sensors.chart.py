@@ -41,7 +41,7 @@ CHARTS = {
     'power': {
         'options': [None, ' power', 'Watt', 'power', 'sensors.power', 'line'],
         'lines': [
-            [None, None, 'absolute', 1, 1000000]
+            [None, None, 'absolute', 1, 1000]
         ]
     },
     'fan': {
@@ -51,9 +51,9 @@ CHARTS = {
         ]
     },
     'energy': {
-        'options': [None, ' energy', 'Joule', 'energy', 'sensors.energy', 'areastack'],
+        'options': [None, ' energy', 'Joule', 'energy', 'sensors.energy', 'line'],
         'lines': [
-            [None, None, 'incremental', 1, 1000000]
+            [None, None, 'incremental', 1, 1000]
         ]
     },
     'humidity': {
@@ -115,7 +115,7 @@ class Service(SimpleService):
                         limit = LIMITS[type_name]
                         if val < limit[0] or val > limit[1]:
                             continue
-                        data[prefix + '_' + str(feature.name.decode())] = int(val * 1000)
+                    data[prefix + '_' + str(feature.name.decode())] = int(val * 1000)
         except sensors.SensorsError as error:
             self.error(error)
             return None
