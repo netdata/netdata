@@ -199,7 +199,7 @@ netnsid_find_all_interfaces_for_pid() {
     set_source "netnsid"
     ip link show |\
         grep -B 1 -E " link-netnsid ${nsid}($| )" |\
-        ip link show | grep -B 1 -E " link-netnsid ${nsid}($| )" | sed -n -e "s|^[[:space:]]*[0-9]\+:[[:space:]]\+\([A-Za-z0-9_]\+\)\(@[A-Za-z0-9_]\+\)*:[[:space:]].*$|\1|p"
+        sed -n -e "s|^[[:space:]]*[0-9]\+:[[:space:]]\+\([A-Za-z0-9_]\+\)\(@[A-Za-z0-9_]\+\)*:[[:space:]].*$|\1|p"
 }
 
 netnsid_find_all_interfaces_for_cgroup() {
