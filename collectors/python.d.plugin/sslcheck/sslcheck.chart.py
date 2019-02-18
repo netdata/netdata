@@ -21,7 +21,7 @@ DAYS_UNTIL_EXPIRATION = 'whatisthis'
 ORDER = ['daysuntilexpiration']
 
 CHARTS = {
-    'daysvalid': {
+    'daysuntilexpiration': {
         'options': [None, 'Days until expiration', 'days', 'daysuntilexpiration', 'sslcheck.daysuntilexpiration', 'line'],
         'lines': [
             [DAYS_UNTIL_EXPIRATION, 'days until expiration', 'absolute', 100, 1000]
@@ -65,7 +65,7 @@ class Service(SimpleService):
         :return: dict
         """
         data = dict()
-        data[DAYS_UNTIL_EXPIRATION] = self.ssl_valid_time_remaining(self.host)
+        data[DAYS_UNTIL_EXPIRATION] = self.ssl_valid_time_remaining(self.host, self.port)
 
         return data
 
