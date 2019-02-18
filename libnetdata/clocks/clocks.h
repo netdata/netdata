@@ -130,4 +130,10 @@ extern usec_t heartbeat_monotonic_dt_to_now_usec(heartbeat_t *hb);
 
 extern int sleep_usec(usec_t usec);
 
+/*
+ * When running a binary with CLOCK_BOOTTIME defined on a system with a linux kernel older than Linux 2.6.39 the
+ * clock_gettime(2) system call fails with EINVAL. In that case it must fall-back to CLOCK_MONOTONIC.
+ */
+void test_clock_boottime(void);
+
 #endif /* NETDATA_CLOCKS_H */
