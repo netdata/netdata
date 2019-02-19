@@ -425,8 +425,9 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
                 cc->rescan_cpu_states = 1;
                 return 1;
             }
-
-            name_buf[r - 1] = '\0'; // erase extra character
+            int i=0;
+            while(i < (int)r && !isspace(name_buf[i])) i++; //Ignore white space after the name
+            if (i < (int)r) name_buf[i] = '\0';
             cc->cpuidle_state[state].name = strdupz(name_buf);
             close(fd);
 
