@@ -24,11 +24,13 @@ SEND_HANGOUTS="YES"
 # Login to Hangouts Chat and create an incoming webhook. You need only one for all
 # your netdata servers (or you can have one for each of your netdata).
 # Without it, netdata cannot send Hangouts notifications.
-HANGOUTS_WEBHOOK_URL="<your_incoming_webhook_url>"
+#HANGOUTS_WEBHOOK_URL="<your_incoming_webhook_url>"
+HANGOUTS_WEBHOOK_URL=""
 
 # if a role's recipients are not configured, a notification will be send to
 # this Hangouts channel (empty = do not send a notification for unconfigured
 # roles).
+#DEFAULT_RECIPIENT_HANGOUTS="<Name of the channel>"
 DEFAULT_RECIPIENT_HANGOUTS="monitoring_alarms"
 
 ```
