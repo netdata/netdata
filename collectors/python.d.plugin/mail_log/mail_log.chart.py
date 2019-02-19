@@ -84,15 +84,15 @@ class MailParser(object):
         self.charts = log_service.charts
         self.stats = log_service.stats
 
-    """Increments number of incoming messages per status code, adds a new line to chart if required"""
     def increment_incoming_code(self, code):
+        """Increments number of incoming messages per status code, adds a new line to chart if required"""
         if code not in self.stats.incoming_codes:
             self.charts["incoming_codes"].add_dimension(['mail_incoming_codes_' + code, code, 'incremental', 1, 1])
             self.stats.incoming_codes[code] = 0
         self.stats.incoming_codes[code] += 1
 
-    """Increments number of outgoing messages per status code, adds a new line to chart if required"""
     def increment_outgoing_code(self, code):
+        """Increments number of outgoing messages per status code, adds a new line to chart if required"""
         if code not in self.stats.outgoing_codes:
             self.charts["outgoing_codes"].add_dimension(['mail_outgoing_codes_' + code, code, 'incremental', 1, 1])
             self.stats.outgoing_codes[code] = 0
@@ -119,15 +119,15 @@ class PostfixParser(MailParser):
         # received by the `cleanup` process and count them as accepted when queued for delivery for the first time.
         self.queue_ids = collections.OrderedDict()
 
-    """Parses queue manager log"""
     def parse_qmgr(self, line, msg_id):
+        """Parses queue manager log"""
         if self.QUEUE_RE.search(line) and msg_id in self.queue_ids.keys():
             self.queue_ids.pop(msg_id)
             self.stats.accepted += 1
             self.increment_incoming_code("2.0.0")
 
-    """Parses smtpd and cleanup logs"""
     def parse_smtpd_and_cleanup(self, line, first, service):
+        """Parses smtpd and cleanup logs"""
         if service == "smtpd" and first == "connect":
             self.stats.connections += 1
             return
@@ -147,8 +147,8 @@ class PostfixParser(MailParser):
             if len(self.queue_ids) > 50:
                 self.queue_ids.popitem(False)
 
-    """Parses smtp client log"""
     def parse_smtp(self, line):
+        """Parses smtp client log"""
         status = self.STATUS_RE.search(line)
         if status:
             self.increment_outgoing_code(status.group(1))
