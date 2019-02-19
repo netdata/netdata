@@ -67,6 +67,31 @@ CHARTS = {
 }
 
 
+def tablespace_charts():
+    order = [
+        'tablespace_usage',
+        'tablespace_usage_in_percent',
+    ]
+    charts = {
+        'tablespace_usage': {
+            'options': [
+                None, 'Usage', 'KiB', 'tablespace', 'oracledb.tablespace_usage', 'area'],
+            'lines': [
+                ['tablespace_size', 'size', 'absolute', 1, 1024 * 1000],
+                ['tablespace_used', 'used', 'absolute', 1, 1024 * 1000],
+            ],
+        },
+        'tablespace_usage_in_percent': {
+            'options': [
+                None, 'Usage In Percent', 'percent', 'tablespace', 'oracledb.tablespace_usage_in_percent', 'line'],
+            'lines': [
+                ['tablespace_used_in_percent', 'used', 'absolute', 1, 1000],
+            ],
+        }
+    }
+    return order, charts
+
+
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
 QUERY_ACTIVITIES_COUNT = '''
@@ -160,6 +185,7 @@ class Service(SimpleService):
         self.service = configuration.get('service', 'XE')
         self.alive = False
         self.conn = None
+        self.active_tablespaces = set()
 
     def connect(self):
         if self.conn:
@@ -256,6 +282,26 @@ class Service(SimpleService):
                 cleaned = name.replace(' ', '_').replace('/', '').lower()
                 new_name = 'wait_time_{0}'.format(cleaned)
                 data[new_name] = amount
+
+        # TABLESPACE
+        try:
+            rv = self.gather_tablespace_metrics()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            for name, offline, size, used, used_in_percent in rv:
+                # TODO: skip offline?
+                if not (not offline and self.charts):
+                    continue
+                # TODO: remove inactive?
+                if name not in self.active_tablespaces:
+                    self.active_tablespaces.update(name)
+                    self.add_tablespace_charts(name)
+                data['{0}_tablespace_size'.format(name)] = int(size * 1000)
+                data['{0}_tablespace_used'.format(name)] = int(used * 1000)
+                data['{0}_tablespace_used_in_percent'.format(name)] = int(used_in_percent * 1000)
 
         return data or None
 
@@ -519,26 +565,26 @@ class Service(SimpleService):
             cursor.execute(QUERY_TABLESPACE)
             for tablespace_name, used_bytes, max_bytes, used_percent in cursor.fetchall():
                 if used_bytes is None:
-                    offline = 1
+                    offline = True
                     used = 0
                 else:
-                    offline = 0
+                    offline = False
                     used = float(used_bytes)
                 if max_bytes is None:
                     size = 0
                 else:
                     size = float(max_bytes)
                 if used_percent is None:
-                    in_use = 0
+                    used_percent = 0
                 else:
-                    in_use = float(used_percent)
+                    used_percent = float(used_percent)
                 metrics.append(
                     [
                         tablespace_name,
-                        used,
-                        size,
-                        in_use,
                         offline,
+                        size,
+                        used,
+                        used_percent,
                     ]
                 )
         return metrics
@@ -592,3 +638,19 @@ class Service(SimpleService):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_ACTIVITIES_COUNT)
             return cursor.fetchall()
+
+    def add_tablespace_charts(self, name):
+        order, charts = tablespace_charts()
+
+        for chart_name in order:
+            chart_id = '{0}_{1}'.format(name, chart_name)
+            # title
+            charts[chart_name]['options'][1] = '{0} {1}'.format(name, charts[chart_name]['options'][1])
+
+            params = [chart_id] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
+
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                dimension[0] = '{0}_{1}'.format(name, dimension[0])
+                new_chart.add_dimension(dimension)
