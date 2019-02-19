@@ -267,6 +267,23 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             if(likely(now >= ae->delay_up_to_timestamp))
                 health_process_notifications(host, ae);
         }
+        // Add repeating alarm entry to the host's list
+        if(unlikely(ae->repeat_warning_every > 0 || ae->repeat_critical_every > 0)) {
+            if(unlikely(!ae->in_repeating_list)) {
+                REPEATING_ALARM_ENTRY *rae = callocz(1, sizeof(REPEATING_ALARM_ENTRY));
+                rae->alarm_entry = ae;
+                rae->next = NULL;
+                if(unlikely(!host->health_rep_alarm_list)) {
+                    host->health_rep_alarm_list = rae;
+                }
+                else {
+                    REPEATING_ALARM_ENTRY *last;
+                    for(last = host->health_rep_alarm_list; last && last->next; last = last->next);
+                    last->next = rae;
+                }
+                ae->in_repeating_list = 1;
+            }
+        }
     }
 
     // remember this for the next iteration
@@ -764,8 +781,9 @@ void *health_main(void *ptr) {
 								(
 								    ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
 								    ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-								)
-
+								),
+								rc->repeat_warning_every,
+								rc->repeat_critical_every
 						);
 
 						rc->last_status_change = now;

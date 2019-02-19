@@ -170,6 +170,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->health_default_repeat_warning_every = config_get_duration(CONFIG_SECTION_HEALTH, "repeat warning notifications every", "never");
     host->health_default_repeat_critical_every = config_get_duration(CONFIG_SECTION_HEALTH, "repeat critical notifications every", "never");
+    host->health_rep_alarm_list = NULL;
 
     // ------------------------------------------------------------------------
     // initialize health variables

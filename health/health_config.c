@@ -72,7 +72,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             rc->repeat_critical_every
     );
 
-    rrdcalc_create_from_template_part2(host, rc);
+    rrdcalc_add_to_host(host, rc);
     return 1;
 }
 

@@ -473,9 +473,22 @@ struct alarm_entry {
     uint32_t updated_by_id;
     uint32_t updates_id;
 
+    int repeat_warning_every;
+    int repeat_critical_every;
+
+    // If the alarm entity is in the repeating list.This field
+    // should not be persisted to log DB.
+    int in_repeating_list;
+
     struct alarm_entry *next;
 };
 
+typedef struct repeating_alarm_entry {
+    ALARM_ENTRY *alarm_entry;
+    struct repeating_alarm_entry *next;
+} REPEATING_ALARM_ENTRY;
+
+typedef REPEATING_ALARM_ENTRY *REPEATING_ALARM_LIST;
 
 typedef struct alarm_log {
     uint32_t next_log_id;
@@ -577,6 +590,8 @@ struct rrdhost {
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
+
+    REPEATING_ALARM_LIST health_rep_alarm_list;     // list of repeating alarm entries
 
     // templates of alarms
     // these are used to create alarms when charts

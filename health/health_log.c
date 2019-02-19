@@ -358,7 +358,9 @@ inline void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
+        uint32_t flags,
+        int repeat_warning_every,
+        int repeat_critical_every
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
@@ -397,6 +399,10 @@ inline void health_alarm_log(
     ae->delay = delay;
     ae->delay_up_to_timestamp = when + delay;
     ae->flags |= flags;
+
+    ae->repeat_warning_every = repeat_warning_every;
+    ae->repeat_critical_every = repeat_critical_every;
+    ae->in_repeating_list = 0;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;

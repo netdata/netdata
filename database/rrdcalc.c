@@ -102,7 +102,9 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0
+                0,
+                rc->repeat_warning_every,
+                rc->repeat_critical_every
         );
     }
 }
@@ -163,7 +165,9 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0
+                0,
+                rc->repeat_warning_every,
+                rc->repeat_critical_every
         );
     }
 
@@ -253,7 +257,7 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
     return host->health_log.next_alarm_id++;
 }
 
-inline void rrdcalc_create_from_template_part2(RRDHOST *host, RRDCALC *rc) {
+inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
     if(rc->calculation) {
@@ -384,7 +388,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->repeat_warning_every
     );
 
-    rrdcalc_create_from_template_part2(host, rc);
+    rrdcalc_add_to_host(host, rc);
     return rc;
 }
 

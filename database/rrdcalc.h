@@ -139,6 +139,6 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
-extern void rrdcalc_create_from_template_part2(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 
 #endif //NETDATA_RRDCALC_H
