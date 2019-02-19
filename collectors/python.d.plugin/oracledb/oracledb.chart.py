@@ -100,9 +100,11 @@ PROCESS_METRICS = [
 
 def handle_oracle_error(method):
     def on_call(*args, **kwargs):
+        self = args[0]
         try:
             return method(*args, **kwargs)
-        except cx_Oracle.Error:
+        except cx_Oracle.Error as error:
+            self.error(error)
             return None
     return on_call
 
