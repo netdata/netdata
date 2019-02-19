@@ -149,15 +149,15 @@ PROCESS_METRICS = [
 ]
 
 
-def handle_oracle_error(method):
-    def on_call(*args, **kwargs):
-        self = args[0]
-        try:
-            return method(*args, **kwargs)
-        except cx_Oracle.Error as error:
-            self.error(error)
-            return None
-    return on_call
+# def handle_oracle_error(method):
+#     def on_call(*args, **kwargs):
+#         self = args[0]
+#         try:
+#             return method(*args, **kwargs)
+#         except cx_Oracle.Error as error:
+#             self.error(error)
+#             return None
+#     return on_call
 
 
 class Service(SimpleService):
@@ -215,7 +215,6 @@ class Service(SimpleService):
 
         return None
 
-    @handle_oracle_error
     def get_system_metrics(self):
 
         """
@@ -438,7 +437,6 @@ class Service(SimpleService):
                 metrics.append([row[0], row[1]])
         return metrics
 
-    @handle_oracle_error
     def get_process_metrics(self):
         """
         :return:
@@ -463,7 +461,6 @@ class Service(SimpleService):
                     metrics.append([row[0], name, row[i]])
         return metrics
 
-    @handle_oracle_error
     def get_tablespace_metrics(self):
         """
         :return:
@@ -502,7 +499,6 @@ class Service(SimpleService):
                 )
         return metrics
 
-    @handle_oracle_error
     def get_sessions_metrics(self):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_SESSION)
@@ -517,7 +513,6 @@ class Service(SimpleService):
             ['inactive', inactive],
         ]
 
-    @handle_oracle_error
     def get_wait_time_metrics(self):
         """
         :return:
@@ -540,13 +535,11 @@ class Service(SimpleService):
                 metrics.append([wait_class, value])
         return metrics
 
-    @handle_oracle_error
     def get_processes_count(self):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_PROCESSES_COUNT)
             return cursor.fetchone()[0]  # 53
 
-    @handle_oracle_error
     def get_activities_count(self):
         """
         :return:
