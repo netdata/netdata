@@ -18,6 +18,7 @@ ORDER = [
     'sessions',
     'activity',
     'wait_time',
+    'cache_hit_ratio',
 ]
 
 CHARTS = {
@@ -63,7 +64,16 @@ CHARTS = {
             ['wait_time_scheduler', 'scheduler', 'absolute', 1, 1000],
             ['wait_time_other', 'other', 'absolute', 1, 1000],
         ]
-    }
+    },
+    'cache_hit_ratio': {
+        'options': [None, 'Cache Hit Ratio', 'ratio', 'cache', 'oracledb.cache_hit_ration', 'stacked'],
+        'lines': [
+            ['buffer_cache_hit_ratio', 'buffer', 'absolute', 1, 1000],
+            ['cursor_cache_hit_ratio', 'cursor', 'absolute', 1, 1000],
+            ['library_cache_hit_ratio', 'library', 'absolute', 1, 1000],
+            ['row_cache_hit_ratio', 'row', 'absolute', 1, 1000],
+        ]
+    },
 }
 
 
@@ -148,8 +158,7 @@ FROM
 QUERY_SYSTEM = '''
 SELECT
   metric_name,
-  value,
-  begin_time
+  value
 FROM
   gv$sysmetric
 ORDER BY
@@ -172,6 +181,13 @@ PROCESS_METRICS = [
     'pga_freeable_memory',
     'pga_maximum_memory',
 ]
+
+SYS_METRICS = {
+    'Buffer Cache Hit Ratio': 'buffer_cache_hit_ratio',
+    'Cursor Cache Hit Ratio': 'cursor_cache_hit_ratio',
+    'Library Cache Hit Ratio': 'library_cache_hit_ratio',
+    'Row Cache Hit Ratio': 'row_cache_hit_ratio',
+}
 
 
 class Service(SimpleService):
@@ -297,11 +313,26 @@ class Service(SimpleService):
                     continue
                 # TODO: remove inactive?
                 if name not in self.active_tablespaces:
-                    self.active_tablespaces.update(name)
+                    self.active_tablespaces.add(name)
                     self.add_tablespace_charts(name)
                 data['{0}_tablespace_size'.format(name)] = int(size * 1000)
                 data['{0}_tablespace_used'.format(name)] = int(used * 1000)
                 data['{0}_tablespace_used_in_percent'.format(name)] = int(used_in_percent * 1000)
+
+        # SYSTEM
+        try:
+            rv = self.gather_system_metrics()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            for name, value in rv:
+                if name not in SYS_METRICS:
+                    continue
+                if 'Cache Hit Ratio' in name:
+                    value = int(float(value) * 1000)
+                data[SYS_METRICS[name]] = value
 
         return data or None
 
@@ -470,61 +501,14 @@ class Service(SimpleService):
          ['Total PGA Used by SQL Workareas', 0],
          ['Run Queue Per Sec', 0],
          ['VM in bytes Per Sec', 0],
-         ['VM out bytes Per Sec', 0],
-         ['Buffer Cache Hit Ratio', 100],
-         ['Total PGA Used by SQL Workareas', 0],
-         ['User Transaction Per Sec', 0],
-         ['Physical Reads Per Sec', 0],
-         ['Physical Reads Per Txn', 0],
-         ['Physical Writes Per Sec', 0],
-         ['Physical Writes Per Txn', 0],
-         ['Physical Reads Direct Per Sec', 0],
-         ['Physical Reads Direct Per Txn', 0],
-         ['Redo Generated Per Sec', Decimal('18.6542305129913')],
-         ['Redo Generated Per Txn', 280],
-         ['Logons Per Sec', Decimal('0.0666222518321119')],
-         ['Logons Per Txn', 1],
-         ['User Calls Per Sec', Decimal('0.133244503664224')],
-         ['User Calls Per Txn', 2],
-         ['Logical Reads Per Sec', Decimal('2.33177881412392')],
-         ['Logical Reads Per Txn', 35],
-         ['Redo Writes Per Sec', Decimal('0.133244503664224')],
-         ['Redo Writes Per Txn', 2],
-         ['Total Table Scans Per Sec', Decimal('0.0666222518321119')],
-         ['Total Table Scans Per Txn', 1],
-         ['Full Index Scans Per Sec', 0],
-         ['Full Index Scans Per Txn', 0],
-         ['Execute Without Parse Ratio', 0],
-         ['Soft Parse Ratio', 100],
-         ['Host CPU Utilization (%)', Decimal('0.14194464158978')],
-         ['DB Block Gets Per Sec', 0],
-         ['DB Block Gets Per Txn', 0],
-         ['Consistent Read Gets Per Sec', Decimal('2.33177881412392')],
-         ['Consistent Read Gets Per Txn', 35],
-         ['DB Block Changes Per Sec', 0],
-         ['DB Block Changes Per Txn', 0],
-         ['Consistent Read Changes Per Sec', 0],
-         ['Consistent Read Changes Per Txn', 0],
-         ['Database CPU Time Ratio', 0],
-         ['Library Cache Hit Ratio', 100],
-         ['Shared Pool Free %', Decimal('7.82380268491548')],
-         ['Executions Per Txn', 9],
-         ['Executions Per Sec', Decimal('0.599600266489007')],
-         ['Txns Per Logon', 0],
-         ['Database Time Per Sec', 0],
-         ['Average Active Sessions', 0],
-         ['Host CPU Usage Per Sec', Decimal('0.133244503664224')],
-         ['Cell Physical IO Interconnect Bytes', 1131520],
-         ['Temp Space Used', 0],
-         ['Total PGA Allocated', 200657920],
-         ['Memory Sorts Ratio', 100]]
+         ['VM out bytes Per Sec', 0]]
         """
 
         metrics = list()
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_SYSTEM)
-            for row in cursor.fetchall():
-                metrics.append([row[0], row[1]])
+            for metric_name, value in cursor.fetchall():
+                metrics.append([metric_name, value])
         return metrics
 
     def gather_process_metrics(self):
@@ -617,8 +601,8 @@ class Service(SimpleService):
         metrics = list()
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_WAIT_TIME)
-            for wait_class, value in cursor.fetchall():
-                metrics.append([wait_class, value])
+            for wait_class_name, value in cursor.fetchall():
+                metrics.append([wait_class_name, value])
         return metrics
 
     def gather_processes_count(self):
