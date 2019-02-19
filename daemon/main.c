@@ -955,6 +955,7 @@ int main(int argc, char **argv) {
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
 #endif
+        test_clock_boottime();
 
         // prepare configuration environment variables for the plugins
 
