@@ -426,7 +426,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
                 return 1;
             }
 
-            name_buf[r-1] = '\0';
+            name_buf[r - 1] = '\0'; // erase extra character
             cc->cpuidle_state[state].name = strdupz(trim(name_buf));
             close(fd);
 
