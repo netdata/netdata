@@ -2885,19 +2885,29 @@ function getGithubLatestVersion(callback) {
 
 function getGCSLatestVersion(callback) {
     versionLog('Downloading latest version id from GCS...');
-
     $.ajax({
-        url: 'https://storage.googleapis.com/netdata-nightlies/latest-version.txt',
-        async: false,
+        url: "https://www.googleapis.com/storage/v1/b/netdata-nightlies/o/latest-version.txt",
+        async: true,
         cache: false
     })
-        .done(function (data) {
-            data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
-            versionLog('Latest nightly version from GCS is ' + data);
-            callback(data);
+        .done(function (response) {
+            $.ajax({
+                url: response.mediaLink,
+                async: true,
+                cache: false
+            })
+                .done(function (data) {
+                    data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
+                    versionLog('Latest nightly version from GCS is ' + data);
+                    callback(data);
+                })
+                .fail(function (xhr, textStatus, errorThrown) {
+                    versionLog('Failed to download the latest nightly version id from GCS!');
+                    callback(null);
+                });
         })
         .fail(function (xhr, textStatus, errorThrown) {
-            versionLog('Failed to download the latest nightly version id from GCS!');
+            versionLog('Failed to download the latest nightly version from GCS!');
             callback(null);
         });
 }
@@ -2947,7 +2957,7 @@ function notifyForUpdate(force) {
             versionLog('<p><big>Failed to get the latest netdata version.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
         } else if (versionsMatch(sha1, sha2)) {
             save = true;
-            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
+            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>We probably need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
         } else {
             save = true;
             var compare = 'https://docs.netdata.cloud/changelog/';
