@@ -18,6 +18,7 @@ class LogService(SimpleService):
         self.__glob_path = self.log_path
         self._last_position = 0
         self.__re_find = dict(current=0, run=0, maximum=60)
+        self.open_args = {'errors': 'replace'} if sys.version_info[0] > 2 else {}
 
     def _get_raw_data(self):
         """
@@ -35,8 +36,7 @@ class LogService(SimpleService):
             elif size < self._last_position:
                 self._last_position = 0  # read from beginning if file has shrunk
 
-            open_args = {'errors': 'replace'} if sys.version_info[0] > 2 else {}
-            with open(self.log_path, **open_args) as fp:
+            with open(self.log_path, **self.open_args) as fp:
                 fp.seek(self._last_position)
                 for line in fp:
                     lines.append(line)
