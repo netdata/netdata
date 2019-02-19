@@ -166,3 +166,7 @@ docs/generator/mkdocs.yml
 
 netdata-updater.sh
 .environment.sh
+
+tags
+output
+compile_commands.json

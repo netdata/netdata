@@ -15,6 +15,13 @@ find_package(PkgConfig REQUIRED)
 # set this to see the compilation commands
 # set(CMAKE_VERBOSE_MAKEFILE 1)
 
+# Add common library directories to search path
+link_directories("/usr/lib"
+                 "/usr/local/lib"
+                 "/lib")
+
+# Generate compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # -----------------------------------------------------------------------------
 # Set compilation options according to build type
