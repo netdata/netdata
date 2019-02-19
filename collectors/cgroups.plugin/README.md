@@ -89,6 +89,10 @@ The whole point for the additional pattern list, is to limit the number of times
 
 The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
 
+### alarms
+
+CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram` and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf` file.
+
 ## Monitoring systemd services
 
 netdata monitors **systemd services**. Example:

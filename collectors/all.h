@@ -12,7 +12,6 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
-#include "nfacct.plugin/plugin_nfacct.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -55,8 +54,8 @@
 #define NETDATA_CHART_PRIO_SYSTEM_ENTROPY             1000
 #define NETDATA_CHART_PRIO_SYSTEM_UPTIME              1000
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES       990 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1000 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1100 // freebsd only
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1000
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1100
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES      1000
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS      1000
 #define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SEGS 1000 // freebsd only
@@ -287,9 +286,6 @@
 #define NETDATA_CHART_PRIO_NETFILTER_EXPECT           8703
 #define NETDATA_CHART_PRIO_NETFILTER_ERRORS           8705
 #define NETDATA_CHART_PRIO_NETFILTER_SEARCH           8710
-
-#define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
-#define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
 
 // SYNPROXY
 

@@ -7,35 +7,35 @@
 # Ownership by directory structure
 .travis/ @paufantom @cakrit
 .github/ @paufantom @cakrit
-build/ @paulfantom
+build/ @paulfantom @cakrit
 backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
 backends/json/ @ktsaou @vlvkobal
 backends/opentsdb/ @ktsaou @vlvkobal
 backends/prometheus/ @ktsaou @vlvkobal @paulfantom
-collectors/ @ktsaou @vlvkobal
-collectors/charts.d.plugin/ @ktsaou @paulfantom
-collectors/freebsd.plugin/ @vlvkobal
-collectors/macos.plugin/ @vlvkobal
-collectors/node.d.plugin/ @ktsaou @gmosx
-collectors/node.d.plugin/fronius/ @ktsaou @gmosx @ccremer
+collectors/ @ktsaou @vlvkobal @cakrit
+collectors/charts.d.plugin/ @ktsaou @paulfantom @cakrit
+collectors/freebsd.plugin/ @vlvkobal @cakrit
+collectors/macos.plugin/ @vlvkobal @cakrit
+collectors/node.d.plugin/ @ktsaou @gmosx @cakrit
+collectors/node.d.plugin/fronius/ @ktsaou @gmosx @ccremer @cakrit
 collectors/node.d.plugin/snmp/ @ktsaou @gmosx @cakrit
-collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer
+collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer @cakrit
 collectors/python.d.plugin/ @ilyam8
-daemon/ @ktsaou @vlvkobal
+daemon/ @ktsaou @mfundul @cakrit
 database/ @ktsaou @mfundul
 docs/ @cakrit
 health/ @ktsaou @cakrit
 health/health.d/ @ktsaou @cakrit
 health/notifications/ @ktsaou @Ferroin @cakrit
 installer/ @ktsaou @paulfantom @cakrit
-libnetdata/ @ktsaou @vlvkobal
-makeself/ @ktsaou @paulfantom
-packaging/ @paulfantom
-registry/ @ktsaou @gmosx
+libnetdata/ @ktsaou @cakrit
+makeself/ @ktsaou @paulfantom @cakrit
+packaging/ @paulfantom @cakrit
+registry/ @ktsaou @gmosx @cakrit
 streaming/ @ktsaou @mfundul
-web/ @ktsaou @vlvkobal
-web/gui/ @ktsaou @gmosx
+web/ @ktsaou @cakrit
+web/gui/ @ktsaou @gmosx @cakrit
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @ktsaou @cakrit

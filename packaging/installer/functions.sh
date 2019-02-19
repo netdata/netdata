@@ -392,8 +392,10 @@ iscontainer() {
 		IFS='(),#:' read name pid th threads
 		echo $pid
 	})
-	pid=$((pid + 0))
-	[ ${pid} -ne 1 ] && return 0
+	if [ ! -z "${pid}" ]; then
+		pid=$(( pid + 0 ))
+		[ ${pid} -gt 1 ] && return 0
+	fi
 
 	# lxc sets environment variable 'container'
 	[ ! -z "${container}" ] && return 0

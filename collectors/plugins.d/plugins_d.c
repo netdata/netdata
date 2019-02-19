@@ -394,9 +394,16 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
             rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             if(options && *options) {
+                if(strstr(options, "obsolete") != NULL)
+                    rrddim_is_obsolete(st, rd);
+                else
+                    rrddim_isnot_obsolete(st, rd);
                 if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
                 if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                 if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            }
+            else {
+                rrddim_isnot_obsolete(st, rd);
             }
         }
         else if(likely(hash == VARIABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_VARIABLE))) {

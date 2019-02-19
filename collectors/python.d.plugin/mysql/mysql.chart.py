@@ -168,16 +168,19 @@ ORDER = [
     'binlog_cache',
     'binlog_stmt_cache',
     'threads',
+    'threads_creation_rate',
     'thread_cache_misses',
     'innodb_io',
     'innodb_io_ops',
     'innodb_io_pending_ops',
     'innodb_log',
     'innodb_os_log',
+    'innodb_os_log_fsync_writes',
     'innodb_os_log_io',
     'innodb_cur_row_lock',
     'innodb_rows',
     'innodb_buffer_pool_pages',
+    'innodb_buffer_pool_flush_pages_requests',
     'innodb_buffer_pool_bytes',
     'innodb_buffer_pool_read_ahead',
     'innodb_buffer_pool_reqs',
@@ -202,14 +205,14 @@ ORDER = [
 
 CHARTS = {
     'net': {
-        'options': [None, 'mysql Bandwidth', 'kilobits/s', 'bandwidth', 'mysql.net', 'area'],
+        'options': [None, 'Bandwidth', 'kilobits/s', 'bandwidth', 'mysql.net', 'area'],
         'lines': [
             ['Bytes_received', 'in', 'incremental', 8, 1000],
             ['Bytes_sent', 'out', 'incremental', -8, 1000]
         ]
     },
     'queries': {
-        'options': [None, 'mysql Queries', 'queries/s', 'queries', 'mysql.queries', 'line'],
+        'options': [None, 'Queries', 'queries/s', 'queries', 'mysql.queries', 'line'],
         'lines': [
             ['Queries', 'queries', 'incremental'],
             ['Questions', 'questions', 'incremental'],
@@ -217,7 +220,7 @@ CHARTS = {
         ]
     },
     'queries_type': {
-        'options': [None, 'mysql Query type', 'queries/s', 'query_types', 'mysql.queries_type', 'stacked'],
+        'options': [None, 'Query Type', 'queries/s', 'query_types', 'mysql.queries_type', 'stacked'],
         'lines': [
             ['Com_select', 'select', 'incremental'],
             ['Com_delete', 'delete', 'incremental'],
@@ -228,7 +231,7 @@ CHARTS = {
         ]
     },
     'handlers': {
-        'options': [None, 'mysql Handlers', 'handlers/s', 'handlers', 'mysql.handlers', 'line'],
+        'options': [None, 'Handlers', 'handlers/s', 'handlers', 'mysql.handlers', 'line'],
         'lines': [
             ['Handler_commit', 'commit', 'incremental'],
             ['Handler_delete', 'delete', 'incremental'],
@@ -247,14 +250,14 @@ CHARTS = {
         ]
     },
     'table_locks': {
-        'options': [None, 'mysql Tables Locks', 'locks/s', 'locks', 'mysql.table_locks', 'line'],
+        'options': [None, 'Tables Locks', 'locks/s', 'locks', 'mysql.table_locks', 'line'],
         'lines': [
             ['Table_locks_immediate', 'immediate', 'incremental'],
             ['Table_locks_waited', 'waited', 'incremental', -1, 1]
         ]
     },
     'join_issues': {
-        'options': [None, 'mysql Select Join Issues', 'joins/s', 'issues', 'mysql.join_issues', 'line'],
+        'options': [None, 'Select Join Issues', 'joins/s', 'issues', 'mysql.join_issues', 'line'],
         'lines': [
             ['Select_full_join', 'full_join', 'incremental'],
             ['Select_full_range_join', 'full_range_join', 'incremental'],
@@ -264,7 +267,7 @@ CHARTS = {
         ]
     },
     'sort_issues': {
-        'options': [None, 'mysql Sort Issues', 'issues/s', 'issues', 'mysql.sort_issues', 'line'],
+        'options': [None, 'Sort Issues', 'issues/s', 'issues', 'mysql.sort_issues', 'line'],
         'lines': [
             ['Sort_merge_passes', 'merge_passes', 'incremental'],
             ['Sort_range', 'range', 'incremental'],
@@ -272,7 +275,7 @@ CHARTS = {
         ]
     },
     'tmp': {
-        'options': [None, 'mysql Tmp Operations', 'counter', 'temporaries', 'mysql.tmp', 'line'],
+        'options': [None, 'Tmp Operations', 'counter', 'temporaries', 'mysql.tmp', 'line'],
         'lines': [
             ['Created_tmp_disk_tables', 'disk_tables', 'incremental'],
             ['Created_tmp_files', 'files', 'incremental'],
@@ -280,14 +283,14 @@ CHARTS = {
         ]
     },
     'connections': {
-        'options': [None, 'mysql Connections', 'connections/s', 'connections', 'mysql.connections', 'line'],
+        'options': [None, 'Connections', 'connections/s', 'connections', 'mysql.connections', 'line'],
         'lines': [
             ['Connections', 'all', 'incremental'],
             ['Aborted_connects', 'aborted', 'incremental']
         ]
     },
     'connections_active': {
-        'options': [None, 'mysql Connections Active', 'connections', 'connections', 'mysql.connections_active', 'line'],
+        'options': [None, 'Connections Active', 'connections', 'connections', 'mysql.connections_active', 'line'],
         'lines': [
             ['Threads_connected', 'active', 'absolute'],
             ['max_connections', 'limit', 'absolute'],
@@ -295,19 +298,24 @@ CHARTS = {
         ]
     },
     'binlog_cache': {
-        'options': [None, 'mysql Binlog Cache', 'transactions/s', 'binlog', 'mysql.binlog_cache', 'line'],
+        'options': [None, 'Binlog Cache', 'transactions/s', 'binlog', 'mysql.binlog_cache', 'line'],
         'lines': [
             ['Binlog_cache_disk_use', 'disk', 'incremental'],
             ['Binlog_cache_use', 'all', 'incremental']
         ]
     },
     'threads': {
-        'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
+        'options': [None, 'Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
             ['Threads_connected', 'connected', 'absolute'],
-            ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
             ['Threads_running', 'running', 'absolute'],
+        ]
+    },
+    'threads_creation_rate': {
+        'options': [None, 'Threads Creation Rate', 'threads', 'threads/s', 'mysql.threads', 'line'],
+        'lines': [
+            ['Threads_created', 'created', 'incremental'],
         ]
     },
     'thread_cache_misses': {
@@ -317,14 +325,14 @@ CHARTS = {
         ]
     },
     'innodb_io': {
-        'options': [None, 'mysql InnoDB I/O Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_io', 'area'],
+        'options': [None, 'InnoDB I/O Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_io', 'area'],
         'lines': [
             ['Innodb_data_read', 'read', 'incremental', 1, 1024],
             ['Innodb_data_written', 'write', 'incremental', -1, 1024]
         ]
     },
     'innodb_io_ops': {
-        'options': [None, 'mysql InnoDB I/O Operations', 'operations/s', 'innodb', 'mysql.innodb_io_ops', 'line'],
+        'options': [None, 'InnoDB I/O Operations', 'operations/s', 'innodb', 'mysql.innodb_io_ops', 'line'],
         'lines': [
             ['Innodb_data_reads', 'reads', 'incremental'],
             ['Innodb_data_writes', 'writes', 'incremental', -1, 1],
@@ -332,7 +340,7 @@ CHARTS = {
         ]
     },
     'innodb_io_pending_ops': {
-        'options': [None, 'mysql InnoDB Pending I/O Operations', 'operations', 'innodb',
+        'options': [None, 'InnoDB Pending I/O Operations', 'operations', 'innodb',
                     'mysql.innodb_io_pending_ops', 'line'],
         'lines': [
             ['Innodb_data_pending_reads', 'reads', 'absolute'],
@@ -341,7 +349,7 @@ CHARTS = {
         ]
     },
     'innodb_log': {
-        'options': [None, 'mysql InnoDB Log Operations', 'operations/s', 'innodb', 'mysql.innodb_log', 'line'],
+        'options': [None, 'InnoDB Log Operations', 'operations/s', 'innodb', 'mysql.innodb_log', 'line'],
         'lines': [
             ['Innodb_log_waits', 'waits', 'incremental'],
             ['Innodb_log_write_requests', 'write_requests', 'incremental', -1, 1],
@@ -349,28 +357,33 @@ CHARTS = {
         ]
     },
     'innodb_os_log': {
-        'options': [None, 'mysql InnoDB OS Log Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'options': [None, 'InnoDB OS Log Pending Operations', 'operations', 'innodb', 'mysql.innodb_os_log', 'line'],
+        'lines': [
+            ['Innodb_os_log_pending_fsyncs', 'fsyncs', 'absolute'],
+            ['Innodb_os_log_pending_writes', 'writes', 'absolute', -1, 1],
+        ]
+    },
+    'innodb_os_log_fsync_writes': {
+        'options': [None, 'InnoDB OS Log Operations', 'operations/s', 'innodb', 'mysql.innodb_os_log', 'line'],
         'lines': [
             ['Innodb_os_log_fsyncs', 'fsyncs', 'incremental'],
-            ['Innodb_os_log_pending_fsyncs', 'pending_fsyncs', 'absolute'],
-            ['Innodb_os_log_pending_writes', 'pending_writes', 'absolute', -1, 1],
         ]
     },
     'innodb_os_log_io': {
-        'options': [None, 'mysql InnoDB OS Log Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_os_log_io', 'area'],
+        'options': [None, 'InnoDB OS Log Bandwidth', 'KiB/s', 'innodb', 'mysql.innodb_os_log_io', 'area'],
         'lines': [
             ['Innodb_os_log_written', 'write', 'incremental', -1, 1024],
         ]
     },
     'innodb_cur_row_lock': {
-        'options': [None, 'mysql InnoDB Current Row Locks', 'operations', 'innodb',
+        'options': [None, 'InnoDB Current Row Locks', 'operations', 'innodb',
                     'mysql.innodb_cur_row_lock', 'area'],
         'lines': [
             ['Innodb_row_lock_current_waits', 'current_waits', 'absolute']
         ]
     },
     'innodb_rows': {
-        'options': [None, 'mysql InnoDB Row Operations', 'operations/s', 'innodb', 'mysql.innodb_rows', 'area'],
+        'options': [None, 'InnoDB Row Operations', 'operations/s', 'innodb', 'mysql.innodb_rows', 'area'],
         'lines': [
             ['Innodb_rows_inserted', 'inserted', 'incremental'],
             ['Innodb_rows_read', 'read', 'incremental', 1, 1],
@@ -379,19 +392,25 @@ CHARTS = {
         ]
     },
     'innodb_buffer_pool_pages': {
-        'options': [None, 'mysql InnoDB Buffer Pool Pages', 'pages', 'innodb',
+        'options': [None, 'InnoDB Buffer Pool Pages', 'pages', 'innodb',
                     'mysql.innodb_buffer_pool_pages', 'line'],
         'lines': [
             ['Innodb_buffer_pool_pages_data', 'data', 'absolute'],
             ['Innodb_buffer_pool_pages_dirty', 'dirty', 'absolute', -1, 1],
             ['Innodb_buffer_pool_pages_free', 'free', 'absolute'],
-            ['Innodb_buffer_pool_pages_flushed', 'flushed', 'incremental', -1, 1],
             ['Innodb_buffer_pool_pages_misc', 'misc', 'absolute', -1, 1],
             ['Innodb_buffer_pool_pages_total', 'total', 'absolute']
         ]
     },
+    'innodb_buffer_pool_flush_pages_requests': {
+        'options': [None, 'InnoDB Buffer Pool Flush Pages Requests', 'requests/s', 'innodb',
+                    'mysql.innodb_buffer_pool_pages', 'line'],
+        'lines': [
+            ['Innodb_buffer_pool_pages_flushed', 'flush pages', 'incremental'],
+        ]
+    },
     'innodb_buffer_pool_bytes': {
-        'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MiB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
+        'options': [None, 'InnoDB Buffer Pool Bytes', 'MiB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
         'lines': [
             ['Innodb_buffer_pool_bytes_data', 'data', 'absolute', 1, 1024 * 1024],
             ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024]
@@ -407,7 +426,7 @@ CHARTS = {
         ]
     },
     'innodb_buffer_pool_reqs': {
-        'options': [None, 'mysql InnoDB Buffer Pool Requests', 'requests/s', 'innodb',
+        'options': [None, 'InnoDB Buffer Pool Requests', 'requests/s', 'innodb',
                     'mysql.innodb_buffer_pool_reqs', 'area'],
         'lines': [
             ['Innodb_buffer_pool_read_requests', 'reads', 'incremental'],
@@ -415,7 +434,7 @@ CHARTS = {
         ]
     },
     'innodb_buffer_pool_ops': {
-        'options': [None, 'mysql InnoDB Buffer Pool Operations', 'operations/s', 'innodb',
+        'options': [None, 'InnoDB Buffer Pool Operations', 'operations/s', 'innodb',
                     'mysql.innodb_buffer_pool_ops', 'area'],
         'lines': [
             ['Innodb_buffer_pool_reads', 'disk reads', 'incremental'],
@@ -423,7 +442,7 @@ CHARTS = {
         ]
     },
     'qcache_ops': {
-        'options': [None, 'mysql QCache Operations', 'queries/s', 'qcache', 'mysql.qcache_ops', 'line'],
+        'options': [None, 'QCache Operations', 'queries/s', 'qcache', 'mysql.qcache_ops', 'line'],
         'lines': [
             ['Qcache_hits', 'hits', 'incremental'],
             ['Qcache_lowmem_prunes', 'lowmem prunes', 'incremental', -1, 1],
@@ -432,26 +451,26 @@ CHARTS = {
         ]
     },
     'qcache': {
-        'options': [None, 'mysql QCache Queries in Cache', 'queries', 'qcache', 'mysql.qcache', 'line'],
+        'options': [None, 'QCache Queries in Cache', 'queries', 'qcache', 'mysql.qcache', 'line'],
         'lines': [
             ['Qcache_queries_in_cache', 'queries', 'absolute']
         ]
     },
     'qcache_freemem': {
-        'options': [None, 'mysql QCache Free Memory', 'MiB', 'qcache', 'mysql.qcache_freemem', 'area'],
+        'options': [None, 'QCache Free Memory', 'MiB', 'qcache', 'mysql.qcache_freemem', 'area'],
         'lines': [
             ['Qcache_free_memory', 'free', 'absolute', 1, 1024 * 1024]
         ]
     },
     'qcache_memblocks': {
-        'options': [None, 'mysql QCache Memory Blocks', 'blocks', 'qcache', 'mysql.qcache_memblocks', 'line'],
+        'options': [None, 'QCache Memory Blocks', 'blocks', 'qcache', 'mysql.qcache_memblocks', 'line'],
         'lines': [
             ['Qcache_free_blocks', 'free', 'absolute'],
             ['Qcache_total_blocks', 'total', 'absolute']
         ]
     },
     'key_blocks': {
-        'options': [None, 'mysql MyISAM Key Cache Blocks', 'blocks', 'myisam', 'mysql.key_blocks', 'line'],
+        'options': [None, 'MyISAM Key Cache Blocks', 'blocks', 'myisam', 'mysql.key_blocks', 'line'],
         'lines': [
             ['Key_blocks_unused', 'unused', 'absolute'],
             ['Key_blocks_used', 'used', 'absolute', -1, 1],
@@ -459,14 +478,14 @@ CHARTS = {
         ]
     },
     'key_requests': {
-        'options': [None, 'mysql MyISAM Key Cache Requests', 'requests/s', 'myisam', 'mysql.key_requests', 'area'],
+        'options': [None, 'MyISAM Key Cache Requests', 'requests/s', 'myisam', 'mysql.key_requests', 'area'],
         'lines': [
             ['Key_read_requests', 'reads', 'incremental'],
             ['Key_write_requests', 'writes', 'incremental', -1, 1]
         ]
     },
     'key_disk_ops': {
-        'options': [None, 'mysql MyISAM Key Cache Disk Operations', 'operations/s',
+        'options': [None, 'MyISAM Key Cache Disk Operations', 'operations/s',
                     'myisam', 'mysql.key_disk_ops', 'area'],
         'lines': [
             ['Key_reads', 'reads', 'incremental'],
@@ -474,19 +493,19 @@ CHARTS = {
         ]
     },
     'files': {
-        'options': [None, 'mysql Open Files', 'files', 'files', 'mysql.files', 'line'],
+        'options': [None, 'Open Files', 'files', 'files', 'mysql.files', 'line'],
         'lines': [
             ['Open_files', 'files', 'absolute']
         ]
     },
     'files_rate': {
-        'options': [None, 'mysql Opened Files Rate', 'files/s', 'files', 'mysql.files_rate', 'line'],
+        'options': [None, 'Opened Files Rate', 'files/s', 'files', 'mysql.files_rate', 'line'],
         'lines': [
             ['Opened_files', 'files', 'incremental']
         ]
     },
     'binlog_stmt_cache': {
-        'options': [None, 'mysql Binlog Statement Cache', 'statements/s', 'binlog',
+        'options': [None, 'Binlog Statement Cache', 'statements/s', 'binlog',
                     'mysql.binlog_stmt_cache', 'line'],
         'lines': [
             ['Binlog_stmt_cache_disk_use', 'disk', 'incremental'],
@@ -494,7 +513,7 @@ CHARTS = {
         ]
     },
     'connection_errors': {
-        'options': [None, 'mysql Connection Errors', 'connections/s', 'connections',
+        'options': [None, 'Connection Errors', 'connections/s', 'connections',
                     'mysql.connection_errors', 'line'],
         'lines': [
             ['Connection_errors_accept', 'accept', 'incremental'],
@@ -519,35 +538,35 @@ CHARTS = {
         ]
     },
     'galera_writesets': {
-        'options': [None, 'Replicated writesets', 'writesets/s', 'galera', 'mysql.galera_writesets', 'line'],
+        'options': [None, 'Replicated Writesets', 'writesets/s', 'galera', 'mysql.galera_writesets', 'line'],
         'lines': [
             ['wsrep_received', 'rx', 'incremental'],
             ['wsrep_replicated', 'tx', 'incremental', -1, 1],
         ]
     },
     'galera_bytes': {
-        'options': [None, 'Replicated bytes', 'KiB/s', 'galera', 'mysql.galera_bytes', 'area'],
+        'options': [None, 'Replicated Bytes', 'KiB/s', 'galera', 'mysql.galera_bytes', 'area'],
         'lines': [
             ['wsrep_received_bytes', 'rx', 'incremental', 1, 1024],
             ['wsrep_replicated_bytes', 'tx', 'incremental', -1, 1024],
         ]
     },
     'galera_queue': {
-        'options': [None, 'Galera queue', 'writesets', 'galera', 'mysql.galera_queue', 'line'],
+        'options': [None, 'Galera Queue', 'writesets', 'galera', 'mysql.galera_queue', 'line'],
         'lines': [
             ['wsrep_local_recv_queue', 'rx', 'absolute'],
             ['wsrep_local_send_queue', 'tx', 'absolute', -1, 1],
         ]
     },
     'galera_conflicts': {
-        'options': [None, 'Replication conflicts', 'transactions', 'galera', 'mysql.galera_conflicts', 'area'],
+        'options': [None, 'Replication Conflicts', 'transactions', 'galera', 'mysql.galera_conflicts', 'area'],
         'lines': [
             ['wsrep_local_bf_aborts', 'bf_aborts', 'incremental'],
             ['wsrep_local_cert_failures', 'cert_fails', 'incremental', -1, 1],
         ]
     },
     'galera_flow_control': {
-        'options': [None, 'Flow control', 'millisec', 'galera', 'mysql.galera_flow_control', 'area'],
+        'options': [None, 'Flow Control', 'millisec', 'galera', 'mysql.galera_flow_control', 'area'],
         'lines': [
             ['wsrep_flow_control_paused_ns', 'paused', 'incremental', 1, 1000000],
         ]

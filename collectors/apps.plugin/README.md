@@ -77,7 +77,7 @@ To do this, edit `/etc/netdata/netdata.conf` and find this section:
 ```
 [plugin:apps]
 	# update every = 1
-	# command options = 
+	# command options =
 ```
 
 Uncomment the line `update every` and set it to a higher number. If you just set it to ` 2 `,
@@ -100,7 +100,8 @@ For the **Applications** section, only groups configured in this file are report
 All other processes will be reported as `other`.
 
 For each process given, its whole process tree will be grouped, not just the process matched.
-The plugin will include both parents and children.
+The plugin will include both parents and children. If including the parents into the group is
+undesirable, the line `other: *` should be appended to the `apps_groups.conf`.
 
 The process names are the ones returned by:
 
@@ -254,7 +255,7 @@ Exactly like `top`, `htop` is providing an incomplete breakdown of the system CP
 
 ```
   CPU[||||||||||||||||||||||||100.0%]   Tasks: 27, 11 thr; 2 running
-  Mem[||||||||||||||||||||85.4M/993M]   Load average: 1.16 0.88 0.90 
+  Mem[||||||||||||||||||||85.4M/993M]   Load average: 1.16 0.88 0.90
   Swp[                         0K/0K]   Uptime: 3 days, 21:37:03
 
   PID USER      PRI  NI  VIRT   RES   SHR S CPU% MEM%   TIME+  Command
@@ -305,10 +306,10 @@ MEM  [ 23.7%]   user:    30.9%   total:   993M   total:       0   1 min:    1.18
 SWAP [  0.0%]   system:  67.8%   used:    236M   used:        0   5 min:    1.08
                 idle:     0.0%   free:    757M   free:        0   15 min:   1.00
 
-NETWORK     Rx/s   Tx/s   TASKS  75 (90 thr), 1 run, 74 slp, 0 oth 
+NETWORK     Rx/s   Tx/s   TASKS  75 (90 thr), 1 run, 74 slp, 0 oth
 eth0        168b    2Kb
-eth1          0b     0b     CPU%  MEM%   PID USER        NI S Command 
-lo            0b     0b     13.5   0.4 12789 root         0 S -bash 
+eth1          0b     0b     CPU%  MEM%   PID USER        NI S Command
+lo            0b     0b     13.5   0.4 12789 root         0 S -bash
                              1.6   2.2  7025 root         0 R /usr/bin/python /u
 DISK I/O     R/s    W/s      1.0   0.0     9 root         0 S rcuos/0
 vda1           0     4K      0.3   0.2  7024 netdata      0 S /usr/libexec/netda

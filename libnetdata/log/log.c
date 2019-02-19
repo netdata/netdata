@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <daemon/main.h>
 #include "../libnetdata.h"
 
 int web_server_is_multithreaded = 1;
@@ -376,6 +377,8 @@ void error_int( const char *prefix, const char *file, const char *function, cons
 }
 
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
+    // save a copy of errno - just in case this function generates a new error
+    int __errno = errno;
     va_list args;
 
     if(error_log_syslog) {
@@ -399,6 +402,12 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     fputc('\n', stderr);
 
     log_unlock();
+
+    char action_data[70+1];
+	snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
+	char action_result[60+1];
+	snprintfz(action_result, 60, "%s:%s",program_name, strcmp(program_name,"STREAM_RECEIVER")?netdata_thread_tag():"[x]");
+	send_statistics("FATAL", action_result, action_data);
 
     netdata_cleanup_and_exit(1);
 }

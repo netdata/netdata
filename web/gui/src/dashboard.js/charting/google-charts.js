@@ -1,5 +1,8 @@
 // google charts
 
+// Codacy declarations
+/* global google */
+
 NETDATA.googleInitialize = function (callback) {
     if (typeof netdataNoGoogleCharts === 'undefined' || !netdataNoGoogleCharts) {
         $.ajax({

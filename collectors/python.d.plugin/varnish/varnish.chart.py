@@ -136,6 +136,8 @@ CHARTS = {
     }
 }
 
+VARNISHSTAT = 'varnishstat'
+
 
 class Parser:
     _backend_new = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
@@ -172,19 +174,31 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        varnishstat = find_binary('varnishstat')
-        self.command = [varnishstat, '-1'] if varnishstat else None
+        self.instance_name = configuration.get('instance_name')
         self.parser = Parser()
+        self.command = None
+
+    def create_command(self):
+        varnishstat = find_binary(VARNISHSTAT)
+
+        if not varnishstat:
+            self.error("can't locate '{0}' binary or binary is not executable by user netdata".format(VARNISHSTAT))
+            return False
+
+        if self.instance_name:
+            self.command = [varnishstat, '-1', '-n', self.instance_name, '-t', '1']
+        else:
+            self.command = [varnishstat, '-1', '-t', '1']
+        return True
 
     def check(self):
-        if not self.command:
-            self.error("Can't locate 'varnishstat' binary or binary is not executable by user netdata")
+        if not self.create_command():
             return False
 
         # STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error("No output from 'varnishstat'. Not enough privileges?")
+            self.error("No output from 'varnishstat'. Is it running? Not enough privileges?")
             return False
 
         self.parser.init(reply)

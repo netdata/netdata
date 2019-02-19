@@ -14,7 +14,7 @@ Netdata is **free, open-source software** and it currently runs on **Linux**, **
 
 ![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
 
-Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/grouping=no&sort=stars).
+Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars) and it is the 3rd most starred open-source project.
 Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
 
 ---
@@ -92,8 +92,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 The above command will:
 
 1. install any required packages on your system (it will ask you to confirm before doing so),
-2. download netdata source to `/usr/src/netdata.git`
-3. compile it, install it and start it
+2. compile it, install it and start it
 
 More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
 

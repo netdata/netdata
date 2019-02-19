@@ -248,7 +248,6 @@ set(FREEIPMI_PLUGIN_FILES
 
 set(NFACCT_PLUGIN_FILES
         collectors/nfacct.plugin/plugin_nfacct.c
-        collectors/nfacct.plugin/plugin_nfacct.h
         )
 
 set(PROC_PLUGIN_FILES
@@ -458,13 +457,6 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         )
 
-IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
-    message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINTERNAL_PLUGIN_NFACCT=1")
-ELSE()
-    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
-ENDIF()
-
 include_directories(AFTER .)
 
 add_definitions(
@@ -488,22 +480,12 @@ IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
-            ${NFACCT_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )
-    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES}
-            ${MNL_LIBRARIES}
-            ${NFACCT_LIBRARIES}
-            )
-    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS}
-            ${MNL_INCLUDE_DIRS}
-            ${NFACCT_INCLUDE_DIRS}
-            )
-    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS}
-            ${MNL_CFLAGS_OTHER}
-            ${NFACCT_CFLAGS_OTHER}
-            )
+    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
@@ -532,6 +514,12 @@ ELSE()
     SET(ENABLE_PLUGIN_FREEIPMI False)
 ENDIF()
 
+IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
+    SET(ENABLE_PLUGIN_NFACCT True)
+ELSE()
+    SET(ENABLE_PLUGIN_NFACCT False)
+ENDIF()
+
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -554,10 +542,24 @@ IF(ENABLE_PLUGIN_FREEIPMI)
     message(STATUS "freeipmi.plugin: enabled")
     add_executable(freeipmi.plugin config.h ${FREEIPMI_PLUGIN_FILES})
     target_link_libraries (freeipmi.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${IPMI_LIBRARIES})
-    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
-    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
+    target_include_directories(freeipmi.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
+    target_compile_options(freeipmi.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
 ELSE()
     message(STATUS "freeipmi.plugin: disabled (depends on libipmimonitoring)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# nfacct.plugin
+
+IF(ENABLE_PLUGIN_NFACCT)
+    message(STATUS "nfacct.plugin: enabled")
+    add_executable(nfacct.plugin config.h ${NFACCT_PLUGIN_FILES})
+    target_link_libraries (nfacct.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
+    target_include_directories(nfacct.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
+    target_compile_options(nfacct.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
 ENDIF()
 
 
@@ -568,8 +570,8 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
     message(STATUS "cgroup-network: enabled")
     add_executable(cgroup-network config.h ${CGROUP_NETWORK_FILES})
     target_link_libraries (cgroup-network libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+    target_include_directories(cgroup-network PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(cgroup-network PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()

@@ -162,6 +162,11 @@ setup_terminal || echo >/dev/null
 updater=""
 [ -x /etc/periodic/daily/netdata-updater ] && updater=/etc/periodic/daily/netdata-updater
 [ -x /etc/cron.daily/netdata-updater ] && updater=/etc/cron.daily/netdata-updater
+if [ -L "${updater}" ]; then
+	# remove old updater (symlink)
+	run "${sudo}" rm -f "${updater}"
+	updater=""
+fi
 if [ -n "${updater}" ]; then
 	# attempt to run the updater, to respect any compilation settings already in place
 	progress "Re-installing netdata..."
@@ -211,7 +216,14 @@ Machine           : ${MACHINE}
 BASH major version: ${BASH_MAJOR_VERSION}
 EOF
 
-tmpdir="$(mktemp -d /tmp/netdata-kickstart-XXXXXX)"
+# Check if tmp is mounted as noexec
+if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+	pattern="$(pwd)/netdata-kickstart-XXXXXX"
+else
+	pattern="/tmp/netdata-kickstart-XXXXXX"
+fi
+
+tmpdir="$(mktemp -d $pattern)"
 cd "${tmpdir}" || :
 
 if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
@@ -227,7 +239,8 @@ else
 			warning "Downloaded dependency installation script is empty."
 		else
 			progress "Running downloaded script to detect required packages..."
-			if run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}; then
+			run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+			if [ $? -ne 0 ] ; then
 				warning "It failed to install all the required packages, but installation might still be possible."
 			fi
 		fi

@@ -60,6 +60,7 @@ dist_noinst_DATA= \
 	package.json \
 	docs \
 	packaging/version \
+	packaging/go.d.checksums \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
 	packaging/installer/UPDATE.md \
@@ -105,6 +106,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
+	$(OPTIONAL_CUPS_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -212,9 +214,14 @@ FREEIPMI_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+CUPS_PLUGIN_FILES = \
+	collectors/cups.plugin/cups_plugin.c \
+	$(LIBNETDATA_FILES) \
+	$(NULL)
+
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
-	collectors/nfacct.plugin/plugin_nfacct.h \
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
@@ -442,7 +449,6 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(NFACCT_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -460,7 +466,6 @@ sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
 
 if ENABLE_PLUGIN_APPS
@@ -486,5 +491,23 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_CUPS
+    plugins_PROGRAMS += cups.plugin
+    cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
+    cups_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_CUPS_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_NFACCT
+    plugins_PROGRAMS += nfacct.plugin
+    nfacct_plugin_SOURCES = $(NFACCT_PLUGIN_FILES)
+    nfacct_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_NFACCT_LIBS) \
         $(NULL)
 endif
