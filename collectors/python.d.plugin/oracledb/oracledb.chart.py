@@ -19,29 +19,45 @@ CHARTS = dict()
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
 QUERY_ACTIVITIES_COUNT = '''
-"SELECT
+SELECT
   name,
   value
-FROM v$sysstat
-WHERE name IN ('parse count (total)', 'execute count', 'user commits', 'user rollbacks')"
+FROM
+  v$sysstat
+WHERE
+  name IN (
+    'parse count (total)',
+    'execute count',
+    'user commits',
+    'user rollbacks'
+  )
 '''
 QUERY_WAIT_TIME = '''
 SELECT
   n.wait_class,
-  round(m.time_waited/m.INTSIZE_CSEC,3)
-FROM v$waitclassmetric  m, v$system_wait_class n 
-WHERE m.wait_class_id=n.wait_class_id AND n.wait_class != 'Idle'
+  round(m.time_waited / m.INTSIZE_CSEC, 3)
+FROM
+  v$waitclassmetric m,
+  v$system_wait_class n
+WHERE
+  m.wait_class_id = n.wait_class_id
+  AND n.wait_class != 'Idle'
 '''
 QUERY_SESSION = '''
 SELECT
   status,
   type
-FROM v$session GROUP BY status, type
+FROM
+  v$session
+GROUP BY
+  status,
+  type
 '''
 QUERY_PROCESSES_COUNT = '''
 SELECT
- COUNT(*)
-FROM v$process
+  COUNT(*)
+FROM
+  v$process
 '''
 QUERY_PROCESS = '''
 SELECT
@@ -54,12 +70,14 @@ FROM
   gv$process
 '''
 QUERY_SYSTEM = '''
-SELECT 
+SELECT
   metric_name,
   value,
   begin_time
 FROM
-  gv$sysmetric ORDER BY begin_time
+  gv$sysmetric
+ORDER BY
+  begin_time
 '''
 QUERY_TABLESPACE = '''
 SELECT
