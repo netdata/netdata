@@ -462,14 +462,24 @@ AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
 PKG_CHECK_MODULES(
     [NFACCT],
     [libnetfilter_acct],
-    [have_libnetfilter_acct=yes],
+    [AC_CHECK_LIB(
+         [netfilter_acct],
+         [nfacct_alloc],
+         [have_libnetfilter_acct=yes],
+         [have_libnetfilter_acct=no]
+     )],
     [have_libnetfilter_acct=no]
 )
 
 PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
-    [have_libmnl=yes],
+    [AC_CHECK_LIB(
+         [mnl],
+         [mnl_socket_open],
+         [have_libmnl=yes],
+         [have_libmnl=no]
+     )],
     [have_libmnl=no]
 )
 
