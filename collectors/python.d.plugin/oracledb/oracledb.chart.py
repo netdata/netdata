@@ -12,9 +12,60 @@ except ImportError:
     HAS_ORACLE = False
 
 
-ORDER = list()
+ORDER = [
+    'processes',
+    'total_sessions',
+    'sessions',
+    'activity',
+    'wait_time',
+]
 
-CHARTS = dict()
+CHARTS = {
+    'processes': {
+        'options': [None, 'Processes', 'amount', 'processes', 'oracledb.processes', 'line'],
+        'lines': [
+            ['processes'],
+        ]
+    },
+    'total_sessions': {
+        'options': [None, 'Total Sessions', 'amount', 'sessions', 'oracledb.sessions', 'line'],
+        'lines': [
+            ['sessions_total', 'sessions'],
+        ]
+    },
+    'sessions': {
+        'options': [None, 'Sessions', 'amount', 'sessions', 'oracledb.sessions', 'line'],
+        'lines': [
+            ['sessions_active', 'active'],
+            ['sessions_inactive', 'inactive'],
+        ]
+    },
+    'activity': {
+        'options': [None, 'Activities Rate', 'activities', 'activities', 'oracledb.activity', 'stacked'],
+        'lines': [
+            ['activity_parse_count_total', 'parse count (total)', 'incremental'],
+            ['activity_execute_count', 'execute count', 'incremental'],
+            ['activity_user_commits', 'user commits', 'incremental'],
+            ['activity_user_rollbacks', 'user rollbacks', 'incremental'],
+        ]
+    },
+    'wait_time': {
+        'options': [None, 'Wait Time', 'ms', 'wait time', 'oracledb.wait_time', 'stacked'],
+        'lines': [
+            ['wait_time_application', 'application', 'absolute', 1, 1000],
+            ['wait_time_configuration', 'configuration', 'absolute', 1, 1000],
+            ['wait_time_administrative', 'administrative', 'absolute', 1, 1000],
+            ['wait_time_concurrency', 'concurrency', 'absolute', 1, 1000],
+            ['wait_time_commit', 'commit', 'absolute', 1, 1000],
+            ['wait_time_network', 'network', 'absolute', 1, 1000],
+            ['wait_time_user_io', 'user I/O', 'absolute', 1, 1000],
+            ['wait_time_system_io', 'system I/O', 'absolute', 1, 1000],
+            ['wait_time_scheduler', 'scheduler', 'absolute', 1, 1000],
+            ['wait_time_other', 'other', 'absolute', 1, 1000],
+        ]
+    }
+}
+
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
