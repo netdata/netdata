@@ -6,9 +6,9 @@
 
 static inline const char* get_release_channel() {
     static int use_stable = -1;
-    char filename[FILENAME_MAX + 1];
 
     if (use_stable == -1) {
+		char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
         procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_DEFAULT);
         if(!ff) {
