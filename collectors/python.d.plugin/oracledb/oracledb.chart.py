@@ -154,7 +154,7 @@ class Service(SimpleService):
         ]):
             return False
 
-        return True
+        return bool(self.get_data())
 
     def get_data(self):
         if not self.alive and not self.reconnect():
