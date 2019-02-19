@@ -271,6 +271,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+        # FIXME: remove defaults
         self.user = configuration.get('user', 'system')
         self.password = configuration.get('password', 'oraclepass')
         self.server = configuration.get('server', 'localhost:1521')
