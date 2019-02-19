@@ -94,7 +94,7 @@ WHERE
   m.wait_class_id = n.wait_class_id
   AND n.wait_class != 'Idle'
 '''
-QUERY_SESSION = '''
+QUERY_SESSION_COUNT = '''
 SELECT
   status,
   type
@@ -147,17 +147,6 @@ PROCESS_METRICS = [
     'pga_freeable_memory',
     'pga_maximum_memory',
 ]
-
-
-# def handle_oracle_error(method):
-#     def on_call(*args, **kwargs):
-#         self = args[0]
-#         try:
-#             return method(*args, **kwargs)
-#         except cx_Oracle.Error as error:
-#             self.error(error)
-#             return None
-#     return on_call
 
 
 class Service(SimpleService):
@@ -213,7 +202,57 @@ class Service(SimpleService):
         if not self.alive and not self.reconnect():
             return None
 
-        return None
+        data = dict()
+
+        # PROCESSES COUNT
+        try:
+            rv = self.get_processes_count()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            data['processes'] = rv
+
+        # SESSIONS COUNT
+        try:
+            rv = self.get_sessions_count()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            data['sessions_total'] = rv[0]
+            data['sessions_active'] = rv[1]
+            data['sessions_inactive'] = rv[2]
+
+        # ACTIVITIES COUNT
+        try:
+            rv = self.get_activities_count()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            for name, amount in rv:
+                cleaned = name.replace(' ', '_').replace('(', '').replace(')', '')
+                new_name = 'activity_{0}'.format(cleaned)
+                data[new_name] = amount
+
+        # WAIT TIME
+        try:
+            rv = self.get_wait_time_metrics()
+        except cx_Oracle.Error as error:
+            self.error(error)
+            self.alive = False
+            return None
+        else:
+            for name, amount in rv:
+                cleaned = name.replace(' ', '_').replace('/', '').lower()
+                new_name = 'wait_time_{0}'.format(cleaned)
+                data[new_name] = amount
+
+        return data or None
 
     def get_system_metrics(self):
 
@@ -499,19 +538,15 @@ class Service(SimpleService):
                 )
         return metrics
 
-    def get_sessions_metrics(self):
+    def get_sessions_count(self):
         with self.conn.cursor() as cursor:
-            cursor.execute(QUERY_SESSION)
+            cursor.execute(QUERY_SESSION_COUNT)
             total, active, inactive = 0, 0, 0
             for status, _ in cursor.fetchall():
                 total += 1
                 active += status == 'ACTIVE'
                 inactive += status == 'INACTIVE'
-        return [
-            ['total', total],
-            ['active', active],
-            ['inactive', inactive],
-        ]
+        return [total, active, inactive]
 
     def get_wait_time_metrics(self):
         """
