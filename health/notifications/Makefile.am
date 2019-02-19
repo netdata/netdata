@@ -37,6 +37,7 @@ include messagebird/Makefile.inc
 include pagerduty/Makefile.inc
 include pushbullet/Makefile.inc
 include pushover/Makefile.inc
+include hangouts/Makefile.inc
 include rocketchat/Makefile.inc
 include slack/Makefile.inc
 include syslog/Makefile.inc

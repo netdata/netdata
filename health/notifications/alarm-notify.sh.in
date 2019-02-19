@@ -183,9 +183,9 @@ fi
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="/etc/netdata"
-[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="/usr/lib/netdata/conf.d"
-[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="/var/cache/netdata"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
+[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="@cachedir_POST@"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
 
 # -----------------------------------------------------------------------------
@@ -826,7 +826,7 @@ send_hangouts() {
 			"cards": [
 				{
 					"header": {
-						"title": "Netdata on<br>${host}",
+						"title": "Netdata on ${host}",
 						"imageUrl": "${images_base_url}/images/banner-icon-144x144.png",
 						"imageStyle": "IMAGE"
 					},
@@ -1853,8 +1853,8 @@ GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
 	if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
-		if [ -f "/var/lib/netdata/registry/netdata.public.unique.id" ]; then
-			NETDATA_REGISTRY_UNIQUE_ID="$(cat "/var/lib/netdata/registry/netdata.public.unique.id")"
+		if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
+			NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
 		fi
 	fi
 	if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
@@ -2311,8 +2311,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_PUSHOVER}" \
 	"${SENT_TELEGRAM}" \
 	"${SENT_SLACK}" \
+	"${SENT_HANGOUTS}" \
 	"${SENT_ROCKETCHAT}" \
-	"${SEND_HANGOUTS}" \
 	"${SENT_ALERTA}" \
 	"${SENT_FLOCK}" \
 	"${SENT_DISCORD}" \
