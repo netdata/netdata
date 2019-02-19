@@ -31,6 +31,11 @@ SELECT
   type
 FROM v$session GROUP BY status, type
 '''
+QUERY_PROCESSES_COUNT = '''
+SELECT
+ COUNT(*)
+FROM v$process
+'''
 QUERY_PROCESS = '''
 SELECT
   program,
@@ -442,3 +447,8 @@ class Service(SimpleService):
             for wait_class, value in cursor.fetchall():
                 metrics.append([wait_class, value])
         return metrics
+
+    def get_processes_count(self):
+        with self.conn.cursor() as cursor:
+            cursor.execute(QUERY_PROCESSES_COUNT)
+            return cursor.fetchone()[0]  # 53
