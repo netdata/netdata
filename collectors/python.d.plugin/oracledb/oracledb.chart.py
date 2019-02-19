@@ -186,6 +186,7 @@ class Service(SimpleService):
 
     def check(self):
         if not HAS_ORACLE:
+            self.error("'cx_Oracle' package is needed to use oracledb module")
             return False
 
         if not all([
@@ -194,6 +195,10 @@ class Service(SimpleService):
             self.server,
             self.service,
         ]):
+            self.error("one of these parameters is not specified: user, password, server, service")
+            return False
+
+        if not self.connect():
             return False
 
         return bool(self.get_data())
@@ -206,7 +211,7 @@ class Service(SimpleService):
 
         # PROCESSES COUNT
         try:
-            rv = self.get_processes_count()
+            rv = self.gather_processes_count()
         except cx_Oracle.Error as error:
             self.error(error)
             self.alive = False
@@ -216,7 +221,7 @@ class Service(SimpleService):
 
         # SESSIONS COUNT
         try:
-            rv = self.get_sessions_count()
+            rv = self.gather_sessions_count()
         except cx_Oracle.Error as error:
             self.error(error)
             self.alive = False
@@ -228,7 +233,7 @@ class Service(SimpleService):
 
         # ACTIVITIES COUNT
         try:
-            rv = self.get_activities_count()
+            rv = self.gather_activities_count()
         except cx_Oracle.Error as error:
             self.error(error)
             self.alive = False
@@ -237,11 +242,11 @@ class Service(SimpleService):
             for name, amount in rv:
                 cleaned = name.replace(' ', '_').replace('(', '').replace(')', '')
                 new_name = 'activity_{0}'.format(cleaned)
-                data[new_name] = amount
+                data[new_name] = int(float(amount) * 1000)
 
         # WAIT TIME
         try:
-            rv = self.get_wait_time_metrics()
+            rv = self.gather_wait_time_metrics()
         except cx_Oracle.Error as error:
             self.error(error)
             self.alive = False
@@ -254,7 +259,7 @@ class Service(SimpleService):
 
         return data or None
 
-    def get_system_metrics(self):
+    def gather_system_metrics(self):
 
         """
         :return:
@@ -476,7 +481,7 @@ class Service(SimpleService):
                 metrics.append([row[0], row[1]])
         return metrics
 
-    def get_process_metrics(self):
+    def gather_process_metrics(self):
         """
         :return:
 
@@ -500,7 +505,7 @@ class Service(SimpleService):
                     metrics.append([row[0], name, row[i]])
         return metrics
 
-    def get_tablespace_metrics(self):
+    def gather_tablespace_metrics(self):
         """
         :return:
 
@@ -538,7 +543,7 @@ class Service(SimpleService):
                 )
         return metrics
 
-    def get_sessions_count(self):
+    def gather_sessions_count(self):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_SESSION_COUNT)
             total, active, inactive = 0, 0, 0
@@ -548,7 +553,7 @@ class Service(SimpleService):
                 inactive += status == 'INACTIVE'
         return [total, active, inactive]
 
-    def get_wait_time_metrics(self):
+    def gather_wait_time_metrics(self):
         """
         :return:
 
@@ -570,12 +575,12 @@ class Service(SimpleService):
                 metrics.append([wait_class, value])
         return metrics
 
-    def get_processes_count(self):
+    def gather_processes_count(self):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_PROCESSES_COUNT)
             return cursor.fetchone()[0]  # 53
 
-    def get_activities_count(self):
+    def gather_activities_count(self):
         """
         :return:
 
