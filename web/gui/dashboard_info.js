@@ -442,7 +442,7 @@ netdataDashboard.menu = {
         info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
     },
     'mail_log': {
-        title: undefined,
+        title: 'Mail server log',
         icon: '<i class="fas fa-file-alt"></i>',
         info: 'Information extracted from a server log file.'
     }
