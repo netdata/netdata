@@ -13,38 +13,121 @@ except ImportError:
 
 
 ORDER = [
-    'processes',
-    'total_sessions',
-    'sessions',
+    'session_count',
+    'session_limit_usage',
+    'logons',
+    'physical_disk_read_write',
+    'sorts_on_disk',
+    'full_table_scans',
+    'database_wait_time_ratio',
+    'shared_pool_free_memory',
+    'in_memory_sorts_ratio',
+    'sql_service_response_time',
+    'user_rollbacks',
+    'enqueue_timeouts',
+    'cache_hit_ratio',
     'activity',
     'wait_time',
-    'cache_hit_ratio',
+    'tablespace_size',
+    'tablespace_usage',
+    'tablespace_usage_in_percent',
 ]
 
 CHARTS = {
-    'processes': {
-        'options': [None, 'Processes', 'amount', 'processes', 'oracledb.processes', 'line'],
+    'session_count': {
+        'options': [None, 'Session Count', 'sessions', 'session activity', 'oracledb.session_count', 'line'],
         'lines': [
-            ['processes'],
+            ['session_count', 'total', 'absolute', 1, 1000],
+            ['average_active_sessions', 'active', 'absolute', 1, 1000],
         ]
     },
-    'total_sessions': {
-        'options': [None, 'Total Sessions', 'amount', 'sessions', 'oracledb.sessions', 'line'],
+    'session_limit_usage': {
+        'options': [None, 'Session Limit Usage', '%', 'session activity', 'oracledb.session_limit_usage', 'area'],
         'lines': [
-            ['sessions_total', 'sessions'],
+            ['session_limit_percent', 'usage', 'absolute', 1, 1000],
         ]
     },
-    'sessions': {
-        'options': [None, 'Sessions', 'amount', 'sessions', 'oracledb.sessions', 'line'],
+    'logons': {
+        'options': [None, 'Logons', 'events/s', 'session activity', 'oracledb.logons', 'area'],
         'lines': [
-            ['sessions_active', 'active'],
-            ['sessions_inactive', 'inactive'],
+            ['logons_per_sec', 'logons', 'absolute', 1, 1000],
+        ]
+    },
+    'physical_disk_read_write': {
+        'options': [None, 'Physical Disk Reads/Writes', 'events/s', 'disk activity',
+                    'oracledb.physical_disk_read_writes', 'area'],
+        'lines': [
+            ['physical_reads_per_sec', 'reads', 'absolute', 1, 1000],
+            ['physical_writes_per_sec', 'writes', 'absolute', -1, 1000],
+        ]
+    },
+    'sorts_on_disk': {
+        'options': [None, 'Sorts On Disk', 'events/s', 'disk activity', 'oracledb.sorts_on_disks', 'line'],
+        'lines': [
+            ['disk_sort_per_sec', 'sorts', 'absolute', 1, 1000],
+        ]
+    },
+    'full_table_scans': {
+        'options': [None, 'Full Table Scans', 'events/s', 'disk activity', 'oracledb.full_table_scans', 'line'],
+        'lines': [
+            ['long_table_scans_per_sec', 'full table scans', 'absolute', 1, 1000],
+        ]
+    },
+    'database_wait_time_ratio': {
+        'options': [None, 'Database Wait Time Ratio', '%', 'database and buffer activity',
+                    'oracledb.database_wait_time_ratio', 'line'],
+        'lines': [
+            ['database_wait_time_ratio', 'wait time ratio', 'absolute', 1, 1000],
+        ]
+    },
+    'shared_pool_free_memory': {
+        'options': [None, 'Shared Pool Free Memory', '%', 'database and buffer activity',
+                    'oracledb.shared_pool_free_memory', 'line'],
+        'lines': [
+            ['shared_pool_free_percent', 'free memory', 'absolute', 1, 1000],
+        ]
+    },
+    'in_memory_sorts_ratio': {
+        'options': [None, 'In-Memory Sorts Ratio', '%', 'database and buffer activity',
+                    'oracledb.in_memory_sorts_ratio', 'line'],
+        'lines': [
+            ['memory_sorts_ratio', 'in-memory sorts', 'absolute', 1, 1000],
+        ]
+    },
+    'sql_service_response_time': {
+        'options': [None, 'SQL Service Response Time', 'seconds', 'database and buffer activity',
+                    'oracledb.sql_service_response_time', 'line'],
+        'lines': [
+            ['sql_service_response_time', 'time', 'absolute', 1, 1000],
+        ]
+    },
+    'user_rollbacks': {
+        'options': [None, 'User Rollbacks', 'events/s', 'database and buffer activity',
+                    'oracledb.user_rollbacks', 'line'],
+        'lines': [
+            ['user_rollbacks_per_sec', 'rollbacks', 'absolute', 1, 1000],
+        ]
+    },
+    'enqueue_timeouts': {
+        'options': [None, 'Enqueue Timeouts', 'events/s', 'database and buffer activity',
+                    'oracledb.enqueue_timeouts', 'line'],
+        'lines': [
+            ['enqueue_timeouts_per_sec', 'enqueue timeouts', 'absolute', 1, 1000],
+        ]
+    },
+    'cache_hit_ratio': {
+        'options': [None, 'Cache Hit Ratio', '%', 'cache', 'oracledb.cache_hit_ration', 'stacked'],
+        'lines': [
+            ['buffer_cache_hit_ratio', 'buffer', 'absolute', 1, 1000],
+            ['cursor_cache_hit_ratio', 'cursor', 'absolute', 1, 1000],
+            ['library_cache_hit_ratio', 'library', 'absolute', 1, 1000],
+            ['row_cache_hit_ratio', 'row', 'absolute', 1, 1000],
         ]
     },
     'activity': {
-        'options': [None, 'Activities Rate', 'activities', 'activities', 'oracledb.activity', 'stacked'],
+        'options': [None, 'Activities', 'events/s', 'activities', 'oracledb.activity', 'stacked'],
         'lines': [
-            ['activity_parse_count_total', 'parse count (total)', 'incremental'],
+            ['activity_parse_count_total', 'parse count', 'incremental'],
             ['activity_execute_count', 'execute count', 'incremental'],
             ['activity_user_commits', 'user commits', 'incremental'],
             ['activity_user_rollbacks', 'user rollbacks', 'incremental'],
@@ -65,45 +148,42 @@ CHARTS = {
             ['wait_time_other', 'other', 'absolute', 1, 1000],
         ]
     },
-    'cache_hit_ratio': {
-        'options': [None, 'Cache Hit Ratio', 'ratio', 'cache', 'oracledb.cache_hit_ration', 'stacked'],
-        'lines': [
-            ['buffer_cache_hit_ratio', 'buffer', 'absolute', 1, 1000],
-            ['cursor_cache_hit_ratio', 'cursor', 'absolute', 1, 1000],
-            ['library_cache_hit_ratio', 'library', 'absolute', 1, 1000],
-            ['row_cache_hit_ratio', 'row', 'absolute', 1, 1000],
-        ]
+    'tablespace_size': {
+        'options': [None, 'Size', 'KiB', 'tablespace', 'oracledb.tablespace_size', 'line'],
+        'lines': [],
+    },
+    'tablespace_usage': {
+        'options': [None, 'Usage', 'KiB', 'tablespace', 'oracledb.tablespace_usage', 'line'],
+        'lines': [],
+    },
+    'tablespace_usage_in_percent': {
+        'options': [None, 'Usage', '%', 'tablespace', 'oracledb.tablespace_usage_in_percent', 'line'],
+        'lines': [],
     },
 }
 
 
-def tablespace_charts():
-    order = [
-        'tablespace_usage',
-        'tablespace_usage_in_percent',
-    ]
-    charts = {
-        'tablespace_usage': {
-            'options': [
-                None, 'Usage', 'KiB', 'tablespace', 'oracledb.tablespace_usage', 'area'],
-            'lines': [
-                ['tablespace_size', 'size', 'absolute', 1, 1024 * 1000],
-                ['tablespace_used', 'used', 'absolute', 1, 1024 * 1000],
-            ],
-        },
-        'tablespace_usage_in_percent': {
-            'options': [
-                None, 'Usage In Percent', 'percent', 'tablespace', 'oracledb.tablespace_usage_in_percent', 'line'],
-            'lines': [
-                ['tablespace_used_in_percent', 'used', 'absolute', 1, 1000],
-            ],
-        }
-    }
-    return order, charts
-
-
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
+QUERY_SYSTEM = '''
+SELECT
+  metric_name,
+  value
+FROM
+  gv$sysmetric
+ORDER BY
+  begin_time
+'''
+QUERY_TABLESPACE = '''
+SELECT
+  m.tablespace_name,
+  m.used_space * t.block_size AS used_bytes,
+  m.tablespace_size * t.block_size AS max_bytes,
+  m.used_percent
+FROM
+  dba_tablespace_usage_metrics m
+  JOIN dba_tablespaces t ON m.tablespace_name = t.tablespace_name
+'''
 QUERY_ACTIVITIES_COUNT = '''
 SELECT
   name,
@@ -129,60 +209,56 @@ WHERE
   m.wait_class_id = n.wait_class_id
   AND n.wait_class != 'Idle'
 '''
-QUERY_SESSION_COUNT = '''
-SELECT
-  status,
-  type
-FROM
-  v$session
-GROUP BY
-  status,
-  type
-'''
-QUERY_PROCESSES_COUNT = '''
-SELECT
-  COUNT(*)
-FROM
-  v$process
-'''
-QUERY_PROCESS = '''
-SELECT
-  program,
-  pga_used_mem,
-  pga_alloc_mem,
-  pga_freeable_mem,
-  pga_max_mem
-FROM
-  gv$process
-'''
-QUERY_SYSTEM = '''
-SELECT
-  metric_name,
-  value
-FROM
-  gv$sysmetric
-ORDER BY
-  begin_time
-'''
-QUERY_TABLESPACE = '''
-SELECT
-  m.tablespace_name,
-  m.used_space * t.block_size AS used_bytes,
-  m.tablespace_size * t.block_size AS max_bytes,
-  m.used_percent
-FROM
-  dba_tablespace_usage_metrics m
-  JOIN dba_tablespaces t ON m.tablespace_name = t.tablespace_name
-'''
+# QUERY_SESSION_COUNT = '''
+# SELECT
+#   status,
+#   type
+# FROM
+#   v$session
+# GROUP BY
+#   status,
+#   type
+# '''
+# QUERY_PROCESSES_COUNT = '''
+# SELECT
+#   COUNT(*)
+# FROM
+#   v$process
+# '''
+# QUERY_PROCESS = '''
+# SELECT
+#   program,
+#   pga_used_mem,
+#   pga_alloc_mem,
+#   pga_freeable_mem,
+#   pga_max_mem
+# FROM
+#   gv$process
+# '''
 
-PROCESS_METRICS = [
-    'pga_used_memory',
-    'pga_allocated_memory',
-    'pga_freeable_memory',
-    'pga_maximum_memory',
-]
+# PROCESS_METRICS = [
+#     'pga_used_memory',
+#     'pga_allocated_memory',
+#     'pga_freeable_memory',
+#     'pga_maximum_memory',
+# ]
+
 
 SYS_METRICS = {
+    'Average Active Sessions': 'average_active_sessions',
+    'Session Count': 'session_count',
+    'Session Limit %': 'session_limit_percent',
+    'Logons Per Sec': 'logons_per_sec',
+    'Physical Reads Per Sec': 'physical_reads_per_sec',
+    'Physical Writes Per Sec': 'physical_writes_per_sec',
+    'Disk Sort Per Sec': 'disk_sort_per_sec',
+    'Long Table Scans Per Sec': 'long_table_scans_per_sec',
+    'Database Wait Time Ratio': 'database_wait_time_ratio',
+    'Shared Pool Free %': 'shared_pool_free_percent',
+    'Memory Sorts Ratio': 'memory_sorts_ratio',
+    'SQL Service Response Time': 'sql_service_response_time',
+    'User Rollbacks Per Sec': 'user_rollbacks_per_sec',
+    'Enqueue Timeouts Per Sec': 'enqueue_timeouts_per_sec',
     'Buffer Cache Hit Ratio': 'buffer_cache_hit_ratio',
     'Cursor Cache Hit Ratio': 'cursor_cache_hit_ratio',
     'Library Cache Hit Ratio': 'library_cache_hit_ratio',
@@ -251,27 +327,18 @@ class Service(SimpleService):
 
         data = dict()
 
-        # PROCESSES COUNT
+        # SYSTEM
         try:
-            rv = self.gather_processes_count()
+            rv = self.gather_system_metrics()
         except cx_Oracle.Error as error:
             self.error(error)
             self.alive = False
             return None
         else:
-            data['processes'] = rv
-
-        # SESSIONS COUNT
-        try:
-            rv = self.gather_sessions_count()
-        except cx_Oracle.Error as error:
-            self.error(error)
-            self.alive = False
-            return None
-        else:
-            data['sessions_total'] = rv[0]
-            data['sessions_active'] = rv[1]
-            data['sessions_inactive'] = rv[2]
+            for name, value in rv:
+                if name not in SYS_METRICS:
+                    continue
+                data[SYS_METRICS[name]] = int(float(value) * 1000)
 
         # ACTIVITIES COUNT
         try:
@@ -314,25 +381,10 @@ class Service(SimpleService):
                 # TODO: remove inactive?
                 if name not in self.active_tablespaces:
                     self.active_tablespaces.add(name)
-                    self.add_tablespace_charts(name)
+                    self.add_tablespace_to_charts(name)
                 data['{0}_tablespace_size'.format(name)] = int(size * 1000)
                 data['{0}_tablespace_used'.format(name)] = int(used * 1000)
                 data['{0}_tablespace_used_in_percent'.format(name)] = int(used_in_percent * 1000)
-
-        # SYSTEM
-        try:
-            rv = self.gather_system_metrics()
-        except cx_Oracle.Error as error:
-            self.error(error)
-            self.alive = False
-            return None
-        else:
-            for name, value in rv:
-                if name not in SYS_METRICS:
-                    continue
-                if 'Cache Hit Ratio' in name:
-                    value = int(float(value) * 1000)
-                data[SYS_METRICS[name]] = value
 
         return data or None
 
@@ -511,30 +563,6 @@ class Service(SimpleService):
                 metrics.append([metric_name, value])
         return metrics
 
-    def gather_process_metrics(self):
-        """
-        :return:
-
-        [['PSEUDO', 'pga_used_memory', 0],
-         ['PSEUDO', 'pga_allocated_memory', 0],
-         ['PSEUDO', 'pga_freeable_memory', 0],
-         ['PSEUDO', 'pga_maximum_memory', 0],
-         ['oracle@localhost.localdomain (PMON)', 'pga_used_memory', 1793827],
-         ['oracle@localhost.localdomain (PMON)', 'pga_allocated_memory', 1888651],
-         ['oracle@localhost.localdomain (PMON)', 'pga_freeable_memory', 0],
-         ['oracle@localhost.localdomain (PMON)', 'pga_maximum_memory', 1888651],
-         ...
-         ...
-        """
-
-        metrics = list()
-        with self.conn.cursor() as cursor:
-            cursor.execute(QUERY_PROCESS)
-            for row in cursor.fetchall():
-                for i, name in enumerate(PROCESS_METRICS, 1):
-                    metrics.append([row[0], name, row[i]])
-        return metrics
-
     def gather_tablespace_metrics(self):
         """
         :return:
@@ -573,16 +601,6 @@ class Service(SimpleService):
                 )
         return metrics
 
-    def gather_sessions_count(self):
-        with self.conn.cursor() as cursor:
-            cursor.execute(QUERY_SESSION_COUNT)
-            total, active, inactive = 0, 0, 0
-            for status, _ in cursor.fetchall():
-                total += 1
-                active += status == 'ACTIVE'
-                inactive += status == 'INACTIVE'
-        return [total, active, inactive]
-
     def gather_wait_time_metrics(self):
         """
         :return:
@@ -605,11 +623,6 @@ class Service(SimpleService):
                 metrics.append([wait_class_name, value])
         return metrics
 
-    def gather_processes_count(self):
-        with self.conn.cursor() as cursor:
-            cursor.execute(QUERY_PROCESSES_COUNT)
-            return cursor.fetchone()[0]  # 53
-
     def gather_activities_count(self):
         """
         :return:
@@ -623,18 +636,67 @@ class Service(SimpleService):
             cursor.execute(QUERY_ACTIVITIES_COUNT)
             return cursor.fetchall()
 
-    def add_tablespace_charts(self, name):
-        order, charts = tablespace_charts()
+    # def gather_process_metrics(self):
+    #     """
+    #     :return:
+    #
+    #     [['PSEUDO', 'pga_used_memory', 0],
+    #      ['PSEUDO', 'pga_allocated_memory', 0],
+    #      ['PSEUDO', 'pga_freeable_memory', 0],
+    #      ['PSEUDO', 'pga_maximum_memory', 0],
+    #      ['oracle@localhost.localdomain (PMON)', 'pga_used_memory', 1793827],
+    #      ['oracle@localhost.localdomain (PMON)', 'pga_allocated_memory', 1888651],
+    #      ['oracle@localhost.localdomain (PMON)', 'pga_freeable_memory', 0],
+    #      ['oracle@localhost.localdomain (PMON)', 'pga_maximum_memory', 1888651],
+    #      ...
+    #      ...
+    #     """
+    #
+    #     metrics = list()
+    #     with self.conn.cursor() as cursor:
+    #         cursor.execute(QUERY_PROCESS)
+    #         for row in cursor.fetchall():
+    #             for i, name in enumerate(PROCESS_METRICS, 1):
+    #                 metrics.append([row[0], name, row[i]])
+    #     return metrics
 
-        for chart_name in order:
-            chart_id = '{0}_{1}'.format(name, chart_name)
-            # title
-            charts[chart_name]['options'][1] = '{0} {1}'.format(name, charts[chart_name]['options'][1])
+    # def gather_processes_count(self):
+    #     with self.conn.cursor() as cursor:
+    #         cursor.execute(QUERY_PROCESSES_COUNT)
+    #         return cursor.fetchone()[0]  # 53
 
-            params = [chart_id] + charts[chart_name]['options']
-            dimensions = charts[chart_name]['lines']
+    # def gather_sessions_count(self):
+    #     with self.conn.cursor() as cursor:
+    #         cursor.execute(QUERY_SESSION_COUNT)
+    #         total, active, inactive = 0, 0, 0
+    #         for status, _ in cursor.fetchall():
+    #             total += 1
+    #             active += status == 'ACTIVE'
+    #             inactive += status == 'INACTIVE'
+    #     return [total, active, inactive]
 
-            new_chart = self.charts.add_chart(params)
-            for dimension in dimensions:
-                dimension[0] = '{0}_{1}'.format(name, dimension[0])
-                new_chart.add_dimension(dimension)
+    def add_tablespace_to_charts(self, name):
+        self.charts['tablespace_size'].add_dimension(
+            [
+                '{0}_tablespace_size'.format(name),
+                name,
+                'absolute',
+                1,
+                1024 * 1000,
+            ])
+        self.charts['tablespace_usage'].add_dimension(
+            [
+                '{0}_tablespace_used'.format(name),
+                name,
+                'absolute',
+                1,
+                1024 * 1000,
+            ])
+        self.charts['tablespace_usage_in_percent'].add_dimension(
+            [
+                '{0}_tablespace_used_in_percent'.format(name),
+                name,
+                'absolute',
+                1,
+                1000,
+            ])
