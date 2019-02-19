@@ -127,10 +127,10 @@ CHARTS = {
     'activity': {
         'options': [None, 'Activities', 'events/s', 'activities', 'oracledb.activity', 'stacked'],
         'lines': [
-            ['activity_parse_count_total', 'parse count', 'incremental'],
-            ['activity_execute_count', 'execute count', 'incremental'],
-            ['activity_user_commits', 'user commits', 'incremental'],
-            ['activity_user_rollbacks', 'user rollbacks', 'incremental'],
+            ['activity_parse_count_total', 'parse count', 'incremental', 1, 1000],
+            ['activity_execute_count', 'execute count', 'incremental', 1, 1000],
+            ['activity_user_commits', 'user commits', 'incremental', 1, 1000],
+            ['activity_user_rollbacks', 'user rollbacks', 'incremental', 1, 1000],
         ]
     },
     'wait_time': {
