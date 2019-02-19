@@ -253,7 +253,7 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
     return host->health_log.next_alarm_id++;
 }
 
-inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
+inline void rrdcalc_create_from_template_part2(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
     if(rc->calculation) {
@@ -301,7 +301,7 @@ inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
+inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
 
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rt->name);
 
@@ -327,6 +327,9 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
     rc->delay_down_duration = rt->delay_down_duration;
     rc->delay_max_duration = rt->delay_max_duration;
     rc->delay_multiplier = rt->delay_multiplier;
+
+    rc->repeat_warning_every = rt->repeat_warning_every;
+    rc->repeat_critical_every = rt->repeat_critical_every;
 
     rc->group = rt->group;
     rc->after = rt->after;
@@ -356,7 +359,7 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, repeat_warning_every %d, repeat_critical_every %d",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -376,10 +379,12 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             rc->delay_up_duration,
             rc->delay_down_duration,
             rc->delay_max_duration,
-            rc->delay_multiplier
+            rc->delay_multiplier,
+            rc->repeat_warning_every,
+            rc->repeat_warning_every
     );
 
-    rrdcalc_create_part2(host, rc);
+    rrdcalc_create_from_template_part2(host, rc);
     return rc;
 }
 

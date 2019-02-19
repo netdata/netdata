@@ -49,6 +49,12 @@ struct rrdcalctemplate {
     float delay_multiplier;        // multiplier for all delays when alarms switch status
 
     // ------------------------------------------------------------------------
+    // notification repeat settings
+
+    int repeat_warning_every;      // interval between repeating warning notifications
+    int repeat_critical_every;     // interval between repeating critical notifications
+
+    // ------------------------------------------------------------------------
     // expressions related to the alarm
 
     EVAL_EXPRESSION *calculation;

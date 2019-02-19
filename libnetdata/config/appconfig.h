@@ -119,6 +119,7 @@ extern long long appconfig_get_number(struct config *root, const char *section, 
 extern LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
+extern int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value);
 
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
@@ -132,5 +133,7 @@ extern int appconfig_move(struct config *root, const char *section_old, const ch
 extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed);
 
 extern int appconfig_section_compare(void *a, void *b);
+
+extern int config_parse_duration(const char* string, int* result);
 
 #endif /* NETDATA_CONFIG_H */

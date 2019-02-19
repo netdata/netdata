@@ -78,6 +78,12 @@ struct rrdcalc {
     // while now < delay_up_to
 
     // ------------------------------------------------------------------------
+    // notification repeat settings
+
+    int repeat_warning_every;      // interval between repeating warning notifications
+    int repeat_critical_every;     // interval between repeating critical notifications
+
+    // ------------------------------------------------------------------------
     // runtime information
 
     RRDCALC_STATUS status;          // the current status of the alarm
@@ -132,7 +138,7 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
-extern RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
-extern void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc);
+extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
+extern void rrdcalc_create_from_template_part2(RRDHOST *host, RRDCALC *rc);
 
 #endif //NETDATA_RRDCALC_H
