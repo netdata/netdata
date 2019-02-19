@@ -18,6 +18,13 @@ CHARTS = dict()
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 
+QUERY_ACTIVITIES_COUNT = '''
+"SELECT
+  name,
+  value
+FROM v$sysstat
+WHERE name IN ('parse count (total)', 'execute count', 'user commits', 'user rollbacks')"
+'''
 QUERY_WAIT_TIME = '''
 SELECT
   n.wait_class,
@@ -452,3 +459,16 @@ class Service(SimpleService):
         with self.conn.cursor() as cursor:
             cursor.execute(QUERY_PROCESSES_COUNT)
             return cursor.fetchone()[0]  # 53
+
+    def get_activities_count(self):
+        """
+        :return:
+
+        [('user commits', 9104),
+         ('user rollbacks', 17),
+         ('parse count (total)', 483695),
+         ('execute count', 2020356)]
+        """
+        with self.conn.cursor() as cursor:
+            cursor.execute(QUERY_ACTIVITIES_COUNT)
+            return cursor.fetchall()
