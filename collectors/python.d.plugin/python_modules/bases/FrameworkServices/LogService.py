@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from glob import glob
+import sys
 import os
 
 from bases.FrameworkServices.SimpleService import SimpleService
@@ -17,6 +18,7 @@ class LogService(SimpleService):
         self.__glob_path = self.log_path
         self._last_position = 0
         self.__re_find = dict(current=0, run=0, maximum=60)
+        self.__open_args = {'errors': 'replace'} if sys.version_info[0] > 2 else {}
 
     def _get_raw_data(self):
         """
@@ -34,7 +36,7 @@ class LogService(SimpleService):
             elif size < self._last_position:
                 self._last_position = 0  # read from beginning if file has shrunk
 
-            with open(self.log_path) as fp:
+            with open(self.log_path, **self.__open_args) as fp:
                 fp.seek(self._last_position)
                 for line in fp:
                     lines.append(line)
