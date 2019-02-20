@@ -29,7 +29,7 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
-export GIT_MAIL="pawel+bot@netdata.cloud"
+export GIT_MAIL="bot@netdata.cloud"
 export GIT_USER="netdatabot"
 echo "--- Initialize git configuration ---"
 git config user.email "${GIT_MAIL}"

@@ -9,7 +9,7 @@ fi
 
 ORGANIZATION=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $1}')
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
-GIT_MAIL=${GIT_MAIL:-"pawel+bot@netdata.cloud"}
+GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
 
 if [ -z ${GIT_TAG+x} ]; then
