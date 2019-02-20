@@ -147,7 +147,7 @@ not just visualize metrics.
 
 ## News  
 
-`Feb 14th, 2018` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)** 
+`Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)** 
 
 Release 1.12 is made out of 211 pull requests and 22 bug fixes.
 The key improvements are:
