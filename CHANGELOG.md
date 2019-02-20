@@ -4,6 +4,13 @@
 
 **Fixed bugs:**
 
+- wrong netdata version in response header [\#5438](https://github.com/netdata/netdata/issues/5438)
+- Readme - News section: shows 1.11.1 as the latest release [\#5436](https://github.com/netdata/netdata/issues/5436)
+- Under python3 the LogService.\_get\_raw\_data fails on undecodable data [\#5430](https://github.com/netdata/netdata/issues/5430)
+- apcupsd chart not updating when on battery [\#5428](https://github.com/netdata/netdata/issues/5428)
+- ERROR 405: Cannot download charts index from server [\#5418](https://github.com/netdata/netdata/issues/5418)
+- Installer/Updater download via curl redirect [\#5411](https://github.com/netdata/netdata/issues/5411)
+- Cannot update netdata [\#5405](https://github.com/netdata/netdata/issues/5405)
 - sensors plugin only plots sensors that have hard-coded limits [\#5402](https://github.com/netdata/netdata/issues/5402)
 - kickstart-static64.sh should be looking in GCS for the binary package [\#5390](https://github.com/netdata/netdata/issues/5390)
 - Docker container networking [\#5383](https://github.com/netdata/netdata/issues/5383)
@@ -31,7 +38,16 @@
 
 **Merged pull requests:**
 
+- Prevent invalid Linux power supply alarms during startup [\#5447](https://github.com/netdata/netdata/pull/5447) ([cakrit](https://github.com/cakrit))
+- Correct duplicate flag enum in health.h [\#5441](https://github.com/netdata/netdata/pull/5441) ([cakrit](https://github.com/cakrit))
+- Remove extra 'v' from Server response header [\#5440](https://github.com/netdata/netdata/pull/5440) ([cakrit](https://github.com/cakrit))
+- Fix curl download [\#5439](https://github.com/netdata/netdata/pull/5439) ([Hufschmidt](https://github.com/Hufschmidt))
+- Update README.md - add news for 1.12 [\#5437](https://github.com/netdata/netdata/pull/5437) ([cakrit](https://github.com/cakrit))
+- apcupsd - Treat ONBATT the same as ONLINE [\#5435](https://github.com/netdata/netdata/pull/5435) ([cakrit](https://github.com/cakrit))
+- fix \#5430 - LogService.\_get\_raw\_data under python3 fails on undecodable data [\#5431](https://github.com/netdata/netdata/pull/5431) ([apardyl](https://github.com/apardyl))
+- Correct version check in UI [\#5429](https://github.com/netdata/netdata/pull/5429) ([cakrit](https://github.com/cakrit))
 - spec: fixed template issue for netdata source. [\#5427](https://github.com/netdata/netdata/pull/5427) ([k0ste](https://github.com/k0ste))
+- cpuidle handle newlines in names [\#5425](https://github.com/netdata/netdata/pull/5425) ([cakrit](https://github.com/cakrit))
 - Improve configure.ac mnl and netfilter\_acc checks for static builds [\#5424](https://github.com/netdata/netdata/pull/5424) ([mfundul](https://github.com/mfundul))
 - remove redudant pipes for cgroup-network netnsid [\#5417](https://github.com/netdata/netdata/pull/5417) ([ktsaou](https://github.com/ktsaou))
 - Fix clock\_gettime\(\) failures with the CLOCK\_BOOTTIME argument [\#5415](https://github.com/netdata/netdata/pull/5415) ([mfundul](https://github.com/mfundul))
