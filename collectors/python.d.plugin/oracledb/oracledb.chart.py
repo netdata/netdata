@@ -281,11 +281,10 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        # FIXME: remove defaults
-        self.user = configuration.get('user', 'system')
-        self.password = configuration.get('password', 'oraclepass')
-        self.server = configuration.get('server', 'localhost:1521')
-        self.service = configuration.get('service', 'XE')
+        self.user = configuration.get('user')
+        self.password = configuration.get('password')
+        self.server = configuration.get('server')
+        self.service = configuration.get('service')
         self.alive = False
         self.conn = None
         self.active_tablespaces = set()
