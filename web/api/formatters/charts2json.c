@@ -14,6 +14,7 @@ static inline const char* get_release_channel() {
         if(!ff) {
             use_stable=1;
         } else {
+            procfile_set_quotes(ff, "'\"");
             ff = procfile_readall(ff);
             if(!ff) {
                 use_stable=1;
@@ -22,11 +23,7 @@ static inline const char* get_release_channel() {
                 for(i = 0; i < procfile_lines(ff); i++) {
                     if (!procfile_linewords(ff, i)) continue;
 
-                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") && (
-                            !strcmp(procfile_lineword(ff, i, 1), "stable") ||
-                            !strcmp(procfile_lineword(ff, i, 1), "'stable'") ||
-                            !strcmp(procfile_lineword(ff, i, 1), "\"stable\"")
-                    )) {
+                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") && !strcmp(procfile_lineword(ff, i, 1), "stable")) {
                         use_stable = 1;
                         break;
                     }
