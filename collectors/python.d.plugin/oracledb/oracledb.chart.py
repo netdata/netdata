@@ -126,7 +126,7 @@ CHARTS = {
         ]
     },
     'global_cache_blocks': {
-        'options': [None, 'Global Cache Blocks', 'events/s', 'cache', 'oracledb.global_cache_blocks', 'area'],
+        'options': [None, 'Global Cache Blocks Events', 'events/s', 'cache', 'oracledb.global_cache_blocks', 'area'],
         'lines': [
             ['global_cache_blocks_corrupted', 'corrupted', 'incremental', 1, 1000],
             ['global_cache_blocks_lost', 'lost', 'incremental', 1, 1000],
@@ -320,11 +320,9 @@ class Service(SimpleService):
 
         if not all([
             self.user,
-            self.password,
-            self.server,
             self.service,
         ]):
-            self.error("one of these parameters is not specified: user, password, server, service")
+            self.error("one of these parameters is not specified: user, service")
             return False
 
         if not self.connect():
