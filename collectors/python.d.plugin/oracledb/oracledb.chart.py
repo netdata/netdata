@@ -320,9 +320,11 @@ class Service(SimpleService):
 
         if not all([
             self.user,
+            self.password,
+            self.server,
             self.service,
         ]):
-            self.error("one of these parameters is not specified: user, service")
+            self.error("one of these parameters is not specified: user, password, server, service")
             return False
 
         if not self.connect():
