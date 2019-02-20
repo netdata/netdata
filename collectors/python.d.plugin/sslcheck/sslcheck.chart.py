@@ -3,15 +3,9 @@
 # Original Author: ccremer (github.com/ccremer)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import ssl
-import socket
-
 import datetime
-
-#try:
-#    from time import monotonic as time
-#except ImportError:
-#    from time import time
+import socket
+import ssl
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -88,6 +82,4 @@ class Service(SimpleService):
     def ssl_valid_time_remaining(self, hostname, port):
         """Get the number of days left in a cert's lifetime."""
         expires = self.ssl_expiry_datetime(hostname, port)
-#        print ((expires - datetime.datetime.utcnow()).days * 1.0)
-#        return ((expires - datetime.datetime.utcnow()).days * 10.0)
         return (expires - datetime.datetime.utcnow()).days
