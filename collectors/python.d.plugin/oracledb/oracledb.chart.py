@@ -26,6 +26,7 @@ ORDER = [
     'user_rollbacks',
     'enqueue_timeouts',
     'cache_hit_ratio',
+    'global_cache_blocks',
     'activity',
     'wait_time',
     'tablespace_size',
