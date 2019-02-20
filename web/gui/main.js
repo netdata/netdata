@@ -2857,8 +2857,8 @@ function versionsMatch(v1, v2) {
         if ( n1 < n2 ) return false;
         else if ( n1 > n2 ) return true;
 
-        n1 = (s1.length > 1)?parseInt(s1[1],10):0;
-        n2 = (s2.length > 1)?parseInt(s2[1],10):0;
+        n1 = (s1.length > 1) ? parseInt(s1[1],10) : 0;
+        n2 = (s2.length > 1) ? parseInt(s2[1],10) : 0;
         if ( n1 < n2 ) return false;
         else return true;
     }
