@@ -124,6 +124,13 @@ CHARTS = {
             ['row_cache_hit_ratio', 'row', 'absolute', 1, 1000],
         ]
     },
+    'global_cache_blocks': {
+        'options': [None, 'Global Cache Blocks', 'events/s', 'cache', 'oracledb.global_cache_blocks', 'area'],
+        'lines': [
+            ['global_cache_blocks_corrupted', 'corrupted', 'incremental', 1, 1000],
+            ['global_cache_blocks_lost', 'lost', 'incremental', 1, 1000],
+        ]
+    },
     'activity': {
         'options': [None, 'Activities', 'events/s', 'activities', 'oracledb.activity', 'stacked'],
         'lines': [
@@ -263,6 +270,8 @@ SYS_METRICS = {
     'Cursor Cache Hit Ratio': 'cursor_cache_hit_ratio',
     'Library Cache Hit Ratio': 'library_cache_hit_ratio',
     'Row Cache Hit Ratio': 'row_cache_hit_ratio',
+    'Global Cache Blocks Corrupted': 'global_cache_blocks_corrupted',
+    'Global Cache Blocks Lost': 'global_cache_blocks_lost',
 }
 
 
