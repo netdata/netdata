@@ -52,7 +52,7 @@ ALTER SESSION SET "_ORACLE_SCRIPT"=true;
 CREATE USER netdata IDENTIFIED BY <PASSWORD>;
 
 GRANT CONNECT TO netdata;
-GRANT select_catalog_role to netdata;
+GRANT SELECT_CATALOG_ROLE TO netdata;
 
 ``` 
 
