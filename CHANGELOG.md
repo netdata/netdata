@@ -1,13 +1,15 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.12.1](https://github.com/netdata/netdata/tree/v1.12.1) (2019-02-21)
 
 **Fixed bugs:**
 
+- \#5457 broke `go.d.plugin` installation. [\#5459](https://github.com/netdata/netdata/issues/5459)
 - wrong netdata version in response header [\#5438](https://github.com/netdata/netdata/issues/5438)
 - Readme - News section: shows 1.11.1 as the latest release [\#5436](https://github.com/netdata/netdata/issues/5436)
 - Under python3 the LogService.\_get\_raw\_data fails on undecodable data [\#5430](https://github.com/netdata/netdata/issues/5430)
 - apcupsd chart not updating when on battery [\#5428](https://github.com/netdata/netdata/issues/5428)
+- /usr/bin/ld: cannot find -lcupsimage [\#5426](https://github.com/netdata/netdata/issues/5426)
 - ERROR 405: Cannot download charts index from server [\#5418](https://github.com/netdata/netdata/issues/5418)
 - Installer/Updater download via curl redirect [\#5411](https://github.com/netdata/netdata/issues/5411)
 - Cannot update netdata [\#5405](https://github.com/netdata/netdata/issues/5405)
@@ -38,12 +40,22 @@
 
 **Merged pull requests:**
 
+- Fix timer crash during exit [\#5464](https://github.com/netdata/netdata/pull/5464) ([mfundul](https://github.com/mfundul))
+- Mention installer option `--disable-go` [\#5461](https://github.com/netdata/netdata/pull/5461) ([cakrit](https://github.com/cakrit))
+- revert \#5457 and test if files exist after installation [\#5460](https://github.com/netdata/netdata/pull/5460) ([paulfantom](https://github.com/paulfantom))
+- Update icon in demosites.html [\#5458](https://github.com/netdata/netdata/pull/5458) ([cakrit](https://github.com/cakrit))
+- Installer - Handle cases when go.d plugin can't be downloaded  [\#5457](https://github.com/netdata/netdata/pull/5457) ([cakrit](https://github.com/cakrit))
+- Update md5sums on README.md [\#5456](https://github.com/netdata/netdata/pull/5456) ([cakrit](https://github.com/cakrit))
+- Fix SEGV by removing free of vars of charts that do not exist [\#5455](https://github.com/netdata/netdata/pull/5455) ([cakrit](https://github.com/cakrit))
+- cups.plugin: remove flag -cupsimage [\#5448](https://github.com/netdata/netdata/pull/5448) ([simonnagl](https://github.com/simonnagl))
 - Prevent invalid Linux power supply alarms during startup [\#5447](https://github.com/netdata/netdata/pull/5447) ([cakrit](https://github.com/cakrit))
+- Use go.d.plugin in version v0.1.0 [\#5446](https://github.com/netdata/netdata/pull/5446) ([paulfantom](https://github.com/paulfantom))
 - Correct duplicate flag enum in health.h [\#5441](https://github.com/netdata/netdata/pull/5441) ([cakrit](https://github.com/cakrit))
 - Remove extra 'v' from Server response header [\#5440](https://github.com/netdata/netdata/pull/5440) ([cakrit](https://github.com/cakrit))
 - Fix curl download [\#5439](https://github.com/netdata/netdata/pull/5439) ([Hufschmidt](https://github.com/Hufschmidt))
 - Update README.md - add news for 1.12 [\#5437](https://github.com/netdata/netdata/pull/5437) ([cakrit](https://github.com/cakrit))
 - apcupsd - Treat ONBATT the same as ONLINE [\#5435](https://github.com/netdata/netdata/pull/5435) ([cakrit](https://github.com/cakrit))
+- Add tor to the default app groups [\#5434](https://github.com/netdata/netdata/pull/5434) ([jamezrin](https://github.com/jamezrin))
 - fix \#5430 - LogService.\_get\_raw\_data under python3 fails on undecodable data [\#5431](https://github.com/netdata/netdata/pull/5431) ([apardyl](https://github.com/apardyl))
 - Correct version check in UI [\#5429](https://github.com/netdata/netdata/pull/5429) ([cakrit](https://github.com/cakrit))
 - spec: fixed template issue for netdata source. [\#5427](https://github.com/netdata/netdata/pull/5427) ([k0ste](https://github.com/k0ste))
@@ -56,6 +68,7 @@
 - python module sensors fix [\#5406](https://github.com/netdata/netdata/pull/5406) ([ilyam8](https://github.com/ilyam8))
 - Refactored static kickstart script [\#5397](https://github.com/netdata/netdata/pull/5397) ([paulfantom](https://github.com/paulfantom))
 - Fix ceph.chart.py for Python3 [\#5396](https://github.com/netdata/netdata/pull/5396) ([GaetanF](https://github.com/GaetanF))
+- Fix Coverity defects [\#5394](https://github.com/netdata/netdata/pull/5394) ([vlvkobal](https://github.com/vlvkobal))
 - Update CODEOWNERS [\#5389](https://github.com/netdata/netdata/pull/5389) ([cakrit](https://github.com/cakrit))
 - Add driver-type option to the freeipmi plugin [\#5384](https://github.com/netdata/netdata/pull/5384) ([cakrit](https://github.com/cakrit))
 - Add documentation for network interfaces [\#5381](https://github.com/netdata/netdata/pull/5381) ([vlvkobal](https://github.com/vlvkobal))
