@@ -46,11 +46,14 @@ apcupsd_check() {
 		if [ $? -ne 0 ]; then
 			error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
 			failed=$((failed + 1))
-		elif [ "$(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }')" != "ONLINE" ]; then
-			error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
-			failed=$((failed + 1))
 		else
-			working=$((working + 1))
+			apcupsd_status = "$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')"
+			if [ ${apcupsd_status} != "ONLINE" ]  && [ ${apcupsd_status} != "ONBATT" ]; then
+				error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
+				failed=$((failed + 1))
+			else
+				working=$((working + 1))
+			fi
 		fi
 	done
 
@@ -143,7 +146,7 @@ BEGIN {
 /^LOADPCT.*/   { load = \$3 * 100 };
 /^ITEMP.*/     { temp = \$3 * 100 };
 /^TIMELEFT.*/  { time = \$3 * 100 };
-/^STATUS.*/    { online=(\$3 == \"ONLINE\")?1:0 };
+/^STATUS.*/    { online=(\$3 == \"ONLINE\" || \$3 == \"ONBATT\")?1:0 };
 END {
 	print \"BEGIN apcupsd_${host}.online $1\";
 	print \"SET online = \" online;

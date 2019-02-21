@@ -37,7 +37,7 @@ download() {
 	if command -v wget >/dev/null 2>&1; then
 		wget -O - "${url}" >"${dest}" 2>&3 || echo >&2 "Cannot download ${url}" >&3 2>&3
 	elif command -v curl >/dev/null 2>&1; then
-		curl "${url}" >"${dest}" 2>&3 || echo "Cannot download ${url}" >&3 2>&3
+		curl -L "${url}" >"${dest}" 2>&3 || echo "Cannot download ${url}" >&3 2>&3
 	else
 		failed "curl or wget is needed to proceed, but neither is available on this system."
 	fi

@@ -112,7 +112,8 @@ collectors/fping.plugin/fping.plugin
 collectors/go.d.plugin
 
 # installer generated files
-netdata-uninstaller.sh
+/netdata-uninstaller.sh
+/netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
@@ -164,5 +165,4 @@ docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
 
-netdata-updater.sh
 .environment.sh

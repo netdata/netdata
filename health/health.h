@@ -22,7 +22,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
 #define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
 #define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
-#define HEALTH_ENTRY_FLAG_SILENCED              0x00000008
+#define HEALTH_ENTRY_FLAG_SILENCED              0x00000010
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
