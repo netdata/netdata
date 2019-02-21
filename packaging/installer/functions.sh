@@ -189,6 +189,10 @@ portable_find_processors() {
 portable_find_processors
 
 # -----------------------------------------------------------------------------
+fatal() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
+}
 
 run_ok() {
 	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"

@@ -43,16 +43,12 @@ fi
 download() {
 	url="${1}"
 	dest="${2}"
-	if command -v wget >/dev/null 2>&1; then
-		if [ -t 1 ]; then
-			run wget --timeout=5 --tries=3 -O - "${url}" >"${dest}"
-		else
-			run wget --timeout=5 --tries=3 --progress=dot:mega -O - "${url}" >"${dest}"
-		fi
-	elif command -v curl >/dev/null 2>&1; then
-		run curl -L --connect-timeout 10 --retry 3 "${url}" >"${dest}"
+	if command -v curl >/dev/null 2>&1; then
+		run curl -L --connect-timeout 5 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
-		echo >&2 "I need curl or wget to proceed, but neither is available on this system."
+		fatal "I need curl or wget to proceed, but neither is available on this system."
 	fi
 }
 
@@ -816,16 +812,8 @@ install_go() {
 		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
 
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
-		if [ $? ] ; then
-			echo >&2 "go.d.plugin package could not be downloaded"
-			return 1
-		fi
 
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
-		if [ $? ] ; then
-			echo >&2 "go.d.plugin config could not be downloaded"
-			return 1
-		fi
 		grep "${GO_PACKAGE_BASENAME}" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
