@@ -2476,7 +2476,7 @@ void update_cgroup_charts(int update_every) {
                         else
                             rrdset_next(cg->st_cpu_limit);
 
-                        calculated_number cpu_usage = (cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
+                        calculated_number cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
                         calculated_number cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
                         rrdset_isnot_obsolete(cg->st_cpu_limit);
