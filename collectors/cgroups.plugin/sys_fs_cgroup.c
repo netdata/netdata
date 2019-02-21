@@ -901,14 +901,15 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         if(s && *s && *s != '\n') {
             debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
 
-            trim(s);
+            s = trim(s);
+            if (s) {
+                freez(cg->chart_title);
+                cg->chart_title = cgroup_title_strdupz(s);
 
-            freez(cg->chart_title);
-            cg->chart_title = cgroup_title_strdupz(s);
-
-            freez(cg->chart_id);
-            cg->chart_id = cgroup_chart_id_strdupz(s);
-            cg->hash_chart = simple_hash(cg->chart_id);
+                freez(cg->chart_id);
+                cg->chart_id = cgroup_chart_id_strdupz(s);
+                cg->hash_chart = simple_hash(cg->chart_id);
+            }
         }
     }
     else
@@ -1041,26 +1042,15 @@ static inline struct cgroup *cgroup_add(const char *id) {
 static inline void cgroup_free(struct cgroup *cg) {
     debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu) {
-        rrdset_wrlock(cg->st_cpu);
-        rrdsetvar_free(cg->chart_var_cpu_limit);
-        rrdset_unlock(cg->st_cpu);
-        rrdset_is_obsolete(cg->st_cpu);
-        rrdset_is_obsolete(cg->st_cpu_limit);
-    }
+    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
+    if(cg->st_cpu_limit)             rrdset_is_obsolete(cg->st_cpu_limit);
     if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
     if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
     if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
     if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
     if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
-    if(cg->st_mem_usage) {
-        rrdset_wrlock(cg->st_mem_usage);
-        rrdsetvar_free(cg->chart_var_memory_limit);
-        rrdsetvar_free(cg->chart_var_memoryswap_limit);
-        rrdset_unlock(cg->st_mem_usage);
-        rrdset_is_obsolete(cg->st_mem_usage);
-        rrdset_is_obsolete(cg->st_mem_usage_limit);
-    }
+    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
+    if (cg->st_mem_usage_limit)      rrdset_is_obsolete(cg->st_mem_usage_limit);
     if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
     if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
     if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
