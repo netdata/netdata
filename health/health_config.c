@@ -250,14 +250,12 @@ static inline uint32_t health_parse_options(const char *s) {
 
 static inline int health_parse_repeat(
         size_t line, const char *file, char *string,
-        int *repeat_warning_duration,
-        int *repeat_critical_duration
+        int *repeat_every
 ) {
 
     int default_duration = 0;
-    char given_default = 0;
-    char given_warning = 0;
-    char given_critical = 0;
+    char given_default = FALSE;
+    char given_repeat = FALSE;
 
     char *s = string;
     while(*s) {
@@ -272,37 +270,28 @@ static inline int health_parse_repeat(
         while(*s && !isspace(*s)) s++;
         while(*s && isspace(*s)) *s++ = '\0';
 
-        if(!strcasecmp(key, "warn") || !strcasecmp(key, "warning")) {
-            if (!config_parse_duration(value, repeat_warning_duration)) {
+        if(!strcasecmp(key, "notifications")) {
+            if (!config_parse_duration(value, repeat_every)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, file, value, key);
             }
-            else given_warning = 1;
-        }
-        else if(!strcasecmp(key, "crit") || !strcasecmp(key, "critical")) {
-            if (!config_parse_duration(value, repeat_critical_duration)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
-                        line, file, value, key);
-            }
-            else given_critical = 1;
+            else given_repeat = TRUE;
         }
         else {
             if (!config_parse_duration(key, &default_duration)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s'",
                         line, file, key);
             }
-            else given_default = 1;
+            else given_default = TRUE;
         }
     }
 
     if(given_default) {
-        if(!given_warning)
-            *repeat_warning_duration = default_duration;
-        if(!given_critical)
-            *repeat_critical_duration = default_duration;
+        if(!given_repeat)
+            *repeat_every = default_duration;
     }
 
-    return 1;
+    return TRUE;
 }
 
 static inline int health_parse_db_lookup(
@@ -554,8 +543,7 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
-            rc->repeat_warning_every = host->health_default_repeat_warning_every;
-            rc->repeat_critical_every = host->health_default_repeat_critical_every;
+            rc->repeat_every = host->health_default_repeat_every;
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -580,8 +568,7 @@ static int health_readfile(const char *filename, void *data) {
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
-            rt->repeat_warning_every = host->health_default_repeat_warning_every;
-            rt->repeat_critical_every = host->health_default_repeat_critical_every;
+            rt->repeat_every = host->health_default_repeat_every;
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -734,7 +721,8 @@ static int health_readfile(const char *filename, void *data) {
                 rc->options |= health_parse_options(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
-                health_parse_repeat(line,filename, value, &rc->repeat_warning_every, &rc->repeat_critical_every);
+                health_parse_repeat(line,filename, value,
+                    &rc->repeat_every);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",

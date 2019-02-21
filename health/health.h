@@ -22,7 +22,8 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
 #define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
 #define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
-#define HEALTH_ENTRY_FLAG_SILENCED              0x00000008
+#define HEALTH_ENTRY_FLAG_SILENCED              0x00000010
+#define HEALTH_ENTRY_FLAG_REPEATING             0x00000020
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
@@ -128,8 +129,7 @@ extern void health_alarm_log(
         const char *info,
         int delay,
         uint32_t flags,
-        int repeat_warning_every,
-        int repeat_critical_every);
+        int repeat_every);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);

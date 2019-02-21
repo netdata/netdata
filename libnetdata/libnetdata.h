@@ -11,6 +11,8 @@
 #define OS_FREEBSD 2
 #define OS_MACOS   3
 
+#define TRUE 1
+#define FALSE 0
 
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs

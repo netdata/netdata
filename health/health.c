@@ -268,8 +268,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
                 health_process_notifications(host, ae);
         }
         // Add repeating alarm entry to the host's list
-        if(unlikely(ae->repeat_warning_every > 0 || ae->repeat_critical_every > 0)) {
-            if(unlikely(!ae->in_repeating_list)) {
+        if(unlikely(ae->repeat_every > 0)) {
+            if(unlikely(!(ae->flags & HEALTH_ENTRY_FLAG_REPEATING))) {
                 REPEATING_ALARM_ENTRY *rae = callocz(1, sizeof(REPEATING_ALARM_ENTRY));
                 rae->alarm_entry = ae;
                 rae->next = NULL;
@@ -281,13 +281,34 @@ static inline void health_alarm_log_process(RRDHOST *host) {
                     for(last = host->health_rep_alarm_list; last && last->next; last = last->next);
                     last->next = rae;
                 }
-                ae->in_repeating_list = 1;
+                ae->flags |= HEALTH_ENTRY_FLAG_REPEATING;
             }
         }
     }
 
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
+
+    // process alarm entries which should be repeated
+    for(REPEATING_ALARM_ENTRY *it = host->health_rep_alarm_list; it; it = it->next) {
+        ALARM_ENTRY *ae = it->alarm_entry;
+        if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_REPEATING)) {
+            // TODO: Check the alarm. If it is cleard, remove the entry from repeating list.
+            if(unlikely(ae->repeat_every == 0)) {
+                // TODO: Remove entry from the repeating list
+                // TODO: Make the debug log more informative
+                debug(D_HEALTH, "Alarm entry %d from alarm %d is marked as repeating but it has zero interval!", ae->id, ae->alarm_id);
+            }
+            else if(likely(ae->last_repeat > 0)) {
+                if(unlikely((ae->last_repeat + ae->repeat_every) > now)) {
+                    health_process_notifications(host, ae);
+                    ae->last_repeat = now;
+                    // TODO: Make debug log more informative
+                    debug(D_HEALTH, "Alarm entry %d from alarm %d is executed as a repeating entry.", ae->id, ae->alarm_id);
+                }
+            }
+        }
+    }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
@@ -311,7 +332,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         ALARM_ENTRY *t = ae->next;
 
-        health_alarm_log_free_one_nochecks_nounlink(ae);
+        if(unlikely(!(ae->flags & HEALTH_ENTRY_FLAG_REPEATING)))
+            health_alarm_log_free_one_nochecks_nounlink(ae);
 
         ae = t;
         host->health_log.count--;
@@ -782,8 +804,7 @@ void *health_main(void *ptr) {
 								    ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
 								    ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
 								),
-								rc->repeat_warning_every,
-								rc->repeat_critical_every
+								rc->repeat_every
 						);
 
 						rc->last_status_change = now;

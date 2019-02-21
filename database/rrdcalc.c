@@ -103,8 +103,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->info,
                 0,
                 0,
-                rc->repeat_warning_every,
-                rc->repeat_critical_every
+                rc->repeat_every
         );
     }
 }
@@ -166,8 +165,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->info,
                 0,
                 0,
-                rc->repeat_warning_every,
-                rc->repeat_critical_every
+                rc->repeat_every
         );
     }
 
@@ -332,8 +330,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->delay_max_duration = rt->delay_max_duration;
     rc->delay_multiplier = rt->delay_multiplier;
 
-    rc->repeat_warning_every = rt->repeat_warning_every;
-    rc->repeat_critical_every = rt->repeat_critical_every;
+    rc->repeat_every = rt->repeat_every;
 
     rc->group = rt->group;
     rc->after = rt->after;

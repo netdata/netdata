@@ -80,8 +80,7 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // notification repeat settings
 
-    int repeat_warning_every;      // interval between repeating warning notifications
-    int repeat_critical_every;     // interval between repeating critical notifications
+    int repeat_every;     // interval between repeating notifications
 
     // ------------------------------------------------------------------------
     // runtime information
