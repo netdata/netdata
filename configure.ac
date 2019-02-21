@@ -443,7 +443,7 @@ if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
     AC_DEFINE([HAVE_CUPS], [1], [cups usability])
 
     CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
-    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
+    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --libs`"
 
     OPTIONAL_CUPS_CLFAGS="${CUPS_CFLAGS}"
     OPTIONAL_CUPS_LIBS="${CUPS_LIBS}"
