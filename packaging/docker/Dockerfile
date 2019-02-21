@@ -3,19 +3,16 @@
 
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
 # It is automated in `build.sh` script
-ARG ARCH=amd64-v3.8
+ARG ARCH=amd64
 # This image contains preinstalled dependecies
 FROM netdata/builder:${ARCH} as builder 
-
-# TODO(paulfantom): Remove this when netdata-installer.sh is supporting less verbose mode
-ARG OUTPUT="/dev/stdout"
 
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
-RUN chmod +x netdata-installer.sh && ./netdata-installer.sh --dont-wait --dont-start-it &>${OUTPUT}
+RUN chmod +x netdata-installer.sh && ./netdata-installer.sh --dont-wait --dont-start-it
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \

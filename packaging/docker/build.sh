@@ -39,7 +39,6 @@ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 for ARCH in "${ARCHITECTURES[@]}"; do
      eval docker build \
      		--build-arg ARCH="${ARCH}" \
-     		--build-arg OUTPUT=/dev/null \
      		--tag "${REPOSITORY}:${VERSION}-${ARCH}" \
      		--file packaging/docker/Dockerfile ./
 done
