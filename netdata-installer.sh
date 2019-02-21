@@ -43,14 +43,10 @@ fi
 download() {
 	url="${1}"
 	dest="${2}"
-	if command -v wget >/dev/null 2>&1; then
-		if [ -t 1 ]; then
-			run wget --timeout=5 --tries=3 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		else
-			run wget --timeout=5 --tries=3 --progress=dot:mega -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		fi
-	elif command -v curl >/dev/null 2>&1; then
-		run curl -L --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	if command -v curl >/dev/null 2>&1; then
+		run curl -L --connect-timeout 5 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
 		fatal "I need curl or wget to proceed, but neither is available on this system."
 	fi

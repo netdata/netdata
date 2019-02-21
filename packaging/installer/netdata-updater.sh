@@ -34,12 +34,12 @@ failed() {
 download() {
 	url="${1}"
 	dest="${2}"
-	if command -v wget >/dev/null 2>&1; then
-		wget -O - "${url}" >"${dest}" 2>&3 || echo >&2 "Cannot download ${url}" >&3 2>&3
-	elif command -v curl >/dev/null 2>&1; then
-		curl -L "${url}" >"${dest}" 2>&3 || echo "Cannot download ${url}" >&3 2>&3
+	if command -v curl >/dev/null 2>&1; then
+		curl -L --connect-timeout 5 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
-		failed "curl or wget is needed to proceed, but neither is available on this system."
+		failed "I need curl or wget to proceed, but neither is available on this system."
 	fi
 }
 
