@@ -168,7 +168,8 @@ And this is what you are going to get:
 First, setup the tc rules in rc.local using commands to assign different DSCP markings to different classids. You can see one such example in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973). 
 
 Then, map the classids to names by creating `/etc/iproute2/tc_cls`. For example:
-```2:1 Standard
+```
+2:1 Standard
 2:8 LowPriorityData
 2:10 HighThroughputData
 2:16 OAM
