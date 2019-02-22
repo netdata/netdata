@@ -1,5 +1,19 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
+- go.d.plugin installation fails due to insufficient timeout [\#5467](https://github.com/netdata/netdata/issues/5467)
+
+**Merged pull requests:**
+
+- Correct kickstart md5sums [\#5473](https://github.com/netdata/netdata/pull/5473) ([cakrit](https://github.com/cakrit))
+- Correct docs: apps plugin is not an internal collector [\#5472](https://github.com/netdata/netdata/pull/5472) ([cakrit](https://github.com/cakrit))
+- Added rocketchat to method-list [\#5471](https://github.com/netdata/netdata/pull/5471) ([tctovsli](https://github.com/tctovsli))
+- Increase timeout for download of go.d.plugin [\#5468](https://github.com/netdata/netdata/pull/5468) ([elfgoh](https://github.com/elfgoh))
+
 ## [v1.12.1](https://github.com/netdata/netdata/tree/v1.12.1) (2019-02-21)
 
 **Fixed bugs:**
