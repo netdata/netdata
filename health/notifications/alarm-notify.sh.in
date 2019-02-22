@@ -32,6 +32,7 @@
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
+#  - RocketChat notifications by @Hermsi1337 #3777
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -163,6 +164,7 @@ msteam
 kavenegar
 prowl
 awssns
+rocketchat
 "
 
 # -----------------------------------------------------------------------------
