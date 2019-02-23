@@ -163,6 +163,7 @@ msteam
 kavenegar
 prowl
 awssns
+matrix
 "
 
 # -----------------------------------------------------------------------------
@@ -341,6 +342,12 @@ FLEEP_SENDER="${host}"
 # Amazon SNS configs
 AWSSNS_MESSAGE_FORMAT=
 
+# Matrix configs
+MATRIX_HOMESERVER=
+MATRIX_ACCESSTOKEN=
+MATRIX_USERID=
+MATRIX_PASS=
+
 # syslog configs
 SYSLOG_FACILITY=
 
@@ -490,6 +497,9 @@ filter_recipient_by_criticality() {
 #shellcheck disable=SC2153
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
 
+# check matrix
+{ [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ] && [ -z "${MATRIX_USERID}" ]; } && SEND_MATRIX="NO"
+
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_SLACK}" = "YES" ] ||
 	[ "${SEND_ROCKETCHAT}" = "YES" ] ||
@@ -506,6 +516,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_KAFKA}" = "YES" ] ||
 	[ "${SEND_FLEEP}" = "YES" ] ||
 	[ "${SEND_PROWL}" = "YES" ] ||
+	[ "${SEND_MATRIX}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
 	[ "${SEND_MSTEAM}" = "YES" ]; then
 	# if we need curl, check for the curl command
@@ -531,6 +542,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_KAFKA="NO"
 		SEND_FLEEP="NO"
 		SEND_PROWL="NO"
+		SEND_MATRIX="NO"
 		SEND_CUSTOM="NO"
 	fi
 fi
@@ -643,6 +655,7 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_KAFKA}" \
 	"${SEND_PD}" \
 	"${SEND_FLEEP}" \
+	"${SEND_MATRIX}" \
 	"${SEND_CUSTOM}" \
 	"${SEND_IRC}" \
 	"${SEND_AWSSNS}" \
@@ -1653,6 +1666,58 @@ send_awssns() {
 }
 
 # -----------------------------------------------------------------------------
+# matrix sender
+
+send_matrix() {
+    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 channel color payload userid="${MATRIX_USERID}" userpass="${MATRIX_PASS}"
+
+	[ "${SEND_MATRIX}" != "YES" ] && return 1
+
+    if [[ "${SEND_MATRIX}" == "YES"  ]] && [[ -n "${MATRIX_ACCESSTOKEN}" ]]; then
+        accesstoken="${MATRIX_ACCESSTOKEN}"
+    elif [[ "${SEND_MATRIX}" == "YES"  ]] && [[ ! -n "${MATRIX_ACCESSTOKEN}" ]] && [[ -n "${MATRIX_USERID}" ]] && [[ -n "${MATRIX_PASS}" ]];then
+        # get access token
+        accesspayload="$(
+        cat <<EOF
+    {
+        "type":"m.login.password",
+        "user":"${userid}",
+        "password":"${userpass}"}
+EOF
+        )"
+        webhook=$homeserver/_matrix/client/r0/login
+        accesstoken=$(${curl} ${curl_options} -d "${accesspayload}" "${webhook}" | grep -Po '"access_token":.*?[^\\]",' | cut -d\" -f4)
+        if [ $? -eq 1 ]; then return 1 ; fi
+    else
+        return 1
+    fi
+
+	for room in ${rooms}; do
+        webhook=$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken
+		payload="$(
+        cat <<EOF
+        {
+            "msgtype": "m.text",
+            "body": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*"
+        }
+EOF
+		)"
+
+		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+		if [ "${httpcode}" == "200" ]; then
+			info "sent matrix notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			sent=$((sent + 1))
+		else
+			error "failed to send matrix notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		fi
+	done
+
+	[ ${sent} -gt 0 ] && return 0
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # syslog sender
 
 send_syslog() {
@@ -2032,6 +2097,13 @@ send_awssns "${to_awssns}"
 SENT_AWSSNS=$?
 
 # -----------------------------------------------------------------------------
+#  send the matrix message
+send_matrix "${MATRIX_HOMESERVER}" "${to_matrix}"
+
+SENT_MATRIX=$?
+
+
+# -----------------------------------------------------------------------------
 # send the syslog message
 
 send_syslog "${to_syslog}"
@@ -2206,6 +2278,7 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_CUSTOM}" \
 	"${SENT_IRC}" \
 	"${SENT_AWSSNS}" \
+    "${SENT_MATRIX}" \
 	"${SENT_SYSLOG}" \
 	"${SENT_MSTEAM}"; do
 	if [ "${state}" -eq 0 ]; then
