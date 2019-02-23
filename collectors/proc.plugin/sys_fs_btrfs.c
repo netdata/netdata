@@ -308,7 +308,11 @@ static inline int find_all_btrfs_pools(const char *path) {
             char label[FILENAME_MAX + 1] = "";
 
             snprintfz(filename, FILENAME_MAX, "%s/%s/label", path, de->d_name);
-            read_file(filename, label, FILENAME_MAX);
+            if(read_file(filename, label, FILENAME_MAX) != 0) {
+                error("BTRFS: failed to read '%s'", filename);
+                btrfs_free_node(node);
+                continue;
+            }
 
             char *s = label;
             if (s[0])

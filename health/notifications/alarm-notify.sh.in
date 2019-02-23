@@ -32,6 +32,7 @@
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
+#  - RocketChat notifications by @Hermsi1337 #3777
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -164,6 +165,7 @@ kavenegar
 prowl
 awssns
 matrix
+rocketchat
 "
 
 # -----------------------------------------------------------------------------
@@ -498,7 +500,7 @@ filter_recipient_by_criticality() {
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
 
 # check matrix
-{ [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ] && [ -z "${MATRIX_USERID}" ]; } && SEND_MATRIX="NO"
+{ [ -z "${MATRIX_HOMESERVER}" ] && { [ -z "${MATRIX_ACCESSTOKEN}" ] || [ -z "${MATRIX_USERID}" ]; }; } && SEND_MATRIX="NO"
 
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_SLACK}" = "YES" ] ||

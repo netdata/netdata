@@ -1037,6 +1037,7 @@ var options = {
     data: null,
     hostname: 'netdata_server', // will be overwritten by the netdata server
     version: 'unknown',
+    release_channel: 'unknown',
     hosts: [],
 
     duration: 0, // the default duration of the charts
@@ -2700,6 +2701,7 @@ function initializeDynamicDashboardWithData(data) {
         options.hostname = data.hostname;
         options.data = data;
         options.version = data.version;
+        options.release_channel = data.release_channel;
         netdataDashboard.os = data.os;
 
         if (typeof data.hosts !== 'undefined') {
@@ -2832,12 +2834,33 @@ function versionsMatch(v1, v2) {
     if (v1 == v2) {
         return true;
     } else {
-        var s1=v1.split('-');
-        var s2=v2.split('-');
-        if (s1.length !== s2.length) return false;
-        if (s1.length === 4) s1.pop();
-        if (s2.length === 4) s2.pop();
-        return (s1.join('-') === s2.join('-'));
+        let s1=v1.split('.');
+        let s2=v2.split('.');
+        // Check major version
+        let n1 = parseInt(s1[0].substring(1,2),10);
+        let n2 = parseInt(s2[0].substring(1,2), 10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        // Check minor version
+        n1 = parseInt(s1[1],10);
+        n2 = parseInt(s2[1],10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        // Split patch: format could be e.g. 0-22-nightly
+        s1=s1[2].split('-');
+        s2=s2[2].split('-');
+
+        n1 = parseInt(s1[0],10);
+        n2 = parseInt(s2[0],10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        n1 = (s1.length > 1) ? parseInt(s1[1],10) : 0;
+        n2 = (s2.length > 1) ? parseInt(s2[1],10) : 0;
+        if ( n1 < n2 ) return false;
+        else return true;
     }
 }
 
@@ -2845,26 +2868,61 @@ function getGithubLatestVersion(callback) {
     versionLog('Downloading latest version id from github...');
 
     $.ajax({
-        url: 'https://api.github.com/repositories/10744183/contents/packaging/version?ref=master',
+        url: 'https://api.github.com/repos/netdata/netdata/releases/latest',
         async: true,
         cache: false
     })
         .done(function (data) {
-            data = atob(data.content).replace(/(\r\n|\n|\r| |\t)/gm, "");
-            versionLog('Latest version from github is ' + data);
+            data = data.tag_name.replace(/(\r\n|\n|\r| |\t)/gm, "");
+            versionLog('Latest stable version from github is ' + data);
             callback(data);
         })
         .fail(function () {
-            versionLog('Failed to download the latest version id from github!');
+            versionLog('Failed to download the latest stable version id from github!');
             callback(null);
         });
 }
 
-function checkForUpdateByVersion(force, callback) {
-    getGithubLatestVersion(function (sha2) {
-            callback(options.version, sha2);
-    });
+function getGCSLatestVersion(callback) {
+    versionLog('Downloading latest version id from GCS...');
+    $.ajax({
+        url: "https://www.googleapis.com/storage/v1/b/netdata-nightlies/o/latest-version.txt",
+        async: true,
+        cache: false
+    })
+        .done(function (response) {
+            $.ajax({
+                url: response.mediaLink,
+                async: true,
+                cache: false
+            })
+                .done(function (data) {
+                    data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
+                    versionLog('Latest nightly version from GCS is ' + data);
+                    callback(data);
+                })
+                .fail(function (xhr, textStatus, errorThrown) {
+                    versionLog('Failed to download the latest nightly version id from GCS!');
+                    callback(null);
+                });
+        })
+        .fail(function (xhr, textStatus, errorThrown) {
+            versionLog('Failed to download the latest nightly version from GCS!');
+            callback(null);
+        });
+}
 
+
+function checkForUpdateByVersion(force, callback) {
+    if (options.release_channel === 'stable') {
+        getGithubLatestVersion(function (sha2) {
+            callback(options.version, sha2);
+        });
+    } else {
+        getGCSLatestVersion(function (sha2) {
+            callback(options.version, sha2);
+        });
+    }
     return null;
 }
 
@@ -2896,10 +2954,10 @@ function notifyForUpdate(force) {
             versionLog('<p><big>Failed to get your netdata version!</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
         } else if (sha2 === null) {
             save = false;
-            versionLog('<p><big>Failed to get the latest netdata version github.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
+            versionLog('<p><big>Failed to get the latest netdata version.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
         } else if (versionsMatch(sha1, sha2)) {
             save = true;
-            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
+            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>We probably need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
         } else {
             save = true;
             var compare = 'https://docs.netdata.cloud/changelog/';
