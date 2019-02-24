@@ -1669,7 +1669,7 @@ send_awssns() {
 # matrix sender
 
 send_matrix() {
-    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 payload
+    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 payload color
 
 	[ "${SEND_MATRIX}" != "YES" ] && return 1
 
@@ -1681,10 +1681,10 @@ send_matrix() {
     fi
 
 	case "${status}" in
-	CRITICAL) severity="critical" ;;
-	WARNING) severity="warning" ;;
-	CLEAR) severity="cleared" ;;
-	*) severity="indeterminate" ;;
+	WARNING) color="warning" ;;
+	CRITICAL) color="danger" ;;
+	CLEAR) color="good" ;;
+	*) color="#777777" ;;
 	esac
 
 	for room in ${rooms}; do
@@ -1692,18 +1692,20 @@ send_matrix() {
 		payload="$(
         cat <<EOF
         {
-            "msgtype": "m.text",
-            "body": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*"
+            "msgtype": "m.notice",
+            "format": "org.matrix.custom.html",
+            "formatted_body": "<font color=\"$color\">${host} ${status_message}, \`${chart}\` (${family}), <b>${alarm}</b></font>",
+            "body": "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*"
         }
 EOF
 		)"
 
 		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
 		if [ "${httpcode}" == "200" ]; then
-			info "sent matrix notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+			info "sent matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 			sent=$((sent + 1))
 		else
-			error "failed to send matrix notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+			error "failed to send matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
 		fi
 	done
 
