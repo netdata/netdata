@@ -347,8 +347,6 @@ AWSSNS_MESSAGE_FORMAT=
 # Matrix configs
 MATRIX_HOMESERVER=
 MATRIX_ACCESSTOKEN=
-MATRIX_USERID=
-MATRIX_PASS=
 
 # syslog configs
 SYSLOG_FACILITY=
@@ -500,7 +498,7 @@ filter_recipient_by_criticality() {
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
 
 # check matrix
-{ [ -z "${MATRIX_HOMESERVER}" ] && { [ -z "${MATRIX_ACCESSTOKEN}" ] || [ -z "${MATRIX_USERID}" ]; }; } && SEND_MATRIX="NO"
+{ [ -z "${MATRIX_HOMESERVER}" ] || [ -z "${MATRIX_ACCESSTOKEN}" ]; } && SEND_MATRIX="NO"
 
 if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_SLACK}" = "YES" ] ||
@@ -1671,28 +1669,23 @@ send_awssns() {
 # matrix sender
 
 send_matrix() {
-    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 channel color payload userid="${MATRIX_USERID}" userpass="${MATRIX_PASS}"
+    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 payload
 
 	[ "${SEND_MATRIX}" != "YES" ] && return 1
 
-    if [[ "${SEND_MATRIX}" == "YES"  ]] && [[ -n "${MATRIX_ACCESSTOKEN}" ]]; then
+    # check if access token was provided
+    if [ "${SEND_MATRIX}" == "YES"  ] && [ -n "${MATRIX_ACCESSTOKEN}" ]; then
         accesstoken="${MATRIX_ACCESSTOKEN}"
-    elif [[ "${SEND_MATRIX}" == "YES"  ]] && [[ ! -n "${MATRIX_ACCESSTOKEN}" ]] && [[ -n "${MATRIX_USERID}" ]] && [[ -n "${MATRIX_PASS}" ]];then
-        # get access token
-        accesspayload="$(
-        cat <<EOF
-    {
-        "type":"m.login.password",
-        "user":"${userid}",
-        "password":"${userpass}"}
-EOF
-        )"
-        webhook=$homeserver/_matrix/client/r0/login
-        accesstoken=$(${curl} ${curl_options} -d "${accesspayload}" "${webhook}" | grep -Po '"access_token":.*?[^\\]",' | cut -d\" -f4)
-        if [ $? -eq 1 ]; then return 1 ; fi
     else
         return 1
     fi
+
+	case "${status}" in
+	CRITICAL) severity="critical" ;;
+	WARNING) severity="warning" ;;
+	CLEAR) severity="cleared" ;;
+	*) severity="indeterminate" ;;
+	esac
 
 	for room in ${rooms}; do
         webhook=$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken
