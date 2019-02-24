@@ -4,11 +4,18 @@
 
 **Fixed bugs:**
 
+- Verbose curl output causes unwanted emails from netdata-updater cronjob [\#5484](https://github.com/netdata/netdata/issues/5484)
 - \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
 - go.d.plugin installation fails due to insufficient timeout [\#5467](https://github.com/netdata/netdata/issues/5467)
 
+**Closed issues:**
+
+- Unexpected data exposure by default value of "\[registry\].registry to announce" [\#2760](https://github.com/netdata/netdata/issues/2760)
+
 **Merged pull requests:**
 
+-  Make curl silent and show errors only if it fails [\#5485](https://github.com/netdata/netdata/pull/5485) ([mullnerz](https://github.com/mullnerz))
+- Fix curl timeout [\#5476](https://github.com/netdata/netdata/pull/5476) ([elfgoh](https://github.com/elfgoh))
 - Correct kickstart md5sums [\#5473](https://github.com/netdata/netdata/pull/5473) ([cakrit](https://github.com/cakrit))
 - Correct docs: apps plugin is not an internal collector [\#5472](https://github.com/netdata/netdata/pull/5472) ([cakrit](https://github.com/cakrit))
 - Added rocketchat to method-list [\#5471](https://github.com/netdata/netdata/pull/5471) ([tctovsli](https://github.com/tctovsli))
