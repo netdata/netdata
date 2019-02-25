@@ -16,11 +16,12 @@ uniquepath() {
 }
 uniquepath
 
-netdata_source_dir="$(pwd)"
-installer_dir="$(dirname "${0}")"
+PROGRAM="$0"
+NETDATA_SOURCE_DIR="$(pwd)"
+INSTALLER_DIR="$(dirname "${PROGRAM}")"
 
-if [ "${netdata_source_dir}" != "${installer_dir}" -a "${installer_dir}" != "." ]; then
-	echo >&2 "Warning: you are currently in '${netdata_source_dir}' but the installer is in '${installer_dir}'."
+if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" -a "${INSTALLER_DIR}" != "." ]; then
+	echo >&2 "Warning: you are currently in '${NETDATA_SOURCE_DIR}' but the installer is in '${INSTALLER_DIR}'."
 fi
 
 # -----------------------------------------------------------------------------
@@ -29,15 +30,15 @@ fi
 [ -f /etc/profile ] && . /etc/profile
 
 # make sure /etc/profile does not change our current directory
-cd "${netdata_source_dir}" || exit 1
+cd "${NETDATA_SOURCE_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
 # load the required functions
 
-if [ -f "${installer_dir}/packaging/installer/functions.sh" ]; then
-	source "${installer_dir}/packaging/installer/functions.sh" || exit 1
+if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
+	source "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
 else
-	source "${netdata_source_dir}/packaging/installer/functions.sh" || exit 1
+	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
 download() {
@@ -77,23 +78,22 @@ CFLAGS="${CFLAGS--O2}"
 printf "\n# " >>netdata-installer.log
 date >>netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >>netdata-installer.log
-printf "%q " "$0" "${@}" >>netdata-installer.log
+printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
 printf "\n" >>netdata-installer.log
 
 REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(
-	printf "%q " "$0" "${@}"
+	printf "%q " "${PROGRAM}" "${@}"
 	printf "\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
-[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${0}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
+[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${PROGRAM}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
 # shellcheck disable=SC2230
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
-ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
 AUTOUPDATE=0
@@ -106,7 +106,7 @@ usage() {
 	netdata_banner "installer command line options"
 	cat <<USAGE
 
-${ME} <installer options>
+${PROGRAM} <installer options>
 
 Valid <installer options> are:
 
@@ -185,7 +185,7 @@ Valid <installer options> are:
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
-  CFLAGS="<gcc options>" ${ME} <installer options>
+  CFLAGS="<gcc options>" ${PROGRAM} <installer options>
 
 For the installer to complete successfully, you will need
 these packages installed:
@@ -307,11 +307,11 @@ if [ "${UID}" -ne 0 ]; then
 
   Please set an installation prefix, like this:
 
-      $0 ${@} --install /tmp
+      $PROGRAM ${@} --install /tmp
 
   or, run the installer as root:
 
-      sudo $0 ${@}
+      sudo $PROGRAM ${@}
 
   We suggest to install it as root, or certain data collectors will
   not be able to work. Netdata drops root privileges when running.
@@ -332,7 +332,7 @@ NONROOTNOPREFIX
   If you installing netdata permanently on your system, run
   the installer like this:
 
-     ${TPUT_YELLOW}${TPUT_BOLD}sudo $0 ${@}${TPUT_RESET}
+     ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
 
 NONROOT
 	fi
@@ -1039,17 +1039,17 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 			fi
 			progress "Installing new netdata-updater in cron"
 
-			rm ${installer_dir}/netdata-updater.sh || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
+			rm ${INSTALLER_DIR}/netdata-updater.sh || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
 
 			rm -f "${crondir}/netdata-updater"
-			if [ -f "${installer_dir}/packaging/installer/netdata-updater.sh" ]; then
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
+			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
 				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${installer_dir}/netdata-updater.sh || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > ${INSTALLER_DIR}/netdata-updater.sh || exit 1
 			else
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${netdata_source_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
 				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${netdata_source_dir}/packaging/installer/netdata-updater.sh" > ${installer_source_dir}/netdata-updater.sh || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > ${installer_source_dir}/netdata-updater.sh || exit 1
 			fi
 
 			chmod 0755 ${crondir}/netdata-updater
