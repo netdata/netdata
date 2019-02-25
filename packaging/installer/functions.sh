@@ -102,32 +102,10 @@ netdata_banner() {
 }
 
 # -----------------------------------------------------------------------------
-# portable service command
-
-service_cmd="$(command -v service 2>/dev/null)"
-rcservice_cmd="$(command -v rc-service 2>/dev/null)"
-systemctl_cmd="$(command -v systemctl 2>/dev/null)"
-service() {
-	local cmd="${1}" action="${2}"
-
-	if [ -n "${systemctl_cmd}" ]; then
-		run "${systemctl_cmd}" "${action}" "${cmd}"
-		return $?
-	elif [ -n "${service_cmd}" ]; then
-		run "${service_cmd}" "${cmd}" "${action}"
-		return $?
-	elif [ -n "${rcservice_cmd}" ]; then
-		run "${rcservice_cmd}" "${cmd}" "${action}"
-		return $?
-	fi
-	return 1
-}
-
-# -----------------------------------------------------------------------------
 # portable pidof
 
-pidof_cmd="$(command -v pidof 2>/dev/null)"
 pidof() {
+	local pidof_cmd="$(command -v pidof 2>/dev/null)"
 	if [ -n "${pidof_cmd}" ]; then
 		${pidof_cmd} "${@}"
 		return $?
@@ -141,27 +119,9 @@ pidof() {
 }
 
 # -----------------------------------------------------------------------------
-# portable delete recursively interactively
 
-portable_deletedir_recursively_interactively() {
-	if [ -n "$1" ] && [ -d "$1" ]; then
-		if [ "$(uname -s)" = "Darwin" ]; then
-			echo >&2
-			read >&2 -p "Press ENTER to recursively delete directory '$1' > "
-			echo >&2 "Deleting directory '$1' ..."
-			run rm -R "$1"
-		else
-			echo >&2
-			echo >&2 "Deleting directory '$1' ..."
-			run rm -I -R "$1"
-		fi
-	else
-		echo "Directory '$1' does not exist."
-	fi
-}
-
-# -----------------------------------------------------------------------------
-
+# TODO(paulfantom): refactor this function to return value of SYSTEM_CPUS instead of writing it to a global variable
+#                   refactor invocations of this function
 export SYSTEM_CPUS=1
 portable_find_processors() {
 	if [ -f "/proc/cpuinfo" ]; then
@@ -173,7 +133,7 @@ portable_find_processors() {
 	fi
 	[ -z "${SYSTEM_CPUS}" -o $((SYSTEM_CPUS)) -lt 1 ] && SYSTEM_CPUS=1
 }
-portable_find_processors
+portable_find_processors  #FIXME(paulfantom): library shouldn't invoke any functions
 
 # -----------------------------------------------------------------------------
 fatal() {
@@ -235,10 +195,10 @@ run() {
 	return ${ret}
 }
 
-getent_cmd="$(command -v getent 2>/dev/null)"
 portable_check_user_exists() {
 	local username="${1}" found=
 
+	getent_cmd="$(command -v getent 2>/dev/null)"
 	if [ -n "${getent_cmd}" ]; then
 		"${getent_cmd}" passwd "${username}" >/dev/null 2>&1
 		return $?
@@ -482,6 +442,29 @@ install_non_systemd_init() {
 	return 1
 }
 
+# -----------------------------------------------------------------------------
+# portable service command
+
+portable_service() {
+	service_cmd="$(command -v service 2>/dev/null)"
+	rcservice_cmd="$(command -v rc-service 2>/dev/null)"
+	systemctl_cmd="$(command -v systemctl 2>/dev/null)"
+
+	local cmd="${1}" action="${2}"
+
+	if [ -n "${systemctl_cmd}" ]; then
+		run "${systemctl_cmd}" "${action}" "${cmd}"
+		return $?
+	elif [ -n "${service_cmd}" ]; then
+		run "${service_cmd}" "${cmd}" "${action}"
+		return $?
+	elif [ -n "${rcservice_cmd}" ]; then
+		run "${rcservice_cmd}" "${cmd}" "${action}"
+		return $?
+	fi
+	return 1
+}
+
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
@@ -535,13 +518,8 @@ install_netdata_service() {
 			local ret=$?
 
 			if [ ${ret} -eq 0 ]; then
-				if [ -n "${service_cmd}" ]; then
-					NETDATA_START_CMD="service netdata start"
-					NETDATA_STOP_CMD="service netdata stop"
-				elif [ -n "${rcservice_cmd}" ]; then
-					NETDATA_START_CMD="rc-service netdata start"
-					NETDATA_STOP_CMD="rc-service netdata stop"
-				fi
+				portable_service netdata start
+				portable_service netdata stop
 			fi
 
 			return ${ret}
