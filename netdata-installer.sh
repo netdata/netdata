@@ -100,6 +100,7 @@ AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
+RELEASE_CHANNEL="nightly"
 
 usage() {
 	netdata_banner "installer command line options"
@@ -128,7 +129,12 @@ Valid <installer options> are:
 
         Install netdata-updater to cron,
         to update netdata automatically once per day
-        (can only be done for installations from git)
+
+   --stable-channel
+
+        Auto-updater will update netdata only when new release is published
+        in GitHub release pages. This results in less frequent updates.
+        Default: Use packages from GCS (nightly release channel).
 
    --enable-plugin-freeipmi
    --disable-plugin-freeipmi
@@ -203,6 +209,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
 		AUTOUPDATE=1
+		shift 1
+	elif [ "$1" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
 		shift 1
 	elif [ "$1" = "--enable-plugin-freeipmi" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
@@ -1043,6 +1052,7 @@ NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 # next 3 values are meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
