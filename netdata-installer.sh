@@ -91,9 +91,6 @@ REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 [ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${PROGRAM}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
-# shellcheck disable=SC2230
-setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
-
 DONOTSTART=0
 DONOTWAIT=0
 AUTOUPDATE=0
@@ -750,7 +747,7 @@ if [ ${UID} -eq 0 ]; then
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
 		setcap_ret=1
 		if ! iscontainer; then
-			if [ -n "${setcap}" ]; then
+			if command -v setcap 2>/dev/null; then
 				run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 				run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 				run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
