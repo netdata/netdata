@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC1090,SC1091,SC1117,SC2002,SC2034,SC2044,SC2046,SC2086,SC2129,SC2162,SC2166,SC2181
+# shellcheck disable=SC2046,SC2086,SC2166
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
 	local path=""
-	while read; do
+	while read -r; do
 		if [[ ! ${path} =~ (^|:)"${REPLY}"(:|$) ]]; then
 			[ -n "${path}" ] && path="${path}:"
 			path="${path}${REPLY}"
 		fi
-	done < <(echo "${PATH}" | tr ":" "\n")
+	done < <(echo "${PATH}" | tr ":" "\\n")
 
 	[ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
 }
@@ -20,13 +20,14 @@ PROGRAM="$0"
 NETDATA_SOURCE_DIR="$(pwd)"
 INSTALLER_DIR="$(dirname "${PROGRAM}")"
 
-if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" -a "${INSTALLER_DIR}" != "." ]; then
+if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" ] && [ "${INSTALLER_DIR}" != "." ]; then
 	echo >&2 "Warning: you are currently in '${NETDATA_SOURCE_DIR}' but the installer is in '${INSTALLER_DIR}'."
 fi
 
 # -----------------------------------------------------------------------------
 # reload the user profile
 
+# shellcheck source=/dev/null
 [ -f /etc/profile ] && . /etc/profile
 
 # make sure /etc/profile does not change our current directory
@@ -36,8 +37,10 @@ cd "${NETDATA_SOURCE_DIR}" || exit 1
 # load the required functions
 
 if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
+	# shellcheck source=packaging/installer/functions.sh
 	source "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
 else
+	# shellcheck source=packaging/installer/functions.sh
 	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
@@ -75,21 +78,23 @@ CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 
 # keep a log of this command
-printf "\n# " >>netdata-installer.log
+# shellcheck disable=SC2129
+printf "\\n# " >>netdata-installer.log
 date >>netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >>netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
-printf "\n" >>netdata-installer.log
+printf "\\n" >>netdata-installer.log
 
-REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(
 	printf "%q " "${PROGRAM}" "${@}"
-	printf "\n"
+	printf "\\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
-[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${PROGRAM}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
+if [ "${REINSTALL_COMMAND:0:1}" != "." ] && [ "${REINSTALL_COMMAND:0:1}" != "/" ] && [ -f "./${PROGRAM}" ]; then
+	REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
+fi
 
 banner_nonroot_install() {
 	cat <<NONROOTNOPREFIX
@@ -299,12 +304,15 @@ fi
 
 if [ ${DONOTWAIT} -eq 0 ]; then
 	if [ -n "${NETDATA_PREFIX}" ]; then
-		eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to \'\001${TPUT_CYAN}\002${NETDATA_PREFIX}\001${TPUT_YELLOW}\002\'\001${TPUT_RESET}\002 > ' -e -r REPLY"
-		[ $? -ne 0 ] && exit 1
+		echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
 	else
-		eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to your system\001${TPUT_RESET}\002 > ' -e -r REPLY"
-		[ $? -ne 0 ] && exit 1
+		echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
 	fi
+	read -ern1
+	if [ "$REPLY" != '' ]; then
+		exit 1
+	fi
+
 fi
 
 build_error() {
@@ -537,14 +545,14 @@ else
 	NETDATA_USER="${USER}"
 	ROOT_USER="${NETDATA_USER}"
 fi
-NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
+NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
 NETDATA_WEB_GROUP="${NETDATA_GROUP}"
-if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
-	NETDATA_WEB_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
+if [ "${UID}" = "0" ] && [ "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
+	NETDATA_WEB_GROUP="$(id -g -n "${NETDATA_WEB_USER}")"
 	[ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
 fi
 NETDATA_WEB_GROUP="$(config_option "web" "web files group" "${NETDATA_WEB_GROUP}")"
@@ -649,7 +657,7 @@ run chmod 755 "${NETDATA_LOG_DIR}"
 
 # --- plugins ----
 
-if [ ${UID} -eq 0 ]; then
+if [ "${UID}" -eq 0 ]; then
 	# find the admin group
 	admin_group=
 	test -z "${admin_group}" && getent group root >/dev/null 2>&1 && admin_group="root"
@@ -759,8 +767,8 @@ install_go() {
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
 		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-		if [ ${UID} -eq 0 ]; then
-			run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		if [ "${UID}" -eq 0 ]; then
+			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
 		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 	fi
@@ -782,17 +790,13 @@ if [ ${DONOTSTART} -eq 1 ]; then
 	generate_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 
 else
-	restart_netdata ${NETDATA_PREFIX}/usr/sbin/netdata "${@}"
-	if [ $? -ne 0 ]; then
-		echo >&2
-		echo >&2 "SORRY! FAILED TO START NETDATA!"
-		echo >&2
+	if ! restart_netdata "${NETDATA_PREFIX}/usr/sbin/netdata" "${@}"; then
+		run_failed "Cannot start netdata!"
 		exit 1
 	fi
 
 	started=1
-	echo >&2 "OK. NetData Started!"
-	echo >&2
+	run_ok "netdata started!"
 
 	# -----------------------------------------------------------------------------
 	# save a config file, if it is not already there
@@ -838,7 +842,7 @@ KSM2
 	}
 
 	if [ -f "/sys/kernel/mm/ksm/run" ]; then
-		if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]; then
+		if [ "$(cat "/sys/kernel/mm/ksm/run")" != "1" ]; then
 			ksm_is_available_but_disabled
 		fi
 	else
@@ -935,17 +939,17 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 			fi
 			progress "Installing new netdata-updater in cron"
 
-			rm ${INSTALLER_DIR}/netdata-updater.sh || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
+			rm "${INSTALLER_DIR}/netdata-updater.sh" || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
 
 			rm -f "${crondir}/netdata-updater"
 			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
 				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > ${INSTALLER_DIR}/netdata-updater.sh || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${INSTALLER_DIR}/netdata-updater.sh" || exit 1
 			else
 				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
 				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > ${installer_source_dir}/netdata-updater.sh || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_SOURCE_DIR}/netdata-updater.sh" || exit 1
 			fi
 
 			chmod 0755 ${crondir}/netdata-updater
@@ -958,7 +962,7 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 fi
 
 # Save environment variables
-cat <<EOF > ${NETDATA_USER_CONFIG_DIR}/.environment
+cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
@@ -974,7 +978,7 @@ EOF
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
-	touch ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics
+	touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
 # -----------------------------------------------------------------------------
