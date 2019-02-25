@@ -1058,6 +1058,7 @@ static inline size_t rrdset_done_interpolate(
 
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
+                rrdeng_store_metric_next(&rd->handle, next_store_ut/USEC_PER_SEC, pack_storage_number(new_value, storage_flags));
                 rd->last_stored_value = new_value;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1080,6 +1081,7 @@ static inline size_t rrdset_done_interpolate(
                 #endif
 
                 rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+                rrdeng_store_metric_next(&rd->handle, next_store_ut/USEC_PER_SEC, SN_EMPTY_SLOT);
                 rd->last_stored_value = NAN;
             }
 

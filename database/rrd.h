@@ -21,6 +21,7 @@ typedef struct alarm_entry ALARM_ENTRY;
 #include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdcalctemplate.h"
+#include "engine/rrdengineapi.h"
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
@@ -204,6 +205,8 @@ struct rrddim {
 
     struct rrddim *next;                            // linking of dimensions within the same data set
     struct rrdset *rrdset;
+
+    struct rrdeng_handle handle;                    // state the database engine uses
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk

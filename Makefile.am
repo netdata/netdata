@@ -311,6 +311,17 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.h \
     database/engine/rrdengine.c \
     database/engine/rrdengine.h \
+    database/engine/rrddiskprotocol.h \
+    database/engine/datafile.c \
+    database/engine/datafile.h \
+    database/engine/journalfile.c \
+    database/engine/journalfile.h \
+    database/engine/rrdenginelib.c \
+    database/engine/rrdenginelib.h \
+    database/engine/rrdengineapi.c \
+    database/engine/rrdengineapi.h \
+    database/engine/pagecache.c \
+    database/engine/pagecache.h \
     $(NULL)
 
 API_PLUGIN_FILES = \
@@ -482,6 +493,7 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_RT_LIBS) \
 	$(OPTIONAL_UV_LIBS) \
 	$(OPTIONAL_LZ4_LIBS) \
+	$(OPTIONAL_JUDY_LIBS) \
 	$(NULL)
 # TODO: Find more graceful way to add libs for AWS Kinesis
 

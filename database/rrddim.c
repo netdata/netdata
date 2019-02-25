@@ -247,6 +247,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
+    rrdeng_store_metric_init(rd, &rd->handle);
 
     // append this dimension
     if(!st->dimensions)
@@ -314,6 +315,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
+    rrdeng_store_metric_final(&rd->handle);
 
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
