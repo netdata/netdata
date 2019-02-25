@@ -6,19 +6,6 @@
 [ -z "${UID}" ] && UID="$(id -u)"
 
 # -----------------------------------------------------------------------------
-# checking the availability of commands
-
-which_cmd() {
-	# shellcheck disable=SC2230
-	which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
-}
-
-check_cmd() {
-	which_cmd "${1}" >/dev/null 2>&1 && return 0
-	return 1
-}
-
-# -----------------------------------------------------------------------------
 
 setup_terminal() {
 	TPUT_RESET=""
@@ -50,7 +37,7 @@ setup_terminal() {
 	# Is stderr on the terminal? If not, then fail
 	test -t 2 || return 1
 
-	if check_cmd tput; then
+	if command -v tput 2>/dev/null; then
 		if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
 			# Enable colors
 			TPUT_RESET="$(tput sgr 0)"
@@ -117,9 +104,9 @@ netdata_banner() {
 # -----------------------------------------------------------------------------
 # portable service command
 
-service_cmd="$(which_cmd service)"
-rcservice_cmd="$(which_cmd rc-service)"
-systemctl_cmd="$(which_cmd systemctl)"
+service_cmd="$(command -v service 2>/dev/null)"
+rcservice_cmd="$(command -v rc-service 2>/dev/null)"
+systemctl_cmd="$(command -v systemctl 2>/dev/null)"
 service() {
 	local cmd="${1}" action="${2}"
 
@@ -139,7 +126,7 @@ service() {
 # -----------------------------------------------------------------------------
 # portable pidof
 
-pidof_cmd="$(which_cmd pidof)"
+pidof_cmd="$(command -v pidof 2>/dev/null)"
 pidof() {
 	if [ ! -z "${pidof_cmd}" ]; then
 		${pidof_cmd} "${@}"
@@ -248,7 +235,7 @@ run() {
 	return ${ret}
 }
 
-getent_cmd="$(which_cmd getent)"
+getent_cmd="$(command -v getent 2>/dev/null)"
 portable_check_user_exists() {
 	local username="${1}" found=
 
@@ -302,17 +289,17 @@ portable_add_user() {
 	local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
 
 	# Linux
-	if check_cmd useradd; then
+	if command -v useradd 2>/dev/null; then
 		run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
 	fi
 
 	# FreeBSD
-	if check_cmd pw; then
+	if command -v pw 2>/dev/null; then
 		run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
 	fi
 
 	# BusyBox
-	if check_cmd adduser; then
+	if command -v adduser 2>/dev/null; then
 		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
 	fi
 
@@ -330,17 +317,17 @@ portable_add_group() {
 	echo >&2 "Adding ${groupname} user group ..."
 
 	# Linux
-	if check_cmd groupadd; then
+	if command -v groupadd 2>/dev/null; then
 		run groupadd -r "${groupname}" && return 0
 	fi
 
 	# FreeBSD
-	if check_cmd pw; then
+	if command -v pw 2>/dev/null; then
 		run pw groupadd "${groupname}" && return 0
 	fi
 
 	# BusyBox
-	if check_cmd addgroup; then
+	if command -v addgroup 2>/dev/null; then
 		run addgroup "${groupname}" && return 0
 	fi
 
@@ -364,17 +351,17 @@ portable_add_user_to_group() {
 		echo >&2 "Adding ${username} user to the ${groupname} group ..."
 
 		# Linux
-		if check_cmd usermod; then
+		if command -v usermod 2>/dev/null; then
 			run usermod -a -G "${groupname}" "${username}" && return 0
 		fi
 
 		# FreeBSD
-		if check_cmd pw; then
+		if command -v pw 2>/dev/null; then
 			run pw groupmod "${groupname}" -m "${username}" && return 0
 		fi
 
 		# BusyBox
-		if check_cmd addgroup; then
+		if command -v addgroup 2>/dev/null; then
 			run addgroup "${username}" "${groupname}" && return 0
 		fi
 
@@ -385,7 +372,7 @@ portable_add_user_to_group() {
 
 iscontainer() {
 	# man systemd-detect-virt
-	local cmd=$(which_cmd systemd-detect-virt)
+	local cmd=$(command -v systemd-detect-virt 2>/dev/null)
 	if [ ! -z "${cmd}" -a -x "${cmd}" ]; then
 		"${cmd}" --container >/dev/null 2>&1 && return 0
 	fi
