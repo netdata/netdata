@@ -4,22 +4,30 @@
 
 **Fixed bugs:**
 
+- Installer at  https://my-netdata.io/kickstart.sh isnt updated to master branch? [\#5492](https://github.com/netdata/netdata/issues/5492)
 - Verbose curl output causes unwanted emails from netdata-updater cronjob [\#5484](https://github.com/netdata/netdata/issues/5484)
+- Invalid URL [\#5479](https://github.com/netdata/netdata/issues/5479)
 - \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
 - go.d.plugin installation fails due to insufficient timeout [\#5467](https://github.com/netdata/netdata/issues/5467)
+- netdata segfault when restart service  [\#5366](https://github.com/netdata/netdata/issues/5366)
 
 **Closed issues:**
 
+- tc.plugin: use high-precission bash sleep as loadable [\#5161](https://github.com/netdata/netdata/issues/5161)
 - Unexpected data exposure by default value of "\[registry\].registry to announce" [\#2760](https://github.com/netdata/netdata/issues/2760)
 
 **Merged pull requests:**
 
+- prevent merging changes to kickstart.sh when checksum in docs is wrong [\#5498](https://github.com/netdata/netdata/pull/5498) ([paulfantom](https://github.com/paulfantom))
+- Update kickstart md5sums in README [\#5496](https://github.com/netdata/netdata/pull/5496) ([cakrit](https://github.com/cakrit))
+- Fix SIGSEGV crash during shutdown of tc plugin. [\#5495](https://github.com/netdata/netdata/pull/5495) ([mfundul](https://github.com/mfundul))
 -  Make curl silent and show errors only if it fails [\#5485](https://github.com/netdata/netdata/pull/5485) ([mullnerz](https://github.com/mullnerz))
 - Fix curl timeout [\#5476](https://github.com/netdata/netdata/pull/5476) ([elfgoh](https://github.com/elfgoh))
 - Correct kickstart md5sums [\#5473](https://github.com/netdata/netdata/pull/5473) ([cakrit](https://github.com/cakrit))
 - Correct docs: apps plugin is not an internal collector [\#5472](https://github.com/netdata/netdata/pull/5472) ([cakrit](https://github.com/cakrit))
 - Added rocketchat to method-list [\#5471](https://github.com/netdata/netdata/pull/5471) ([tctovsli](https://github.com/tctovsli))
 - Increase timeout for download of go.d.plugin [\#5468](https://github.com/netdata/netdata/pull/5468) ([elfgoh](https://github.com/elfgoh))
+- docker: use base images build by us [\#5465](https://github.com/netdata/netdata/pull/5465) ([paulfantom](https://github.com/paulfantom))
 
 ## [v1.12.1](https://github.com/netdata/netdata/tree/v1.12.1) (2019-02-21)
 
