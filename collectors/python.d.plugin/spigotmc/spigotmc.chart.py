@@ -107,9 +107,9 @@ class Service(SimpleService):
             raw = self.console.command('tps')
             match = _TPS_REGEX.match(raw)
             if match:
-                data['tps1'] = int(match.group(1)) * PRECISION
-                data['tps5'] = int(match.group(2)) * PRECISION
-                data['tps15'] = int(match.group(3)) * PRECISION
+                data['tps1'] = int(float(match.group(1)) * PRECISION)
+                data['tps5'] = int(float(match.group(2)) * PRECISION)
+                data['tps15'] = int(float(match.group(3)) * PRECISION)
             else:
                 self.error('Unable to process TPS values.')
         except mcrcon.MCRconException:
