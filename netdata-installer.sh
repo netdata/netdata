@@ -866,11 +866,6 @@ install_go() {
 }
 install_go
 
-# --- fix #1292 bug ---
-
-[ -d "${NETDATA_PREFIX}/usr/libexec" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/libexec"
-[ -d "${NETDATA_PREFIX}/usr/share/netdata" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/share/netdata"
-
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
