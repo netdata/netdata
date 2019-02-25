@@ -195,141 +195,6 @@ run() {
 	return ${ret}
 }
 
-portable_check_user_exists() {
-	local username="${1}" found=
-
-	getent_cmd="$(command -v getent 2>/dev/null)"
-	if [ -n "${getent_cmd}" ]; then
-		"${getent_cmd}" passwd "${username}" >/dev/null 2>&1
-		return $?
-	fi
-
-	found="$(cut -d ':' -f 1 </etc/passwd | grep "^${username}$")"
-	[ "${found}" = "${username}" ] && return 0
-	return 1
-}
-
-portable_check_group_exists() {
-	local groupname="${1}" found=
-
-	if [ -n "${getent_cmd}" ]; then
-		"${getent_cmd}" group "${groupname}" >/dev/null 2>&1
-		return $?
-	fi
-
-	found="$(cut -d ':' -f 1 </etc/group | grep "^${groupname}$")"
-	[ "${found}" = "${groupname}" ] && return 0
-	return 1
-}
-
-portable_check_user_in_group() {
-	local username="${1}" groupname="${2}" users=
-
-	if [ -n "${getent_cmd}" ]; then
-		users="$(getent group "${groupname}" | cut -d ':' -f 4)"
-	else
-		users="$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)"
-	fi
-
-	[[ ",${users}," =~ ,${username}, ]] && return 0
-	return 1
-}
-
-portable_add_user() {
-	local username="${1}" homedir="${2}"
-
-	[ -z "${homedir}" ] && homedir="/tmp"
-
-	portable_check_user_exists "${username}"
-	[ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
-
-	echo >&2 "Adding ${username} user account with home ${homedir} ..."
-
-	# shellcheck disable=SC2230
-	local nologin="$(which nologin 2>/dev/null || command -v nologin 2>/dev/null || echo '/bin/false')"
-
-	# Linux
-	if command -v useradd 2>/dev/null; then
-		run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
-	fi
-
-	# FreeBSD
-	if command -v pw 2>/dev/null; then
-		run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
-	fi
-
-	# BusyBox
-	if command -v adduser 2>/dev/null; then
-		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
-	fi
-
-	echo >&2 "Failed to add ${username} user account !"
-
-	return 1
-}
-
-portable_add_group() {
-	local groupname="${1}"
-
-	portable_check_group_exists "${groupname}"
-	[ $? -eq 0 ] && echo >&2 "Group '${groupname}' already exists." && return 0
-
-	echo >&2 "Adding ${groupname} user group ..."
-
-	# Linux
-	if command -v groupadd 2>/dev/null; then
-		run groupadd -r "${groupname}" && return 0
-	fi
-
-	# FreeBSD
-	if command -v pw 2>/dev/null; then
-		run pw groupadd "${groupname}" && return 0
-	fi
-
-	# BusyBox
-	if command -v addgroup 2>/dev/null; then
-		run addgroup "${groupname}" && return 0
-	fi
-
-	echo >&2 "Failed to add ${groupname} user group !"
-	return 1
-}
-
-portable_add_user_to_group() {
-	local groupname="${1}" username="${2}"
-
-	portable_check_group_exists "${groupname}"
-	[ $? -ne 0 ] && echo >&2 "Group '${groupname}' does not exist." && return 1
-
-	# find the user is already in the group
-	if portable_check_user_in_group "${username}" "${groupname}"; then
-		# username is already there
-		echo >&2 "User '${username}' is already in group '${groupname}'."
-		return 0
-	else
-		# username is not in group
-		echo >&2 "Adding ${username} user to the ${groupname} group ..."
-
-		# Linux
-		if command -v usermod 2>/dev/null; then
-			run usermod -a -G "${groupname}" "${username}" && return 0
-		fi
-
-		# FreeBSD
-		if command -v pw 2>/dev/null; then
-			run pw groupmod "${groupname}" -m "${username}" && return 0
-		fi
-
-		# BusyBox
-		if command -v addgroup 2>/dev/null; then
-			run addgroup "${username}" "${groupname}" && return 0
-		fi
-
-		echo >&2 "Failed to add user ${username} to group ${groupname} !"
-		return 1
-	fi
-}
-
 iscontainer() {
 	# man systemd-detect-virt
 	local cmd=$(command -v systemd-detect-virt 2>/dev/null)
@@ -610,9 +475,9 @@ restart_netdata() {
 	progress "Start netdata"
 
 	if [ "${UID}" -eq 0 ]; then
-		service netdata stop
+		portable_service netdata stop
 		stop_all_netdata
-		service netdata restart && started=1
+		portable_service netdata restart && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -620,7 +485,7 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			service netdata start && started=1
+			portable_service netdata start && started=1
 		fi
 	fi
 
@@ -733,6 +598,110 @@ download_netdata_conf() {
 	fi
 }
 
+portable_add_user() {
+	local username="${1}" homedir="${2}"
+
+	[ -z "${homedir}" ] && homedir="/tmp"
+
+    # Check if user exists
+	if cut -d ':' -f 1 </etc/passwd | grep "^${username}$"; then
+        echo >&2 "User '${username}' already exists."
+        return 0
+    fi
+
+	echo >&2 "Adding ${username} user account with home ${homedir} ..."
+
+	# shellcheck disable=SC2230
+	local nologin="$(command -v nologin 2>/dev/null || echo '/bin/false')"
+
+	# Linux
+	if command -v useradd 2>/dev/null; then
+		run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
+	fi
+
+	# FreeBSD
+	if command -v pw 2>/dev/null; then
+		run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
+	fi
+
+	# BusyBox
+	if command -v adduser 2>/dev/null; then
+		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
+	fi
+
+	echo >&2 "Failed to add ${username} user account !"
+
+	return 1
+}
+
+portable_add_group() {
+	local groupname="${1}"
+
+    # Check if group exist
+	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$"; then
+        echo >&2 "Group '${groupname}' already exists."
+        return 0
+    fi
+
+	echo >&2 "Adding ${groupname} user group ..."
+
+	# Linux
+	if command -v groupadd 2>/dev/null; then
+		run groupadd -r "${groupname}" && return 0
+	fi
+
+	# FreeBSD
+	if command -v pw 2>/dev/null; then
+		run pw groupadd "${groupname}" && return 0
+	fi
+
+	# BusyBox
+	if command -v addgroup 2>/dev/null; then
+		run addgroup "${groupname}" && return 0
+	fi
+
+	echo >&2 "Failed to add ${groupname} user group !"
+	return 1
+}
+
+portable_add_user_to_group() {
+	local groupname="${1}" username="${2}"
+
+    # Check if group exist
+	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$"; then
+        echo >&2 "Group '${groupname}' does not exist."
+        return 1
+    fi
+
+    # Check if user is in group
+	if [[ ",$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)," =~ ,${username}, ]]; then
+		# username is already there
+		echo >&2 "User '${username}' is already in group '${groupname}'."
+		return 0
+	else
+		# username is not in group
+		echo >&2 "Adding ${username} user to the ${groupname} group ..."
+
+		# Linux
+		if command -v usermod 2>/dev/null; then
+			run usermod -a -G "${groupname}" "${username}" && return 0
+		fi
+
+		# FreeBSD
+		if command -v pw 2>/dev/null; then
+			run pw groupmod "${groupname}" -m "${username}" && return 0
+		fi
+
+		# BusyBox
+		if command -v addgroup 2>/dev/null; then
+			run addgroup "${username}" "${groupname}" && return 0
+		fi
+
+		echo >&2 "Failed to add user ${username} to group ${groupname} !"
+		return 1
+	fi
+}
+
 # -----------------------------------------------------------------------------
 # add netdata user and group
 
@@ -750,14 +719,6 @@ add_netdata_user_and_group() {
 			portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
 		done
 
-		[ "${homedir}" = / ] && cat <<USERMOD
-
-The netdata user has its home directory set to /
-You may want to change it, using this command:
-
-# usermod -d "${homedir}" netdata
-
-USERMOD
 		return 0
 	fi
 
