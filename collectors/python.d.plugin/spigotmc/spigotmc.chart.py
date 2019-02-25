@@ -5,6 +5,7 @@
 
 import socket
 import platform
+import re
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -49,6 +50,10 @@ class Service(SimpleService):
         self.password = self.configuration.get('password', '')
         self.console = mcrcon.MCRcon()
         self.alive = True
+        self._tps_regex = re.compile(
+            b'^.*: ([0-9]{1,2}.[0-9]{1,2}), .*?([0-9]{1,2}.[0-9]{1,2}), .*?([0-9]{1,2}.[0-9]{1,2}).*$'
+        )
+        self._list_regex = re.compile(b'^.*: .*?([0-9]*).*?[0-9]*.*$')
 
     def check(self):
         if platform.system() != 'Linux':
@@ -91,27 +96,28 @@ class Service(SimpleService):
         data = {}
         try:
             raw = self.console.command('tps')
-            # The above command returns a string that looks like this:
-            # '§6TPS from last 1m, 5m, 15m: §a19.99, §a19.99, §a19.99\n'
-            # The values we care about are the three numbers after the :
-            tmp = raw.split(':')[1].split(',')
-            data['tps1'] = float(tmp[0].lstrip(u' §a*')) * PRECISION
-            data['tps5'] = float(tmp[1].lstrip(u' §a*')) * PRECISION
-            data['tps15'] = float(tmp[2].lstrip(u' §a*').rstrip()) * PRECISION
+            match = self._list_regex.match(raw)
+            if match:
+                data['tps1'] = int(match.group(1)) * PRECISION
+                data['tps5'] = int(match.group(2)) * PRECISION
+                data['tps15'] = int(match.group(3)) * PRECISION
+            else:
+                self.error('Unable to process TPS values.')
         except mcrcon.MCRconException:
             self.error('Unable to fetch TPS values.')
         except socket.error:
             self.error('Connection is dead.')
             self.alive = False
             return None
-        except (TypeError, LookupError):
+        except (TypeError, LookupError, IndexError):
             self.error('Unable to process TPS values.')
         try:
             raw = self.console.command('list')
-            # The above command returns a string that looks like this:
-            # 'There are 0/20 players online:'
-            # We care about the first number here.
-            data['users'] = int(raw.split()[2].split('/')[0])
+            match = self._list_regex.match(raw)
+            if match:
+                data['users'] = int(match.group(1))
+            else:
+                self.error('Unable to process user counts.')
         except mcrcon.MCRconException:
             self.error('Unable to fetch user counts.')
         except socket.error:
