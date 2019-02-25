@@ -7,12 +7,12 @@ uniquepath() {
 	local path=""
 	while read; do
 		if [[ ! ${path} =~ (^|:)"${REPLY}"(:|$) ]]; then
-			[ ! -z "${path}" ] && path="${path}:"
+			[ -n "${path}" ] && path="${path}:"
 			path="${path}${REPLY}"
 		fi
 	done < <(echo "${PATH}" | tr ":" "\n")
 
-	[ ! -z "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
+	[ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
 }
 uniquepath
 
@@ -194,7 +194,7 @@ For the plugins, you will at least need:
 USAGE
 }
 
-while [ ! -z "${1}" ]; do
+while [ -n "${1}" ]; do
 	if [ "$1" = "--install" ]; then
 		NETDATA_PREFIX="${2}/netdata"
 		shift 2
@@ -369,7 +369,7 @@ EOF
 fi
 
 if [ ${DONOTWAIT} -eq 0 ]; then
-	if [ ! -z "${NETDATA_PREFIX}" ]; then
+	if [ -n "${NETDATA_PREFIX}" ]; then
 		eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to \'\001${TPUT_CYAN}\002${NETDATA_PREFIX}\001${TPUT_YELLOW}\002\'\001${TPUT_RESET}\002 > ' -e -r REPLY"
 		[ $? -ne 0 ] && exit 1
 	else
@@ -571,7 +571,7 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 progress "Add user netdata to required user groups"
 
 homedir="${NETDATA_PREFIX}/var/lib/netdata"
-[ ! -z "${NETDATA_PREFIX}" ] && homedir="${NETDATA_PREFIX}"
+[ -n "${NETDATA_PREFIX}" ] && homedir="${NETDATA_PREFIX}"
 add_netdata_user_and_group "${homedir}" || run_failed "The installer does not run as root."
 
 # -----------------------------------------------------------------------------
@@ -737,7 +737,7 @@ if [ ${UID} -eq 0 ]; then
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
 		setcap_ret=1
 		if ! iscontainer; then
-			if [ ! -z "${setcap}" ]; then
+			if [ -n "${setcap}" ]; then
 				run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 				run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 				run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
