@@ -701,26 +701,3 @@ portable_add_user_to_group() {
 		return 1
 	fi
 }
-
-# -----------------------------------------------------------------------------
-# add netdata user and group
-
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
-NETDATA_ADDED_TO_GROUPS=""
-add_netdata_user_and_group() {
-	local homedir="${1}" g
-
-	if [ "${UID}" -eq 0 ]; then
-		portable_add_group netdata || return 1
-		portable_add_user netdata "${homedir}" || return 1
-
-		for g in ${NETDATA_WANTED_GROUPS}; do
-			# shellcheck disable=SC2086
-			portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
-		done
-
-		return 0
-	fi
-
-	return 1
-}

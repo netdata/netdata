@@ -507,9 +507,19 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-homedir="${NETDATA_PREFIX}/var/lib/netdata"
-[ -n "${NETDATA_PREFIX}" ] && homedir="${NETDATA_PREFIX}"
-add_netdata_user_and_group "${homedir}" || run_failed "The installer does not run as root."
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_ADDED_TO_GROUPS=""
+if [ "${UID}" -eq 0 ]; then
+	portable_add_group netdata || :
+	portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
+
+	for g in ${NETDATA_WANTED_GROUPS}; do
+		# shellcheck disable=SC2086
+		portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+	done
+else
+	run_failed "The installer does not run as root."
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
