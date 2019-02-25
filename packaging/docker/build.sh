@@ -38,8 +38,7 @@ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 # Build images using multi-arch Dockerfile.
 for ARCH in "${ARCHITECTURES[@]}"; do
      eval docker build \
-     		--build-arg ARCH="${ARCH}-v3.8" \
-     		--build-arg OUTPUT=/dev/null \
+     		--build-arg ARCH="${ARCH}" \
      		--tag "${REPOSITORY}:${VERSION}-${ARCH}" \
      		--file packaging/docker/Dockerfile ./
 done
