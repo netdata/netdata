@@ -38,6 +38,19 @@ CHARTS = {
         ]
     }
 }
+_TPS_REGEX = re.compile(
+    '^.*: .*?'                     # Message lead-in
+    '([0-9]{1,2}.[0-9]{1,2}), .*?' # 1-minute TPS value
+    '([0-9]{1,2}.[0-9]{1,2}), .*?' # 5-minute TPS value
+    '([0-9]{1,2}.[0-9]{1,2}).*$',  # 15-minute TPS value
+    re.X
+)
+_LIST_REGEX = re.compile(
+    '^.*?'          # Message lead-in
+    '([0-9]*)'      # Current user count.
+    '.*?[0-9]*.*$', # Rest of the line, which should include another number.
+    re.X
+)
 
 
 class Service(SimpleService):
@@ -50,10 +63,6 @@ class Service(SimpleService):
         self.password = self.configuration.get('password', '')
         self.console = mcrcon.MCRcon()
         self.alive = True
-        self._tps_regex = re.compile(
-            b'^.*: ([0-9]{1,2}.[0-9]{1,2}), .*?([0-9]{1,2}.[0-9]{1,2}), .*?([0-9]{1,2}.[0-9]{1,2}).*$'
-        )
-        self._list_regex = re.compile(b'^.*: .*?([0-9]*).*?[0-9]*.*$')
 
     def check(self):
         if platform.system() != 'Linux':
@@ -96,7 +105,7 @@ class Service(SimpleService):
         data = {}
         try:
             raw = self.console.command('tps')
-            match = self._list_regex.match(raw)
+            match = _TPS_REGEX.match(raw)
             if match:
                 data['tps1'] = int(match.group(1)) * PRECISION
                 data['tps5'] = int(match.group(2)) * PRECISION
@@ -113,7 +122,7 @@ class Service(SimpleService):
             self.error('Unable to process TPS values.')
         try:
             raw = self.console.command('list')
-            match = self._list_regex.match(raw)
+            match = _LIST_REGEX.match(raw)
             if match:
                 data['users'] = int(match.group(1))
             else:
