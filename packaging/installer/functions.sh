@@ -527,75 +527,47 @@ install_netdata_logrotate() {
 }
 
 # -----------------------------------------------------------------------------
-# download netdata.conf
+# create netdata.conf
 
-fix_netdata_conf() {
-	local owner="${1}"
+create_netdata_conf() {
+	local path="${1}" url="${2}"
 
-	if [ "${UID}" -eq 0 ]; then
-		run chown "${owner}" "${filename}"
+	if [ -s "${path}" ]; then
+		return 0
 	fi
-	run chmod 0664 "${filename}"
-}
 
-generate_netdata_conf() {
-	local owner="${1}" filename="${2}" url="${3}"
-
-	if [ ! -s "${filename}" ]; then
-		cat >"${filename}" <<EOFCONF
-# netdata can generate its own config.
-# Get it with:
-#
-# wget -O ${filename} "${url}"
-#
-# or
-#
-# curl -s -o ${filename} "${url}"
-#
-EOFCONF
-		fix_netdata_conf "${owner}"
-	fi
-}
-
-download_netdata_conf() {
-	local owner="${1}" filename="${2}" url="${3}"
-
-	if [ ! -s "${filename}" ]; then
-		echo >&2
-		echo >&2 "-------------------------------------------------------------------------------"
-		echo >&2
+	if [ -n "$url" ]; then
 		echo >&2 "Downloading default configuration from netdata..."
 		sleep 5
 
-		# remove a possibly obsolete download
-		[ -f "${filename}.new" ] && rm "${filename}.new"
+		# remove a possibly obsolete configuration file
+		[ -f "${path}.new" ] && rm "${path}.new"
 
 		# disable a proxy to get data from the local netdata
 		export http_proxy=
 		export https_proxy=
 
-		# try curl
-		run curl -s -o "${filename}.new" "${url}"
-		ret=$?
-
-		if [ ${ret} -ne 0 ] || [ ! -s "${filename}.new" ]; then
-			# try wget
-			run wget -O "${filename}.new" "${url}"
-			ret=$?
+		if command -v curl >/dev/null 2>&1; then
+			run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${path}.new"
+		elif command -v wget >/dev/null 2>&1; then
+			run wget -T 15 -O - "${url}" >"${path}.new"
 		fi
 
-		if [ ${ret} -eq 0 ] && [ -s "${filename}.new" ]; then
-			run mv "${filename}.new" "${filename}"
-			run_ok "New configuration saved for you to edit at ${filename}"
+		if [ -s "${path}.new" ]; then
+			run mv "${path}.new" "${path}"
+			run_ok "New configuration saved for you to edit at ${path}"
 		else
-			[ -f "${filename}.new" ] && rm "${filename}.new"
+			[ -f "${path}.new" ] && rm "${path}.new"
 			run_failed "Cannnot download configuration from netdata daemon using url '${url}'"
-
-			generate_netdata_conf "${owner}" "${filename}" "${url}"
+			url=''
 		fi
-
-		fix_netdata_conf "${owner}"
 	fi
+
+	if [ -z "$url" ]; then
+		echo "# netdata can generate its own config which is available at 'http://<netdata_ip>/netdata.conf'" >"${path}"
+		echo "# You can download it with command like: 'wget -O ${path} http://localhost:19999/netdata.conf'" >>"${path}"
+	fi
+
 }
 
 portable_add_user() {

@@ -805,24 +805,23 @@ install_netdata_service || run_failed "Cannot install netdata init service."
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
 
+# TODO(paulfantom): Creation of configuration file should be handled by a build system. Additionally we shouldn't touch configuration files in /etc/netdata/...
 started=0
 if [ ${DONOTSTART} -eq 1 ]; then
-	generate_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
-
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 else
 	if ! restart_netdata "${NETDATA_PREFIX}/usr/sbin/netdata" "${@}"; then
-		run_failed "Cannot start netdata!"
-		exit 1
+		fatal "Cannot start netdata!"
 	fi
 
 	started=1
 	run_ok "netdata started!"
-
-	# -----------------------------------------------------------------------------
-	# save a config file, if it is not already there
-
-	download_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
+if [ "${UID}" -eq 0 ]; then
+        run chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+fi
+run chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
 if [ "$(uname)" = "Linux" ]; then
 	# -------------------------------------------------------------------------
