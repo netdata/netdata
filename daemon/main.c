@@ -40,6 +40,7 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
         rrdhost_free_all();
+        rrdeng_exit();
     }
 
     // unlink the pid
@@ -1127,6 +1128,14 @@ int main(int argc, char **argv) {
     // initialize rrd, registry, health, rrdpush, etc.
 
     rrd_init(netdata_configured_hostname);
+    {
+        int ret;
+
+        ret = rrdeng_init();
+        if (ret) {
+            exit(ret);
+        }
+    }
 
     // ------------------------------------------------------------------------
     // enable log flood protection

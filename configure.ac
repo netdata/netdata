@@ -279,6 +279,20 @@ OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
 
 
 # -----------------------------------------------------------------------------
+# Judy General purpose dynamic array
+
+AC_CHECK_LIB(
+    [Judy],
+    [JudyLIns],
+    [JUDY_LIBS="-lJudy"]
+)
+test -z "${JUDY_LIBS}" && AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
+
+OPTIONAL_JUDY_CLFAGS="${JUDY_CFLAGS}"
+OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
+
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -708,6 +722,7 @@ AC_SUBST([OPTIONAL_RT_CLFAGS])
 AC_SUBST([OPTIONAL_RT_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CLFAGS])

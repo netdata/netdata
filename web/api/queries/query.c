@@ -408,8 +408,11 @@ static inline void do_dimension(
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
 
+    struct rrdeng_handle handle;
+
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
+    rrdeng_load_metric_init(rd->handle.uuid, &handle, now, now + dt * points_wanted);
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
 
@@ -429,6 +432,7 @@ static inline void do_dimension(
 
         // read the value from the database
         storage_number n = rd->values[slot];
+        n = rrdeng_load_metric_next(&handle, now);
         calculated_number value = NAN;
         if(likely(does_storage_number_exist(n))) {
 
@@ -485,6 +489,7 @@ static inline void do_dimension(
             values_in_group_non_zero = 0;
         }
     }
+    rrdeng_load_metric_final(&handle);
 
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
