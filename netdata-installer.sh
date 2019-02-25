@@ -91,6 +91,88 @@ REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 [ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${PROGRAM}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
 
+banner_nonroot_install() {
+	cat <<NONROOTNOPREFIX
+
+  ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
+
+  You are attempting to install netdata as non-root, but you plan
+  to install it in system paths.
+
+  Please set an installation prefix, like this:
+
+      $PROGRAM ${@} --install /tmp
+
+  or, run the installer as root:
+
+      sudo $PROGRAM ${@}
+
+  We suggest to install it as root, or certain data collectors will
+  not be able to work. Netdata drops root privileges when running.
+  So, if you plan to keep it, install it as root to get the full
+  functionality.
+
+NONROOTNOPREFIX
+}
+
+banner_root_notify() {
+	cat <<NONROOT
+
+  ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
+  You are about to install netdata as a non-root user.
+  Netdata will work, but a few data collection modules that
+  require root access will fail.
+
+  If you installing netdata permanently on your system, run
+  the installer like this:
+
+     ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
+
+NONROOT
+}
+
+usage() {
+	netdata_banner "installer command line options"
+	cat <<HEREDOC
+
+USAGE: ${PROGRAM} [options]
+       where options include:
+
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata
+  --dont-start-it            Do not (re)start netdata after installation
+  --dont-wait                Run installation in non-interactive mode
+  --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
+                             This results in less frequent updates.
+  --disable-go               Disable installation of go.d.plugin.
+  --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
+  --disable-plugin-freeipmi
+  --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
+  --disable-plugin-nfacct
+  --enable-lto               Enable Link-Time-Optimization. Default: enabled
+  --disable-lto
+  --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
+  --zlib-is-really-here or
+  --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
+                             have a broken pkg-config. Use this option to proceed without checking pkg-config.
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam.
+
+Netdata will by default be compiled with gcc optimization -O2
+If you need to pass different CFLAGS, use something like this:
+
+  CFLAGS="<gcc options>" ${PROGRAM} [options]
+
+For the installer to complete successfully, you will need these packages installed:
+
+  gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel) uuid-dev (or libuuid-devel)
+
+For the plugins, you will at least need:
+
+  curl, bash v4+, python v2 or v3, node.js
+
+HEREDOC
+}
+
 DONOTSTART=0
 DONOTWAIT=0
 AUTOUPDATE=0
@@ -98,159 +180,52 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly"
-
-usage() {
-	netdata_banner "installer command line options"
-	cat <<USAGE
-
-${PROGRAM} <installer options>
-
-Valid <installer options> are:
-
-   --install /PATH/TO/INSTALL
-
-        If you give: --install /opt
-        netdata will be installed in /opt/netdata
-
-   --dont-start-it
-
-        Do not (re)start netdata.
-        Just install it.
-
-   --dont-wait
-
-        Do not wait for the user to press ENTER.
-        Start immediately building it.
-
-   --auto-update | -u
-
-        Install netdata-updater to cron,
-        to update netdata automatically once per day
-
-   --stable-channel
-
-        Auto-updater will update netdata only when new release is published
-        in GitHub release pages. This results in less frequent updates.
-        Default: Use packages from GCS (nightly release channel).
-
-   --enable-plugin-freeipmi
-   --disable-plugin-freeipmi
-
-        Enable/disable the FreeIPMI plugin.
-        Default: enable it when libipmimonitoring is available.
-
-   --enable-plugin-nfacct
-   --disable-plugin-nfacct
-
-        Enable/disable the nfacct plugin.
-        Default: enable it when libmnl and libnetfilter_acct are available.
-
-   --enable-lto
-   --disable-lto
-
-        Enable/disable Link-Time-Optimization
-        Default: enabled
-
-   --disable-x86-sse
-
-        Disable SSE instructions
-        Default: enabled
-
-   --zlib-is-really-here
-   --libs-are-really-here
-
-        If you get errors about missing zlib,
-        or libuuid but you know it is available,
-        you have a broken pkg-config.
-        Use this option to allow it continue
-        without checking pkg-config.
-
-   --disable-telemetry
-
-        Use this flag to opt-out from our anonymous telemetry progam.
-
-   --disable-go
-
-        Flag to disable installation of go.d.plugin
-
-Netdata will by default be compiled with gcc optimization -O2
-If you need to pass different CFLAGS, use something like this:
-
-  CFLAGS="<gcc options>" ${PROGRAM} <installer options>
-
-For the installer to complete successfully, you will need
-these packages installed:
-
-   gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel)
-   uuid-dev (or libuuid-devel)
-
-For the plugins, you will at least need:
-
-   curl, bash v4+, python v2 or v3, node.js
-
-USAGE
-}
-
 while [ -n "${1}" ]; do
-	if [ "$1" = "--install" ]; then
-		NETDATA_PREFIX="${2}/netdata"
-		shift 2
-	elif [ "$1" = "--zlib-is-really-here" -o "$1" = "--libs-are-really-here" ]; then
-		LIBS_ARE_HERE=1
-		shift 1
-	elif [ "$1" = "--dont-start-it" ]; then
-		DONOTSTART=1
-		shift 1
-	elif [ "$1" = "--dont-wait" ]; then
-		DONOTWAIT=1
-		shift 1
-	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
-		AUTOUPDATE=1
-		shift 1
-	elif [ "$1" = "--stable-channel" ]; then
-		RELEASE_CHANNEL="stable"
-		shift 1
-	elif [ "$1" = "--enable-plugin-freeipmi" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
-		shift 1
-	elif [ "$1" = "--disable-plugin-freeipmi" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi"
-		shift 1
-	elif [ "$1" = "--enable-plugin-nfacct" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct"
-		shift 1
-	elif [ "$1" = "--disable-plugin-nfacct" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct"
-		shift 1
-	elif [ "$1" = "--enable-lto" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto"
-		shift 1
-	elif [ "$1" = "--disable-lto" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto"
-		shift 1
-	elif [ "$1" = "--disable-x86-sse" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"
-		shift 1
-	elif [ "$1" = "--disable-telemetry" ]; then
-		NETDATA_DISABLE_TELEMETRY=1
-		shift 1
-	elif [ "$1" = "--disable-go" ]; then
-		NETDATA_DISABLE_GO=1
-		shift 1
-	elif [ "$1" = "--help" -o "$1" = "-h" ]; then
-		usage
-		exit 1
-	else
-		echo >&2
-		echo >&2 "ERROR:"
-		echo >&2 "I cannot understand option '$1'."
-		usage
-		exit 1
-	fi
+	case "${1}" in
+		"--zlib-is-really-here") LIBS_ARE_HERE=1;;
+		"--libs-are-really-here") LIBS_ARE_HERE=1;;
+		"--dont-start-it") DONOTSTART=1;;
+		"--dont-wait") DONOTWAIT=1;;
+		"--auto-update"|"-u") AUTOUPDATE=1;;
+		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
+		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
+		"--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct";;
+		"--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct";;
+		"--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto";;
+		"--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto";;
+		"--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse";;
+		"--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1;;
+		"--disable-go") NETDATA_DISABLE_GO=1;;
+		"--install")
+			NETDATA_PREFIX="${2}/netdata"
+			shift 1
+			;;
+		"--help"|"-h")
+			usage
+			exit 1
+			;;
+		*)
+			run_failed "I cannot understand option '$1'."
+			usage
+			exit 1
+			;;
+		esac
+	shift 1
 done
 
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
+
+if [ "${UID}" -ne 0 ]; then
+	if [ -z "${NETDATA_PREFIX}" ]; then
+		netdata_banner "wrong command line options!"
+		banner_nonroot_install "${@}"
+		exit 1
+	else
+		banner_root_notify "${@}"
+	fi
+fi
 
 netdata_banner "real-time performance monitoring, done right!"
 cat <<BANNER1
@@ -279,49 +254,6 @@ cat <<BANNER3
   Press Control-C and run the same command with --help for help.
 
 BANNER3
-
-if [ "${UID}" -ne 0 ]; then
-	if [ -z "${NETDATA_PREFIX}" ]; then
-		netdata_banner "wrong command line options!"
-		cat <<NONROOTNOPREFIX
-
-  ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
-
-  You are attempting to install netdata as non-root, but you plan
-  to install it in system paths.
-
-  Please set an installation prefix, like this:
-
-      $PROGRAM ${@} --install /tmp
-
-  or, run the installer as root:
-
-      sudo $PROGRAM ${@}
-
-  We suggest to install it as root, or certain data collectors will
-  not be able to work. Netdata drops root privileges when running.
-  So, if you plan to keep it, install it as root to get the full
-  functionality.
-
-NONROOTNOPREFIX
-		exit 1
-
-	else
-		cat <<NONROOT
-
-  ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
-  You are about to install netdata as a non-root user.
-  Netdata will work, but a few data collection modules that
-  require root access will fail.
-
-  If you installing netdata permanently on your system, run
-  the installer like this:
-
-     ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
-
-NONROOT
-	fi
-fi
 
 have_autotools=
 if [ "$(type autoreconf 2>/dev/null)" ]; then
