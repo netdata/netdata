@@ -219,6 +219,9 @@ Netdata can send metrics to prometheus from 3 data sources:
    The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
    If the metric is a counter (`incremental` in netdata lingo), `_total` is appended the context.
+   
+   To change the data source to `sum` or `as-collected` you need to specify the source(`source=as-collected`) in the URL:
+   `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`
 
    Unlike prometheus, netdata allows each dimension of a chart to have a different algorithm and conversion constants (`multiplier` and `divisor`). In this case, that the dimensions of a charts are heterogeneous, netdata will use this format: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
 
