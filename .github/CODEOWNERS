@@ -54,6 +54,7 @@ netdata.spec.in @paulfantom
 netlify.toml @cakrit
 package.json @gmosx
 packaging/version @netdatabot
+netdata-installer.sh @ktsaou @paulfantom @cakrit
 
 LICENSE.md @ktsaou
 CHANGELOG.md @netdatabot
