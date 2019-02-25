@@ -897,6 +897,13 @@ static int rrdpush_receive(int fd
         return 1;
     }
 
+    if(host == localhost) {
+        close(fd);
+        log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FOR LOCALHOST MACHINE_GUID");
+        error("STREAM %s [receive from [%s]:%s]: denied to receive metrics for localhost - did you copy the master/proxy machine guid to a slave?.", hostname, client_ip, client_port);
+        return 1;
+    }
+
 #ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s, tags '%s'"
          , hostname
