@@ -395,7 +395,7 @@ run make clean
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run make -j${SYSTEM_CPUS} || exit 1
+run make -j$(find_processors) || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"

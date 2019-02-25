@@ -119,21 +119,21 @@ pidof() {
 }
 
 # -----------------------------------------------------------------------------
-
-# TODO(paulfantom): refactor this function to return value of SYSTEM_CPUS instead of writing it to a global variable
-#                   refactor invocations of this function
-export SYSTEM_CPUS=1
-portable_find_processors() {
+find_processors() {
+	local cpus
 	if [ -f "/proc/cpuinfo" ]; then
 		# linux
-		SYSTEM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+		cpus=$(grep -c ^processor /proc/cpuinfo)
 	else
 		# freebsd
-		SYSTEM_CPUS=$(sysctl hw.ncpu 2>/dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
+		cpus=$(sysctl hw.ncpu 2>/dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
 	fi
-	[ -z "${SYSTEM_CPUS}" -o $((SYSTEM_CPUS)) -lt 1 ] && SYSTEM_CPUS=1
+	if [ -z "${cpus}" ] || [ $((cpus)) -lt 1 ]; then
+		echo 1
+	else
+		echo "${cpus}"
+	fi
 }
-portable_find_processors  #FIXME(paulfantom): library shouldn't invoke any functions
 
 # -----------------------------------------------------------------------------
 fatal() {
