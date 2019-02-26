@@ -46,9 +46,7 @@ _TPS_REGEX = re.compile(
     re.X | re.A
 )
 _LIST_REGEX = re.compile(
-    r'^.*?'       # Message lead-in
-    r'(\d+)'      # Current user count.
-    r'.*?\d*.*$', # Rest of the line, which should include another number.
+    r'(\d+)', # Current user count.
     re.X | re.A
 )
 
@@ -120,10 +118,10 @@ class Service(SimpleService):
             return None
         try:
             raw = self.console.command('list')
-            match = _LIST_REGEX.match(raw)
+            match = _LIST_REGEX.search(raw)
             if not match:
                 raw = self.console.command('online')
-                match = _LIST_REGEX.match(raw)
+                match = _LIST_REGEX.search(raw)
             if match:
                 data['users'] = int(match.group(1))
             else:
