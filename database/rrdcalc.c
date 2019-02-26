@@ -103,7 +103,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->info,
                 0,
                 0,
-                rc->repeat_every
+                rc->warn_repeat_every,
+                rc->crit_repeat_every
         );
     }
 }
@@ -165,7 +166,8 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->info,
                 0,
                 0,
-                rc->repeat_every
+                rc->warn_repeat_every,
+                rc->crit_repeat_every
         );
     }
 
@@ -330,7 +332,8 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->delay_max_duration = rt->delay_max_duration;
     rc->delay_multiplier = rt->delay_multiplier;
 
-    rc->repeat_every = rt->repeat_every;
+    rc->warn_repeat_every = rt->warn_repeat_every;
+    rc->crit_repeat_every = rt->crit_repeat_every;
 
     rc->group = rt->group;
     rc->after = rt->after;
@@ -360,7 +363,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, repeat_warning_every %d, repeat_critical_every %d",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -381,8 +384,8 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->delay_down_duration,
             rc->delay_max_duration,
             rc->delay_multiplier,
-            rc->repeat_warning_every,
-            rc->repeat_warning_every
+            rc->warn_repeat_every,
+            rc->crit_repeat_every
     );
 
     rrdcalc_add_to_host(host, rc);

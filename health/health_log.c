@@ -270,6 +270,9 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
 
+            ae->warn_repeat_every = 0;
+            ae->crit_repeat_every = 0;
+
             char value_string[100 + 1];
             freez(ae->old_value_string);
             freez(ae->new_value_string);
@@ -359,57 +362,99 @@ inline void health_alarm_log(
         const char *info,
         int delay,
         uint32_t flags,
-        int repeat_every
+        uint32_t warn_repeat_every,
+        uint32_t crit_repeat_every
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
-    ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
-    ae->name = strdupz(name);
-    ae->hash_name = simple_hash(ae->name);
-
-    if(chart) {
-        ae->chart = strdupz(chart);
-        ae->hash_chart = simple_hash(ae->chart);
+    bool_t create_new_alarm_entry = 1;
+    bool_t is_repeating = make_bool(warn_repeat_every > 0 || crit_repeat_every > 0);
+    REPEATING_ALARM_ENTRY *target_alarm_entity = NULL;
+    if(unlikely(is_repeating)) {
+        REPEATING_ALARM_ENTRY *it;
+        for(it = host->health_rep_alarm_entry_list; it && it->next; it = it->next)
+            if(it->alarm_entry->alarm_id == alarm_id) {
+                target_alarm_entity = it;
+                create_new_alarm_entry = 0;
+                break;
+            }
     }
 
-    if(family)
-        ae->family = strdupz(family);
+    ALARM_ENTRY *ae = NULL;
+    if(likely(create_new_alarm_entry)) {
+        ae = callocz(1, sizeof(ALARM_ENTRY));
+        ae->name = strdupz(name);
+        ae->hash_name = simple_hash(ae->name);
 
-    if(exec) ae->exec = strdupz(exec);
-    if(recipient) ae->recipient = strdupz(recipient);
-    if(source) ae->source = strdupz(source);
-    if(units) ae->units = strdupz(units);
-    if(info) ae->info = strdupz(info);
+        if(chart) {
+            ae->chart = strdupz(chart);
+            ae->hash_chart = simple_hash(ae->chart);
+        }
 
-    ae->unique_id = host->health_log.next_log_id++;
-    ae->alarm_id = alarm_id;
-    ae->alarm_event_id = alarm_event_id;
-    ae->when = when;
-    ae->old_value = old_value;
-    ae->new_value = new_value;
+        if(family)
+            ae->family = strdupz(family);
 
-    char value_string[100 + 1];
-    ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
-    ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+        if(exec) ae->exec = strdupz(exec);
+        if(recipient) ae->recipient = strdupz(recipient);
+        if(source) ae->source = strdupz(source);
+        if(units) ae->units = strdupz(units);
+        if(info) ae->info = strdupz(info);
 
-    ae->old_status = old_status;
-    ae->new_status = new_status;
-    ae->duration = duration;
-    ae->delay = delay;
-    ae->delay_up_to_timestamp = when + delay;
-    ae->flags |= flags;
+        ae->unique_id = host->health_log.next_log_id++;
+        ae->alarm_id = alarm_id;
+        ae->alarm_event_id = alarm_event_id;
+        ae->when = when;
+        ae->old_value = old_value;
+        ae->new_value = new_value;
 
-    ae->repeat_every = repeat_every;
-    ae->last_repeat = 0;
+        char value_string[100 + 1];
+        ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
+        ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
-    if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
-        ae->non_clear_duration += ae->duration;
+        ae->old_status = old_status;
+        ae->new_status = new_status;
+        ae->duration = duration;
+        ae->delay = delay;
+        ae->delay_up_to_timestamp = when + delay;
+        ae->flags |= flags;
+
+        ae->warn_repeat_every = warn_repeat_every;
+        ae->crit_repeat_every = crit_repeat_every;
+        ae->last_repeat = 0;
+
+        if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
+            ae->non_clear_duration += ae->duration;
+    }
+    else {
+        ae = target_alarm_entity->alarm_entry;
+        netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+        // TODO: Update more necessary fields
+        ae->old_status = old_status;
+        ae->new_status = new_status;
+        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    }
 
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-    ae->next = host->health_log.alarms;
-    host->health_log.alarms = ae;
-    host->health_log.count++;
+    if(likely(!is_repeating)) {
+        ae->next = host->health_log.alarms;
+        host->health_log.alarms = ae;
+        host->health_log.count++;
+    }
+    else {
+        if(unlikely(!target_alarm_entity)) {
+            // TODO: Remove these entries once host is going to be freed
+            REPEATING_ALARM_ENTRY *rae = callocz(1, sizeof(REPEATING_ALARM_ENTRY));
+            rae->alarm_entry = ae;
+            if(unlikely(!host->health_rep_alarm_entry_list)) {
+                host->health_rep_alarm_entry_list = rae;
+            }
+            else {
+                rae->next = host->health_rep_alarm_entry_list;
+                host->health_rep_alarm_entry_list = rae;
+            }
+        }
+    }
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     // match previous alarms

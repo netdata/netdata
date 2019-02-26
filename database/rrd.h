@@ -473,7 +473,8 @@ struct alarm_entry {
     uint32_t updated_by_id;
     uint32_t updates_id;
 
-    int repeat_every;
+    uint32_t warn_repeat_every;
+    uint32_t crit_repeat_every;
     time_t last_repeat;
 
     struct alarm_entry *next;
@@ -484,7 +485,7 @@ typedef struct repeating_alarm_entry {
     struct repeating_alarm_entry *next;
 } REPEATING_ALARM_ENTRY;
 
-typedef REPEATING_ALARM_ENTRY *REPEATING_ALARM_LIST;
+typedef REPEATING_ALARM_ENTRY *REPEATING_ALARM_ENTRY_LIST;
 
 typedef struct alarm_log {
     uint32_t next_log_id;
@@ -574,7 +575,8 @@ struct rrdhost {
     char *health_log_filename;                      // the alarms event log filename
     size_t health_log_entries_written;              // the number of alarm events writtern to the alarms event log
     FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
-    int health_default_repeat_every;                // the default value for the interval between repeating notifications
+    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
 
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
@@ -586,7 +588,7 @@ struct rrdhost {
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
     uint32_t health_max_alarm_id;                   // the max alarm id given for the host
 
-    REPEATING_ALARM_LIST health_rep_alarm_list;     // list of repeating alarm entries
+    REPEATING_ALARM_ENTRY_LIST health_rep_alarm_entry_list;    // list of repeating alarm entries
 
     // templates of alarms
     // these are used to create alarms when charts

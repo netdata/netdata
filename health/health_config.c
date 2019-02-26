@@ -46,7 +46,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, repeat_warning_every %d, repeat_critical_every %d",
+    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             rc->chart?rc->chart:"NOCHART",
             rc->name,
             rc->id,
@@ -68,8 +68,8 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             rc->delay_down_duration,
             rc->delay_max_duration,
             rc->delay_multiplier,
-            rc->repeat_warning_every,
-            rc->repeat_critical_every
+            rc->warn_repeat_every,
+            rc->crit_repeat_every
     );
 
     rrdcalc_add_to_host(host, rc);
@@ -103,7 +103,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         }
     }
 
-    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, repeat_warning_every %d, repeat_critical_every %d",
+    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             rt->name,
             (rt->context)?rt->context:"NONE",
             (rt->exec)?rt->exec:"DEFAULT",
@@ -124,8 +124,8 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             rt->delay_down_duration,
             rt->delay_max_duration,
             rt->delay_multiplier,
-            rt->repeat_warning_every,
-            rt->repeat_critical_every
+            rt->warn_repeat_every,
+            rt->crit_repeat_every
     );
 
     if(likely(last)) {
@@ -250,12 +250,14 @@ static inline uint32_t health_parse_options(const char *s) {
 
 static inline int health_parse_repeat(
         size_t line, const char *file, char *string,
-        int *repeat_every
+        uint32_t *warn_repeat_every,
+        uint32_t *crit_repeat_every
 ) {
 
-    int default_duration = 0;
+    uint32_t default_duration = 0;
     char given_default = FALSE;
-    char given_repeat = FALSE;
+    char given_warn_repeat = FALSE;
+    char given_crit_repeat = FALSE;
 
     char *s = string;
     while(*s) {
@@ -270,15 +272,22 @@ static inline int health_parse_repeat(
         while(*s && !isspace(*s)) s++;
         while(*s && isspace(*s)) *s++ = '\0';
 
-        if(!strcasecmp(key, "notifications")) {
-            if (!config_parse_duration(value, repeat_every)) {
+        if(!strcasecmp(key, "warning")) {
+            if (!config_parse_duration(value, (int*)warn_repeat_every)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, file, value, key);
             }
-            else given_repeat = TRUE;
+            else given_warn_repeat = TRUE;
+        }
+        else if(!strcasecmp(key, "critical")) {
+            if (!config_parse_duration(value, (int*)crit_repeat_every)) {
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                        line, file, value, key);
+            }
+            else given_crit_repeat = TRUE;
         }
         else {
-            if (!config_parse_duration(key, &default_duration)) {
+            if (!config_parse_duration(key, (int*)&default_duration)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s'",
                         line, file, key);
             }
@@ -287,8 +296,10 @@ static inline int health_parse_repeat(
     }
 
     if(given_default) {
-        if(!given_repeat)
-            *repeat_every = default_duration;
+        if(!given_warn_repeat)
+            *warn_repeat_every = default_duration;
+        if(!given_crit_repeat)
+            *crit_repeat_every = default_duration;
     }
 
     return TRUE;
@@ -543,7 +554,8 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
-            rc->repeat_every = host->health_default_repeat_every;
+            rc->warn_repeat_every = host->health_default_warn_repeat_every;
+            rc->crit_repeat_every = host->health_default_crit_repeat_every;
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -568,7 +580,8 @@ static int health_readfile(const char *filename, void *data) {
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
-            rt->repeat_every = host->health_default_repeat_every;
+            rt->warn_repeat_every = host->health_default_warn_repeat_every;
+            rt->crit_repeat_every = host->health_default_crit_repeat_every;
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -722,7 +735,8 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
                 health_parse_repeat(line,filename, value,
-                    &rc->repeat_every);
+                    &rc->warn_repeat_every,
+                    &rc->crit_repeat_every);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",

@@ -51,7 +51,8 @@ struct rrdcalctemplate {
     // ------------------------------------------------------------------------
     // notification repeat settings
 
-    int repeat_every;     // interval between repeating notifications
+    uint32_t warn_repeat_every;    // interval between repeating warning notifications
+    uint32_t crit_repeat_every;    // interval between repeating critical notifications
 
     // ------------------------------------------------------------------------
     // expressions related to the alarm

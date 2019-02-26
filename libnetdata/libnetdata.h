@@ -14,6 +14,10 @@
 #define TRUE 1
 #define FALSE 0
 
+typedef int bool_t;
+
+#define make_bool(cond) cond?TRUE:FALSE
+
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs
 
