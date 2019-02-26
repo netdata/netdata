@@ -5,6 +5,7 @@
 **Fixed bugs:**
 
 - Installer at  https://my-netdata.io/kickstart.sh isnt updated to master branch? [\#5492](https://github.com/netdata/netdata/issues/5492)
+- zombie processes exist after restart netdata [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Verbose curl output causes unwanted emails from netdata-updater cronjob [\#5484](https://github.com/netdata/netdata/issues/5484)
 - Invalid URL [\#5479](https://github.com/netdata/netdata/issues/5479)
 - \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
@@ -18,6 +19,7 @@
 
 **Merged pull requests:**
 
+- python.d.plugin add heartbeat [\#5503](https://github.com/netdata/netdata/pull/5503) ([ilyam8](https://github.com/ilyam8))
 - prevent merging changes to kickstart.sh when checksum in docs is wrong [\#5498](https://github.com/netdata/netdata/pull/5498) ([paulfantom](https://github.com/paulfantom))
 - Update kickstart md5sums in README [\#5496](https://github.com/netdata/netdata/pull/5496) ([cakrit](https://github.com/cakrit))
 - Fix SIGSEGV crash during shutdown of tc plugin. [\#5495](https://github.com/netdata/netdata/pull/5495) ([mfundul](https://github.com/mfundul))
@@ -28,6 +30,7 @@
 - Added rocketchat to method-list [\#5471](https://github.com/netdata/netdata/pull/5471) ([tctovsli](https://github.com/tctovsli))
 - Increase timeout for download of go.d.plugin [\#5468](https://github.com/netdata/netdata/pull/5468) ([elfgoh](https://github.com/elfgoh))
 - docker: use base images build by us [\#5465](https://github.com/netdata/netdata/pull/5465) ([paulfantom](https://github.com/paulfantom))
+- Fix CMake warning for nfacct plugin [\#5379](https://github.com/netdata/netdata/pull/5379) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.12.1](https://github.com/netdata/netdata/tree/v1.12.1) (2019-02-21)
 
