@@ -367,7 +367,7 @@ inline void health_alarm_log(
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
-    bool_t create_new_alarm_entry = 1;
+    bool_t create_new_alarm_entry = TRUE;
     bool_t is_repeating = make_bool(warn_repeat_every > 0 || crit_repeat_every > 0);
     REPEATING_ALARM_ENTRY *target_alarm_entity = NULL;
     if(unlikely(is_repeating)) {
@@ -375,7 +375,7 @@ inline void health_alarm_log(
         for(it = host->health_rep_alarm_entry_list; it && it->next; it = it->next)
             if(it->alarm_entry->alarm_id == alarm_id) {
                 target_alarm_entity = it;
-                create_new_alarm_entry = 0;
+                create_new_alarm_entry = FALSE;
                 break;
             }
     }
