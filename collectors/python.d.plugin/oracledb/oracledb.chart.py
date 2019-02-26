@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: example netdata python.d module
+# Description: oracledb netdata python.d module
 # Author: ilyam8 (Ilya Mashchenko)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
