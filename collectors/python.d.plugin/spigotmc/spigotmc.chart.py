@@ -121,6 +121,9 @@ class Service(SimpleService):
         try:
             raw = self.console.command('list')
             match = _LIST_REGEX.match(raw)
+            if !match:
+                raw = self.console.command('online')
+                match = _LIST_REGEX.match(raw)
             if match:
                 data['users'] = int(match.group(1))
             else:
