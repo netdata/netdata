@@ -873,6 +873,7 @@ static int rrdpush_receive(int fd
     else if (strcmp(machine_guid, localhost->machine_guid) == 0) {
         log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO MASTER");
         error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the master/proxy machine guid to a slave?", hostname, client_ip, client_port, machine_guid);
+        close(fd);
         return 1;
     }
     else
