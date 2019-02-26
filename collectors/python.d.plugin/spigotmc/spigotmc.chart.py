@@ -39,17 +39,17 @@ CHARTS = {
     }
 }
 _TPS_REGEX = re.compile(
-    r'^.*: .*?'                 # Message lead-in
-    r'([0-9]{1,2}.[0-9]+), .*?' # 1-minute TPS value
-    r'([0-9]{1,2}.[0-9]+), .*?' # 5-minute TPS value
-    r'([0-9]{1,2}\.[0-9]+).*$', # 15-minute TPS value
-    re.X
+    r'^.*: .*?'           # Message lead-in
+    r'(\d{1,2}.\d+), .*?' # 1-minute TPS value
+    r'(\d{1,2}.\d+), .*?' # 5-minute TPS value
+    r'(\d{1,2}\.\d+).*$', # 15-minute TPS value
+    re.X | re.A
 )
 _LIST_REGEX = re.compile(
-    r'^.*?'          # Message lead-in
-    r'([0-9]*)'      # Current user count.
-    r'.*?[0-9]*.*$', # Rest of the line, which should include another number.
-    re.X
+    r'^.*?'       # Message lead-in
+    r'(\d+)'      # Current user count.
+    r'.*?\d*.*$', # Rest of the line, which should include another number.
+    re.X | re.A
 )
 
 
