@@ -1959,10 +1959,10 @@ SENT_SLACK=$?
 # -----------------------------------------------------------------------------
 # send the hangouts notification
 
-# hangouts aggregates posts from the same username
-# so we use "${host} ${status}" as the bot username, to make them diff
+# hangouts aggregates posts from the same room
+# so we use "${host} ${status}" as the room, to make them diff
 
-send_hangouts "${HANGOUTS_WEBHOOK_URL}" "${to_hangouts}"
+send_hangouts "${HANGOUTS_WEBHOOK_URI}" "${to_hangouts}"
 SENT_HANGOUTS=$?
 
 
