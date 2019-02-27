@@ -102,7 +102,7 @@ update() {
 	fi
 
 	info "Re-installing netdata..."
-	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 	sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
 	cat <<EOF >>"${ENVIRONMENT_FILE}"
 NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"

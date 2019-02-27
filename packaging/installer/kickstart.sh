@@ -251,7 +251,6 @@ while [ -n "${1}" ]; do
 		NETDATA_UPDATES=
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
-		# echo >&2 "netdata will not auto-update"
 		RELEASE_CHANNEL="stable"
 		shift 1
 	else
@@ -277,7 +276,7 @@ set_tarball_urls "${RELEASE_CHANNEL}"
 download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
 download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
 if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
-	failed "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
+	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
 run tar -xf netdata-latest.tar.gz
 rm -rf netdata-latest.tar.gz >/dev/null 2>&1
