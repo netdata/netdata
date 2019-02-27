@@ -43,14 +43,10 @@ fi
 download() {
 	url="${1}"
 	dest="${2}"
-	if command -v wget >/dev/null 2>&1; then
-		if [ -t 1 ]; then
-			run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		else
-			run wget --progress=dot:mega -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		fi
-	elif command -v curl >/dev/null 2>&1; then
-		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	if command -v curl >/dev/null 2>&1; then
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
 		fatal "I need curl or wget to proceed, but neither is available on this system."
 	fi
@@ -104,6 +100,7 @@ AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
+RELEASE_CHANNEL="nightly"
 
 usage() {
 	netdata_banner "installer command line options"
@@ -132,7 +129,12 @@ Valid <installer options> are:
 
         Install netdata-updater to cron,
         to update netdata automatically once per day
-        (can only be done for installations from git)
+
+   --stable-channel
+
+        Auto-updater will update netdata only when new release is published
+        in GitHub release pages. This results in less frequent updates.
+        Default: Use packages from GCS (nightly release channel).
 
    --enable-plugin-freeipmi
    --disable-plugin-freeipmi
@@ -207,6 +209,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
 		AUTOUPDATE=1
+		shift 1
+	elif [ "$1" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
 		shift 1
 	elif [ "$1" = "--enable-plugin-freeipmi" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
@@ -787,7 +792,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.0.2"
+	GO_PACKAGE_VERSION="v0.1.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -814,7 +819,9 @@ install_go() {
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
 		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
+
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
 		grep "${GO_PACKAGE_BASENAME}" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
@@ -1045,6 +1052,7 @@ NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 # next 3 values are meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"

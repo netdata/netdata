@@ -443,7 +443,7 @@ if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
     AC_DEFINE([HAVE_CUPS], [1], [cups usability])
 
     CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
-    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
+    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --libs`"
 
     OPTIONAL_CUPS_CLFAGS="${CUPS_CFLAGS}"
     OPTIONAL_CUPS_LIBS="${CUPS_LIBS}"
@@ -462,14 +462,24 @@ AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
 PKG_CHECK_MODULES(
     [NFACCT],
     [libnetfilter_acct],
-    [have_libnetfilter_acct=yes],
+    [AC_CHECK_LIB(
+         [netfilter_acct],
+         [nfacct_alloc],
+         [have_libnetfilter_acct=yes],
+         [have_libnetfilter_acct=no]
+     )],
     [have_libnetfilter_acct=no]
 )
 
 PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
-    [have_libmnl=yes],
+    [AC_CHECK_LIB(
+         [mnl],
+         [mnl_socket_open],
+         [have_libmnl=yes],
+         [have_libmnl=no]
+     )],
     [have_libmnl=no]
 )
 

@@ -264,6 +264,8 @@ static void web_server_tmr_callback(void *timer_data) {
     static __thread RRDSET *st = NULL;
     static __thread RRDDIM *rd_user = NULL, *rd_system = NULL;
 
+    if(unlikely(netdata_exit)) return;
+
     if(unlikely(!st)) {
         char id[100 + 1];
         char title[100 + 1];
