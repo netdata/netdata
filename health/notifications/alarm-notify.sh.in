@@ -810,7 +810,8 @@ send_email() {
 # hangouts sender
 
 send_hangouts() {
-	local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+	local webhook="${1}" rooms="${2}" httpcode sent=0 room color payload
+	declare -A HANGOUTS_WEBHOOK_URI
 
 	[ "${SEND_HANGOUTS}" != "YES" ] && return 1
 
@@ -821,7 +822,7 @@ send_hangouts() {
 	*) color="#777777" ;;
 	esac
 
-	for channel in ${channels}; do
+	for room in ${rooms}; do
 	payload="$(
 		cat <<EOF
 		{
@@ -890,15 +891,15 @@ send_hangouts() {
 			]
 		}
 EOF
-	)"
+		)"
 
 	httpcode=$(docurl -H "Content-Type: application/json" -X POST -d "${payload}" "${webhook}")
 
 	if [ "${httpcode}" = "200" ]; then
-		info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+		info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 		sent=$((sent + 1))
 	else
-		error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+		error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
 	fi
 	done
 

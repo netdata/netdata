@@ -4,46 +4,37 @@ This is what you will get:
 ![Netdata on Hangouts](https://imgur.com/a/FVlZ3F0)
 You need:
 
-1. The **incoming webhook URL** as given by Hangouts Chat. You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
-2. One or more channels to post the messages to.
+1. A room or more rooms
+2. In each room create a **Incoming Webhooks**
 
-Get them here: https://developers.google.com/hangouts/chat/how-tos/webhooks
+How to create a incoming webhooks: 
+https://developers.google.com/hangouts/chat/how-tos/webhooks
 
 Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
 
 ```
 #------------------------------------------------------------------------------
-# hangouts (hangouts chat) global notification options
+# hangouts (google hangouts chat) global notification options
 
-# multiple recipients can be given like this:
-#                  "CHANNEL1 CHANNEL2 ..."
-
-# enable/disable sending Hangouts notifications
+# enable/disable sending hangouts notifications
 SEND_HANGOUTS="YES"
 
-# Login to Hangouts Chat and create an incoming webhook. You need only one for all
-# your netdata servers (or you can have one for each of your netdata).
-# Without it, netdata cannot send Hangouts notifications.
-#HANGOUTS_WEBHOOK_URL="<your_incoming_webhook_url>"
-HANGOUTS_WEBHOOK_URL=""
+# On Hangouts, in the room you choose, create an incoming webhook,
+# copy the link and paste it below and also identify the room name.
+# Without it, netdata cannot send hangouts notifications to that room.
+# HANGOUTS_WEBHOOK_URI[ROOM_NAME]="URLforroom1"
 
-# if a role's recipients are not configured, a notification will be send to
-# this Hangouts channel (empty = do not send a notification for unconfigured
-# roles).
-#DEFAULT_RECIPIENT_HANGOUTS="<Name of the channel>"
-DEFAULT_RECIPIENT_HANGOUTS="monitoring_alarms"
+HANGOUTS_WEBHOOK_URI[systems]="https://chat.googleapis.com/v1/spaces/AAAAXXXXXXX/..."
+HANGOUTS_WEBHOOK_URI[development]="https://chat.googleapis.com/v1/spaces/AAAAYYYYY/..."
 
-```
+# if a DEFAULT_RECIPIENT_HANGOUTS are not configured,
+# notifications wouldn't be send to hangouts rooms.
+# DEFAULT_RECIPIENT_HANGOUTS="systems development|critical"
 
-You can define multiple channels like this: `alarms systems`.
-You can give different channels per **role** using these (at the same file):
+DEFAULT_RECIPIENT_HANGOUTS="sysadmin devops alarms|critical"
 
 ```
-role_recipients_hangouts[sysadmin]="systems"
-role_recipients_hangouts[dba]="databases systems"
-role_recipients_hangouts[webmaster]="marketing development"
-```
+You can define multiple rooms like this: `sysadmin devops alarms|critical`.
 
-The keywords `systems`, `databases`, `marketing`, `development` are Hangouts channels (they should already exist).
-Both public and private channels can be used, even if they differ from the channel configured in yout Hangouts incomming webhook.
+The keywords `sysadmin`, `devops` and `alarms` are Hangouts rooms.
 
