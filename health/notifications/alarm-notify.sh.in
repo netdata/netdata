@@ -285,7 +285,7 @@ for method_name in ${method_names}; do
 done
 
 # hangouts configs
-HANGOUTS_WEBHOOK_URI=
+declare -A HANGOUTS_WEBHOOK_URI
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -454,7 +454,7 @@ filter_recipient_by_criticality() {
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
 # check hangouts
-[ -z "${HANGOUTS_WEBHOOK_URI}" ] && SEND_HANGOUTS="NO"
+[ ${#HANGOUTS_WEBHOOK_URI[@]} -eq 0 ] && SEND_HANGOUTS="NO"
 
 # check rocketchat
 [ -z "${ROCKETCHAT_WEBHOOK_URL}" ] && SEND_ROCKETCHAT="NO"
@@ -810,8 +810,7 @@ send_email() {
 # hangouts sender
 
 send_hangouts() {
-	local webhook="${1}" rooms="${2}" httpcode sent=0 room color payload
-	declare -A HANGOUTS_WEBHOOK_URI
+	local rooms="${1}" httpcode sent=0 room color payload webhook
 
 	[ "${SEND_HANGOUTS}" != "YES" ] && return 1
 
@@ -823,64 +822,70 @@ send_hangouts() {
 	esac
 
 	for room in ${rooms}; do
-	payload="$(
-		cat <<EOF
-		{
-			"cards": [
+		if [ ! -n "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
+			info "Can't send Hangouts notification for: ${host} ${chart}.${name} to room ${room}. HANGOUTS_WEBHOOK_URI[$room] not defined"
+		else
+			webhook="${HANGOUTS_WEBHOOK_URI[$room]}"
+			payload="$(
+				cat <<EOF
 				{
-					"header": {
-						"title": "Netdata on ${host}",
-						"imageUrl": "${images_base_url}/images/banner-icon-144x144.png",
-						"imageStyle": "IMAGE"
-					},
-					"sections": [
+					"cards": [
 						{
-							"header": "<b>${host}</b>",
-							"widgets": [
+							"header": {
+								"title": "Netdata on ${host}",
+								"imageUrl": "${images_base_url}/images/banner-icon-144x144.png",
+								"imageStyle": "IMAGE"
+							},
+							"sections": [
 								{
-									"keyValue": {
-										"topLabel": "Status Message",
-										"content": "<b>${status_message}</b>",
-										"contentMultiline": "true",
-										"iconUrl": "${image}",
-										"onClick": {
-											"openLink": {
-												"url": "${goto_url}"
-											}
-										}
-									}
-								},
-								{
-									"keyValue": {
-										"topLabel": "${chart} | ${family}",
-										"content": "<font color=${color}>${alarm}</font>",
-										"contentMultiline": "true"
-									}
-								}
-							]
-						},
-						{
-							"widgets": [
-								{
-									"textParagraph": {
-									"text": "<font color=\"#0057e7\">@ ${date}\n<b>${info}</b></font>"
-									}
-								}
-							]
-						},
-						{
-							"widgets": [
-								{
-									"buttons": [
+									"header": "<b>${host}</b>",
+									"widgets": [
 										{
-											"textButton": {
-												"text": "Go to ${host}",
+											"keyValue": {
+												"topLabel": "Status Message",
+												"content": "<b>${status_message}</b>",
+												"contentMultiline": "true",
+												"iconUrl": "${image}",
 												"onClick": {
 													"openLink": {
-														"url": "http://${host}:19999/"
+														"url": "${goto_url}"
 													}
 												}
 											}
+										},
+										{
+											"keyValue": {
+												"topLabel": "${chart} | ${family}",
+												"content": "<font color=${color}>${alarm}</font>",
+												"contentMultiline": "true"
+											}
+										}
+									]
+								},
+								{
+									"widgets": [
+										{
+											"textParagraph": {
+											"text": "<font color=\"#0057e7\">@ ${date}\n<b>${info}</b></font>"
+											}
+										}
+									]
+								},
+								{
+									"widgets": [
+										{
+											"buttons": [
+												{
+													"textButton": {
+														"text": "Go to ${host}",
+														"onClick": {
+															"openLink": {
+																"url": "${goto_url}"
+															}
+														}
+													}
+												}
+											]
 										}
 									]
 								}
@@ -888,19 +893,18 @@ send_hangouts() {
 						}
 					]
 				}
-			]
-		}
 EOF
-		)"
+				)"
 
-	httpcode=$(docurl -H "Content-Type: application/json" -X POST -d "${payload}" "${webhook}")
+			httpcode=$(docurl -H "Content-Type: application/json" -X POST -d "${payload}" "${webhook}")
 
-	if [ "${httpcode}" = "200" ]; then
-		info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
-		sent=$((sent + 1))
-	else
-		error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
-	fi
+			if [ "${httpcode}" = "200" ]; then
+				info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
+			fi
+		fi
 	done
 
 	[ ${sent} -gt 0 ] && return 0
@@ -1962,7 +1966,7 @@ SENT_SLACK=$?
 # hangouts aggregates posts from the same room
 # so we use "${host} ${status}" as the room, to make them diff
 
-send_hangouts "${HANGOUTS_WEBHOOK_URI}" "${to_hangouts}"
+send_hangouts "${to_hangouts}"
 SENT_HANGOUTS=$?
 
 
