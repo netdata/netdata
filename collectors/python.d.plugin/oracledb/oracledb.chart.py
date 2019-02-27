@@ -3,6 +3,8 @@
 # Author: ilyam8 (Ilya Mashchenko)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from copy import deepcopy
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 try:
@@ -280,7 +282,7 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
-        self.definitions = CHARTS
+        self.definitions = deepcopy(CHARTS)
         self.user = configuration.get('user')
         self.password = configuration.get('password')
         self.server = configuration.get('server')
