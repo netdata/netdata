@@ -285,7 +285,7 @@ for method_name in ${method_names}; do
 done
 
 # hangouts configs
-HANGOUTS_WEBHOOK_URL=
+HANGOUTS_WEBHOOK_URI=
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -454,7 +454,7 @@ filter_recipient_by_criticality() {
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
 # check hangouts
-[ -z "${HANGOUTS_WEBHOOK_URL}" ] && SEND_HANGOUTS="NO"
+[ -z "${HANGOUTS_WEBHOOK_URI}" ] && SEND_HANGOUTS="NO"
 
 # check rocketchat
 [ -z "${ROCKETCHAT_WEBHOOK_URL}" ] && SEND_ROCKETCHAT="NO"
