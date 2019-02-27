@@ -550,6 +550,17 @@ function renderStreamedHosts(options) {
 }
 
 function renderMachines(machinesArray) {
+    if (!isSignedIn()) {
+        if (!NETDATA.registry.isRegistryEnabled()) {
+            return (
+                `<div class="info-item" style="white-space: nowrap">
+                    <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your nodes!</span>
+                    <div></div>
+                </div>`
+            );
+        }
+    }
+
     // let html = isSignedIn() 
     //     ? `<div class="info-item">My nodes</div>`
     //     : `<div class="info-item">My nodes</div>`;
@@ -709,13 +720,6 @@ function restrictMyNetdataMenu() {
 function renderMyNetdataMenu(machinesArray) {
     const el = document.getElementById('my-netdata-dropdown-content');
     el.classList.add(`theme-${netdataTheme}`);
-
-    if (!isSignedIn()) {
-        if (!NETDATA.registry.isRegistryEnabled()) {
-            restrictMyNetdataMenu();
-            return;
-        }
-    }
 
     if (machinesArray == registryAgents) {
         console.log("Rendering my-netdata menu from registry");
