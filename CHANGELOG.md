@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
 **Fixed bugs:**
