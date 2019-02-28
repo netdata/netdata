@@ -31,6 +31,17 @@ fatal() {
 	exit 1
 }
 
+create_tmp_directory() {
+	# Check if tmp is mounted as noexec
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+		pattern="$(pwd)/netdata-updater-XXXXXX"
+	else
+		pattern="/tmp/netdata-updater-XXXXXX"
+	fi
+
+	mktemp -d "$pattern"
+}
+
 download() {
 	url="${1}"
 	dest="${2}"
@@ -43,18 +54,24 @@ download() {
 	fi
 }
 
+set_tarball_urls() {
+	if [ "$1" == "stable" ]; then
+		local latest
+		# Simple version
+		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
+		latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+	else
+		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+	fi
+}
+
 update() {
 	[ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-	# Check if tmp is mounted as noexec
-	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-		pattern="$(pwd)/netdata-updater-XXXXXX"
-	else
-		pattern="/tmp/netdata-updater-XXXXXX"
-	fi
-
-	dir=$(mktemp -d "$pattern")
-
+	dir=$(create_tmp_directory)
 	cd "$dir"
 
 	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${dir}/sha256sum.txt" >&3 2>&3
@@ -85,11 +102,9 @@ update() {
 	fi
 
 	info "Re-installing netdata..."
-	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 	sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
 	cat <<EOF >>"${ENVIRONMENT_FILE}"
-NETDATA_TARBALL_URL="$NETDATA_TARBALL_URL"
-NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_TARBALL_CHECKSUM_URL"
 NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"
 EOF
 
@@ -120,6 +135,8 @@ else
 	# open fd 3 and send it to logfile
 	exec 3>"${logfile}"
 fi
+
+set_tarball_urls "${RELEASE_CHANNEL}"
 
 # the installer updates this script - so we run and exit in a single line
 update && exit 0

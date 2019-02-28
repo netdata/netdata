@@ -1053,9 +1053,7 @@ NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
-# next 3 values are meant to be populated by autoupdater (if enabled)
-NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
-NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+# This value is meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 

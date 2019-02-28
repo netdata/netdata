@@ -2,10 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC1117,SC2039,SC2059,SC2086
 
-# External files
-NIGHTLY_PACKAGE_TARBALL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run"
-NIGHTLY_PACKAGE_CHECKSUM="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
-
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
@@ -73,11 +69,20 @@ run() {
 	return ${ret}
 }
 
-# ---------------------------------------------------------------------------------------------------------------------
-
 fatal() {
 	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
 	exit 1
+}
+
+create_tmp_directory() {
+	# Check if tmp is mounted as noexec
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+		pattern="$(pwd)/netdata-kickstart-XXXXXX"
+	else
+		pattern="/tmp/netdata-kickstart-XXXXXX"
+	fi
+
+	mktemp -d $pattern
 }
 
 download() {
@@ -92,6 +97,21 @@ download() {
 	fi
 }
 
+set_tarball_urls() {
+	if [ "$1" == "stable" ]; then
+		local latest
+		# Simple version
+		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
+		latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.gz.run"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+	else
+		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+	fi
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
 umask 022
 
 sudo=""
@@ -101,7 +121,6 @@ sudo=""
 setup_terminal || echo >/dev/null
 
 # ---------------------------------------------------------------------------------------------------------------------
-
 if [ "$(uname -m)" != "x86_64" ]; then
 	fatal "Static binary versions of netdata are available only for 64bit Intel/AMD CPUs (x86_64), but yours is: $(uname -m)."
 fi
@@ -111,51 +130,45 @@ if [ "$(uname -s)" != "Linux" ]; then
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
-
-# Check if tmp is mounted as noexec
-if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-	pattern="$(pwd)/netdata-kickstart-static-XXXXXX"
-else
-	pattern="/tmp/netdata-kickstart-static-XXXXXX"
-fi
-
-tmpdir="$(mktemp -d $pattern)"
-cd "${tmpdir}" || :
-
-progress "Downloading static netdata binary: ${NIGHTLY_PACKAGE_TARBALL}"
-
-download "${NIGHTLY_PACKAGE_CHECKSUM}" "${tmpdir}/sha256sum.txt"
-download "${NIGHTLY_PACKAGE_TARBALL}" "${tmpdir}/netdata-latest.gz.run"
-if ! grep netdata-latest.gz.run sha256sum.txt | sha256sum --check - >/dev/null 2>&1; then
-	failed "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${tmpdir}"
-fi
-
-# ---------------------------------------------------------------------------------------------------------------------
-
 opts=
 inner_opts=
-while [ ! -z "${1}" ]; do
+RELEASE_CHANNEL="nightly"
+while [ -n "${1}" ]; do
 	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
 		opts="${opts} --accept"
 	elif [ "${1}" = "--dont-start-it" ]; then
 		inner_opts="${inner_opts} ${1}"
+	elif [ "${1}" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
 	else
 		echo >&2 "Unknown option '${1}'"
 		exit 1
 	fi
 	shift
 done
-[ ! -z "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
+[ -n "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
 # ---------------------------------------------------------------------------------------------------------------------
+TMPDIR=$(create_tmp_directory)
+cd "${TMPDIR}" || :
 
+set_tarball_urls "${RELEASE_CHANNEL}"
+progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
+
+download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
+if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+	fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
 progress "Installing netdata"
 
-run ${sudo} sh "${tmpdir}/netdata-latest.gz.run" ${opts} ${inner_opts}
+run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
 
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then
-	rm "${tmpdir}/netdata-latest.gz.run"
+	rm "${TMPDIR}/netdata-latest.gz.run"
 else
-	echo >&2 "NOTE: did not remove: ${tmpdir}/netdata-latest.gz.run"
+	echo >&2 "NOTE: did not remove: ${TMPDIR}/netdata-latest.gz.run"
 fi
