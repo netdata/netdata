@@ -1,5 +1,15 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Closed issues:**
+
+- Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
+
+**Merged pull requests:**
+
+- Update unbound module documenttion with troubleshooting section. [\#5528](https://github.com/netdata/netdata/pull/5528) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
 
 **Fixed bugs:**
@@ -14,7 +24,6 @@
 
 **Closed issues:**
 
-- google is blocked. [\#5410](https://github.com/netdata/netdata/issues/5410)
 - tc.plugin: use high-precission bash sleep as loadable [\#5161](https://github.com/netdata/netdata/issues/5161)
 - Unexpected data exposure by default value of "\[registry\].registry to announce" [\#2760](https://github.com/netdata/netdata/issues/2760)
 - Oracle monitoring [\#1996](https://github.com/netdata/netdata/issues/1996)
