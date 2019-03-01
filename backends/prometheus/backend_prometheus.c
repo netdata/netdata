@@ -85,18 +85,42 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable,
 
     // Fix for issue 5227
     if (unlikely(showoldunits)) {
-    	if (!strcmp(s,"KiB/s")) s="kilobytes/s";
-		else if (!strcmp(s,"MiB/s")) s="MB/s";
-		else if (!strcmp(s,"GiB/s")) s="GB/s";
-		else if (!strcmp(s,"KiB")) s="KB";
-		else if (!strcmp(s,"MiB")) s="MB";
-		else if (!strcmp(s,"GiB")) s="GB";
-		else if (!strcmp(s,"KiB/operation")) s="kilobytes per operation";
-		else if (!strcmp(s,"percentage")) s="percent";
-		else if (!strcmp(s,"faults/s")) s="page faults/s";
-		else if (!strcmp(s,"milliseconds/operation")) s="ms per operation";
-		else if (!strcmp(s,"inodes")) s="Inodes";
-		sorig = s;
+		static struct {
+			const char *newunit;
+			uint32_t hash;
+			const char *oldunit;
+		} units[] = {
+				  {"KiB/s", 0, "kilobytes/s"}
+				, {"MiB/s", 0, "MB/s"}
+				, {"GiB/s", 0, "GB/s"}
+				, {"KiB"  , 0, "KB"}
+				, {"MiB"  , 0, "MB"}
+				, {"GiB"  , 0, "GB"}
+				, {"inodes"       , 0, "Inodes"}
+				, {"percentage"   , 0, "percent"}
+				, {"faults/s"     , 0, "page faults/s"}
+				, {"KiB/operation", 0, "kilobytes per operation"}
+				, {"milliseconds/operation", 0, "ms per operation"}
+				, {NULL, 0, NULL}
+		};
+		static int initialized = 0;
+		int i;
+
+		if(unlikely(!initialized)) {
+			for (i = 0; units[i].newunit; i++)
+				units[i].hash = simple_hash(units[i].newunit);
+			initialized = 1;
+		}
+
+		uint32_t hash = simple_hash(s);
+		for(i = 0; units[i].newunit ; i++) {
+			if(unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
+				// info("matched extension for filename '%s': '%s'", filename, last_dot);
+				s=units[i].oldunit;
+				sorig = s;
+				break;
+			}
+		}
     }
     *d++ = '_';
     for(n = 1; *s && n < usable ; d++, s++, n++) {
