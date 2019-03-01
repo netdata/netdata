@@ -9,6 +9,7 @@
 **Merged pull requests:**
 
 - Update unbound module documenttion with troubleshooting section. [\#5528](https://github.com/netdata/netdata/pull/5528) ([Ferroin](https://github.com/Ferroin))
+- Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
 
