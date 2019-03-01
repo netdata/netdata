@@ -78,11 +78,26 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
-static inline char *prometheus_units_copy(char *d, const char *s, size_t usable) {
+static inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
     const char *sorig = s;
     char *ret = d;
     size_t n;
 
+    // Fix for issue 5227
+    if (unlikely(showoldunits)) {
+    	if (!strcmp(s,"KiB/s")) s="kilobytes/s";
+		else if (!strcmp(s,"MiB/s")) s="MB/s";
+		else if (!strcmp(s,"GiB/s")) s="GB/s";
+		else if (!strcmp(s,"KiB")) s="KB";
+		else if (!strcmp(s,"MiB")) s="MB";
+		else if (!strcmp(s,"GiB")) s="GB";
+		else if (!strcmp(s,"KiB/operation")) s="kilobytes per operation";
+		else if (!strcmp(s,"percentage")) s="percent";
+		else if (!strcmp(s,"faults/s")) s="page faults/s";
+		else if (!strcmp(s,"milliseconds/operation")) s="ms per operation";
+		else if (!strcmp(s,"inodes")) s="Inodes";
+		sorig = s;
+    }
     *d++ = '_';
     for(n = 1; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
@@ -275,8 +290,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     homogeneus = 0;
             }
             else {
-                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX);
+                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
             if(unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
