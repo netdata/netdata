@@ -14,6 +14,7 @@ validate_metrics() {
 	diff tests/backends/${fname} tests/backends/new-${fname}
 	ret=$?
 	rm tests/backends/new-${fname}
+	return ${ret}
 }
 
 
