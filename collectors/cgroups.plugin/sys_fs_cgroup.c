@@ -210,10 +210,10 @@ void read_cgroup_plugin_configuration() {
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
     cgroups_network_interface_script = config_get("plugin:cgroups", "script to get cgroup network interfaces", filename);
 
     enabled_cgroup_renames = simple_pattern_create(

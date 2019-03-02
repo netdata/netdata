@@ -459,7 +459,7 @@ static void get_netdata_configured_variables() {
 
     {
         pluginsd_initialize_plugin_directories();
-        netdata_configured_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
+        netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
     // ------------------------------------------------------------------------
@@ -588,7 +588,7 @@ void set_global_environment() {
     setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_plugins_dir),      1);
+    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_primary_plugins_dir),      1);
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
     setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
     setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
@@ -653,8 +653,8 @@ void send_statistics( const char *action, const char *action_result, const char 
         char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
         if (likely(access(optout_file, R_OK) != 0)) {
-            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
-            sprintf(as_script, "%s/%s", netdata_configured_plugins_dir, "anonymous-statistics.sh");
+            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
+            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
 			if (unlikely(access(as_script, R_OK) != 0)) {
 				netdata_anonymous_statistics_enabled=0;
 				info("Anonymous statistics script %s not found.",as_script);
