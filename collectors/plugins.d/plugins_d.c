@@ -108,7 +108,7 @@ inline int pluginsd_initialize_plugin_directories() {
     plugins_dir_list = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
 
     // Parse it and store it to plugin directories
-    quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
+    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
 }
 
 inline int pluginsd_split_words(char *str, char **words, int max_words) {
