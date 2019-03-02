@@ -3,8 +3,6 @@
 #include "plugins_d.h"
 
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
-char *netdata_configured_plugins_dir_base;
-
 struct plugind *pluginsd_root = NULL;
 
 static inline int pluginsd_space(char c) {
@@ -99,6 +97,18 @@ inline int quoted_strings_splitter(char *str, char **words, int max_words, int (
     while(likely(j < max_words)) words[j++] = NULL;
 
     return i;
+}
+
+inline int pluginsd_initialize_plugin_directories() {
+    char plugins_dirs[(FILENAME_MAX * 2) + 1];
+    char *plugins_dir_list = NULL;
+
+    // Get the configuration entry
+    snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
+    plugins_dir_list = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
+
+    // Parse it and store it to plugin directories
+    quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
 }
 
 inline int pluginsd_split_words(char *str, char **words, int max_words) {

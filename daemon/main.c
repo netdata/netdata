@@ -458,12 +458,8 @@ static void get_netdata_configured_variables() {
     netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
 
     {
-        char plugins_dirs[(FILENAME_MAX * 2) + 1];
-        snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        netdata_configured_plugins_dir_base = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
-        quoted_strings_splitter(netdata_configured_plugins_dir_base, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
-        netdata_configured_plugins_dir = plugin_directories[0];
-
+        pluginsd_initialize_plugin_directories();
+        netdata_configured_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
     // ------------------------------------------------------------------------
