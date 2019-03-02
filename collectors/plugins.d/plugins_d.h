@@ -68,7 +68,6 @@ extern void *pluginsd_main(void *ptr);
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
 extern int pluginsd_split_words(char *str, char **words, int max_words);
 
-extern int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char));
 extern int pluginsd_initialize_plugin_directories();
 
 extern int config_isspace(char c);
