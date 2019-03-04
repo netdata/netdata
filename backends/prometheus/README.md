@@ -250,7 +250,7 @@ If you search that page for `"system.cpu"` you will find all the metrics netdata
 Searching for `"system.cpu"` reveals:
 
 ```sh
-# COMMENT homogeneus chart "system.cpu", context "system.cpu", family "cpu", units "percentage"
+# COMMENT homogeneous chart "system.cpu", context "system.cpu", family "cpu", units "percentage"
 # COMMENT netdata_system_cpu_percentage_average: dimension "guest_nice", value is percentage, gauge, dt 1500066653 to 1500066662 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="guest_nice"} 0.0000000 1500066662000
 # COMMENT netdata_system_cpu_percentage_average: dimension "guest", value is percentage, gauge, dt 1500066653 to 1500066662 inclusive
@@ -279,7 +279,7 @@ In `average` or `sum` data sources, all values are normalized and are reported t
 If the data source was `as collected`, the response would be:
 
 ```sh
-# COMMENT homogeneus chart "system.cpu", context "system.cpu", family "cpu", units "percentage"
+# COMMENT homogeneous chart "system.cpu", context "system.cpu", family "cpu", units "percentage"
 # COMMENT netdata_system_cpu_total: chart "system.cpu", context "system.cpu", family "cpu", dimension "guest_nice", value * 1 / 1 delta gives percentage (counter)
 netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="guest_nice"} 0 1500066716438
 # COMMENT netdata_system_cpu_total: chart "system.cpu", context "system.cpu", family "cpu", dimension "guest", value * 1 / 1 delta gives percentage (counter)
