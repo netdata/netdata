@@ -125,6 +125,7 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+        self.url = configuration.get('url', 'http://127.0.0.1:8081/api/v1/servers/localhost/statistics')
 
     def check(self):
         self._manager = self._build_manager()
