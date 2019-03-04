@@ -14,7 +14,7 @@ import sys
 import threading
 
 from re import sub
-from sys import version_info, argv
+from sys import version_info, argv, stdout
 from time import sleep
 
 GC_RUN = True
@@ -40,12 +40,14 @@ sys.path.append(PYTHON_MODULES_DIR)
 
 from bases.loaders import ModuleAndConfigLoader  # noqa: E402
 from bases.loggers import PythonDLogger  # noqa: E402
-from bases.collection import setdefault_values, run_and_exit  # noqa: E402
+from bases.collection import setdefault_values, run_and_exit, safe_print  # noqa: E402
 
 try:
     from collections import OrderedDict
 except ImportError:
     from third_party.ordereddict import OrderedDict
+
+IS_ATTY = stdout.isatty()
 
 BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'priority': 60000,
@@ -393,6 +395,10 @@ class Plugin(object):
             if self.do_gc and self.runs_counter % self.gc_interval == 0:
                 v = gc.collect()
                 Logger.debug("GC full collection run result: {0}".format(v))
+
+            # for exiting on SIGPIPE
+            if not IS_ATTY:
+                safe_print('\n')
 
     def cleanup(self):
         for job in self.dead_jobs:
