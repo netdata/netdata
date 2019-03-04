@@ -78,11 +78,50 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
-static inline char *prometheus_units_copy(char *d, const char *s, size_t usable) {
+static inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
     const char *sorig = s;
     char *ret = d;
     size_t n;
 
+    // Fix for issue 5227
+    if (unlikely(showoldunits)) {
+		static struct {
+			const char *newunit;
+			uint32_t hash;
+			const char *oldunit;
+		} units[] = {
+				  {"KiB/s", 0, "kilobytes/s"}
+				, {"MiB/s", 0, "MB/s"}
+				, {"GiB/s", 0, "GB/s"}
+				, {"KiB"  , 0, "KB"}
+				, {"MiB"  , 0, "MB"}
+				, {"GiB"  , 0, "GB"}
+				, {"inodes"       , 0, "Inodes"}
+				, {"percentage"   , 0, "percent"}
+				, {"faults/s"     , 0, "page faults/s"}
+				, {"KiB/operation", 0, "kilobytes per operation"}
+				, {"milliseconds/operation", 0, "ms per operation"}
+				, {NULL, 0, NULL}
+		};
+		static int initialized = 0;
+		int i;
+
+		if(unlikely(!initialized)) {
+			for (i = 0; units[i].newunit; i++)
+				units[i].hash = simple_hash(units[i].newunit);
+			initialized = 1;
+		}
+
+		uint32_t hash = simple_hash(s);
+		for(i = 0; units[i].newunit ; i++) {
+			if(unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
+				// info("matched extension for filename '%s': '%s'", filename, last_dot);
+				s=units[i].oldunit;
+				sorig = s;
+				break;
+			}
+		}
+    }
     *d++ = '_';
     for(n = 1; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
@@ -275,8 +314,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     homogeneus = 0;
             }
             else {
-                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX);
+                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
             if(unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
