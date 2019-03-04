@@ -147,7 +147,7 @@ not just visualize metrics.
 
 ## News  
 
-`Feb 28th, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)** 
+`Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)** 
 
 Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
 
