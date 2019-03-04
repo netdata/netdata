@@ -89,7 +89,7 @@ class SimpleService(PythonDLimitedLogger, OldVersionCompatibility, object):
 
     @property
     def name(self):
-        if self.job_name:
+        if self.job_name and self.job_name != self.module_name:
             return '_'.join([self.module_name, self.override_name or self.job_name])
         return self.module_name
 
