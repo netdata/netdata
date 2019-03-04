@@ -2,12 +2,29 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
+- RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
+- Reliability of Prometheus exposed metrics names [\#5527](https://github.com/netdata/netdata/issues/5527)
+- Unexpected host seen in list of hosts [\#5518](https://github.com/netdata/netdata/issues/5518)
+
 **Closed issues:**
 
 - Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
+- Move to CMake [\#4610](https://github.com/netdata/netdata/issues/4610)
+- Modularize installer script [\#4609](https://github.com/netdata/netdata/issues/4609)
+- Normalize data to use standard units [\#4380](https://github.com/netdata/netdata/issues/4380)
+- RFC: Remove node and bash plugins [\#4036](https://github.com/netdata/netdata/issues/4036)
 
 **Merged pull requests:**
 
+- Have the debug option set the freeipmi debug flags [\#5548](https://github.com/netdata/netdata/pull/5548) ([cakrit](https://github.com/cakrit))
+- Fix typo [\#5546](https://github.com/netdata/netdata/pull/5546) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add news for 1.12.1 and 1.12.2 to main readme [\#5544](https://github.com/netdata/netdata/pull/5544) ([cakrit](https://github.com/cakrit))
+- Correct go.d.plugin sha256sum check [\#5539](https://github.com/netdata/netdata/pull/5539) ([cakrit](https://github.com/cakrit))
+- Registry delete should allow deleting the host we are looking at [\#5537](https://github.com/netdata/netdata/pull/5537) ([cakrit](https://github.com/cakrit))
+- Support legacy Prometheus metric names for source average [\#5531](https://github.com/netdata/netdata/pull/5531) ([cakrit](https://github.com/cakrit))
 - Update unbound module documenttion with troubleshooting section. [\#5528](https://github.com/netdata/netdata/pull/5528) ([Ferroin](https://github.com/Ferroin))
 - Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
