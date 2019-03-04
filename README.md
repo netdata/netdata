@@ -147,6 +147,19 @@ not just visualize metrics.
 
 ## News  
 
+`Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)** 
+
+Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
+
+The main motivation behind a new patch release is the introduction of a **stable release channel**.
+A "stable" installation and update channel was always on our roadmap, but it became a necessity when we realized that our users in China could not use the nightly releases published on Google Cloud. The "stable" channel is based on our official GitHub releases and uses assets hosted on GitHub. 
+
+We are also introducing a new **Oracle DB collector** module, implemented in Python.  
+
+`Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)** 
+
+Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
+
 `Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)** 
 
 Release 1.12 is made out of 211 pull requests and 22 bug fixes.
