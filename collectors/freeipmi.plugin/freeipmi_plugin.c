@@ -1790,7 +1790,10 @@ int main (int argc, char **argv) {
 
     _init_ipmi_config(&ipmi_config);
 
-    if(debug) fprintf(stderr, "freeipmi.plugin: calling ipmi_monitoring_init()\n");
+    if(debug) {
+        fprintf(stderr, "freeipmi.plugin: calling ipmi_monitoring_init()\n");
+        ipmimonitoring_init_flags|=IPMI_MONITORING_FLAGS_DEBUG|IPMI_MONITORING_FLAGS_DEBUG_IPMI_PACKETS;
+    }
 
     if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0)
         fatal("ipmi_monitoring_init: %s", ipmi_monitoring_ctx_strerror(errnum));
