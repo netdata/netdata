@@ -231,7 +231,7 @@ class ModuleChecker(multiprocessing.Process):
 
         # CHECK JOBS
         jobs = module.create_jobs()
-        self.log.info("{0} : created {0} job(s) from the config".format(task.module_name, len(jobs)))
+        self.log.info("{0} : created {1} job(s) from the config".format(task.module_name, len(jobs)))
 
         has_auto_detection_jobs = len([j for j in jobs if j.autodetection_retry() > 0]) > 0
 
@@ -583,11 +583,14 @@ class Plugin:
             self.auto_detection_jobs = [job for job in self.auto_detection_jobs if not self.retry_job(job)]
 
     def retry_job(self, job):
+        stop_retrying = True
+        retry_later = False
+
         if self.runs % job.autodetection_retry() != 0:
-            return False
+            return retry_later
 
         if job.full_name in self.checked_jobs:
-            return True
+            return stop_retrying
 
         self.log.info('{0}[{1}] : recheck')
         try:
@@ -595,16 +598,16 @@ class Plugin:
         except Exception as error:
             self.log.warning("{0}[{1}] : unhandled exception on recheck : {2}, dropping the job".format(
                 job.module_name, job.name, error))
-            return True
+            return stop_retrying
 
         if not ok:
-            return False
+            return retry_later
 
         if not job.create():
-            return True
+            return stop_retrying
 
         self.checked_jobs.add(job.full_name)
-        return True
+        return stop_retrying
 
 
 def parse_cmd():
@@ -660,8 +663,8 @@ def main():
 
     plugin = Plugin(
         cmd.update_every,
-        # cmd.modules_to_run or AVAILABLE_MODULES,
-        cmd.modules_to_run or ['example'],
+        cmd.modules_to_run or AVAILABLE_MODULES,
+        # cmd.modules_to_run or ['example'],
     )
 
     if not plugin.setup():
