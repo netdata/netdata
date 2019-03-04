@@ -23,6 +23,8 @@ jobs:
     script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
   - name: lint .sh.in files
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+  - name: check checksums for kickstart files
+    script: ./tests/installer/checksums.sh
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-scan.sh || echo "Coverity failed :("

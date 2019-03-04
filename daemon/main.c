@@ -198,6 +198,8 @@ void cancel_main_threads() {
         }
     }
 
+    netdata_exit = 1;
+
     while(found && max > 0) {
         max -= step;
         info("Waiting %d threads to finish...", found);
