@@ -81,3 +81,23 @@ class SourceLoader:
 
 class ModuleAndConfigLoader(YamlOrderedLoader, SourceLoader):
     pass
+
+
+def load_module(name, path):
+    module = SourceFileLoader(name, path)
+    if isinstance(module, types.ModuleType):
+        return module
+    return module.load_module()
+
+
+def load_yaml(stream):
+    loader = YamlSafeLoader(stream)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
+def load_config(file_name):
+    with open(file_name, 'r') as stream:
+        return load_yaml(stream)
