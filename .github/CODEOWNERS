@@ -7,12 +7,12 @@
 # Ownership by directory structure
 .travis/ @paufantom @cakrit
 .github/ @paufantom @cakrit
-build/ @paulfantom @cakrit
 backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
 backends/json/ @ktsaou @vlvkobal
 backends/opentsdb/ @ktsaou @vlvkobal
 backends/prometheus/ @ktsaou @vlvkobal @paulfantom
+build/ @paulfantom @cakrit
 collectors/ @ktsaou @vlvkobal @cakrit
 collectors/charts.d.plugin/ @ktsaou @paulfantom @cakrit
 collectors/freebsd.plugin/ @vlvkobal @cakrit
@@ -28,10 +28,10 @@ docs/ @cakrit
 health/ @ktsaou @cakrit
 health/health.d/ @ktsaou @cakrit
 health/notifications/ @ktsaou @Ferroin @cakrit
-installer/ @ktsaou @paulfantom @cakrit
 libnetdata/ @ktsaou @cakrit
-makeself/ @ktsaou @paulfantom @cakrit
 packaging/ @paulfantom @cakrit
+packaging/installer/ @ktsaou @paulfantom @cakrit
+packaging/makeself/ @ktsaou @paulfantom @cakrit
 registry/ @ktsaou @gmosx @cakrit
 streaming/ @ktsaou @mfundul
 web/ @ktsaou @cakrit
@@ -51,6 +51,7 @@ web/gui/ @ktsaou @gmosx @cakrit
 .codeclimate.yml @paulfantom
 .codacy.yml @paulfantom
 netdata.spec.in @paulfantom
+netdata-installer.sh @ktsaou @paulfantom @cakrit
 netlify.toml @cakrit
 package.json @gmosx
 packaging/version @netdatabot
