@@ -3,38 +3,16 @@
 
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
 # It is automated in `build.sh` script
-ARG ARCH=amd64-v3.8
-FROM multiarch/alpine:${ARCH} as builder
-
-ARG OUTPUT="/dev/stdout"
-# Install prerequisites
-RUN apk --no-cache add alpine-sdk \
-                       autoconf \
-                       automake \
-                       bash \
-                       build-base \
-                       curl \
-                       jq \
-                       libmnl-dev \
-                       libuuid \
-                       lm_sensors \
-                       netcat-openbsd \
-                       nodejs \
-                       pkgconfig \
-                       py-mysqldb \
-                       py-psycopg2 \
-                       py-yaml \
-                       python \
-                       util-linux-dev \
-                       zlib-dev
+ARG ARCH=amd64
+# This image contains preinstalled dependecies
+FROM netdata/builder:${ARCH} as builder 
 
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
-RUN chmod +x netdata-installer.sh && \
-    ./netdata-installer.sh --dont-wait --dont-start-it &>${OUTPUT}
+RUN chmod +x netdata-installer.sh && ./netdata-installer.sh --dont-wait --dont-start-it
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -56,20 +34,8 @@ RUN mkdir -p /app/usr/sbin/ \
 
 #####################################################################
 ARG ARCH
-FROM multiarch/alpine:${ARCH}
-
-# Install some prerequisites
-RUN apk --no-cache add curl \
-                       fping \
-                       jq \
-                       libuuid \
-                       lm_sensors \
-                       netcat-openbsd \
-                       nodejs \
-                       py-mysqldb \
-                       py-psycopg2 \
-                       py-yaml \
-                       python
+# This image contains preinstalled dependecies
+FROM netdata/base:${ARCH}
 
 # Conditional subscribiton to Polyverse's Polymorphic Linux repositories
 RUN if [ "$(uname -m)" == "x86_64" ]; then \
@@ -78,7 +44,6 @@ RUN if [ "$(uname -m)" == "x86_64" ]; then \
         apk upgrade --available --no-cache; \
         sed -in 's/^#//g' /etc/apk/repositories; \
     fi
-
 
 # Copy files over
 COPY --from=builder /app /

@@ -903,6 +903,9 @@ int main(int argc, char **argv) {
 #else // !HAVE_LIBMNL
 
 int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
     fatal("nfacct.plugin is not compiled.");
 }
 

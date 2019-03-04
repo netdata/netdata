@@ -550,10 +550,6 @@ function renderStreamedHosts(options) {
 }
 
 function renderMachines(machinesArray) {
-    // let html = isSignedIn() 
-    //     ? `<div class="info-item">My nodes</div>`
-    //     : `<div class="info-item">My nodes</div>`;
-
     let html = `<div class="info-item">My nodes</div>`;
 
     if (machinesArray === null) {
@@ -710,13 +706,6 @@ function renderMyNetdataMenu(machinesArray) {
     const el = document.getElementById('my-netdata-dropdown-content');
     el.classList.add(`theme-${netdataTheme}`);
 
-    if (!isSignedIn()) {
-        if (!NETDATA.registry.isRegistryEnabled()) {
-            restrictMyNetdataMenu();
-            return;
-        }
-    }
-
     if (machinesArray == registryAgents) {
         console.log("Rendering my-netdata menu from registry");
     } else {
@@ -724,6 +713,18 @@ function renderMyNetdataMenu(machinesArray) {
     }
 
     let html = '';
+
+    if (!isSignedIn()) {
+        if (!NETDATA.registry.isRegistryEnabled()) {
+            html += (
+                `<div class="info-item" style="white-space: nowrap">
+                    <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your nodes!</span>
+                    <div></div>
+                </div>
+                <hr />`
+            );
+        }
+    }
 
     if (isSignedIn()) {
         html += (
@@ -743,16 +744,26 @@ function renderMyNetdataMenu(machinesArray) {
         );
     }
 
+    // options.hosts = [
+    //     {
+    //         hostname: "streamed1",
+    //     },
+    //     {
+    //         hostname: "streamed2",
+    //     },
+    // ]
+
     if (options.hosts.length > 1) {
         html += `<div id="my-netdata-menu-streamed">${renderStreamedHosts(options)}</div><hr />`;
     }
 
-    html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div>`;
+    if (isSignedIn() || NETDATA.registry.isRegistryEnabled()) {
+        html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div><hr />`;
+    }
 
     if (!isSignedIn()) {
         html += (
-            `<hr />
-            <div class="agent-item">
+            `<div class="agent-item">
                 <i class="fas fa-cog""></i>
                 <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
                 <div></div>
@@ -765,8 +776,7 @@ function renderMyNetdataMenu(machinesArray) {
         )
     } else {
         html += (
-            `<hr />
-            <div class="agent-item">
+            `<div class="agent-item">
                 <i class="fas fa-sync"></i>
                 <a href="#" onclick="showSyncModal(); return false">Synchronize with netdata.cloud</a>
                 <div></div>

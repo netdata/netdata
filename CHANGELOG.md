@@ -1,5 +1,52 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Closed issues:**
+
+- Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
+
+**Merged pull requests:**
+
+- Update unbound module documenttion with troubleshooting section. [\#5528](https://github.com/netdata/netdata/pull/5528) ([Ferroin](https://github.com/Ferroin))
+- Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
+## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
+
+**Fixed bugs:**
+
+- Installer at  https://my-netdata.io/kickstart.sh isnt updated to master branch? [\#5492](https://github.com/netdata/netdata/issues/5492)
+- zombie processes exist after restart netdata [\#5491](https://github.com/netdata/netdata/issues/5491)
+- Verbose curl output causes unwanted emails from netdata-updater cronjob [\#5484](https://github.com/netdata/netdata/issues/5484)
+- Invalid URL [\#5479](https://github.com/netdata/netdata/issues/5479)
+- \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
+- go.d.plugin installation fails due to insufficient timeout [\#5467](https://github.com/netdata/netdata/issues/5467)
+- netdata segfault when restart service  [\#5366](https://github.com/netdata/netdata/issues/5366)
+
+**Closed issues:**
+
+- tc.plugin: use high-precission bash sleep as loadable [\#5161](https://github.com/netdata/netdata/issues/5161)
+- Unexpected data exposure by default value of "\[registry\].registry to announce" [\#2760](https://github.com/netdata/netdata/issues/2760)
+- Oracle monitoring [\#1996](https://github.com/netdata/netdata/issues/1996)
+
+**Merged pull requests:**
+
+- Show streamed servers even for users that are not signed in! \#5482 [\#5519](https://github.com/netdata/netdata/pull/5519) ([gmosx](https://github.com/gmosx))
+- python.d.plugin add heartbeat [\#5503](https://github.com/netdata/netdata/pull/5503) ([ilyam8](https://github.com/ilyam8))
+- prevent merging changes to kickstart.sh when checksum in docs is wrong [\#5498](https://github.com/netdata/netdata/pull/5498) ([paulfantom](https://github.com/paulfantom))
+- Update kickstart md5sums in README [\#5496](https://github.com/netdata/netdata/pull/5496) ([cakrit](https://github.com/cakrit))
+- Fix SIGSEGV crash during shutdown of tc plugin. [\#5495](https://github.com/netdata/netdata/pull/5495) ([mfundul](https://github.com/mfundul))
+- introduce stable installation channel [\#5487](https://github.com/netdata/netdata/pull/5487) ([paulfantom](https://github.com/paulfantom))
+-  Make curl silent and show errors only if it fails [\#5485](https://github.com/netdata/netdata/pull/5485) ([mullnerz](https://github.com/mullnerz))
+- Fix curl timeout [\#5476](https://github.com/netdata/netdata/pull/5476) ([elfgoh](https://github.com/elfgoh))
+- Correct kickstart md5sums [\#5473](https://github.com/netdata/netdata/pull/5473) ([cakrit](https://github.com/cakrit))
+- Correct docs: apps plugin is not an internal collector [\#5472](https://github.com/netdata/netdata/pull/5472) ([cakrit](https://github.com/cakrit))
+- Added rocketchat to method-list [\#5471](https://github.com/netdata/netdata/pull/5471) ([tctovsli](https://github.com/tctovsli))
+- Increase timeout for download of go.d.plugin [\#5468](https://github.com/netdata/netdata/pull/5468) ([elfgoh](https://github.com/elfgoh))
+- docker: use base images build by us [\#5465](https://github.com/netdata/netdata/pull/5465) ([paulfantom](https://github.com/paulfantom))
+- oracledb py module [\#5421](https://github.com/netdata/netdata/pull/5421) ([ilyam8](https://github.com/ilyam8))
+- Fix CMake warning for nfacct plugin [\#5379](https://github.com/netdata/netdata/pull/5379) ([vlvkobal](https://github.com/vlvkobal))
+
 ## [v1.12.1](https://github.com/netdata/netdata/tree/v1.12.1) (2019-02-21)
 
 **Fixed bugs:**
