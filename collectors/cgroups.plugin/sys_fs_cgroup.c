@@ -377,7 +377,7 @@ struct cgroup {
     char enabled;        // enabled in the config
 
     char renaming_delayed;
-    char renamed;
+    char needs_renaming;
 
     char *id;
     uint32_t hash;
@@ -779,7 +779,7 @@ static inline void read_all_cgroups(struct cgroup *root) {
     struct cgroup *cg;
 
     for(cg = root; cg ; cg = cg->next)
-        if(cg->enabled && cg->available && cg->renamed)
+        if(cg->enabled && cg->available && !cg->needs_renaming)
             cgroup_read(cg);
 }
 
@@ -889,7 +889,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->id);
     FILE *fp = mypopen(command, &cgroup_pid);
@@ -904,8 +904,11 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         if(s && *s && *s != '\n') {
             debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
 
+            char *name_error = mystrsep(&s, " ");
             s = trim(s);
             if (s) {
+                if(likely(*name_error == '1')) cg->needs_renaming = 1;
+
                 freez(cg->chart_title);
                 cg->chart_title = cgroup_title_strdupz(s);
 
@@ -950,16 +953,15 @@ static inline struct cgroup *cgroup_add(const char *id) {
 
     cgroup_root_count++;
 
-    // TODO: remove this
-    // // fix the chart_id and title by calling the external script
-    // if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
+    // fix the chart_id and title by calling the external script
+    if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
 
-    //     cgroup_get_chart_name(cg);
+        cgroup_get_chart_name(cg);
 
-    //     debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
-    // }
-    // else
-    //     debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
+        debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
+    }
+    else
+        debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
 
     int user_configurable = 1;
 
@@ -1035,9 +1037,8 @@ static inline struct cgroup *cgroup_add(const char *id) {
         }
     }
 
-    // TODO: remove this
-    // if(cg->enabled && cg->renamed && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
-    //     read_cgroup_network_interfaces(cg);
+    if(cg->enabled && !cg->needs_renaming && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
+        read_cgroup_network_interfaces(cg);
 
     debug(D_CGROUP, "ADDED CGROUP: '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 
@@ -1145,13 +1146,12 @@ static inline void found_subdir_in_dir(const char *dir) {
 
     if(cg) {
         // delay renaming of the cgroup and looking for network interfaces to deal with the docker lag when starting the container
-        if(unlikely(cg->renaming_delayed && !cg->renamed)) {
+        if(unlikely(cg->needs_renaming && cg->renaming_delayed)) {
             // fix the chart_id and title by calling the external script
             if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
 
-                // info("cg->id = %s", cg->id);
                 cgroup_get_chart_name(cg);
-                cg->renamed = 1;
+                cg->needs_renaming = 0;
 
                 if(cg->enabled && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
                     read_cgroup_network_interfaces(cg);
@@ -1327,10 +1327,10 @@ static inline void find_all_cgroups() {
     for(cg = cgroup_root; cg ; cg = cg->next) {
         // fprintf(stderr, " >>> CGROUP '%s' (%u - %s) with name '%s'\n", cg->id, cg->hash, cg->available?"available":"stopped", cg->name);
 
-        if(unlikely(!cg->renaming_delayed))
+        if(unlikely(cg->needs_renaming && !cg->renaming_delayed))
             cg->renaming_delayed = 1;
 
-        if(unlikely(!cg->available || !cg->renamed))
+        if(unlikely(!cg->available || cg->needs_renaming))
             continue;
 
         debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
@@ -2065,7 +2065,7 @@ void update_systemd_services_charts(
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || !cg->renamed || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
+        if(unlikely(!cg->available || !cg->enabled || cg->needs_renaming || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
@@ -2388,7 +2388,7 @@ void update_cgroup_charts(int update_every) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || !cg->renamed))
+        if(unlikely(!cg->available || !cg->enabled || cg->needs_renaming))
             continue;
 
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {

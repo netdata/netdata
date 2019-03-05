@@ -73,6 +73,7 @@ function docker_get_name() {
 	fi
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of docker container '${id}'"
+		NAME_NOT_FOUND=1
 		NAME="${id:0:12}"
 	else
 		info "docker container '${id}' is named '${NAME}'"
@@ -95,6 +96,7 @@ function docker_validate_id() {
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 CGROUP="${1}"
+NAME_NOT_FOUND=0
 NAME=
 
 # -----------------------------------------------------------------------------
@@ -173,4 +175,4 @@ if [ -z "${NAME}" ]; then
 fi
 
 info "cgroup '${CGROUP}' is called '${NAME}'"
-echo "${NAME}"
+echo "${NAME_NOT_FOUND}" "${NAME}"
