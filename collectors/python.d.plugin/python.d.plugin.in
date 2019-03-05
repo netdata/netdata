@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-'''':; exec "$(command -v python || command -v python3 || command -v python2 ||
+'''':; exec "$(command -v python2 || command -v python3 || command -v python2 ||
 echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 
 # -*- coding: utf-8 -*-
@@ -189,7 +189,6 @@ class ModuleChecker(multiprocessing.Process):
         if task is END_TASK_MARKER:
             self.task_queue.task_done()
             self.result_queue.put(END_TASK_MARKER)
-            self.result_queue.join()
             return False
 
         result = self.do_task(task)
@@ -358,7 +357,7 @@ class Module:
         if len(job_names) == 0:
             job_conf = JobConf(JOB_BASE_CONF)
             job_conf.set_defaults_from_module(self.source)
-            job_conf.set_defaults_from_config(self.config)
+            job_conf.update(self.config)
             job_conf.set_job_name(self.name)
             job_conf.set_override_name(job_conf.pop('name'))
             return [job_conf]
@@ -500,6 +499,7 @@ class Plugin:
         self.enqueue_tasks()
         self.task_queue.join()
         self.dequeue_results()
+        self.result_queue.join()
         self.log.info('stopping checker process')
         worker.join()
 
@@ -666,7 +666,7 @@ def main():
     if cmd.trace:
         logger.log_traceback = True
 
-    logger.info('using python v{0}'.format(sys.version_info[:2]))
+    logger.info('using python v{0}'.format(sys.version_info[:2][0]))
 
     unknown_modules = set(cmd.modules_to_run) - set(AVAILABLE_MODULES)
     if unknown_modules:
