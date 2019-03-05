@@ -607,7 +607,7 @@ class Plugin:
         if job.full_name in self.checked_jobs:
             return stop_retrying
 
-        self.log.info('{0}[{1}] : recheck')
+        self.log.info('{0}[{1}] : recheck'.format(job.module_name, job.name))
         try:
             ok = job.check()
         except Exception as error:
