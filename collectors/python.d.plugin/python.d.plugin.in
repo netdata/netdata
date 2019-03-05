@@ -7,7 +7,6 @@ echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
 
 
 import collections
@@ -123,6 +122,17 @@ JOB_BASE_CONF = {
     }
 
 
+def heartbeat_task_thread(every):
+    def heartbeat(t):
+        time.sleep(t)
+        if not IS_ATTY:
+            safe_print('\n')
+
+    th = threading.Thread(target=heartbeat, args=(every, ))
+    th.daemon = True
+    return th
+
+
 def load_module(name):
     abs_path = os.path.join(DIRS.modules, '{0}{1}'.format(name, MODULE_SUFFIX))
     return _load_module(name, abs_path)
@@ -167,6 +177,7 @@ class ModuleChecker(multiprocessing.Process):
 
     def run(self):
         self.log.info('starting...')
+        heartbeat_task_thread(1).start()
         while self.run_once():
             pass
         self.log.info('terminating...')
@@ -310,6 +321,10 @@ class Job:
 
     def check(self):
         return self.wrapped.check()
+
+    def post_check(self, min_update_every):
+        if self.wrapped.update_every < min_update_every:
+            self.wrapped.update_every = min_update_every
 
     def create(self):
         return self.wrapped.create()
@@ -553,6 +568,8 @@ class Plugin:
 
             self.log.info('{0}[{1}] : check success'.format(job.module_name, job.name))
 
+            job.post_check(int(self.min_update_every))
+
             if not job.create():
                 self.log.info('{0}[{1}] : create failed'.format(job.module_name, job.name))
 
@@ -572,9 +589,6 @@ class Plugin:
                 return
 
             time.sleep(1)
-
-            if not IS_ATTY:
-                print('\n')
 
             if gc_run and self.runs % gc_interval == 0:
                 v = gc.collect()
@@ -664,8 +678,9 @@ def main():
     plugin = Plugin(
         cmd.update_every,
         cmd.modules_to_run or AVAILABLE_MODULES,
-        # cmd.modules_to_run or ['example'],
     )
+
+    heartbeat_task_thread(1).start()
 
     if not plugin.setup():
         plugin.shutdown()
