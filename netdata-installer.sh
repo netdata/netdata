@@ -208,6 +208,8 @@ while [ ! -z "${1}" ]; do
 		DONOTWAIT=1
 		shift 1
 	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
+		REINSTALL_COMMAND="${REINSTALL_COMMAND// -u/}"
+		REINSTALL_COMMAND="${REINSTALL_COMMAND//--auto-update/} --auto-update"
 		AUTOUPDATE=1
 		shift 1
 	elif [ "$1" = "--stable-channel" ]; then
