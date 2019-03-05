@@ -102,6 +102,29 @@ netdata_banner() {
 }
 
 # -----------------------------------------------------------------------------
+# portable service command
+
+service_cmd="$(command -v service 2>/dev/null)"
+rcservice_cmd="$(command -v rc-service 2>/dev/null)"
+systemctl_cmd="$(command -v systemctl 2>/dev/null)"
+service() {
+
+	local cmd="${1}" action="${2}"
+
+	if [ -n "${systemctl_cmd}" ]; then
+		run "${systemctl_cmd}" "${action}" "${cmd}"
+		return $?
+	elif [ -n "${service_cmd}" ]; then
+		run "${service_cmd}" "${cmd}" "${action}"
+		return $?
+	elif [ -n "${rcservice_cmd}" ]; then
+		run "${rcservice_cmd}" "${cmd}" "${action}"
+		return $?
+	fi
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # portable pidof
 
 pidof() {
@@ -307,29 +330,6 @@ install_non_systemd_init() {
 	return 1
 }
 
-# -----------------------------------------------------------------------------
-# portable service command
-
-portable_service() {
-	service_cmd="$(command -v service 2>/dev/null)"
-	rcservice_cmd="$(command -v rc-service 2>/dev/null)"
-	systemctl_cmd="$(command -v systemctl 2>/dev/null)"
-
-	local cmd="${1}" action="${2}"
-
-	if [ -n "${systemctl_cmd}" ]; then
-		run "${systemctl_cmd}" "${action}" "${cmd}"
-		return $?
-	elif [ -n "${service_cmd}" ]; then
-		run "${service_cmd}" "${cmd}" "${action}"
-		return $?
-	elif [ -n "${rcservice_cmd}" ]; then
-		run "${rcservice_cmd}" "${cmd}" "${action}"
-		return $?
-	fi
-	return 1
-}
-
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
@@ -383,8 +383,13 @@ install_netdata_service() {
 			local ret=$?
 
 			if [ ${ret} -eq 0 ]; then
-				portable_service netdata start
-				portable_service netdata stop
+				if [ -n "${service_cmd}" ]; then
+					NETDATA_START_CMD="service netdata start"
+					NETDATA_STOP_CMD="service netdata stop"
+				elif [ -n "${rcservice_cmd}" ]; then
+					NETDATA_START_CMD="rc-service netdata start"
+					NETDATA_STOP_CMD="rc-service netdata stop"
+				fi
 			fi
 
 			return ${ret}
@@ -475,9 +480,9 @@ restart_netdata() {
 	progress "Start netdata"
 
 	if [ "${UID}" -eq 0 ]; then
-		portable_service netdata stop
+		service netdata stop
 		stop_all_netdata
-		portable_service netdata restart && started=1
+		service netdata restart && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -485,7 +490,7 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			portable_service netdata start && started=1
+			service netdata start && started=1
 		fi
 	fi
 
