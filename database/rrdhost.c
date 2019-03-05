@@ -229,7 +229,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
     host->health_log_filename = strdupz(filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health_default_recipient = strdupz("root");
 
