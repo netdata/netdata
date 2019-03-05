@@ -124,9 +124,10 @@ JOB_BASE_CONF = {
 
 def heartbeat_task_thread(every):
     def heartbeat(t):
-        time.sleep(t)
-        if not IS_ATTY:
-            safe_print('\n')
+        while True:
+            time.sleep(t)
+            if not IS_ATTY:
+                safe_print('\n')
 
     th = threading.Thread(target=heartbeat, args=(every, ))
     th.daemon = True
