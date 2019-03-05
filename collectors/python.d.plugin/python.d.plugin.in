@@ -28,11 +28,11 @@ ENV_NETDATA_UPDATE_EVERY = 'NETDATA_UPDATE_EVERY'
 def dirs():
     user_config = os.getenv(
         ENV_NETDATA_USER_CONFIG_DIR,
-        '/opt/netdata/etc/netdata',
+        '@configdir_POST@',
     )
     stock_config = os.getenv(
         ENV_NETDATA_STOCK_CONFIG_DIR,
-        '/opt/netdata/usr/lib/netdata/conf.d/',
+        '@libconfigdir_POST@',
     )
     modules_user_config = os.path.join(user_config, 'python.d')
     modules_stock_config = os.path.join(stock_config, 'python.d')
@@ -502,8 +502,8 @@ class Plugin:
         self.task_queue.join()
         self.dequeue_results()
 
-        self.log.info('stopping checker process')
         self.result_queue.join()
+        self.log.info('stopping checker process')
         worker.join()
 
         if not self.results:
@@ -586,7 +586,7 @@ class Plugin:
         while True:
             self.runs += 1
 
-            if threading.active_count() <= 1 and not self.auto_detection_jobs:
+            if threading.active_count() <= 3 and not self.auto_detection_jobs:
                 return
 
             time.sleep(1)
@@ -687,6 +687,7 @@ def main():
         plugin.shutdown()
 
     plugin.run()
+    logger.info('exiting from main...')
     plugin.shutdown()
 
 
