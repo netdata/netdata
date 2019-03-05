@@ -103,7 +103,7 @@ update() {
 
 	info "Re-installing netdata..."
 	REINSTALL_COMMAND="${REINSTALL_COMMAND//--auto-update/}"
-	REINSTALL_COMMAND="${REINSTALL_COMMAND//-u/} -u"
+	REINSTALL_COMMAND="${REINSTALL_COMMAND// -u/} -u"
 	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 	sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
 	cat <<EOF >>"${ENVIRONMENT_FILE}"
