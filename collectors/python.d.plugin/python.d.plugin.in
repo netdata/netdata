@@ -119,7 +119,7 @@ JOB_BASE_CONF = {
     'chart_cleanup': 10,
     'penalty': True,
     'name': str(),
-    }
+}
 
 
 def heartbeat_task_thread(every):
@@ -189,6 +189,7 @@ class ModuleChecker(multiprocessing.Process):
         if task is END_TASK_MARKER:
             self.task_queue.task_done()
             self.result_queue.put(END_TASK_MARKER)
+            self.result_queue.join()
             return False
 
         result = self.do_task(task)
@@ -281,9 +282,8 @@ class ModuleChecker(multiprocessing.Process):
 
 
 class JobConf(OrderedDict):
-    def __init__(self):
-        OrderedDict.__init__(self)
-        self.update(JOB_BASE_CONF)
+    def __init__(self, *args):
+        OrderedDict.__init__(self, *args)
 
     def set_defaults_from_module(self, module):
         for k in [k for k in JOB_BASE_CONF if hasattr(module, k)]:
@@ -356,9 +356,9 @@ class Module:
         job_names = [v for v in self.config if isinstance(self.config[v], dict)]
 
         if len(job_names) == 0:
-            job_conf = JobConf()
+            job_conf = JobConf(JOB_BASE_CONF)
             job_conf.set_defaults_from_module(self.source)
-            job_conf.update(self.config)
+            job_conf.set_defaults_from_config(self.config)
             job_conf.set_job_name(self.name)
             job_conf.set_override_name(job_conf.pop('name'))
             return [job_conf]
@@ -366,7 +366,7 @@ class Module:
         configs = list()
         for job_name in job_names:
             raw_job_conf = self.config[job_name]
-            job_conf = JobConf()
+            job_conf = JobConf(JOB_BASE_CONF)
             job_conf.set_defaults_from_module(self.source)
             job_conf.set_defaults_from_config(self.config)
             job_conf.update(raw_job_conf)
@@ -376,8 +376,8 @@ class Module:
 
         return configs
 
-    def create_jobs(self):
-        return [Job(self.source.Service, self.name, conf) for conf in self.gather_jobs_configs()]
+    def create_jobs(self, jobs_conf=None):
+        return [Job(self.source.Service, self.name, conf) for conf in jobs_conf or self.gather_jobs_configs()]
 
 
 class JobRunner(threading.Thread):
@@ -390,10 +390,9 @@ class JobRunner(threading.Thread):
         self.wrapped.run()
 
 
-class PluginConf(OrderedDict):
-    def __init__(self):
-        OrderedDict.__init__(self)
-        self.update(PLUGIN_BASE_CONF)
+class PluginConf(dict):
+    def __init__(self, *args):
+        dict.__init__(self, *args)
 
     def is_module_enabled(self, module_name, explicit):
         if module_name in self:
@@ -410,7 +409,7 @@ class Plugin:
             modules_to_run=tuple(AVAILABLE_MODULES),
     ):
         self.log = PythonDLogger()
-        self.config = PluginConf()
+        self.config = PluginConf(PLUGIN_BASE_CONF)
         self.task_queue = multiprocessing.JoinableQueue()
         self.result_queue = multiprocessing.JoinableQueue()
         self.min_update_every = min_update_every
@@ -501,8 +500,6 @@ class Plugin:
         self.enqueue_tasks()
         self.task_queue.join()
         self.dequeue_results()
-
-        self.result_queue.join()
         self.log.info('stopping checker process')
         worker.join()
 
@@ -528,8 +525,7 @@ class Plugin:
                     result.module_name, error))
                 continue
 
-            module.jobs_configs = result.jobs_configs
-            module_jobs = module.create_jobs()
+            module_jobs = module.create_jobs(result.jobs_configs)
             self.log.info("{0} : created {1} job(s)".format(module.name, len(module_jobs)))
             jobs.extend(module_jobs)
 
@@ -670,6 +666,8 @@ def main():
     if cmd.trace:
         logger.log_traceback = True
 
+    logger.info('using python v{0}'.format(sys.version_info[:2]))
+
     unknown_modules = set(cmd.modules_to_run) - set(AVAILABLE_MODULES)
     if unknown_modules:
         logger.error('unknown modules : {0}'.format(sorted(list(unknown_modules))))
@@ -684,7 +682,8 @@ def main():
     heartbeat_task_thread(1).start()
 
     if not plugin.setup():
-        plugin.shutdown()
+        safe_print('DISABLE')
+        return
 
     plugin.run()
     logger.info('exiting from main...')
