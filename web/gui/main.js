@@ -495,7 +495,9 @@ function renderStreamedHosts(options) {
     }
 
     var master = options.hosts[0].hostname;
-    var sorted = options.hosts.sort(function (a, b) {
+    // We sort a clone of options.hosts, to keep the master as the first element
+    // for future calls.
+    var sorted = options.hosts.slice(0).sort(function (a, b) {
         if (a.hostname === master) {
             return -1;
         }
