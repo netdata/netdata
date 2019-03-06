@@ -5,6 +5,7 @@
 
 import socket
 import platform
+import re
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -37,6 +38,17 @@ CHARTS = {
         ]
     }
 }
+_TPS_REGEX = re.compile(
+    r'^.*: .*?'           # Message lead-in
+    r'(\d{1,2}.\d+), .*?' # 1-minute TPS value
+    r'(\d{1,2}.\d+), .*?' # 5-minute TPS value
+    r'(\d{1,2}\.\d+).*$', # 15-minute TPS value
+    re.X | re.A
+)
+_LIST_REGEX = re.compile(
+    r'(\d+)', # Current user count.
+    re.X | re.A
+)
 
 
 class Service(SimpleService):
@@ -91,33 +103,33 @@ class Service(SimpleService):
         data = {}
         try:
             raw = self.console.command('tps')
-            # The above command returns a string that looks like this:
-            # '§6TPS from last 1m, 5m, 15m: §a19.99, §a19.99, §a19.99\n'
-            # The values we care about are the three numbers after the :
-            tmp = raw.split(':')[1].split(',')
-            data['tps1'] = float(tmp[0].lstrip(u' §a*')) * PRECISION
-            data['tps5'] = float(tmp[1].lstrip(u' §a*')) * PRECISION
-            data['tps15'] = float(tmp[2].lstrip(u' §a*').rstrip()) * PRECISION
+            match = _TPS_REGEX.match(raw)
+            if match:
+                data['tps1'] = int(float(match.group(1)) * PRECISION)
+                data['tps5'] = int(float(match.group(2)) * PRECISION)
+                data['tps15'] = int(float(match.group(3)) * PRECISION)
+            else:
+                self.error('Unable to process TPS values.')
         except mcrcon.MCRconException:
             self.error('Unable to fetch TPS values.')
         except socket.error:
             self.error('Connection is dead.')
             self.alive = False
             return None
-        except (TypeError, LookupError):
-            self.error('Unable to process TPS values.')
         try:
             raw = self.console.command('list')
-            # The above command returns a string that looks like this:
-            # 'There are 0/20 players online:'
-            # We care about the first number here.
-            data['users'] = int(raw.split()[2].split('/')[0])
+            match = _LIST_REGEX.search(raw)
+            if not match:
+                raw = self.console.command('online')
+                match = _LIST_REGEX.search(raw)
+            if match:
+                data['users'] = int(match.group(1))
+            else:
+                self.error('Unable to process user counts.')
         except mcrcon.MCRconException:
             self.error('Unable to fetch user counts.')
         except socket.error:
             self.error('Connection is dead.')
             self.alive = False
             return None
-        except (TypeError, LookupError):
-            self.error('Unable to process user counts.')
         return data
