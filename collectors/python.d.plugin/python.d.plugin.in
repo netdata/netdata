@@ -608,7 +608,8 @@ class Plugin:
 
         check_name = job.override_name or job.name
         if check_name in self.checked_jobs[job.module_name]:
-            self.log.info("{0}[{1}]: already served by another job, give up on retrying")
+            self.log.info("{0}[{1}]: already served by another job, give up on retrying".format(
+                job.module_name, job.name))
             return stop_retrying
 
         try:
