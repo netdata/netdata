@@ -313,7 +313,7 @@ class Job:
         self.config = config
         self.module_name = module_name
         self.name = config['job_name']
-        self.full_name = '{0}_{1}'.format(module_name, config['job_name'])
+        self.override_name = config['override_name']
         self.wrapped = None
 
     def init(self):
@@ -416,7 +416,7 @@ class Plugin:
         self.auto_detection_jobs = list()
         self.tasks = list()
         self.results = list()
-        self.checked_jobs = set()
+        self.checked_jobs = collections.defaultdict(list)
         self.runs = 0
 
     @staticmethod
@@ -535,9 +535,11 @@ class Plugin:
         prepared = list()
 
         for job in jobs:
-            if job.full_name in self.checked_jobs:
+            check_name = job.override_name or job.name
+            if check_name in self.checked_jobs[job.module_name]:
                 self.log.info('{0}[{1}] : already served by another job, skipping the job'.format(
                     job.module_name, job.name))
+                continue
 
             try:
                 job.init()
@@ -570,7 +572,7 @@ class Plugin:
             if not job.create():
                 self.log.info('{0}[{1}] : create failed'.format(job.module_name, job.name))
 
-            self.checked_jobs.add(job.full_name)
+            self.checked_jobs[job.module_name].append(check_name)
             prepared.append(job)
 
         return prepared
@@ -600,7 +602,8 @@ class Plugin:
         if self.runs % job.autodetection_retry() != 0:
             return retry_later
 
-        if job.full_name in self.checked_jobs:
+        check_name = job.override_name or job.name
+        if check_name in self.checked_jobs[job.module_name]:
             return stop_retrying
 
         self.log.info('{0}[{1}] : recheck'.format(job.module_name, job.name))
@@ -617,7 +620,7 @@ class Plugin:
         if not job.create():
             return stop_retrying
 
-        self.checked_jobs.add(job.full_name)
+        self.checked_jobs[job.module_name].append(check_name)
         return stop_retrying
 
 
