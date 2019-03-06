@@ -122,16 +122,18 @@ JOB_BASE_CONF = {
 }
 
 
-def heartbeat_task_thread(every):
-    def heartbeat(t):
-        while True:
-            time.sleep(t)
-            if not IS_ATTY:
-                safe_print('\n')
+class HeartBeat(threading.Thread):
+    def __init__(self, every):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.every = every
 
-    th = threading.Thread(target=heartbeat, args=(every, ))
-    th.daemon = True
-    return th
+    def run(self):
+        while True:
+            time.sleep(self.every)
+            if IS_ATTY:
+                continue
+            safe_print('\n')
 
 
 def load_module(name):
@@ -178,7 +180,7 @@ class ModuleChecker(multiprocessing.Process):
 
     def run(self):
         self.log.info('starting...')
-        heartbeat_task_thread(1).start()
+        HeartBeat(1).start()
         while self.run_once():
             pass
         self.log.info('terminating...')
@@ -245,14 +247,13 @@ class ModuleChecker(multiprocessing.Process):
         jobs = module.create_jobs()
         self.log.info("{0} : created {1} job(s) from the config".format(task.module_name, len(jobs)))
 
-        has_auto_detection_jobs = len([j for j in jobs if j.autodetection_retry() > 0]) > 0
+        successful_jobs_configs = list()
+        for job in jobs:
+            if job.autodetection_retry() > 0:
+                successful_jobs_configs.append(job.config)
+                self.log.info("{0}[{1}]: autodetection job, will be checked in main".format(task.module_name, job.name))
+                continue
 
-        if has_auto_detection_jobs:
-            self.log.info("{0} : has auto detection jobs, stop checking".format(task.module_name))
-            return Result(module.source.__name__, [job.config for job in jobs])
-
-        idx = -1
-        for i, job in enumerate(jobs):
             try:
                 job.init()
             except Exception as error:
@@ -267,17 +268,20 @@ class ModuleChecker(multiprocessing.Process):
                     task.module_name, job.name, error))
                 continue
 
-            if ok:
-                self.log.info("{0}[{1}] : first checked ok job ({2}), stop checking".format(
-                    task.module_name, job.name, i))
-                idx = i
-                break
+            if not ok:
+                self.log.info("{0}[{1}] : check failed, skipping the job".format(task.module_name, job.name))
+                continue
 
-        if idx < 0:
+            self.log.info("{0}[{1}] : check successful".format(task.module_name, job.name))
+
+            job.config['autodetection_retry'] = job.config['update_every']
+            successful_jobs_configs.append(job.config)
+
+        if not successful_jobs_configs:
             self.log.info("{0} : all jobs failed, skipping module".format(task.module_name))
             return None
 
-        return Result(module.source.__name__, [job.config for job in jobs][idx:])
+        return Result(module.source.__name__, successful_jobs_configs)
 
 
 class JobConf(OrderedDict):
@@ -430,7 +434,7 @@ class Plugin:
             return
 
         for job in self.prepare_jobs(jobs):
-            self.log.info('{0}[{1}] : started thread'.format(job.module_name, job.name))
+            self.log.info('{0}[{1}] : started in thread'.format(job.module_name, job.name))
             JobRunner(job).start()
 
         self.serve()
@@ -548,7 +552,7 @@ class Plugin:
                     job.module_name, job.name, error))
                 continue
 
-            self.log.info("{0}[{1}] : init success".format(job.module_name, job.name))
+            self.log.info("{0}[{1}] : init successful".format(job.module_name, job.name))
 
             try:
                 ok = job.check()
@@ -565,7 +569,7 @@ class Plugin:
                     self.auto_detection_jobs.append(job)
                 continue
 
-            self.log.info('{0}[{1}] : check success'.format(job.module_name, job.name))
+            self.log.info('{0}[{1}] : check successful'.format(job.module_name, job.name))
 
             job.post_check(int(self.min_update_every))
 
@@ -604,22 +608,26 @@ class Plugin:
 
         check_name = job.override_name or job.name
         if check_name in self.checked_jobs[job.module_name]:
+            self.log.info("{0}[{1}]: already served by another job, give up on retrying")
             return stop_retrying
 
-        self.log.info('{0}[{1}] : recheck'.format(job.module_name, job.name))
         try:
             ok = job.check()
         except Exception as error:
-            self.log.warning("{0}[{1}] : unhandled exception on recheck : {2}, dropping the job".format(
+            self.log.warning("{0}[{1}] : unhandled exception on recheck : {2}, give up on retrying".format(
                 job.module_name, job.name, error))
             return stop_retrying
 
         if not ok:
+            self.log.info('{0}[{1}] : recheck failed, will retry in {2} second(s)'.format(
+                job.module_name, job.name, job.autodetection_retry()))
             return retry_later
+        self.log.info('{0}[{1}] : recheck successful'.format(job.module_name, job.name))
 
         if not job.create():
             return stop_retrying
 
+        job.post_check(int(self.min_update_every))
         self.checked_jobs[job.module_name].append(check_name)
         return stop_retrying
 
@@ -682,7 +690,7 @@ def main():
         cmd.modules_to_run or AVAILABLE_MODULES,
     )
 
-    heartbeat_task_thread(1).start()
+    HeartBeat(1).start()
 
     if not plugin.setup():
         safe_print('DISABLE')
