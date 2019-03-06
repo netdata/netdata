@@ -4,10 +4,15 @@
 
 **Fixed bugs:**
 
+- Alert if process isn't alive [\#5547](https://github.com/netdata/netdata/issues/5547)
 - sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
 - RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
 - Reliability of Prometheus exposed metrics names [\#5527](https://github.com/netdata/netdata/issues/5527)
 - Unexpected host seen in list of hosts [\#5518](https://github.com/netdata/netdata/issues/5518)
+- apps\_plugin plots zeroes for empty groups [\#5514](https://github.com/netdata/netdata/issues/5514)
+- Problem loading module sensors [\#5490](https://github.com/netdata/netdata/issues/5490)
+- Need more graceful handling of duplicate machine GUIDs [\#5488](https://github.com/netdata/netdata/issues/5488)
+- SpigotMC Chart won't show [\#4131](https://github.com/netdata/netdata/issues/4131)
 
 **Closed issues:**
 
@@ -19,14 +24,20 @@
 
 **Merged pull requests:**
 
+- Pass agent id to authorization pages [\#5551](https://github.com/netdata/netdata/pull/5551) ([gmosx](https://github.com/gmosx))
 - Have the debug option set the freeipmi debug flags [\#5548](https://github.com/netdata/netdata/pull/5548) ([cakrit](https://github.com/cakrit))
 - Fix typo [\#5546](https://github.com/netdata/netdata/pull/5546) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add news for 1.12.1 and 1.12.2 to main readme [\#5544](https://github.com/netdata/netdata/pull/5544) ([cakrit](https://github.com/cakrit))
+- Don't send zeroes for empty groups [\#5540](https://github.com/netdata/netdata/pull/5540) ([vlvkobal](https://github.com/vlvkobal))
 - Correct go.d.plugin sha256sum check [\#5539](https://github.com/netdata/netdata/pull/5539) ([cakrit](https://github.com/cakrit))
 - Registry delete should allow deleting the host we are looking at [\#5537](https://github.com/netdata/netdata/pull/5537) ([cakrit](https://github.com/cakrit))
+- Minor fixes around plugin\_directories initialization [\#5536](https://github.com/netdata/netdata/pull/5536) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Support legacy Prometheus metric names for source average [\#5531](https://github.com/netdata/netdata/pull/5531) ([cakrit](https://github.com/cakrit))
 - Update unbound module documenttion with troubleshooting section. [\#5528](https://github.com/netdata/netdata/pull/5528) ([Ferroin](https://github.com/Ferroin))
+- Add IPC shared memory charts [\#5522](https://github.com/netdata/netdata/pull/5522) ([vlvkobal](https://github.com/vlvkobal))
 - Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Convert SpigotMC module to use regexes for parsing. [\#5507](https://github.com/netdata/netdata/pull/5507) ([Ferroin](https://github.com/Ferroin))
+- Add zero minimum in linux power supply module [\#5395](https://github.com/netdata/netdata/pull/5395) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
 
