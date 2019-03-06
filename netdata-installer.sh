@@ -689,7 +689,7 @@ if [ "${UID}" -eq 0 ]; then
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
 		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 		capabilities=0
-		if ! iscontainer && command -v setcap 2>/dev/null; then
+		if ! iscontainer && command -v setcap 1>/dev/null 2>/dev/null; then
 			run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 			if run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"; then
 				# if we managed to setcap, but we fail to execute apps.plugin setuid to root
