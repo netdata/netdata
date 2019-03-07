@@ -376,8 +376,7 @@ struct cgroup {
     char available;      // found in the filesystem
     char enabled;        // enabled in the config
 
-    char renaming_delayed;
-    char needs_renaming;
+    char pending_renames;
 
     char *id;
     uint32_t hash;
@@ -779,7 +778,7 @@ static inline void read_all_cgroups(struct cgroup *root) {
     struct cgroup *cg;
 
     for(cg = root; cg ; cg = cg->next)
-        if(cg->enabled && cg->available && !cg->needs_renaming)
+        if(cg->enabled && cg->available && !cg->pending_renames)
             cgroup_read(cg);
 }
 
@@ -907,7 +906,8 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
             char *name_error = mystrsep(&s, " ");
             s = trim(s);
             if (s) {
-                if(likely(*name_error == '1')) cg->needs_renaming = 1;
+                if(likely(*name_error == '0'))
+                    cg->pending_renames = 0;
 
                 freez(cg->chart_title);
                 cg->chart_title = cgroup_title_strdupz(s);
@@ -956,6 +956,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     // fix the chart_id and title by calling the external script
     if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
 
+        cg->pending_renames = 2;
         cgroup_get_chart_name(cg);
 
         debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
@@ -1037,7 +1038,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
         }
     }
 
-    if(cg->enabled && !cg->needs_renaming && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
+    if(cg->enabled && !cg->pending_renames && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
         read_cgroup_network_interfaces(cg);
 
     debug(D_CGROUP, "ADDED CGROUP: '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
@@ -1146,12 +1147,12 @@ static inline void found_subdir_in_dir(const char *dir) {
 
     if(cg) {
         // delay renaming of the cgroup and looking for network interfaces to deal with the docker lag when starting the container
-        if(unlikely(cg->needs_renaming && cg->renaming_delayed)) {
+        if(unlikely(cg->pending_renames == 1)) {
             // fix the chart_id and title by calling the external script
             if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
 
                 cgroup_get_chart_name(cg);
-                cg->needs_renaming = 0;
+                cg->pending_renames = 0;
 
                 if(cg->enabled && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
                     read_cgroup_network_interfaces(cg);
@@ -1327,10 +1328,10 @@ static inline void find_all_cgroups() {
     for(cg = cgroup_root; cg ; cg = cg->next) {
         // fprintf(stderr, " >>> CGROUP '%s' (%u - %s) with name '%s'\n", cg->id, cg->hash, cg->available?"available":"stopped", cg->name);
 
-        if(unlikely(cg->needs_renaming && !cg->renaming_delayed))
-            cg->renaming_delayed = 1;
+        if(unlikely(cg->pending_renames))
+            cg->pending_renames--;
 
-        if(unlikely(!cg->available || cg->needs_renaming))
+        if(unlikely(!cg->available || cg->pending_renames))
             continue;
 
         debug(D_CGROUP, "checking paths for cgroup '%s'", cg->id);
@@ -2065,7 +2066,7 @@ void update_systemd_services_charts(
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->needs_renaming || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
+        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
@@ -2388,7 +2389,7 @@ void update_cgroup_charts(int update_every) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(unlikely(!cg->available || !cg->enabled || cg->needs_renaming))
+        if(unlikely(!cg->available || !cg->enabled || cg->pending_renames))
             continue;
 
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
