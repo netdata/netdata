@@ -165,17 +165,22 @@
                 </ul>
             </nav>
         </div>
-
-        <div id="sign-in-banner" class="container">
-            Like what you see? 
-            <strong><a href="#" class="__link" onclick="signInDidClick(event); return false">Sign in</a> 
-            to experience the full-range of netdata capabilities!</strong>
-        </div>
     </nav>
     <div class="navbar-highlight">
         <div id="navbar-highlight-content" class="navbar-highlight-content"></div>
     </div>
 
+    <div id="sign-in-banner" style="display: none">
+        <div class="container">
+            Like what you see? 
+            <strong><a href="#" class="__link" onclick="signInDidClick(event); return false">Sign in</a> 
+            to experience the full-range of netdata capabilities!</strong>
+            <div class="__close" onclick="closeSignInBannerDidClick(event)">
+                Close <i class="fas fa-times"></i>
+            </div>
+        </div>
+    </div>
+    
     <div id="masthead" style="display: none;">
         <div class="container">
             <div class="row">

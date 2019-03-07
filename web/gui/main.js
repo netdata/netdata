@@ -4042,6 +4042,10 @@ function runOnceOnDashboardWithjQuery() {
     // ------------------------------------------------------------------------
     // sidebar / affix
 
+    if (shouldShowSignInBanner()) {
+        document.getElementById("sign-in-banner").style.display = "initial";
+    }
+
     $('#sidebar')
         .affix({
             offset: {
@@ -4683,6 +4687,18 @@ function signInDidClick(e) {
     signIn();
 }
 
+function shouldShowSignInBanner() {
+    return localStorage.getItem("signInBannerClosed") != "true";
+}
+
+function closeSignInBannerDidClick(e) {
+    localStorage.setItem("signInBannerClosed", "true");
+    const el = document.getElementById("sign-in-banner");
+    if (el) {
+        el.style.display = "none";
+    }
+}
+
 function signOutDidClick(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -4777,7 +4793,7 @@ function renderAccountUI() {
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signInDidClick(event); return false">
+            `<a href="#" class="btn sign-in-btn" onclick="signInDidClick(event); return false">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
