@@ -667,3 +667,17 @@ body.modal-open {
     font-size: 18px;
 }
 
+#sign-in-banner {
+    background-color: #1E2126;
+    height: 44px;
+    line-height: 44px;
+    text-align: center;
+}
+
+#sign-in-banner .__link {
+    color: #17CE8A;
+}
+
+#sign-in-banner .__link:hover {
+    text-decoration: underline;
+}
