@@ -64,6 +64,22 @@ function docker_get_name_api() {
 	return 0
 }
 
+function k8s_get_name() {
+	local id="${1}"
+	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+	NAME=$(
+curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
+jq -r '.items[].status.containerStatuses[0] | "\(.name) \(.containerID)"' |
+grep $id |
+cut -d' ' -f1
+)
+	if [ -z "${NAME}" ]; then
+		warning "cannot find the name of k8s pod with containerID '${id}'"
+	else
+		info "k8s containerID '${id}' is has pod name '${NAME}'"
+	fi
+}
+
 function docker_get_name() {
 	local id="${1}"
 	if hash docker 2>/dev/null; then
@@ -88,6 +104,7 @@ function docker_validate_id() {
 		error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
 	fi
 }
+
 
 # -----------------------------------------------------------------------------
 
@@ -118,13 +135,16 @@ for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_C
 	fi
 done
 
+if [ -z "${NAME}" ] && [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+	k8s_get_name "${CGROUP}"
+fi
+
 if [ -z "${NAME}" ]; then
 	if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# docker containers
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
 		docker_validate_id "${DOCKERID}"
-
 	elif [[ ${CGROUP} =~ ^.*ecs[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# ECS
 		#shellcheck disable=SC1117
