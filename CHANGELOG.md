@@ -16,6 +16,7 @@
 
 **Closed issues:**
 
+- descrease python.d.plugin memory usage [\#5525](https://github.com/netdata/netdata/issues/5525)
 - Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
 - Move to CMake [\#4610](https://github.com/netdata/netdata/issues/4610)
 - Modularize installer script [\#4609](https://github.com/netdata/netdata/issues/4609)
@@ -24,6 +25,8 @@
 
 **Merged pull requests:**
 
+- Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
+- python.d.plugin: use separate process for initial module checking [\#5552](https://github.com/netdata/netdata/pull/5552) ([ilyam8](https://github.com/ilyam8))
 - Pass agent id to authorization pages [\#5551](https://github.com/netdata/netdata/pull/5551) ([gmosx](https://github.com/gmosx))
 - Have the debug option set the freeipmi debug flags [\#5548](https://github.com/netdata/netdata/pull/5548) ([cakrit](https://github.com/cakrit))
 - Fix typo [\#5546](https://github.com/netdata/netdata/pull/5546) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
