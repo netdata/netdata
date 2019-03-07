@@ -897,16 +897,15 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         char buffer[CGROUP_CHARTID_LINE_MAX + 1];
         char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
         // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
-        mypclose(fp, cgroup_pid);
+        int name_error = mypclose(fp, cgroup_pid);
         // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
 
         if(s && *s && *s != '\n') {
             debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
 
-            char *name_error = mystrsep(&s, " ");
             s = trim(s);
             if (s) {
-                if(likely(*name_error == '0'))
+                if(likely(!name_error))
                     cg->pending_renames = 0;
 
                 freez(cg->chart_title);
