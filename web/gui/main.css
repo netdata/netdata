@@ -697,3 +697,7 @@ body.modal-open {
     float: right;
 }
 
+#sign-in-banner .__close .fa-times {
+    margin-left: 5px;
+    color: #17CE8A;
+}

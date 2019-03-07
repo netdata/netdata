@@ -4688,15 +4688,23 @@ function signInDidClick(e) {
 }
 
 function shouldShowSignInBanner() {
+    if (isSignedIn()) {
+        return false;
+    }
+
     return localStorage.getItem("signInBannerClosed") != "true";
 }
 
-function closeSignInBannerDidClick(e) {
+function closeSignInBanner() {
     localStorage.setItem("signInBannerClosed", "true");
     const el = document.getElementById("sign-in-banner");
     if (el) {
         el.style.display = "none";
     }
+}
+
+function closeSignInBannerDidClick(e) {
+    closeSignInBanner();
 }
 
 function signOutDidClick(e) {
@@ -4816,6 +4824,7 @@ function handleMessage(e) {
 }
 
 function handleSignInMessage(e) {
+    closeSignInBanner();
     localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
 
     cloudAccountID = e.data.accountID;
