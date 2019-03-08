@@ -67,12 +67,12 @@ function docker_get_name_api() {
 function k8s_get_name() {
 	local id="${1}"
 	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
-	NAME=$(
+	NAME="$(
 curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
 jq -r '.items[].status.containerStatuses[0] | "\(.name) \(.containerID)"' |
 grep $id |
 cut -d' ' -f1
-)
+)"
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of k8s pod with containerID '${id}'"
 	else
