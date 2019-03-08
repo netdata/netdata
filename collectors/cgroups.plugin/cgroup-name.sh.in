@@ -70,7 +70,7 @@ function k8s_get_name() {
 	NAME="$(
 curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
 jq -r '.items[].status.containerStatuses[0] | "\(.name) \(.containerID)"' |
-grep $id |
+grep "$id" |
 cut -d' ' -f1
 )"
 	if [ -z "${NAME}" ]; then
