@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- swap chart should use stack mode instead of area mode [\#5567](https://github.com/netdata/netdata/issues/5567)
 - Alert if process isn't alive [\#5547](https://github.com/netdata/netdata/issues/5547)
 - sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
 - RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
@@ -25,7 +26,9 @@
 
 **Merged pull requests:**
 
+- Wait for logs to be opened before calling anonymous statistics [\#5573](https://github.com/netdata/netdata/pull/5573) ([cakrit](https://github.com/cakrit))
 - Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
+- Correct PLUGINS\_DIR flag in CMakeLists.txt [\#5555](https://github.com/netdata/netdata/pull/5555) ([cakrit](https://github.com/cakrit))
 - python.d.plugin: use separate process for initial module checking [\#5552](https://github.com/netdata/netdata/pull/5552) ([ilyam8](https://github.com/ilyam8))
 - Pass agent id to authorization pages [\#5551](https://github.com/netdata/netdata/pull/5551) ([gmosx](https://github.com/gmosx))
 - Have the debug option set the freeipmi debug flags [\#5548](https://github.com/netdata/netdata/pull/5548) ([cakrit](https://github.com/cakrit))
