@@ -66,6 +66,7 @@ fi
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
 export REPOSITORY="netdata/netdata"
 ./packaging/docker/build.sh
+./packaging/docker/publish.sh
 
 echo "---- CREATING RELEASE ARTIFACTS -----"
 # Artifacts are stored in `artifacts/` directory
