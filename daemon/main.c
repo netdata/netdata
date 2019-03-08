@@ -960,9 +960,6 @@ int main(int argc, char **argv) {
         get_netdata_configured_variables();
         set_global_environment();
 
-        netdata_anonymous_statistics_enabled=-1;
-        send_statistics("START","-", "-");
-
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
         // files using relative filenames
@@ -995,10 +992,8 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // get log filenames and settings
-
         log_init();
         error_log_limit_unlimited();
-
 
         // --------------------------------------------------------------------
         // setup process signals
@@ -1040,6 +1035,7 @@ int main(int argc, char **argv) {
             user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
         }
 
+
         // --------------------------------------------------------------------
         // create the listening sockets
 
@@ -1052,6 +1048,8 @@ int main(int argc, char **argv) {
 
     // initialize the log files
     open_all_log_files();
+	netdata_anonymous_statistics_enabled=-1;
+	send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
