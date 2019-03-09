@@ -77,7 +77,7 @@ cut -d' ' -f1
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of k8s pod with containerID '${id}'"
 	else
-		info "k8s containerID '${id}' is has pod name '${NAME}'"
+		info "k8s containerID '${id}' has pod name '${NAME}'"
 	fi
 }
 
