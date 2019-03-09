@@ -65,8 +65,11 @@ function docker_get_name_api() {
 }
 
 function k8s_get_name() {
-	# Take the last part of the underscore-delimited identifier.
+	# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
 	local id="${1##*_}"
+	if [ ${id} == ${1} ]; then
+		id="${1##*/}"
+	fi
 	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
 	NAME="$(
 curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
@@ -75,7 +78,9 @@ grep "$id" |
 cut -d' ' -f1
 )"
 	if [ -z "${NAME}" ]; then
-		warning "cannot find the name of k8s pod with containerID '${id}'"
+		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id}"
+		NAME="${id}"
+		NAME_NOT_FOUND=3
 	else
 		info "k8s containerID '${id}' has pod name '${NAME}'"
 	fi
@@ -90,7 +95,7 @@ function docker_get_name() {
 	fi
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of docker container '${id}'"
-		NAME_NOT_FOUND=1
+		NAME_NOT_FOUND=2
 		NAME="${id:0:12}"
 	else
 		info "docker container '${id}' is named '${NAME}'"
@@ -198,8 +203,5 @@ fi
 info "cgroup '${CGROUP}' is called '${NAME}'"
 echo "${NAME}"
 
-if [ "${NAME_NOT_FOUND}" -eq 1 ]; then
-	exit 2
-else
-	exit 0
-fi
+exit ${NAME_NOT_FOUND}
+

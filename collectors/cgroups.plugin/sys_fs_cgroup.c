@@ -905,8 +905,12 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
 
             s = trim(s);
             if (s) {
-                if(likely(!name_error))
+                if(likely(name_error==0))
                     cg->pending_renames = 0;
+                else if (unlikely(name_error==3)) {
+                    debug(D_CGROUP, "cgroup '%s' disabled based due to rename command output", cg->id);
+                    cg->enabled = 0;
+                }
 
                 if(likely(cg->pending_renames < 2)) {
                     freez(cg->chart_title);
