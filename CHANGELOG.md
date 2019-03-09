@@ -11,6 +11,7 @@
 - Reliability of Prometheus exposed metrics names [\#5527](https://github.com/netdata/netdata/issues/5527)
 - Unexpected host seen in list of hosts [\#5518](https://github.com/netdata/netdata/issues/5518)
 - apps\_plugin plots zeroes for empty groups [\#5514](https://github.com/netdata/netdata/issues/5514)
+- Docker containers resources missing unless a netdata full restart executed [\#5512](https://github.com/netdata/netdata/issues/5512)
 - Problem loading module sensors [\#5490](https://github.com/netdata/netdata/issues/5490)
 - Need more graceful handling of duplicate machine GUIDs [\#5488](https://github.com/netdata/netdata/issues/5488)
 - SpigotMC Chart won't show [\#4131](https://github.com/netdata/netdata/issues/4131)
@@ -28,6 +29,7 @@
 
 - Wait for logs to be opened before calling anonymous statistics [\#5573](https://github.com/netdata/netdata/pull/5573) ([cakrit](https://github.com/cakrit))
 - Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
+- Delay renaming for docker containers [\#5557](https://github.com/netdata/netdata/pull/5557) ([vlvkobal](https://github.com/vlvkobal))
 - Correct PLUGINS\_DIR flag in CMakeLists.txt [\#5555](https://github.com/netdata/netdata/pull/5555) ([cakrit](https://github.com/cakrit))
 - python.d.plugin: use separate process for initial module checking [\#5552](https://github.com/netdata/netdata/pull/5552) ([ilyam8](https://github.com/ilyam8))
 - Pass agent id to authorization pages [\#5551](https://github.com/netdata/netdata/pull/5551) ([gmosx](https://github.com/gmosx))
