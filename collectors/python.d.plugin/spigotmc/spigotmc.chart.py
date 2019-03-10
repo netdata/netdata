@@ -12,10 +12,14 @@ from bases.FrameworkServices.SimpleService import SimpleService
 from third_party import mcrcon
 
 # Update only every 5 seconds because collection takes in excess of
-# 100ms sometimes, and mos tpeople won't care about second-by-second data.
+# 100ms sometimes, and most people won't care about second-by-second data.
 update_every = 5
 
 PRECISION = 100
+
+COMMAND_TPS = 'tps'
+COMMAND_LIST = 'list'
+COMMAND_ONLINE = 'online'
 
 ORDER = [
     'tps',
@@ -38,15 +42,17 @@ CHARTS = {
         ]
     }
 }
+
+
 _TPS_REGEX = re.compile(
-    r'^.*: .*?'           # Message lead-in
-    r'(\d{1,2}.\d+), .*?' # 1-minute TPS value
-    r'(\d{1,2}.\d+), .*?' # 5-minute TPS value
-    r'(\d{1,2}\.\d+).*$', # 15-minute TPS value
+    r'^.*: .*?'            # Message lead-in
+    r'(\d{1,2}.\d+), .*?'  # 1-minute TPS value
+    r'(\d{1,2}.\d+), .*?'  # 5-minute TPS value
+    r'(\d{1,2}\.\d+).*$',  # 15-minute TPS value
     re.X
 )
 _LIST_REGEX = re.compile(
-    r'(\d+)', # Current user count.
+    r'(\d+)',  # Current user count.
     re.X
 )
 
@@ -92,17 +98,24 @@ class Service(SimpleService):
         return True
 
     def is_alive(self):
-        if (not self.alive) or \
-           self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1:
+        if not any(
+            [
+                not self.alive,
+                self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1
+            ]
+        ):
             return self.reconnect()
         return True
 
     def _get_data(self):
         if not self.is_alive():
             return None
+
         data = {}
+
         try:
-            raw = self.console.command('tps')
+            raw = self.console.command(COMMAND_TPS)
+            self.debug("'{0}' command output : {1}".format(COMMAND_TPS, raw))
             match = _TPS_REGEX.match(raw)
             if match:
                 data['tps1'] = int(float(match.group(1)) * PRECISION)
@@ -116,11 +129,14 @@ class Service(SimpleService):
             self.error('Connection is dead.')
             self.alive = False
             return None
+
         try:
-            raw = self.console.command('list')
+            raw = self.console.command(COMMAND_LIST)
+            self.debug("'{0}' command output : {1}".format(COMMAND_LIST, raw))
             match = _LIST_REGEX.search(raw)
             if not match:
-                raw = self.console.command('online')
+                raw = self.console.command(COMMAND_ONLINE)
+                self.debug("'{0}' command output : {1}".format(COMMAND_ONLINE, raw))
                 match = _LIST_REGEX.search(raw)
             if match:
                 data['users'] = int(match.group(1))
@@ -132,4 +148,5 @@ class Service(SimpleService):
             self.error('Connection is dead.')
             self.alive = False
             return None
+
         return data
