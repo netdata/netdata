@@ -116,7 +116,6 @@ class Service(SimpleService):
 
         try:
             raw = self.console.command(COMMAND_TPS)
-            self.debug("'{0}' command output : {1}".format(COMMAND_TPS, raw))
             match = _TPS_REGEX.match(raw)
             if match:
                 data['tps1'] = int(float(match.group(1)) * PRECISION)
@@ -135,11 +134,9 @@ class Service(SimpleService):
 
         try:
             raw = self.console.command(COMMAND_LIST)
-            self.debug("'{0}' command output : {1}".format(COMMAND_LIST, raw))
             match = _LIST_REGEX.search(raw)
             if not match:
                 raw = self.console.command(COMMAND_ONLINE)
-                self.debug("'{0}' command output : {1}".format(COMMAND_ONLINE, raw))
                 match = _LIST_REGEX.search(raw)
             if match:
                 data['users'] = int(match.group(1))
