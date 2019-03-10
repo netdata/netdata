@@ -15,6 +15,7 @@
 - Problem loading module sensors [\#5490](https://github.com/netdata/netdata/issues/5490)
 - Need more graceful handling of duplicate machine GUIDs [\#5488](https://github.com/netdata/netdata/issues/5488)
 - SpigotMC Chart won't show [\#4131](https://github.com/netdata/netdata/issues/4131)
+- Memory leak in python.d.plugin [\#3817](https://github.com/netdata/netdata/issues/3817)
 
 **Closed issues:**
 
@@ -27,6 +28,7 @@
 
 **Merged pull requests:**
 
+- SimpleService cleanup: do not inherit from OldVersionCompatibility [\#5594](https://github.com/netdata/netdata/pull/5594) ([ilyam8](https://github.com/ilyam8))
 - Wait for logs to be opened before calling anonymous statistics [\#5573](https://github.com/netdata/netdata/pull/5573) ([cakrit](https://github.com/cakrit))
 - Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
 - Delay renaming for docker containers [\#5557](https://github.com/netdata/netdata/pull/5557) ([vlvkobal](https://github.com/vlvkobal))
