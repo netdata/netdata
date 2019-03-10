@@ -17,6 +17,7 @@ declare -A ARCH_MAP
 ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 ARCHS="${!ARCH_MAP[@]}"
+DOCKER_CMD="docker --config ${WORKDIR}"
 
 # When development mode is set, build on DEVEL_ARCHS
 if [ ! -z ${DEVEL+x} ]; then
@@ -55,20 +56,20 @@ mkdir -p "${WORKDIR}"
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
 # Login to docker hub to allow futher operations
-echo "$DOCKER_PASSWORD" | docker --config "${WORKDIR}" login -u "$DOCKER_USERNAME" --password-stdin
+echo "$DOCKER_PASSWORD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
 for ARCH in ${ARCHS[@]}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
     echo "Publushing image ${TAG}.."
-    docker --config "${WORKDIR}" push "${TAG}" &
+    $DOCKER_CMD push "${TAG}" &
 done
 
 echo "Waiting for images publishing to complete"
 wait
 
 # Recreate docker manifest list
-docker --config "${WORKDIR}" manifest create --amend "${MANIFEST_LIST}" \
+$DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" \
                                                      "${MANIFEST_LIST}-i386" \
                                                      "${MANIFEST_LIST}-armhf" \
                                                      "${MANIFEST_LIST}-aarch64" \
@@ -77,13 +78,13 @@ docker --config "${WORKDIR}" manifest create --amend "${MANIFEST_LIST}" \
 # Annotate manifest with CPU architecture information
 for ARCH in ${ARCHS[@]}; do
      TAG="${MANIFEST_LIST}-${ARCH}"
-     docker --config "${WORKDIR}" manifest annotate "${MANIFEST_LIST}" "${TAG}" --os linux --arch "${ARCH_MAP[$ARCH]}"
+     $DOCKER_CMD manifest annotate "${MANIFEST_LIST}" "${TAG}" --os linux --arch "${ARCH_MAP[$ARCH]}"
 done
 
 # Push manifest to docker hub
-docker --config "${WORKDIR}" manifest push -p "${MANIFEST_LIST}"
+$DOCKER_CMD manifest push -p "${MANIFEST_LIST}"
 
 # Show current manifest (debugging purpose only)
-docker --config "${WORKDIR}" manifest inspect "${MANIFEST_LIST}"
+$DOCKER_CMD manifest inspect "${MANIFEST_LIST}"
 
 echo "Docker publishing process completed!"
