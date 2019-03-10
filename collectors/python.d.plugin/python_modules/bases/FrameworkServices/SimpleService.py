@@ -55,7 +55,7 @@ class RuntimeCounters:
             self.penalty = round(min(self.retries * self.update_every / 2, MAX_PENALTY))
 
 
-class SimpleService(PythonDLimitedLogger, OldVersionCompatibility, object):
+class SimpleService(PythonDLimitedLogger, object):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
