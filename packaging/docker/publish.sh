@@ -56,7 +56,7 @@ echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 echo "$DOCKER_PASSWORD" | docker --config "${WORKDIR}" login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
-for ARCH in amd64 i386 armhf aarch64; do
+for ARCH in ${ARCHS[@]}; do
     docker --config "${WORKDIR}" push "${REPOSITORY}:${VERSION}-${ARCH}" &
 done
 wait
@@ -70,7 +70,7 @@ docker --config "${WORKDIR}" manifest create --amend \
                        "${REPOSITORY}:${VERSION}-amd64"
 
 # Annotate manifest with CPU architecture information
-for ARCH in i386 armhf aarch64 amd64; do
+for ARCH in ${ARCHS[@]}; do
      docker --config "${WORKDIR}" manifest annotate "${REPOSITORY}:${VERSION}" "${REPOSITORY}:${VERSION}-${ARCH}" --os linux --arch "${ARCH_MAP[$ARCH]}"
 done
 
