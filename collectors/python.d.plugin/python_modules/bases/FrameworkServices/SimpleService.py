@@ -10,7 +10,7 @@ from time import sleep, time
 from third_party.monotonic import monotonic
 
 from bases.charts import Charts, ChartError, create_runtime_chart
-from bases.collection import OldVersionCompatibility, safe_print
+from bases.collection import safe_print
 from bases.loggers import PythonDLimitedLogger
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
@@ -66,7 +66,6 @@ class SimpleService(PythonDLimitedLogger, object):
         :param name: <str>
         """
         PythonDLimitedLogger.__init__(self)
-        OldVersionCompatibility.__init__(self)
         self.configuration = configuration
         self.order = list()
         self.definitions = dict()
