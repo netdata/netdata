@@ -9,7 +9,7 @@
 
 set -e
 
-WORKDIR="/tmp/docker"
+WORKDIR="/tmp/docker" # Temporary folder, removed after script is done
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
@@ -86,5 +86,8 @@ $DOCKER_CMD manifest push -p "${MANIFEST_LIST}"
 
 # Show current manifest (debugging purpose only)
 $DOCKER_CMD manifest inspect "${MANIFEST_LIST}"
+
+# Cleanup
+rm -r "${WORKDIR}"
 
 echo "Docker publishing process completed!"
