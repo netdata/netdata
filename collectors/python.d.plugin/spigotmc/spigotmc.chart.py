@@ -43,11 +43,11 @@ _TPS_REGEX = re.compile(
     r'(\d{1,2}.\d+), .*?' # 1-minute TPS value
     r'(\d{1,2}.\d+), .*?' # 5-minute TPS value
     r'(\d{1,2}\.\d+).*$', # 15-minute TPS value
-    re.X | re.A
+    re.X
 )
 _LIST_REGEX = re.compile(
     r'(\d+)', # Current user count.
-    re.X | re.A
+    re.X
 )
 
 
