@@ -78,7 +78,8 @@ class Service(SimpleService):
             self.error('Error connecting.')
             self.error(repr(err))
             return False
-        return True
+
+        return self._get_data()
 
     def connect(self):
         self.console.connect(self.host, self.port, self.password)
@@ -123,6 +124,8 @@ class Service(SimpleService):
                 data['tps15'] = int(float(match.group(3)) * PRECISION)
             else:
                 self.error('Unable to process TPS values.')
+                if not raw:
+                    self.error("'{0}' command returned no value, make sure you set correct password".format(COMMAND_TPS))
         except mcrcon.MCRconException:
             self.error('Unable to fetch TPS values.')
         except socket.error:
@@ -141,6 +144,9 @@ class Service(SimpleService):
             if match:
                 data['users'] = int(match.group(1))
             else:
+                if not raw:
+                    self.error("'{0}' and '{1}' commands returned no value, make sure you set correct password".format(
+                        COMMAND_LIST, COMMAND_ONLINE))
                 self.error('Unable to process user counts.')
         except mcrcon.MCRconException:
             self.error('Unable to fetch user counts.')
