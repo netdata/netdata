@@ -61,8 +61,9 @@ echo "$DOCKER_PASSWORD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-std
 # Push images to registry
 for ARCH in ${ARCHS[@]}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
-    echo "Publushing image ${TAG}.."
+    echo "Publishing image ${TAG}.."
     $DOCKER_CMD push "${TAG}" &
+    echo "Image ${TAG} published succesfully!"
 done
 
 echo "Waiting for images publishing to complete"
