@@ -9,6 +9,7 @@
 
 set -e
 
+WORKDIR="/tmp/docker"
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
 declare -A ARCH_MAP
@@ -48,20 +49,20 @@ echo "Repository    : ${REPOSITORY}"
 echo "Architectures : ${ARCHS}"
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
-mkdir -p /tmp/docker
-echo '{"experimental":"enabled"}' > /tmp/docker/config.json
+mkdir -p "${WORKDIR}"
+echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
 # Login to docker hub to allow futher operations
-echo "$DOCKER_PASSWORD" | docker --config /tmp/docker login -u "$DOCKER_USERNAME" --password-stdin
+echo "$DOCKER_PASSWORD" | docker --config "${WORKDIR}" login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
 for ARCH in amd64 i386 armhf aarch64; do
-    docker --config /tmp/docker push "${REPOSITORY}:${VERSION}-${ARCH}" &
+    docker --config "${WORKDIR}" push "${REPOSITORY}:${VERSION}-${ARCH}" &
 done
 wait
 
 # Recreate docker manifest
-docker --config /tmp/docker manifest create --amend \
+docker --config "${WORKDIR}" manifest create --amend \
                        "${REPOSITORY}:${VERSION}" \
                        "${REPOSITORY}:${VERSION}-i386" \
                        "${REPOSITORY}:${VERSION}-armhf" \
@@ -70,13 +71,13 @@ docker --config /tmp/docker manifest create --amend \
 
 # Annotate manifest with CPU architecture information
 for ARCH in i386 armhf aarch64 amd64; do
-     docker --config /tmp/docker manifest annotate "${REPOSITORY}:${VERSION}" "${REPOSITORY}:${VERSION}-${ARCH}" --os linux --arch "${ARCH_MAP[$ARCH]}"
+     docker --config "${WORKDIR}" manifest annotate "${REPOSITORY}:${VERSION}" "${REPOSITORY}:${VERSION}-${ARCH}" --os linux --arch "${ARCH_MAP[$ARCH]}"
 done
 
 # Push manifest to docker hub
-docker --config /tmp/docker manifest push -p "${REPOSITORY}:${VERSION}"
+docker --config "${WORKDIR}" manifest push -p "${REPOSITORY}:${VERSION}"
 
 # Show current manifest (debugging purpose only)
-docker --config /tmp/docker manifest inspect "${REPOSITORY}:${VERSION}"
+docker --config "${WORKDIR}" manifest inspect "${REPOSITORY}:${VERSION}"
 
 echo "Docker publishing process completed!"
