@@ -842,7 +842,7 @@ install_go() {
 		if [ ${UID} -eq 0 ]; then
 			run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
-		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		run chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 	fi
 	return 0
 }
