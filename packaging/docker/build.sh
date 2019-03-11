@@ -1,6 +1,5 @@
 #!/bin/bash
 # Cross-arch docker build helper script
-# Needs docker in version >18.02 due to usage of manifests
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #

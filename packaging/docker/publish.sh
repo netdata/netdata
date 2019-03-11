@@ -4,7 +4,6 @@
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author  : Pawel Krupa (paulfantom)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 
 set -e
