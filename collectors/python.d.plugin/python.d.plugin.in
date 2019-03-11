@@ -689,7 +689,7 @@ def main():
     if cmd.trace:
         logger.log_traceback = True
 
-    logger.info('using python v{0}'.format(PY_VERSION))
+    logger.info('using python v{0}'.format(PY_VERSION[0]))
 
     unknown_modules = set(cmd.modules_to_run) - set(AVAILABLE_MODULES)
     if unknown_modules:
