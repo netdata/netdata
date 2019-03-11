@@ -4,7 +4,9 @@
 
 **Fixed bugs:**
 
+- spigotmc py2 : load source error : 'module' object has no attribute 'A' [\#5595](https://github.com/netdata/netdata/issues/5595)
 - swap chart should use stack mode instead of area mode [\#5567](https://github.com/netdata/netdata/issues/5567)
+- netdata segfault since 1.12.1 [\#5553](https://github.com/netdata/netdata/issues/5553)
 - Alert if process isn't alive [\#5547](https://github.com/netdata/netdata/issues/5547)
 - sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
 - RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
@@ -28,8 +30,13 @@
 
 **Merged pull requests:**
 
+- python loaders cleanup [\#5602](https://github.com/netdata/netdata/pull/5602) ([ilyam8](https://github.com/ilyam8))
+- Update custom dashboards documentation [\#5600](https://github.com/netdata/netdata/pull/5600) ([cakrit](https://github.com/cakrit))
+- spigotmc fix UnicodeDecodeError [\#5598](https://github.com/netdata/netdata/pull/5598) ([ilyam8](https://github.com/ilyam8))
 - SimpleService cleanup: do not inherit from OldVersionCompatibility [\#5594](https://github.com/netdata/netdata/pull/5594) ([ilyam8](https://github.com/ilyam8))
+- spigotmc: py2 compatibility fix [\#5593](https://github.com/netdata/netdata/pull/5593) ([ilyam8](https://github.com/ilyam8))
 - Wait for logs to be opened before calling anonymous statistics [\#5573](https://github.com/netdata/netdata/pull/5573) ([cakrit](https://github.com/cakrit))
+- Fix nonobsolete dimension deletion [\#5563](https://github.com/netdata/netdata/pull/5563) ([vlvkobal](https://github.com/vlvkobal))
 - Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
 - Delay renaming for docker containers [\#5557](https://github.com/netdata/netdata/pull/5557) ([vlvkobal](https://github.com/vlvkobal))
 - Correct PLUGINS\_DIR flag in CMakeLists.txt [\#5555](https://github.com/netdata/netdata/pull/5555) ([cakrit](https://github.com/cakrit))
