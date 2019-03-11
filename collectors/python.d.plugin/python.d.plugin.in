@@ -515,6 +515,8 @@ class Plugin:
         self.task_queue.join()
         self.dequeue_results()
         self.result_queue.join()
+        self.task_queue.close()
+        self.result_queue.close()
         self.log.info('stopping checker process')
         worker.join()
 
@@ -599,7 +601,8 @@ class Plugin:
         while True:
             self.runs += 1
 
-            if threading.active_count() <= 3 and not self.auto_detection_jobs:
+            # threads: main + heartbeat
+            if threading.active_count() <= 2 and not self.auto_detection_jobs:
                 return
 
             time.sleep(1)
