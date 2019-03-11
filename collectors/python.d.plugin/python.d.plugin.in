@@ -18,6 +18,15 @@ import re
 import sys
 import time
 import threading
+import types
+
+PY_VERSION = sys.version_info[:2]
+
+if PY_VERSION > (3, 1):
+    from importlib.machinery import SourceFileLoader
+else:
+    from imp import load_source as SourceFileLoader
+
 
 ENV_NETDATA_USER_CONFIG_DIR = 'NETDATA_USER_CONFIG_DIR'
 ENV_NETDATA_STOCK_CONFIG_DIR = 'NETDATA_STOCK_CONFIG_DIR'
@@ -73,7 +82,6 @@ sys.path.append(DIRS.pythond_packages)
 from bases.collection import safe_print
 from bases.loggers import PythonDLogger
 from bases.loaders import load_config
-from bases.loaders import load_module as _load_module
 
 try:
     from collections import OrderedDict
@@ -138,7 +146,10 @@ class HeartBeat(threading.Thread):
 
 def load_module(name):
     abs_path = os.path.join(DIRS.modules, '{0}{1}'.format(name, MODULE_SUFFIX))
-    return _load_module(name, abs_path)
+    module = SourceFileLoader(name, abs_path)
+    if isinstance(module, types.ModuleType):
+        return module
+    return module.load_module()
 
 
 def multi_path_find(name, paths):
@@ -504,6 +515,8 @@ class Plugin:
         self.task_queue.join()
         self.dequeue_results()
         self.result_queue.join()
+        self.task_queue.close()
+        self.result_queue.close()
         self.log.info('stopping checker process')
         worker.join()
 
@@ -588,7 +601,8 @@ class Plugin:
         while True:
             self.runs += 1
 
-            if threading.active_count() <= 3 and not self.auto_detection_jobs:
+            # threads: main + heartbeat
+            if threading.active_count() <= 2 and not self.auto_detection_jobs:
                 return
 
             time.sleep(1)
@@ -678,7 +692,7 @@ def main():
     if cmd.trace:
         logger.log_traceback = True
 
-    logger.info('using python v{0}'.format(sys.version_info[:2][0]))
+    logger.info('using python v{0}'.format(PY_VERSION[0]))
 
     unknown_modules = set(cmd.modules_to_run) - set(AVAILABLE_MODULES)
     if unknown_modules:
