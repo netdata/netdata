@@ -67,7 +67,7 @@ function docker_get_name_api() {
 function k8s_get_name() {
 	# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
 	local id="${1##*_}"
-	if [ ${id} == ${1} ]; then
+	if [ "${id}" == "${1}" ]; then
 		id="${1##*/}"
 	fi
 	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
