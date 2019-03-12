@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: simple ssl expiration check netdata python.d module
-# Original Author: ccremer (github.com/ccremer)
+# Original Author: Peter Thurner (github.com/p-thurner)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import datetime
