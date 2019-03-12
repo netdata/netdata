@@ -814,17 +814,17 @@ class Service(SimpleService):
 
         conf = self.configuration
 
-        try:
-            params = {
-                'host': conf.get('host'),
-                'port': conf.get('host', DEFAULT_PORT),
-                'database': conf.get('database'),
-                'user': conf.get('user', DEFAULT_USER),
-                'password': conf.get('password'),
-                'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
-                'options': '-c statement_timeout={0}'.format(self.statement_timeout),
-            }
+        params = {
+            'host': conf.get('host'),
+            'port': conf.get('host', DEFAULT_PORT),
+            'database': conf.get('database'),
+            'user': conf.get('user', DEFAULT_USER),
+            'password': conf.get('password'),
+            'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
+            'options': '-c statement_timeout={0}'.format(self.statement_timeout),
+        }
 
+        try:
             self.conn = psycopg2.connect(**params)
             self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             self.conn.set_session(readonly=True)
