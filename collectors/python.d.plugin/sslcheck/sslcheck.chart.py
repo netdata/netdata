@@ -40,6 +40,11 @@ CHARTS = {
 
 SSL_DATE_FMT = r'%b %d %H:%M:%S %Y %Z'
 
+DEFAULT_PORT = 443
+DEFAULT_CONN_TIMEOUT = 3
+DEFAULT_DAYS_UNTIL_WARN_LIMIT = 14
+DEFAULT_DAYS_UNTIL_CRIT_LIMIT = 7
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -47,10 +52,10 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.host = configuration.get('host')
-        self.port = configuration.get('port', 443)
-        self.timeout = configuration.get('timeout', 3)
-        self.days_warn = configuration.get('days_until_expiration_warning', 14)
-        self.days_crit = configuration.get('days_until_expiration_critical', 7)
+        self.port = configuration.get('port', DEFAULT_PORT)
+        self.timeout = configuration.get('timeout', DEFAULT_CONN_TIMEOUT)
+        self.days_warn = configuration.get('days_until_expiration_warning', DEFAULT_DAYS_UNTIL_WARN_LIMIT)
+        self.days_crit = configuration.get('days_until_expiration_critical', DEFAULT_DAYS_UNTIL_CRIT_LIMIT)
 
     def check(self):
         if not self.host:
