@@ -671,6 +671,14 @@ body.modal-open {
     background-color: #1E2126;
 }
 
+.sign-in-btn.theme-white {
+    background-color: #e6e6e6;
+}
+
+.sign-in-btn.theme-white span {
+    color: #000;
+}
+
 #sign-in-banner {
     position: fixed;
     bottom: 0;
@@ -682,6 +690,10 @@ body.modal-open {
     height: 44px;
     line-height: 44px;
     text-align: center;
+}
+
+#sign-in-banner.theme-white {
+    background-color: #e6e6e6;
 }
 
 #sign-in-banner .__link {

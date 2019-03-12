@@ -4043,7 +4043,11 @@ function runOnceOnDashboardWithjQuery() {
     // sidebar / affix
 
     if (shouldShowSignInBanner()) {
-        document.getElementById("sign-in-banner").style.display = "initial";
+        const el = document.getElementById("sign-in-banner");
+        if (el) {
+            el.style.display = "initial";
+            el.classList.add(`theme-${netdataTheme}`);
+        }
     }
 
     $('#sidebar')
@@ -4801,7 +4805,7 @@ function renderAccountUI() {
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
-            `<a href="#" class="btn sign-in-btn" onclick="signInDidClick(event); return false">
+            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
