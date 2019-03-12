@@ -10,6 +10,9 @@ import ssl
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
+update_every = 60
+
+
 ORDER = [
     'time_until_expiration',
 ]
