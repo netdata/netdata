@@ -792,7 +792,6 @@ class Service(SimpleService):
         self.do_table_stats = configuration.pop('table_stats', False)
         self.do_index_stats = configuration.pop('index_stats', False)
         self.databases_to_poll = configuration.pop('database_poll', None)
-        self.statement_timeout = configuration.pop('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)
         self.configuration = configuration
         self.conn = None
         self.server_version = None
@@ -812,18 +811,20 @@ class Service(SimpleService):
             self.conn.close()
             self.conn = None
 
-        try:
-            params = dict(
-                host=None,
-                port=DEFAULT_PORT,
-                database=None,
-                user=DEFAULT_USER,
-                password=None,
-                connect_timeout=DEFAULT_CONNECT_TIMEOUT,
-                options='-c statement_timeout={0}'.format(self.statement_timeout),
-            )
-            params.update(self.configuration)
+        conf = self.configuration
 
+        params = {
+            'host': conf.get('host'),
+            'port': conf.get('host', DEFAULT_PORT),
+            'database': conf.get('database'),
+            'user': conf.get('user', DEFAULT_USER),
+            'password': conf.get('password'),
+            'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
+            'options': '-c statement_timeout={0}'.format(
+                conf.get('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)),
+        }
+
+        try:
             self.conn = psycopg2.connect(**params)
             self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             self.conn.set_session(readonly=True)
