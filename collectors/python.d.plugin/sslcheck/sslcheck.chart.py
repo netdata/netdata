@@ -56,7 +56,7 @@ class Service(SimpleService):
         self.debug('run check : host {host}:{port}, update every {update}s, timeout {timeout}s'.format(
             host=self.host, port=self.port, update=self.update_every, timeout=self.timeout))
 
-        return True
+        return bool(self.get_data())
 
     def get_data(self):
         conn = create_ssl_conn(self.host, self.timeout)
