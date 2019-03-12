@@ -888,7 +888,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->id);
+    snprintfz(command, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
 
     debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", command, cg->id);
     FILE *fp = mypopen(command, &cgroup_pid);
@@ -908,12 +908,14 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
                 if(likely(!name_error))
                     cg->pending_renames = 0;
 
-                freez(cg->chart_title);
-                cg->chart_title = cgroup_title_strdupz(s);
+                if(likely(cg->pending_renames < 2)) {
+                    freez(cg->chart_title);
+                    cg->chart_title = cgroup_title_strdupz(s);
 
-                freez(cg->chart_id);
-                cg->chart_id = cgroup_chart_id_strdupz(s);
-                cg->hash_chart = simple_hash(cg->chart_id);
+                    freez(cg->chart_id);
+                    cg->chart_id = cgroup_chart_id_strdupz(s);
+                    cg->hash_chart = simple_hash(cg->chart_id);
+                }
             }
         }
     }
