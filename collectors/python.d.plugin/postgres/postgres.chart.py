@@ -815,7 +815,7 @@ class Service(SimpleService):
 
         params = {
             'host': conf.get('host'),
-            'port': conf.get('host', DEFAULT_PORT),
+            'port': conf.get('port', DEFAULT_PORT),
             'database': conf.get('database'),
             'user': conf.get('user', DEFAULT_USER),
             'password': conf.get('password'),
