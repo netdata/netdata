@@ -73,16 +73,16 @@ function k8s_get_name() {
 	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
 	NAME="$(
 curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
-jq -r '.items[].status.containerStatuses[0] | "\(.name) \(.containerID)"' |
+jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_\(.status.containerStatuses[0].name) \(.status.containerStatuses[0].containerID)"' |
 grep "$id" |
 cut -d' ' -f1
 )"
 	if [ -z "${NAME}" ]; then
-		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id}"
+		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id} and disabling it"
 		NAME="${id}"
 		NAME_NOT_FOUND=3
 	else
-		info "k8s containerID '${id}' has pod name '${NAME}'"
+		info "k8s containerID '${id}' has chart name (namespace_podname_poduid_containername) '${NAME}'"
 	fi
 }
 
@@ -141,7 +141,7 @@ for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_C
 	fi
 done
 
-if [ -z "${NAME}" ] && [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ]; then
+if [ -z "${NAME}" ] && [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ] && [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
 	k8s_get_name "${CGROUP}"
 fi
 
@@ -155,12 +155,6 @@ if [ -z "${NAME}" ]; then
 		# ECS
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
-		docker_validate_id "${DOCKERID}"
-
-	elif [[ ${CGROUP} =~ ^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]+[_/][a-fA-F0-9]+$ ]]; then
-		# kubernetes
-		#shellcheck disable=SC1117
-		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]\+[_/]\([a-fA-F0-9]\+\)$|\1|")"
 		docker_validate_id "${DOCKERID}"
 
 	elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
