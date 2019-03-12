@@ -32,6 +32,7 @@ CHARTS = {
         ],
         'variables': [
             ['days_until_expiration_warning'],
+            ['days_until_expiration_critical'],
         ],
     },
 }
@@ -48,7 +49,8 @@ class Service(SimpleService):
         self.host = configuration.get('host')
         self.port = configuration.get('port', 443)
         self.timeout = configuration.get('timeout', 3)
-        self.days_warn = configuration.get('days_until_expiration_warning', 5)
+        self.days_warn = configuration.get('days_until_expiration_warning', 30)
+        self.days_crit = configuration.get('days_until_expiration_critical', 7)
 
     def check(self):
         if not self.host:
@@ -82,6 +84,7 @@ class Service(SimpleService):
         return {
             'time': cert_expiration_seconds(peer_cert),
             'days_until_expiration_warning': self.days_warn,
+            'days_until_expiration_critical': self.days_crit,
         }
 
 
