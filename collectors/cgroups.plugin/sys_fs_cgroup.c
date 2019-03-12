@@ -297,6 +297,7 @@ struct memory {
     int detailed_has_swap;
 
     // detailed metrics
+/*
     unsigned long long cache;
     unsigned long long rss;
     unsigned long long rss_huge;
@@ -308,13 +309,13 @@ struct memory {
     unsigned long long pgpgout;
     unsigned long long pgfault;
     unsigned long long pgmajfault;
-/*
     unsigned long long inactive_anon;
     unsigned long long active_anon;
     unsigned long long inactive_file;
     unsigned long long active_file;
     unsigned long long unevictable;
     unsigned long long hierarchical_memory_limit;
+*/
     unsigned long long total_cache;
     unsigned long long total_rss;
     unsigned long long total_rss_huge;
@@ -326,6 +327,7 @@ struct memory {
     unsigned long long total_pgpgout;
     unsigned long long total_pgfault;
     unsigned long long total_pgmajfault;
+/*
     unsigned long long total_inactive_anon;
     unsigned long long total_active_anon;
     unsigned long long total_inactive_file;
@@ -685,17 +687,17 @@ static inline void cgroup_read_memory(struct memory *mem) {
         if(unlikely(!mem->arl_base)) {
             mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
-            arl_expect(mem->arl_base, "cache", &mem->cache);
-            arl_expect(mem->arl_base, "rss", &mem->rss);
-            arl_expect(mem->arl_base, "rss_huge", &mem->rss_huge);
-            arl_expect(mem->arl_base, "mapped_file", &mem->mapped_file);
-            arl_expect(mem->arl_base, "writeback", &mem->writeback);
-            mem->arl_dirty = arl_expect(mem->arl_base, "dirty", &mem->dirty);
-            mem->arl_swap  = arl_expect(mem->arl_base, "swap", &mem->swap);
-            arl_expect(mem->arl_base, "pgpgin", &mem->pgpgin);
-            arl_expect(mem->arl_base, "pgpgout", &mem->pgpgout);
-            arl_expect(mem->arl_base, "pgfault", &mem->pgfault);
-            arl_expect(mem->arl_base, "pgmajfault", &mem->pgmajfault);
+            arl_expect(mem->arl_base, "total_cache", &mem->total_cache);
+            arl_expect(mem->arl_base, "total_rss", &mem->total_rss);
+            arl_expect(mem->arl_base, "total_rss_huge", &mem->total_rss_huge);
+            arl_expect(mem->arl_base, "total_mapped_file", &mem->total_mapped_file);
+            arl_expect(mem->arl_base, "total_writeback", &mem->total_writeback);
+            mem->arl_dirty = arl_expect(mem->arl_base, "total_dirty", &mem->total_dirty);
+            mem->arl_swap  = arl_expect(mem->arl_base, "total_swap", &mem->total_swap);
+            arl_expect(mem->arl_base, "total_pgpgin", &mem->total_pgpgin);
+            arl_expect(mem->arl_base, "total_pgpgout", &mem->total_pgpgout);
+            arl_expect(mem->arl_base, "total_pgfault", &mem->total_pgfault);
+            arl_expect(mem->arl_base, "total_pgmajfault", &mem->total_pgmajfault);
         }
 
         arl_begin(mem->arl_base);
@@ -717,7 +719,8 @@ static inline void cgroup_read_memory(struct memory *mem) {
         mem->updated_detailed = 1;
 
         if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
-            if(mem->cache || mem->dirty || mem->rss || mem->rss_huge || mem->mapped_file || mem->writeback || mem->swap || mem->pgpgin || mem->pgpgout || mem->pgfault || mem->pgmajfault)
+            if(mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
+               || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault)
                 mem->enabled_detailed = CONFIG_BOOLEAN_YES;
             else
                 mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
@@ -2081,49 +2084,49 @@ void update_systemd_services_charts(
             if(unlikely(!cg->rd_mem_usage))
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
+            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.total_cache:0));
         }
 
         if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
             if(unlikely(!cg->rd_mem_detailed_rss))
                 cg->rd_mem_detailed_rss = rrddim_add(st_mem_detailed_rss, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.rss + cg->memory.rss_huge);
+            rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.total_rss + cg->memory.total_rss_huge);
 
             if(unlikely(!cg->rd_mem_detailed_mapped))
                 cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_mapped, cg->rd_mem_detailed_mapped, cg->memory.mapped_file);
+            rrddim_set_by_pointer(st_mem_detailed_mapped, cg->rd_mem_detailed_mapped, cg->memory.total_mapped_file);
 
             if(unlikely(!cg->rd_mem_detailed_cache))
                 cg->rd_mem_detailed_cache = rrddim_add(st_mem_detailed_cache, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_cache, cg->rd_mem_detailed_cache, cg->memory.cache);
+            rrddim_set_by_pointer(st_mem_detailed_cache, cg->rd_mem_detailed_cache, cg->memory.total_cache);
 
             if(unlikely(!cg->rd_mem_detailed_writeback))
                 cg->rd_mem_detailed_writeback = rrddim_add(st_mem_detailed_writeback, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_detailed_writeback, cg->rd_mem_detailed_writeback, cg->memory.writeback);
+            rrddim_set_by_pointer(st_mem_detailed_writeback, cg->rd_mem_detailed_writeback, cg->memory.total_writeback);
 
             if(unlikely(!cg->rd_mem_detailed_pgfault))
                 cg->rd_mem_detailed_pgfault = rrddim_add(st_mem_detailed_pgfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
-            rrddim_set_by_pointer(st_mem_detailed_pgfault, cg->rd_mem_detailed_pgfault, cg->memory.pgfault);
+            rrddim_set_by_pointer(st_mem_detailed_pgfault, cg->rd_mem_detailed_pgfault, cg->memory.total_pgfault);
 
             if(unlikely(!cg->rd_mem_detailed_pgmajfault))
                 cg->rd_mem_detailed_pgmajfault = rrddim_add(st_mem_detailed_pgmajfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
-            rrddim_set_by_pointer(st_mem_detailed_pgmajfault, cg->rd_mem_detailed_pgmajfault, cg->memory.pgmajfault);
+            rrddim_set_by_pointer(st_mem_detailed_pgmajfault, cg->rd_mem_detailed_pgmajfault, cg->memory.total_pgmajfault);
 
             if(unlikely(!cg->rd_mem_detailed_pgpgin))
                 cg->rd_mem_detailed_pgpgin = rrddim_add(st_mem_detailed_pgpgin, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
-            rrddim_set_by_pointer(st_mem_detailed_pgpgin, cg->rd_mem_detailed_pgpgin, cg->memory.pgpgin);
+            rrddim_set_by_pointer(st_mem_detailed_pgpgin, cg->rd_mem_detailed_pgpgin, cg->memory.total_pgpgin);
 
             if(unlikely(!cg->rd_mem_detailed_pgpgout))
                 cg->rd_mem_detailed_pgpgout = rrddim_add(st_mem_detailed_pgpgout, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
 
-            rrddim_set_by_pointer(st_mem_detailed_pgpgout, cg->rd_mem_detailed_pgpgout, cg->memory.pgpgout);
+            rrddim_set_by_pointer(st_mem_detailed_pgpgout, cg->rd_mem_detailed_pgpgout, cg->memory.total_pgpgout);
         }
 
         if(likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
@@ -2586,14 +2589,14 @@ void update_cgroup_charts(int update_every) {
             else
                 rrdset_next(cg->st_mem);
 
-            rrddim_set(cg->st_mem, "cache", cg->memory.cache);
-            rrddim_set(cg->st_mem, "rss", (cg->memory.rss > cg->memory.rss_huge)?(cg->memory.rss - cg->memory.rss_huge):0);
+            rrddim_set(cg->st_mem, "cache", cg->memory.total_cache);
+            rrddim_set(cg->st_mem, "rss", (cg->memory.total_rss > cg->memory.total_rss_huge)?(cg->memory.total_rss - cg->memory.total_rss_huge):0);
 
             if(cg->memory.detailed_has_swap)
-                rrddim_set(cg->st_mem, "swap", cg->memory.swap);
+                rrddim_set(cg->st_mem, "swap", cg->memory.total_swap);
 
-            rrddim_set(cg->st_mem, "rss_huge", cg->memory.rss_huge);
-            rrddim_set(cg->st_mem, "mapped_file", cg->memory.mapped_file);
+            rrddim_set(cg->st_mem, "rss_huge", cg->memory.total_rss_huge);
+            rrddim_set(cg->st_mem, "mapped_file", cg->memory.total_mapped_file);
             rrdset_done(cg->st_mem);
 
             if(unlikely(!cg->st_writeback)) {
@@ -2623,9 +2626,9 @@ void update_cgroup_charts(int update_every) {
                 rrdset_next(cg->st_writeback);
 
             if(cg->memory.detailed_has_dirty)
-                rrddim_set(cg->st_writeback, "dirty", cg->memory.dirty);
+                rrddim_set(cg->st_writeback, "dirty", cg->memory.total_dirty);
 
-            rrddim_set(cg->st_writeback, "writeback", cg->memory.writeback);
+            rrddim_set(cg->st_writeback, "writeback", cg->memory.total_writeback);
             rrdset_done(cg->st_writeback);
 
             if(unlikely(!cg->st_mem_activity)) {
@@ -2652,8 +2655,8 @@ void update_cgroup_charts(int update_every) {
             else
                 rrdset_next(cg->st_mem_activity);
 
-            rrddim_set(cg->st_mem_activity, "pgpgin", cg->memory.pgpgin);
-            rrddim_set(cg->st_mem_activity, "pgpgout", cg->memory.pgpgout);
+            rrddim_set(cg->st_mem_activity, "pgpgin", cg->memory.total_pgpgin);
+            rrddim_set(cg->st_mem_activity, "pgpgout", cg->memory.total_pgpgout);
             rrdset_done(cg->st_mem_activity);
 
             if(unlikely(!cg->st_pgfaults)) {
@@ -2680,8 +2683,8 @@ void update_cgroup_charts(int update_every) {
             else
                 rrdset_next(cg->st_pgfaults);
 
-            rrddim_set(cg->st_pgfaults, "pgfault", cg->memory.pgfault);
-            rrddim_set(cg->st_pgfaults, "pgmajfault", cg->memory.pgmajfault);
+            rrddim_set(cg->st_pgfaults, "pgfault", cg->memory.total_pgfault);
+            rrddim_set(cg->st_pgfaults, "pgmajfault", cg->memory.total_pgmajfault);
             rrdset_done(cg->st_pgfaults);
         }
 
@@ -2710,7 +2713,7 @@ void update_cgroup_charts(int update_every) {
             else
                 rrdset_next(cg->st_mem_usage);
 
-            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
+            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.total_cache:0));
             rrddim_set(cg->st_mem_usage, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
             rrdset_done(cg->st_mem_usage);
 
@@ -2769,8 +2772,8 @@ void update_cgroup_charts(int update_every) {
 
                     rrdset_isnot_obsolete(cg->st_mem_usage_limit);
 
-                    rrddim_set(cg->st_mem_usage_limit, "available", memory_limit - (cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0)));
-                    rrddim_set(cg->st_mem_usage_limit, "used", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
+                    rrddim_set(cg->st_mem_usage_limit, "available", memory_limit - (cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.total_cache:0)));
+                    rrddim_set(cg->st_mem_usage_limit, "used", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.total_cache:0));
                     rrdset_done(cg->st_mem_usage_limit);
                 }
             }
