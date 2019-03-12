@@ -792,7 +792,6 @@ class Service(SimpleService):
         self.do_table_stats = configuration.pop('table_stats', False)
         self.do_index_stats = configuration.pop('index_stats', False)
         self.databases_to_poll = configuration.pop('database_poll', None)
-        self.statement_timeout = configuration.pop('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)
         self.configuration = configuration
         self.conn = None
         self.server_version = None
@@ -821,7 +820,8 @@ class Service(SimpleService):
             'user': conf.get('user', DEFAULT_USER),
             'password': conf.get('password'),
             'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
-            'options': '-c statement_timeout={0}'.format(self.statement_timeout),
+            'options': '-c statement_timeout={0}'.format(
+                conf.get('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)),
         }
 
         try:
