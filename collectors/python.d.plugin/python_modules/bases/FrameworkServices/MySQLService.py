@@ -52,6 +52,7 @@ class MySQLService(SimpleService):
                 properties['port'] = int(conf.get('port', 3306))
             elif conf.get('my.cnf'):
                 if MySQLdb.__name__ == 'pymysql':
+                    # TODO: this is probablt wrong, it depends on version
                     self.error('"my.cnf" parsing is not working for pymysql')
                 else:
                     properties['read_default_file'] = conf['my.cnf']
