@@ -18,23 +18,22 @@ ORDER = [
 ]
 
 CHARTS = {
-        'time_until_expiration': {
-            'options': [
-                None,
-                'Time Until Certificate Expiration',
-                'seconds',
-                'certificate expiration',
-                'sslcheck.time_until_expiration',
-                'line',
-            ],
-            'lines': [
-                ['time'],
-            ],
-            'variables': [
-                ['days_until_expiration_warning'],
-            ],
-
-        },
+    'time_until_expiration': {
+        'options': [
+            None,
+            'Time Until Certificate Expiration',
+            'seconds',
+            'certificate expiration time',
+            'sslcheck.time_until_expiration',
+            'line',
+        ],
+        'lines': [
+            ['time'],
+        ],
+        'variables': [
+            ['days_until_expiration_warning'],
+        ],
+    },
 }
 
 
