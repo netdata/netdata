@@ -44,6 +44,7 @@ class MySQLService(SimpleService):
                 properties['user'] = conf['user']
             if conf.get('pass'):
                 properties['passwd'] = conf['pass']
+
             if conf.get('socket'):
                 properties['unix_socket'] = conf['socket']
             elif conf.get('host'):
@@ -54,6 +55,10 @@ class MySQLService(SimpleService):
                     self.error('"my.cnf" parsing is not working for pymysql')
                 else:
                     properties['read_default_file'] = conf['my.cnf']
+
+            if conf.get('ssl'):
+                properties['ssl'] = conf['ssl']
+
             if isinstance(extra_conf, dict) and extra_conf:
                 properties.update(extra_conf)
 
