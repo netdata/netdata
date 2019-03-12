@@ -26,7 +26,11 @@ CHARTS = {
             ],
             'lines': [
                 ['time'],
-            ]
+            ],
+            'variables': [
+                ['days_until_expiration_warning'],
+            ],
+
         },
 }
 
@@ -42,6 +46,7 @@ class Service(SimpleService):
         self.host = configuration.get('host')
         self.port = configuration.get('port', 443)
         self.timeout = configuration.get('timeout', 3)
+        self.days_warn = configuration.get('days_until_expiration_warning', 5)
 
     def check(self):
         if not self.host:
@@ -73,7 +78,8 @@ class Service(SimpleService):
             return None
 
         return {
-            'time': calc_cert_expiration_time(peer_cert).seconds
+            'time': cert_expiration_seconds(peer_cert),
+            'days_until_expiration_warning': self.days_warn,
         }
 
 
@@ -88,8 +94,9 @@ def create_ssl_conn(hostname, timeout):
     return conn
 
 
-def calc_cert_expiration_time(cert):
+def cert_expiration_seconds(cert):
     expiration_date = datetime.datetime.strptime(cert['notAfter'], SSL_DATE_FMT)
     current_date = datetime.datetime.utcnow()
+    delta = expiration_date - current_date
 
-    return expiration_date - current_date
+    return ((delta.days * 86400 + delta.seconds) * 10 ** 6 + delta.microseconds) / 10 ** 6
