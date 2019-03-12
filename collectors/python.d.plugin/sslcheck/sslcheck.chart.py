@@ -49,7 +49,7 @@ class Service(SimpleService):
         self.host = configuration.get('host')
         self.port = configuration.get('port', 443)
         self.timeout = configuration.get('timeout', 3)
-        self.days_warn = configuration.get('days_until_expiration_warning', 30)
+        self.days_warn = configuration.get('days_until_expiration_warning', 14)
         self.days_crit = configuration.get('days_until_expiration_critical', 7)
 
     def check(self):

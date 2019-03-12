@@ -13,7 +13,6 @@ update_every : 60
 
 example_org:
   host: 'example.org'
-  days_until_expiration_warning: 15
 
 my_site_org:
   host: 'my-site.org'
