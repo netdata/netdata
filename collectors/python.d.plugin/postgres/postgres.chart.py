@@ -824,7 +824,6 @@ class Service(SimpleService):
                 'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
                 'options': '-c statement_timeout={0}'.format(self.statement_timeout),
             }
-            params.update(self.configuration)
 
             self.conn = psycopg2.connect(**params)
             self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
