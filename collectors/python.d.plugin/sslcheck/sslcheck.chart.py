@@ -10,76 +10,86 @@ import ssl
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
-DAYS_UNTIL_EXPIRATION = 'daysuntilexpiration'
-
-ORDER = ['daysuntilexpiration']
+ORDER = [
+    'time_until_expiration',
+]
 
 CHARTS = {
-    'daysuntilexpiration': {
-        'options': [None, 'days until certificate expiration', 'days', 'days until expiration', 'sslcheck.daysuntilexpiration', 'line'],
-        'lines': [
-            [DAYS_UNTIL_EXPIRATION, 'days until expiration', 'absolute', 10, 0]
-        ]
-    }
+        'time_until_expiration': {
+            'options': [
+                None,
+                'Time Until Certificate Expiration',
+                'seconds',
+                'certificate expiration',
+                'sslcheck.time_until_expiration',
+                'line',
+            ],
+            'lines': [
+                ['time'],
+            ]
+        },
 }
 
 
-# Not deriving from SocketService, too much is different
+SSL_DATE_FMT = r'%b %d %H:%M:%S %Y %Z'
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.host = self.configuration.get('host')
-        self.port = self.configuration.get('port')
-        self.timeout = self.configuration.get('timeout', 3)
+        self.host = configuration.get('host')
+        self.port = configuration.get('port', 443)
+        self.timeout = configuration.get('timeout', 3)
 
     def check(self):
-        """
-        Parse configuration, check if configuration is available, and dynamically create chart lines data
-        :return: boolean
-        """
-        if self.host is None or self.port is None:
-            self.error('Host or port missing')
-            return False
-        if not isinstance(self.port, int):
-            self.error('"port" is not an integer. Specify a numerical value, not service name.')
+        if not self.host:
+            self.error('host parameter is mandatory, but it is not set')
             return False
 
-        self.debug('Enabled sslcheck: {host}:{port}, update every {update}s, timeout: {timeout}s'.format(
-            host=self.host, port=self.port, update=self.update_every, timeout=self.timeout
-        ))
-        # We will accept any (valid-ish) configuration, even if initial connection fails (a service
-        # might be down from the beginning)
+        self.debug('run check : host {host}:{port}, update every {update}s, timeout {timeout}s'.format(
+            host=self.host, port=self.port, update=self.update_every, timeout=self.timeout))
+
         return True
 
-    def _get_data(self):
-        """
-        Get number of days until the certificate for the configured hostname expires
-        :return: dict
-        """
-        data = dict()
-        data[DAYS_UNTIL_EXPIRATION] = self.ssl_valid_time_remaining(self.host, self.port)
+    def get_data(self):
+        conn = create_ssl_conn(self.host, self.timeout)
 
-        return data
+        try:
+            conn.connect((self.host, self.port))
+        except Exception as error:
+            self.error("error on connection to {0}:{1} : {2}".format(self.host, self.port, error))
+            return None
 
-    def ssl_expiry_datetime(self, hostname, port):
-        ssl_date_fmt = r'%b %d %H:%M:%S %Y %Z'
+        peer_cert = conn.getpeercert()
+        conn.close()
 
-        context = ssl.create_default_context()
-        conn = context.wrap_socket(
-            socket.socket(socket.AF_INET),
-            server_hostname=hostname,
-        )
+        if peer_cert is None:
+            self.warning("no certificate was provided by {0}:{1}".format(self.host, self.port))
+            return None
+        elif not peer_cert:
+            self.warning("certificate was provided by {0}:{1}, but not validated".format(self.host, self.port))
+            return None
 
-        conn.settimeout(self.timeout)
+        return {
+            'time': calc_cert_expiration_time(peer_cert).seconds
+        }
 
-        conn.connect((hostname, port))
-        ssl_info = conn.getpeercert()
-        # parse the string from the certificate into a Python datetime object
-        return datetime.datetime.strptime(ssl_info['notAfter'], ssl_date_fmt)
 
-    def ssl_valid_time_remaining(self, hostname, port):
-        """Get the number of days left in a cert's lifetime."""
-        expires = self.ssl_expiry_datetime(hostname, port)
-        return (expires - datetime.datetime.utcnow()).days
+def create_ssl_conn(hostname, timeout):
+    context = ssl.create_default_context()
+    conn = context.wrap_socket(
+        socket.socket(socket.AF_INET),
+        server_hostname=hostname,
+    )
+    conn.settimeout(timeout)
+
+    return conn
+
+
+def calc_cert_expiration_time(cert):
+    expiration_date = datetime.datetime.strptime(cert['notAfter'], SSL_DATE_FMT)
+    current_date = datetime.datetime.utcnow()
+
+    return expiration_date - current_date
