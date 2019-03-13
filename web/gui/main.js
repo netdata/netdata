@@ -4772,7 +4772,7 @@ function clearCloudLocalStorageItems() {
 }
 
 function signIn() {
-    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&origin=${encodeURIComponent(window.location.origin + "/")}`;
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`;
     window.open(url);
 }
 
