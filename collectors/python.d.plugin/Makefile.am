@@ -96,7 +96,6 @@ include smartd_log/Makefile.inc
 include spigotmc/Makefile.inc
 include springboot/Makefile.inc
 include squid/Makefile.inc
-include sslcheck/Makefile.inc
 include tomcat/Makefile.inc
 include tor/Makefile.inc
 include traefik/Makefile.inc
