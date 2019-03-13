@@ -11,10 +11,10 @@ backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
 backends/json/ @ktsaou @vlvkobal
 backends/opentsdb/ @ktsaou @vlvkobal
-backends/prometheus/ @ktsaou @vlvkobal @paulfantom
-build/ @paulfantom @cakrit
+backends/prometheus/ @ktsaou @vlvkobal @paulkatsoulakis
+build/ @paulkatsoulakis @cakrit
 collectors/ @ktsaou @vlvkobal @cakrit
-collectors/charts.d.plugin/ @ktsaou @paulfantom @cakrit
+collectors/charts.d.plugin/ @ktsaou @paulkatsoulakis @cakrit
 collectors/freebsd.plugin/ @vlvkobal @cakrit
 collectors/macos.plugin/ @vlvkobal @cakrit
 collectors/node.d.plugin/ @ktsaou @gmosx @cakrit
@@ -29,9 +29,9 @@ health/ @ktsaou @cakrit
 health/health.d/ @ktsaou @cakrit
 health/notifications/ @ktsaou @Ferroin @cakrit
 libnetdata/ @ktsaou @cakrit
-packaging/ @paulfantom @cakrit
-packaging/installer/ @ktsaou @paulfantom @cakrit
-packaging/makeself/ @ktsaou @paulfantom @cakrit
+packaging/ @paulkatsoulakis @cakrit
+packaging/installer/ @ktsaou @paulkatsoulakis @cakrit
+packaging/makeself/ @ktsaou @paulkatsoulakis @cakrit
 registry/ @ktsaou @gmosx @cakrit
 streaming/ @ktsaou @mfundul
 web/ @ktsaou @cakrit
@@ -39,19 +39,19 @@ web/gui/ @ktsaou @gmosx @cakrit
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @ktsaou @cakrit
-*.am @paulfantom @ktsaou
+*.am @paulkatsoulakis @ktsaou
 
 # Ownership of specific files
-.gitignore @paulfantom @cakrit
-.travis.yml @paulfantom
-.lgtm.yml @paulfantom
-.eslintrc @paulfantom
-.eslintignore @paulfantom
-.csslintrc @paulfantom
-.codeclimate.yml @paulfantom
-.codacy.yml @paulfantom
-netdata.spec.in @paulfantom
-netdata-installer.sh @ktsaou @paulfantom @cakrit
+.gitignore @paulkatsoulakis @cakrit
+.travis.yml @paulkatsoulakis
+.lgtm.yml @paulkatsoulakis
+.eslintrc @paulkatsoulakis
+.eslintignore @paulkatsoulakis
+.csslintrc @paulkatsoulakis
+.codeclimate.yml @paulkatsoulakis
+.codacy.yml @paulkatsoulakis
+netdata.spec.in @paulkatsoulakis
+netdata-installer.sh @ktsaou @paulkatsoulakis @cakrit
 netlify.toml @cakrit
 package.json @gmosx
 packaging/version @netdatabot

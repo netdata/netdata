@@ -32,7 +32,7 @@ jobs:
     if: type = cron
 
   - stage: build
-# TODO(paulfantom): enable when travis OSX become stable. Probably after 12.01.2019
+# TODO: enable when travis OSX become stable. Probably after 12.01.2019
 #    name: OSX
 #    install: brew install fakeroot ossp-uuid
 #    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
