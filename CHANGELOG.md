@@ -4,10 +4,15 @@
 
 **Fixed bugs:**
 
+- ssl\_check memory leak [\#5624](https://github.com/netdata/netdata/issues/5624)
+- postgresql : invalid connection option "autodetection\_retry" [\#5615](https://github.com/netdata/netdata/issues/5615)
+- Proxmox containers no longer being renamed [\#5606](https://github.com/netdata/netdata/issues/5606)
 - spigotmc py2 : load source error : 'module' object has no attribute 'A' [\#5595](https://github.com/netdata/netdata/issues/5595)
 - swap chart should use stack mode instead of area mode [\#5567](https://github.com/netdata/netdata/issues/5567)
+- streaming master is incorrectly detected \(home icon of streamed hosts\) [\#5560](https://github.com/netdata/netdata/issues/5560)
 - netdata segfault since 1.12.1 [\#5553](https://github.com/netdata/netdata/issues/5553)
 - Alert if process isn't alive [\#5547](https://github.com/netdata/netdata/issues/5547)
+- Sign-in to netdata.cloud fails with "file does not exist" [\#5542](https://github.com/netdata/netdata/issues/5542)
 - sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
 - RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
 - Reliability of Prometheus exposed metrics names [\#5527](https://github.com/netdata/netdata/issues/5527)
@@ -16,12 +21,17 @@
 - Docker containers resources missing unless a netdata full restart executed [\#5512](https://github.com/netdata/netdata/issues/5512)
 - Problem loading module sensors [\#5490](https://github.com/netdata/netdata/issues/5490)
 - Need more graceful handling of duplicate machine GUIDs [\#5488](https://github.com/netdata/netdata/issues/5488)
+- Used ram for container shows incorrectly [\#5477](https://github.com/netdata/netdata/issues/5477)
 - SpigotMC Chart won't show [\#4131](https://github.com/netdata/netdata/issues/4131)
 - Memory leak in python.d.plugin [\#3817](https://github.com/netdata/netdata/issues/3817)
 
 **Closed issues:**
 
+- Support connect to mysql via SSL [\#5608](https://github.com/netdata/netdata/issues/5608)
+- Document how to install netdata on kubernetes [\#5526](https://github.com/netdata/netdata/issues/5526)
 - descrease python.d.plugin memory usage [\#5525](https://github.com/netdata/netdata/issues/5525)
+- google is blocked. [\#5410](https://github.com/netdata/netdata/issues/5410)
+- Kubernetes pod/containers monitoring [\#5387](https://github.com/netdata/netdata/issues/5387)
 - Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
 - Move to CMake [\#4610](https://github.com/netdata/netdata/issues/4610)
 - Modularize installer script [\#4609](https://github.com/netdata/netdata/issues/4609)
@@ -30,11 +40,21 @@
 
 **Merged pull requests:**
 
+- Add link to k8s helm chart in installation [\#5627](https://github.com/netdata/netdata/pull/5627) ([cakrit](https://github.com/cakrit))
+- Remove ssl check module [\#5626](https://github.com/netdata/netdata/pull/5626) ([ilyam8](https://github.com/ilyam8))
+- Fix Postgres connect, incorrect port value [\#5618](https://github.com/netdata/netdata/pull/5618) ([Jaxmetalmax](https://github.com/Jaxmetalmax))
+- postgres connect fix [\#5617](https://github.com/netdata/netdata/pull/5617) ([ilyam8](https://github.com/ilyam8))
+- Fix a bug in cgroups renaming [\#5612](https://github.com/netdata/netdata/pull/5612) ([vlvkobal](https://github.com/vlvkobal))
+- mysql module add ssl connection support [\#5610](https://github.com/netdata/netdata/pull/5610) ([ilyam8](https://github.com/ilyam8))
+- Fix memory leaks [\#5604](https://github.com/netdata/netdata/pull/5604) ([vlvkobal](https://github.com/vlvkobal))
 - python loaders cleanup [\#5602](https://github.com/netdata/netdata/pull/5602) ([ilyam8](https://github.com/ilyam8))
 - Update custom dashboards documentation [\#5600](https://github.com/netdata/netdata/pull/5600) ([cakrit](https://github.com/cakrit))
 - spigotmc fix UnicodeDecodeError [\#5598](https://github.com/netdata/netdata/pull/5598) ([ilyam8](https://github.com/ilyam8))
 - SimpleService cleanup: do not inherit from OldVersionCompatibility [\#5594](https://github.com/netdata/netdata/pull/5594) ([ilyam8](https://github.com/ilyam8))
 - spigotmc: py2 compatibility fix [\#5593](https://github.com/netdata/netdata/pull/5593) ([ilyam8](https://github.com/ilyam8))
+- Use total\_\* memory counters for cgroups [\#5592](https://github.com/netdata/netdata/pull/5592) ([vlvkobal](https://github.com/vlvkobal))
+- remove paulfantom code ownership and TODO notices [\#5579](https://github.com/netdata/netdata/pull/5579) ([paulfantom](https://github.com/paulfantom))
+- When running from within a k8s pod, use the k8s API to get the cgroup name  [\#5576](https://github.com/netdata/netdata/pull/5576) ([cakrit](https://github.com/cakrit))
 - Wait for logs to be opened before calling anonymous statistics [\#5573](https://github.com/netdata/netdata/pull/5573) ([cakrit](https://github.com/cakrit))
 - Fix nonobsolete dimension deletion [\#5563](https://github.com/netdata/netdata/pull/5563) ([vlvkobal](https://github.com/vlvkobal))
 - Fix incorrect icon for streaming master \#5560 [\#5561](https://github.com/netdata/netdata/pull/5561) ([gmosx](https://github.com/gmosx))
@@ -55,6 +75,7 @@
 - Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Convert SpigotMC module to use regexes for parsing. [\#5507](https://github.com/netdata/netdata/pull/5507) ([Ferroin](https://github.com/Ferroin))
 - Add zero minimum in linux power supply module [\#5395](https://github.com/netdata/netdata/pull/5395) ([vlvkobal](https://github.com/vlvkobal))
+- sslcheck module: \(remote\) SSL certificate expiry time check [\#5365](https://github.com/netdata/netdata/pull/5365) ([p-thurner](https://github.com/p-thurner))
 
 ## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
 
