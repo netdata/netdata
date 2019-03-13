@@ -16,6 +16,7 @@ The best way to install Netdata is directly from source. Our **automatic install
 6. [Install on pfSense](#pfsense)
 7. [Enable on FreeNAS Corral](#freenas)
 8. [Install on macOS (OS X)](#macos)
+9. [Install on a Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 
 See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
