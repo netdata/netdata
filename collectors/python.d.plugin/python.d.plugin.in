@@ -99,12 +99,13 @@ MODULE_SUFFIX = '.chart.py'
 
 OBSOLETED_MODULES = (
     'apache_cache',        # replaced by web_log
-    'gunicorn_log',        # replaced by web_log
-    'nginx_log',           # replaced by web_log
-    'cpufreq',             # rewritten in C
     'cpuidle',             # rewritten in C
-    'mdstat',              # rewritten in C
+    'cpufreq',             # rewritten in C
+    'gunicorn_log',        # replaced by web_log
     'linux_power_supply',  # rewritten in C
+    'nginx_log',           # replaced by web_log
+    'mdstat',              # rewritten in C
+    'sslcheck',            # memory leak bug https://github.com/netdata/netdata/issues/5624
 )
 
 
