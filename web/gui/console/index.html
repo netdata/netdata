@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Netdata Console</title>
+    <meta name="application-name" content="netdata">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/console/main.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+
+<body class="mdc-theme--background mdc-typography">
+    <main 
+        id="app" 
+        class="console-app"
+        data-host="agent"
+        data-api-base-url="http://localhost:8080"
+    >
+    </main>
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    <script src="/console/main.bundle.js"></script>
+    <script type="text/javascript" src="https://my-netdata.io/dashboard.js?v=2"></script>
+</body>
+
+</html>
