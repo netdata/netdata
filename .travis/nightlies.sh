@@ -1,6 +1,7 @@
 #!/bin/bash
 
-BAD_THING_HAPPENED=0
+set -e
+CHANGELOG_GENERATION=0
 
 if [ ! -f .gitignore ]; then
 	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
@@ -21,25 +22,21 @@ if [ "$NO_COMMITS" == "$(rev <packaging/version | cut -d- -f 2 | rev)" ]; then
 	exit 0
 fi
 echo "$LAST_TAG-$((NO_COMMITS + 1))-nightly" >packaging/version
-git add packaging/version || exit 1
+git add packaging/version
 
 echo "--- GENERATE CHANGELOG ---"
-if .travis/generate_changelog.sh; then
-	git add CHANGELOG.md
+.travis/generate_changelog.sh || CHANGELOG_GENERATION=128
+git add CHANGELOG.md || CHANGELOG_GENERATION=128
 
-	echo "--- UPLOAD FILE CHANGES ---"
-	git commit -m '[ci skip] create nightly packages and update changelog'
-	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
-else
-	git clean -xfd
-	BAD_THING_HAPPENED=1
-fi
+echo "--- UPLOAD FILE CHANGES ---"
+git commit -m '[ci skip] create nightly packages and update changelog'
+git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 
 echo "--- BUILD & PUBLISH DOCKER IMAGES ---"
 export REPOSITORY="netdata/netdata"
-packaging/docker/build.sh || BAD_THING_HAPPENED=1
+packaging/docker/build.sh
 
 echo "--- BUILD ARTIFACTS ---"
-.travis/create_artifacts.sh || BAD_THING_HAPPENED=1
+.travis/create_artifacts.sh
 
-exit "${BAD_THING_HAPPENED}"
+exit "${CHANGELOG_GENERATION}"

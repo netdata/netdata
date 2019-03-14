@@ -58,7 +58,9 @@ jobs:
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
     before_script: sudo pip install git-semver
-    script: ".travis/releaser.sh && .travis/labeler.sh" # labeler should be replaced with GitHub Actions when they hit GA
+    script: 
+    - .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
+    - .travis/releaser.sh
     git:
       depth: false
 
