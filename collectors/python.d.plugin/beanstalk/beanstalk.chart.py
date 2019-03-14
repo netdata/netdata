@@ -10,7 +10,7 @@ except ImportError:
     BEANSTALKC = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
-from bases.loaders import safe_load
+from bases.loaders import load_yaml
 
 
 ORDER = [
@@ -233,7 +233,7 @@ class Service(SimpleService):
             return beanstalkc.Connection(host=host,
                                          port=port,
                                          connect_timeout=timeout,
-                                         parse_yaml=safe_load)
+                                         parse_yaml=load_yaml)
         except beanstalkc.SocketError as error:
             self.error('Connection to {0}:{1} failed: {2}'.format(host, port, error))
             return None
