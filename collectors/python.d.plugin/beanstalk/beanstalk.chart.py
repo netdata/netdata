@@ -10,7 +10,7 @@ except ImportError:
     BEANSTALKC = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
-from bases.loaders import safe_load
+from bases.loaders import load_yaml
 
 
 ORDER = [
