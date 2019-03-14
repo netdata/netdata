@@ -147,6 +147,16 @@ not just visualize metrics.
 
 ## News  
 
+`Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)** 
+
+Release 1.13.0 contains 14 bug fixes and 8 improvements.
+
+netdata has taken the first step into the world of Kubernetes, with a beta version of a [Helm chart](https://github.com/netdata/helmchart) for deployment to a k8s cluster and [proper naming](https://github.com/netdata/netdata/pull/5576) of the cgroup containers. We have [big plans](https://github.com/netdata/netdata/issues/5392) for Kubernetes, so stay tuned!
+
+A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/pull/5552) has resulted in a dramatic decrease of the required memory, making netdata even more resource efficient.
+
+We also added charts for IPC shared memory segments and total memory used.
+
 `Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)** 
 
 Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
