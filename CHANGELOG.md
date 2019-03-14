@@ -1,6 +1,6 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.13.0](https://github.com/netdata/netdata/tree/v1.13.0) (2019-03-14)
 
 **Fixed bugs:**
 
@@ -12,7 +12,6 @@
 - streaming master is incorrectly detected \(home icon of streamed hosts\) [\#5560](https://github.com/netdata/netdata/issues/5560)
 - netdata segfault since 1.12.1 [\#5553](https://github.com/netdata/netdata/issues/5553)
 - Alert if process isn't alive [\#5547](https://github.com/netdata/netdata/issues/5547)
-- Sign-in to netdata.cloud fails with "file does not exist" [\#5542](https://github.com/netdata/netdata/issues/5542)
 - sha256sum: go.d.plugin-v0.1.0.linux-arm64: No such file or directory [\#5538](https://github.com/netdata/netdata/issues/5538)
 - RESOLVED - NS\_ERROR\_FILE\_CORRUPTED:  [\#5535](https://github.com/netdata/netdata/issues/5535)
 - Reliability of Prometheus exposed metrics names [\#5527](https://github.com/netdata/netdata/issues/5527)
@@ -27,9 +26,11 @@
 
 **Closed issues:**
 
+- ssl check module [\#5631](https://github.com/netdata/netdata/issues/5631)
 - Support connect to mysql via SSL [\#5608](https://github.com/netdata/netdata/issues/5608)
 - Document how to install netdata on kubernetes [\#5526](https://github.com/netdata/netdata/issues/5526)
 - descrease python.d.plugin memory usage [\#5525](https://github.com/netdata/netdata/issues/5525)
+- Per User statistics from apps.plugin disappear / stopped working [\#5517](https://github.com/netdata/netdata/issues/5517)
 - google is blocked. [\#5410](https://github.com/netdata/netdata/issues/5410)
 - Kubernetes pod/containers monitoring [\#5387](https://github.com/netdata/netdata/issues/5387)
 - Configuration translator [\#5144](https://github.com/netdata/netdata/issues/5144)
@@ -40,6 +41,8 @@
 
 **Merged pull requests:**
 
+- installer: include go.d.plugin version v0.2.0 [\#5638](https://github.com/netdata/netdata/pull/5638) ([paulfantom](https://github.com/paulfantom))
+- Beanstalk fix [\#5633](https://github.com/netdata/netdata/pull/5633) ([ilyam8](https://github.com/ilyam8))
 - Add link to k8s helm chart in installation [\#5627](https://github.com/netdata/netdata/pull/5627) ([cakrit](https://github.com/cakrit))
 - Remove ssl check module [\#5626](https://github.com/netdata/netdata/pull/5626) ([ilyam8](https://github.com/ilyam8))
 - Fix Postgres connect, incorrect port value [\#5618](https://github.com/netdata/netdata/pull/5618) ([Jaxmetalmax](https://github.com/Jaxmetalmax))
