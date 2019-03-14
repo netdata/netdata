@@ -233,7 +233,7 @@ class Service(SimpleService):
             return beanstalkc.Connection(host=host,
                                          port=port,
                                          connect_timeout=timeout,
-                                         parse_yaml=safe_load)
+                                         parse_yaml=load_yaml)
         except beanstalkc.SocketError as error:
             self.error('Connection to {0}:{1} failed: {2}'.format(host, port, error))
             return None
