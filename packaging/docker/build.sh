@@ -29,7 +29,7 @@ if [ "${VERSION}" == "" ]; then
 fi
 
 # If we are not in netdata git repo, at the top level directory, fail
-GIT_TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
+TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 CWD=$(git rev-parse --show-cdup)
 if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     echo "Run as ./packaging/docker/$(basename "$0") from top level directory of netdata git repository"
