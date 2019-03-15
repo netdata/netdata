@@ -13,7 +13,7 @@ VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 declare -A ARCH_MAP
-ARCH_MAP=( ["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
+ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 ARCHS="${!ARCH_MAP[@]}"
 DOCKER_CMD="docker --config ${WORKDIR}"
@@ -37,9 +37,11 @@ if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
     exit 1
 fi
 
-# TODO: Need a more stable way to find where to run from.
-if [ ! -f .gitignore ]; then
-    echo "Run as ./packaging/docker/$(basename "$0") from top level directory of git repository"
+# If we are not in netdata git repo, at the top level directory, fail
+GIT_TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
+CWD=$(git rev-parse --show-cdup)
+if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
+    echo "Run as ./packaging/docker/$(basename "$0") from top level directory of netdata git repository"
     echo "Docker build process aborted"
     exit 1
 fi
