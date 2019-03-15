@@ -1242,7 +1242,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "by <${goto_url}|${host}>",
+                    "footer": "by ${host}",
                     "ts": ${when}
                 }
             ]
@@ -1756,7 +1756,7 @@ fi
 if [ ${GOTOCLOUD} -eq 0 ]; then
 	goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
-	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+	goto_url="http://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
 fi
 
 # the severity of the alarm
