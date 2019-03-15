@@ -83,7 +83,7 @@ run() {
 
 	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
 
-	"${@}"
+	${@}
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
