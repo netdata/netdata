@@ -8,7 +8,7 @@
 
 set -e
 
-WORKDIR="/tmp/docker" # Temporary folder, removed after script is done
+WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
@@ -53,7 +53,6 @@ echo "Architectures : ${ARCHS}"
 echo "Manifest list : ${MANIFEST_LIST}"
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
-mkdir -p "${WORKDIR}"
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
 # Login to docker hub to allow futher operations
