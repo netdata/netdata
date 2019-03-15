@@ -70,10 +70,10 @@ wait
 
 # Recreate docker manifest list
 $DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" \
-                                                     "${MANIFEST_LIST}-i386" \
-                                                     "${MANIFEST_LIST}-armhf" \
-                                                     "${MANIFEST_LIST}-aarch64" \
-                                                     "${MANIFEST_LIST}-amd64"
+                                    "${MANIFEST_LIST}-i386" \
+                                    "${MANIFEST_LIST}-armhf" \
+                                    "${MANIFEST_LIST}-aarch64" \
+                                    "${MANIFEST_LIST}-amd64"
 
 # Annotate manifest with CPU architecture information
 for ARCH in ${ARCHS[@]}; do
