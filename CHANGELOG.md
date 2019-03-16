@@ -1,5 +1,20 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
+
+**Closed issues:**
+
+- netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
+
+**Merged pull requests:**
+
+- x509check alarm fix [\#5645](https://github.com/netdata/netdata/pull/5645) ([ilyam8](https://github.com/ilyam8))
+- fix command not found error when run script under root user. [\#5581](https://github.com/netdata/netdata/pull/5581) ([vinsia](https://github.com/vinsia))
+
 ## [v1.13.0](https://github.com/netdata/netdata/tree/v1.13.0) (2019-03-14)
 
 **Fixed bugs:**
