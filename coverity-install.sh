@@ -30,3 +30,4 @@ export PATH=${PATH}:/opt/coverity/bin/
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 
 echo >&2 "Coverity scan installed!"
+rm -r "${WORKDIR}"
