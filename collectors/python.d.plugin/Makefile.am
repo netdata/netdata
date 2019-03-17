@@ -45,7 +45,6 @@ include ceph/Makefile.inc
 include chrony/Makefile.inc
 include couchdb/Makefile.inc
 include cpufreq/Makefile.inc
-include cpuidle/Makefile.inc
 include dnsdist/Makefile.inc
 include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc
