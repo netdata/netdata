@@ -60,7 +60,6 @@ include httpcheck/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
 include isc_dhcpd/Makefile.inc
-include linux_power_supply/Makefile.inc
 include litespeed/Makefile.inc
 include logind/Makefile.inc
 include megacli/Makefile.inc
