@@ -63,7 +63,6 @@ include isc_dhcpd/Makefile.inc
 include linux_power_supply/Makefile.inc
 include litespeed/Makefile.inc
 include logind/Makefile.inc
-include mdstat/Makefile.inc
 include megacli/Makefile.inc
 include memcached/Makefile.inc
 include mongodb/Makefile.inc
