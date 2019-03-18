@@ -1242,7 +1242,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "by <${goto_url}|${host}>",
+                    "footer": "by ${host}",
                     "ts": ${when}
                 }
             ]
