@@ -226,6 +226,7 @@ navpart 3 collectors/cups.plugin
 navpart 3 collectors/fping.plugin
 navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
+navpart 3 collectors/xenstat.plugin
 
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'

@@ -41,7 +41,6 @@ AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
-
 # -----------------------------------------------------------------------------
 # configurable options
 
@@ -57,12 +56,18 @@ AC_ARG_ENABLE(
     ,
     [enable_plugin_freeipmi="detect"]
 )
- AC_ARG_ENABLE(
+AC_ARG_ENABLE(
     [plugin-cups],
     [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
     ,
     [enable_plugin_cups="detect"]
-  )
+)
+AC_ARG_ENABLE(
+    [plugin-xenstat],
+    [AS_HELP_STRING([--enable-plugin-xenstat], [enable xenstat plugin @<:@default autodetect@:>@])],
+    ,
+    [enable_plugin_xenstat="detect"]
+)
 
 AC_ARG_ENABLE(
     [pedantic],
@@ -407,10 +412,10 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 
 
 # -----------------------------------------------------------------------------
-# cups.plugin - libmnl, libnetfilter_acct
+# cups.plugin - libcups
 
 # Only check most recently added method of cups
- AC_CHECK_LIB([cups], [httpConnect2],
+AC_CHECK_LIB([cups], [httpConnect2],
     [AC_CHECK_HEADER(
         [cups/cups.h],
         [have_cups=yes],
@@ -463,11 +468,11 @@ PKG_CHECK_MODULES(
     [NFACCT],
     [libnetfilter_acct],
     [AC_CHECK_LIB(
-         [netfilter_acct],
-         [nfacct_alloc],
-         [have_libnetfilter_acct=yes],
-         [have_libnetfilter_acct=no]
-     )],
+        [netfilter_acct],
+        [nfacct_alloc],
+        [have_libnetfilter_acct=yes],
+        [have_libnetfilter_acct=no]
+    )],
     [have_libnetfilter_acct=no]
 )
 
@@ -475,11 +480,11 @@ PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
     [AC_CHECK_LIB(
-         [mnl],
-         [mnl_socket_open],
-         [have_libmnl=yes],
-         [have_libmnl=no]
-     )],
+        [mnl],
+        [mnl_socket_open],
+        [have_libmnl=yes],
+        [have_libmnl=no]
+    )],
     [have_libmnl=no]
 )
 
@@ -501,6 +506,53 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_nfacct}])
 AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# xenstat.plugin - libxenstat
+
+PKG_CHECK_MODULES(
+    [YAJL],
+    [yajl],
+    [AC_CHECK_LIB(
+        [yajl],
+        [yajl_tree_get],
+        [have_libyajl=yes],
+        [have_libyajl=no]
+    )],
+    [have_libyajl=no]
+)
+
+AC_CHECK_LIB(
+    [xenstat],
+    [xenstat_init],
+    [AC_CHECK_HEADER(
+        [xenstat.h],
+        [have_libxenstat=yes],
+        [have_libxenstat=no]
+    )],
+    [have_libxenstat=no],
+    [-lyajl]
+)
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenstat}" != "yes" && \
+    AC_MSG_ERROR([libxenstat required but not found])
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libyajl}" != "yes" && \
+    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl'])
+
+AC_MSG_CHECKING([if xenstat.plugin should be enabled])
+if test "${enable_plugin_xenstat}" != "no" -a "${have_libxenstat}" = "yes" -a "${have_libyajl}" = "yes"; then
+    enable_plugin_xenstat="yes"
+    AC_DEFINE([HAVE_LIBXENSTAT], [1], [libxenstat usability])
+    AC_DEFINE([HAVE_LIBYAJL], [1], [libyajl usability])
+    OPTIONAL_XENSTAT_CLFAGS="${YAJL_CFLAGS}"
+    OPTIONAL_XENSTAT_LIBS="-lxenstat ${YAJL_LIBS}"
+else
+    enable_plugin_xenstat="no"
+fi
+AC_MSG_RESULT([${enable_plugin_xenstat}])
+AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -527,7 +579,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CLFAGS}"
+    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CLFAGS} ${OPTIONAL_XENSTAT_FLAGS}"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -600,6 +652,8 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 AC_SUBST([OPTIONAL_CUPS_CFLAGS])
 AC_SUBST([OPTIONAL_CUPS_LIBS])
+AC_SUBST([OPTIONAL_XENSTAT_CFLAGS])
+AC_SUBST([OPTIONAL_XENSTAT_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -629,6 +683,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
+    collectors/xenstat.plugin/Makefile
     daemon/Makefile
     database/Makefile
     diagrams/Makefile
