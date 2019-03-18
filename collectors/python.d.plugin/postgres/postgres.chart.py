@@ -824,7 +824,7 @@ class Service(SimpleService):
                 conf.get('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)),
         }
 
-        # https://www.postgresql.org/docs/9.1/libpq-ssl.html
+        # https://www.postgresql.org/docs/current/libpq-ssl.html
         ssl_params = {
             'sslmode': conf.get('sslmode'),
             'sslrootcert': conf.get('sslrootcert'),
