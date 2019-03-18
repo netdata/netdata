@@ -824,6 +824,17 @@ class Service(SimpleService):
                 conf.get('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)),
         }
 
+        # https://www.postgresql.org/docs/9.1/libpq-ssl.html
+        ssl_params = {
+            'sslmode': conf.get('sslmode'),
+            'sslrootcert': conf.get('sslrootcert'),
+            'sslcrl': conf.get('sslcrl'),
+            'sslcert': conf.get('sslcert'),
+            'sslkey': conf.get('sslkey'),
+        }
+
+        params.update(dict((k, v) for k, v in ssl_params.items() if v))
+
         try:
             self.conn = psycopg2.connect(**params)
             self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
