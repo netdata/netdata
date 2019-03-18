@@ -8,10 +8,10 @@
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM        8702
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS     8703
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS        8704
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ    8705
 
-#define NETDATA_CHART_PRIO_XENSTAT_CHANGES          8905
-#define NETDATA_CHART_PRIO_XENSTAT_PACKETS          8906
-#define NETDATA_CHART_PRIO_XENSTAT_BYTES            8907
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU       8901
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM       8902
 
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret) {
@@ -54,14 +54,16 @@ static int netdata_update_every = 1;
 static xenstat_handle *xhandle = NULL;
 
 struct domain_metrics {
+    unsigned int id;
     char *name;
     uint32_t hash;
 
-    uint64_t pkts;
-    uint64_t bytes;
+    unsigned long long cpu_ns;
+    unsigned long long cur_mem;
+    unsigned long long max_mem;
 
-    int packets_dimension_added;
-    int bytes_dimension_added;
+    int cpu_chart_generated;
+    int mem_chart_generated;
 
     int updated;
 
@@ -129,11 +131,26 @@ static int xenstat_collect() {
     node_metrics.num_cpus = xenstat_node_num_cpus(node);
     node_metrics.node_cpu_hz = xenstat_node_cpu_hz(node);
 
+    int i;
+    for(i = 0; i < node_metrics.num_domains; i++) {
+        xenstat_domain *domain = NULL;
+        domain = xenstat_node_domain_by_index(node, i);
+
+        const char *name = xenstat_domain_name(domain);
+        uint32_t hash = simple_hash(name);
+        d = domain_metrics_get(name, hash);
+
+        d->cpu_ns = xenstat_domain_cpu_ns(domain);
+        d->cur_mem = xenstat_domain_cur_mem(domain);
+        d->max_mem = xenstat_domain_max_mem(domain);
+
+        d->updated = 1;
+    }
     return 0;
 }
 
 static void xenstat_send_node_metrics() {
-    static int mem_chart_generated = 0, tmem_chart_generated = 0, domains_chart_generated, cpus_chart_generated, cpu_freq_chart_generated;
+    static int mem_chart_generated = 0, tmem_chart_generated = 0, domains_chart_generated = 0, cpus_chart_generated = 0, cpu_freq_chart_generated = 0;
 
     if(!mem_chart_generated) {
         mem_chart_generated = 1;
@@ -209,7 +226,7 @@ static void xenstat_send_node_metrics() {
     if(!cpu_freq_chart_generated) {
         cpu_freq_chart_generated = 1;
         printf("CHART xenstat.cpu_freq '' 'CPU frequency on XenServer Node' 'MHz' 'xenstat' '' line %d %d %s\n"
-               , NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS
+               , NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
@@ -225,33 +242,49 @@ static void xenstat_send_node_metrics() {
 }
 
 static void xenstat_send_domain_metrics() {
-    static int packets_chart_generated = 0, tmem_chart_generated = 0, domains_chart_generated, cpus_chart_generated, cpu_hz_chart_generated;
 
     if(!node_metrics.domain_root) return;
     struct domain_metrics *d;
 
-    if(!packets_chart_generated) {
-        packets_chart_generated = 1;
-        printf("CHART netfilter.xenstat_packets '' 'Netfilter Accounting Packets' 'packets/s' 'xenstat' '' stacked %d %d %s\n"
-               , NETDATA_CHART_PRIO_XENSTAT_NODE_MEM
-               , netdata_update_every
-               , PLUGIN_XENSTAT_NAME
-        );
-    }
-
-    for(d = node_metrics.domain_root; d ; d = d->next) {
+    for(d = node_metrics.domain_root; d; d = d->next) {
         if(likely(d->updated)) {
-            if(unlikely(!d->packets_dimension_added)) {
-                d->packets_dimension_added = 1;
-                printf("CHART netfilter.xenstat_packets '' 'Netfilter Accounting Packets' 'packets/s'\n");
-                printf("DIMENSION %s '' incremental 1 %d\n", d->name, netdata_update_every);
+            if(!d->cpu_chart_generated) {
+                d->cpu_chart_generated = 1;
+                printf("CHART %s.xenstat_domain_cpu '' 'CPU usage for XenServer Domain' 'percentage' '' '' line %d %d %s\n"
+                       , d->name
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
+                       , netdata_update_every
+                       , PLUGIN_XENSTAT_NAME
+                );
+                printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
             }
             printf(
-                    "BEGIN netfilter.xenstat_packets\n"
-                    "SET %s = %lld\n"
+                    "BEGIN %s.xenstat_domain_cpu\n"
+                    "SET usage = %lld\n"
                     "END\n"
                     , d->name
-                    , (collected_number)d->pkts
+                    , (collected_number)d->cpu_ns
+            );
+
+            if(!d->mem_chart_generated) {
+                d->mem_chart_generated = 1;
+                printf("CHART %s.xenstat_domain_mem '' 'Memory reservation for XenServer Domain' 'MiB' '' '' line %d %d %s\n"
+                       , d->name
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM
+                       , netdata_update_every
+                       , PLUGIN_XENSTAT_NAME
+                );
+                printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+                printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+            }
+            printf(
+                    "BEGIN %s.xenstat_domain_mem\n"
+                    "SET maximum = %lld\n"
+                    "SET current = %lld\n"
+                    "END\n"
+                    , d->name
+                    , (collected_number)d->max_mem
+                    , (collected_number)d->cur_mem
             );
         }
     }
