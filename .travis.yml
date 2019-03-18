@@ -28,7 +28,7 @@ jobs:
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
-    if: type = cron
+#   if: type = cron
 
   - stage: build
 # TODO: enable when travis OSX become stable. Probably after 12.01.2019
