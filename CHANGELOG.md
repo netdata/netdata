@@ -5,13 +5,19 @@
 **Fixed bugs:**
 
 - Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
+- .opt-out-from-anonymous-statistics still leaks referrer [\#5577](https://github.com/netdata/netdata/issues/5577)
 
 **Closed issues:**
 
+- Slack footer link breaks when the URL is too long [\#5654](https://github.com/netdata/netdata/issues/5654)
 - netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
+- feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
 
 **Merged pull requests:**
 
+- Fix path to pidfile in FreeBSD rc.d file [\#5657](https://github.com/netdata/netdata/pull/5657) ([honzahommer](https://github.com/honzahommer))
+- Load gtm only if anonymous\_statistics are enabled [\#5651](https://github.com/netdata/netdata/pull/5651) ([cakrit](https://github.com/cakrit))
+- Fix slack notifications footer and set cloud redirect URL to http [\#5650](https://github.com/netdata/netdata/pull/5650) ([cakrit](https://github.com/cakrit))
 - x509check alarm fix [\#5645](https://github.com/netdata/netdata/pull/5645) ([ilyam8](https://github.com/ilyam8))
 - fix command not found error when run script under root user. [\#5581](https://github.com/netdata/netdata/pull/5581) ([vinsia](https://github.com/vinsia))
 
