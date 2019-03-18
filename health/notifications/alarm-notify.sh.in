@@ -2256,8 +2256,8 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_IRC}" \
 	"${SENT_AWSSNS}" \
 	"${SENT_SYSLOG}" \
-	"${SENT_MSTEAM}" \
-	"${SENT_SMS}"; do
+	"${SENT_SMS}" \
+	"${SENT_MSTEAM}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something
 		exit 0
