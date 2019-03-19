@@ -186,7 +186,7 @@ The key improvements are:
 
 - Improved internal database to support values above 64bit.
 - New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
-- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/python.d.plugin/cpufreq/), [`sensors`](collectors/python.d.plugin/sensors/).
+- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/proc.plugin/README.md#cpu-frequency), [`sensors`](collectors/python.d.plugin/sensors/).
 - Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
 - `my-netdata`menu has been refactored. 
 - Packaging: `openrc` service definition got a few improvements.
@@ -317,8 +317,8 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[SoftIRQs](collectors/proc.plugin/)** - total and per core SoftIRQs.
 - **[SoftNet](collectors/proc.plugin/)** - total and per core SoftIRQs related to network activity.
 - **[CPU Throttling](collectors/proc.plugin/)** - collects per core CPU throttling.
-- **[CPU Frequency](collectors/python.d.plugin/couchdb/)** - collects the current CPU frequency.
-- **[CPU Idle](collectors/python.d.plugin/cpuidle/)** - collects the time spent per processor state.
+- **[CPU Frequency](collectors/proc.plugin/)** - collects the current CPU frequency.
+- **[CPU Idle](collectors/proc.plugin/)** - collects the time spent per processor state.
 - **[IdleJitter](collectors/idlejitter.plugin/)** - measures CPU latency.
 - **[Entropy](collectors/proc.plugin/)** - random numbers pool, using in cryptography.
 - **[Interprocess Communication - IPC](collectors/proc.plugin/)** - such as semaphores and semaphores arrays.
@@ -339,7 +339,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[block devices](collectors/proc.plugin/)** - per disk: I/O, operations, backlog, utilization, space, etc.  
 - **[BCACHE](collectors/proc.plugin/)** - detailed performance of SSD caching devices.
 - **[DiskSpace](collectors/proc.plugin/)** - monitors disk space usage.
-- **[mdstat](collectors/python.d.plugin/mdstat/)** - software RAID.
+- **[mdstat](collectors/proc.plugin/)** - software RAID.
 - **[hddtemp](collectors/python.d.plugin/hddtemp/)** - disk temperatures.
 - **[smartd](collectors/python.d.plugin/smartd_log/)** - disk S.M.A.R.T. values.
 - **[device mapper](collectors/proc.plugin/)** - naming disks.
@@ -448,7 +448,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### UPSes
 - **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
+- **[Linux Power Supply](collectors/proc.plugin/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers
 - **[RetroShare](collectors/python.d.plugin/retroshare/)** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
