@@ -13,6 +13,8 @@
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU       8901
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM       8902
 
+#define TYPE_LENGTH_MAX 1024
+
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
@@ -54,6 +56,7 @@ static int netdata_update_every = 1;
 
 static xenstat_handle *xhandle = NULL;
 static libxl_ctx *ctx = NULL;
+static libxl_dominfo info;
 
 struct domain_metrics {
     char *uuid;
@@ -89,15 +92,15 @@ static struct node_metrics node_metrics = {
         .domain_root = NULL
 };
 
-static inline struct domain_metrics *domain_metrics_get(const char *name, uint32_t hash) {
+static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32_t hash) {
     struct domain_metrics *d = NULL, *last = NULL;
     for(d = node_metrics.domain_root; d ; last = d, d = d->next) {
-        if(unlikely(d->hash == hash && !strcmp(d->name, name)))
+        if(unlikely(d->hash == hash && !strcmp(d->uuid, uuid)))
             return d;
     }
 
     d = callocz(1, sizeof(struct domain_metrics));
-    d->name = strdupz(name);
+    d->uuid = strdupz(uuid);
     d->hash = hash;
 
     if(!last) {
@@ -138,12 +141,24 @@ static int xenstat_collect() {
     int i;
     for(i = 0; i < node_metrics.num_domains; i++) {
         xenstat_domain *domain = NULL;
+        char uuid[LIBXL_UUID_FMTLEN + 1];
+
         domain = xenstat_node_domain_by_index(node, i);
 
-        const char *name = xenstat_domain_name(domain);
-        uint32_t hash = simple_hash(name);
-        d = domain_metrics_get(name, hash);
+        // get domain UUID
+        unsigned id = xenstat_domain_id(domain);
+        if(libxl_domain_info(ctx, &info, id)) {
+            error("XENSTAT: cannot get domain info.");
+        }
+        else {
+            snprintfz(uuid, LIBXL_UUID_FMTLEN, LIBXL_UUID_FMT "\n", LIBXL_UUID_BYTES(info.uuid));
+        }
 
+        uint32_t hash = simple_hash(uuid);
+        d = domain_metrics_get(uuid, hash);
+
+        d->id = id;
+        d->name = xenstat_domain_name(domain);
         d->cpu_ns = xenstat_domain_cpu_ns(domain);
         d->cur_mem = xenstat_domain_cur_mem(domain);
         d->max_mem = xenstat_domain_max_mem(domain);
@@ -252,10 +267,14 @@ static void xenstat_send_domain_metrics() {
 
     for(d = node_metrics.domain_root; d; d = d->next) {
         if(likely(d->updated)) {
+            char type[TYPE_LENGTH_MAX + 1];
+
+            snprintfz(type, TYPE_LENGTH_MAX, "xendomain_%s_%s", d->name, d->uuid);
+
             if(!d->cpu_chart_generated) {
                 d->cpu_chart_generated = 1;
                 printf("CHART %s.xenstat_domain_cpu '' 'CPU usage for XenServer Domain' 'percentage' '' '' line %d %d %s\n"
-                       , d->name
+                       , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
                        , netdata_update_every
                        , PLUGIN_XENSTAT_NAME
@@ -266,14 +285,14 @@ static void xenstat_send_domain_metrics() {
                     "BEGIN %s.xenstat_domain_cpu\n"
                     "SET usage = %lld\n"
                     "END\n"
-                    , d->name
+                    , type
                     , (collected_number)d->cpu_ns
             );
 
             if(!d->mem_chart_generated) {
                 d->mem_chart_generated = 1;
                 printf("CHART %s.xenstat_domain_mem '' 'Memory reservation for XenServer Domain' 'MiB' '' '' line %d %d %s\n"
-                       , d->name
+                       , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM
                        , netdata_update_every
                        , PLUGIN_XENSTAT_NAME
@@ -286,7 +305,7 @@ static void xenstat_send_domain_metrics() {
                     "SET maximum = %lld\n"
                     "SET current = %lld\n"
                     "END\n"
-                    , d->name
+                    , type
                     , (collected_number)d->max_mem
                     , (collected_number)d->cur_mem
             );
@@ -384,6 +403,7 @@ int main(int argc, char **argv) {
     if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, NULL)) {
         error("XENSTAT: failed to initialize xl context.");
     }
+    libxl_dominfo_init(&info);
 
     // ------------------------------------------------------------------------
     // the main loop
