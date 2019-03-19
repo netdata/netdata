@@ -21,12 +21,22 @@ fi
 
 echo >&2 "Installing coverity..."
 WORKDIR="/opt/coverity-source"
+mkdir -p "${WORKDIR}"
 
 curl -SL --data "token=${token}&project=${REPOSITORY}" https://scan.coverity.com/download/linux64 > "${WORKDIR}/coverity_tool.tar.gz"
-tar -x -C "${WORKDIR}/coverity-install" -f "${WORKDIR}/coverity_tool.tar.gz"
-sudo mv "${WORKDIR}/coverity-install/cov-analysis-linux64-2017.07" /opt/coverity
-export PATH=${PATH}:/opt/coverity/bin/
+if [ -f "${WORKDIR}/coverity_tool.tar.gz" ]; then
+	tar -x -C "${WORKDIR}" -f "${WORKDIR}/coverity_tool.tar.gz"
+	sudo mv "${WORKDIR}/cov-analysis-linux64-2017.07" /opt/coverity
+	export PATH=${PATH}:/opt/coverity/bin/
+else
+	echo "Failed to download coverity tool tarball!"
+fi
 
+# Validate the installation
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
-
-echo >&2 "Coverity scan installed!"
+if [ -z "$covbuild" ]; then
+	echo "Failed to install coverity!"
+	exit 1
+else
+	echo >&2 "Coverity scan installed!"
+fi
