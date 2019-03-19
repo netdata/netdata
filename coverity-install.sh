@@ -22,7 +22,7 @@ fi
 echo >&2 "Installing coverity..."
 WORKDIR="/opt/coverity-source"
 
-curl -SL --data "token=${token}&project=netdata%2Fnetdata" https://scan.coverity.com/download/linux64 > "${WORKDIR}/coverity_tool.tar.gz"
+curl -SL --data "token=${token}&project=${REPOSITORY}" https://scan.coverity.com/download/linux64 > "${WORKDIR}/coverity_tool.tar.gz"
 tar -x -C "${WORKDIR}/coverity-install" -f "${WORKDIR}/coverity_tool.tar.gz"
 sudo mv "${WORKDIR}/coverity-install/cov-analysis-linux64-2017.07" /opt/coverity
 export PATH=${PATH}:/opt/coverity/bin/

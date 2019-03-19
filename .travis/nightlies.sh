@@ -36,7 +36,6 @@ else
 fi
 
 echo "--- BUILD & PUBLISH DOCKER IMAGES ---"
-export REPOSITORY="netdata/netdata"
 packaging/docker/build.sh || BAD_THING_HAPPENED=1
 
 echo "--- BUILD ARTIFACTS ---"
