@@ -57,4 +57,4 @@ curl --progress-bar --form token="${token}" \
   --form description="netdata, real-time performance monitoring, done right." \
   https://scan.coverity.com/builds?project=${REPOSITORY}
 
-echo >&2 "\n\nCoverity scan submitted!"
+echo -e >&2 "\n\nCoverity scan submitted!"
