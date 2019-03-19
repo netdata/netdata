@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="author" content="costa@tsaousis.gr">
 
-    <link rel="stylesheet" type="text/css" href="main.css?v=4">
+    <link rel="stylesheet" type="text/css" href="main.css?v=5">
 
     <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAA7EAAAOxAGVKw4bAAACyklEQVRYhcWXz0sUYRjHP8+wLItImEhnEfEgEVJk+56CbCECQWezOkTQTTp6kejgKUSoEAoK/wAhaaeDBkLoIahZIWIJo0U8hHQJJBYJERGfDrOju7PjuO5u6/c0PM/7zvfzvvP+eEaoVu6wBZIA3cW82wtvY7cD1xEWSTpb1bxWjm2RtbtQxoF7iLSA7gO/UL4A74G3mBIzNz0Peg1hFmUK46zXBuDaCYQJlDFE4ke/QreAZyhPMc42rt2PyEoxt4cyDUxgnO3qAVy7C8gg0hdFHwBZA0ZIOt9w7e+I9B6mdBVhmGTlbFQCuPYFhA8g56o3P3D6CwyiDCIyFshtgqRIZnKlUStg3lW7OYC0AvPATkiuA9U3uOlEOEDWTgCZ2s3LIMbCU9ID3A8HUCZO9s2jGCRxdFIflDUF/EX3I3q1N0iq+8BZf+v6MzDeFHMAEQvoJpuOAwiu3Qr89g6ZJkm5CnoHeBwDbjTV3CPoRRhF+WQBA801B+AJiAUMWMDFptuLtBef+iygs+kAh+q0gDOnCNBmETyOmywLKJyifyEG/ATqPP+LUt0FZoAlIA6MgNyKqDo2YkAO6G+QeQrjfCyJzuHaoyCvjuiVs4q0jdBMwNyTcV6j+jm0h7BkAYuohpZLJ1TUQJYrIqo7KAtW8VaabQBA1GVWmROZwzgFfwtOoRpealevdGg0a8eAoUB0D9VJ8M8A46yDTNdlL9wmaz8MMX9RrIQOpfoS4+S9br7cdAvoCiLn6wLxFtwyQhxlKMQ8j3CJpFeml+9QN90N6iLSURfEkXD8AQwms+aHyo9hk1kHSaG6+Z/MU6XmlQAeRA7EoLraQPM83si/BlPhF5E3E1dQfY5S++5Q/9dMLwdH7uv4n1PX7gEeAXejy+0y4x2QOWASk8lHNT0e4AAk3QZ6E6+E68MrZNqK2QKwgXevLCEskHSqumX/AUXU5QBtOC5FAAAAAElFTkSuQmCC">
 
@@ -163,6 +163,17 @@
         <div id="navbar-highlight-content" class="navbar-highlight-content"></div>
     </div>
 
+    <div id="sign-in-banner" style="display: none">
+        <div class="container">
+            Like what you see? 
+            <strong><a href="#" class="__link" onclick="signInDidClick(event); return false">Sign in</a> 
+            to experience the full-range of netdata capabilities!</strong>
+            <div class="__close" onclick="closeSignInBannerDidClick(event)">
+                Close <i class="fas fa-times"></i>
+            </div>
+        </div>
+    </div>
+    
     <div id="masthead" style="display: none;">
         <div class="container">
             <div class="row">

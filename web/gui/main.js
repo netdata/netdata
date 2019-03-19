@@ -4044,6 +4044,14 @@ function runOnceOnDashboardWithjQuery() {
     // ------------------------------------------------------------------------
     // sidebar / affix
 
+    if (shouldShowSignInBanner()) {
+        const el = document.getElementById("sign-in-banner");
+        if (el) {
+            el.style.display = "initial";
+            el.classList.add(`theme-${netdataTheme}`);
+        }
+    }
+
     $('#sidebar')
         .affix({
             offset: {
@@ -4685,6 +4693,26 @@ function signInDidClick(e) {
     signIn();
 }
 
+function shouldShowSignInBanner() {
+    if (isSignedIn()) {
+        return false;
+    }
+
+    return localStorage.getItem("signInBannerClosed") != "true";
+}
+
+function closeSignInBanner() {
+    localStorage.setItem("signInBannerClosed", "true");
+    const el = document.getElementById("sign-in-banner");
+    if (el) {
+        el.style.display = "none";
+    }
+}
+
+function closeSignInBannerDidClick(e) {
+    closeSignInBanner();
+}
+
 function signOutDidClick(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -4779,7 +4807,7 @@ function renderAccountUI() {
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signInDidClick(event); return false">
+            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
@@ -4802,6 +4830,7 @@ function handleMessage(e) {
 }
 
 function handleSignInMessage(e) {
+    closeSignInBanner();
     localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
 
     cloudAccountID = e.data.accountID;
