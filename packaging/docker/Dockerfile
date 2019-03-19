@@ -43,6 +43,7 @@ RUN if [ "$(uname -m)" == "x86_64" ]; then \
         apk update; \
         apk upgrade --available --no-cache; \
         sed -in 's/^#//g' /etc/apk/repositories; \
+        apk fix py2-psycopg2; \
     fi
 
 # Copy files over
