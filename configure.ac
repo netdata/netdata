@@ -535,19 +535,39 @@ AC_CHECK_LIB(
     [-lyajl]
 )
 
+PKG_CHECK_MODULES(
+    [XENLIGHT],
+    [xenlight],
+    [AC_CHECK_LIB(
+        [xenlight],
+        [libxl_domain_info],
+        [AC_CHECK_HEADER(
+            [libxl.h],
+            [have_libxenlight=yes],
+            [have_libxenlight=no]
+        )],
+        [have_libxenlight=no]
+    )],
+    [have_libxenlight=no]
+)
+
 test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenstat}" != "yes" && \
-    AC_MSG_ERROR([libxenstat required but not found])
+    AC_MSG_ERROR([libxenstat required but not found. try installing 'xen-dom0-libs-devel'])
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenlight}" != "yes" && \
+    AC_MSG_ERROR([libxenlight required but not found. try installing 'xen-dom0-libs-devel'])
 
 test "${enable_plugin_xenstat}" = "yes" -a "${have_libyajl}" != "yes" && \
-    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl'])
+    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl-devel'])
 
 AC_MSG_CHECKING([if xenstat.plugin should be enabled])
-if test "${enable_plugin_xenstat}" != "no" -a "${have_libxenstat}" = "yes" -a "${have_libyajl}" = "yes"; then
+if test "${enable_plugin_xenstat}" != "no" -a "${have_libxenstat}" = "yes" -a "${have_libxenlight}" = "yes" -a "${have_libyajl}" = "yes"; then
     enable_plugin_xenstat="yes"
     AC_DEFINE([HAVE_LIBXENSTAT], [1], [libxenstat usability])
+    AC_DEFINE([HAVE_LIBXENLIGHT], [1], [libxenlight usability])
     AC_DEFINE([HAVE_LIBYAJL], [1], [libyajl usability])
-    OPTIONAL_XENSTAT_CLFAGS="${YAJL_CFLAGS}"
-    OPTIONAL_XENSTAT_LIBS="-lxenstat ${YAJL_LIBS}"
+    OPTIONAL_XENSTAT_CLFAGS="${XENLIGHT_CFLAGS} ${YAJL_CFLAGS}"
+    OPTIONAL_XENSTAT_LIBS="-lxenstat ${XENLIGHT_LIBS} ${YAJL_LIBS}"
 else
     enable_plugin_xenstat="no"
 fi

@@ -50,13 +50,17 @@ static int netdata_update_every = 1;
 
 #ifdef HAVE_LIBXENSTAT
 #include <xenstat.h>
+#include <libxl.h>
 
 static xenstat_handle *xhandle = NULL;
+static libxl_ctx *ctx = NULL;
 
 struct domain_metrics {
+    char *uuid;
+    uint32_t hash;
+
     unsigned int id;
     char *name;
-    uint32_t hash;
 
     unsigned long long cpu_ns;
     unsigned long long cur_mem;
@@ -368,10 +372,18 @@ int main(int argc, char **argv) {
     else if(freq)
         error("update frequency %d seconds is too small for XENSTAT. Using %d.", freq, netdata_update_every);
 
+    // ------------------------------------------------------------------------
+    // initialize xen API handles
+
     if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
     xhandle = xenstat_init();
     if (xhandle == NULL)
         error("XENSTAT: failed to initialize xenstat library.");
+
+    if(debug) fprintf(stderr, "xenstat.plugin: calling libxl_ctx_alloc()\n");
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, NULL)) {
+        error("XENSTAT: failed to initialize xl context.");
+    }
 
     // ------------------------------------------------------------------------
     // the main loop
