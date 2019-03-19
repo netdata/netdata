@@ -50,11 +50,13 @@ echo >&2 "Compressing data..."
 tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 
 echo >&2 "Sending analysis for version ${version} ..."
-curl --progress-bar --form token="${token}" \
+COVERITY_SUBMIT_RESULT=$(curl --progress-bar --form token="${token}" \
   --form email=${COVERITY_SCAN_SUBMIT_MAIL} \
   --form file=@netdata-coverity-analysis.tgz \
   --form version="${version}" \
   --form description="netdata, real-time performance monitoring, done right." \
-  https://scan.coverity.com/builds?project=${REPOSITORY}
+  https://scan.coverity.com/builds?project=${REPOSITORY})
 
-echo -e >&2 "\n\nCoverity scan submitted!"
+echo ${COVERITY_SUBMIT_RESULT} | grep -q -e 'Build successfully submitted' || echo >&2 "scan results were not pushed to coverity. Message was: ${COVERITY_SUBMIT_RESULT}"
+
+echo >&2 "Coverity scan mechanism completed"
