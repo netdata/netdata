@@ -4,8 +4,10 @@
 
 **Fixed bugs:**
 
+- remove python obsolete modules [\#5647](https://github.com/netdata/netdata/issues/5647)
 - Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
 - .opt-out-from-anonymous-statistics still leaks referrer [\#5577](https://github.com/netdata/netdata/issues/5577)
+- Installer problem with config files under 'orig' symlink  [\#5039](https://github.com/netdata/netdata/issues/5039)
 
 **Closed issues:**
 
@@ -15,11 +17,16 @@
 
 **Merged pull requests:**
 
+- Fix py2-psycopg2 right after upgrade [\#5667](https://github.com/netdata/netdata/pull/5667) ([archisgore](https://github.com/archisgore))
+- Remove obsolete python modules [\#5659](https://github.com/netdata/netdata/pull/5659) ([ilyam8](https://github.com/ilyam8))
 - Fix path to pidfile in FreeBSD rc.d file [\#5657](https://github.com/netdata/netdata/pull/5657) ([honzahommer](https://github.com/honzahommer))
+- netdata/build: A small house keeping around coverity scan \(no functional  or process change\) [\#5656](https://github.com/netdata/netdata/pull/5656) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Load gtm only if anonymous\_statistics are enabled [\#5651](https://github.com/netdata/netdata/pull/5651) ([cakrit](https://github.com/cakrit))
 - Fix slack notifications footer and set cloud redirect URL to http [\#5650](https://github.com/netdata/netdata/pull/5650) ([cakrit](https://github.com/cakrit))
 - x509check alarm fix [\#5645](https://github.com/netdata/netdata/pull/5645) ([ilyam8](https://github.com/ilyam8))
 - fix command not found error when run script under root user. [\#5581](https://github.com/netdata/netdata/pull/5581) ([vinsia](https://github.com/vinsia))
+- Patch netdata-installer.sh to avoid unwanted errors during stock config cleanup [\#5571](https://github.com/netdata/netdata/pull/5571) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Make sign-in functionality more visible [\#5569](https://github.com/netdata/netdata/pull/5569) ([gmosx](https://github.com/gmosx))
 
 ## [v1.13.0](https://github.com/netdata/netdata/tree/v1.13.0) (2019-03-14)
 
