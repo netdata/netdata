@@ -430,7 +430,7 @@ GROUP BY
     V10: """
 WITH wal_size AS (
   SELECT
-    current_setting('wal_block_size')::INT * setting::INT AS val
+    current_setting('wal_block_size')::BIGINT * setting::INT AS val
   FROM pg_settings
   WHERE name = 'wal_segment_size'
   )
