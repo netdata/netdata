@@ -1669,7 +1669,7 @@ send_awssns() {
 # matrix sender
 
 send_matrix() {
-    local homeserver="${1}" webhook accesstoken accesspayload rooms="${2}" httpcode sent=0 payload color
+    local homeserver="${1}" webhook accesstoken rooms="${2}" httpcode sent=0 payload color
 
 	[ "${SEND_MATRIX}" != "YES" ] && return 1
 
@@ -1688,7 +1688,7 @@ send_matrix() {
 	esac
 
 	for room in ${rooms}; do
-        webhook=$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken
+        webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken"
 		payload="$(
         cat <<EOF
         {
