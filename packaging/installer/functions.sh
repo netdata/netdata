@@ -645,7 +645,7 @@ portable_add_user_to_group() {
 	local groupname="${1}" username="${2}"
 
     # Check if group exist
-	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$" >/dev/null 2>&1; then
+	if ! cut -d ':' -f 1 </etc/group | grep "^${groupname}$" >/dev/null 2>&1; then
         echo >&2 "Group '${groupname}' does not exist."
         return 1
     fi
