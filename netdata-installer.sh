@@ -964,17 +964,11 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 			fi
 			progress "Installing new netdata-updater in cron"
 
-			rm "${INSTALLER_DIR}/netdata-updater.sh" || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
-
 			rm -f "${crondir}/netdata-updater"
 			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
 				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
-				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${INSTALLER_DIR}/netdata-updater.sh" || exit 1
 			else
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
-				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_SOURCE_DIR}/netdata-updater.sh" || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
 			fi
 
 			chmod 0755 ${crondir}/netdata-updater
