@@ -64,7 +64,6 @@ if [[ $(git describe) =~ -rc* ]]; then
 fi
 
 echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
-export REPOSITORY="netdata/netdata"
 ./packaging/docker/build.sh
 
 echo "---- CREATING RELEASE ARTIFACTS -----"

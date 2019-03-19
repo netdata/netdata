@@ -27,8 +27,7 @@ jobs:
     script: ./tests/installer/checksums.sh
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-    script: ./coverity-scan.sh || echo "Coverity failed :("
-    env: INSTALL_COVERITY="true"
+    script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
     if: type = cron
 
   - stage: build
