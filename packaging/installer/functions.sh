@@ -260,7 +260,7 @@ issystemd() {
 
 	# if there is no systemctl command, it is not systemd
 	# shellcheck disable=SC2230
-	systemctl=$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)
+	systemctl=$(command -v systemctl 2>/dev/null)
 	[ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
 
 	# if pid 1 is systemd, it is systemd
@@ -581,7 +581,7 @@ portable_add_user() {
 	[ -z "${homedir}" ] && homedir="/tmp"
 
     # Check if user exists
-	if cut -d ':' -f 1 </etc/passwd | grep "^${username}$"; then
+	if cut -d ':' -f 1 </etc/passwd | grep "^${username}$" 1>/dev/null 2>&1; then
         echo >&2 "User '${username}' already exists."
         return 0
     fi
@@ -592,17 +592,17 @@ portable_add_user() {
 	local nologin="$(command -v nologin 2>/dev/null || echo '/bin/false')"
 
 	# Linux
-	if command -v useradd 2>/dev/null; then
+	if command -v useradd 1>/dev/null 2>&1; then
 		run useradd -r -g "${username}" -c "${username}" -s "${nologin}" --no-create-home -d "${homedir}" "${username}" && return 0
 	fi
 
 	# FreeBSD
-	if command -v pw 2>/dev/null; then
+	if command -v pw 1>/dev/null 2>&1; then
 		run pw useradd "${username}" -d "${homedir}" -g "${username}" -s "${nologin}" && return 0
 	fi
 
 	# BusyBox
-	if command -v adduser 2>/dev/null; then
+	if command -v adduser 1>/dev/null 2>&1; then
 		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
 	fi
 
@@ -615,7 +615,7 @@ portable_add_group() {
 	local groupname="${1}"
 
     # Check if group exist
-	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$"; then
+	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$" 1>/dev/null 2>&1; then
         echo >&2 "Group '${groupname}' already exists."
         return 0
     fi
@@ -623,17 +623,17 @@ portable_add_group() {
 	echo >&2 "Adding ${groupname} user group ..."
 
 	# Linux
-	if command -v groupadd 2>/dev/null; then
+	if command -v groupadd 1>/dev/null 2>&1; then
 		run groupadd -r "${groupname}" && return 0
 	fi
 
 	# FreeBSD
-	if command -v pw 2>/dev/null; then
+	if command -v pw 1>/dev/null 2>&1; then
 		run pw groupadd "${groupname}" && return 0
 	fi
 
 	# BusyBox
-	if command -v addgroup 2>/dev/null; then
+	if command -v addgroup 1>/dev/null 2>&1; then
 		run addgroup "${groupname}" && return 0
 	fi
 
@@ -645,7 +645,7 @@ portable_add_user_to_group() {
 	local groupname="${1}" username="${2}"
 
     # Check if group exist
-	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$"; then
+	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$" >/dev/null 2>&1; then
         echo >&2 "Group '${groupname}' does not exist."
         return 1
     fi
@@ -660,17 +660,17 @@ portable_add_user_to_group() {
 		echo >&2 "Adding ${username} user to the ${groupname} group ..."
 
 		# Linux
-		if command -v usermod 2>/dev/null; then
+		if command -v usermod 1>/dev/null 2>&1; then
 			run usermod -a -G "${groupname}" "${username}" && return 0
 		fi
 
 		# FreeBSD
-		if command -v pw 2>/dev/null; then
+		if command -v pw 1>/dev/null 2>&1; then
 			run pw groupmod "${groupname}" -m "${username}" && return 0
 		fi
 
 		# BusyBox
-		if command -v addgroup 2>/dev/null; then
+		if command -v addgroup 1>/dev/null 2>&1; then
 			run addgroup "${username}" "${groupname}" && return 0
 		fi
 
