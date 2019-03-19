@@ -15,6 +15,9 @@
 
 #define TYPE_LENGTH_MAX 1024
 
+#define CHART_IS_OBSOLETE     1
+#define CHART_IS_NOT_OBSOLETE 0
+
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
@@ -165,6 +168,7 @@ static int xenstat_collect() {
 
         d->updated = 1;
     }
+
     return 0;
 }
 
@@ -173,7 +177,7 @@ static void xenstat_send_node_metrics() {
 
     if(!mem_chart_generated) {
         mem_chart_generated = 1;
-        printf("CHART xenstat.mem '' 'Node Memory Usage' 'MiB' 'xenstat' '' stacked %d %d %s\n"
+        printf("CHART xenstat.mem '' 'Node Memory Usage' 'MiB' 'xenstat' '' stacked %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_MEM
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
@@ -193,7 +197,7 @@ static void xenstat_send_node_metrics() {
 
     if(!tmem_chart_generated) {
         tmem_chart_generated = 1;
-        printf("CHART xenstat.tmem '' 'Freeable Node Transcedent Memory' 'MiB' 'xenstat' '' line %d %d %s\n"
+        printf("CHART xenstat.tmem '' 'Freeable Node Transcedent Memory' 'MiB' 'xenstat' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
@@ -210,7 +214,7 @@ static void xenstat_send_node_metrics() {
 
     if(!domains_chart_generated) {
         domains_chart_generated = 1;
-        printf("CHART xenstat.domains '' 'Number of Domains on XenServer Node' 'domains' 'xenstat' '' line %d %d %s\n"
+        printf("CHART xenstat.domains '' 'Number of Domains on XenServer Node' 'domains' 'xenstat' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
@@ -227,7 +231,7 @@ static void xenstat_send_node_metrics() {
 
     if(!cpus_chart_generated) {
         cpus_chart_generated = 1;
-        printf("CHART xenstat.cpus '' 'Number of CPUs on XenServer Node' 'cpus' 'xenstat' '' line %d %d %s\n"
+        printf("CHART xenstat.cpus '' 'Number of CPUs on XenServer Node' 'cpus' 'xenstat' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
@@ -244,7 +248,7 @@ static void xenstat_send_node_metrics() {
 
     if(!cpu_freq_chart_generated) {
         cpu_freq_chart_generated = 1;
-        printf("CHART xenstat.cpu_freq '' 'CPU frequency on XenServer Node' 'MHz' 'xenstat' '' line %d %d %s\n"
+        printf("CHART xenstat.cpu_freq '' 'CPU frequency on XenServer Node' 'MHz' 'xenstat' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
@@ -260,26 +264,42 @@ static void xenstat_send_node_metrics() {
     );
 }
 
+static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_cpu '' 'CPU usage for XenServer Domain' 'percentage' '' '' line %d %d %s %s\n"
+                       , type
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+                );
+    printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
+}
+
+static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_mem '' 'Memory reservation for XenServer Domain' 'MiB' '' '' line %d %d %s %s\n"
+                       , type
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+                );
+                printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+                printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+}
+
 static void xenstat_send_domain_metrics() {
 
     if(!node_metrics.domain_root) return;
     struct domain_metrics *d;
 
     for(d = node_metrics.domain_root; d; d = d->next) {
+        char type[TYPE_LENGTH_MAX + 1];
+        snprintfz(type, TYPE_LENGTH_MAX, "xendomain_%s_%s", d->name, d->uuid);
+
         if(likely(d->updated)) {
-            char type[TYPE_LENGTH_MAX + 1];
-
-            snprintfz(type, TYPE_LENGTH_MAX, "xendomain_%s_%s", d->name, d->uuid);
-
             if(!d->cpu_chart_generated) {
                 d->cpu_chart_generated = 1;
-                printf("CHART %s.xenstat_domain_cpu '' 'CPU usage for XenServer Domain' 'percentage' '' '' line %d %d %s\n"
-                       , type
-                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
-                       , netdata_update_every
-                       , PLUGIN_XENSTAT_NAME
-                );
-                printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
+                print_domain_cpu_chart_definition(type, CHART_IS_NOT_OBSOLETE);
             }
             printf(
                     "BEGIN %s.xenstat_domain_cpu\n"
@@ -291,14 +311,7 @@ static void xenstat_send_domain_metrics() {
 
             if(!d->mem_chart_generated) {
                 d->mem_chart_generated = 1;
-                printf("CHART %s.xenstat_domain_mem '' 'Memory reservation for XenServer Domain' 'MiB' '' '' line %d %d %s\n"
-                       , type
-                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM
-                       , netdata_update_every
-                       , PLUGIN_XENSTAT_NAME
-                );
-                printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
-                printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+                print_domain_mem_chart_definition(type, CHART_IS_NOT_OBSOLETE);
             }
             printf(
                     "BEGIN %s.xenstat_domain_mem\n"
@@ -309,6 +322,13 @@ static void xenstat_send_domain_metrics() {
                     , (collected_number)d->max_mem
                     , (collected_number)d->cur_mem
             );
+        }
+        else{
+            print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
+            print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
+
+            d->cpu_chart_generated = 0;
+            d->mem_chart_generated = 0;
         }
     }
 }
