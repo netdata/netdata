@@ -21,6 +21,7 @@ if [ -z "${token}" ]; then
 	exit 1
 fi
 
+export PATH=${PATH}:/opt/coverity/bin/
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 ([ -z "${covbuild}" ] && [ -f .coverity-build ]) && covbuild="$(<.coverity-build)"
 if [ -z "${covbuild}" ]; then
