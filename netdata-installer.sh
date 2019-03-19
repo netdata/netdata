@@ -525,7 +525,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 	}
 
 	# clean up stock config files from the user configuration directory
-	for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f); do
+	for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)); do
 		if [ -f "${x}" ]; then
 			# find it relative filename
 			f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
@@ -534,6 +534,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 			t="${f/.conf.installer_backup.*/.conf}"
 			t="${t/.conf.old/.conf}"
 			t="${t/.conf.orig/.conf}"
+			t="${t/orig\//}"
 
 			if [ -z "${md5sum}" -o ! -x "${md5sum}" ]; then
 				# we don't have md5sum - keep it
@@ -549,7 +550,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 					deleted_stock_configs=$((deleted_stock_configs + 1))
 				else
 					# edited by user - keep it
-					echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
+					echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of${TPUT_RESET} ${TPUT_CYAN}'${t}'${TPUT_RESET}. Keeping it."
 				fi
 			fi
 		fi
