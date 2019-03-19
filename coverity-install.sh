@@ -20,7 +20,7 @@ if [ ! -z "${covbuild}" ]; then
 fi
 
 echo >&2 "Installing coverity..."
-WORKDIR=$(mktemp -d)
+WORKDIR="/opt/coverity-source"
 
 curl -SL --data "token=${token}&project=netdata%2Fnetdata" https://scan.coverity.com/download/linux64 > "${WORKDIR}/coverity_tool.tar.gz"
 tar -x -C "${WORKDIR}/coverity-install" -f "${WORKDIR}/coverity_tool.tar.gz"
@@ -30,4 +30,3 @@ export PATH=${PATH}:/opt/coverity/bin/
 covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 
 echo >&2 "Coverity scan installed!"
-rm -r "${WORKDIR}"
