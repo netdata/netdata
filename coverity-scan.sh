@@ -51,10 +51,10 @@ tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 
 echo >&2 "Sending analysis for version ${version} ..."
 curl --progress-bar --form token="${token}" \
-  --form email=costa@tsaousis.gr \
+  --form email=${COVERITY_SCAN_SUBMIT_MAIL} \
   --form file=@netdata-coverity-analysis.tgz \
   --form version="${version}" \
   --form description="netdata, real-time performance monitoring, done right." \
-  https://scan.coverity.com/builds?project=netdata%2Fnetdata
+  https://scan.coverity.com/builds?project=${REPOSITORY}
 
-echo >&2 "Coverity scan submitted!"
+echo >&2 "\n\nCoverity scan submitted!"
