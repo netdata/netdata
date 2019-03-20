@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: adaptec_raid netdata python.d module
 # Author: Federico Ceratto <federico.ceratto@gmail.com>
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
