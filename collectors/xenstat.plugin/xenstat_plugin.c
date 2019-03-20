@@ -11,9 +11,10 @@
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS     8705
 
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU              8901
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM              8902
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES       8903
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS  8904
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU             8902
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM              8903
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES       8904
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS  8905
 
 #define TYPE_LENGTH_MAX 1024
 
@@ -63,6 +64,17 @@ static xenstat_handle *xhandle = NULL;
 static libxl_ctx *ctx = NULL;
 static libxl_dominfo info;
 
+struct vcpu_metrics {
+    unsigned int id;
+    unsigned int online;
+    unsigned long long ns;
+
+    int chart_generated;
+    int updated;
+
+    struct vcpu_metrics *next;
+};
+
 struct tmem_metrics {
     unsigned long long curr_eph_pages;
     unsigned long long succ_eph_gets;
@@ -84,11 +96,11 @@ struct domain_metrics {
     unsigned long long cur_mem;
     unsigned long long max_mem;
 
-    int cpu_chart_generated;
-    int mem_chart_generated;
-
+    struct vcpu_metrics *vcpu_root;
     struct tmem_metrics tmem;
 
+    int cpu_chart_generated;
+    int mem_chart_generated;
     int updated;
 
     struct domain_metrics *next;
@@ -132,6 +144,39 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
     return d;
 }
 
+static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+    unsigned int num_vcpus = xenstat_domain_num_vcpus(domain);
+    xenstat_vcpu *vcpu = NULL;
+    struct vcpu_metrics *vcpu_m = NULL, *last_vcpu_m = NULL;
+
+    for(vcpu_m = d->vcpu_root; vcpu_m ; vcpu_m = vcpu_m->next)
+        vcpu_m->updated = 0;
+
+    vcpu_m = d->vcpu_root;
+
+    unsigned int  i;
+    for(i = 0; i < num_vcpus; i++) {
+        if(unlikely(!vcpu_m)) {
+            vcpu_m = callocz(1, sizeof(struct vcpu_metrics));
+
+            if(i == 0) d->vcpu_root = vcpu_m;
+            else last_vcpu_m->next = vcpu_m;
+        }
+
+        vcpu_m->id = i;
+
+        vcpu = xenstat_domain_vcpu(domain, i);
+
+        vcpu_m->online = xenstat_vcpu_online(vcpu);
+        vcpu_m->ns = xenstat_vcpu_ns(vcpu);
+
+        vcpu_m->updated = 1;
+
+        last_vcpu_m = vcpu_m;
+        vcpu_m = vcpu_m->next;
+    }
+}
+
 static int xenstat_collect() {
     static xenstat_node *node = NULL;
 
@@ -163,7 +208,7 @@ static int xenstat_collect() {
         domain = xenstat_node_domain_by_index(node, i);
 
         // get domain UUID
-        unsigned id = xenstat_domain_id(domain);
+        unsigned int id = xenstat_domain_id(domain);
         if(libxl_domain_info(ctx, &info, id)) {
             error("XENSTAT: cannot get domain info.");
         }
@@ -185,6 +230,8 @@ static int xenstat_collect() {
         d->tmem.succ_eph_gets = xenstat_tmem_succ_eph_gets(tmem);
         d->tmem.succ_pers_puts = xenstat_tmem_succ_pers_puts(tmem);
         d->tmem.succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
+
+        vcpu_metrics_collect(d, domain);
 
         d->updated = 1;
     }
@@ -291,7 +338,7 @@ static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
-                );
+    );
     printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
 }
 
@@ -302,9 +349,9 @@ static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
-                );
-                printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
-                printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+    );
+    printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+    printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
 }
 
 static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_flag) {
@@ -314,8 +361,8 @@ static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_fl
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
-                );
-                printf("DIMENSION pages '' absolute 1 %d\n", netdata_update_every);
+    );
+    printf("DIMENSION pages '' absolute 1 %d\n", netdata_update_every);
 }
 
 static void print_domain_tmem_operations_chart_definition(char *type, int obsolete_flag) {
@@ -325,10 +372,23 @@ static void print_domain_tmem_operations_chart_definition(char *type, int obsole
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
-                );
-                printf("DIMENSION ephemeral_gets 'ephemeral gets' incremental 1 %d\n", netdata_update_every);
-                printf("DIMENSION persistent_puts 'persistent puts' incremental 1 %d\n", netdata_update_every);
-                printf("DIMENSION persistent_gets 'persistent gets' incremental 1 %d\n", netdata_update_every);
+    );
+    printf("DIMENSION ephemeral_gets 'ephemeral gets' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION persistent_puts 'persistent puts' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION persistent_gets 'persistent gets' incremental 1 %d\n", netdata_update_every);
+}
+
+static void print_domain_vcpu_chart_definition(char *type, unsigned int vcpu, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_vcpu%u '' 'VCPU%u Usage' 'percentage' 'cpu' '' line %d %d %s %s\n"
+                       , type
+                       , vcpu
+                       , vcpu
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU + vcpu
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
 }
 
 static void xenstat_send_domain_metrics() {
@@ -352,6 +412,28 @@ static void xenstat_send_domain_metrics() {
                     , type
                     , (collected_number)d->cpu_ns
             );
+
+            struct vcpu_metrics *vcpu_m;
+            for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
+                if(likely(vcpu_m->updated && vcpu_m ->online)) {
+                    if(!vcpu_m->chart_generated) {
+                        vcpu_m->chart_generated = 1;
+                        print_domain_vcpu_chart_definition(type, vcpu_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_vcpu%u\n"
+                            "SET usage = %lld\n"
+                            "END\n"
+                            , type
+                            , vcpu_m->id
+                            , (collected_number)vcpu_m->ns
+                    );
+                }
+                else {
+                    print_domain_vcpu_chart_definition(type, vcpu_m->id, CHART_IS_OBSOLETE);
+                    vcpu_m->chart_generated = 0;
+                }
+            }
 
             if(!d->mem_chart_generated) {
                 d->mem_chart_generated = 1;
