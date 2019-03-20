@@ -319,16 +319,16 @@ static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_fl
 }
 
 static void print_domain_tmem_operations_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_tmem_operations '' 'Successful Transcedent Memory Puts and Gets' 'events' 'memory' '' line %d %d %s %s\n"
+    printf("CHART %s.xenstat_domain_tmem_operations '' 'Successful Transcedent Memory Puts and Gets' 'events/s' 'memory' '' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
                 );
-                printf("DIMENSION ephemeral_gets '' absolute 1 %d\n", netdata_update_every);
-                printf("DIMENSION persistent_puts '' absolute 1 %d\n", netdata_update_every);
-                printf("DIMENSION persistent_gets '' absolute 1 %d\n", netdata_update_every);
+                printf("DIMENSION ephemeral_gets 'ephemeral gets' incremental 1 %d\n", netdata_update_every);
+                printf("DIMENSION persistent_puts 'persistent puts' incremental 1 %d\n", netdata_update_every);
+                printf("DIMENSION persistent_gets 'persistent gets' incremental 1 %d\n", netdata_update_every);
 }
 
 static void xenstat_send_domain_metrics() {
