@@ -242,6 +242,8 @@ static int xenstat_collect() {
 static void xenstat_send_node_metrics() {
     static int mem_chart_generated = 0, tmem_chart_generated = 0, domains_chart_generated = 0, cpus_chart_generated = 0, cpu_freq_chart_generated = 0;
 
+    // ----------------------------------------------------------------
+
     if(!mem_chart_generated) {
         mem_chart_generated = 1;
         printf("CHART xenstat.mem '' 'Memory Usage' 'MiB' 'memory' '' stacked %d %d '' %s\n"
@@ -262,6 +264,8 @@ static void xenstat_send_node_metrics() {
             , (collected_number) (node_metrics.tot_mem - node_metrics.free_mem)
     );
 
+    // ----------------------------------------------------------------
+
     if(!tmem_chart_generated) {
         tmem_chart_generated = 1;
         printf("CHART xenstat.tmem '' 'Freeable Transcedent Memory' 'MiB' 'memory' '' line %d %d '' %s\n"
@@ -278,6 +282,8 @@ static void xenstat_send_node_metrics() {
             "END\n"
             , (collected_number) node_metrics.freeable_mb
     );
+
+    // ----------------------------------------------------------------
 
     if(!domains_chart_generated) {
         domains_chart_generated = 1;
@@ -296,6 +302,8 @@ static void xenstat_send_node_metrics() {
             , (collected_number) node_metrics.num_domains
     );
 
+    // ----------------------------------------------------------------
+
     if(!cpus_chart_generated) {
         cpus_chart_generated = 1;
         printf("CHART xenstat.cpus '' 'Number of CPUs' 'cpus' 'cpu' '' line %d %d '' %s\n"
@@ -312,6 +320,8 @@ static void xenstat_send_node_metrics() {
             "END\n"
             , (collected_number) node_metrics.num_cpus
     );
+
+    // ----------------------------------------------------------------
 
     if(!cpu_freq_chart_generated) {
         cpu_freq_chart_generated = 1;
@@ -401,6 +411,9 @@ static void xenstat_send_domain_metrics() {
         snprintfz(type, TYPE_LENGTH_MAX, "xendomain_%s_%s", d->name, d->uuid);
 
         if(likely(d->updated)) {
+
+            // ----------------------------------------------------------------
+
             if(!d->cpu_chart_generated) {
                 d->cpu_chart_generated = 1;
                 print_domain_cpu_chart_definition(type, CHART_IS_NOT_OBSOLETE);
@@ -412,6 +425,8 @@ static void xenstat_send_domain_metrics() {
                     , type
                     , (collected_number)d->cpu_ns
             );
+
+            // ----------------------------------------------------------------
 
             struct vcpu_metrics *vcpu_m;
             for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
@@ -435,6 +450,8 @@ static void xenstat_send_domain_metrics() {
                 }
             }
 
+            // ----------------------------------------------------------------
+
             if(!d->mem_chart_generated) {
                 d->mem_chart_generated = 1;
                 print_domain_mem_chart_definition(type, CHART_IS_NOT_OBSOLETE);
@@ -449,6 +466,8 @@ static void xenstat_send_domain_metrics() {
                     , (collected_number)d->cur_mem
             );
 
+            // ----------------------------------------------------------------
+
             if(!d->tmem.pages_chart_generated) {
                 d->tmem.pages_chart_generated = 1;
                 print_domain_tmem_pages_chart_definition(type, CHART_IS_NOT_OBSOLETE);
@@ -460,6 +479,8 @@ static void xenstat_send_domain_metrics() {
                     , type
                     , (collected_number)d->tmem.curr_eph_pages
             );
+
+            // ----------------------------------------------------------------
 
             if(!d->tmem.operation_chart_generated) {
                 d->tmem.operation_chart_generated = 1;
