@@ -984,6 +984,11 @@ SETUID_WARNING
 fi
 
 # -----------------------------------------------------------------------------
+progress "Copy uninstaller"
+sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
+chmod 750 ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
+
+# -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
 
 cat <<END
@@ -1003,6 +1008,7 @@ To start netdata run:
 
 
 END
+echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ "${AUTOUPDATE}" = "1" ]; then
 	if [ "${UID}" -ne "0" ]; then
