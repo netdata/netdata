@@ -15,6 +15,9 @@
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM              8903
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES       8904
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS  8905
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ       8906
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS     8907
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS      8908
 
 #define TYPE_LENGTH_MAX 1024
 
@@ -66,6 +69,7 @@ static libxl_dominfo info;
 
 struct vcpu_metrics {
     unsigned int id;
+
     unsigned int online;
     unsigned long long ns;
 
@@ -85,6 +89,24 @@ struct tmem_metrics {
     int operation_chart_generated;
 };
 
+struct vbd_metrics {
+    unsigned int id;
+
+    unsigned int error;
+    unsigned long long oo_reqs;
+    unsigned long long rd_reqs;
+    unsigned long long wr_reqs;
+    unsigned long long rd_sects;
+    unsigned long long wr_sects;
+
+    int oo_req_chart_generated;
+    int requests_chart_generated;
+    int sectors_chart_generated;
+    int updated;
+
+    struct vbd_metrics *next;
+};
+
 struct domain_metrics {
     char *uuid;
     uint32_t hash;
@@ -96,8 +118,9 @@ struct domain_metrics {
     unsigned long long cur_mem;
     unsigned long long max_mem;
 
-    struct vcpu_metrics *vcpu_root;
     struct tmem_metrics tmem;
+    struct vcpu_metrics *vcpu_root;
+    struct vbd_metrics *vbd_root;
 
     int cpu_chart_generated;
     int mem_chart_generated;
@@ -177,6 +200,43 @@ static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domai
     }
 }
 
+static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+    unsigned int num_vbds = xenstat_domain_num_vbds(domain);
+    xenstat_vbd *vbd = NULL;
+    struct vbd_metrics *vbd_m = NULL, *last_vbd_m = NULL;
+
+    for(vbd_m = d->vbd_root; vbd_m ; vbd_m = vbd_m->next)
+        vbd_m->updated = 0;
+
+    vbd_m = d->vbd_root;
+
+    unsigned int  i;
+    for(i = 0; i < num_vbds; i++) {
+        if(unlikely(!vbd_m)) {
+            vbd_m = callocz(1, sizeof(struct vbd_metrics));
+
+            if(i == 0) d->vbd_root = vbd_m;
+            else last_vbd_m->next = vbd_m;
+        }
+
+        vbd_m->id = i;
+
+        vbd = xenstat_domain_vbd(domain, i);
+
+        vbd_m->error   = xenstat_vbd_error(vbd);
+        vbd_m->oo_reqs  = xenstat_vbd_oo_reqs(vbd);
+        vbd_m->rd_reqs  = xenstat_vbd_rd_reqs(vbd);
+        vbd_m->wr_reqs  = xenstat_vbd_wr_reqs(vbd);
+        vbd_m->rd_sects = xenstat_vbd_rd_sects(vbd);
+        vbd_m->wr_sects = xenstat_vbd_wr_sects(vbd);
+
+        vbd_m->updated = 1;
+
+        last_vbd_m = vbd_m;
+        vbd_m = vbd_m->next;
+    }
+}
+
 static int xenstat_collect() {
     static xenstat_node *node = NULL;
 
@@ -221,6 +281,7 @@ static int xenstat_collect() {
 
         d->id = id;
         d->name = xenstat_domain_name(domain);
+        netdata_fix_chart_id(d->name);
         d->cpu_ns = xenstat_domain_cpu_ns(domain);
         d->cur_mem = xenstat_domain_cur_mem(domain);
         d->max_mem = xenstat_domain_max_mem(domain);
@@ -232,6 +293,7 @@ static int xenstat_collect() {
         d->tmem.succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
 
         vcpu_metrics_collect(d, domain);
+        vbd_metrics_collect(d, domain);
 
         d->updated = 1;
     }
@@ -342,7 +404,7 @@ static void xenstat_send_node_metrics() {
 }
 
 static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_cpu '' 'CPU Usage (100% = 1 core)' 'percentage' 'cpu' '' line %d %d %s %s\n"
+    printf("CHART %s.xenstat_domain_cpu '' 'CPU Usage (100%% = 1 core)' 'percentage' 'cpu' '' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
                        , netdata_update_every
@@ -401,6 +463,47 @@ static void print_domain_vcpu_chart_definition(char *type, unsigned int vcpu, in
     printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
 }
 
+static void print_domain_vbd_oo_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_oo_req_vbd%u '' 'VBD%u \"Out Of\" Requests' 'requests/s' 'vbd' '' line %d %d %s %s\n"
+                       , type
+                       , vbd
+                       , vbd
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ + vbd
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION requests '' incremental 1 %d\n", netdata_update_every);
+}
+
+static void print_domain_vbd_requests_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_requests_vbd%u '' 'VBD%u Requests' 'requests/s' 'vbd' '' line %d %d %s %s\n"
+                       , type
+                       , vbd
+                       , vbd
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS + vbd
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION write '' incremental 1 %d\n", netdata_update_every);
+}
+
+static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_sectors_vbd%u '' 'VBD%u Read/Written Sectors' 'sectors/s' 'vbd' '' line %d %d %s %s\n"
+                       , type
+                       , vbd
+                       , vbd
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS + vbd
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION write '' incremental 1 %d\n", netdata_update_every);
+}
+
 static void xenstat_send_domain_metrics() {
 
     if(!node_metrics.domain_root) return;
@@ -430,7 +533,7 @@ static void xenstat_send_domain_metrics() {
 
             struct vcpu_metrics *vcpu_m;
             for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
-                if(likely(vcpu_m->updated && vcpu_m ->online)) {
+                if(likely(vcpu_m->updated && vcpu_m->online)) {
                     if(!vcpu_m->chart_generated) {
                         vcpu_m->chart_generated = 1;
                         print_domain_vcpu_chart_definition(type, vcpu_m->id, CHART_IS_NOT_OBSOLETE);
@@ -497,6 +600,68 @@ static void xenstat_send_domain_metrics() {
                     , (collected_number)d->tmem.succ_pers_puts
                     , (collected_number)d->tmem.succ_eph_gets
             );
+
+            // ----------------------------------------------------------------
+
+            struct vbd_metrics *vbd_m;
+            for(vbd_m = d->vbd_root; vbd_m; vbd_m = vbd_m->next) {
+                if(likely(vbd_m->updated && !vbd_m->error)) {
+                    if(!vbd_m->oo_req_chart_generated) {
+                        vbd_m->oo_req_chart_generated = 1;
+                        print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_oo_req_vbd%u\n"
+                            "SET requests = %lld\n"
+                            "END\n"
+                            , type
+                            , vbd_m->id
+                            , (collected_number)vbd_m->oo_reqs
+                    );
+
+                    // ----------------------------------------------------------------
+
+                    if(!vbd_m->requests_chart_generated) {
+                        vbd_m->requests_chart_generated = 1;
+                        print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_requests_vbd%u\n"
+                            "SET read = %lld\n"
+                            "SET write = %lld\n"
+                            "END\n"
+                            , type
+                            , vbd_m->id
+                            , (collected_number)vbd_m->rd_reqs
+                            , (collected_number)vbd_m->wr_reqs
+                    );
+
+                    // ----------------------------------------------------------------
+
+                    if(!vbd_m->sectors_chart_generated) {
+                        vbd_m->sectors_chart_generated = 1;
+                        print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_sectors_vbd%u\n"
+                            "SET read = %lld\n"
+                            "SET write = %lld\n"
+                            "END\n"
+                            , type
+                            , vbd_m->id
+                            , (collected_number)vbd_m->rd_sects
+                            , (collected_number)vbd_m->wr_sects
+                    );
+                }
+                else {
+                    print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                    print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                    print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                    vbd_m->oo_req_chart_generated = 0;
+                    vbd_m->requests_chart_generated = 0;
+                    vbd_m->sectors_chart_generated = 0;
+                }
+            }
         }
         else{
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
