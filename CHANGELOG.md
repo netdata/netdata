@@ -11,12 +11,16 @@
 
 **Closed issues:**
 
+- Status of netdata/binary-packages [\#5671](https://github.com/netdata/netdata/issues/5671)
 - Slack footer link breaks when the URL is too long [\#5654](https://github.com/netdata/netdata/issues/5654)
 - netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
 - feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
 
 **Merged pull requests:**
 
+- fix incorrect use of isnormal\(\) [\#5677](https://github.com/netdata/netdata/pull/5677) ([ktsaou](https://github.com/ktsaou))
+- py stuff: change l2isbad to ilyam8 [\#5676](https://github.com/netdata/netdata/pull/5676) ([ilyam8](https://github.com/ilyam8))
+- bring uninstaller back [\#5675](https://github.com/netdata/netdata/pull/5675) ([paulfantom](https://github.com/paulfantom))
 - Fix py2-psycopg2 right after upgrade [\#5667](https://github.com/netdata/netdata/pull/5667) ([archisgore](https://github.com/archisgore))
 - Remove obsolete python modules [\#5659](https://github.com/netdata/netdata/pull/5659) ([ilyam8](https://github.com/ilyam8))
 - Fix path to pidfile in FreeBSD rc.d file [\#5657](https://github.com/netdata/netdata/pull/5657) ([honzahommer](https://github.com/honzahommer))
