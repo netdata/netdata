@@ -6,7 +6,7 @@ To have netdata send notifications via SMS Server Tools 3, you'll first need [in
 
 You then just need to configure the recipient phone numbers in `health_alarm_notify.conf`:
 
-```
+```sh
 #------------------------------------------------------------------------------
 # SMS Server Tools 3 (smstools3) global notification options
 
@@ -22,7 +22,7 @@ DEFAULT_RECIPIENT_SMS=""
 
 Netdata uses the script `sendsms` that is installed by `smstools3` and just passes a phone number and a message to it. If `sendsms` is not in `$PATH`, you can pass its location in `health_alarm_notify.conf`:
 
-```
+```sh
 # The full path of the sendsms command (smstools3).
 # If empty, the system $PATH will be searched for it.
 # If not found, SMS notifications will be silently disabled.
