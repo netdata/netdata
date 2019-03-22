@@ -155,12 +155,13 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
 bool_t alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
     RRDCALC *rc = NULL;
     for(rc = host->alarms; rc; rc = rc->next) {
-      if(ae->alarm_id == rc->id) {
-        break;
-      }
+        if(ae->alarm_id == rc->id) {
+            break;
+        }
     }
     if (!rc) {
-      // TODO: Handle this!
+        error("No alarm found for the alarm id %u", ae->alarm_id);
+        return FALSE;
     }
     return rrdcalc_isrepeating(rc);
 }

@@ -265,13 +265,12 @@ static inline void health_alarm_log_process(RRDHOST *host) {
                 if(unlikely(ae->unique_id < first_waiting))
                     first_waiting = ae->unique_id;
 
-                if(likely(now >= ae->delay_up_to_timestamp)) {
+                if(likely(now >= ae->delay_up_to_timestamp))
                     health_process_notifications(host, ae);
-                }
             }
         }
         else {
-          // TODO: Handle this!
+            error("No alarm entry for a repeaing alarm should be in the alarm log. Alarm id: %u", ae->alarm_id);
         }
     }
 
@@ -305,7 +304,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
             host->health_log.count--;
         }
         else {
-          // TODO: Handle this
+            error("No alarm entry for a repeaing alarm should be in the alarm log. Alarm id: %u", ae->alarm_id);
         }
 
         ae = t;
@@ -422,7 +421,7 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
                 debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
             } else {
                 debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
-                		, (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
+                    , (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
                         , (rc->rrdset)?rc->rrdset->context:""
                         , rc->chart

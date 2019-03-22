@@ -185,10 +185,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                     break;
                 }
             }
-            if (!rc) {
-                // TODO: Handle this!
-            }
-            else {
+            if(unlikely(rc)) {
                 rc->last_repeat = last_repeat;
                 continue;
             }
@@ -224,7 +221,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                         }
                     }
                 } else {
-                    // TODO: Handle this!
+                    error("No alarm entry for a repeating alarm should be seen at this point. Alarm id: %u", ae->alarm_id);
                 }
             }
 
