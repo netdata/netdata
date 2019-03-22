@@ -16,6 +16,14 @@ NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user ru
 ```
 3. Run `netdata-uninstaller.sh` as follows
 ```
+${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh --yes --env <environment_file>
+```
+
+Note: Existing installations may still need to download the file if it's not present.
+To execute uninstall in that case, run the following commands:
+```
+wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh
+chmod +x ./netdata-uninstaller.sh
 ./netdata-uninstaller.sh --yes --env <environment_file>
 ```
 
