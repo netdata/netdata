@@ -845,7 +845,7 @@ class Service(SimpleService):
                 CONN_PARAM_SSL_KEY: conf.get(CONN_PARAM_SSL_KEY),
             }.items() if v)
 
-        if CONN_PARAM_SSL_MODE not in ssl_params and len(ssl_params) > 1:
+        if CONN_PARAM_SSL_MODE not in ssl_params and len(ssl_params) > 0:
             raise ValueError("mandatory 'sslmode' param is missing, please set")
 
         params.update(ssl_params)
