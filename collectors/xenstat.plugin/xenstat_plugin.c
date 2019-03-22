@@ -153,6 +153,8 @@ struct domain_metrics {
     struct network_metrics *network_root;
 
     int cpu_chart_generated;
+    int vcpu_chart_generated;
+    int num_vcpus_changed;
     int mem_chart_generated;
     int updated;
 
@@ -198,9 +200,16 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
 }
 
 static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
-    unsigned int num_vcpus = xenstat_domain_num_vcpus(domain);
+    static unsigned int last_num_vcpus = 0;
+    unsigned int num_vcpus = 0;
     xenstat_vcpu *vcpu = NULL;
     struct vcpu_metrics *vcpu_m = NULL, *last_vcpu_m = NULL;
+
+    num_vcpus = xenstat_domain_num_vcpus(domain);
+    if(unlikely(num_vcpus != last_num_vcpus)) {
+        d->num_vcpus_changed = 1;
+        last_num_vcpus = num_vcpus;
+    }
 
     for(vcpu_m = d->vcpu_root; vcpu_m ; vcpu_m = vcpu_m->next)
         vcpu_m->updated = 0;
@@ -521,17 +530,22 @@ static void print_domain_tmem_operations_chart_definition(char *type, int obsole
     printf("DIMENSION persistent_gets 'persistent gets' incremental 1 %d\n", netdata_update_every);
 }
 
-static void print_domain_vcpu_chart_definition(char *type, unsigned int vcpu, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_vcpu%u '' 'VCPU%u Usage' 'percentage' 'cpu' '' line %d %d %s %s\n"
+static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics *d, int obsolete_flag) {
+    struct vcpu_metrics *vcpu_m;
+
+    printf("CHART %s.xenstat_domain_vcpu '' 'VCPU Usage' 'percentage' 'cpu' '' line %d %d %s %s\n"
                        , type
-                       , vcpu
-                       , vcpu
-                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU + vcpu
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU
                        , netdata_update_every
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
+
+    for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
+        if(likely(vcpu_m->updated && vcpu_m->online)) {
+            printf("DIMENSION vcpu%u '' incremental 100 %d\n", vcpu_m->id, netdata_update_every * 1000000000);
+        }
+    }
 }
 
 static void print_domain_vbd_oo_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
@@ -659,26 +673,24 @@ static void xenstat_send_domain_metrics() {
             // ----------------------------------------------------------------
 
             struct vcpu_metrics *vcpu_m;
+
+            if(!d->vcpu_chart_generated || d->num_vcpus_changed) {
+                d->vcpu_chart_generated = 1;
+                d->num_vcpus_changed = 0;
+                print_domain_vcpu_chart_definition(type, d, CHART_IS_NOT_OBSOLETE);
+            }
+
+            printf("BEGIN %s.xenstat_domain_vcpu\n", type);
             for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
                 if(likely(vcpu_m->updated && vcpu_m->online)) {
-                    if(!vcpu_m->chart_generated) {
-                        vcpu_m->chart_generated = 1;
-                        print_domain_vcpu_chart_definition(type, vcpu_m->id, CHART_IS_NOT_OBSOLETE);
-                    }
                     printf(
-                            "BEGIN %s.xenstat_domain_vcpu%u\n"
-                            "SET usage = %lld\n"
-                            "END\n"
-                            , type
+                            "SET vcpu%u = %lld\n"
                             , vcpu_m->id
                             , (collected_number)vcpu_m->ns
                     );
                 }
-                else {
-                    print_domain_vcpu_chart_definition(type, vcpu_m->id, CHART_IS_OBSOLETE);
-                    vcpu_m->chart_generated = 0;
-                }
             }
+            printf("END\n");
 
             // ----------------------------------------------------------------
 
@@ -875,11 +887,13 @@ static void xenstat_send_domain_metrics() {
         }
         else{
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
+            print_domain_vcpu_chart_definition(type, d, CHART_IS_OBSOLETE);
             print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_tmem_pages_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_tmem_operations_chart_definition(type, CHART_IS_OBSOLETE);
 
             d->cpu_chart_generated = 0;
+            d->vcpu_chart_generated = 0;
             d->mem_chart_generated = 0;
             d->tmem.pages_chart_generated = 0;
             d->tmem.operation_chart_generated = 0;
