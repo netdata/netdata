@@ -81,7 +81,7 @@ jobs:
       bucket: "netdata-nightlies"
       skip_cleanup: true
       local_dir: "artifacts"
-    after_deploy: rm .travis/gcs-credentials.json
+    after_deploy: rm -f .travis/gcs-credentials.json
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
