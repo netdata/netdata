@@ -590,7 +590,7 @@ static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int v
 }
 
 static void print_domain_network_bytes_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_bytes_network%u '' 'Network%u Recieved/Sent Bytes' 'kilobits/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.xenstat_domain_bytes_network%u '' 'Network%u Received/Sent Bytes' 'kilobits/s' 'network' '' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -604,7 +604,7 @@ static void print_domain_network_bytes_chart_definition(char *type, unsigned int
 }
 
 static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_packets_network%u '' 'Network%u Recieved/Sent Bytes' 'packets/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.xenstat_domain_packets_network%u '' 'Network%u Recieved/Sent Packets' 'packets/s' 'network' '' line %d %d %s %s\n"
                        , type
                        , network
                        , network
