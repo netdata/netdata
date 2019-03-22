@@ -254,11 +254,6 @@ static inline int health_parse_repeat(
         uint32_t *crit_repeat_every
 ) {
 
-    uint32_t default_duration = 0;
-    char given_default = FALSE;
-    char given_warn_repeat = FALSE;
-    char given_crit_repeat = FALSE;
-
     char *s = string;
     while(*s) {
         char *key = s;
@@ -277,29 +272,13 @@ static inline int health_parse_repeat(
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, file, value, key);
             }
-            else given_warn_repeat = TRUE;
         }
         else if(!strcasecmp(key, "critical")) {
             if (!config_parse_duration(value, (int*)crit_repeat_every)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, file, value, key);
             }
-            else given_crit_repeat = TRUE;
         }
-        else {
-            if (!config_parse_duration(key, (int*)&default_duration)) {
-                error("Health configuration at line %zu of file '%s': invalid value '%s'",
-                        line, file, key);
-            }
-            else given_default = TRUE;
-        }
-    }
-
-    if(given_default) {
-        if(!given_warn_repeat)
-            *warn_repeat_every = default_duration;
-        if(!given_crit_repeat)
-            *crit_repeat_every = default_duration;
     }
 
     return TRUE;
@@ -554,6 +533,7 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
+            rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
             rc->warn_repeat_every = host->health_default_warn_repeat_every;
             rc->crit_repeat_every = host->health_default_crit_repeat_every;
 
@@ -734,7 +714,7 @@ static int health_readfile(const char *filename, void *data) {
                 rc->options |= health_parse_options(value);
             }
             else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
-                health_parse_repeat(line,filename, value,
+                health_parse_repeat(line, filename, value,
                     &rc->warn_repeat_every,
                     &rc->crit_repeat_every);
             }
@@ -862,6 +842,11 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rt->options |= health_parse_options(value);
+            }
+            else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
+                health_parse_repeat(line, filename, value,
+                    &rt->warn_repeat_every,
+                    &rt->crit_repeat_every);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",

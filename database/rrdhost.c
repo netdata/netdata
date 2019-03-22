@@ -168,9 +168,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "repeat warning notifications every", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "repeat critical notifications every", "never");
-    host->health_rep_alarm_entry_list = NULL;
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -536,13 +535,6 @@ void rrdhost_free(RRDHOST *host) {
 
     while(host->alarms)
         rrdcalc_unlink_and_free(host, host->alarms);
-
-    while(host->health_rep_alarm_entry_list) {
-        health_alarm_log_free_one_nochecks_nounlink(host->health_rep_alarm_entry_list->alarm_entry);
-        REPEATING_ALARM_ENTRY *tmp = host->health_rep_alarm_entry_list;
-        host->health_rep_alarm_entry_list = host->health_rep_alarm_entry_list->next;
-        freez(tmp);
-    }
 
     while(host->templates)
         rrdcalctemplate_unlink_and_free(host, host->templates);

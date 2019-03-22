@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <assert.h>
-
 #include "health.h"
 
 struct health_cmdapi_thread_status {
@@ -258,60 +256,27 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
-        assert(ae->warn_repeat_every == 0 && ae->crit_repeat_every == 0);
-        if(unlikely(
-            !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
-            !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
-            )) {
+        if(likely(!alarm_entry_isrepeating(host, ae))) {
+            if(unlikely(
+                !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
+                !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
+                )) {
 
-            if(unlikely(ae->unique_id < first_waiting))
-                first_waiting = ae->unique_id;
+                if(unlikely(ae->unique_id < first_waiting))
+                    first_waiting = ae->unique_id;
 
-            if(likely(now >= ae->delay_up_to_timestamp)) {
-                health_process_notifications(host, ae);
+                if(likely(now >= ae->delay_up_to_timestamp)) {
+                    health_process_notifications(host, ae);
+                }
             }
+        }
+        else {
+          // TODO: Handle this!
         }
     }
 
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
-
-    // process repeating alarm entries
-    REPEATING_ALARM_ENTRY *it;
-    for(it = host->health_rep_alarm_entry_list; it; it = it->next) {
-        ALARM_ENTRY *ae = it->alarm_entry;
-        assert(ae->warn_repeat_every > 0 || ae->crit_repeat_every > 0);
-        if(unlikely(ae->last_repeat == 0)) {
-            if(likely(now >= ae->delay_up_to_timestamp)) {
-                health_process_notifications(host, ae);
-                ae->last_repeat = now;
-                debug(D_HEALTH, "Alarm entry from alarm %u is executed as repeating for the first time.", ae->alarm_id);
-            }
-        }
-        else {
-            int repeat_every = 0;
-            RRDCALC *rc;
-            for(rc = host->alarms; rc ; rc = rc->next) {
-                if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-                    if(ae->alarm_id == rc->id)
-                        repeat_every = ae->warn_repeat_every;
-                }
-                else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-                    if(ae->alarm_id == rc->id)
-                        repeat_every = ae->crit_repeat_every;
-                }
-                else if(likely(rc->status == RRDCALC_STATUS_CLEAR)) {
-                    if(ae->alarm_id == rc->id)
-                        break;
-                }
-            }
-            if(unlikely(repeat_every > 0 && (ae->last_repeat + repeat_every) < now)) {
-                health_process_notifications(host, ae);
-                ae->last_repeat = now;
-                debug(D_HEALTH, "Alarm entry from alarm %u is executed as a repeating entry.", ae->alarm_id);
-            }
-        }
-    }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
@@ -335,11 +300,15 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         ALARM_ENTRY *t = ae->next;
 
-        assert(ae->warn_repeat_every == 0 && ae->crit_repeat_every == 0);
-        health_alarm_log_free_one_nochecks_nounlink(ae);
+        if(likely(!alarm_entry_isrepeating(host, ae))) {
+            health_alarm_log_free_one_nochecks_nounlink(ae);
+            host->health_log.count--;
+        }
+        else {
+          // TODO: Handle this
+        }
 
         ae = t;
-        host->health_log.count--;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -798,21 +767,22 @@ void *health_main(void *ptr) {
 						rc->delay_last = delay;
 						rc->delay_up_to_timestamp = now + delay;
 
-						health_alarm_log(
-								host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
-								rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
-								rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
-								rc->delay_last,
-								(
-								    ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-								    ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-								),
-								rc->warn_repeat_every,
-								rc->crit_repeat_every
-						);
-
-						rc->last_status_change = now;
-						rc->status = status;
+            if(likely(!rrdcalc_isrepeating(rc))) {
+                ALARM_ENTRY *ae = health_create_alarm_entry(
+                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                    rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
+                    rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
+                    rc->delay_last,
+                    (
+                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                    )
+                );
+                health_alarm_log(host, ae);
+            }
+            rc->last_status_change = now;
+            rc->old_status = rc->status;
+            rc->status = status;
 					}
 
 					rc->last_updated = now;
@@ -821,6 +791,35 @@ void *health_main(void *ptr) {
 					if (next_run > rc->next_update)
 						next_run = rc->next_update;
 				}
+
+        // process repeating alarms
+        RRDCALC *rc;
+        for(rc = host->alarms; rc ; rc = rc->next) {
+            int repeat_every = 0;
+            if(unlikely(rrdcalc_isrepeating(rc))) {
+                if(unlikely(rc->status == RRDCALC_STATUS_WARNING))
+                    repeat_every = rc->warn_repeat_every;
+                else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
+                    repeat_every = rc->crit_repeat_every;
+            }
+            if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) < now)) {
+                rc->last_repeat = now;
+                ALARM_ENTRY *ae = health_create_alarm_entry(
+                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                    rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
+                    rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
+                    rc->delay_last,
+                    (
+                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                    )
+                );
+                ae->last_repeat = rc->last_repeat;
+                health_process_notifications(host, ae);
+                debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
+                health_alarm_log_free_one_nochecks_nounlink(ae);
+            }
+        }
 
 				rrdhost_unlock(host);
 			}

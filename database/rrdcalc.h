@@ -86,6 +86,7 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // runtime information
 
+    RRDCALC_STATUS old_status;      // the old status of the alarm
     RRDCALC_STATUS status;          // the current status of the alarm
 
     calculated_number value;        // the current value of the alarm
@@ -96,6 +97,7 @@ struct rrdcalc {
     time_t last_updated;            // the last update timestamp of the alarm
     time_t next_update;             // the next update timestamp of the alarm
     time_t last_status_change;      // the timestamp of the last time this alarm changed status
+    time_t last_repeat;             // the last time the alarm got repeated
 
     time_t db_after;                // the first timestamp evaluated by the db lookup
     time_t db_before;               // the last timestamp evaluated by the db lookup
@@ -140,5 +142,12 @@ extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, ui
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
+
+static inline bool_t rrdcalc_isrepeating(RRDCALC *rc) {
+  if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
+    return TRUE;
+  }
+  return FALSE;
+}
 
 #endif //NETDATA_RRDCALC_H

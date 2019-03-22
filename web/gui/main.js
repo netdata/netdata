@@ -550,7 +550,7 @@ function renderStreamedHosts(options) {
 }
 
 function renderMachines(machinesArray) {
-    // let html = isSignedIn() 
+    // let html = isSignedIn()
     //     ? `<div class="info-item">My nodes</div>`
     //     : `<div class="info-item">My nodes</div>`;
 
@@ -728,13 +728,13 @@ function renderMyNetdataMenu(machinesArray) {
     if (isSignedIn()) {
         html += (
             `<div class="filter-control">
-                <input 
+                <input
                     id="my-netdata-menu-filter-input"
-                    type="text" 
+                    type="text"
                     placeholder="filter nodes..."
                     autofocus
                     autocomplete="off"
-                    value="${myNetdataMenuFilterValue}" 
+                    value="${myNetdataMenuFilterValue}"
                     onkeydown="myNetdataFilterDidChange(event)"
                 />
                 <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick(event)"><i class="fas fa-times"></i><span>
@@ -918,7 +918,7 @@ function gotoServerModalHandler(guid) {
 
     if (!isSignedIn()) {
         // When the registry is enabled, if the user's known URLs are not working
-        // we consult the registry to get additional URLs.  
+        // we consult the registry to get additional URLs.
         setTimeout(function () {
             if (gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
@@ -979,7 +979,7 @@ function notifyForSwitchRegistry() {
     }
 }
 
-var deleteRegistryGuid = null; 
+var deleteRegistryGuid = null;
 var deleteRegistryUrl = null;
 
 function deleteRegistryModalHandler(guid, name, url) {
@@ -992,7 +992,7 @@ function deleteRegistryModalHandler(guid, name, url) {
     document.getElementById('deleteRegistryServerName2').innerHTML = name;
     document.getElementById('deleteRegistryServerURL').innerHTML = url;
     document.getElementById('deleteRegistryResponse').innerHTML = '';
- 
+
     $('#deleteRegistryModal').modal('show');
 }
 
@@ -1015,7 +1015,7 @@ function notifyForDeleteRegistry() {
                         deleteRegistryUrl = null;
                         $('#deleteRegistryModal').modal('hide');
                         NETDATA.registry.init();
-                    });    
+                    });
                 });
         } else {
             NETDATA.registry.delete(deleteRegistryUrl, function (result) {
@@ -1026,7 +1026,7 @@ function notifyForDeleteRegistry() {
                 } else {
                     responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
                 }
-            });              
+            });
         }
     }
 }
@@ -2067,6 +2067,14 @@ function alarmsUpdateModal() {
                     + ((typeof alarm.calc !== 'undefined') ? ('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>') : '')
                     + ((chart.green !== null) ? ('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + units + '</code></td></tr>') : '')
                     + ((chart.red !== null) ? ('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + units + '</code></td></tr>') : '');
+            }
+
+            if (alarm.warn_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;warning</td><td>' + NETDATA.seconds4human(alarm.warn_repeat_every) + '</td></tr>';
+            }
+
+            if (alarm.crit_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;critical</td><td>' + NETDATA.seconds4human(alarm.crit_repeat_every) + '</td></tr>';
             }
 
             var delay = '';
@@ -4485,7 +4493,7 @@ function getCloudAccountAgents() {
     if (!isSignedIn()) {
         return [];
     }
-    
+
     return fetch(
         `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
         {
@@ -4544,7 +4552,7 @@ function postCloudAccountAgents(agentsToSync) {
         "agents": agents,
         "merge": false,
     };
-    
+
     return fetch(
         `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
         {
@@ -4572,7 +4580,7 @@ function postCloudAccountAgents(agentsToSync) {
                 "url": a.urls[0],
                 "alternate_urls": a.urls
             }
-        })        
+        })
     });
 }
 
@@ -4629,7 +4637,7 @@ function updateMyNetdataAfterFilterChange() {
 
     if (options.hosts.length > 1) {
         const streamedEl = document.getElementById("my-netdata-menu-streamed")
-        streamedEl.innerHTML = renderStreamedHosts(options);    
+        streamedEl.innerHTML = renderStreamedHosts(options);
     }
 }
 
@@ -4644,7 +4652,7 @@ function myNetdataFilterDidChange(e) {
     const inputEl = e.target;
     setTimeout(() => {
         myNetdataMenuFilterValue = inputEl.value;
-        updateMyNetdataAfterFilterChange();        
+        updateMyNetdataAfterFilterChange();
     }, 1);
 }
 
@@ -4655,9 +4663,9 @@ function myNetdataFilterClearDidClick(e) {
     const inputEl = document.getElementById("my-netdata-menu-filter-input");
     inputEl.value = "";
     myNetdataMenuFilterValue = "";
-    
-    updateMyNetdataAfterFilterChange();        
-    
+
+    updateMyNetdataAfterFilterChange();
+
     inputEl.focus();
 }
 
@@ -4742,7 +4750,7 @@ function handleSignInMessage(e) {
 }
 
 function handleSignOutMessage(e) {
-    clearCloudVariables();    
+    clearCloudVariables();
     renderAccountUI();
     renderMyNetdataMenu(registryAgents);
 }
@@ -4819,14 +4827,14 @@ function explicitlySyncAgents() {
     const sync = json ? JSON.parse(json): {};
     delete sync[cloudAccountID];
     localStorage.setItem("cloud.sync", JSON.stringify(sync));
-    
+
     NETDATA.registry.init();
 }
 
 function syncAgents(callback) {
     const json = localStorage.getItem("cloud.sync");
     const sync = json ? JSON.parse(json): {};
-    
+
     const currentAgent = {
         guid: NETDATA.registry.machine_guid,
         name: NETDATA.registry.hostname,
@@ -4834,10 +4842,10 @@ function syncAgents(callback) {
         alternate_urls: [NETDATA.serverDefault],
     }
 
-    const localAgents = sync[cloudAccountID] 
-        ? [currentAgent] 
+    const localAgents = sync[cloudAccountID]
+        ? [currentAgent]
         : registryAgents.concat([currentAgent]);
-    
+
     console.log("Checking if sync is needed.", localAgents);
 
     const agentsToSync = mergeAgents(cloudAgents, localAgents);
@@ -4849,15 +4857,15 @@ function syncAgents(callback) {
 
     if (agentsToSync) {
         console.log("Synchronizing with netdata.cloud.");
-        
+
         postCloudAccountAgents(agentsToSync).then((agents) => {
             // TODO: clear syncTime on error!
             cloudAgents = agents;
             callback(cloudAgents);
         });
 
-        return        
-    } 
+        return
+    }
 
     callback(cloudAgents);
 }
@@ -4905,10 +4913,10 @@ function netdataRegistryCallback(machinesArray) {
 
     initCloud();
 
-    registryAgents = machinesArray;  
+    registryAgents = machinesArray;
 
     if (isSignedIn()) {
-        // We call getCloudAccountAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountAgents().then((agents) => {
@@ -4916,17 +4924,17 @@ function netdataRegistryCallback(machinesArray) {
                 errorMyNetdataMenu();
                 return;
             }
-            cloudAgents = agents; 
+            cloudAgents = agents;
             syncAgents((agents) => {
                 const agentsMap = {}
                 for (const agent of agents) {
                     agentsMap[agent.guid] = agent;
                 }
-    
+
                 NETDATA.registry.machines = agentsMap;
                 NETDATA.registry.machines_array = agents;
-    
-                renderMyNetdataMenu(agents);    
+
+                renderMyNetdataMenu(agents);
             });
         });
     } else {
@@ -4934,8 +4942,8 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
-// the account ui before receiving the definitive response from the web server. 
+// If we know the cloudBaseURL and agentID from local storage render (eagerly)
+// the account ui before receiving the definitive response from the web server.
 // This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");
@@ -4945,13 +4953,13 @@ function tryFastInitCloud() {
         NETDATA.registry.cloudBaseURL = baseURL;
         NETDATA.registry.machine_guid = agentID;
         NETDATA.registry.isCloudEnabled = true;
-    
+
         initCloud();
     }
 }
 
 function initializeApp() {
-    window.addEventListener("message", handleMessage, false);    
+    window.addEventListener("message", handleMessage, false);
 
 //    tryFastInitCloud();
 }

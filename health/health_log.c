@@ -78,6 +78,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%08x\t%08x\t%08x"
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
+                        "\t%016lx"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
@@ -110,6 +111,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->old_status
                             , ae->delay
 
+                            , (uint64_t)ae->last_repeat
+
                             , ae->new_value
                             , ae->old_value
         ) < 0))
@@ -134,7 +137,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 30, entries = 0;
+        int max_entries = 31, entries = 0;
         char *pointers[max_entries];
 
         pointers[entries++] = s++;
@@ -174,6 +177,22 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 continue;
             }
 
+            time_t last_repeat = (time_t)strtoul(pointers[25], NULL, 16);
+
+            RRDCALC *rc = NULL;
+            for(rc = host->alarms; rc; rc = rc->next) {
+                if(rc->id == alarm_id && rrdcalc_isrepeating(rc)) {
+                    break;
+                }
+            }
+            if (!rc) {
+                // TODO: Handle this!
+            }
+            else {
+                rc->last_repeat = last_repeat;
+                continue;
+            }
+
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
@@ -185,23 +204,27 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 ae = callocz(1, sizeof(ALARM_ENTRY));
             }
             else if(unlikely(*pointers[0] == 'U')) {
-                // find the original
-                for(ae = host->health_log.alarms; ae; ae = ae->next) {
-                    if(unlikely(unique_id == ae->unique_id)) {
-                        if(unlikely(*pointers[0] == 'A')) {
-                            error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
-                                  , host->hostname, line, filename, unique_id);
-                            *pointers[0] = 'U';
-                            duplicate++;
+                if(likely(!alarm_entry_isrepeating(host, ae))) {
+                    // find the original
+                    for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                        if(unlikely(unique_id == ae->unique_id)) {
+                            if(unlikely(*pointers[0] == 'A')) {
+                                error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
+                                      , host->hostname, line, filename, unique_id);
+                                *pointers[0] = 'U';
+                                duplicate++;
+                            }
+                            break;
                         }
-                        break;
+                        else if(unlikely(unique_id > ae->unique_id)) {
+                            // no need to continue
+                            // the linked list is sorted
+                            ae = NULL;
+                            break;
+                        }
                     }
-                    else if(unlikely(unique_id > ae->unique_id)) {
-                        // no need to continue
-                        // the linked list is sorted
-                        ae = NULL;
-                        break;
-                    }
+                } else {
+                    // TODO: Handle this!
                 }
             }
 
@@ -267,11 +290,10 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->old_status  = str2i(pointers[23]);
             ae->delay       = str2i(pointers[24]);
 
-            ae->new_value   = str2l(pointers[25]);
-            ae->old_value   = str2l(pointers[26]);
+            ae->last_repeat = last_repeat;
 
-            ae->warn_repeat_every = 0;
-            ae->crit_repeat_every = 0;
+            ae->new_value   = str2l(pointers[26]);
+            ae->old_value   = str2l(pointers[27]);
 
             char value_string[100 + 1];
             freez(ae->old_value_string);
@@ -342,7 +364,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // health alarm log management
 
-inline void health_alarm_log(
+inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
@@ -361,100 +383,70 @@ inline void health_alarm_log(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags,
-        uint32_t warn_repeat_every,
-        uint32_t crit_repeat_every
+        uint32_t flags
 ) {
-    debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
+    debug(D_HEALTH, "Creating alarm log entry with id: %u", host->health_log.next_log_id);
 
-    bool_t create_new_alarm_entry = TRUE;
-    bool_t is_repeating = make_bool(warn_repeat_every > 0 || crit_repeat_every > 0);
-    REPEATING_ALARM_ENTRY *target_alarm_entity = NULL;
-    if(unlikely(is_repeating)) {
-        REPEATING_ALARM_ENTRY *it;
-        for(it = host->health_rep_alarm_entry_list; it && it->next; it = it->next)
-            if(it->alarm_entry->alarm_id == alarm_id) {
-                target_alarm_entity = it;
-                create_new_alarm_entry = FALSE;
-                break;
-            }
+    ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
+    ae->name = strdupz(name);
+    ae->hash_name = simple_hash(ae->name);
+
+    if(chart) {
+        ae->chart = strdupz(chart);
+        ae->hash_chart = simple_hash(ae->chart);
     }
 
-    ALARM_ENTRY *ae = NULL;
-    if(likely(create_new_alarm_entry)) {
-        ae = callocz(1, sizeof(ALARM_ENTRY));
-        ae->name = strdupz(name);
-        ae->hash_name = simple_hash(ae->name);
+    if(family)
+        ae->family = strdupz(family);
 
-        if(chart) {
-            ae->chart = strdupz(chart);
-            ae->hash_chart = simple_hash(ae->chart);
-        }
+    if(exec) ae->exec = strdupz(exec);
+    if(recipient) ae->recipient = strdupz(recipient);
+    if(source) ae->source = strdupz(source);
+    if(units) ae->units = strdupz(units);
+    if(info) ae->info = strdupz(info);
 
-        if(family)
-            ae->family = strdupz(family);
+    ae->unique_id = host->health_log.next_log_id++;
+    ae->alarm_id = alarm_id;
+    ae->alarm_event_id = alarm_event_id;
+    ae->when = when;
+    ae->old_value = old_value;
+    ae->new_value = new_value;
 
-        if(exec) ae->exec = strdupz(exec);
-        if(recipient) ae->recipient = strdupz(recipient);
-        if(source) ae->source = strdupz(source);
-        if(units) ae->units = strdupz(units);
-        if(info) ae->info = strdupz(info);
+    char value_string[100 + 1];
+    ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
+    ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
-        ae->unique_id = host->health_log.next_log_id++;
-        ae->alarm_id = alarm_id;
-        ae->alarm_event_id = alarm_event_id;
-        ae->when = when;
-        ae->old_value = old_value;
-        ae->new_value = new_value;
+    ae->old_status = old_status;
+    ae->new_status = new_status;
+    ae->duration = duration;
+    ae->delay = delay;
+    ae->delay_up_to_timestamp = when + delay;
+    ae->flags |= flags;
 
-        char value_string[100 + 1];
-        ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
-        ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+    ae->last_repeat = 0;
 
-        ae->old_status = old_status;
-        ae->new_status = new_status;
-        ae->duration = duration;
-        ae->delay = delay;
-        ae->delay_up_to_timestamp = when + delay;
-        ae->flags |= flags;
+    if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
+        ae->non_clear_duration += ae->duration;
 
-        ae->warn_repeat_every = warn_repeat_every;
-        ae->crit_repeat_every = crit_repeat_every;
-        ae->last_repeat = 0;
+    return ae;
+}
 
-        if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
-            ae->non_clear_duration += ae->duration;
-    }
-    else {
-        ae = target_alarm_entity->alarm_entry;
-        netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-        // TODO: Update more necessary fields
-        ae->old_status = old_status;
-        ae->new_status = new_status;
-        netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+inline void health_alarm_log(
+        RRDHOST *host,
+        ALARM_ENTRY *ae
+) {
+    debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
+
+    if(unlikely(alarm_entry_isrepeating(host, ae))) {
+        error("Repeating alarms cannot be added to host's alarm log entries. It seems somewhere in the logic, API is being misused. Alarm id: %u", ae->alarm_id);
+        return;
     }
 
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
-    if(likely(!is_repeating)) {
-        ae->next = host->health_log.alarms;
-        host->health_log.alarms = ae;
-        host->health_log.count++;
-    }
-    else {
-        if(unlikely(!target_alarm_entity)) {
-            // TODO: Remove these entries once host is going to be freed
-            REPEATING_ALARM_ENTRY *rae = callocz(1, sizeof(REPEATING_ALARM_ENTRY));
-            rae->alarm_entry = ae;
-            if(unlikely(!host->health_rep_alarm_entry_list)) {
-                host->health_rep_alarm_entry_list = rae;
-            }
-            else {
-                rae->next = host->health_rep_alarm_entry_list;
-                host->health_rep_alarm_entry_list = rae;
-            }
-        }
-    }
+    ae->next = host->health_log.alarms;
+    host->health_log.alarms = ae;
+    host->health_log.count++;
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     // match previous alarms
