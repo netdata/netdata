@@ -15,9 +15,14 @@
 - Slack footer link breaks when the URL is too long [\#5654](https://github.com/netdata/netdata/issues/5654)
 - netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
 - feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
+- /etc/cron.daily/netdata-updater -f $'\E\(B\E\[0m\\n' /dev/fd/63: line 86: : command not found [\#5570](https://github.com/netdata/netdata/issues/5570)
+- support gauges without a needle [\#4206](https://github.com/netdata/netdata/issues/4206)
+- remove not updated charts after some time [\#688](https://github.com/netdata/netdata/issues/688)
 
 **Merged pull requests:**
 
+- do not show the modal on demo sites [\#5686](https://github.com/netdata/netdata/pull/5686) ([ktsaou](https://github.com/ktsaou))
+- netdata/packaging/uninstaller: Update uninstall document [\#5678](https://github.com/netdata/netdata/pull/5678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - fix incorrect use of isnormal\(\) [\#5677](https://github.com/netdata/netdata/pull/5677) ([ktsaou](https://github.com/ktsaou))
 - py stuff: change l2isbad to ilyam8 [\#5676](https://github.com/netdata/netdata/pull/5676) ([ilyam8](https://github.com/ilyam8))
 - bring uninstaller back [\#5675](https://github.com/netdata/netdata/pull/5675) ([paulfantom](https://github.com/paulfantom))
