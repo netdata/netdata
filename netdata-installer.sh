@@ -761,8 +761,8 @@ install_go() {
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
 
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
-		grep "${GO_PACKAGE_BASENAME}\$" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
-		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
 		if ! (cd "${tmp}" && sha256sum -c "sha256sums.txt"); then
