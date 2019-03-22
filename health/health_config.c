@@ -267,6 +267,11 @@ static inline int health_parse_repeat(
         while(*s && !isspace(*s)) s++;
         while(*s && isspace(*s)) *s++ = '\0';
 
+        if(!strcasecmp(key, "off")) {
+          *warn_repeat_every = 0;
+          *crit_repeat_every = 0;
+          return TRUE;
+        }
         if(!strcasecmp(key, "warning")) {
             if (!config_parse_duration(value, (int*)warn_repeat_every)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
