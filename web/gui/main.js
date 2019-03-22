@@ -4369,12 +4369,6 @@ function finalizePage() {
         // do not to give errors on netdata demo servers for 60 seconds
         NETDATA.options.current.retries_on_data_failures = 60;
 
-        if (urlOptions.nowelcome !== true) {
-            setTimeout(function () {
-                $('#welcomeModal').modal();
-            }, 1000);
-        }
-
         // google analytics when this is used for the home page of the demo sites
         // this does not run on user's installations
         setTimeout(function () {
@@ -4412,6 +4406,12 @@ function finalizePage() {
     if (netdataSnapshotData !== null) {
         NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
     }
+
+    //if (urlOptions.nowelcome !== true) {
+    //    setTimeout(function () {
+    //        $('#welcomeModal').modal();
+    //    }, 2000);
+    //}
 
     // var netdataEnded = performance.now();
     // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
