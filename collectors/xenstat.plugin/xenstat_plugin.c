@@ -4,20 +4,27 @@
 
 #define PLUGIN_XENSTAT_NAME "xenstat.plugin"
 
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS        8701
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ    8702
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_MEM         8703
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM        8704
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS     8705
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS              8701
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ          8702
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_MEM               8703
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM              8704
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS           8705
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU              8901
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU             8902
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM              8903
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES       8904
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS  8905
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ       8906
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS     8907
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS      8908
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU             8901
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU            8902
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM             8903
+
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES      8904
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS 8905
+
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ      8906
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS    8907
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS     8908
+
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_BYTES       8909
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS     8910
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_ERRORS      8911
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_DROPS       8912
 
 #define TYPE_LENGTH_MAX 1024
 
@@ -107,6 +114,28 @@ struct vbd_metrics {
     struct vbd_metrics *next;
 };
 
+struct network_metrics {
+    unsigned int id;
+
+    unsigned long long rbytes;
+    unsigned long long rpackets;
+    unsigned long long rerrs;
+    unsigned long long rdrops;
+
+    unsigned long long tbytes;
+    unsigned long long tpackets;
+    unsigned long long terrs;
+    unsigned long long tdrops;
+
+    int bytes_chart_generated;
+    int packets_chart_generated;
+    int errors_chart_generated;
+    int drops_chart_generated;
+    int updated;
+
+    struct network_metrics *next;
+};
+
 struct domain_metrics {
     char *uuid;
     uint32_t hash;
@@ -121,6 +150,7 @@ struct domain_metrics {
     struct tmem_metrics tmem;
     struct vcpu_metrics *vcpu_root;
     struct vbd_metrics *vbd_root;
+    struct network_metrics *network_root;
 
     int cpu_chart_generated;
     int mem_chart_generated;
@@ -223,7 +253,7 @@ static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
 
         vbd = xenstat_domain_vbd(domain, i);
 
-        vbd_m->error   = xenstat_vbd_error(vbd);
+        vbd_m->error    = xenstat_vbd_error(vbd);
         vbd_m->oo_reqs  = xenstat_vbd_oo_reqs(vbd);
         vbd_m->rd_reqs  = xenstat_vbd_rd_reqs(vbd);
         vbd_m->wr_reqs  = xenstat_vbd_wr_reqs(vbd);
@@ -234,6 +264,46 @@ static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
 
         last_vbd_m = vbd_m;
         vbd_m = vbd_m->next;
+    }
+}
+
+static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+    unsigned int num_networks = xenstat_domain_num_networks(domain);
+    xenstat_network *network = NULL;
+    struct network_metrics *network_m = NULL, *last_network_m = NULL;
+
+    for(network_m = d->network_root; network_m ; network_m = network_m->next)
+        network_m->updated = 0;
+
+    network_m = d->network_root;
+
+    unsigned int  i;
+    for(i = 0; i < num_networks; i++) {
+        if(unlikely(!network_m)) {
+            network_m = callocz(1, sizeof(struct network_metrics));
+
+            if(i == 0) d->network_root = network_m;
+            else last_network_m->next = network_m;
+        }
+
+        network_m->id = i;
+
+        network = xenstat_domain_network(domain, i);
+
+        network_m->rbytes   = xenstat_network_rbytes(network);
+        network_m->rpackets = xenstat_network_rpackets(network);
+        network_m->rerrs    = xenstat_network_rerrs(network);
+        network_m->rdrops   = xenstat_network_rdrop(network);
+
+        network_m->tbytes   = xenstat_network_tbytes(network);
+        network_m->tpackets = xenstat_network_tpackets(network);
+        network_m->terrs    = xenstat_network_terrs(network);
+        network_m->tdrops   = xenstat_network_tdrop(network);
+
+        network_m->updated = 1;
+
+        last_network_m = network_m;
+        network_m = network_m->next;
     }
 }
 
@@ -294,6 +364,7 @@ static int xenstat_collect() {
 
         vcpu_metrics_collect(d, domain);
         vbd_metrics_collect(d, domain);
+        network_metrics_collect(d, domain);
 
         d->updated = 1;
     }
@@ -504,6 +575,62 @@ static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int v
     printf("DIMENSION write '' incremental 1 %d\n", netdata_update_every);
 }
 
+static void print_domain_network_bytes_chart_definition(char *type, unsigned int network, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_bytes_network%u '' 'Network%u Recieved/Sent Bytes' 'kilobits/s' 'network' '' line %d %d %s %s\n"
+                       , type
+                       , network
+                       , network
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_BYTES + network
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION received '' incremental 8 %d\n", netdata_update_every * 1000);
+    printf("DIMENSION sent '' incremental 8 %d\n", netdata_update_every * 1000);
+}
+
+static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_packets_network%u '' 'Network%u Recieved/Sent Bytes' 'packets/s' 'network' '' line %d %d %s %s\n"
+                       , type
+                       , network
+                       , network
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS + network
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+}
+
+static void print_domain_network_errors_chart_definition(char *type, unsigned int network, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_errors_network%u '' 'Network%u Receive/Transmit Errors' 'errors/s' 'network' '' line %d %d %s %s\n"
+                       , type
+                       , network
+                       , network
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS + network
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+}
+
+static void print_domain_network_drops_chart_definition(char *type, unsigned int network, int obsolete_flag) {
+    printf("CHART %s.xenstat_domain_drops_network%u '' 'Network%u Recieve/Transmit Drops' 'drops/s' 'network' '' line %d %d %s %s\n"
+                       , type
+                       , network
+                       , network
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS + network
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+}
+
 static void xenstat_send_domain_metrics() {
 
     if(!node_metrics.domain_root) return;
@@ -660,6 +787,89 @@ static void xenstat_send_domain_metrics() {
                     vbd_m->oo_req_chart_generated = 0;
                     vbd_m->requests_chart_generated = 0;
                     vbd_m->sectors_chart_generated = 0;
+                }
+            }
+
+            // ----------------------------------------------------------------
+
+            struct network_metrics *network_m;
+            for(network_m = d->network_root; network_m; network_m = network_m->next) {
+                if(likely(network_m->updated)) {
+                    if(!network_m->bytes_chart_generated) {
+                        network_m->bytes_chart_generated = 1;
+                        print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_bytes_network%u\n"
+                            "SET recieved = %lld\n"
+                            "SET sent = %lld\n"
+                            "END\n"
+                            , type
+                            , network_m->id
+                            , (collected_number)network_m->rbytes
+                            , (collected_number)network_m->tbytes
+                    );
+
+                    // ----------------------------------------------------------------
+
+                    if(!network_m->packets_chart_generated) {
+                        network_m->packets_chart_generated = 1;
+                        print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_packets_network%u\n"
+                            "SET recieved = %lld\n"
+                            "SET sent = %lld\n"
+                            "END\n"
+                            , type
+                            , network_m->id
+                            , (collected_number)network_m->rpackets
+                            , (collected_number)network_m->tpackets
+                    );
+
+                    // ----------------------------------------------------------------
+
+                    if(!network_m->errors_chart_generated) {
+                        network_m->errors_chart_generated = 1;
+                        print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_errors_network%u\n"
+                            "SET recieved = %lld\n"
+                            "SET sent = %lld\n"
+                            "END\n"
+                            , type
+                            , network_m->id
+                            , (collected_number)network_m->rerrs
+                            , (collected_number)network_m->terrs
+                    );
+
+                    // ----------------------------------------------------------------
+
+                    if(!network_m->drops_chart_generated) {
+                        network_m->drops_chart_generated = 1;
+                        print_domain_network_drops_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                    }
+                    printf(
+                            "BEGIN %s.xenstat_domain_drops_network%u\n"
+                            "SET recieved = %lld\n"
+                            "SET sent = %lld\n"
+                            "END\n"
+                            , type
+                            , network_m->id
+                            , (collected_number)network_m->rdrops
+                            , (collected_number)network_m->tdrops
+                    );
+                }
+                else {
+                    print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
+                    print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
+                    print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
+                    print_domain_network_drops_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
+                    network_m->bytes_chart_generated   = 0;
+                    network_m->packets_chart_generated = 0;
+                    network_m->errors_chart_generated  = 0;
+                    network_m->drops_chart_generated   = 0;
                 }
             }
         }
