@@ -951,7 +951,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     buffer_sprintf(w->response.header_output,
             "HTTP/1.1 %d %s\r\n"
                     "Connection: %s\r\n"
-                    "Server: NetData Embedded HTTP Server v%s\r\n"
+                    "Server: NetData Embedded HTTP Server %s\r\n"
                     "Access-Control-Allow-Origin: %s\r\n"
                     "Access-Control-Allow-Credentials: true\r\n"
                     "Content-Type: %s\r\n"

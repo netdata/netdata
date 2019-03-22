@@ -23,14 +23,15 @@ jobs:
     script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
   - name: lint .sh.in files
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+  - name: check checksums for kickstart files
+    script: ./tests/installer/checksums.sh
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-    script: ./coverity-scan.sh || echo "Coverity failed :("
-    env: INSTALL_COVERITY="true"
+    script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
     if: type = cron
 
   - stage: build
-# TODO(paulfantom): enable when travis OSX become stable. Probably after 12.01.2019
+# TODO: enable when travis OSX become stable. Probably after 12.01.2019
 #    name: OSX
 #    install: brew install fakeroot ossp-uuid
 #    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it

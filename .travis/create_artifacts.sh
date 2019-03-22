@@ -27,10 +27,10 @@ echo "--- Create self-extractor ---"
 # Needed fo GCS
 echo "--- Copy artifacts to separate directory ---"
 #shellcheck disable=SC2164
+cp packaging/version artifacts/latest-version.txt
 cd artifacts
 ln -s "${BASENAME}.tar.gz" netdata-latest.tar.gz
 ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
 sha256sum -b ./* >"sha256sums.txt"
 echo "checksums:"
 cat sha256sums.txt
-

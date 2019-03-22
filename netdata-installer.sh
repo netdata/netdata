@@ -43,14 +43,10 @@ fi
 download() {
 	url="${1}"
 	dest="${2}"
-	if command -v wget >/dev/null 2>&1; then
-		if [ -t 1 ]; then
-			run wget -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		else
-			run wget --progress=dot:mega -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
-		fi
-	elif command -v curl >/dev/null 2>&1; then
-		run curl "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	if command -v curl >/dev/null 2>&1; then
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
 		fatal "I need curl or wget to proceed, but neither is available on this system."
 	fi
@@ -104,6 +100,7 @@ AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
+RELEASE_CHANNEL="nightly"
 
 usage() {
 	netdata_banner "installer command line options"
@@ -132,7 +129,12 @@ Valid <installer options> are:
 
         Install netdata-updater to cron,
         to update netdata automatically once per day
-        (can only be done for installations from git)
+
+   --stable-channel
+
+        Auto-updater will update netdata only when new release is published
+        in GitHub release pages. This results in less frequent updates.
+        Default: Use packages from GCS (nightly release channel).
 
    --enable-plugin-freeipmi
    --disable-plugin-freeipmi
@@ -207,6 +209,9 @@ while [ ! -z "${1}" ]; do
 		shift 1
 	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
 		AUTOUPDATE=1
+		shift 1
+	elif [ "$1" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
 		shift 1
 	elif [ "$1" = "--enable-plugin-freeipmi" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
@@ -520,7 +525,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 	}
 
 	# clean up stock config files from the user configuration directory
-	for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f); do
+	for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)); do
 		if [ -f "${x}" ]; then
 			# find it relative filename
 			f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
@@ -529,6 +534,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 			t="${f/.conf.installer_backup.*/.conf}"
 			t="${t/.conf.old/.conf}"
 			t="${t/.conf.orig/.conf}"
+			t="${t/orig\//}"
 
 			if [ -z "${md5sum}" -o ! -x "${md5sum}" ]; then
 				# we don't have md5sum - keep it
@@ -544,7 +550,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 					deleted_stock_configs=$((deleted_stock_configs + 1))
 				else
 					# edited by user - keep it
-					echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of '${t}'${TPUT_RESET}. Keeping it."
+					echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} does not match stock of${TPUT_RESET} ${TPUT_CYAN}'${t}'${TPUT_RESET}. Keeping it."
 				fi
 			fi
 		fi
@@ -787,7 +793,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.0.2"
+	GO_PACKAGE_VERSION="v0.2.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -814,9 +820,11 @@ install_go() {
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
 		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
+
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
-		grep "${GO_PACKAGE_BASENAME}" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "${GO_PACKAGE_BASENAME}\$" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
@@ -976,6 +984,11 @@ SETUID_WARNING
 fi
 
 # -----------------------------------------------------------------------------
+progress "Copy uninstaller"
+sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
+chmod 750 ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
+
+# -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
 
 cat <<END
@@ -995,6 +1008,7 @@ To start netdata run:
 
 
 END
+echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ "${AUTOUPDATE}" = "1" ]; then
 	if [ "${UID}" -ne "0" ]; then
@@ -1045,9 +1059,8 @@ NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
-# next 3 values are meant to be populated by autoupdater (if enabled)
-NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
-NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+RELEASE_CHANNEL="${RELEASE_CHANNEL}"
+# This value is meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 

@@ -85,13 +85,14 @@ fi
 # -------------------------------------------------------------------------------------------------
 # detect containers with heuristics
 
-if [ "${CONTAINER}" = "unknown" ] ; then
-	IFS='(, ' read -r process _ </proc/1/sched
-	if [ "${process}" = "netdata" ]; then
-		CONTAINER="container"
-		CONT_DETECTION="process"
+if [ "${CONTAINER}" = "unknown" ]; then
+	if [ -f /proc/1/sched ] ; then
+		IFS='(, ' read -r process _ </proc/1/sched
+		if [ "${process}" = "netdata" ]; then
+			CONTAINER="container"
+			CONT_DETECTION="process"
+		fi
 	fi
-
 	# ubuntu and debian supply /bin/running-in-container
 	# https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
 	if /bin/running-in-container >/dev/null 2>&1; then

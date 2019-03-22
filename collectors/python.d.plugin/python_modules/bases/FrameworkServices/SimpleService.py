@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 # Description:
 # Author: Pawel Krupa (paulfantom)
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from threading import Thread
+
 from time import sleep, time
 
 from third_party.monotonic import monotonic
 
 from bases.charts import Charts, ChartError, create_runtime_chart
-from bases.collection import OldVersionCompatibility, safe_print
+from bases.collection import safe_print
 from bases.loggers import PythonDLimitedLogger
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
@@ -55,7 +55,7 @@ class RuntimeCounters:
             self.penalty = round(min(self.retries * self.update_every / 2, MAX_PENALTY))
 
 
-class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, object):
+class SimpleService(PythonDLimitedLogger, object):
     """
     Prototype of Service class.
     Implemented basic functionality to run jobs by `python.d.plugin`
@@ -65,10 +65,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :param configuration: <dict>
         :param name: <str>
         """
-        Thread.__init__(self)
-        self.daemon = True
         PythonDLimitedLogger.__init__(self)
-        OldVersionCompatibility.__init__(self)
         self.configuration = configuration
         self.order = list()
         self.definitions = dict()
@@ -91,7 +88,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
     @property
     def name(self):
-        if self.job_name:
+        if self.job_name and self.job_name != self.module_name:
             return '_'.join([self.module_name, self.override_name or self.job_name])
         return self.module_name
 

@@ -4,6 +4,38 @@
 
 // generate JSON for the /api/v1/charts API call
 
+static inline const char* get_release_channel() {
+    static int use_stable = -1;
+
+    if (use_stable == -1) {
+		char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
+        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_DEFAULT);
+        if(!ff) {
+            use_stable=1;
+        } else {
+            procfile_set_quotes(ff, "'\"");
+            ff = procfile_readall(ff);
+            if(!ff) {
+                use_stable=1;
+            } else {
+                unsigned int i;
+                for(i = 0; i < procfile_lines(ff); i++) {
+                    if (!procfile_linewords(ff, i)) continue;
+
+                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL") && !strcmp(procfile_lineword(ff, i, 1), "stable")) {
+                        use_stable = 1;
+                        break;
+                    }
+                }
+                procfile_close(ff);
+                if (use_stable == -1) use_stable = 0;
+            }
+        }
+    }
+    return (use_stable)?"stable":"nightly";
+}
+
 void charts2json(RRDHOST *host, BUFFER *wb) {
     static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
@@ -17,6 +49,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     buffer_sprintf(wb, "{\n"
                        "\t\"hostname\": \"%s\""
                        ",\n\t\"version\": \"%s\""
+                       ",\n\t\"release_channel\": \"%s\""
                        ",\n\t\"os\": \"%s\""
                        ",\n\t\"timezone\": \"%s\""
                        ",\n\t\"update_every\": %d"
@@ -25,6 +58,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"charts\": {"
                    , host->hostname
                    , host->program_version
+                   , get_release_channel()
                    , host->os
                    , host->timezone
                    , host->rrd_update_every

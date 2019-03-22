@@ -19,6 +19,7 @@ struct ps_property_dim {
 
     RRDDIM *rd;
     unsigned long long value;
+    int always_zero;
 
     struct ps_property_dim *next;
 };
@@ -184,6 +185,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 for(pr_idx = 0; pr_idx < 3; pr_idx++) {
                     if(unlikely(do_property[pr_idx] != CONFIG_BOOLEAN_NO)) {
                         struct ps_property *pr = NULL;
+                        int min_value_found = 0, max_value_found = 0;
 
                         for(pd_idx = pr_idx * 5; pd_idx < pr_idx * 5 + 5; pd_idx++) {
 
@@ -192,6 +194,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             snprintfz(filename, FILENAME_MAX, "%s/%s/%s_%s", dirname, de->d_name,
                                       ps_property_names[pr_idx], ps_property_dim_names[pd_idx]);
                             if (stat(filename, &stbuf) == 0) {
+
+                                if(unlikely(pd_idx == pr_idx * 5 + 1))
+                                    min_value_found = 1;
+                                if(unlikely(pd_idx == pr_idx * 5 + 3))
+                                    max_value_found = 1;
 
                                 // add chart
                                 if(unlikely(prev_idx != pr_idx)) {
@@ -214,6 +221,16 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 pd->next = pr->property_dim_root;
                                 pr->property_dim_root = pd;
                             }
+                        }
+
+                        // create a zero empty/min dimension
+                        if(unlikely(max_value_found && !min_value_found)) {
+                            struct ps_property_dim *pd;
+                            pd= callocz(sizeof(struct ps_property_dim), 1);
+                            pd->name = strdupz(ps_property_dim_names[pr_idx * 5 + 1]);
+                            pd->always_zero = 1;
+                            pd->next = pr->property_dim_root;
+                            pr->property_dim_root = pd;
                         }
                     }
                 }
@@ -258,36 +275,38 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
                 struct ps_property_dim *pd;
                 for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                    char buffer[30 + 1];
+                    if(likely(!pd->always_zero)) {
+                        char buffer[30 + 1];
 
-                    if(unlikely(pd->fd == -1)) {
-                        pd->fd = open(pd->filename, O_RDONLY, 0666);
                         if(unlikely(pd->fd == -1)) {
-                            error("Cannot open file '%s'", pd->filename);
+                            pd->fd = open(pd->filename, O_RDONLY, 0666);
+                            if(unlikely(pd->fd == -1)) {
+                                error("Cannot open file '%s'", pd->filename);
+                                read_error = 1;
+                                power_supply_free(ps);
+                                break;
+                            }
+                        }
+
+                        ssize_t r = read(pd->fd, buffer, 30);
+                        if(unlikely(r < 1)) {
+                            error("Cannot read file '%s'", pd->filename);
                             read_error = 1;
                             power_supply_free(ps);
                             break;
                         }
-                    }
+                        buffer[r] = '\0';
+                        pd->value = str2ull(buffer);
 
-                    ssize_t r = read(pd->fd, buffer, 30);
-                    if(unlikely(r < 1)) {
-                        error("Cannot read file '%s'", pd->filename);
-                        read_error = 1;
-                        power_supply_free(ps);
-                        break;
-                    }
-                    buffer[r] = '\0';
-                    pd->value = str2ull(buffer);
-
-                    if(unlikely(!keep_fds_open)) {
-                        close(pd->fd);
-                        pd->fd = -1;
-                    }
-                    else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
-                        error("Cannot seek in file '%s'", pd->filename);
-                        close(pd->fd);
-                        pd->fd = -1;
+                        if(unlikely(!keep_fds_open)) {
+                            close(pd->fd);
+                            pd->fd = -1;
+                        }
+                        else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
+                            error("Cannot seek in file '%s'", pd->filename);
+                            close(pd->fd);
+                            pd->fd = -1;
+                        }
                     }
                 }
             }
