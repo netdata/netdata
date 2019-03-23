@@ -37,6 +37,7 @@ fi
 
 echo "--- BUILD & PUBLISH DOCKER IMAGES ---"
 packaging/docker/build.sh || BAD_THING_HAPPENED=1
+packaging/docker/publish.sh || BAD_THING_HAPPENED=1
 
 echo "--- BUILD ARTIFACTS ---"
 .travis/create_artifacts.sh || BAD_THING_HAPPENED=1

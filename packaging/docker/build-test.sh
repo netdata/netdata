@@ -1,7 +1,11 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
-# Author  : Chris Akritidis (cakrit)
-# Cross-arch docker build helper script
+# Docker build wrapper, for testing manually the docker build process
+# TODO: This script should consume build.sh after setting up required parameters
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author  : Chris Akritidis (chris@netdata.cloud)
+# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 
 printhelp() {
 	echo "Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PASSWORD> [-s]

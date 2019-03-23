@@ -32,11 +32,11 @@ jobs:
 
   - stage: build
 # TODO: enable when travis OSX become stable. Probably after 12.01.2019
-#    name: OSX
-#    install: brew install fakeroot ossp-uuid
-#    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-#    os: osx
-#  - name: ubuntu 14.04 (not containerized)
+#   name: OSX
+#   install: brew install fakeroot ossp-uuid
+#   script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
+#   os: osx
+# - name: ubuntu 14.04 (not containerized)
     name: ubuntu 14.04 (not containerized)
     install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
     script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
@@ -80,7 +80,7 @@ jobs:
       bucket: "netdata-nightlies"
       skip_cleanup: true
       local_dir: "artifacts"
-
+    after_deploy: rm -f .travis/gcs-credentials.json
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
