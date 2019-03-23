@@ -33,6 +33,7 @@
 - Load gtm only if anonymous\_statistics are enabled [\#5651](https://github.com/netdata/netdata/pull/5651) ([cakrit](https://github.com/cakrit))
 - Fix slack notifications footer and set cloud redirect URL to http [\#5650](https://github.com/netdata/netdata/pull/5650) ([cakrit](https://github.com/cakrit))
 - x509check alarm fix [\#5645](https://github.com/netdata/netdata/pull/5645) ([ilyam8](https://github.com/ilyam8))
+- Split docker build script into build and publish - attempt small cleanups along the way [\#5591](https://github.com/netdata/netdata/pull/5591) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - fix command not found error when run script under root user. [\#5581](https://github.com/netdata/netdata/pull/5581) ([vinsia](https://github.com/vinsia))
 - Patch netdata-installer.sh to avoid unwanted errors during stock config cleanup [\#5571](https://github.com/netdata/netdata/pull/5571) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Make sign-in functionality more visible [\#5569](https://github.com/netdata/netdata/pull/5569) ([gmosx](https://github.com/gmosx))
