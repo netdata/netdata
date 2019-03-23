@@ -11,8 +11,7 @@ stages:
   if: branch = master AND type != pull_request AND type != cron
 - name: nightlies
   if: branch = master AND type = cron
-- name: integrity
-  if: branch = master
+- integrity
 
 jobs:
   include:
