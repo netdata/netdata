@@ -863,7 +863,7 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern bool_t alarm_entry_isrepeating_by_alarmid(RRDHOST *host, uint32_t alarm_id);
+extern bool_t alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
 extern bool_t alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
 
 // ----------------------------------------------------------------------------

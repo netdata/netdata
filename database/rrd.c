@@ -152,7 +152,7 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-bool_t alarm_entry_isrepeating_by_alarmid(RRDHOST *host, uint32_t alarm_id) {
+bool_t alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC *rc = NULL;
     for(rc = host->alarms; rc; rc = rc->next) {
         if(alarm_id == rc->id) {
@@ -166,5 +166,5 @@ bool_t alarm_entry_isrepeating_by_alarmid(RRDHOST *host, uint32_t alarm_id) {
     return rrdcalc_isrepeating(rc);
 }
 bool_t alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
-    return alarm_entry_isrepeating_by_alarmid(host, ae->alarm_id);
+    return alarm_isrepeating(host, ae->alarm_id);
 }

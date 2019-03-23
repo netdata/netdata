@@ -269,9 +269,6 @@ static inline void health_alarm_log_process(RRDHOST *host) {
                     health_process_notifications(host, ae);
             }
         }
-        else {
-            error("No alarm entry for a repeaing alarm should be in the alarm log. Alarm id: %u", ae->alarm_id);
-        }
     }
 
     // remember this for the next iteration
@@ -302,9 +299,6 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         if(likely(!alarm_entry_isrepeating(host, ae))) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             host->health_log.count--;
-        }
-        else {
-            error("No alarm entry for a repeaing alarm should be in the alarm log. Alarm id: %u", ae->alarm_id);
         }
 
         ae = t;
