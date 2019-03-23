@@ -92,7 +92,7 @@ jobs:
 notifications:
   email:
     recipients:
-    - paul@netdata.cloud
+    - paul@netdata.rocks
     on_success: always
     on_failure: always
   webhooks: https://app.fossa.io/hooks/travisci
