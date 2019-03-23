@@ -21,6 +21,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging/docker: Fix build - typo on array iteration [\#5691](https://github.com/netdata/netdata/pull/5691) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - do not show the modal on demo sites [\#5686](https://github.com/netdata/netdata/pull/5686) ([ktsaou](https://github.com/ktsaou))
 - netdata/packaging/uninstaller: Update uninstall document [\#5678](https://github.com/netdata/netdata/pull/5678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - fix incorrect use of isnormal\(\) [\#5677](https://github.com/netdata/netdata/pull/5677) ([ktsaou](https://github.com/ktsaou))
