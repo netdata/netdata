@@ -201,7 +201,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 ae = callocz(1, sizeof(ALARM_ENTRY));
             }
             else if(unlikely(*pointers[0] == 'U')) {
-                if(likely(!alarm_entry_isrepeating(host, ae))) {
+                if(likely(!alarm_entry_isrepeating_by_alarmid(host, alarm_id))) {
                     // find the original
                     for(ae = host->health_log.alarms; ae; ae = ae->next) {
                         if(unlikely(unique_id == ae->unique_id)) {
