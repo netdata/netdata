@@ -11,6 +11,8 @@ stages:
   if: branch = master AND type != pull_request AND type != cron
 - name: nightlies
   if: branch = master AND type = cron
+- name: integrity
+  if: branch = master
 
 jobs:
   include:
@@ -81,6 +83,11 @@ jobs:
       skip_cleanup: true
       local_dir: "artifacts"
     after_deploy: rm -f .travis/gcs-credentials.json
+
+  - stage: integrity
+    name: Deployment integrity testing
+    script: ".travis/validate_kickstart_integrity.sh"
+
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
