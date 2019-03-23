@@ -11,7 +11,8 @@ stages:
   if: branch = master AND type != pull_request AND type != cron
 - name: nightlies
   if: branch = master AND type = cron
-- integrity
+- name: Integrity testing
+  if: branch = master AND type = cron
 
 jobs:
   include:
@@ -83,8 +84,8 @@ jobs:
       local_dir: "artifacts"
     after_deploy: rm -f .travis/gcs-credentials.json
 
-  - stage: integrity
-    name: Deployment integrity testing
+  - stage: Integrity testing
+    name: Kickstart files integrity testing
     script: ".travis/validate_kickstart_integrity.sh"
 
 notifications:
