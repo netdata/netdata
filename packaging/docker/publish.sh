@@ -11,7 +11,6 @@ set -e
 WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
-MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
@@ -30,6 +29,7 @@ if [ "${VERSION}" == "" ]; then
         VERSION="latest"
     fi
 fi
+MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 
 # There is no reason to continue if we cannot log in to docker hub
 if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
@@ -70,6 +70,7 @@ echo "Waiting for images publishing to complete"
 wait
 
 # Recreate docker manifest list
+echo "Creating manifest list.."
 $DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" \
                                     "${MANIFEST_LIST}-i386" \
                                     "${MANIFEST_LIST}-armhf" \
@@ -77,15 +78,20 @@ $DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" \
                                     "${MANIFEST_LIST}-amd64"
 
 # Annotate manifest with CPU architecture information
+
+echo "Executing manifest annotate.."
 for ARCH in ${ARCHS[@]}; do
      TAG="${MANIFEST_LIST}-${ARCH}"
+     echo "Annotating manifest for $ARCH, with TAG: ${TAG} (Manifest list: ${MANIFEST_LIST})"
      $DOCKER_CMD manifest annotate "${MANIFEST_LIST}" "${TAG}" --os linux --arch "${ARCH_MAP[$ARCH]}"
 done
 
 # Push manifest to docker hub
+echo "Pushing manifest list to docker.."
 $DOCKER_CMD manifest push -p "${MANIFEST_LIST}"
 
 # Show current manifest (debugging purpose only)
+echo "Evaluating manifest list entry"
 $DOCKER_CMD manifest inspect "${MANIFEST_LIST}"
 
 # Cleanup
