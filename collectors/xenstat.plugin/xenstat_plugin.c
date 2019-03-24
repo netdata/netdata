@@ -70,10 +70,6 @@ static int netdata_update_every = 1;
 #include <xenstat.h>
 #include <libxl.h>
 
-static xenstat_handle *xhandle = NULL;
-static libxl_ctx *ctx = NULL;
-static libxl_dominfo info;
-
 struct vcpu_metrics {
     unsigned int id;
 
@@ -316,7 +312,7 @@ static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *do
     }
 }
 
-static int xenstat_collect() {
+static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominfo *info) {
     static xenstat_node *node = NULL;
 
     // mark all old metrics as not-updated
@@ -348,11 +344,11 @@ static int xenstat_collect() {
 
         // get domain UUID
         unsigned int id = xenstat_domain_id(domain);
-        if(libxl_domain_info(ctx, &info, id)) {
+        if(libxl_domain_info(ctx, info, id)) {
             error("XENSTAT: cannot get domain info.");
         }
         else {
-            snprintfz(uuid, LIBXL_UUID_FMTLEN, LIBXL_UUID_FMT "\n", LIBXL_UUID_BYTES(info.uuid));
+            snprintfz(uuid, LIBXL_UUID_FMTLEN, LIBXL_UUID_FMT "\n", LIBXL_UUID_BYTES(info->uuid));
         }
 
         uint32_t hash = simple_hash(uuid);
@@ -981,6 +977,9 @@ int main(int argc, char **argv) {
 
     // ------------------------------------------------------------------------
     // initialize xen API handles
+    xenstat_handle *xhandle = NULL;
+    libxl_ctx *ctx = NULL;
+    libxl_dominfo info;
 
     if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
     xhandle = xenstat_init();
@@ -1018,7 +1017,7 @@ int main(int argc, char **argv) {
 
         if(likely(xhandle)) {
             if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_collect()\n");
-            int ret = xenstat_collect();
+            int ret = xenstat_collect(xhandle, ctx, &info);
 
             if(likely(!ret)) {
                 if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_send_node_metrics()\n");
