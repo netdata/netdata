@@ -1,31 +1,55 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+/* Default global database state */
+static struct rrdengine_instance default_global_ctx;
+
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_release_store_metric().
  */
-void rrdeng_store_metric_init(RRDDIM *rd, struct rrdeng_handle *handle)
+void rrdeng_store_metric_init(struct rrdengine_instance *ctx, RRDDIM *rd, struct rrdeng_handle *handle)
 {
-    void *page;
-    uuid_t *temp_id;
-    uint32_t *hashp;
-
-    /* TODO: this malloc needs to move to a metrics index */
-    handle->uuid = calloc(1, sizeof(uuid_t)); /* sets memory to zero */
-    if (unlikely(handle->uuid == NULL)) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
+    if (NULL == ctx) {
+        /* TODO: move to per host basis */
+        ctx = &default_global_ctx;
     }
-    strncpy((char *)handle->uuid, rd->id, sizeof(uuid_t) - 2 * sizeof(uint32_t));
-    hashp = ((void *)handle->uuid) + sizeof(uuid_t) - 2 * sizeof(uint32_t);
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    uuid_t temp_id;
+    uint32_t *hashp;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index;
+
+    handle->ctx = ctx;
+
+    memset(&temp_id, 0, sizeof(temp_id));
+    strncpy((char *)&temp_id, rd->id, sizeof(uuid_t) - 2 * sizeof(uint32_t));
+    hashp = ((void *)&temp_id) + sizeof(uuid_t) - 2 * sizeof(uint32_t);
     hashp[0] = rd->hash;
     hashp[1] = rd->rrdset->hash;
     handle->descr = NULL;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t));
+    if (likely(NULL != PValue)) {
+        page_index = *PValue;
+    }
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    if (NULL == PValue) {
+        /* First time we see the UUID */
+        uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t), PJE0);
+        assert(NULL == *PValue); /* TODO: figure out concurrency model */
+        *PValue = page_index = create_page_index(&temp_id);
+        uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
+    }
+    handle->uuid = &page_index->id;
 }
 
 void rrdeng_store_metric_next(struct rrdeng_handle *handle, usec_t point_in_time, storage_number number)
 {
+    struct rrdengine_instance *ctx = handle->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_cache_descr *descr;
     storage_number *page;
 
@@ -33,21 +57,39 @@ void rrdeng_store_metric_next(struct rrdeng_handle *handle, usec_t point_in_time
     if (unlikely(NULL == descr || descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE)) {
         if (descr) {
             descr->handle = NULL;
-            rrdeng_commit_page(descr);
+            if (descr->page_length) {
+                uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+                --pg_cache->producers; /* DEBUG STAT */
+                uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
+                rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+            } else {
+                free(descr->page);
+                free(descr);
+            }
         }
         page = rrdeng_create_page(handle->uuid, &descr);
         assert(page);
         handle->descr = descr;
         descr->handle = handle;
+        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+        handle->page_correlation_id = pg_cache->commited_page_index.latest_corr_id++;
+        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
     }
     page = descr->page;
 
     page[descr->page_length / sizeof(number)] = number;
-    if (unlikely(INVALID_TIME == descr->start_time)) {
-        descr->start_time = point_in_time;
-    }
     descr->end_time = point_in_time;
     descr->page_length += sizeof(number);
+    if (unlikely(INVALID_TIME == descr->start_time)) {
+        descr->start_time = point_in_time;
+
+        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+        ++pg_cache->producers; /* DEBUG STAT */
+        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
+        pg_cache_insert(ctx, descr);
+    }
 }
 
 /*
@@ -55,11 +97,22 @@ void rrdeng_store_metric_next(struct rrdeng_handle *handle, usec_t point_in_time
  */
 void rrdeng_store_metric_final(struct rrdeng_handle *handle)
 {
+    struct rrdengine_instance *ctx = handle->ctx;
     struct rrdeng_page_cache_descr *descr = handle->descr;
 
     if (descr) {
         descr->handle = NULL;
-        rrdeng_commit_page(descr);
+        if (descr->page_length) {
+            struct page_cache *pg_cache = &ctx->pg_cache;
+            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+            --pg_cache->producers; /* DEBUG STAT */
+            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
+            rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+        } else {
+            free(descr->page);
+            free(descr);
+        }
     }
 }
 
@@ -67,19 +120,24 @@ void rrdeng_store_metric_final(struct rrdeng_handle *handle)
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_release_store_metric().
  */
-void rrdeng_load_metric_init(uuid_t *uuid, struct rrdeng_handle *handle, usec_t start_time, usec_t end_time)
+void rrdeng_load_metric_init(struct rrdengine_instance *ctx, uuid_t *uuid, struct rrdeng_handle *handle,
+                             usec_t start_time, usec_t end_time)
 {
-    void *page;
-    uuid_t *temp_id;
-
+    if (NULL == ctx) {
+        /* TODO: move to per host basis */
+        ctx = &default_global_ctx;
+    }
+    handle->ctx = ctx;
     handle->uuid = uuid;
     handle->descr = NULL;
-    pg_cache_preload(handle->uuid, start_time, end_time);
+    pg_cache_preload(ctx, handle->uuid, start_time, end_time);
 }
 
 
 storage_number rrdeng_load_metric_next(struct rrdeng_handle *handle, usec_t point_in_time)
 {
+    struct rrdengine_instance *ctx = handle->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_cache_descr *descr;
     storage_number *page;
     unsigned position;
@@ -90,12 +148,19 @@ storage_number rrdeng_load_metric_next(struct rrdeng_handle *handle, usec_t poin
                  point_in_time < descr->start_time ||
                  point_in_time > descr->end_time)) {
         if (descr) {
+            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+            --pg_cache->consumers; /* DEBUG STAT */
+            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
             pg_cache_put(descr);
         }
-        descr = pg_cache_lookup(handle->uuid, point_in_time);
+        descr = pg_cache_lookup(ctx, handle->uuid, point_in_time);
         if (NULL == descr) {
             return SN_EMPTY_SLOT;
         }
+        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+        ++pg_cache->consumers; /* DEBUG STAT */
+        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
         handle->descr = descr;
     }
     if (unlikely(INVALID_TIME == descr->start_time ||
@@ -116,9 +181,15 @@ storage_number rrdeng_load_metric_next(struct rrdeng_handle *handle, usec_t poin
  */
 void rrdeng_load_metric_final(struct rrdeng_handle *handle)
 {
+    struct rrdengine_instance *ctx = handle->ctx;
     struct rrdeng_page_cache_descr *descr = handle->descr;
 
     if (descr) {
+        struct page_cache *pg_cache = &ctx->pg_cache;
+        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+        --pg_cache->consumers; /* DEBUG STAT */
+        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
         pg_cache_put(descr);
     }
 }
@@ -138,47 +209,36 @@ void *rrdeng_create_page(uuid_t *id, struct rrdeng_page_cache_descr **ret_descr)
         *ret_descr = NULL;
         return NULL;
     }
-    descr = malloc(sizeof(*descr));
-    if (unlikely(descr == NULL)) {
-        fprintf(stderr, "malloc failed.\n");
-        free(page);
-        *ret_descr = NULL;
-        return NULL;
-    }
+    descr = pg_cache_create_descr();
     descr->page = page;
-    descr->page_length = 0;
-    descr->start_time = INVALID_TIME; /* TODO: netdata should populate this */
-    descr->end_time = INVALID_TIME; /* TODO: netdata should populate this */
     descr->id = id; /* TODO: add page type: metric, log, something? */
-    descr->extent = NULL;
     descr->flags = RRD_PAGE_DIRTY /*| RRD_PAGE_LOCKED */ | RRD_PAGE_POPULATED /* | BEING_COLLECTED */;
     descr->refcnt = 1;
-    assert(0 == uv_cond_init(&descr->cond));
-    assert(0 == uv_mutex_init(&descr->mutex));
 
     fprintf(stderr, "-----------------\nCreated new page:\n-----------------\n");
     print_page_cache_descr(descr);
-    pg_cache_insert(descr);
     *ret_descr = descr;
     return page;
 }
 
-void rrdeng_commit_page(struct rrdeng_page_cache_descr *descr)
+/* The page must not be empty */
+void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_cache_descr *descr,
+                        Word_t page_correlation_id)
 {
+    struct page_cache *pg_cache = &ctx->pg_cache;
     int i;
     struct rrdeng_cmd cmd;
     struct rrdeng_page_cache_descr *tmp;
+    Pvoid_t *PValue;
 
     if (unlikely(NULL == descr)) {
         fprintf(stderr, "%s: page descriptor is NULL, page has already been force-commited.\n", __func__);
         return;
     }
-//    uv_mutex_lock(&descr->mutex);
-//    descr->page_length = page_length; /* TODO: it may be empty/0 */
-//    descr->end_time = now_boottime_usec(); /* TODO: netdata should populate this */
-//    uv_mutex_unlock(&descr->mutex);
+    assert(descr->page_length);
 
-    uv_rwlock_wrlock(&pg_cache.commited_pages_rwlock);
+    uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+#if 0 /* TODO: examine if this is necessary anymore */
     while (PAGE_CACHE_MAX_COMMITED_PAGES == pg_cache.nr_commited_pages) {
         int found_pending;
 
@@ -193,7 +253,7 @@ void rrdeng_commit_page(struct rrdeng_page_cache_descr *descr)
                 found_pending = 1;
                 fprintf(stderr, "%s: waiting for in-flight page to be written to disk:\n", __func__);
                 print_page_cache_descr(tmp);
-                uv_cond_wait(&tmp->cond, &tmp->mutex);
+                pg_cache_wait_event_unsafe(tmp);
                 uv_mutex_unlock(&tmp->mutex);
                 break;
             }
@@ -214,28 +274,24 @@ void rrdeng_commit_page(struct rrdeng_page_cache_descr *descr)
         }
         uv_rwlock_wrlock(&pg_cache.commited_pages_rwlock);
     }
-    for (i = 0 ; i < PAGE_CACHE_MAX_COMMITED_PAGES ; ++i) {
-        if (NULL == pg_cache.commited_pages[i]) {
-            pg_cache.commited_pages[i] = descr;
-            ++pg_cache.nr_commited_pages;
-            break;
-        }
-    }
-    assert (i != PAGE_CACHE_MAX_COMMITED_PAGES);
-    uv_rwlock_wrunlock(&pg_cache.commited_pages_rwlock);
+#endif
+    PValue = JudyLIns(&pg_cache->commited_page_index.JudyL_array, page_correlation_id, PJE0);
+    *PValue = descr;
+    ++pg_cache->commited_page_index.nr_commited_pages;
+    uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
 
     pg_cache_put(descr);
 }
 
 /* Gets a reference for the page */
-void *rrdeng_get_latest_page(uuid_t *id, void **handle)
+void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle)
 {
     struct rrdeng_page_cache_descr *descr;
     void *page;
     int ret;
 
     fprintf(stderr, "----------------------\nReading existing page:\n----------------------\n");
-    descr = pg_cache_lookup(id, INVALID_TIME);
+    descr = pg_cache_lookup(ctx, id, INVALID_TIME);
     if (NULL == descr) {
         *handle = NULL;
 
@@ -247,14 +303,14 @@ void *rrdeng_get_latest_page(uuid_t *id, void **handle)
 }
 
 /* Gets a reference for the page */
-void *rrdeng_get_page(uuid_t *id, usec_t point_in_time, void **handle)
+void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time, void **handle)
 {
     struct rrdeng_page_cache_descr *descr;
     void *page;
     int ret;
 
     fprintf(stderr, "----------------------\nReading existing page:\n----------------------\n");
-    descr = pg_cache_lookup(id, point_in_time);
+    descr = pg_cache_lookup(ctx, id, point_in_time);
     if (NULL == descr) {
         *handle = NULL;
 
@@ -266,7 +322,7 @@ void *rrdeng_get_page(uuid_t *id, usec_t point_in_time, void **handle)
 }
 
 /* Releases reference to page */
-void rrdeng_put_page(void *handle)
+void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
 {
     pg_cache_put((struct rrdeng_page_cache_descr *)handle);
 }
@@ -274,55 +330,67 @@ void rrdeng_put_page(void *handle)
 /*
  * Returns 0 on success, 1 on error
  */
-int rrdeng_init(void)
+int rrdeng_init(struct rrdengine_instance *ctx)
 {
     int error;
 
-    if (rrdengine_state != RRDENGINE_STATUS_UNINITIALIZED) {
+    sanity_check();
+    if (NULL == ctx) {
+        /* TODO: move to per host basis */
+        ctx = &default_global_ctx;
+    }
+    if (ctx->rrdengine_state != RRDENGINE_STATUS_UNINITIALIZED) {
         return 1;
     }
-    rrdengine_state = RRDENGINE_STATUS_INITIALIZING;
-    sanity_check();
+    ctx->rrdengine_state = RRDENGINE_STATUS_INITIALIZING;
+    ctx->global_compress_alg = RRD_LZ4;
+    ctx->disk_space = 0;
 
     error = 0;
-    memset(&worker_config, 0, sizeof(worker_config));
-    init_page_cache();
-    error = init_rrd_files();
-    if (error)
-        return error;
-
-
-    init_completion(&rrdengine_completion);
-    assert(0 == uv_thread_create(&worker_config.thread, rrdeng_worker, &worker_config));
-    /* wait for worker thread to initialize */
-    wait_for_completion(&rrdengine_completion);
-    destroy_completion(&rrdengine_completion);
-
+    memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
+    ctx->worker_config.ctx = ctx;
+    init_page_cache(ctx);
+    init_commit_log(ctx);
+    error = init_rrd_files(ctx);
     if (error) {
-        rrdengine_state = RRDENGINE_STATUS_UNINITIALIZED;
+        ctx->rrdengine_state = RRDENGINE_STATUS_UNINITIALIZED;
         return 1;
     }
 
-    rrdengine_state = RRDENGINE_STATUS_INITIALIZED;
+    init_completion(&ctx->rrdengine_completion);
+    assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
+    /* wait for worker thread to initialize */
+    wait_for_completion(&ctx->rrdengine_completion);
+    destroy_completion(&ctx->rrdengine_completion);
+    if (error) {
+        ctx->rrdengine_state = RRDENGINE_STATUS_UNINITIALIZED;
+        return 1;
+    }
+
+    ctx->rrdengine_state = RRDENGINE_STATUS_INITIALIZED;
     return 0;
 }
 
 /*
  * Returns 0 on success, 1 on error
  */
-int rrdeng_exit(void)
+int rrdeng_exit(struct rrdengine_instance *ctx)
 {
     struct rrdeng_cmd cmd;
 
-    if (rrdengine_state != RRDENGINE_STATUS_INITIALIZED) {
+    if (NULL == ctx) {
+        /* TODO: move to per host basis */
+        ctx = &default_global_ctx;
+    }
+    if (ctx->rrdengine_state != RRDENGINE_STATUS_INITIALIZED) {
         return 1;
     }
 
     /* TODO: add page to page cache */
     cmd.opcode = RRDENG_SHUTDOWN;
-    rrdeng_enq_cmd(&worker_config, &cmd);
+    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
-    assert(0 == uv_thread_join(&worker_config.thread));
+    assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     return 0;
 }

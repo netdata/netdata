@@ -11,6 +11,7 @@
 #include <uv.h>
 #include <assert.h>
 #include <lz4.h>
+#include <Judy.h>
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -23,7 +24,16 @@
 
 #endif /* NETDATA_RRD_INTERNALS */
 
+/* Forward declerations */
+struct rrdengine_instance;
+
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
+#define DISK_QUOTA (64000000) /* stay below N MB of disk space e.g. 64MB, configurable */
+
+#define RRDENG_FILEPATH "/tmp"
+#define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
+#define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
+
 
 typedef enum {
     RRDENGINE_STATUS_UNINITIALIZED = 0,
@@ -75,7 +85,7 @@ struct extent_io_descriptor {
     unsigned descr_count;
     int release_descr;
     struct rrdeng_page_cache_descr *descr_array[MAX_PAGES_PER_EXTENT];
-    unsigned descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
+    Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
 };
 
 struct generic_io_descriptor {
@@ -88,9 +98,12 @@ struct generic_io_descriptor {
 };
 
 struct rrdengine_worker_config {
+    struct rrdengine_instance *ctx;
+
     uv_thread_t thread;
     uv_loop_t* loop;
     uv_async_t async;
+    uv_work_t now_deleting;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -99,12 +112,20 @@ struct rrdengine_worker_config {
     struct rrdeng_cmdqueue cmd_queue;
 };
 
-extern rrdengine_state_t rrdengine_state;
-extern struct rrdengine_worker_config worker_config;
-extern struct completion rrdengine_completion;
+struct rrdengine_instance {
+    rrdengine_state_t rrdengine_state;
+    struct rrdengine_worker_config worker_config;
+    struct completion rrdengine_completion;
+    struct page_cache pg_cache;
+    uint8_t global_compress_alg;
+    struct transaction_commit_log commit_log;
+    struct rrdengine_datafile_list datafiles;
+    uint64_t disk_space;
+};
 
 extern void sanity_check(void);
-extern int init_rrd_files(void);
+extern int init_rrd_files(struct rrdengine_instance *ctx);
+extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);
 extern void rrdeng_worker(void* arg);
 extern void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
 extern struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);

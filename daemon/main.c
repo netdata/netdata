@@ -40,7 +40,7 @@ void netdata_cleanup_and_exit(int ret) {
         // free the database
         info("EXIT: freeing database memory...");
         rrdhost_free_all();
-        rrdeng_exit();
+        rrdeng_exit(NULL);
     }
 
     // unlink the pid
@@ -1142,7 +1142,7 @@ int main(int argc, char **argv) {
     {
         int ret;
 
-        ret = rrdeng_init();
+        ret = rrdeng_init(NULL);
         if (ret) {
             exit(ret);
         }
