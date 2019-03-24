@@ -8,6 +8,8 @@
 
 2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
 
+Keep in mind that `libxenstat` requires root access, so the plugin is setuid to root.
+
 ## Charts
 
 The plugin provides XenServer and XCP-ng host and domains statistics:

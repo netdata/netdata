@@ -4,29 +4,29 @@
 
 #define PLUGIN_XENSTAT_NAME "xenstat.plugin"
 
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS              8701
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ          8702
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_MEM               8703
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM              8704
-#define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS           8705
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS              30001
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ          30002
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_MEM               30003
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM              30004
+#define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS           30005
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU             8901
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU            8902
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM             8903
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU             30101
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU            30102
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM             30103
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES      8904
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS 8905
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES      30104
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS 30105
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ      8906
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS    8907
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS     8908
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_OO_REQ      30200
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_REQUESTS    30300
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VBD_SECTORS     30400
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_BYTES       8909
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS     8910
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_ERRORS      8911
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_DROPS       8912
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_BYTES       30500
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_PACKETS     30600
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_ERRORS      30700
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_NET_DROPS       30800
 
-#define TYPE_LENGTH_MAX 1024
+#define TYPE_LENGTH_MAX 200
 
 #define CHART_IS_OBSOLETE     1
 #define CHART_IS_NOT_OBSOLETE 0
@@ -387,7 +387,6 @@ static void xenstat_send_node_metrics() {
     // ----------------------------------------------------------------
 
     if(!mem_chart_generated) {
-        mem_chart_generated = 1;
         printf("CHART xenstat.mem '' 'Memory Usage' 'MiB' 'memory' '' stacked %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_MEM
                , netdata_update_every
@@ -395,6 +394,7 @@ static void xenstat_send_node_metrics() {
         );
         printf("DIMENSION %s '' absolute 1 %d\n", "free", netdata_update_every * 1024 * 1024);
         printf("DIMENSION %s '' absolute 1 %d\n", "used", netdata_update_every * 1024 * 1024);
+        mem_chart_generated = 1;
     }
 
     printf(
@@ -409,13 +409,13 @@ static void xenstat_send_node_metrics() {
     // ----------------------------------------------------------------
 
     if(!tmem_chart_generated) {
-        tmem_chart_generated = 1;
         printf("CHART xenstat.tmem '' 'Freeable Transcedent Memory' 'MiB' 'memory' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
         printf("DIMENSION %s '' absolute 1 %d\n", "freeable", netdata_update_every * 1024 * 1024);
+        tmem_chart_generated = 1;
     }
 
     printf(
@@ -428,13 +428,13 @@ static void xenstat_send_node_metrics() {
     // ----------------------------------------------------------------
 
     if(!domains_chart_generated) {
-        domains_chart_generated = 1;
         printf("CHART xenstat.domains '' 'Number of Domains' 'domains' 'domains' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
         printf("DIMENSION %s '' absolute 1 %d\n", "domains", netdata_update_every);
+        domains_chart_generated = 1;
     }
 
     printf(
@@ -447,13 +447,13 @@ static void xenstat_send_node_metrics() {
     // ----------------------------------------------------------------
 
     if(!cpus_chart_generated) {
-        cpus_chart_generated = 1;
         printf("CHART xenstat.cpus '' 'Number of CPUs' 'cpus' 'cpu' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
         printf("DIMENSION %s '' absolute 1 %d\n", "cpus", netdata_update_every);
+        cpus_chart_generated = 1;
     }
 
     printf(
@@ -466,13 +466,13 @@ static void xenstat_send_node_metrics() {
     // ----------------------------------------------------------------
 
     if(!cpu_freq_chart_generated) {
-        cpu_freq_chart_generated = 1;
         printf("CHART xenstat.cpu_freq '' 'CPU Frequency' 'MHz' 'cpu' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
         printf("DIMENSION %s '' absolute 1 %d\n", "frequency", netdata_update_every * 1024 * 1024);
+        cpu_freq_chart_generated = 1;
     }
 
     printf(
@@ -491,7 +491,7 @@ static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION usage '' incremental 100 %d\n", netdata_update_every * 1000000000);
+    printf("DIMENSION used '' incremental 100 %d\n", netdata_update_every * 1000000000);
 }
 
 static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
@@ -533,7 +533,7 @@ static void print_domain_tmem_operations_chart_definition(char *type, int obsole
 static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics *d, int obsolete_flag) {
     struct vcpu_metrics *vcpu_m;
 
-    printf("CHART %s.xenstat_domain_vcpu '' 'VCPU Usage' 'percentage' 'cpu' '' line %d %d %s %s\n"
+    printf("CHART %s.xenstat_domain_vcpu '' 'CPU Usage per VCPU' 'percentage' 'cpu' '' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU
                        , netdata_update_every
@@ -659,12 +659,12 @@ static void xenstat_send_domain_metrics() {
             // ----------------------------------------------------------------
 
             if(!d->cpu_chart_generated) {
-                d->cpu_chart_generated = 1;
                 print_domain_cpu_chart_definition(type, CHART_IS_NOT_OBSOLETE);
+                d->cpu_chart_generated = 1;
             }
             printf(
                     "BEGIN %s.xenstat_domain_cpu\n"
-                    "SET usage = %lld\n"
+                    "SET used = %lld\n"
                     "END\n"
                     , type
                     , (collected_number)d->cpu_ns
@@ -675,9 +675,9 @@ static void xenstat_send_domain_metrics() {
             struct vcpu_metrics *vcpu_m;
 
             if(!d->vcpu_chart_generated || d->num_vcpus_changed) {
-                d->vcpu_chart_generated = 1;
-                d->num_vcpus_changed = 0;
                 print_domain_vcpu_chart_definition(type, d, CHART_IS_NOT_OBSOLETE);
+                d->num_vcpus_changed = 0;
+                d->vcpu_chart_generated = 1;
             }
 
             printf("BEGIN %s.xenstat_domain_vcpu\n", type);
@@ -695,8 +695,8 @@ static void xenstat_send_domain_metrics() {
             // ----------------------------------------------------------------
 
             if(!d->mem_chart_generated) {
-                d->mem_chart_generated = 1;
                 print_domain_mem_chart_definition(type, CHART_IS_NOT_OBSOLETE);
+                d->mem_chart_generated = 1;
             }
             printf(
                     "BEGIN %s.xenstat_domain_mem\n"
@@ -711,8 +711,8 @@ static void xenstat_send_domain_metrics() {
             // ----------------------------------------------------------------
 
             if(!d->tmem.pages_chart_generated) {
-                d->tmem.pages_chart_generated = 1;
                 print_domain_tmem_pages_chart_definition(type, CHART_IS_NOT_OBSOLETE);
+                d->tmem.pages_chart_generated = 1;
             }
             printf(
                     "BEGIN %s.xenstat_domain_tmem_pages\n"
@@ -725,8 +725,8 @@ static void xenstat_send_domain_metrics() {
             // ----------------------------------------------------------------
 
             if(!d->tmem.operation_chart_generated) {
-                d->tmem.operation_chart_generated = 1;
                 print_domain_tmem_operations_chart_definition(type, CHART_IS_NOT_OBSOLETE);
+                d->tmem.operation_chart_generated = 1;
             }
             printf(
                     "BEGIN %s.xenstat_domain_tmem_operations\n"
@@ -746,8 +746,8 @@ static void xenstat_send_domain_metrics() {
             for(vbd_m = d->vbd_root; vbd_m; vbd_m = vbd_m->next) {
                 if(likely(vbd_m->updated && !vbd_m->error)) {
                     if(!vbd_m->oo_req_chart_generated) {
-                        vbd_m->oo_req_chart_generated = 1;
                         print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                        vbd_m->oo_req_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_oo_req_vbd%u\n"
@@ -761,8 +761,8 @@ static void xenstat_send_domain_metrics() {
                     // ----------------------------------------------------------------
 
                     if(!vbd_m->requests_chart_generated) {
-                        vbd_m->requests_chart_generated = 1;
                         print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                        vbd_m->requests_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_requests_vbd%u\n"
@@ -778,8 +778,8 @@ static void xenstat_send_domain_metrics() {
                     // ----------------------------------------------------------------
 
                     if(!vbd_m->sectors_chart_generated) {
-                        vbd_m->sectors_chart_generated = 1;
                         print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
+                        vbd_m->sectors_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_sectors_vbd%u\n"
@@ -808,8 +808,8 @@ static void xenstat_send_domain_metrics() {
             for(network_m = d->network_root; network_m; network_m = network_m->next) {
                 if(likely(network_m->updated)) {
                     if(!network_m->bytes_chart_generated) {
-                        network_m->bytes_chart_generated = 1;
                         print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                        network_m->bytes_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_bytes_network%u\n"
@@ -825,8 +825,8 @@ static void xenstat_send_domain_metrics() {
                     // ----------------------------------------------------------------
 
                     if(!network_m->packets_chart_generated) {
-                        network_m->packets_chart_generated = 1;
                         print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                        network_m->packets_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_packets_network%u\n"
@@ -842,8 +842,8 @@ static void xenstat_send_domain_metrics() {
                     // ----------------------------------------------------------------
 
                     if(!network_m->errors_chart_generated) {
-                        network_m->errors_chart_generated = 1;
                         print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                        network_m->errors_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_errors_network%u\n"
@@ -859,8 +859,8 @@ static void xenstat_send_domain_metrics() {
                     // ----------------------------------------------------------------
 
                     if(!network_m->drops_chart_generated) {
-                        network_m->drops_chart_generated = 1;
                         print_domain_network_drops_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
+                        network_m->drops_chart_generated = 1;
                     }
                     printf(
                             "BEGIN %s.xenstat_domain_drops_network%u\n"
