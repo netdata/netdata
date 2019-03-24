@@ -189,13 +189,13 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
             return d;
     }
 
-    if(debug) fprintf(stderr, "xenstat.plugin: allocating memory for domain with uuid %s\n", uuid);
+    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: allocating memory for domain with uuid %s\n", uuid);
 
     d = callocz(1, sizeof(struct domain_metrics));
     d->uuid = strdupz(uuid);
     d->hash = hash;
 
-    if(!last) {
+    if(unlikely(!last)) {
         d->next = node_metrics.domain_root;
         node_metrics.domain_root = d;
     }
@@ -217,12 +217,12 @@ static void domain_metrics_free(struct domain_metrics *d) {
         if(unlikely(cur->hash == d->hash && !strcmp(cur->uuid, d->uuid))) break;
     }
 
-    if(!cur) {
+    if(unlikely(!cur)) {
         error("XENSTAT: failed to free domain metrics.");
         return;
     }
 
-    if(last)
+    if(likely(last))
         last->next = cur->next;
     else
         node_metrics.domain_root = NULL;
@@ -276,7 +276,7 @@ static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
         if(unlikely(!vcpu_m)) {
             vcpu_m = callocz(1, sizeof(struct vcpu_metrics));
 
-            if(i == 0) d->vcpu_root = vcpu_m;
+            if(unlikely(i == 0)) d->vcpu_root = vcpu_m;
             else last_vcpu_m->next = vcpu_m;
         }
 
@@ -284,7 +284,7 @@ static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
 
         vcpu = xenstat_domain_vcpu(domain, i);
 
-        if(!vcpu) {
+        if(unlikely(!vcpu)) {
             error("XENSTAT: cannot get VCPU statistics.");
             return 1;
         }
@@ -316,7 +316,7 @@ static int vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain)
         if(unlikely(!vbd_m)) {
             vbd_m = callocz(1, sizeof(struct vbd_metrics));
 
-            if(i == 0) d->vbd_root = vbd_m;
+            if(unlikely(i == 0)) d->vbd_root = vbd_m;
             else last_vbd_m->next = vbd_m;
         }
 
@@ -324,7 +324,7 @@ static int vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain)
 
         vbd = xenstat_domain_vbd(domain, i);
 
-        if(!vbd) {
+        if(unlikely(!vbd)) {
             error("XENSTAT: cannot get VBD statistics.");
             return 1;
         }
@@ -360,7 +360,7 @@ static int network_metrics_collect(struct domain_metrics *d, xenstat_domain *dom
         if(unlikely(!network_m)) {
             network_m = callocz(1, sizeof(struct network_metrics));
 
-            if(i == 0) d->network_root = network_m;
+            if(unlikely(i == 0)) d->network_root = network_m;
             else last_network_m->next = network_m;
         }
 
@@ -368,7 +368,7 @@ static int network_metrics_collect(struct domain_metrics *d, xenstat_domain *dom
 
         network = xenstat_domain_network(domain, i);
 
-        if(!network) {
+        if(unlikely(!network)) {
             error("XENSTAT: cannot get network statistics.");
             return 1;
         }
@@ -421,7 +421,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 
         // get domain UUID
         unsigned int id = xenstat_domain_id(domain);
-        if(libxl_domain_info(ctx, info, id)) {
+        if(unlikely(libxl_domain_info(ctx, info, id))) {
             error("XENSTAT: cannot get domain info.");
         }
         else {
@@ -435,7 +435,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         if(unlikely(!d->name)) {
             d->name = strdupz(xenstat_domain_name(domain));
             netdata_fix_chart_id(d->name);
-            if(debug) fprintf(stderr, "xenstat.plugin: domain id %d, uuid %s has name '%s'\n", d->id, d->uuid, d->name);
+            if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: domain id %d, uuid %s has name '%s'\n", d->id, d->uuid, d->name);
         }
 
         d->running  = xenstat_domain_running(domain);
@@ -455,7 +455,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         d->tmem.succ_pers_puts = xenstat_tmem_succ_pers_puts(tmem);
         d->tmem.succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
 
-        if(vcpu_metrics_collect(d, domain) || vbd_metrics_collect(d, domain) || network_metrics_collect(d, domain)) {
+        if(unlikely(vcpu_metrics_collect(d, domain) || vbd_metrics_collect(d, domain) || network_metrics_collect(d, domain))) {
             xenstat_free_node(node);
             return 1;
         }
@@ -473,7 +473,7 @@ static void xenstat_send_node_metrics() {
 
     // ----------------------------------------------------------------
 
-    if(!mem_chart_generated) {
+    if(unlikely(!mem_chart_generated)) {
         printf("CHART xenstat.mem '' 'Memory Usage' 'MiB' 'memory' '' stacked %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_MEM
                , netdata_update_every
@@ -495,7 +495,7 @@ static void xenstat_send_node_metrics() {
 
     // ----------------------------------------------------------------
 
-    if(!tmem_chart_generated) {
+    if(unlikely(!tmem_chart_generated)) {
         printf("CHART xenstat.tmem '' 'Freeable Transcedent Memory' 'MiB' 'memory' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM
                , netdata_update_every
@@ -514,7 +514,7 @@ static void xenstat_send_node_metrics() {
 
     // ----------------------------------------------------------------
 
-    if(!domains_chart_generated) {
+    if(unlikely(!domains_chart_generated)) {
         printf("CHART xenstat.domains '' 'Number of Domains' 'domains' 'domains' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS
                , netdata_update_every
@@ -533,7 +533,7 @@ static void xenstat_send_node_metrics() {
 
     // ----------------------------------------------------------------
 
-    if(!cpus_chart_generated) {
+    if(unlikely(!cpus_chart_generated)) {
         printf("CHART xenstat.cpus '' 'Number of CPUs' 'cpus' 'cpu' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPUS
                , netdata_update_every
@@ -552,7 +552,7 @@ static void xenstat_send_node_metrics() {
 
     // ----------------------------------------------------------------
 
-    if(!cpu_freq_chart_generated) {
+    if(unlikely(!cpu_freq_chart_generated)) {
         printf("CHART xenstat.cpu_freq '' 'CPU Frequency' 'MHz' 'cpu' '' line %d %d '' %s\n"
                , NETDATA_CHART_PRIO_XENSTAT_NODE_CPU_FREQ
                , netdata_update_every
@@ -750,7 +750,7 @@ static void print_domain_network_drops_chart_definition(char *type, unsigned int
 
 static void xenstat_send_domain_metrics() {
 
-    if(!node_metrics.domain_root) return;
+    if(unlikely(!node_metrics.domain_root)) return;
     struct domain_metrics *d;
 
     for(d = node_metrics.domain_root; d; d = d->next) {
@@ -761,7 +761,7 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(!d->states_chart_generated) {
+            if(unlikely(!d->states_chart_generated)) {
                 print_domain_states_chart_definition(type, CHART_IS_NOT_OBSOLETE);
                 d->states_chart_generated = 1;
             }
@@ -785,7 +785,7 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(!d->cpu_chart_generated) {
+            if(unlikely(!d->cpu_chart_generated)) {
                 print_domain_cpu_chart_definition(type, CHART_IS_NOT_OBSOLETE);
                 d->cpu_chart_generated = 1;
             }
@@ -801,7 +801,7 @@ static void xenstat_send_domain_metrics() {
 
             struct vcpu_metrics *vcpu_m;
 
-            if(!d->vcpu_chart_generated || d->num_vcpus_changed) {
+            if(unlikely(!d->vcpu_chart_generated || d->num_vcpus_changed)) {
                 print_domain_vcpu_chart_definition(type, d, CHART_IS_NOT_OBSOLETE);
                 d->num_vcpus_changed = 0;
                 d->vcpu_chart_generated = 1;
@@ -821,7 +821,7 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(!d->mem_chart_generated) {
+            if(unlikely(!d->mem_chart_generated)) {
                 print_domain_mem_chart_definition(type, CHART_IS_NOT_OBSOLETE);
                 d->mem_chart_generated = 1;
             }
@@ -837,7 +837,7 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(!d->tmem.pages_chart_generated) {
+            if(unlikely(!d->tmem.pages_chart_generated)) {
                 print_domain_tmem_pages_chart_definition(type, CHART_IS_NOT_OBSOLETE);
                 d->tmem.pages_chart_generated = 1;
             }
@@ -851,7 +851,7 @@ static void xenstat_send_domain_metrics() {
 
             // ----------------------------------------------------------------
 
-            if(!d->tmem.operation_chart_generated) {
+            if(unlikely(!d->tmem.operation_chart_generated)) {
                 print_domain_tmem_operations_chart_definition(type, CHART_IS_NOT_OBSOLETE);
                 d->tmem.operation_chart_generated = 1;
             }
@@ -872,7 +872,7 @@ static void xenstat_send_domain_metrics() {
             struct vbd_metrics *vbd_m;
             for(vbd_m = d->vbd_root; vbd_m; vbd_m = vbd_m->next) {
                 if(likely(vbd_m->updated && !vbd_m->error)) {
-                    if(!vbd_m->oo_req_chart_generated) {
+                    if(unlikely(!vbd_m->oo_req_chart_generated)) {
                         print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
                         vbd_m->oo_req_chart_generated = 1;
                     }
@@ -887,7 +887,7 @@ static void xenstat_send_domain_metrics() {
 
                     // ----------------------------------------------------------------
 
-                    if(!vbd_m->requests_chart_generated) {
+                    if(unlikely(!vbd_m->requests_chart_generated)) {
                         print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
                         vbd_m->requests_chart_generated = 1;
                     }
@@ -904,7 +904,7 @@ static void xenstat_send_domain_metrics() {
 
                     // ----------------------------------------------------------------
 
-                    if(!vbd_m->sectors_chart_generated) {
+                    if(unlikely(!vbd_m->sectors_chart_generated)) {
                         print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_NOT_OBSOLETE);
                         vbd_m->sectors_chart_generated = 1;
                     }
@@ -920,7 +920,7 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
-                    if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for vbd %d, domain '%s', id %d, uuid %s\n", vbd_m->id, d->name, d->id, d->uuid);
+                    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for vbd %d, domain '%s', id %d, uuid %s\n", vbd_m->id, d->name, d->id, d->uuid);
                     print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
                     print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
                     print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
@@ -935,7 +935,7 @@ static void xenstat_send_domain_metrics() {
             struct network_metrics *network_m;
             for(network_m = d->network_root; network_m; network_m = network_m->next) {
                 if(likely(network_m->updated)) {
-                    if(!network_m->bytes_chart_generated) {
+                    if(unlikely(!network_m->bytes_chart_generated)) {
                         print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
                         network_m->bytes_chart_generated = 1;
                     }
@@ -952,7 +952,7 @@ static void xenstat_send_domain_metrics() {
 
                     // ----------------------------------------------------------------
 
-                    if(!network_m->packets_chart_generated) {
+                    if(unlikely(!network_m->packets_chart_generated)) {
                         print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
                         network_m->packets_chart_generated = 1;
                     }
@@ -969,7 +969,7 @@ static void xenstat_send_domain_metrics() {
 
                     // ----------------------------------------------------------------
 
-                    if(!network_m->errors_chart_generated) {
+                    if(unlikely(!network_m->errors_chart_generated)) {
                         print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
                         network_m->errors_chart_generated = 1;
                     }
@@ -986,7 +986,7 @@ static void xenstat_send_domain_metrics() {
 
                     // ----------------------------------------------------------------
 
-                    if(!network_m->drops_chart_generated) {
+                    if(unlikely(!network_m->drops_chart_generated)) {
                         print_domain_network_drops_chart_definition(type, network_m->id, CHART_IS_NOT_OBSOLETE);
                         network_m->drops_chart_generated = 1;
                     }
@@ -1002,7 +1002,7 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
-                    if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for network %d, domain '%s', id %d, uuid %s\n", network_m->id, d->name, d->id, d->uuid);
+                    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for network %d, domain '%s', id %d, uuid %s\n", network_m->id, d->name, d->id, d->uuid);
                     print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
                     print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
                     print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
@@ -1015,7 +1015,7 @@ static void xenstat_send_domain_metrics() {
             }
         }
         else{
-            if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for domain '%s', id %d, uuid %s\n", d->name, d->id, d->uuid);
+            if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for domain '%s', id %d, uuid %s\n", d->name, d->id, d->uuid);
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_vcpu_chart_definition(type, d, CHART_IS_OBSOLETE);
             print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
@@ -1111,12 +1111,12 @@ int main(int argc, char **argv) {
     libxl_ctx *ctx = NULL;
     libxl_dominfo info;
 
-    if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
+    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_init()\n");
     xhandle = xenstat_init();
     if (xhandle == NULL)
         error("XENSTAT: failed to initialize xenstat library.");
 
-    if(debug) fprintf(stderr, "xenstat.plugin: calling libxl_ctx_alloc()\n");
+    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling libxl_ctx_alloc()\n");
     if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, NULL)) {
         error("XENSTAT: failed to initialize xl context.");
     }
@@ -1125,7 +1125,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // the main loop
 
-    if(debug) fprintf(stderr, "xenstat.plugin: starting data collection\n");
+    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: starting data collection\n");
 
     time_t started_t = now_monotonic_sec();
 
@@ -1139,31 +1139,31 @@ int main(int argc, char **argv) {
 
         if(unlikely(netdata_exit)) break;
 
-        if(debug && iteration)
+        if(unlikely(debug && iteration))
             fprintf(stderr, "xenstat.plugin: iteration %zu, dt %llu usec\n"
                     , iteration
                     , dt
             );
 
         if(likely(xhandle)) {
-            if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_collect()\n");
+            if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_collect()\n");
             int ret = xenstat_collect(xhandle, ctx, &info);
 
             if(likely(!ret)) {
-                if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_send_node_metrics()\n");
+                if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_send_node_metrics()\n");
                 xenstat_send_node_metrics();
-                if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_send_domain_metrics()\n");
+                if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_send_domain_metrics()\n");
                 xenstat_send_domain_metrics();
             }
             else {
-                if(debug) fprintf(stderr, "xenstat.plugin: can't collect data\n");
+                if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: can't collect data\n");
             }
         }
 
         fflush(stdout);
 
         // restart check (14400 seconds)
-        if(now_monotonic_sec() - started_t > 14400) break;
+        if(unlikely(now_monotonic_sec() - started_t > 14400)) break;
     }
 
     libxl_ctx_free(ctx);
