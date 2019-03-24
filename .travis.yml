@@ -27,6 +27,7 @@ jobs:
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
   - name: check checksums for kickstart files
     script: ./tests/installer/checksums.sh
+    env: LOCAL_ONLY="true"
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
@@ -86,7 +87,7 @@ jobs:
 
   - stage: Integrity testing
     name: Kickstart files integrity testing
-    script: ".travis/validate_kickstart_integrity.sh"
+    script: ./tests/installer/checksums.sh
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
