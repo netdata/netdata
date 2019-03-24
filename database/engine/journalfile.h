@@ -6,14 +6,21 @@
 #include "rrdengine.h"
 
 /* Forward declarations */
+struct rrdengine_instance;
 struct rrdengine_worker_config;
+struct rrdengine_datafile;
+struct rrdengine_journalfile;
 
-#define WALFILE "/tmp/journal.njf"
+#define WALFILE_PREFIX "journalfile-"
+#define WALFILE_EXTENSION ".njf"
+
 
 /* only one event loop is supported for now */
 struct rrdengine_journalfile {
     uv_file file;
     uint64_t pos;
+
+    struct rrdengine_datafile *datafile;
 };
 
 /* only one event loop is supported for now */
@@ -26,11 +33,14 @@ struct transaction_commit_log {
     unsigned buf_size;
 };
 
-extern struct transaction_commit_log commit_log;
-extern struct rrdengine_journalfile journalfile;
-
-extern int init_journal_files(uint64_t data_file_size);
+extern void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 extern void *wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size);
 extern void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc);
+extern int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+extern int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
+extern int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
+                             struct rrdengine_datafile *datafile);
+extern void init_commit_log(struct rrdengine_instance *ctx);
+
 
 #endif /* NETDATA_JOURNALFILE_H */

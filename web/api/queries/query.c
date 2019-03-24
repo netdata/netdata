@@ -412,7 +412,7 @@ static inline void do_dimension(
 
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
-    rrdeng_load_metric_init(rd->handle.uuid, &handle, now, now + dt * points_wanted);
+    rrdeng_load_metric_init(NULL, rd->handle.uuid, &handle, now, now + dt * points_wanted);
     for( ; points_added < points_wanted ; now += dt, slot++ ) {
         if(unlikely(slot >= entries)) slot = 0;
 

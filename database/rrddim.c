@@ -247,7 +247,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
-    rrdeng_store_metric_init(rd, &rd->handle);
+    rrdeng_store_metric_init(NULL, rd, &rd->handle);
 
     // append this dimension
     if(!st->dimensions)
