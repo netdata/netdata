@@ -313,16 +313,13 @@ static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *do
 }
 
 static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominfo *info) {
-    static xenstat_node *node = NULL;
 
     // mark all old metrics as not-updated
     struct domain_metrics *d;
     for(d = node_metrics.domain_root; d ; d = d->next)
         d->updated = 0;
 
-    if (likely(node))
-        xenstat_free_node(node);
-    node = xenstat_get_node(xhandle, XENSTAT_ALL);
+    xenstat_node *node = xenstat_get_node(xhandle, XENSTAT_ALL);
     if (unlikely(!node)) {
         printf("XENSTAT: failed to retrieve statistics from libxenstat\n");
         return 1;
@@ -355,8 +352,11 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         d = domain_metrics_get(uuid, hash);
 
         d->id = id;
-        d->name = xenstat_domain_name(domain);
-        netdata_fix_chart_id(d->name);
+        if(unlikely(!d->name)) {
+            d->name = strdupz(xenstat_domain_name(domain));
+            netdata_fix_chart_id(d->name);
+        }
+
         d->cpu_ns = xenstat_domain_cpu_ns(domain);
         d->cur_mem = xenstat_domain_cur_mem(domain);
         d->max_mem = xenstat_domain_max_mem(domain);
@@ -373,6 +373,8 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 
         d->updated = 1;
     }
+
+    xenstat_free_node(node);
 
     return 0;
 }
@@ -1033,6 +1035,8 @@ int main(int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) break;
     }
 
+    libxl_ctx_free(ctx);
+    xenstat_uninit(xhandle);
     info("XENSTAT process exiting");
 }
 
