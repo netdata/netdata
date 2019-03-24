@@ -189,6 +189,8 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
             return d;
     }
 
+    if(debug) fprintf(stderr, "xenstat.plugin: allocating memory for domain with uuid %s\n", uuid);
+
     d = callocz(1, sizeof(struct domain_metrics));
     d->uuid = strdupz(uuid);
     d->hash = hash;
@@ -215,6 +217,11 @@ static void domain_metrics_free(struct domain_metrics *d) {
         if(unlikely(cur->hash == d->hash && !strcmp(cur->uuid, d->uuid))) break;
     }
 
+    if(!cur) {
+        error("XENSTAT: failed to free domain metrics.");
+        return;
+    }
+
     if(last)
         last->next = cur->next;
     else
@@ -222,25 +229,32 @@ static void domain_metrics_free(struct domain_metrics *d) {
 
     freez(cur->uuid);
     freez(cur->name);
-    for(vcpu = cur->vcpu_root; vcpu;) {
+
+    vcpu = cur->vcpu_root;
+    while(vcpu) {
         vcpu_f = vcpu;
         vcpu = vcpu->next;
         freez(vcpu_f);
     }
-    for(vbd = cur->vbd_root; vbd;) {
+
+    vbd = cur->vbd_root;
+    while(vbd) {
         vbd_f = vbd;
         vbd = vbd->next;
         freez(vbd_f);
     }
-    for(network = cur->network_root; network;) {
+
+    network = cur->network_root;
+    while(network) {
         network_f = network;
         network = network->next;
         freez(network_f);
     }
+
     freez(cur);
 }
 
-static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
     static unsigned int last_num_vcpus = 0;
     unsigned int num_vcpus = 0;
     xenstat_vcpu *vcpu = NULL;
@@ -270,6 +284,11 @@ static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domai
 
         vcpu = xenstat_domain_vcpu(domain, i);
 
+        if(!vcpu) {
+            error("XENSTAT: cannot get VCPU statistics.");
+            return 1;
+        }
+
         vcpu_m->online = xenstat_vcpu_online(vcpu);
         vcpu_m->ns = xenstat_vcpu_ns(vcpu);
 
@@ -278,9 +297,11 @@ static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domai
         last_vcpu_m = vcpu_m;
         vcpu_m = vcpu_m->next;
     }
+
+    return 0;
 }
 
-static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+static int vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
     unsigned int num_vbds = xenstat_domain_num_vbds(domain);
     xenstat_vbd *vbd = NULL;
     struct vbd_metrics *vbd_m = NULL, *last_vbd_m = NULL;
@@ -303,6 +324,11 @@ static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
 
         vbd = xenstat_domain_vbd(domain, i);
 
+        if(!vbd) {
+            error("XENSTAT: cannot get VBD statistics.");
+            return 1;
+        }
+
         vbd_m->error    = xenstat_vbd_error(vbd);
         vbd_m->oo_reqs  = xenstat_vbd_oo_reqs(vbd);
         vbd_m->rd_reqs  = xenstat_vbd_rd_reqs(vbd);
@@ -315,9 +341,11 @@ static void vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain
         last_vbd_m = vbd_m;
         vbd_m = vbd_m->next;
     }
+
+    return 0;
 }
 
-static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
+static int network_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
     unsigned int num_networks = xenstat_domain_num_networks(domain);
     xenstat_network *network = NULL;
     struct network_metrics *network_m = NULL, *last_network_m = NULL;
@@ -340,6 +368,11 @@ static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *do
 
         network = xenstat_domain_network(domain, i);
 
+        if(!network) {
+            error("XENSTAT: cannot get network statistics.");
+            return 1;
+        }
+
         network_m->rbytes   = xenstat_network_rbytes(network);
         network_m->rpackets = xenstat_network_rpackets(network);
         network_m->rerrs    = xenstat_network_rerrs(network);
@@ -355,6 +388,8 @@ static void network_metrics_collect(struct domain_metrics *d, xenstat_domain *do
         last_network_m = network_m;
         network_m = network_m->next;
     }
+
+    return 0;
 }
 
 static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominfo *info) {
@@ -366,7 +401,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
 
     xenstat_node *node = xenstat_get_node(xhandle, XENSTAT_ALL);
     if (unlikely(!node)) {
-        printf("XENSTAT: failed to retrieve statistics from libxenstat\n");
+        error("XENSTAT: failed to retrieve statistics from libxenstat.");
         return 1;
     }
 
@@ -400,6 +435,7 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         if(unlikely(!d->name)) {
             d->name = strdupz(xenstat_domain_name(domain));
             netdata_fix_chart_id(d->name);
+            if(debug) fprintf(stderr, "xenstat.plugin: domain id %d, uuid %s has name '%s'\n", d->id, d->uuid, d->name);
         }
 
         d->running  = xenstat_domain_running(domain);
@@ -419,9 +455,10 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
         d->tmem.succ_pers_puts = xenstat_tmem_succ_pers_puts(tmem);
         d->tmem.succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
 
-        vcpu_metrics_collect(d, domain);
-        vbd_metrics_collect(d, domain);
-        network_metrics_collect(d, domain);
+        if(vcpu_metrics_collect(d, domain) || vbd_metrics_collect(d, domain) || network_metrics_collect(d, domain)) {
+            xenstat_free_node(node);
+            return 1;
+        }
 
         d->updated = 1;
     }
@@ -883,6 +920,7 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
+                    if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for vbd %d, domain '%s', id %d, uuid %s\n", vbd_m->id, d->name, d->id, d->uuid);
                     print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
                     print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
                     print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
@@ -964,6 +1002,7 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
+                    if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for network %d, domain '%s', id %d, uuid %s\n", network_m->id, d->name, d->id, d->uuid);
                     print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
                     print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
                     print_domain_network_errors_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
@@ -976,6 +1015,7 @@ static void xenstat_send_domain_metrics() {
             }
         }
         else{
+            if(debug) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for domain '%s', id %d, uuid %s\n", d->name, d->id, d->uuid);
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_vcpu_chart_definition(type, d, CHART_IS_OBSOLETE);
             print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
@@ -1114,6 +1154,9 @@ int main(int argc, char **argv) {
                 xenstat_send_node_metrics();
                 if(debug) fprintf(stderr, "xenstat.plugin: calling xenstat_send_domain_metrics()\n");
                 xenstat_send_domain_metrics();
+            }
+            else {
+                if(debug) fprintf(stderr, "xenstat.plugin: can't collect data\n");
             }
         }
 
