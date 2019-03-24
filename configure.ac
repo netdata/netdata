@@ -558,7 +558,7 @@ test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenlight}" != "yes" && \
     AC_MSG_ERROR([libxenlight required but not found. try installing 'xen-dom0-libs-devel'])
 
 test "${enable_plugin_xenstat}" = "yes" -a "${have_libyajl}" != "yes" && \
-    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl'])
+    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl-devel'])
 
 AC_MSG_CHECKING([if xenstat.plugin should be enabled])
 if test "${enable_plugin_xenstat}" != "no" -a "${have_libxenstat}" = "yes" -a "${have_libxenlight}" = "yes" -a "${have_libyajl}" = "yes"; then

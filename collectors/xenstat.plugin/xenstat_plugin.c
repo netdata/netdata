@@ -484,7 +484,7 @@ static void xenstat_send_node_metrics() {
 }
 
 static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_cpu '' 'CPU Usage (100%% = 1 core)' 'percentage' 'cpu' '' line %d %d %s %s\n"
+    printf("CHART %s.cpu '' 'CPU Usage (100%% = 1 core)' 'percentage' 'cpu' 'xendomain.cpu' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU
                        , netdata_update_every
@@ -495,7 +495,7 @@ static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
 }
 
 static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_mem '' 'Memory Reservation' 'MiB' 'memory' '' line %d %d %s %s\n"
+    printf("CHART %s.mem '' 'Memory Reservation' 'MiB' 'memory' 'xendomain.mem' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM
                        , netdata_update_every
@@ -507,7 +507,7 @@ static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
 }
 
 static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_tmem_pages '' 'Current Number of Transcedent Memory Ephemeral Pages' 'pages' 'memory' '' line %d %d %s %s\n"
+    printf("CHART %s.tmem_pages '' 'Current Number of Transcedent Memory Ephemeral Pages' 'pages' 'memory' 'xendomain.tmem_pages' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES
                        , netdata_update_every
@@ -518,7 +518,7 @@ static void print_domain_tmem_pages_chart_definition(char *type, int obsolete_fl
 }
 
 static void print_domain_tmem_operations_chart_definition(char *type, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_tmem_operations '' 'Successful Transcedent Memory Puts and Gets' 'events/s' 'memory' '' line %d %d %s %s\n"
+    printf("CHART %s.tmem_operations '' 'Successful Transcedent Memory Puts and Gets' 'events/s' 'memory' 'xendomain.tmem_operations' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS
                        , netdata_update_every
@@ -533,7 +533,7 @@ static void print_domain_tmem_operations_chart_definition(char *type, int obsole
 static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics *d, int obsolete_flag) {
     struct vcpu_metrics *vcpu_m;
 
-    printf("CHART %s.xenstat_domain_vcpu '' 'CPU Usage per VCPU' 'percentage' 'cpu' '' line %d %d %s %s\n"
+    printf("CHART %s.vcpu '' 'CPU Usage per VCPU' 'percentage' 'cpu' 'xendomain.vcpu' line %d %d %s %s\n"
                        , type
                        , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU
                        , netdata_update_every
@@ -549,7 +549,7 @@ static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics
 }
 
 static void print_domain_vbd_oo_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_oo_req_vbd%u '' 'VBD%u \"Out Of\" Requests' 'requests/s' 'vbd' '' line %d %d %s %s\n"
+    printf("CHART %s.oo_req_vbd%u '' 'VBD%u \"Out Of\" Requests' 'requests/s' 'vbd' 'xendomain.oo_req_vbd' line %d %d %s %s\n"
                        , type
                        , vbd
                        , vbd
@@ -562,7 +562,7 @@ static void print_domain_vbd_oo_chart_definition(char *type, unsigned int vbd, i
 }
 
 static void print_domain_vbd_requests_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_requests_vbd%u '' 'VBD%u Requests' 'requests/s' 'vbd' '' line %d %d %s %s\n"
+    printf("CHART %s.requests_vbd%u '' 'VBD%u Requests' 'requests/s' 'vbd' 'xendomain.requests_vbd' line %d %d %s %s\n"
                        , type
                        , vbd
                        , vbd
@@ -576,7 +576,7 @@ static void print_domain_vbd_requests_chart_definition(char *type, unsigned int 
 }
 
 static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_sectors_vbd%u '' 'VBD%u Read/Written Sectors' 'sectors/s' 'vbd' '' line %d %d %s %s\n"
+    printf("CHART %s.sectors_vbd%u '' 'VBD%u Read/Written Sectors' 'sectors/s' 'vbd' 'xendomain.sectors_vbd' line %d %d %s %s\n"
                        , type
                        , vbd
                        , vbd
@@ -590,7 +590,7 @@ static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int v
 }
 
 static void print_domain_network_bytes_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_bytes_network%u '' 'Network%u Received/Sent Bytes' 'kilobits/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.bytes_network%u '' 'Network%u Received/Sent Bytes' 'kilobits/s' 'network' 'xendomain.bytes_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -604,7 +604,7 @@ static void print_domain_network_bytes_chart_definition(char *type, unsigned int
 }
 
 static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_packets_network%u '' 'Network%u Recieved/Sent Packets' 'packets/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.packets_network%u '' 'Network%u Recieved/Sent Packets' 'packets/s' 'network' 'xendomain.packets_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -618,7 +618,7 @@ static void print_domain_network_packets_chart_definition(char *type, unsigned i
 }
 
 static void print_domain_network_errors_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_errors_network%u '' 'Network%u Receive/Transmit Errors' 'errors/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.errors_network%u '' 'Network%u Receive/Transmit Errors' 'errors/s' 'network' 'xendomain.errors_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -632,7 +632,7 @@ static void print_domain_network_errors_chart_definition(char *type, unsigned in
 }
 
 static void print_domain_network_drops_chart_definition(char *type, unsigned int network, int obsolete_flag) {
-    printf("CHART %s.xenstat_domain_drops_network%u '' 'Network%u Recieve/Transmit Drops' 'drops/s' 'network' '' line %d %d %s %s\n"
+    printf("CHART %s.drops_network%u '' 'Network%u Recieve/Transmit Drops' 'drops/s' 'network' 'xendomain.drops_network' line %d %d %s %s\n"
                        , type
                        , network
                        , network
@@ -663,7 +663,7 @@ static void xenstat_send_domain_metrics() {
                 d->cpu_chart_generated = 1;
             }
             printf(
-                    "BEGIN %s.xenstat_domain_cpu\n"
+                    "BEGIN %s.cpu\n"
                     "SET used = %lld\n"
                     "END\n"
                     , type
@@ -680,7 +680,7 @@ static void xenstat_send_domain_metrics() {
                 d->vcpu_chart_generated = 1;
             }
 
-            printf("BEGIN %s.xenstat_domain_vcpu\n", type);
+            printf("BEGIN %s.vcpu\n", type);
             for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
                 if(likely(vcpu_m->updated && vcpu_m->online)) {
                     printf(
@@ -699,7 +699,7 @@ static void xenstat_send_domain_metrics() {
                 d->mem_chart_generated = 1;
             }
             printf(
-                    "BEGIN %s.xenstat_domain_mem\n"
+                    "BEGIN %s.mem\n"
                     "SET maximum = %lld\n"
                     "SET current = %lld\n"
                     "END\n"
@@ -715,7 +715,7 @@ static void xenstat_send_domain_metrics() {
                 d->tmem.pages_chart_generated = 1;
             }
             printf(
-                    "BEGIN %s.xenstat_domain_tmem_pages\n"
+                    "BEGIN %s.tmem_pages\n"
                     "SET pages = %lld\n"
                     "END\n"
                     , type
@@ -729,7 +729,7 @@ static void xenstat_send_domain_metrics() {
                 d->tmem.operation_chart_generated = 1;
             }
             printf(
-                    "BEGIN %s.xenstat_domain_tmem_operations\n"
+                    "BEGIN %s.tmem_operations\n"
                     "SET ephemeral_gets = %lld\n"
                     "SET persistent_puts = %lld\n"
                     "SET persistent_gets = %lld\n"
@@ -750,7 +750,7 @@ static void xenstat_send_domain_metrics() {
                         vbd_m->oo_req_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_oo_req_vbd%u\n"
+                            "BEGIN %s.oo_req_vbd%u\n"
                             "SET requests = %lld\n"
                             "END\n"
                             , type
@@ -765,7 +765,7 @@ static void xenstat_send_domain_metrics() {
                         vbd_m->requests_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_requests_vbd%u\n"
+                            "BEGIN %s.requests_vbd%u\n"
                             "SET read = %lld\n"
                             "SET write = %lld\n"
                             "END\n"
@@ -782,7 +782,7 @@ static void xenstat_send_domain_metrics() {
                         vbd_m->sectors_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_sectors_vbd%u\n"
+                            "BEGIN %s.sectors_vbd%u\n"
                             "SET read = %lld\n"
                             "SET write = %lld\n"
                             "END\n"
@@ -812,7 +812,7 @@ static void xenstat_send_domain_metrics() {
                         network_m->bytes_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_bytes_network%u\n"
+                            "BEGIN %s.bytes_network%u\n"
                             "SET recieved = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
@@ -829,7 +829,7 @@ static void xenstat_send_domain_metrics() {
                         network_m->packets_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_packets_network%u\n"
+                            "BEGIN %s.packets_network%u\n"
                             "SET recieved = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
@@ -846,7 +846,7 @@ static void xenstat_send_domain_metrics() {
                         network_m->errors_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_errors_network%u\n"
+                            "BEGIN %s.errors_network%u\n"
                             "SET recieved = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
@@ -863,7 +863,7 @@ static void xenstat_send_domain_metrics() {
                         network_m->drops_chart_generated = 1;
                     }
                     printf(
-                            "BEGIN %s.xenstat_domain_drops_network%u\n"
+                            "BEGIN %s.drops_network%u\n"
                             "SET recieved = %lld\n"
                             "SET sent = %lld\n"
                             "END\n"
