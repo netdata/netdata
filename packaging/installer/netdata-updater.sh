@@ -77,36 +77,35 @@ update() {
 	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${dir}/sha256sum.txt" >&3 2>&3
 	if grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
 		info "Newest version is already installed"
-		exit 0
-	fi
-
-	download "${NETDATA_TARBALL_URL}" "${dir}/netdata-latest.tar.gz"
-	if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
-		failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
-	fi
-	NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
-	tar -xf netdata-latest.tar.gz >&3 2>&3
-	rm netdata-latest.tar.gz >&3 2>&3
-	cd netdata-*
-
-	# signal netdata to start saving its database
-	# this is handy if your database is big
-	pids=$(pidof netdata)
-	do_not_start=
-	if [ -n "${pids}" ]; then
-		#shellcheck disable=SC2086
-		kill -USR1 ${pids}
 	else
-		# netdata is currently not running, so do not start it after updating
-		do_not_start="--dont-start-it"
-	fi
+		download "${NETDATA_TARBALL_URL}" "${dir}/netdata-latest.tar.gz"
+		if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
+			failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
+		fi
+		NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
+		tar -xf netdata-latest.tar.gz >&3 2>&3
+		rm netdata-latest.tar.gz >&3 2>&3
+		cd netdata-*
 
-	info "Re-installing netdata..."
-	eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
-	sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
-	cat <<EOF >>"${ENVIRONMENT_FILE}"
+		# signal netdata to start saving its database
+		# this is handy if your database is big
+		pids=$(pidof netdata)
+		do_not_start=
+		if [ -n "${pids}" ]; then
+			#shellcheck disable=SC2086
+			kill -USR1 ${pids}
+		else
+			# netdata is currently not running, so do not start it after updating
+			do_not_start="--dont-start-it"
+		fi
+
+		info "Re-installing netdata..."
+		eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
+		sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
+		cat <<EOF >>"${ENVIRONMENT_FILE}"
 NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"
 EOF
+	fi
 
 	rm -rf "${dir}" >&3 2>&3
 	[ -n "${logfile}" ] && rm "${logfile}" && logfile=
