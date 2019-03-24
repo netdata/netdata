@@ -7,9 +7,6 @@
 # Author  : Pawel Krupa (pawel@netdata.cloud)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 set -e
-source ./slack.sh
-
-README_DOC="packaging/installer/README.md"
 
 # If we are not in netdata git repo, at the top level directory, fail
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel 2> /dev/null || echo "")")
@@ -19,6 +16,9 @@ if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     echo "Kickstart validation process aborted"
     exit 1
 fi
+
+README_DOC="packaging/installer/README.md"
+source ./tests/installer/slack.sh
 
 for file in kickstart.sh kickstart-static64.sh; do
 	README_MD5=$(grep "$file" $README_DOC | grep md5sum | cut -d '"' -f2)
@@ -33,7 +33,7 @@ for file in kickstart.sh kickstart-static64.sh; do
 		if [ "$KICKSTART_MD5" == "$CALCULATED_MD5" ]; then
 			echo "${KICKSTART_URL} looks fine"
 		else
-			post_message "${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
+			post_message "Attention @group , ${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
 		fi
 	fi
 
@@ -49,4 +49,3 @@ for file in kickstart.sh kickstart-static64.sh; do
 
 done
 echo "No problems found, exiting succesfully!"
-post_message "Kickstart file validation completed successfuly"
