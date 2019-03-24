@@ -10,9 +10,10 @@
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_TMEM              30004
 #define NETDATA_CHART_PRIO_XENSTAT_NODE_DOMAINS           30005
 
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU             30101
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU            30102
-#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM             30103
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_STATES          30101
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_CPU             30102
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_VCPU            30103
+#define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_MEM             30104
 
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_PAGES      30104
 #define NETDATA_CHART_PRIO_XENSTAT_DOMAIN_TMEM_OPERATIONS 30105
@@ -139,6 +140,14 @@ struct domain_metrics {
     unsigned int id;
     char *name;
 
+    // states
+    unsigned int running;
+    unsigned int blocked;
+    unsigned int paused;
+    unsigned int shutdown;
+    unsigned int crashed;
+    unsigned int dying;
+
     unsigned long long cpu_ns;
     unsigned long long cur_mem;
     unsigned long long max_mem;
@@ -148,6 +157,7 @@ struct domain_metrics {
     struct vbd_metrics *vbd_root;
     struct network_metrics *network_root;
 
+    int states_chart_generated;
     int cpu_chart_generated;
     int vcpu_chart_generated;
     int num_vcpus_changed;
@@ -392,6 +402,13 @@ static int xenstat_collect(xenstat_handle *xhandle, libxl_ctx *ctx, libxl_dominf
             netdata_fix_chart_id(d->name);
         }
 
+        d->running  = xenstat_domain_running(domain);
+        d->blocked  = xenstat_domain_blocked(domain);
+        d->paused   = xenstat_domain_paused(domain);
+        d->shutdown = xenstat_domain_shutdown(domain);
+        d->crashed  = xenstat_domain_crashed(domain);
+        d->dying    = xenstat_domain_dying(domain);
+
         d->cpu_ns = xenstat_domain_cpu_ns(domain);
         d->cur_mem = xenstat_domain_cur_mem(domain);
         d->max_mem = xenstat_domain_max_mem(domain);
@@ -514,6 +531,22 @@ static void xenstat_send_node_metrics() {
             "END\n"
             , (collected_number) node_metrics.node_cpu_hz
     );
+}
+
+static void print_domain_states_chart_definition(char *type, int obsolete_flag) {
+    printf("CHART %s.states '' 'Domain States' 'boolean' 'states' 'xendomain.states' line %d %d %s %s\n"
+                       , type
+                       , NETDATA_CHART_PRIO_XENSTAT_DOMAIN_STATES
+                       , netdata_update_every
+                       , obsolete_flag ? "obsolete": "''"
+                       , PLUGIN_XENSTAT_NAME
+    );
+    printf("DIMENSION running '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION blocked '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION paused '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION shutdown '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION crashed '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION dying '' absolute 1 %d\n", netdata_update_every);
 }
 
 static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
@@ -688,6 +721,30 @@ static void xenstat_send_domain_metrics() {
         snprintfz(type, TYPE_LENGTH_MAX, "xendomain_%s_%s", d->name, d->uuid);
 
         if(likely(d->updated)) {
+
+            // ----------------------------------------------------------------
+
+            if(!d->states_chart_generated) {
+                print_domain_states_chart_definition(type, CHART_IS_NOT_OBSOLETE);
+                d->states_chart_generated = 1;
+            }
+            printf(
+                    "BEGIN %s.states\n"
+                    "SET running = %lld\n"
+                    "SET blocked = %lld\n"
+                    "SET paused = %lld\n"
+                    "SET shutdown = %lld\n"
+                    "SET crashed = %lld\n"
+                    "SET dying = %lld\n"
+                    "END\n"
+                    , type
+                    , (collected_number)d->running
+                    , (collected_number)d->blocked
+                    , (collected_number)d->paused
+                    , (collected_number)d->shutdown
+                    , (collected_number)d->crashed
+                    , (collected_number)d->dying
+            );
 
             // ----------------------------------------------------------------
 
