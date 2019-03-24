@@ -195,6 +195,41 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
     return d;
 }
 
+static void domain_metrics_free(struct domain_metrics *d) {
+    struct domain_metrics *cur = NULL, *last = NULL;
+    struct vcpu_metrics *vcpu, *vcpu_f;
+    struct vbd_metrics *vbd, *vbd_f;
+    struct network_metrics *network, *network_f;
+
+    for(cur = node_metrics.domain_root; cur ; last = cur, cur = cur->next) {
+        if(unlikely(cur->hash == d->hash && !strcmp(cur->uuid, d->uuid))) break;
+    }
+
+    if(last)
+        last->next = cur->next;
+    else
+        node_metrics.domain_root = NULL;
+
+    freez(cur->uuid);
+    freez(cur->name);
+    for(vcpu = cur->vcpu_root; vcpu;) {
+        vcpu_f = vcpu;
+        vcpu = vcpu->next;
+        freez(vcpu_f);
+    }
+    for(vbd = cur->vbd_root; vbd;) {
+        vbd_f = vbd;
+        vbd = vbd->next;
+        freez(vbd_f);
+    }
+    for(network = cur->network_root; network;) {
+        network_f = network;
+        network = network->next;
+        freez(network_f);
+    }
+    freez(cur);
+}
+
 static void vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
     static unsigned int last_num_vcpus = 0;
     unsigned int num_vcpus = 0;
@@ -890,11 +925,7 @@ static void xenstat_send_domain_metrics() {
             print_domain_tmem_pages_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_tmem_operations_chart_definition(type, CHART_IS_OBSOLETE);
 
-            d->cpu_chart_generated = 0;
-            d->vcpu_chart_generated = 0;
-            d->mem_chart_generated = 0;
-            d->tmem.pages_chart_generated = 0;
-            d->tmem.operation_chart_generated = 0;
+            domain_metrics_free(d);
         }
     }
 }
