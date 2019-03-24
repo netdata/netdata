@@ -80,7 +80,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
 
-    cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", NETDATA_CHART_PRIO_CGROUPS_CONTAINERS);
+    cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", cgroup_containers_chart_priority);
     if(cgroup_containers_chart_priority < 1)
         cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
 
