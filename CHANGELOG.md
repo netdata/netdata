@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Errant netdata-updater logs on root "/" directory [\#5679](https://github.com/netdata/netdata/issues/5679)
 - remove python obsolete modules [\#5647](https://github.com/netdata/netdata/issues/5647)
 - Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
 - .opt-out-from-anonymous-statistics still leaks referrer [\#5577](https://github.com/netdata/netdata/issues/5577)
@@ -21,6 +22,8 @@
 
 **Merged pull requests:**
 
+- Remove temp log file if no update needed [\#5695](https://github.com/netdata/netdata/pull/5695) ([cakrit](https://github.com/cakrit))
+- add a description how to achieve vhost access logs with nginx in web\_log [\#5694](https://github.com/netdata/netdata/pull/5694) ([hsegnitz](https://github.com/hsegnitz))
 - netdata/packaging/docker/publish: Fix docker publishing [\#5692](https://github.com/netdata/netdata/pull/5692) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: Fix build - typo on array iteration [\#5691](https://github.com/netdata/netdata/pull/5691) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - do not show the modal on demo sites [\#5686](https://github.com/netdata/netdata/pull/5686) ([ktsaou](https://github.com/ktsaou))
