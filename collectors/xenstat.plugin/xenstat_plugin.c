@@ -572,7 +572,7 @@ static void print_domain_vbd_requests_chart_definition(char *type, unsigned int 
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION write '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION write '' incremental -1 %d\n", netdata_update_every);
 }
 
 static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
@@ -586,7 +586,7 @@ static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int v
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION write '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION write '' incremental -1 %d\n", netdata_update_every);
 }
 
 static void print_domain_network_bytes_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -600,7 +600,7 @@ static void print_domain_network_bytes_chart_definition(char *type, unsigned int
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION received '' incremental 8 %d\n", netdata_update_every * 1000);
-    printf("DIMENSION sent '' incremental 8 %d\n", netdata_update_every * 1000);
+    printf("DIMENSION sent '' incremental -8 %d\n", netdata_update_every * 1000);
 }
 
 static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -614,7 +614,7 @@ static void print_domain_network_packets_chart_definition(char *type, unsigned i
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
 }
 
 static void print_domain_network_errors_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -628,7 +628,7 @@ static void print_domain_network_errors_chart_definition(char *type, unsigned in
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
 }
 
 static void print_domain_network_drops_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -642,7 +642,7 @@ static void print_domain_network_drops_chart_definition(char *type, unsigned int
                        , PLUGIN_XENSTAT_NAME
     );
     printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
 }
 
 static void xenstat_send_domain_metrics() {
