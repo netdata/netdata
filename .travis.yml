@@ -11,6 +11,8 @@ stages:
   if: branch = master AND type != pull_request AND type != cron
 - name: nightlies
   if: branch = master AND type = cron
+- name: Integrity testing
+  if: branch = master AND type = cron
 
 jobs:
   include:
@@ -25,6 +27,7 @@ jobs:
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
   - name: check checksums for kickstart files
     script: ./tests/installer/checksums.sh
+    env: LOCAL_ONLY="true"
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
@@ -81,6 +84,11 @@ jobs:
       skip_cleanup: true
       local_dir: "artifacts"
     after_deploy: rm -f .travis/gcs-credentials.json
+
+  - stage: Integrity testing
+    name: Kickstart files integrity testing
+    script: ./tests/installer/checksums.sh
+
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
   slack:
