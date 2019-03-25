@@ -207,11 +207,13 @@ static inline struct domain_metrics *domain_metrics_get(const char *uuid, uint32
     return d;
 }
 
-static void domain_metrics_free(struct domain_metrics *d) {
+static struct domain_metrics *domain_metrics_free(struct domain_metrics *d) {
     struct domain_metrics *cur = NULL, *last = NULL;
     struct vcpu_metrics *vcpu, *vcpu_f;
     struct vbd_metrics *vbd, *vbd_f;
     struct network_metrics *network, *network_f;
+
+    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: freeing memory for domain '%s' id %d, uuid %s\n", d->name, d->id, d->uuid);
 
     for(cur = node_metrics.domain_root; cur ; last = cur, cur = cur->next) {
         if(unlikely(cur->hash == d->hash && !strcmp(cur->uuid, d->uuid))) break;
@@ -219,7 +221,7 @@ static void domain_metrics_free(struct domain_metrics *d) {
 
     if(unlikely(!cur)) {
         error("XENSTAT: failed to free domain metrics.");
-        return;
+        return NULL;
     }
 
     if(likely(last))
@@ -252,6 +254,8 @@ static void domain_metrics_free(struct domain_metrics *d) {
     }
 
     freez(cur);
+
+    return last ? last : NULL;
 }
 
 static int vcpu_metrics_collect(struct domain_metrics *d, xenstat_domain *domain) {
@@ -920,13 +924,17 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
-                    if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for vbd %d, domain '%s', id %d, uuid %s\n", vbd_m->id, d->name, d->id, d->uuid);
-                    print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
-                    print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
-                    print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
-                    vbd_m->oo_req_chart_generated = 0;
-                    vbd_m->requests_chart_generated = 0;
-                    vbd_m->sectors_chart_generated = 0;
+                    if(unlikely(vbd_m->oo_req_chart_generated
+                                || vbd_m->requests_chart_generated
+                                || vbd_m->sectors_chart_generated)) {
+                        if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for vbd %d, domain '%s', id %d, uuid %s\n", vbd_m->id, d->name, d->id, d->uuid);
+                        print_domain_vbd_oo_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                        print_domain_vbd_requests_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                        print_domain_vbd_sectors_chart_definition(type, vbd_m->id, CHART_IS_OBSOLETE);
+                        vbd_m->oo_req_chart_generated = 0;
+                        vbd_m->requests_chart_generated = 0;
+                        vbd_m->sectors_chart_generated = 0;
+                    }
                 }
             }
 
@@ -1002,6 +1010,10 @@ static void xenstat_send_domain_metrics() {
                     );
                 }
                 else {
+                    if(unlikely(network_m->bytes_chart_generated
+                                || network_m->packets_chart_generated
+                                || network_m->errors_chart_generated
+                                || network_m->drops_chart_generated))
                     if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for network %d, domain '%s', id %d, uuid %s\n", network_m->id, d->name, d->id, d->uuid);
                     print_domain_network_bytes_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
                     print_domain_network_packets_chart_definition(type, network_m->id, CHART_IS_OBSOLETE);
@@ -1016,13 +1028,14 @@ static void xenstat_send_domain_metrics() {
         }
         else{
             if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: mark charts as obsolete for domain '%s', id %d, uuid %s\n", d->name, d->id, d->uuid);
+            print_domain_states_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_cpu_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_vcpu_chart_definition(type, d, CHART_IS_OBSOLETE);
             print_domain_mem_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_tmem_pages_chart_definition(type, CHART_IS_OBSOLETE);
             print_domain_tmem_operations_chart_definition(type, CHART_IS_OBSOLETE);
 
-            domain_metrics_free(d);
+            d = domain_metrics_free(d);
         }
     }
 }
