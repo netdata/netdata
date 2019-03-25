@@ -33,6 +33,7 @@ static int cgroup_search_in_devices = 1;
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
 static int cgroup_check_for_new_every = 10;
 static int cgroup_update_every = 1;
+static int cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
 
 static int cgroup_recheck_zero_blkio_every_iterations = 10;
 static int cgroup_recheck_zero_mem_failcnt_every_iterations = 10;
@@ -78,6 +79,10 @@ void read_cgroup_plugin_configuration() {
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", (long long)cgroup_check_for_new_every * (long long)cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)
         cgroup_check_for_new_every = cgroup_update_every;
+
+    cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", cgroup_containers_chart_priority);
+    if(cgroup_containers_chart_priority < 1)
+        cgroup_containers_chart_priority = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS;
 
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat (total CPU)", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage (per core CPU)", cgroup_enable_cpuacct_usage);
@@ -2433,7 +2438,7 @@ void update_cgroup_charts(int update_every) {
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS
+                        , cgroup_containers_chart_priority
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -2493,7 +2498,7 @@ void update_cgroup_charts(int update_every) {
                                     , "percentage"
                                     , PLUGIN_CGROUPS_NAME
                                     , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                                    , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS - 1
+                                    , cgroup_containers_chart_priority - 1
                                     , update_every
                                     , RRDSET_TYPE_LINE
                             );
@@ -2542,7 +2547,7 @@ void update_cgroup_charts(int update_every) {
                         , "percentage"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 100
+                        , cgroup_containers_chart_priority + 100
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -2576,7 +2581,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 210
+                        , cgroup_containers_chart_priority + 210
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -2616,7 +2621,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 300
+                        , cgroup_containers_chart_priority + 300
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -2648,7 +2653,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 400
+                        , cgroup_containers_chart_priority + 400
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2676,7 +2681,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 500
+                        , cgroup_containers_chart_priority + 500
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2706,7 +2711,7 @@ void update_cgroup_charts(int update_every) {
                         , "MiB"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 200
+                        , cgroup_containers_chart_priority + 200
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
@@ -2763,7 +2768,7 @@ void update_cgroup_charts(int update_every) {
                                 , "MiB"
                                 , PLUGIN_CGROUPS_NAME
                                 , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                                , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 199
+                                , cgroup_containers_chart_priority + 199
                                 , update_every
                                 , RRDSET_TYPE_STACKED
                         );
@@ -2805,7 +2810,7 @@ void update_cgroup_charts(int update_every) {
                         , "count"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 250
+                        , cgroup_containers_chart_priority + 250
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2833,7 +2838,7 @@ void update_cgroup_charts(int update_every) {
                         , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
+                        , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -2863,7 +2868,7 @@ void update_cgroup_charts(int update_every) {
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
+                        , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2893,7 +2898,7 @@ void update_cgroup_charts(int update_every) {
                         , "KiB/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
+                        , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -2923,7 +2928,7 @@ void update_cgroup_charts(int update_every) {
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 1200
+                        , cgroup_containers_chart_priority + 1200
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2953,7 +2958,7 @@ void update_cgroup_charts(int update_every) {
                         , "operations"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2000
+                        , cgroup_containers_chart_priority + 2000
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -2983,7 +2988,7 @@ void update_cgroup_charts(int update_every) {
                         , "operations/s"
                         , PLUGIN_CGROUPS_NAME
                         , PLUGIN_CGROUPS_MODULE_CGROUPS_NAME
-                        , NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 2100
+                        , cgroup_containers_chart_priority + 2100
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
