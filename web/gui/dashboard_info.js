@@ -455,7 +455,7 @@ netdataDashboard.menu = {
         title: '',
         icon: '<i class="fas fa-th-large"></i>',
         info: 'XenServer domain resource utilization metrics. Netdata reads this information using <b>xenstat</b> library which gives access to the resource usage information (CPU, memory, disk I/O, network) for a virtual machine.'
-    },
+    }
 };
 
 
