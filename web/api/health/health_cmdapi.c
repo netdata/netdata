@@ -31,7 +31,39 @@ void free_silencers(SILENCER *t) {
     return;
 }
 
+int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
+    if (val) {
+        buffer_sprintf(wb, "%s\n\t\t\t\"%s\": \"%s\"", (hasprev)?",":"", var, val);
+        return 1;
+    } else {
+        return hasprev;
+    }
+}
 
+void health_silencers2json(BUFFER *wb) {
+    buffer_sprintf(wb, "{\n\t\"all\": %s,"
+                       "\n\t\"type\": \"%s\","
+                       "\n\t\"silencers\": [",
+                   (silencers->all_alarms)?"true":"false",
+                   (silencers->stype == STYPE_NONE)?"None":((silencers->stype == STYPE_DISABLE_ALARMS)?"DISABLE":"SILENCE"));
+
+    SILENCER *silencer;
+    int i = 0, j = 0;
+    for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
+        if(likely(i)) buffer_strcat(wb, ",");
+        buffer_strcat(wb, "\n\t\t{");
+        j=health_silencers2json_entry(wb, HEALTH_ALARM_KEY, silencer->alarms, j);
+        j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
+        j=health_silencers2json_entry(wb, HEALTH_CONTEXT_KEY, silencer->contexts, j);
+        j=health_silencers2json_entry(wb, HEALTH_HOST_KEY, silencer->hosts, j);
+        health_silencers2json_entry(wb, HEALTH_FAMILIES_KEY, silencer->families, j);
+        j=0;
+        buffer_strcat(wb, "\n\t\t}");
+        i++;
+    }
+    if(likely(i)) buffer_strcat(wb, "\n\t");
+    buffer_strcat(wb, "]\n}\n");
+}
 
 int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url) {
     int ret = 400;
@@ -105,6 +137,8 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         free_silencers(silencers->silencers);
                         silencers->silencers = NULL;
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
+                    } else if (!strcmp(value, HEALTH_CMDAPI_CMD_LIST)) {
+                        health_silencers2json(wb);
                     }
                 } else {
                     uint32_t hash = simple_uhash(key);

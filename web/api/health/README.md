@@ -142,6 +142,40 @@ Example 2.2: Add one more selector, to also silence alarms for cpu1 and cpu2
 http://localhost/api/v1/manage/health?families=cpu1 cpu2
 ```
 
+### List silencers
+
+The command `LIST` returns a JSON with the current status of the silencers.
+
+```
+ curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken" 
+```
+
+As an example, the following response shows that we have two silencers configured, one for an alarm called `samplealarm` and one for alarms with context `random` on host `myhost`
+```json
+{
+	"all": false,
+	"type": "SILENCE",
+	"silencers": [
+		{
+			"alarm": "samplealarm"
+		},
+		{
+			"context": "random",
+			"hosts": "myhost"
+		}
+	]
+}
+```
+
+The response below shows that we have disabled all health checks. 
+```json
+{
+	"all": true,
+	"type": "DISABLE",
+	"silencers": []
+}
+
+```
 ### Responses
 
 - "Auth Error" : Token authentication failed
