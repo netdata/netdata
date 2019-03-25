@@ -1,6 +1,5 @@
-#!/bin/bash
-#
-# Simple incoming webhook for slack integration.
+# #No shebang necessary
+# BASH Lib: Simple incoming webhook for slack integration.
 # 
 # The script expects the following parameters to be defined by the upper layer:
 # SLACK_INCOMING_WEBHOOK_URL

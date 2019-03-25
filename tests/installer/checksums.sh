@@ -12,7 +12,7 @@ set -e
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel 2> /dev/null || echo "")")
 CWD="$(git rev-parse --show-cdup 2> /dev/null || echo "")"
 if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
-    echo "Run as .travis/$(basename "$0") from top level directory of netdata git repository"
+    echo "Run as ./tests/installer/$(basename "$0") from top level directory of netdata git repository"
     echo "Kickstart validation process aborted"
     exit 1
 fi
