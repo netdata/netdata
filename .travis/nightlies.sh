@@ -1,6 +1,19 @@
 #!/bin/bash
+# This is the nightlies orchastration script
+# It runs the following activities in order:
+# 1) Generate changelog
+# 2) Build docker images
+# 3) Publish docker images
+# 4) Generate the rest of the artifacts (Source code .tar.gz file and makeself binary generation)
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author  : Pawel Krupa (paulfantom)
+# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 
-BAD_THING_HAPPENED=0
+set -e
+
+FAIL=0
 
 if [ ! -f .gitignore ]; then
 	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
@@ -32,14 +45,14 @@ if .travis/generate_changelog.sh; then
 	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 else
 	git clean -xfd
-	BAD_THING_HAPPENED=1
+	echo "Changelog generation has failed, will proceed anyway"
 fi
 
 echo "--- BUILD & PUBLISH DOCKER IMAGES ---"
-packaging/docker/build.sh || BAD_THING_HAPPENED=1
-packaging/docker/publish.sh || BAD_THING_HAPPENED=1
+packaging/docker/build.sh || FAIL=1
+packaging/docker/publish.sh || FAIL=1
 
 echo "--- BUILD ARTIFACTS ---"
-.travis/create_artifacts.sh || BAD_THING_HAPPENED=1
+.travis/create_artifacts.sh || FAIL=1
 
-exit "${BAD_THING_HAPPENED}"
+exit "${FAIL}"
