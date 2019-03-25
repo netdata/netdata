@@ -90,9 +90,4 @@ jobs:
     script: ./tests/installer/checksums.sh
 
 notifications:
-  email:
-    recipients:
-    - paul@netdata.rocks
-    on_success: always
-    on_failure: always
   webhooks: https://app.fossa.io/hooks/travisci
