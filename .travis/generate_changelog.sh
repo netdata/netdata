@@ -10,19 +10,19 @@ set -e
 
 # If we are not in netdata git repo, at the top level directory, fail
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
-CWD=$(git rev-parse --show-cdup)
-if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
+CWD=$(git rev-parse --show-cdup || echo "")
+if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     echo "Run as .travis/$(basename "$0") from top level directory of netdata git repository"
     echo "Changelog generation process aborted"
     exit 1
 fi
 
+LAST_TAG="$1"
+COMMITS_SINCE_RELEASE="$2"
 ORG=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f1)
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f 2)
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
-LAST_TAG=$(git describe --abbrev=0 --tags)
-COMMITS_SINCE_RELEASE=$(git rev-list "$LAST_TAG"..HEAD --count)
 PUSH_URL=$(git config --get remote.origin.url | sed -e 's/^https:\/\///')
 FAIL=0
 if [ -z ${GIT_TAG+x} ]; then
@@ -31,11 +31,6 @@ else
 	OPTS="--future-release ${GIT_TAG}"
 fi
 
-# If no commits since release, just stop
-if [ "$COMMITS_SINCE_RELEASE" == "$(rev <packaging/version | cut -d- -f 2 | rev)" ]; then
-	echo "No changes since last release"
-	exit 0
-fi
 echo "We got $COMMITS_SINCE_RELEASE changes since $LAST_TAG, re-generating changelog"
 git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
