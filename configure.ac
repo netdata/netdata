@@ -41,6 +41,7 @@ AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
 
+
 # -----------------------------------------------------------------------------
 # configurable options
 
