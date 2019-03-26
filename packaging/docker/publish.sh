@@ -8,6 +8,11 @@
 
 set -e
 
+if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
+	echo "This mechanism currently can only run on BASH version 4 and above"
+	exit 1
+fi
+
 WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
@@ -49,7 +54,7 @@ fi
 echo "Docker image publishing in progress.."
 echo "Version       : ${VERSION}"
 echo "Repository    : ${REPOSITORY}"
-echo "Architectures : ${ARCHS}"
+echo "Architectures : ${ARCHS[*]}"
 echo "Manifest list : ${MANIFEST_LIST}"
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
