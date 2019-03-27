@@ -13,19 +13,29 @@
 
 **Closed issues:**
 
-- How to disable disk monitoring for specific drives, in particular automounted \(autofs\) network shares [\#5704](https://github.com/netdata/netdata/issues/5704)
+- Feature: Netdata alarms as POST events to a configurable endpoint in health\_alarm\_notify.conf [\#5702](https://github.com/netdata/netdata/issues/5702)
 - feature cgroups plugin: make containers priority user configurable [\#5697](https://github.com/netdata/netdata/issues/5697)
+- Basic kubeproxy collector [\#5683](https://github.com/netdata/netdata/issues/5683)
 - push kickstart.sh to https://my-netdata.io/kickstart.sh [\#5681](https://github.com/netdata/netdata/issues/5681)
 - Slack footer link breaks when the URL is too long [\#5654](https://github.com/netdata/netdata/issues/5654)
 - netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
+- Basic kubelet collector [\#5639](https://github.com/netdata/netdata/issues/5639)
+- Isn't it a security risk not having SSL mode for postgres plugin? [\#5629](https://github.com/netdata/netdata/issues/5629)
 - feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
 - /etc/cron.daily/netdata-updater -f $'\E\(B\E\[0m\\n' /dev/fd/63: line 86: : command not found [\#5570](https://github.com/netdata/netdata/issues/5570)
+- NetData on XCP-ng dom0 CentOS [\#5357](https://github.com/netdata/netdata/issues/5357)
+- Kubelet monitoring [\#4859](https://github.com/netdata/netdata/issues/4859)
+- fping 4.1 released [\#4227](https://github.com/netdata/netdata/issues/4227)
 - support gauges without a needle [\#4206](https://github.com/netdata/netdata/issues/4206)
 - notifications with smstools \(direct connection to mobile phone\) [\#2720](https://github.com/netdata/netdata/issues/2720)
 - remove not updated charts after some time [\#688](https://github.com/netdata/netdata/issues/688)
 
 **Merged pull requests:**
 
+- Update fping version [\#5719](https://github.com/netdata/netdata/pull/5719) ([vlvkobal](https://github.com/vlvkobal))
+- add some kubernetes to apps\_groups.conf [\#5714](https://github.com/netdata/netdata/pull/5714) ([ilyam8](https://github.com/ilyam8))
+- netdata/packaging/ci: nits [\#5709](https://github.com/netdata/netdata/pull/5709) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Send custom docs [\#5703](https://github.com/netdata/netdata/pull/5703) ([cakrit](https://github.com/cakrit))
 - add 'containers priority' option to cgroups plugin [\#5700](https://github.com/netdata/netdata/pull/5700) ([ilyam8](https://github.com/ilyam8))
 - Remove temp log file if no update needed [\#5695](https://github.com/netdata/netdata/pull/5695) ([cakrit](https://github.com/cakrit))
 - add a description how to achieve vhost access logs with nginx in web\_log [\#5694](https://github.com/netdata/netdata/pull/5694) ([hsegnitz](https://github.com/hsegnitz))
@@ -39,6 +49,8 @@
 - bring uninstaller back [\#5675](https://github.com/netdata/netdata/pull/5675) ([paulfantom](https://github.com/paulfantom))
 - Fix py2-psycopg2 right after upgrade [\#5667](https://github.com/netdata/netdata/pull/5667) ([archisgore](https://github.com/archisgore))
 - Add SMS Server Tools 3 SMS notifications [\#5662](https://github.com/netdata/netdata/pull/5662) ([cakrit](https://github.com/cakrit))
+- postgres add ssl connection support [\#5661](https://github.com/netdata/netdata/pull/5661) ([ilyam8](https://github.com/ilyam8))
+- Add xenstat plugin [\#5660](https://github.com/netdata/netdata/pull/5660) ([vlvkobal](https://github.com/vlvkobal))
 - Remove obsolete python modules [\#5659](https://github.com/netdata/netdata/pull/5659) ([ilyam8](https://github.com/ilyam8))
 - Fix path to pidfile in FreeBSD rc.d file [\#5657](https://github.com/netdata/netdata/pull/5657) ([honzahommer](https://github.com/honzahommer))
 - netdata/build: A small house keeping around coverity scan \(no functional  or process change\) [\#5656](https://github.com/netdata/netdata/pull/5656) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
