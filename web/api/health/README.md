@@ -45,6 +45,7 @@ The following will return an SVG badge of the alarm named `NAME`, attached to th
 ## Health Management API
 
 Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alarms.
+From Netdata v1.13.1 and beyond, the configuration controlled via the API commands is [persisted across netdata restarts](#persistence).
 
 Specifically, the API allows you to:
  - Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
@@ -144,7 +145,7 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 
 ### List silencers
 
-The command `LIST` returns a JSON with the current status of the silencers.
+The command `LIST` was added in netdata v1.13.1 and returns a JSON with the current status of the silencers.
 
 ```
  curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken" 
@@ -185,9 +186,20 @@ The response below shows that we have disabled all health checks.
 - "Health checks disabled for alarms matching the selectors" : Added to the response for a cmd=DISABLE
 - "Alarm notifications silenced for alarms matching the selectors" : Added to the response for a cmd=SILENCE
 - "Alarm selector added" : Added to the response when a new selector is added
-- "Invalid key. Ignoring it." : Wrong name of a parameter. Added to the response and ignored.
 - "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command." : Added to the response if a selector is added without a selector-specific command.
 - "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors." : Added to the response if a selector-specific command is issued without a selector.
+
+### Persistence
+
+From netdata v1.13.1 and beyond, the silencers configuration is persisted to disk and loaded when netdata starts. 
+The JSON string returned by the [LIST command](#list-silencers) is automatically saved to the `silencers file`, every time a command alters the silencers configuration. 
+The file's location is configurable in `netdata.conf`. The default is shown below:
+
+```
+[health]
+	# silencers file = /var/lib/netdata/health.silencers.json
+```
+
 
 ### Further reading
 

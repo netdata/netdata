@@ -21,6 +21,7 @@ SUBDIRS = \
     storage_number \
     threads \
     url \
+    json \
     $(NULL)
 
 dist_noinst_DATA = \

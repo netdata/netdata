@@ -16,27 +16,35 @@ printhelp () {
 }
 
 check () {
-	echo -e "${GRAY}Check: '${1}' in 2 sec"
-	sleep 2
-	resp=$(curl -s "http://$URL/api/v1/alarms?all")
-	r=$(echo "${resp}" | \
-	python3 -c "import sys, json; d=json.load(sys.stdin); \
-	print(\
-	d['alarms']['example.random.example_alarm1']['disabled'], \
-	d['alarms']['example.random.example_alarm1']['silenced'] , \
-	d['alarms']['example.random.example_alarm2']['disabled'], \
-	d['alarms']['example.random.example_alarm2']['silenced'], \
-	d['alarms']['system.load.load_trigger']['disabled'], \
-	d['alarms']['system.load.load_trigger']['silenced'], \
-	);" 2>&1)
-	if [ $? -ne 0 ] ; then
-		echo -e "${RED}ERROR: Unexpected response '$resp'"
-		err=$((err+1))
-	elif [ "${r}" != "${2}" ] ; then
-		echo -e "${RED}ERROR: 'Got ${r}'. Expected '${2}'"
-		err=$((err+1))
-	else
-		echo -e "${GREEN}Success"
+	iterations=1
+	error=1
+	while [ ${iterations} -lt 6 ] && [ ${error} -eq 1 ]; do
+		echo -e "${GRAY}Check (${iterations}/5): '${1}' in 1 sec"
+		sleep 1
+		resp=$(curl -s "http://$URL/api/v1/alarms?all")
+		r=$(echo "${resp}" | \
+		python3 -c "import sys, json; d=json.load(sys.stdin); \
+		print(\
+		d['alarms']['example.random.example_alarm1']['disabled'], \
+		d['alarms']['example.random.example_alarm1']['silenced'] , \
+		d['alarms']['example.random.example_alarm2']['disabled'], \
+		d['alarms']['example.random.example_alarm2']['silenced'], \
+		d['alarms']['system.load.load_trigger']['disabled'], \
+		d['alarms']['system.load.load_trigger']['silenced'], \
+		);" 2>&1)
+		if [ $? -ne 0 ] ; then
+			echo -e "${RED}  ERROR: Unexpected response"
+		elif [ "${r}" != "${2}" ] ; then
+			echo -e "${RED}  ERROR: 'Got ${r}'. Expected '${2}'"
+		else
+			echo -e "${GREEN}Success"
+			error=0
+		fi
+		iterations=$((iterations+1))
+	done
+	if [ ${error} -eq 1 ] ; then
+		err=$((err+1));
+		echo -e "${RED}Failure"
 	fi
 }
 

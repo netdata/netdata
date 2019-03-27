@@ -190,6 +190,10 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
+        libnetdata/json/jsmn.c
+        libnetdata/json/jsmn.h
+        libnetdata/json/json.c
+        libnetdata/json/json.h
         )
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
