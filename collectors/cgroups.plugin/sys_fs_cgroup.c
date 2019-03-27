@@ -164,10 +164,10 @@ void read_cgroup_plugin_configuration() {
     else {
         //cgroup_enable_cpuacct_stat =
         cgroup_enable_cpuacct_usage =
-        cgroup_enable_memory =
-        cgroup_enable_detailed_memory =
+        //cgroup_enable_memory =
+        //cgroup_enable_detailed_memory =
         cgroup_enable_memory_failcnt =
-        cgroup_enable_swap =
+        //cgroup_enable_swap =
         //cgroup_enable_blkio_io =
         //cgroup_enable_blkio_ops =
         cgroup_enable_blkio_throttle_io =
@@ -175,6 +175,7 @@ void read_cgroup_plugin_configuration() {
         cgroup_enable_blkio_merged_ops =
         cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
         cgroup_search_in_devices = 0;
+        cgroup_used_memory_without_cache = CONFIG_BOOLEAN_NO; //unified cgroups use different values
 
         //TODO: can there be more than 1 cgroup2 mount point?
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup2", "rw"); //there is no cgroup2 specific super option - for now use 'rw' option
@@ -906,6 +907,7 @@ static inline void cgroup_read(struct cgroup *cg) {
         cgroup2_read_blkio(&cg->io_service_bytes, 0);
         cgroup2_read_blkio(&cg->io_serviced, 4);
         cgroup2_read_cpuacct_stat(&cg->cpuacct_stat);
+        cgroup_read_memory(&cg->memory);
     }
 }
 
@@ -929,7 +931,12 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     pid_t cgroup_pid;
     char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
 
-    snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+    if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+    }
+    else {
+        snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_unified_base, cg->id);
+    }
 
     debug(D_CGROUP, "executing command '%s' for cgroup '%s'", command, cg->id);
     FILE *fp = mypopen(command, &cgroup_pid);
@@ -1643,6 +1650,42 @@ static inline void find_all_cgroups() {
                 else
                     debug(D_CGROUP, "cpu.stat file for unified cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
+            if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory_without_cache) && !cg->memory.filename_detailed && (cgroup_used_memory_without_cache || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_detailed = strdupz(filename);
+                    cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
+                    debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
+                }
+                else
+                    debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+
+            if(unlikely(cgroup_enable_memory && !cg->memory.filename_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.current", cgroup_unified_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_usage_in_bytes = strdupz(filename);
+                    cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
+                    debug(D_CGROUP, "memory.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+                    snprintfz(filename, FILENAME_MAX, "%s%s/memory.max", cgroup_unified_base, cg->id);
+                    cg->filename_memory_limit = strdupz(filename);
+                }
+                else
+                    debug(D_CGROUP, "memory.current file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
+
+            if(unlikely(cgroup_enable_swap && !cg->memory.filename_msw_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.current", cgroup_unified_base, cg->id);
+                if(likely(stat(filename, &buf) != -1)) {
+                    cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
+                    cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
+                    snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.max", cgroup_unified_base, cg->id);
+                    cg->filename_memoryswap_limit = strdupz(filename);
+                    debug(D_CGROUP, "memory.swap.current filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+                }
+                else
+                    debug(D_CGROUP, "memory.swap file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
         }
     }
 
@@ -2234,8 +2277,15 @@ void update_systemd_services_charts(
             continue;
 
         if(likely(do_cpu && cg->cpuacct_stat.updated)) {
-            if(unlikely(!cg->rd_cpu))
-                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+            if(unlikely(!cg->rd_cpu)){
+
+
+                if (!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                    cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, system_hz, RRD_ALGORITHM_INCREMENTAL);
+                } else {
+                    cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                }
+            }
 
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
@@ -2519,12 +2569,32 @@ static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, u
         }
 
         if(*filename && *chart_var) {
-            if(read_single_number_file(*filename, value)) {
-                error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
-                freez(*filename);
-                *filename = NULL;
-            }
-            else {
+            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                if(read_single_number_file(*filename, value)) {
+                    error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+                    freez(*filename);
+                    *filename = NULL;
+                }
+                else {
+                    rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
+                    return 1;
+                }
+            } else {
+                char buffer[30 + 1];
+                int ret = read_file(*filename, buffer, 30);
+                if(ret) {
+                    error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+                    freez(*filename);
+                    *filename = NULL;
+                    return 0;
+                }
+                char *s = "max\n\0";
+                if(strsame(s, buffer) == 0){
+                    *value = UINT64_MAX;
+                    rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
+                    return 1;
+                }
+                *value = str2ull(buffer);
                 rrdsetvar_custom_chart_variable_set(*chart_var, (calculated_number)(*value / (1024 * 1024)));
                 return 1;
             }
@@ -2879,7 +2949,11 @@ void update_cgroup_charts(int update_every) {
                 rrdset_next(cg->st_mem_usage);
 
             rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
-            rrddim_set(cg->st_mem_usage, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
+            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                rrddim_set(cg->st_mem_usage, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
+            } else {
+                rrddim_set(cg->st_mem_usage, "swap", cg->memory.msw_usage_in_bytes);
+            }
             rrdset_done(cg->st_mem_usage);
 
             if (likely(update_memory_limits(&cg->filename_memory_limit, &cg->chart_var_memory_limit, &cg->memory_limit, "memory_limit", cg))) {
