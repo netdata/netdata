@@ -20,6 +20,7 @@ To collect non-system metrics, netdata supports a plugin architecture. The follo
 - **[Mail Servers](#mail-servers)**, like postfix, exim, dovecot
 - **[File Servers](#file-servers)**, like samba, NFS, ftp, sftp, WebDAV
 - **[Print Servers](#print-servers)**, like CUPS
+- **[Hypervisors](#hypervisors)**, like XenServer, XCP-ng
 - **[System](#system)**, for processes and other system metrics
 - **[Sensors](#sensors)**, like temperature, fans speed, voltage, humidity, HDD/SSD S.M.A.R.T attributes
 - **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time, nfacct
@@ -66,6 +67,7 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# fping = yes
 	# charts.d = yes
 	# apps = yes
+	# xenstat = yes
 ```
 
 The default for all plugins is the option `enable running new plugins`. So, setting this to `no` will disable all the plugins, except the ones specifically enabled.
@@ -293,11 +295,21 @@ NFS Client|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Co
 NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
 samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
+---
+
 ### Print Servers
 
 application|language|notes|
 :---------:|:------:|:----|
-CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: cups.plugin
+CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: [cups.plugin](../collectors/cups.plugin)
+
+---
+
+### Hypervisors
+
+application|language|notes|
+:---------:|:------:|:----|
+xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisors.<br/>&nbsp;<br/>netdata plugin: [xenstat.plugin](../collectors/xenstat.plugin)
 
 ---
 

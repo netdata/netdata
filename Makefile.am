@@ -109,6 +109,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
 	$(OPTIONAL_CUPS_CFLAGS) \
+	$(OPTIONAL_XENSTAT_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -223,6 +224,11 @@ CUPS_PLUGIN_FILES = \
 
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+XENSTAT_PLUGIN_FILES = \
+    collectors/xenstat.plugin/xenstat_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -511,5 +517,14 @@ if ENABLE_PLUGIN_NFACCT
     nfacct_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_NFACCT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_XENSTAT
+    plugins_PROGRAMS += xenstat.plugin
+    xenstat_plugin_SOURCES = $(XENSTAT_PLUGIN_FILES)
+    xenstat_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_XENSTAT_LIBS) \
         $(NULL)
 endif

@@ -136,6 +136,16 @@ pkg_check_modules(NFACCT libnetfilter_acct)
 
 
 # -----------------------------------------------------------------------------
+# Detect libxenstat
+
+pkg_check_modules(XENSTAT libxenstat)
+# later we use:
+# ${XENSTAT_LIBRARIES}
+# ${XENSTAT_CFLAGS_OTHER}
+# ${XENSTAT_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
 # Detect MacOS IOKit/Foundation framework
 
 IF(MACOS)
@@ -248,6 +258,10 @@ set(FREEIPMI_PLUGIN_FILES
 
 set(NFACCT_PLUGIN_FILES
         collectors/nfacct.plugin/plugin_nfacct.c
+        )
+
+set(XENSTAT_PLUGIN_FILES
+        collectors/xenstat.plugin/xenstat_plugin.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -520,6 +534,12 @@ ELSE()
     SET(ENABLE_PLUGIN_NFACCT False)
 ENDIF()
 
+IF(XENSTAT_LIBRARIES)
+    SET(ENABLE_PLUGIN_XENSTAT True)
+ELSE()
+    SET(ENABLE_PLUGIN_XENSTAT False)
+ENDIF()
+
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -560,6 +580,20 @@ IF(ENABLE_PLUGIN_NFACCT)
     target_compile_options(nfacct.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
 ELSE()
     message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# xenstat.plugin
+
+IF(ENABLE_PLUGIN_XENSTAT)
+    message(STATUS "xenstat.plugin: enabled")
+    add_executable(xenstat.plugin config.h ${XENSTAT_PLUGIN_FILES})
+    target_link_libraries (xenstat.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${XENSTAT_LIBRARIES})
+    target_include_directories(xenstat.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${XENSTAT_INCLUDE_DIRS})
+    target_compile_options(xenstat.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${XENSTAT_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "xenstat.plugin: disabled (requires libxenstat)")
 ENDIF()
 
 

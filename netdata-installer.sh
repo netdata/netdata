@@ -148,6 +148,12 @@ Valid <installer options> are:
         Enable/disable the nfacct plugin.
         Default: enable it when libmnl and libnetfilter_acct are available.
 
+   --enable-plugin-xenstat
+   --disable-plugin-xenstat
+
+        Enable/disable the xenstat plugin.
+        Default: enable it when libxenstat and libyajl are available.
+
    --enable-lto
    --disable-lto
 
@@ -225,6 +231,12 @@ while [ ! -z "${1}" ]; do
 	elif [ "$1" = "--disable-plugin-nfacct" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct"
 		shift 1
+    elif [ "$1" = "--enable-plugin-xenstat" ]; then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat"
+        shift 1
+    elif [ "$1" = "--disable-plugin-xenstat" ]; then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat"
+        shift 1
 	elif [ "$1" = "--enable-lto" ]; then
 		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto"
 		shift 1
@@ -769,6 +781,11 @@ if [ ${UID} -eq 0 ]; then
     if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin" ]; then
         run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
         run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+    fi
+
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin" ]; then
+        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
+        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
     fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
