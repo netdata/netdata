@@ -1048,8 +1048,8 @@ int main(int argc, char **argv) {
 
     // initialize the log files
     open_all_log_files();
-	netdata_anonymous_statistics_enabled=-1;
-	send_statistics("START","-", "-");
+    netdata_anonymous_statistics_enabled=-1;
+    send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {

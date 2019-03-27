@@ -795,7 +795,7 @@ void *health_main(void *ptr) {
                 else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
                     repeat_every = rc->crit_repeat_every;
             }
-            if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) < now)) {
+            if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                 rc->last_repeat = now;
                 ALARM_ENTRY *ae = health_create_alarm_entry(
                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,

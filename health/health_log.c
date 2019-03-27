@@ -78,8 +78,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%08x\t%08x\t%08x"
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
-                        "\t%016lx"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+                        "\t%016lx"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -111,10 +111,10 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->old_status
                             , ae->delay
 
-                            , (uint64_t)ae->last_repeat
-
                             , ae->new_value
                             , ae->old_value
+
+                            , (uint64_t)ae->last_repeat
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -137,7 +137,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         host->health_log_entries_written++;
         line++;
 
-        int max_entries = 31, entries = 0;
+        int max_entries = 30, entries = 0;
         char *pointers[max_entries];
 
         pointers[entries++] = s++;
@@ -177,17 +177,25 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 continue;
             }
 
-            time_t last_repeat = (time_t)strtoul(pointers[25], NULL, 16);
+            // Check if we got last_repeat field
+            time_t last_repeat = 0;
+            if(entries > 27) {
+                char* alarm_name = pointers[13];
+                last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
 
-            RRDCALC *rc = NULL;
-            for(rc = host->alarms; rc; rc = rc->next) {
-                if(rc->id == alarm_id && rrdcalc_isrepeating(rc)) {
-                    break;
+                RRDCALC *rc = NULL;
+                for(rc = host->alarms; rc; rc = rc->next) {
+                    if(unlikely(!strcmp(rc->name, alarm_name) && rrdcalc_isrepeating(rc))) {
+                        break;
+                    }
                 }
-            }
-            if(unlikely(rc)) {
-                rc->last_repeat = last_repeat;
-                continue;
+                if(unlikely(rc)) {
+                    rc->last_repeat = last_repeat;
+                    // We iterate through repeating alarm entries only to
+                    // find the latest last_repeat timestamp. Otherwise,
+                    // there is no need to keep them in memory.
+                    continue;
+                }
             }
 
             if(unlikely(*pointers[0] == 'A')) {
@@ -287,10 +295,10 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->old_status  = str2i(pointers[23]);
             ae->delay       = str2i(pointers[24]);
 
-            ae->last_repeat = last_repeat;
+            ae->new_value   = str2l(pointers[25]);
+            ae->old_value   = str2l(pointers[26]);
 
-            ae->new_value   = str2l(pointers[26]);
-            ae->old_value   = str2l(pointers[27]);
+            ae->last_repeat = last_repeat;
 
             char value_string[100 + 1];
             freez(ae->old_value_string);
