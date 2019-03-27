@@ -868,8 +868,12 @@ static int rrdpush_receive(int fd
     tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
 
-    if(!strcmp(machine_guid, "localhost"))
-        host = localhost;
+    if (strcmp(machine_guid, localhost->machine_guid) == 0) {
+        log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO MASTER");
+        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the master/proxy machine guid to a slave?", hostname, client_ip, client_port, machine_guid);
+        close(fd);
+        return 1;
+    }
     else
         host = rrdhost_find_or_create(
                 hostname
@@ -1050,24 +1054,24 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 static void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
-        struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
-        info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
-        rrdpush_receive(
-                rpt->fd
-                , rpt->key
-                , rpt->hostname
-                , rpt->registry_hostname
-                , rpt->machine_guid
-                , rpt->os
-                , rpt->timezone
-                , rpt->tags
-                , rpt->program_name
-                , rpt->program_version
-                , rpt->update_every
-                , rpt->client_ip
-                , rpt->client_port
-        );
+    rrdpush_receive(
+	    rpt->fd
+	    , rpt->key
+	    , rpt->hostname
+	    , rpt->registry_hostname
+	    , rpt->machine_guid
+	    , rpt->os
+	    , rpt->timezone
+	    , rpt->tags
+	    , rpt->program_name
+	    , rpt->program_version
+	    , rpt->update_every
+	    , rpt->client_ip
+	    , rpt->client_port
+    );
 
     netdata_thread_cleanup_pop(1);
     return NULL;

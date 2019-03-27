@@ -387,12 +387,12 @@ and metrics:
 
 ```
 [plugin:proc:/sys/class/power_supply]
-    # battery capacity = yes
-    # battery charge = no
-    # battery energy = no
-    # power supply voltage = no
-    # keep files open = auto
-    # directory to monitor = /sys/class/power_supply
+  # battery capacity = yes
+  # battery charge = no
+  # battery energy = no
+  # power supply voltage = no
+  # keep files open = auto
+  # directory to monitor = /sys/class/power_supply
 ```
 
 #### notes
@@ -413,16 +413,27 @@ This way, alerts which match on these will still work.
 
 ## IPC
 
-This module monitors the number of semaphores, semaphore arrays, number of messages in message queues, and amount of memory used by message queues. As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
+### Monitored IPC metrics
 
-#### configuration
+- **number of messages in message queues**
+- **amount of memory used by message queues**
+- **number of semaphores**
+- **number of semaphore arrays**
+- **number of shared memory segments**
+- **amount of memory used by shared memory segments**
+
+As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
+
+### configuration
 
 ```
 [plugin:proc:ipc]
-    # semaphore totals = yes
-    # message queues = yes
-    # msg filename to monitor = /proc/sysvipc/msg
-    # max dimensions in memory allowed = 50
+  # message queues = yes
+  # semaphore totals = yes
+  # shared memory totals = yes
+  # msg filename to monitor = /proc/sysvipc/msg
+  # shm filename to monitor = /proc/sysvipc/shm
+  # max dimensions in memory allowed = 50
 ```
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fproc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

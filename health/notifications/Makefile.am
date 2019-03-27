@@ -39,7 +39,9 @@ include pushbullet/Makefile.inc
 include pushover/Makefile.inc
 include rocketchat/Makefile.inc
 include slack/Makefile.inc
+include smstools3/Makefile.inc
 include syslog/Makefile.inc
 include telegram/Makefile.inc
 include twilio/Makefile.inc
 include web/Makefile.inc
+include custom/Makefile.inc

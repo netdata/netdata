@@ -78,5 +78,6 @@ dist_healthconfig_DATA = \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
     health.d/web_log.conf \
+    health.d/x509check.conf \
     health.d/zfs.conf \
     $(NULL)

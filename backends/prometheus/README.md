@@ -373,6 +373,14 @@ netdata sends all metrics prefixed with `netdata_`. You can change this in `netd
 
 It can also be changed from the URL, by appending `&prefix=netdata`.
 
+### Metric Units
+
+The default source `average` adds the unit of measurement to the name of each metric (e.g. `_KiB_persec`).
+To hide the units and get the same metric names as with the other sources, append to the URL `&hideunits=yes`.
+
+The units were standardized in v1.12, with the effect of changing the metric names. 
+To get the metric names as they were before v1.12, append to the URL `&oldunits=yes`
+
 ### Accuracy of `average` and `sum` data sources
 
 When the data source is set to `average` or `sum`, netdata remembers the last access of each client accessing prometheus metrics and uses this last access time to respond with the `average` or `sum` of all the entries in the database since that. This means that prometheus servers are not losing data when they access netdata with data source = `average` or `sum`.

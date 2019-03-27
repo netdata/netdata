@@ -146,12 +146,47 @@ It has been designed by **SysAdmins**, **DevOps** and **Developers** for trouble
 not just visualize metrics.
 
 ## News  
-  
+
+`Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)** 
+
+Release 1.13.0 contains 14 bug fixes and 8 improvements.
+
+netdata has taken the first step into the world of Kubernetes, with a beta version of a [Helm chart](https://github.com/netdata/helmchart) for deployment to a k8s cluster and [proper naming](https://github.com/netdata/netdata/pull/5576) of the cgroup containers. We have [big plans](https://github.com/netdata/netdata/issues/5392) for Kubernetes, so stay tuned!
+
+A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/pull/5552) has resulted in a dramatic decrease of the required memory, making netdata even more resource efficient.
+
+We also added charts for IPC shared memory segments and total memory used.
+
+`Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)** 
+
+Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
+
+The main motivation behind a new patch release is the introduction of a **stable release channel**.
+A "stable" installation and update channel was always on our roadmap, but it became a necessity when we realized that our users in China could not use the nightly releases published on Google Cloud. The "stable" channel is based on our official GitHub releases and uses assets hosted on GitHub. 
+
+We are also introducing a new **Oracle DB collector** module, implemented in Python.  
+
+`Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)** 
+
+Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
+
+`Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)** 
+
+Release 1.12 is made out of 211 pull requests and 22 bug fixes.
+The key improvements are:
+
+- Introducing `netdata.cloud`, the free netdata service for all netdata users
+- High performance plugins with go.d.plugin (data collection orchestrator written in Go)
+- 7 new data collectors and 11 rewrites of existing data collectors for improved performance
+- A new management API for all netdata servers
+- Bind different functions of the netdata APIs to different ports
+- Improved installation and updates
+
 `Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**  
 
 - Improved internal database to support values above 64bit.
 - New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
-- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/python.d.plugin/cpufreq/), [`sensors`](collectors/python.d.plugin/sensors/).
+- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/proc.plugin/README.md#cpu-frequency), [`sensors`](collectors/python.d.plugin/sensors/).
 - Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
 - `my-netdata`menu has been refactored. 
 - Packaging: `openrc` service definition got a few improvements.
@@ -211,7 +246,7 @@ This is what you should expect from Netdata:
 
 ### Health Monitoring & Alarms
 - **Sophisticated alerting** - comes with hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods.
-- **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irs](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/).
+- **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom notifications](health/notifications/custom/).
 
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
@@ -282,8 +317,8 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[SoftIRQs](collectors/proc.plugin/)** - total and per core SoftIRQs.
 - **[SoftNet](collectors/proc.plugin/)** - total and per core SoftIRQs related to network activity.
 - **[CPU Throttling](collectors/proc.plugin/)** - collects per core CPU throttling.
-- **[CPU Frequency](collectors/python.d.plugin/couchdb/)** - collects the current CPU frequency.
-- **[CPU Idle](collectors/python.d.plugin/cpuidle/)** - collects the time spent per processor state.
+- **[CPU Frequency](collectors/proc.plugin/)** - collects the current CPU frequency.
+- **[CPU Idle](collectors/proc.plugin/)** - collects the time spent per processor state.
 - **[IdleJitter](collectors/idlejitter.plugin/)** - measures CPU latency.
 - **[Entropy](collectors/proc.plugin/)** - random numbers pool, using in cryptography.
 - **[Interprocess Communication - IPC](collectors/proc.plugin/)** - such as semaphores and semaphores arrays.
@@ -304,7 +339,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[block devices](collectors/proc.plugin/)** - per disk: I/O, operations, backlog, utilization, space, etc.  
 - **[BCACHE](collectors/proc.plugin/)** - detailed performance of SSD caching devices.
 - **[DiskSpace](collectors/proc.plugin/)** - monitors disk space usage.
-- **[mdstat](collectors/python.d.plugin/mdstat/)** - software RAID.
+- **[mdstat](collectors/proc.plugin/)** - software RAID.
 - **[hddtemp](collectors/python.d.plugin/hddtemp/)** - disk temperatures.
 - **[smartd](collectors/python.d.plugin/smartd_log/)** - disk S.M.A.R.T. values.
 - **[device mapper](collectors/proc.plugin/)** - naming disks.
@@ -413,7 +448,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### UPSes
 - **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
+- **[Linux Power Supply](collectors/proc.plugin/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers
 - **[RetroShare](collectors/python.d.plugin/retroshare/)** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.

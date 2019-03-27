@@ -1,252 +1,174 @@
 #!/usr/bin/env sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC1117,SC2016,SC2034,SC2039,SC2059,SC2086,SC2119,SC2120,SC2129,SC2162,SC2166,SC2181
-
-umask 022
-
-# make sure UID is set
-# shellcheck disable=SC2155
-[ -z "${UID}" ] && export UID="$(id -u)"
+# shellcheck disable=SC1117,SC2039,SC2059,SC2086
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
-which_cmd() {
-    # shellcheck disable=SC2230
-    which "${1}" 2>/dev/null || command -v "${1}" 2>/dev/null
-}
-
-check_cmd() {
-    which_cmd "${1}" >/dev/null 2>&1 && return 0
-    return 1
-}
-
 setup_terminal() {
-    TPUT_RESET=""
-    TPUT_BLACK=""
-    TPUT_RED=""
-    TPUT_GREEN=""
-    TPUT_YELLOW=""
-    TPUT_BLUE=""
-    TPUT_PURPLE=""
-    TPUT_CYAN=""
-    TPUT_WHITE=""
-    TPUT_BGBLACK=""
-    TPUT_BGRED=""
-    TPUT_BGGREEN=""
-    TPUT_BGYELLOW=""
-    TPUT_BGBLUE=""
-    TPUT_BGPURPLE=""
-    TPUT_BGCYAN=""
-    TPUT_BGWHITE=""
-    TPUT_BOLD=""
-    TPUT_DIM=""
-    TPUT_UNDERLINED=""
-    TPUT_BLINK=""
-    TPUT_INVERTED=""
-    TPUT_STANDOUT=""
-    TPUT_BELL=""
-    TPUT_CLEAR=""
+	TPUT_RESET=""
+	TPUT_YELLOW=""
+	TPUT_WHITE=""
+	TPUT_BGRED=""
+	TPUT_BGGREEN=""
+	TPUT_BOLD=""
+	TPUT_DIM=""
 
-    # Is stderr on the terminal? If not, then fail
-    test -t 2 || return 1
+	# Is stderr on the terminal? If not, then fail
+	test -t 2 || return 1
 
-    if check_cmd tput
-    then
-        if [ $(( $(tput colors 2>/dev/null) )) -ge 8 ]
-        then
-            # Enable colors
-            TPUT_RESET="$(tput sgr 0)"
-            TPUT_BLACK="$(tput setaf 0)"
-            TPUT_RED="$(tput setaf 1)"
-            TPUT_GREEN="$(tput setaf 2)"
-            TPUT_YELLOW="$(tput setaf 3)"
-            TPUT_BLUE="$(tput setaf 4)"
-            TPUT_PURPLE="$(tput setaf 5)"
-            TPUT_CYAN="$(tput setaf 6)"
-            TPUT_WHITE="$(tput setaf 7)"
-            TPUT_BGBLACK="$(tput setab 0)"
-            TPUT_BGRED="$(tput setab 1)"
-            TPUT_BGGREEN="$(tput setab 2)"
-            TPUT_BGYELLOW="$(tput setab 3)"
-            TPUT_BGBLUE="$(tput setab 4)"
-            TPUT_BGPURPLE="$(tput setab 5)"
-            TPUT_BGCYAN="$(tput setab 6)"
-            TPUT_BGWHITE="$(tput setab 7)"
-            TPUT_BOLD="$(tput bold)"
-            TPUT_DIM="$(tput dim)"
-            TPUT_UNDERLINED="$(tput smul)"
-            TPUT_BLINK="$(tput blink)"
-            TPUT_INVERTED="$(tput rev)"
-            TPUT_STANDOUT="$(tput smso)"
-            TPUT_BELL="$(tput bel)"
-            TPUT_CLEAR="$(tput clear)"
-        fi
-    fi
+	if command -v tput >/dev/null 2>&1; then
+		if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
+			# Enable colors
+			TPUT_RESET="$(tput sgr 0)"
+			TPUT_YELLOW="$(tput setaf 3)"
+			TPUT_WHITE="$(tput setaf 7)"
+			TPUT_BGRED="$(tput setab 1)"
+			TPUT_BGGREEN="$(tput setab 2)"
+			TPUT_BOLD="$(tput bold)"
+			TPUT_DIM="$(tput dim)"
+		fi
+	fi
 
-    return 0
+	return 0
 }
-setup_terminal || echo >/dev/null
 
 progress() {
-    echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
-run_ok() {
-    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
-}
-
-run_failed() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
-}
-
-ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
-    if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]
-    then
-        printf "%q " "${@}"
-    else
-        printf "%s" "${*}"
-    fi
-    return 0
+	if printf "%q " test >/dev/null 2>&1; then
+		printf "%q " "${@}"
+	else
+		printf "%s" "${*}"
+	fi
+	return 0
 }
 
-run_logfile="/dev/null"
 run() {
-    local user="${USER--}" dir="${PWD}" info info_console
+	local dir="${PWD}" info_console
 
-    if [ "${UID}" = "0" ]
-        then
-        info="[root ${dir}]# "
-        info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
-    else
-        info="[${user} ${dir}]$ "
-        info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
-    fi
+	if [ "${UID}" = "0" ]; then
+		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
+	else
+		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
+	fi
 
-    printf >> "${run_logfile}" "${info}"
-    escaped_print >> "${run_logfile}" "${@}"
-    printf >> "${run_logfile}" " ... "
+	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
 
-    printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
-    escaped_print >&2 "${@}"
-    printf >&2 "${TPUT_RESET}\n"
+	"${@}"
 
-    "${@}"
+	local ret=$?
+	if [ ${ret} -ne 0 ]; then
+		printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+	else
+		printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+	fi
 
-    local ret=$?
-    if [ ${ret} -ne 0 ]
-        then
-        run_failed
-        printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
-    else
-        run_ok
-        printf >> "${run_logfile}" "OK\n"
-    fi
-
-    return ${ret}
+	return ${ret}
 }
-
-
-# ---------------------------------------------------------------------------------------------------------------------
 
 fatal() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
-    exit 1
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
+}
+
+create_tmp_directory() {
+	# Check if tmp is mounted as noexec
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+		pattern="$(pwd)/netdata-kickstart-XXXXXX"
+	else
+		pattern="/tmp/netdata-kickstart-XXXXXX"
+	fi
+
+	mktemp -d $pattern
+}
+
+download() {
+	url="${1}"
+	dest="${2}"
+	if command -v curl >/dev/null 2>&1; then
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	elif command -v wget >/dev/null 2>&1; then
+		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+	else
+		fatal "I need curl or wget to proceed, but neither is available on this system."
+	fi
+}
+
+set_tarball_urls() {
+	if [ "$1" == "stable" ]; then
+		local latest
+		# Simple version
+		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
+		latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.gz.run"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+	else
+		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
+	fi
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
+umask 022
 
-if [ "$(uname -m)" != "x86_64" ]
-	then
+sudo=""
+[ -z "${UID}" ] && UID="$(id -u)"
+[ "${UID}" -ne "0" ] && sudo="sudo"
+
+setup_terminal || echo >/dev/null
+
+# ---------------------------------------------------------------------------------------------------------------------
+if [ "$(uname -m)" != "x86_64" ]; then
 	fatal "Static binary versions of netdata are available only for 64bit Intel/AMD CPUs (x86_64), but yours is: $(uname -m)."
 fi
 
-if [ "$(uname -s)" != "Linux" ]
-	then
+if [ "$(uname -s)" != "Linux" ]; then
 	fatal "Static binary versions of netdata are available only for Linux, but this system is $(uname -s)"
 fi
 
-curl="$(which_cmd curl)"
-wget="$(which_cmd wget)"
-
 # ---------------------------------------------------------------------------------------------------------------------
-
-progress "Checking the latest version of static build..."
-
-BASE='https://raw.githubusercontent.com/netdata/binary-packages/master'
-
-LATEST=
-if [ ! -z "${curl}" -a -x "${curl}" ]
-then
-    LATEST="$(run ${curl} "${BASE}/netdata-latest.gz.run")"
-elif [ ! -z "${wget}" -a -x "${wget}" ]
-then
-    LATEST="$(run ${wget} -O - "${BASE}/netdata-latest.gz.run")"
-else
-    fatal "curl or wget are needed for this script to work."
-fi
-
-if [ -z "${LATEST}" ]
-	then
-	fatal "Cannot find the latest static binary version of netdata."
-fi
-
-# ---------------------------------------------------------------------------------------------------------------------
-
-progress "Downloading static netdata binary: ${LATEST}"
-
-ret=1
-if [ ! -z "${curl}" -a -x "${curl}" ]
-then
-    run ${curl} "${BASE}/${LATEST}" >"/tmp/${LATEST}"
-    ret=$?
-elif [ ! -z "${wget}" -a -x "${wget}" ]
-then
-    run ${wget} -O "/tmp/${LATEST}" "${BASE}/${LATEST}"
-    ret=$?
-else
-    fatal "curl or wget are needed for this script to work."
-fi
-
-if [ ${ret} -ne 0 -o ! -s "/tmp/${LATEST}" ]
-	then
-	fatal "Failed to download the latest static binary version of netdata."
-fi
-
-# ---------------------------------------------------------------------------------------------------------------------
-
 opts=
 inner_opts=
-while [ ! -z "${1}" ]
-do
-    if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" -o "${1}" = "--accept" ]
-    then
-        opts="${opts} --accept"
-    elif [ "${1}" = "--dont-start-it" ]
-    then
-        inner_opts="${inner_opts} ${1}"
-    else
-        echo >&2 "Unknown option '${1}'"
-        exit 1
-    fi
-    shift
+RELEASE_CHANNEL="nightly"
+while [ -n "${1}" ]; do
+	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
+		opts="${opts} --accept"
+	elif [ "${1}" = "--dont-start-it" ]; then
+		inner_opts="${inner_opts} ${1}"
+	elif [ "${1}" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
+	else
+		echo >&2 "Unknown option '${1}'"
+		exit 1
+	fi
+	shift
 done
-[ ! -z "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
+[ -n "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
 # ---------------------------------------------------------------------------------------------------------------------
+TMPDIR=$(create_tmp_directory)
+cd "${TMPDIR}" || :
 
+set_tarball_urls "${RELEASE_CHANNEL}"
+progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
+
+download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
+if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+	fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
 progress "Installing netdata"
 
-sudo=
-[ "${UID}" != "0" ] && sudo="sudo"
-run ${sudo} sh "/tmp/${LATEST}" ${opts} ${inner_opts}
+run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
 
-if [ $? -eq 0 ]
-	then
-	rm "/tmp/${LATEST}"
+#shellcheck disable=SC2181
+if [ $? -eq 0 ]; then
+	rm "${TMPDIR}/netdata-latest.gz.run"
 else
-	echo >&2 "NOTE: did not remove: /tmp/${LATEST}"
+	echo >&2 "NOTE: did not remove: ${TMPDIR}/netdata-latest.gz.run"
 fi
