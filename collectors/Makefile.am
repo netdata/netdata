@@ -11,6 +11,7 @@ SUBDIRS = \
     cups.plugin \
     diskspace.plugin \
     fping.plugin \
+    ioping.plugin \
     freebsd.plugin \
     freeipmi.plugin \
     idlejitter.plugin \

@@ -213,6 +213,13 @@ then
     run chmod 4750 bin/fping
 fi
 
+# fix the ioping binary
+if [ -f bin/ioping ]
+then
+    run chown root:${NETDATA_GROUP} bin/ioping
+    run chmod 4750 bin/ioping
+fi
+
 
 # -----------------------------------------------------------------------------
 
