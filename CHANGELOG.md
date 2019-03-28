@@ -13,13 +13,16 @@
 
 **Closed issues:**
 
+- support AWS Timestream as a back-end [\#5722](https://github.com/netdata/netdata/issues/5722)
 - Feature: Netdata alarms as POST events to a configurable endpoint in health\_alarm\_notify.conf [\#5702](https://github.com/netdata/netdata/issues/5702)
 - feature cgroups plugin: make containers priority user configurable [\#5697](https://github.com/netdata/netdata/issues/5697)
 - Basic kubeproxy collector [\#5683](https://github.com/netdata/netdata/issues/5683)
 - push kickstart.sh to https://my-netdata.io/kickstart.sh [\#5681](https://github.com/netdata/netdata/issues/5681)
 - Slack footer link breaks when the URL is too long [\#5654](https://github.com/netdata/netdata/issues/5654)
 - netdata build error [\#5649](https://github.com/netdata/netdata/issues/5649)
+- Scalable page cache, metrics index and space management [\#5640](https://github.com/netdata/netdata/issues/5640)
 - Basic kubelet collector [\#5639](https://github.com/netdata/netdata/issues/5639)
+- Kubernetes helmchart improvements [\#5637](https://github.com/netdata/netdata/issues/5637)
 - Isn't it a security risk not having SSL mode for postgres plugin? [\#5629](https://github.com/netdata/netdata/issues/5629)
 - feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
 - /etc/cron.daily/netdata-updater -f $'\E\(B\E\[0m\\n' /dev/fd/63: line 86: : command not found [\#5570](https://github.com/netdata/netdata/issues/5570)
@@ -32,6 +35,7 @@
 
 **Merged pull requests:**
 
+- Fix dist build [\#5728](https://github.com/netdata/netdata/pull/5728) ([vlvkobal](https://github.com/vlvkobal))
 - Update fping version [\#5719](https://github.com/netdata/netdata/pull/5719) ([vlvkobal](https://github.com/vlvkobal))
 - add some kubernetes to apps\_groups.conf [\#5714](https://github.com/netdata/netdata/pull/5714) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/ci: nits [\#5709](https://github.com/netdata/netdata/pull/5709) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
