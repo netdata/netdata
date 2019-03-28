@@ -37,7 +37,7 @@ setup_terminal() {
 	# Is stderr on the terminal? If not, then fail
 	test -t 2 || return 1
 
-	if command -v tput 2>/dev/null; then
+	if command -v tput 1>/dev/null 2>&1; then
 		if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
 			# Enable colors
 			TPUT_RESET="$(tput sgr 0)"
@@ -552,9 +552,9 @@ create_netdata_conf() {
 		export http_proxy=
 		export https_proxy=
 
-		if command -v curl >/dev/null 2>&1; then
+		if command -v curl 1>/dev/null 2>&1; then
 			run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${path}.new"
-		elif command -v wget >/dev/null 2>&1; then
+		elif command -v wget 1>/dev/null 2>&1; then
 			run wget -T 15 -O - "${url}" >"${path}.new"
 		fi
 
@@ -589,7 +589,7 @@ portable_add_user() {
 	echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
 	# shellcheck disable=SC2230
-	local nologin="$(command -v nologin 2>/dev/null || echo '/bin/false')"
+	local nologin="$(command -v nologin >/dev/null 2>&1 || echo '/bin/false')"
 
 	# Linux
 	if command -v useradd 1>/dev/null 2>&1; then
