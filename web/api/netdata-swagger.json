@@ -628,7 +628,7 @@
           {
             "name": "cmd",
             "in": "query",
-            "description": "DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors.",
+            "description": "DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.",
             "required": false,
             "type": "string",
             "enum": [
@@ -636,7 +636,8 @@
               "SILENCE ALL",
               "DISABLE",
               "SILENCE",
-              "RESET"
+              "RESET",
+              "LIST"
             ]
           },
           {

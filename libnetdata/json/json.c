@@ -137,7 +137,12 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
 
 size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
-	JSON_ENTRY ne;
+	JSON_ENTRY ne = {
+			.name = "",
+			.fullname = "",
+			.callback_data = NULL,
+			.callback_function = NULL
+	};
 
 	char old = js[t[start].end];
 	js[t[start].end] = '\0';
@@ -147,8 +152,8 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
 	ne.type = JSON_ARRAY;
 	ne.data.items = t[start].size;
 	ne.callback_function = NULL;
-	strcpy(ne.name, "");
-	strcpy(ne.fullname, ne.name);
+	ne.name[0]='\0';
+	ne.fullname[0]='\0';
 	if(e->callback_function) e->callback_function(&ne);
 	js[t[start].end] = old;
 
@@ -187,13 +192,16 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
 
 size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
-	JSON_ENTRY ne;
+	JSON_ENTRY ne = {
+		.name = "",
+		.fullname = "",
+		.callback_data = NULL,
+		.callback_function = NULL
+	};
 
 	char old = js[t[start].end];
 	js[t[start].end] = '\0';
 	ne.original_string = &js[t[start].start];
-	strcpy(ne.name, "");
-	strcpy(ne.fullname, ne.name);
 	memcpy(&ne, e, sizeof(JSON_ENTRY));
 	ne.type = JSON_OBJECT;
 	ne.callback_function = NULL;
@@ -249,11 +257,13 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
 
 size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *))
 {
-	JSON_ENTRY e;
-	strcpy(e.name, "");
-	strcpy(e.fullname, e.name);
-	e.callback_data = callback_data;
-	e.callback_function = callback_function;
+	JSON_ENTRY e = {
+		.name = "",
+		.fullname = "",
+		.callback_data = callback_data,
+		.callback_function = callback_function
+	};
+
 	switch (t[0].type) {
 		case JSMN_OBJECT:
 			e.type = JSON_OBJECT;
