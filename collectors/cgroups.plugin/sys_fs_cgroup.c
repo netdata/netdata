@@ -367,6 +367,12 @@ struct memory {
     unsigned long long sock;
     unsigned long long shmem;
     unsigned long long anon_thp;
+    unsigned long long file_writeback;
+    unsigned long long file_dirty;
+    unsigned long long file;
+    unsigned long long pgfault;
+    unsigned long long pgmajfault;
+
 
     unsigned long long total_cache;
     unsigned long long total_rss;
@@ -847,7 +853,18 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                 arl_expect(mem->arl_base, "total_pgfault", &mem->total_pgfault);
                 arl_expect(mem->arl_base, "total_pgmajfault", &mem->total_pgmajfault);
             } else {
+                mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
+                arl_expect(mem->arl_base, "anon", &mem->anon);
+                arl_expect(mem->arl_base, "kernel_stack", &mem->kernel_stack);
+                arl_expect(mem->arl_base, "slab", &mem->slab);
+                arl_expect(mem->arl_base, "sock", &mem->sock);
+                arl_expect(mem->arl_base, "anon_thp", &mem->anon_thp);
+                arl_expect(mem->arl_base, "file", &mem->file);
+                arl_expect(mem->arl_base, "file_writeback", &mem->total_writeback);
+                mem->arl_dirty = arl_expect(mem->arl_base, "file_dirty", &mem->total_dirty);
+                arl_expect(mem->arl_base, "pgfault", &mem->total_pgfault);
+                arl_expect(mem->arl_base, "pgmajfault", &mem->total_pgmajfault);
             }
         }
 
@@ -862,7 +879,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
         if(unlikely(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND))
             mem->detailed_has_dirty = 1;
 
-        if(unlikely(mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
+        if(unlikely(parent_cg_is_unified == 0 && mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
             mem->detailed_has_swap = 1;
 
         // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
