@@ -35,25 +35,15 @@ if [ "${1}" = "install" ]
 
     run cd /usr/src
 
-    if [ -d ioping-1.1 ]
+    if [ -d ioping-netdata ]
         then
-        run rm -rf ioping-1.1 || exit 1
+        run rm -rf ioping-netdata || exit 1
     fi
 
-    if [ -d netdata ]
-        then
-        run rm -rf netdata || exit 1
-    fi
-
-    download 'https://github.com/koct9i/ioping.git' 'ioping-1.1'
+    download 'https://github.com/netdata/ioping.git' 'ioping-netdata'
     [ $? -ne 0 ] && exit 1
-    download 'https://github.com/netdata/netdata.git' '--depth=1'
-    [ $? -ne 0 ] && exit 1
-    run cd ioping-1.1 || exit 1
+    run cd ioping-netdata || exit 1
 
-    run git checkout tags/v1.1
-    # run git apply ../netdata/collectors/ioping.plugin/ioping.patch
-    run git apply /home/vlad/netdata/collectors/ioping.plugin/ioping.patch
     run make clean
     run make
     if [ -f /usr/local/bin/ioping ]
@@ -151,8 +141,8 @@ ioping="$( which ioping 2>/dev/null || command -v ioping 2>/dev/null )"
 # the destination to ioping
 destination=""
 
-# the size in bytes to ping the disk
-size="4k"
+# the request size in bytes to ping the disk
+request_size="4k"
 
 # ioping options
 ioping_opts="-T 1000000"
@@ -188,7 +178,7 @@ then
 fi
 
 # the ioping options we will use
-options=( -N -i ${update_every} -s ${size} ${ioping_opts} ${destination} )
+options=( -N -i ${update_every} -s ${request_size} ${ioping_opts} ${destination} )
 
 # execute ioping
 info "starting ioping: ${ioping} ${options[*]}"
