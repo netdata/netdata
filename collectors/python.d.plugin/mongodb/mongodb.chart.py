@@ -708,7 +708,7 @@ class Service(SimpleService):
         try:
             connection = MongoClient(**conn_vars)
             if self.user and self.password:
-                connection[self.authdb].authenticate(name=self.user, password=self.password)
+                getattr(connection, self.authdb).authenticate(name=self.user, password=self.password)
             # elif self.user:
             #     connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')
