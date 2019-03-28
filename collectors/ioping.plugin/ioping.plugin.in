@@ -148,11 +148,10 @@ update_every="${1-1}"
 # if you have multiple versions, put here the full filename of the right one
 ioping="$( which ioping 2>/dev/null || command -v ioping 2>/dev/null )"
 
-# a space separated list of destinations to ioping
-destinations=""
+# the destination to ioping
+destination=""
 
-# the time in milliseconds (1 sec = 1000 ms)
-# to ping the hosts - by default 5 pings per host per iteration
+# the size in bytes to ping the disk
 size="4k"
 
 # ioping options
@@ -173,9 +172,9 @@ do
     fi
 done
 
-if [ -z "${destinations}" ]
+if [ -z "${destination}" ]
 then
-	fatal "no destinations configured - nothing to do."
+	fatal "destination is not configured - nothing to do."
 fi
 
 if [ -z "${ioping}" ]
@@ -189,7 +188,7 @@ then
 fi
 
 # the ioping options we will use
-options=( -N -i ${update_every} -s ${size} ${ioping_opts} ${destinations} )
+options=( -N -i ${update_every} -s ${size} ${ioping_opts} ${destination} )
 
 # execute ioping
 info "starting ioping: ${ioping} ${options[*]}"

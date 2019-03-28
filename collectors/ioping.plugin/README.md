@@ -19,13 +19,13 @@ Then you need to edit `/etc/netdata/ioping.conf` (to edit it on your system run
 # uncomment the following line - it should already be there
 ioping="/usr/local/bin/ioping"
 
-# set here all the directories/files/devices, you need to ping
-destinations="destination1 destination2 destination3"
+# set here the directory/file/device, you need to ping
+destination="destination"
 
 # override the chart update frequency - the default is inherited from netdata
-update_every=1
+update_every="1s"
 
-# the request size in bytes to ping the destinations
+# the request size in bytes to ping the destination
 request_size="4k"
 
 # other iping options - these are the defaults
@@ -39,8 +39,8 @@ Check the [latest versions of the ioping alarms](../../health/health.d/ioping.co
 
 ## Multiple ioping Plugins With Different Settings
 
-You may need to run multiple ioping plugins with different settings for different end points.
-For example, you may need to ping a few destinations once per 10 seconds, and others once per second.
+You may need to run multiple ioping plugins with different settings or different end points.
+For example, you may need to ping one destination once per 10 seconds, and another once per second.
 
 netdata allows you to add as many `ioping` plugins as you like.
 
@@ -57,7 +57,7 @@ cd /etc/netdata
 cp ioping.conf ioping2.conf
 ```
 
-Edit `ioping2.conf` and set the settings and the destinations you need for the seconds instance.
+Edit `ioping2.conf` and set the settings and the destination you need for the seconds instance.
 
 **2. Soft Link Original ioping Plugin to New Plugin File**
 

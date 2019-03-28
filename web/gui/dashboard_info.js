@@ -216,7 +216,7 @@ netdataDashboard.menu = {
     'ioping': {
         title: 'ioping',
         icon: '<i class="fas fa-exchange-alt"></i>',
-        info: 'Disk latency statistics, via <b>ioping</b>. <b>ioping</b> is a program to read/write data probes to disks.'
+        info: 'Disk latency statistics, via <b>ioping</b>. <b>ioping</b> is a program to read/write data probes from/to a disk.'
     },
 
     'httpcheck': {
