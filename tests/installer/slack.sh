@@ -18,11 +18,11 @@ post_message() {
 		"PLAIN_MESSAGE")
 			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_INCOMING_WEBHOOK_URL}
 			;;
-		"RICH_MESSAGE")
+		"TRAVIS_MESSAGE")
 			POST_MESSAGE="{
-				\"text\": \"${MESSAGE}\",
+				\"text\": \"${TRAVIS_REPO_SLUG}: ${MESSAGE}\",
 				\"attachments\": [{
-				    \"text\": \"Current build\",
+				    \"text\": \"${TRAVIS_JOB_NUMBER}: Event type ${TRAVIS_EVENT_TYPE}, on ${TRAVIS_OS_NAME}\",
 				    \"fallback\": \"I could not determine the build\",
 				    \"callback_id\": \"\",
 				    \"color\": \"#3AA3E3\",
@@ -30,7 +30,7 @@ post_message() {
 				    \"actions\": [
 					{
 					    \"name\": \"${TRAVIS_BUILD_NUMBER}\",
-					    \"text\": \"View build status\",
+					    \"text\": \"Build #${TRAVIS_BUILD_NUMBER}\",
 					    \"type\": \"button\",
 					    \"url\": \"${TRAVIS_BUILD_WEB_URL}\"
 					}]
