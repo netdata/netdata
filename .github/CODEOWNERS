@@ -5,8 +5,8 @@
 * @ktsaou
 
 # Ownership by directory structure
-.travis/ @paufantom @cakrit
-.github/ @paufantom @cakrit
+.travis/ @paulkatsoulakis @cakrit
+.github/ @paulkatsoulakis @cakrit
 backends/ @ktsaou @vlvkobal
 backends/graphite/ @ktsaou @vlvkobal
 backends/json/ @ktsaou @vlvkobal
