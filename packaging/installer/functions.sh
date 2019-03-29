@@ -102,6 +102,10 @@ netdata_banner() {
 }
 
 # -----------------------------------------------------------------------------
+# Include system related methods
+source "$(dirname $0)/system.sh"
+
+# -----------------------------------------------------------------------------
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
