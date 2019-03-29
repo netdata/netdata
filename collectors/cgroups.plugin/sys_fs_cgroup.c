@@ -367,12 +367,9 @@ struct memory {
     unsigned long long sock;
     unsigned long long shmem;
     unsigned long long anon_thp;
-    unsigned long long file_writeback;
-    unsigned long long file_dirty;
-    unsigned long long file;
-    unsigned long long pgfault;
-    unsigned long long pgmajfault;
-
+    //unsigned long long file_writeback;
+    //unsigned long long file_dirty;
+    //unsigned long long file;
 
     unsigned long long total_cache;
     unsigned long long total_rss;
@@ -611,9 +608,6 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
         cp->user = str2ull(procfile_lineword(ff, 1, 1));
         cp->system = str2ull(procfile_lineword(ff, 2, 1));
 
-        procfile_print(ff);
-        debug(D_CGROUP, "%llu %llu", cp->user, cp->system);
-        debug(D_CGROUP, "cg2 cpu upd");
         cp->updated = 1;
 
         if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO && (cp->user || cp->system)))
@@ -789,10 +783,6 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
                 io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset));
             }
 
-            procfile_print(ff);
-            debug(D_CGROUP, "%llu %llu", io->Read, io->Write);
-            debug(D_CGROUP, "cg2 blkio  upd");
-
             io->updated = 1;
 
             if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
@@ -860,7 +850,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
                 arl_expect(mem->arl_base, "slab", &mem->slab);
                 arl_expect(mem->arl_base, "sock", &mem->sock);
                 arl_expect(mem->arl_base, "anon_thp", &mem->anon_thp);
-                arl_expect(mem->arl_base, "file", &mem->file);
+                arl_expect(mem->arl_base, "file", &mem->total_mapped_file);
                 arl_expect(mem->arl_base, "file_writeback", &mem->total_writeback);
                 mem->arl_dirty = arl_expect(mem->arl_base, "file_dirty", &mem->total_dirty);
                 arl_expect(mem->arl_base, "pgfault", &mem->total_pgfault);
@@ -887,8 +877,10 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
         mem->updated_detailed = 1;
 
         if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
-            if(mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
-               || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault)
+            if(( (!parent_cg_is_unified) && ( mem->total_cache || mem->total_dirty || mem->total_rss || mem->total_rss_huge || mem->total_mapped_file || mem->total_writeback
+                    || mem->total_swap || mem->total_pgpgin || mem->total_pgpgout || mem->total_pgfault || mem->total_pgmajfault))
+               || (parent_cg_is_unified && ( mem->anon || mem->total_dirty || mem->kernel_stack || mem->slab || mem->sock || mem->total_writeback
+                    || mem->anon_thp || mem->total_pgfault || mem->total_pgmajfault)))
                 mem->enabled_detailed = CONFIG_BOOLEAN_YES;
             else
                 mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
@@ -2883,7 +2875,12 @@ void update_cgroup_charts(int update_every) {
                     rrddim_add(cg->st_mem, "rss_huge", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(cg->st_mem, "mapped_file", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 } else {
-
+                    rrddim_add(cg->st_mem, "anon", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(cg->st_mem, "kernel_stack", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(cg->st_mem, "slab", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(cg->st_mem, "sock", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(cg->st_mem, "anon_thp", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(cg->st_mem, "file", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
             }
             else
@@ -2899,7 +2896,12 @@ void update_cgroup_charts(int update_every) {
                 rrddim_set(cg->st_mem, "rss_huge", cg->memory.total_rss_huge);
                 rrddim_set(cg->st_mem, "mapped_file", cg->memory.total_mapped_file);
             } else {
-
+                rrddim_set(cg->st_mem, "anon", cg->memory.anon);
+                rrddim_set(cg->st_mem, "kernel_stack", cg->memory.kernel_stack);
+                rrddim_set(cg->st_mem, "slab", cg->memory.slab);
+                rrddim_set(cg->st_mem, "sock", cg->memory.sock);
+                rrddim_set(cg->st_mem, "anon_thp", cg->memory.anon_thp);
+                rrddim_set(cg->st_mem, "file", cg->memory.total_mapped_file);
             }
             rrdset_done(cg->st_mem);
 
