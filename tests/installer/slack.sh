@@ -34,20 +34,19 @@ post_message() {
 				    \"attachment_type\": \"default\",
 				    \"actions\": [
 					{
-					    \"name\": \"${TRAVIS_JOB_NUMBER}\",
-					    \"text\": \"Job #${TRAVIS_JOB_NUMBER}\",
-					    \"type\": \"button\",
-					    \"url\": \"${TRAVIS_JOB_WEB_URL}\"
-					},
-					{
 					    \"name\": \"${TRAVIS_BUILD_NUMBER}\",
 					    \"text\": \"Build #${TRAVIS_BUILD_NUMBER}\",
 					    \"type\": \"button\",
 					    \"url\": \"${TRAVIS_BUILD_WEB_URL}\"
+					},
+					{
+					    \"name\": \"${TRAVIS_JOB_NUMBER}\",
+					    \"text\": \"Job #${TRAVIS_JOB_NUMBER}\",
+					    \"type\": \"button\",
+					    \"url\": \"${TRAVIS_JOB_WEB_URL}\"
 					}]
 				}]
 			}"
-			echo "URL: ${SLACK_INCOMING_WEBHOOK_URL}"
 			echo "Sending ${POST_MESSAGE}"
 			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_INCOMING_WEBHOOK_URL}"
 			;;
