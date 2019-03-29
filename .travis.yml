@@ -19,19 +19,23 @@ jobs:
   - stage: test
     name: C
     install:
-    - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     - source tests/installer/slack.sh
+    - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/C Starting"
     script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
   - name: dashboard.js
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/Dashboard validation Starting"
     script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
   - name: lint .sh.in files
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/Linting files Starting"
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
   - name: check checksums for kickstart files
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/Kickstart files checksum validation Starting"
     script: ./tests/installer/checksums.sh
     env: LOCAL_ONLY="true"
   - name: coverity
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/Coverity scan Starting"
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
     if: type = cron
