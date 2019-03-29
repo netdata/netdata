@@ -127,7 +127,7 @@ service() {
 # -----------------------------------------------------------------------------
 # portable pidof
 
-pidof() {
+safe_pidof() {
 	local pidof_cmd="$(command -v pidof 2>/dev/null)"
 	if [ -n "${pidof_cmd}" ]; then
 		${pidof_cmd} "${@}"
@@ -267,7 +267,7 @@ issystemd() {
 	[ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
 
 	# if systemd is not running, it is not systemd
-	pids=$(pidof systemd 2>/dev/null)
+	pids=$(safe_pidof systemd 2>/dev/null)
 	[ -z "${pids}" ] && return 1
 
 	# check if the running systemd processes are not in our namespace
@@ -451,7 +451,7 @@ netdata_pids() {
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
 		$(cat /var/run/netdata/netdata.pid 2>/dev/null) \
-		$(pidof netdata 2>/dev/null); do
+		$(safe_pidof netdata 2>/dev/null); do
 		ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
 
 		if [ -z "${myns}" ] || [ -z "${ns}" ] || [ "${myns}" = "${ns}" ]; then
