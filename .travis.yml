@@ -75,7 +75,7 @@ jobs:
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
     - source tests/installer/slack.sh
-    before_script: post_message "RICH_MESSAGE" "${TRAVIS_JOB_NUMBER}/${TRAVIS_JOB_NAME}: Nightly started on $TRAVIS_BRANCH"
+    before_script: post_message "RICH_MESSAGE" "Nightly started"
     script: ".travis/nightlies.sh"
     git:
       depth: false
