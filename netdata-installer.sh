@@ -1,43 +1,47 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC1090,SC1091,SC1117,SC2002,SC2034,SC2044,SC2046,SC2086,SC2129,SC2162,SC2166,SC2181
+# shellcheck disable=SC2046,SC2086,SC2166
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
 	local path=""
-	while read; do
+	while read -r; do
 		if [[ ! ${path} =~ (^|:)"${REPLY}"(:|$) ]]; then
-			[ ! -z "${path}" ] && path="${path}:"
+			[ -n "${path}" ] && path="${path}:"
 			path="${path}${REPLY}"
 		fi
-	done < <(echo "${PATH}" | tr ":" "\n")
+	done < <(echo "${PATH}" | tr ":" "\\n")
 
-	[ ! -z "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
+	[ -n "${path}" ] && [[ ${PATH} =~ /bin ]] && [[ ${PATH} =~ /sbin ]] && export PATH="${path}"
 }
 uniquepath
 
-netdata_source_dir="$(pwd)"
-installer_dir="$(dirname "${0}")"
+PROGRAM="$0"
+NETDATA_SOURCE_DIR="$(pwd)"
+INSTALLER_DIR="$(dirname "${PROGRAM}")"
 
-if [ "${netdata_source_dir}" != "${installer_dir}" -a "${installer_dir}" != "." ]; then
-	echo >&2 "Warning: you are currently in '${netdata_source_dir}' but the installer is in '${installer_dir}'."
+if [ "${NETDATA_SOURCE_DIR}" != "${INSTALLER_DIR}" ] && [ "${INSTALLER_DIR}" != "." ]; then
+	echo >&2 "Warning: you are currently in '${NETDATA_SOURCE_DIR}' but the installer is in '${INSTALLER_DIR}'."
 fi
 
 # -----------------------------------------------------------------------------
 # reload the user profile
 
+# shellcheck source=/dev/null
 [ -f /etc/profile ] && . /etc/profile
 
 # make sure /etc/profile does not change our current directory
-cd "${netdata_source_dir}" || exit 1
+cd "${NETDATA_SOURCE_DIR}" || exit 1
 
 # -----------------------------------------------------------------------------
 # load the required functions
 
-if [ -f "${installer_dir}/packaging/installer/functions.sh" ]; then
-	source "${installer_dir}/packaging/installer/functions.sh" || exit 1
+if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
+	# shellcheck source=packaging/installer/functions.sh
+	source "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
 else
-	source "${netdata_source_dir}/packaging/installer/functions.sh" || exit 1
+	# shellcheck source=packaging/installer/functions.sh
+	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
 download() {
@@ -74,26 +78,108 @@ CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 
 # keep a log of this command
-printf "\n# " >>netdata-installer.log
+# shellcheck disable=SC2129
+printf "\\n# " >>netdata-installer.log
 date >>netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >>netdata-installer.log
-printf "%q " "$0" "${@}" >>netdata-installer.log
-printf "\n" >>netdata-installer.log
+printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
+printf "\\n" >>netdata-installer.log
 
-REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(
-	printf "%q " "$0" "${@}"
-	printf "\n"
+	printf "%q " "${PROGRAM}" "${@}"
+	printf "\\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
-[ "${REINSTALL_COMMAND:0:1}" != "." -a "${REINSTALL_COMMAND:0:1}" != "/" -a -f "./${0}" ] && REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
+if [ "${REINSTALL_COMMAND:0:1}" != "." ] && [ "${REINSTALL_COMMAND:0:1}" != "/" ] && [ -f "./${PROGRAM}" ]; then
+	REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
+fi
 
-# shellcheck disable=SC2230
-setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
+banner_nonroot_install() {
+	cat <<NONROOTNOPREFIX
 
-ME="$0"
+  ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
+
+  You are attempting to install netdata as non-root, but you plan
+  to install it in system paths.
+
+  Please set an installation prefix, like this:
+
+      $PROGRAM ${@} --install /tmp
+
+  or, run the installer as root:
+
+      sudo $PROGRAM ${@}
+
+  We suggest to install it as root, or certain data collectors will
+  not be able to work. Netdata drops root privileges when running.
+  So, if you plan to keep it, install it as root to get the full
+  functionality.
+
+NONROOTNOPREFIX
+}
+
+banner_root_notify() {
+	cat <<NONROOT
+
+  ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
+  You are about to install netdata as a non-root user.
+  Netdata will work, but a few data collection modules that
+  require root access will fail.
+
+  If you installing netdata permanently on your system, run
+  the installer like this:
+
+     ${TPUT_YELLOW}${TPUT_BOLD}sudo $PROGRAM ${@}${TPUT_RESET}
+
+NONROOT
+}
+
+usage() {
+	netdata_banner "installer command line options"
+	cat <<HEREDOC
+
+USAGE: ${PROGRAM} [options]
+       where options include:
+
+  --install <path>           Install netdata in <path>. Ex. --install /opt will put netdata in /opt/netdata
+  --dont-start-it            Do not (re)start netdata after installation
+  --dont-wait                Run installation in non-interactive mode
+  --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
+  --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
+                             This results in less frequent updates.
+  --disable-go               Disable installation of go.d.plugin.
+  --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
+  --disable-plugin-freeipmi
+  --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
+  --disable-plugin-nfacct
+  --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
+  --disable-plugin-xenstat   Disable the xenstat plugin.
+  --enable-lto               Enable Link-Time-Optimization. Default: enabled
+  --disable-lto
+  --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
+  --zlib-is-really-here or
+  --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
+                             have a broken pkg-config. Use this option to proceed without checking pkg-config.
+  --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam.
+
+Netdata will by default be compiled with gcc optimization -O2
+If you need to pass different CFLAGS, use something like this:
+
+  CFLAGS="<gcc options>" ${PROGRAM} [options]
+
+For the installer to complete successfully, you will need these packages installed:
+
+  gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel) uuid-dev (or libuuid-devel)
+
+For the plugins, you will at least need:
+
+  curl, bash v4+, python v2 or v3, node.js
+
+HEREDOC
+}
+
 DONOTSTART=0
 DONOTWAIT=0
 AUTOUPDATE=0
@@ -101,171 +187,54 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly"
-
-usage() {
-	netdata_banner "installer command line options"
-	cat <<USAGE
-
-${ME} <installer options>
-
-Valid <installer options> are:
-
-   --install /PATH/TO/INSTALL
-
-        If you give: --install /opt
-        netdata will be installed in /opt/netdata
-
-   --dont-start-it
-
-        Do not (re)start netdata.
-        Just install it.
-
-   --dont-wait
-
-        Do not wait for the user to press ENTER.
-        Start immediately building it.
-
-   --auto-update | -u
-
-        Install netdata-updater to cron,
-        to update netdata automatically once per day
-
-   --stable-channel
-
-        Auto-updater will update netdata only when new release is published
-        in GitHub release pages. This results in less frequent updates.
-        Default: Use packages from GCS (nightly release channel).
-
-   --enable-plugin-freeipmi
-   --disable-plugin-freeipmi
-
-        Enable/disable the FreeIPMI plugin.
-        Default: enable it when libipmimonitoring is available.
-
-   --enable-plugin-nfacct
-   --disable-plugin-nfacct
-
-        Enable/disable the nfacct plugin.
-        Default: enable it when libmnl and libnetfilter_acct are available.
-
-   --enable-plugin-xenstat
-   --disable-plugin-xenstat
-
-        Enable/disable the xenstat plugin.
-        Default: enable it when libxenstat and libyajl are available.
-
-   --enable-lto
-   --disable-lto
-
-        Enable/disable Link-Time-Optimization
-        Default: enabled
-
-   --disable-x86-sse
-
-        Disable SSE instructions
-        Default: enabled
-
-   --zlib-is-really-here
-   --libs-are-really-here
-
-        If you get errors about missing zlib,
-        or libuuid but you know it is available,
-        you have a broken pkg-config.
-        Use this option to allow it continue
-        without checking pkg-config.
-
-   --disable-telemetry
-
-        Use this flag to opt-out from our anonymous telemetry progam.
-
-   --disable-go
-
-        Flag to disable installation of go.d.plugin
-
-Netdata will by default be compiled with gcc optimization -O2
-If you need to pass different CFLAGS, use something like this:
-
-  CFLAGS="<gcc options>" ${ME} <installer options>
-
-For the installer to complete successfully, you will need
-these packages installed:
-
-   gcc make autoconf automake pkg-config zlib1g-dev (or zlib-devel)
-   uuid-dev (or libuuid-devel)
-
-For the plugins, you will at least need:
-
-   curl, bash v4+, python v2 or v3, node.js
-
-USAGE
-}
-
-while [ ! -z "${1}" ]; do
-	if [ "$1" = "--install" ]; then
-		NETDATA_PREFIX="${2}/netdata"
-		shift 2
-	elif [ "$1" = "--zlib-is-really-here" -o "$1" = "--libs-are-really-here" ]; then
-		LIBS_ARE_HERE=1
-		shift 1
-	elif [ "$1" = "--dont-start-it" ]; then
-		DONOTSTART=1
-		shift 1
-	elif [ "$1" = "--dont-wait" ]; then
-		DONOTWAIT=1
-		shift 1
-	elif [ "$1" = "--auto-update" -o "$1" = "-u" ]; then
-		AUTOUPDATE=1
-		shift 1
-	elif [ "$1" = "--stable-channel" ]; then
-		RELEASE_CHANNEL="stable"
-		shift 1
-	elif [ "$1" = "--enable-plugin-freeipmi" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
-		shift 1
-	elif [ "$1" = "--disable-plugin-freeipmi" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi"
-		shift 1
-	elif [ "$1" = "--enable-plugin-nfacct" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct"
-		shift 1
-	elif [ "$1" = "--disable-plugin-nfacct" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct"
-		shift 1
-    elif [ "$1" = "--enable-plugin-xenstat" ]; then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat"
-        shift 1
-    elif [ "$1" = "--disable-plugin-xenstat" ]; then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat"
-        shift 1
-	elif [ "$1" = "--enable-lto" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto"
-		shift 1
-	elif [ "$1" = "--disable-lto" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto"
-		shift 1
-	elif [ "$1" = "--disable-x86-sse" ]; then
-		NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse"
-		shift 1
-	elif [ "$1" = "--disable-telemetry" ]; then
-		NETDATA_DISABLE_TELEMETRY=1
-		shift 1
-	elif [ "$1" = "--disable-go" ]; then
-		NETDATA_DISABLE_GO=1
-		shift 1
-	elif [ "$1" = "--help" -o "$1" = "-h" ]; then
-		usage
-		exit 1
-	else
-		echo >&2
-		echo >&2 "ERROR:"
-		echo >&2 "I cannot understand option '$1'."
-		usage
-		exit 1
-	fi
+while [ -n "${1}" ]; do
+	case "${1}" in
+		"--zlib-is-really-here") LIBS_ARE_HERE=1;;
+		"--libs-are-really-here") LIBS_ARE_HERE=1;;
+		"--dont-start-it") DONOTSTART=1;;
+		"--dont-wait") DONOTWAIT=1;;
+		"--auto-update"|"-u") AUTOUPDATE=1;;
+		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
+		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
+		"--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct";;
+		"--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct";;
+		"--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat";;
+		"--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat";;
+		"--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto";;
+		"--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto";;
+		"--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse";;
+		"--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1;;
+		"--disable-go") NETDATA_DISABLE_GO=1;;
+		"--install")
+			NETDATA_PREFIX="${2}/netdata"
+			shift 1
+			;;
+		"--help"|"-h")
+			usage
+			exit 1
+			;;
+		*)
+			run_failed "I cannot understand option '$1'."
+			usage
+			exit 1
+			;;
+		esac
+	shift 1
 done
 
 # replace multiple spaces with a single space
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
+
+if [ "${UID}" -ne 0 ]; then
+	if [ -z "${NETDATA_PREFIX}" ]; then
+		netdata_banner "wrong command line options!"
+		banner_nonroot_install "${@}"
+		exit 1
+	else
+		banner_root_notify "${@}"
+	fi
+fi
 
 netdata_banner "real-time performance monitoring, done right!"
 cat <<BANNER1
@@ -294,49 +263,6 @@ cat <<BANNER3
   Press Control-C and run the same command with --help for help.
 
 BANNER3
-
-if [ "${UID}" -ne 0 ]; then
-	if [ -z "${NETDATA_PREFIX}" ]; then
-		netdata_banner "wrong command line options!"
-		cat <<NONROOTNOPREFIX
-
-  ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
-
-  You are attempting to install netdata as non-root, but you plan
-  to install it in system paths.
-
-  Please set an installation prefix, like this:
-
-      $0 ${@} --install /tmp
-
-  or, run the installer as root:
-
-      sudo $0 ${@}
-
-  We suggest to install it as root, or certain data collectors will
-  not be able to work. Netdata drops root privileges when running.
-  So, if you plan to keep it, install it as root to get the full
-  functionality.
-
-NONROOTNOPREFIX
-		exit 1
-
-	else
-		cat <<NONROOT
-
-  ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
-  You are about to install netdata as a non-root user.
-  Netdata will work, but a few data collection modules that
-  require root access will fail.
-
-  If you installing netdata permanently on your system, run
-  the installer like this:
-
-     ${TPUT_YELLOW}${TPUT_BOLD}sudo $0 ${@}${TPUT_RESET}
-
-NONROOT
-	fi
-fi
 
 have_autotools=
 if [ "$(type autoreconf 2>/dev/null)" ]; then
@@ -381,13 +307,16 @@ EOF
 fi
 
 if [ ${DONOTWAIT} -eq 0 ]; then
-	if [ ! -z "${NETDATA_PREFIX}" ]; then
-		eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to \'\001${TPUT_CYAN}\002${NETDATA_PREFIX}\001${TPUT_YELLOW}\002\'\001${TPUT_RESET}\002 > ' -e -r REPLY"
-		[ $? -ne 0 ] && exit 1
+	if [ -n "${NETDATA_PREFIX}" ]; then
+		echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to '${TPUT_CYAN}${NETDATA_PREFIX}${TPUT_YELLOW}'${TPUT_RESET} > "
 	else
-		eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to your system\001${TPUT_RESET}\002 > ' -e -r REPLY"
-		[ $? -ne 0 ] && exit 1
+		echo -n "${TPUT_BOLD}${TPUT_GREEN}Press ENTER to build and install netdata to your system${TPUT_RESET} > "
 	fi
+	read -ern1
+	if [ "$REPLY" != '' ]; then
+		exit 1
+	fi
+
 fi
 
 build_error() {
@@ -466,7 +395,7 @@ run make clean
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run make -j${SYSTEM_CPUS} || exit 1
+run make -j$(find_processors) || exit 1
 
 # -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
@@ -506,7 +435,7 @@ fi
 # -----------------------------------------------------------------------------
 
 # shellcheck disable=SC2230
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
+md5sum="$(command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
 
 deleted_stock_configs=0
 if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
@@ -583,9 +512,19 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-homedir="${NETDATA_PREFIX}/var/lib/netdata"
-[ ! -z "${NETDATA_PREFIX}" ] && homedir="${NETDATA_PREFIX}"
-add_netdata_user_and_group "${homedir}" || run_failed "The installer does not run as root."
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_ADDED_TO_GROUPS=""
+if [ "${UID}" -eq 0 ]; then
+	portable_add_group netdata || :
+	portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
+
+	for g in ${NETDATA_WANTED_GROUPS}; do
+		# shellcheck disable=SC2086
+		portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+	done
+else
+	run_failed "The installer does not run as root."
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
@@ -621,14 +560,14 @@ else
 	NETDATA_USER="${USER}"
 	ROOT_USER="${NETDATA_USER}"
 fi
-NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
+NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
 NETDATA_WEB_GROUP="${NETDATA_GROUP}"
-if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
-	NETDATA_WEB_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
+if [ "${UID}" = "0" ] && [ "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]; then
+	NETDATA_WEB_GROUP="$(id -g -n "${NETDATA_WEB_USER}")"
 	[ -z "${NETDATA_WEB_GROUP}" ] && NETDATA_WEB_GROUP="${NETDATA_WEB_USER}"
 fi
 NETDATA_WEB_GROUP="$(config_option "web" "web files group" "${NETDATA_WEB_GROUP}")"
@@ -733,7 +672,7 @@ run chmod 755 "${NETDATA_LOG_DIR}"
 
 # --- plugins ----
 
-if [ ${UID} -eq 0 ]; then
+if [ "${UID}" -eq 0 ]; then
 	# find the admin group
 	admin_group=
 	test -z "${admin_group}" && getent group root >/dev/null 2>&1 && admin_group="root"
@@ -741,47 +680,38 @@ if [ ${UID} -eq 0 ]; then
 	test -z "${admin_group}" && admin_group="${NETDATA_GROUP}"
 
 	run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"
-	run chown -R root "${NETDATA_PREFIX}/usr/libexec/netdata"
+	run chown -R "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
-		setcap_ret=1
-		if ! iscontainer; then
-			if [ ! -z "${setcap}" ]; then
-				run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-				run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-				run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-				setcap_ret=$?
-			fi
-
-			if [ ${setcap_ret} -eq 0 ]; then
-				# if we managed to setcap
-				# but we fail to execute apps.plugin
-				# trigger setuid to root
-				"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
-				setcap_ret=$?
+		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+		capabilities=0
+		if ! iscontainer && command -v setcap 1>/dev/null 2>&1; then
+			run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+			if run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"; then
+				# if we managed to setcap, but we fail to execute apps.plugin setuid to root
+				"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1 && capabilities=1 || capabilities=0
 			fi
 		fi
 
-		if [ ${setcap_ret} -ne 0 ]; then
+		if [ $capabilities -eq 0 ]; then
 			# fix apps.plugin to be setuid to root
-			run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 			run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
 		fi
 	fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
+		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
 	fi
 
-    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin" ]; then
-        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
-        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
-    fi
+	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin" ]; then
+		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/nfacct.plugin"
+	fi
 
     if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin" ]; then
         run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
@@ -789,12 +719,12 @@ if [ ${UID} -eq 0 ]; then
     fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
+		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
 	fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
-		run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
 		run chmod 0550 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
 	fi
 
@@ -841,8 +771,8 @@ install_go() {
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
 
 		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
-		grep "${GO_PACKAGE_BASENAME}\$" "${installer_dir}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
-		grep "config.tar.gz" "${installer_dir}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
 		if ! (cd "${tmp}" && sha256sum -c "sha256sums.txt"); then
@@ -857,19 +787,14 @@ install_go() {
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
 		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-		if [ ${UID} -eq 0 ]; then
-			run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		if [ "${UID}" -eq 0 ]; then
+			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
 		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 	fi
 	return 0
 }
 install_go
-
-# --- fix #1292 bug ---
-
-[ -d "${NETDATA_PREFIX}/usr/libexec" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/libexec"
-[ -d "${NETDATA_PREFIX}/usr/share/netdata" ] && run chmod a+rX "${NETDATA_PREFIX}/usr/share/netdata"
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
@@ -880,28 +805,23 @@ install_netdata_service || run_failed "Cannot install netdata init service."
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
 
+# TODO(paulfantom): Creation of configuration file should be handled by a build system. Additionally we shouldn't touch configuration files in /etc/netdata/...
 started=0
 if [ ${DONOTSTART} -eq 1 ]; then
-	generate_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
-
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 else
-	restart_netdata ${NETDATA_PREFIX}/usr/sbin/netdata "${@}"
-	if [ $? -ne 0 ]; then
-		echo >&2
-		echo >&2 "SORRY! FAILED TO START NETDATA!"
-		echo >&2
-		exit 1
+	if ! restart_netdata "${NETDATA_PREFIX}/usr/sbin/netdata" "${@}"; then
+		fatal "Cannot start netdata!"
 	fi
 
 	started=1
-	echo >&2 "OK. NetData Started!"
-	echo >&2
-
-	# -----------------------------------------------------------------------------
-	# save a config file, if it is not already there
-
-	download_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
+	run_ok "netdata started!"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
+if [ "${UID}" -eq 0 ]; then
+        run chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+fi
+run chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
 if [ "$(uname)" = "Linux" ]; then
 	# -------------------------------------------------------------------------
@@ -941,7 +861,7 @@ KSM2
 	}
 
 	if [ -f "/sys/kernel/mm/ksm/run" ]; then
-		if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]; then
+		if [ "$(cat "/sys/kernel/mm/ksm/run")" != "1" ]; then
 			ksm_is_available_but_disabled
 		fi
 	else
@@ -1044,17 +964,11 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 			fi
 			progress "Installing new netdata-updater in cron"
 
-			rm ${installer_dir}/netdata-updater.sh || : #TODO(paulfantom): this workaround should be removed after v1.13.0-rc1. It just needs to be propagated
-
 			rm -f "${crondir}/netdata-updater"
-			if [ -f "${installer_dir}/packaging/installer/netdata-updater.sh" ]; then
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
-				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${installer_dir}/packaging/installer/netdata-updater.sh" > ${installer_dir}/netdata-updater.sh || exit 1
+			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
 			else
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${netdata_source_dir}/packaging/installer/netdata-updater.sh" > ${crondir}/netdata-updater || exit 1
-				 #TODO(paulfantom): Following line is a workaround and should be removed after v1.13.0-rc1. It just needs time to be propagated.
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${netdata_source_dir}/packaging/installer/netdata-updater.sh" > ${installer_source_dir}/netdata-updater.sh || exit 1
+				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
 			fi
 
 			chmod 0755 ${crondir}/netdata-updater
@@ -1067,7 +981,7 @@ if [ "${AUTOUPDATE}" = "1" ]; then
 fi
 
 # Save environment variables
-cat <<EOF > ${NETDATA_USER_CONFIG_DIR}/.environment
+cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
@@ -1083,7 +997,7 @@ EOF
 
 # Opt-out from telemetry program
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
-	touch ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics
+	touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
 # -----------------------------------------------------------------------------
