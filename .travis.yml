@@ -3,6 +3,7 @@ sudo: true
 language: c
 services:
 - docker
+install: source tests/installer/slack.sh && post_message "Build triggered"
 
 stages:
 - test
@@ -18,9 +19,7 @@ jobs:
   include:
   - stage: test
     name: C
-    install:
-    - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-    - source tests/installer/slack.sh
+    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     before_script: post_message "Starting test/C"
     script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
