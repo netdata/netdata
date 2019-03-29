@@ -21,7 +21,7 @@ jobs:
     install:
     - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     - source tests/installer/slack.sh
-    before_script: post_message "TRAVIS_MESSAGE" "test/C Starting"
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}/C Starting"
     script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
   - name: dashboard.js
@@ -75,7 +75,7 @@ jobs:
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
     - source tests/installer/slack.sh
-    before_script: post_message "TRAVIS_MESSAGE" "Nightly starting"
+    before_script: post_message "TRAVIS_MESSAGE" "${TRAVIS_BUILD_STAGE_NAME}: Publishing ${TRAVIS_TAG}"
     script: ".travis/nightlies.sh"
     git:
       depth: false
