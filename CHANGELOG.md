@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- NetData no longer installs after recent xenstat commit [\#5726](https://github.com/netdata/netdata/issues/5726)
 - Errant netdata-updater logs on root "/" directory [\#5679](https://github.com/netdata/netdata/issues/5679)
 - remove python obsolete modules [\#5647](https://github.com/netdata/netdata/issues/5647)
 - Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
@@ -14,6 +15,7 @@
 **Closed issues:**
 
 - support AWS Timestream as a back-end [\#5722](https://github.com/netdata/netdata/issues/5722)
+- netdata/packaging/installer: Finish up netdata installer refactoring [\#5705](https://github.com/netdata/netdata/issues/5705)
 - Feature: Netdata alarms as POST events to a configurable endpoint in health\_alarm\_notify.conf [\#5702](https://github.com/netdata/netdata/issues/5702)
 - feature cgroups plugin: make containers priority user configurable [\#5697](https://github.com/netdata/netdata/issues/5697)
 - Basic kubeproxy collector [\#5683](https://github.com/netdata/netdata/issues/5683)
@@ -25,20 +27,30 @@
 - Kubernetes helmchart improvements [\#5637](https://github.com/netdata/netdata/issues/5637)
 - Isn't it a security risk not having SSL mode for postgres plugin? [\#5629](https://github.com/netdata/netdata/issues/5629)
 - feature: collect docker-engine metrics [\#5622](https://github.com/netdata/netdata/issues/5622)
+- nightlies.sh should stop on error [\#5580](https://github.com/netdata/netdata/issues/5580)
 - /etc/cron.daily/netdata-updater -f $'\E\(B\E\[0m\\n' /dev/fd/63: line 86: : command not found [\#5570](https://github.com/netdata/netdata/issues/5570)
 - NetData on XCP-ng dom0 CentOS [\#5357](https://github.com/netdata/netdata/issues/5357)
 - Kubelet monitoring [\#4859](https://github.com/netdata/netdata/issues/4859)
+- Docker Hub monitoring [\#4843](https://github.com/netdata/netdata/issues/4843)
 - fping 4.1 released [\#4227](https://github.com/netdata/netdata/issues/4227)
 - support gauges without a needle [\#4206](https://github.com/netdata/netdata/issues/4206)
+- RFC: a new design for alert system [\#3963](https://github.com/netdata/netdata/issues/3963)
 - notifications with smstools \(direct connection to mobile phone\) [\#2720](https://github.com/netdata/netdata/issues/2720)
 - remove not updated charts after some time [\#688](https://github.com/netdata/netdata/issues/688)
 
 **Merged pull requests:**
 
+- installer: include go.d.plugin version v0.3.1 [\#5740](https://github.com/netdata/netdata/pull/5740) ([ilyam8](https://github.com/ilyam8))
+- access: fix codeowners [\#5739](https://github.com/netdata/netdata/pull/5739) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/installer: netdata-installer.sh script \(and subscripts\) refactoring wrap-up [\#5736](https://github.com/netdata/netdata/pull/5736) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Spelling fix for streaming readme.md [\#5734](https://github.com/netdata/netdata/pull/5734) ([vinyasmusic](https://github.com/vinyasmusic))
 - Fix dist build [\#5728](https://github.com/netdata/netdata/pull/5728) ([vlvkobal](https://github.com/vlvkobal))
+- add some kubelet alarms [\#5724](https://github.com/netdata/netdata/pull/5724) ([ilyam8](https://github.com/ilyam8))
 - Update fping version [\#5719](https://github.com/netdata/netdata/pull/5719) ([vlvkobal](https://github.com/vlvkobal))
 - add some kubernetes to apps\_groups.conf [\#5714](https://github.com/netdata/netdata/pull/5714) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/ci: nits [\#5709](https://github.com/netdata/netdata/pull/5709) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/ci: Make Travis CI more strict on nightlies run [\#5708](https://github.com/netdata/netdata/pull/5708) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- NEW: authdb option for MongoDB collector [\#5707](https://github.com/netdata/netdata/pull/5707) ([andvgal](https://github.com/andvgal))
 - Send custom docs [\#5703](https://github.com/netdata/netdata/pull/5703) ([cakrit](https://github.com/cakrit))
 - add 'containers priority' option to cgroups plugin [\#5700](https://github.com/netdata/netdata/pull/5700) ([ilyam8](https://github.com/ilyam8))
 - Remove temp log file if no update needed [\#5695](https://github.com/netdata/netdata/pull/5695) ([cakrit](https://github.com/cakrit))
