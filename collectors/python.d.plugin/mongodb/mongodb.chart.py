@@ -424,6 +424,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
+        self.authdb = self.configuration.get('authdb', 'admin')
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
         self.host = self.configuration.get('host', '127.0.0.1')
@@ -707,7 +708,7 @@ class Service(SimpleService):
         try:
             connection = MongoClient(**conn_vars)
             if self.user and self.password:
-                connection.admin.authenticate(name=self.user, password=self.password)
+                getattr(connection, self.authdb).authenticate(name=self.user, password=self.password)
             # elif self.user:
             #     connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')
