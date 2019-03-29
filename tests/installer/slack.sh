@@ -47,6 +47,7 @@ post_message() {
 					}]
 				}]
 			}"
+			echo "URL: ${SLACK_INCOMING_WEBHOOK_URL}"
 			echo "Sending ${POST_MESSAGE}"
 			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_INCOMING_WEBHOOK_URL}"
 			;;
