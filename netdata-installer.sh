@@ -37,9 +37,13 @@ cd "${NETDATA_SOURCE_DIR}" || exit 1
 # load the required functions
 
 if [ -f "${INSTALLER_DIR}/packaging/installer/functions.sh" ]; then
+	# shellcheck source=packaging/installer/system.sh
+	source "${INSTALLER_DIR}/packaging/installer/system.sh" || exit 1
 	# shellcheck source=packaging/installer/functions.sh
 	source "${INSTALLER_DIR}/packaging/installer/functions.sh" || exit 1
 else
+	# shellcheck source=packaging/installer/system.sh
+	source "${NETDATA_SOURCE_DIR}/packaging/installer/system.sh" || exit 1
 	# shellcheck source=packaging/installer/functions.sh
 	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
