@@ -16,10 +16,11 @@ To collect non-system metrics, netdata supports a plugin architecture. The follo
 - **[Name Servers](#name-servers)** (DNS), like bind, nsd, powerdns, dnsdist
 - **[DHCP Servers](#dhcp-servers)**, like ISC DHCP
 - **[UPS](#ups)**, such as APC UPS, NUT
-- **[RAID](#raid)**, such as linux software raid (mdadm), MegaRAID
+- **[RAID](#raid)**, such as MegaRAID
 - **[Mail Servers](#mail-servers)**, like postfix, exim, dovecot
 - **[File Servers](#file-servers)**, like samba, NFS, ftp, sftp, WebDAV
 - **[Print Servers](#print-servers)**, like CUPS
+- **[Hypervisors](#hypervisors)**, like XenServer, XCP-ng
 - **[System](#system)**, for processes and other system metrics
 - **[Sensors](#sensors)**, like temperature, fans speed, voltage, humidity, HDD/SSD S.M.A.R.T attributes
 - **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time, nfacct
@@ -66,6 +67,7 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# fping = yes
 	# charts.d = yes
 	# apps = yes
+	# xenstat = yes
 ```
 
 The default for all plugins is the option `enable running new plugins`. So, setting this to `no` will disable all the plugins, except the ones specifically enabled.
@@ -268,7 +270,6 @@ nut|BASH<br/>Shell Script|Connects to a nut server (upsd) to collect real-time U
 
 application|language|notes|
 :---------:|:------:|:----|
-mdstat|python<br/>v2 or v3|Parses `/proc/mdstat` to get mds health metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [mdstat.chart.py](../collectors/python.d.plugin/mdstat)<br/>configuration file: [python.d/mdstat.conf](../collectors/python.d.plugin/mdstat)|
 megacli|python<br/>v2 or v3|Collects adapter, physical drives and battery stats..<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [megacli.chart.py](../collectors/python.d.plugin/megacli)<br/>configuration file: [python.d/megacli.conf](../collectors/python.d.plugin/megacli)|
 
 ---
@@ -294,11 +295,21 @@ NFS Client|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Co
 NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
 samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
+---
+
 ### Print Servers
 
 application|language|notes|
 :---------:|:------:|:----|
-CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: cups.plugin
+CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: [cups.plugin](../collectors/cups.plugin)
+
+---
+
+### Hypervisors
+
+application|language|notes|
+:---------:|:------:|:----|
+xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisors.<br/>&nbsp;<br/>netdata plugin: [xenstat.plugin](../collectors/xenstat.plugin)
 
 ---
 
@@ -318,7 +329,6 @@ mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applicati
 
 application|language|notes|
 :---------:|:------:|:----|
-cpufreq|python<br/>v2 or v3|Collects the current CPU frequency from `/sys/devices`.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [cpufreq.chart.py](../collectors/python.d.plugin/cpufreq)<br/>configuration file: [python.d/cpufreq.conf](../collectors/python.d.plugin/cpufreq)|
 cpufreq|BASH<br/>Shell Script|Collects current CPU frequency from `/sys/devices`.<br/><br/>DEPRECATED IN FAVOR OF THE PYTHON ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [cpufreq.chart.sh](../collectors/charts.d.plugin/cpufreq)<br/>configuration file: [charts.d/cpufreq.conf](../collectors/charts.d.plugin/cpufreq)|
 IPMI|C|Collects temperatures, voltages, currents, power, fans and `SEL` events from IPMI using `libipmimonitoring`.<br/>Check [Monitoring IPMI](../collectors/freeipmi.plugin/) for more information<br/>&nbsp;<br/>netdata plugin: [freeipmi.plugin](../collectors/freeipmi.plugin)<br/>configuration file: none required - to enable it, compile/install netdata with `--enable-plugin-freeipmi`|
 hddtemp|python<br/>v2 or v3|Connects to multiple hddtemp servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [hddtemp.chart.py](../collectors/python.d.plugin/hddtemp)<br/>configuration file: [python.d/hddtemp.conf](../collectors/python.d.plugin/hddtemp)|

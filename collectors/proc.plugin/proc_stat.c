@@ -404,8 +404,8 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         }
         snprintfz(next_state_filename, FILENAME_MAX, cpuidle_name_filename, core, cc->cpuidle_state_len);
 
-        cc->cpuidle_state = callocz(cc->cpuidle_state_len, sizeof(struct cpuidle_state));
-        memset(cc->cpuidle_state, 0, sizeof(struct cpuidle_state) * cc->cpuidle_state_len);
+        if(likely(cc->cpuidle_state_len))
+            cc->cpuidle_state = callocz(cc->cpuidle_state_len, sizeof(struct cpuidle_state));
 
         for(state = 0; state < cc->cpuidle_state_len; state++) {
             char name_buf[50 + 1];

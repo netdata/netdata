@@ -14,12 +14,19 @@ A workflow for uninstallation looks like this:
 NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
 NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running netdata process
 ```
-3. Download, chmod and run netdata-uninstaller.sh.
+3. Run `netdata-uninstaller.sh` as follows
+```
+${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh --yes --env <environment_file>
+```
+
+Note: Existing installations may still need to download the file if it's not present.
+To execute uninstall in that case, run the following commands:
 ```
 wget https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh
 chmod +x ./netdata-uninstaller.sh
 ./netdata-uninstaller.sh --yes --env <environment_file>
 ```
+
 The default `environment_file` is `/etc/netdata/.environment`. 
 
 Note: This uninstallation method assumes previous installation with netdata-installer.sh or kickstart script. Currently using it when netdata was installed by a package manager can work or cause unexpected results.

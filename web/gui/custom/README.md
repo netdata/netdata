@@ -11,15 +11,18 @@ netdata charts can also be added to existing web pages.
 
 Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its **[html source](../demo.html)**.
 
-If you plan to put it on TV, check **[tv.html](../tv.html)**. This is a screenshot of it, monitoring 2 servers on the same page:
+You should also look at the **[custom dashboard template](https://my-netdata.io/dashboard.html)**, that contains samples of all supported charts. The code is [here](../dashboard.html). 
+
+If you plan to put the dashboard on TV, check **[tv.html](../tv.html)**. This is a screenshot of it, monitoring 2 servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 -- 
+  
 
 ## Web directory
 
-The default web root directory is `/usr/share/netdata/web` where you will find examples such as tv.html, and demo.html as well as the main dashboard contained in index.html.  
-Note: index.html have a different syntax. Don't use it as a template for simple custom dashboards.
+All of the mentioned examples are available on your local netdata installation (e.g. `http://myhost:19999/dashboard.html`). The default web root directory with the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in that directory and called `index.html`.  
+Note: index.html has a different syntax. Don't use it as a template for simple custom dashboards.
 
 ## Example empty dashboard
 

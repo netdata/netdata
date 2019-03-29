@@ -53,6 +53,9 @@ cups.plugin
 nfacct.plugin
 !nfacct.plugin/
 
+xenstat.plugin
+!xenstat.plugin/
+
 cgroup-network
 !cgroup-network/
 

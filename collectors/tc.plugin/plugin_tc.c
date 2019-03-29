@@ -879,7 +879,7 @@ void *tc_main(void *ptr) {
 #endif
     uint32_t first_hash;
 
-    snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
+    snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
     while(!netdata_exit) {

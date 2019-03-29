@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: fail2ban log netdata python.d module
-# Author: l2isbad
+# Author: ilyam8
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import re

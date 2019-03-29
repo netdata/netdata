@@ -333,6 +333,20 @@ paths:
           type: string
           enum: [ 'yes', 'no' ]
           default: 'yes'
+        - name: oldunits
+          in: query
+          description: 'When enabled, netdata will show metric names for the default source=average as they appeared before 1.12, by using the legacy unit naming conventions'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
+        - name: hideunits
+          in: query
+          description: 'When enabled, netdata will not include the units in the metric names, for the default source=average.'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
         - name: server
           in: query
           description: 'Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.'
