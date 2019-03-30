@@ -19,6 +19,7 @@ fi
 
 LAST_TAG="$1"
 COMMITS_SINCE_RELEASE="$2"
+NEW_VERSION="${LAST_TAG}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
 ORG=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f1)
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f 2)
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
@@ -48,8 +49,8 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
 	--no-compare-link ${OPTS}
 
-echo "Changelog created! Adding packaging/version and CHANGELOG.md to the repository"
-echo "$LAST_TAG-$((COMMITS_SINCE_RELEASE + 1))-nightly" > packaging/version
+echo "Changelog created! Adding packaging/version(${NEW_VERSION}) and CHANGELOG.md to the repository"
+echo "${NEW_VERSION}" > packaging/version
 git add packaging/version && echo "1) Added packaging/version to repository" || FAIL=1
 git add CHANGELOG.md && echo "2) Added changelog file to repository" || FAIL=1
 git commit -m '[ci skip] create nightly packages and update changelog' && echo "3) Committed changes to repository" || FAIL=1
