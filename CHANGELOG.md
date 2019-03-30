@@ -40,6 +40,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging/makeself: no comment [\#5743](https://github.com/netdata/netdata/pull/5743) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - installer: include go.d.plugin version v0.3.1 [\#5740](https://github.com/netdata/netdata/pull/5740) ([ilyam8](https://github.com/ilyam8))
 - access: fix codeowners [\#5739](https://github.com/netdata/netdata/pull/5739) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: netdata-installer.sh script \(and subscripts\) refactoring wrap-up [\#5736](https://github.com/netdata/netdata/pull/5736) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
