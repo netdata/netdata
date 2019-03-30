@@ -1,6 +1,6 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.14.0-rc0](https://github.com/netdata/netdata/tree/v1.14.0-rc0) (2019-03-30)
 
 **Fixed bugs:**
 
@@ -40,6 +40,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging/ci: small improvements in logging [\#5746](https://github.com/netdata/netdata/pull/5746) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/makeself: no comment [\#5743](https://github.com/netdata/netdata/pull/5743) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - installer: include go.d.plugin version v0.3.1 [\#5740](https://github.com/netdata/netdata/pull/5740) ([ilyam8](https://github.com/ilyam8))
 - access: fix codeowners [\#5739](https://github.com/netdata/netdata/pull/5739) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
