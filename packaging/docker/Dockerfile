@@ -39,6 +39,7 @@ FROM netdata/base:${ARCH}
 
 # Conditional subscribiton to Polyverse's Polymorphic Linux repositories
 RUN if [ "$(uname -m)" == "x86_64" ]; then \
+	apk update && apk upgrade; \ 
         curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
         if [ $? -eq 0 ]; then \
                 apk update && \
