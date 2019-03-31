@@ -44,7 +44,6 @@ RUN if [ "$(uname -m)" == "x86_64" ]; then \
         if [ $? -eq 0 ]; then \
                 apk update && \
                 apk upgrade --available --no-cache && \
-                apk fix py2-psycopg2 && \
                 sed -in 's/^#//g' /etc/apk/repositories; \
         fi \
     fi
