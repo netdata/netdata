@@ -39,11 +39,12 @@ FROM netdata/base:${ARCH}
 
 # Conditional subscribiton to Polyverse's Polymorphic Linux repositories
 RUN if [ "$(uname -m)" == "x86_64" ]; then \
-	apk update && apk upgrade; \ 
+        apk update && apk upgrade; \
         curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
         if [ $? -eq 0 ]; then \
                 apk update && \
-                apk upgrade --available --force-refresh --no-scripts --clean-protected && \
+                apk upgrade --available --no-cache && \
+                apk fix py2-psycopg2 && \
                 sed -in 's/^#//g' /etc/apk/repositories; \
         fi \
     fi
