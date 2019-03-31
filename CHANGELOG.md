@@ -1,5 +1,12 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Merged pull requests:**
+
+- fix go.d.plugin config.tar.gz checksum [\#5750](https://github.com/netdata/netdata/pull/5750) ([ilyam8](https://github.com/ilyam8))
+- Fix some misspells in docs and code [\#5549](https://github.com/netdata/netdata/pull/5549) ([JoeWrightss](https://github.com/JoeWrightss))
+
 ## [v1.14.0-rc0](https://github.com/netdata/netdata/tree/v1.14.0-rc0) (2019-03-30)
 
 **Fixed bugs:**
