@@ -97,6 +97,7 @@ username|name|email (optional)
 @ccremer|Christian Cremer|
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
 @Chocobo1|Mike Tzou|
+@vinyasmusic|Vinyas Malagaudanavar|vinyasmusic@gmail.com
 @cosmix|Dimosthenis Kaponis|
 @shadycuz|Levi Blaney|shadycuz+spam@gmail.com
 @Flums|Philip Gabrielsen|philip@digno.no

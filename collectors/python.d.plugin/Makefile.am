@@ -44,8 +44,6 @@ include boinc/Makefile.inc
 include ceph/Makefile.inc
 include chrony/Makefile.inc
 include couchdb/Makefile.inc
-include cpufreq/Makefile.inc
-include cpuidle/Makefile.inc
 include dnsdist/Makefile.inc
 include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc
@@ -62,10 +60,8 @@ include httpcheck/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
 include isc_dhcpd/Makefile.inc
-include linux_power_supply/Makefile.inc
 include litespeed/Makefile.inc
 include logind/Makefile.inc
-include mdstat/Makefile.inc
 include megacli/Makefile.inc
 include memcached/Makefile.inc
 include mongodb/Makefile.inc

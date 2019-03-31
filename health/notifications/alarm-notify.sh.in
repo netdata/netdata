@@ -165,6 +165,7 @@ kavenegar
 prowl
 awssns
 rocketchat
+sms
 "
 
 # -----------------------------------------------------------------------------
@@ -537,6 +538,14 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	fi
 fi
 
+if [ "${SEND_SMS}" = "YES" ]; then
+	if [ -z "${sendsms}" ]; then
+		sendsms="$(command -v sendsms 2>/dev/null)"
+	fi
+	if [ -z "${sendsms}" ]; then
+		SEND_SMS="NO"
+	fi
+fi
 # if we need sendmail, check for the sendmail command
 if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
 	sendmail="$(command -v sendmail 2>/dev/null)"
@@ -649,6 +658,7 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_IRC}" \
 	"${SEND_AWSSNS}" \
 	"${SEND_SYSLOG}" \
+	"${SEND_SMS}" \
 	"${SEND_MSTEAM}"; do
 	if [ "${method}" == "YES" ]; then
 		proceed=1
@@ -1727,6 +1737,36 @@ send_syslog() {
 }
 
 # -----------------------------------------------------------------------------
+# SMS sender
+
+send_sms() {
+	local recipients="${1}" exitcode sent=0
+
+    # Human readable SMS
+    local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
+
+    # limit it to 160 characters
+    msg="${msg:0:160}"
+
+	if [ "${SEND_SMS}" = "YES" ] && [ -n "${sendsms}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
+		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
+		for phone in ${recipients}; do
+			exitcode=$($sendsms $phone "$msg")
+			if [ ${exitcode} -eq 0 ]; then
+				info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${exitcode}."
+			fi
+		done
+
+		[ ${sent} -gt 0 ] && return 0
+	fi
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -1996,6 +2036,13 @@ ${info}"
 SENT_IRC=$?
 
 # -----------------------------------------------------------------------------
+# send the SMS message with smstools3
+
+send_sms "${to_sms}"
+
+SENT_SMS=$?
+
+# -----------------------------------------------------------------------------
 # send the custom message
 
 send_custom() {
@@ -2209,6 +2256,7 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_IRC}" \
 	"${SENT_AWSSNS}" \
 	"${SENT_SYSLOG}" \
+	"${SENT_SMS}" \
 	"${SENT_MSTEAM}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something

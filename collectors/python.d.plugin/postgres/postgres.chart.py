@@ -23,27 +23,41 @@ DEFAULT_CONNECT_TIMEOUT = 2       # seconds
 DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
 
 
-WAL = 'WAL'
-ARCHIVE = 'ARCHIVE'
-BACKENDS = 'BACKENDS'
-TABLE_STATS = 'TABLE_STATS'
-INDEX_STATS = 'INDEX_STATS'
-DATABASE = 'DATABASE'
-BGWRITER = 'BGWRITER'
-LOCKS = 'LOCKS'
-DATABASES = 'DATABASES'
-STANDBY = 'STANDBY'
-REPLICATION_SLOT = 'REPLICATION_SLOT'
-STANDBY_DELTA = 'STANDBY_DELTA'
-REPSLOT_FILES = 'REPSLOT_FILES'
-IF_SUPERUSER = 'IF_SUPERUSER'
-SERVER_VERSION = 'SERVER_VERSION'
-AUTOVACUUM = 'AUTOVACUUM'
-DIFF_LSN = 'DIFF_LSN'
-WAL_WRITES = 'WAL_WRITES'
+CONN_PARAM_HOST = 'host'
+CONN_PARAM_PORT = 'port'
+CONN_PARAM_DATABASE = 'database'
+CONN_PARAM_USER = 'user'
+CONN_PARAM_PASSWORD = 'password'
+CONN_PARAM_CONN_TIMEOUT = 'connect_timeout'
+CONN_PARAM_STATEMENT_TIMEOUT = 'statement_timeout'
+CONN_PARAM_SSL_MODE = 'sslmode'
+CONN_PARAM_SSL_ROOT_CERT = 'sslrootcert'
+CONN_PARAM_SSL_CRL = 'sslcrl'
+CONN_PARAM_SSL_CERT = 'sslcert'
+CONN_PARAM_SSL_KEY = 'sslkey'
+
+
+QUERY_NAME_WAL = 'WAL'
+QUERY_NAME_ARCHIVE = 'ARCHIVE'
+QUERY_NAME_BACKENDS = 'BACKENDS'
+QUERY_NAME_TABLE_STATS = 'TABLE_STATS'
+QUERY_NAME_INDEX_STATS = 'INDEX_STATS'
+QUERY_NAME_DATABASE = 'DATABASE'
+QUERY_NAME_BGWRITER = 'BGWRITER'
+QUERY_NAME_LOCKS = 'LOCKS'
+QUERY_NAME_DATABASES = 'DATABASES'
+QUERY_NAME_STANDBY = 'STANDBY'
+QUERY_NAME_REPLICATION_SLOT = 'REPLICATION_SLOT'
+QUERY_NAME_STANDBY_DELTA = 'STANDBY_DELTA'
+QUERY_NAME_REPSLOT_FILES = 'REPSLOT_FILES'
+QUERY_NAME_IF_SUPERUSER = 'IF_SUPERUSER'
+QUERY_NAME_SERVER_VERSION = 'SERVER_VERSION'
+QUERY_NAME_AUTOVACUUM = 'AUTOVACUUM'
+QUERY_NAME_DIFF_LSN = 'DIFF_LSN'
+QUERY_NAME_WAL_WRITES = 'WAL_WRITES'
 
 METRICS = {
-    DATABASE: [
+    QUERY_NAME_DATABASE: [
         'connections',
         'xact_commit',
         'xact_rollback',
@@ -59,32 +73,32 @@ METRICS = {
         'temp_bytes',
         'size'
     ],
-    BACKENDS: [
+    QUERY_NAME_BACKENDS: [
         'backends_active',
         'backends_idle'
     ],
-    INDEX_STATS: [
+    QUERY_NAME_INDEX_STATS: [
         'index_count',
         'index_size'
     ],
-    TABLE_STATS: [
+    QUERY_NAME_TABLE_STATS: [
         'table_size',
         'table_count'
     ],
-    WAL: [
+    QUERY_NAME_WAL: [
         'written_wal',
         'recycled_wal',
         'total_wal'
     ],
-    WAL_WRITES: [
+    QUERY_NAME_WAL_WRITES: [
         'wal_writes'
     ],
-    ARCHIVE: [
+    QUERY_NAME_ARCHIVE: [
         'ready_count',
         'done_count',
         'file_count'
     ],
-    BGWRITER: [
+    QUERY_NAME_BGWRITER: [
         'checkpoint_scheduled',
         'checkpoint_requested',
         'buffers_checkpoint',
@@ -94,7 +108,7 @@ METRICS = {
         'buffers_alloc',
         'buffers_backend_fsync'
     ],
-    LOCKS: [
+    QUERY_NAME_LOCKS: [
         'ExclusiveLock',
         'RowShareLock',
         'SIReadLock',
@@ -105,20 +119,20 @@ METRICS = {
         'ShareLock',
         'RowExclusiveLock'
     ],
-    AUTOVACUUM: [
+    QUERY_NAME_AUTOVACUUM: [
         'analyze',
         'vacuum_analyze',
         'vacuum',
         'vacuum_freeze',
         'brin_summarize'
     ],
-    STANDBY_DELTA: [
+    QUERY_NAME_STANDBY_DELTA: [
         'sent_delta',
         'write_delta',
         'flush_delta',
         'replay_delta'
     ],
-    REPSLOT_FILES: [
+    QUERY_NAME_REPSLOT_FILES: [
         'replslot_wal_keep',
         'replslot_files'
     ]
@@ -518,47 +532,47 @@ SELECT
 
 
 def query_factory(name, version=NO_VERSION):
-    if name == BACKENDS:
+    if name == QUERY_NAME_BACKENDS:
         return QUERY_BACKEND[DEFAULT]
-    elif name == TABLE_STATS:
+    elif name == QUERY_NAME_TABLE_STATS:
         return QUERY_TABLE_STATS[DEFAULT]
-    elif name == INDEX_STATS:
+    elif name == QUERY_NAME_INDEX_STATS:
         return QUERY_INDEX_STATS[DEFAULT]
-    elif name == DATABASE:
+    elif name == QUERY_NAME_DATABASE:
         return QUERY_DATABASE[DEFAULT]
-    elif name == BGWRITER:
+    elif name == QUERY_NAME_BGWRITER:
         return QUERY_BGWRITER[DEFAULT]
-    elif name == LOCKS:
+    elif name == QUERY_NAME_LOCKS:
         return QUERY_LOCKS[DEFAULT]
-    elif name == DATABASES:
+    elif name == QUERY_NAME_DATABASES:
         return QUERY_DATABASES[DEFAULT]
-    elif name == STANDBY:
+    elif name == QUERY_NAME_STANDBY:
         return QUERY_STANDBY[DEFAULT]
-    elif name == REPLICATION_SLOT:
+    elif name == QUERY_NAME_REPLICATION_SLOT:
         return QUERY_REPLICATION_SLOT[DEFAULT]
-    elif name == IF_SUPERUSER:
+    elif name == QUERY_NAME_IF_SUPERUSER:
         return QUERY_SUPERUSER[DEFAULT]
-    elif name == SERVER_VERSION:
+    elif name == QUERY_NAME_SERVER_VERSION:
         return QUERY_SHOW_VERSION[DEFAULT]
-    elif name == AUTOVACUUM:
+    elif name == QUERY_NAME_AUTOVACUUM:
         return QUERY_AUTOVACUUM[DEFAULT]
-    elif name == WAL:
+    elif name == QUERY_NAME_WAL:
         if version < 100000:
             return QUERY_WAL[V96]
         return QUERY_WAL[DEFAULT]
-    elif name == ARCHIVE:
+    elif name == QUERY_NAME_ARCHIVE:
         if version < 100000:
             return QUERY_ARCHIVE[V96]
         return QUERY_ARCHIVE[DEFAULT]
-    elif name == STANDBY_DELTA:
+    elif name == QUERY_NAME_STANDBY_DELTA:
         if version < 100000:
             return QUERY_STANDBY_DELTA[V96]
         return QUERY_STANDBY_DELTA[DEFAULT]
-    elif name == REPSLOT_FILES:
+    elif name == QUERY_NAME_REPSLOT_FILES:
         if version < 110000:
             return QUERY_REPSLOT_FILES[V10]
         return QUERY_REPSLOT_FILES[DEFAULT]
-    elif name == DIFF_LSN:
+    elif name == QUERY_NAME_DIFF_LSN:
         if version < 100000:
             return QUERY_DIFF_LSN[V96]
         return QUERY_DIFF_LSN[DEFAULT]
@@ -794,6 +808,7 @@ class Service(SimpleService):
         self.databases_to_poll = configuration.pop('database_poll', None)
         self.configuration = configuration
         self.conn = None
+        self.conn_params = dict()
         self.server_version = None
         self.is_superuser = False
         self.alive = False
@@ -806,26 +821,44 @@ class Service(SimpleService):
     def reconnect(self):
         return self.connect()
 
+    def build_conn_params(self):
+        conf = self.configuration
+
+        params = {
+            CONN_PARAM_HOST: conf.get(CONN_PARAM_HOST),
+            CONN_PARAM_PORT: conf.get(CONN_PARAM_PORT, DEFAULT_PORT),
+            CONN_PARAM_DATABASE: conf.get(CONN_PARAM_DATABASE),
+            CONN_PARAM_USER: conf.get(CONN_PARAM_USER, DEFAULT_USER),
+            CONN_PARAM_PASSWORD: conf.get(CONN_PARAM_PASSWORD),
+            CONN_PARAM_CONN_TIMEOUT: conf.get(CONN_PARAM_CONN_TIMEOUT, DEFAULT_CONNECT_TIMEOUT),
+            'options': '-c statement_timeout={0}'.format(
+                conf.get(CONN_PARAM_STATEMENT_TIMEOUT, DEFAULT_STATEMENT_TIMEOUT)),
+        }
+
+        # https://www.postgresql.org/docs/current/libpq-ssl.html
+        ssl_params = dict(
+            (k, v) for k, v in {
+                CONN_PARAM_SSL_MODE: conf.get(CONN_PARAM_SSL_MODE),
+                CONN_PARAM_SSL_ROOT_CERT: conf.get(CONN_PARAM_SSL_ROOT_CERT),
+                CONN_PARAM_SSL_CRL: conf.get(CONN_PARAM_SSL_CRL),
+                CONN_PARAM_SSL_CERT: conf.get(CONN_PARAM_SSL_CERT),
+                CONN_PARAM_SSL_KEY: conf.get(CONN_PARAM_SSL_KEY),
+            }.items() if v)
+
+        if CONN_PARAM_SSL_MODE not in ssl_params and len(ssl_params) > 0:
+            raise ValueError("mandatory 'sslmode' param is missing, please set")
+
+        params.update(ssl_params)
+
+        return params
+
     def connect(self):
         if self.conn:
             self.conn.close()
             self.conn = None
 
-        conf = self.configuration
-
-        params = {
-            'host': conf.get('host'),
-            'port': conf.get('port', DEFAULT_PORT),
-            'database': conf.get('database'),
-            'user': conf.get('user', DEFAULT_USER),
-            'password': conf.get('password'),
-            'connect_timeout': conf.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT),
-            'options': '-c statement_timeout={0}'.format(
-                conf.get('statement_timeout', DEFAULT_STATEMENT_TIMEOUT)),
-        }
-
         try:
-            self.conn = psycopg2.connect(**params)
+            self.conn = psycopg2.connect(**self.conn_params)
             self.conn.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             self.conn.set_session(readonly=True)
         except OperationalError as error:
@@ -841,8 +874,14 @@ class Service(SimpleService):
             self.error("'python-psycopg2' package is needed to use postgres module")
             return False
 
+        try:
+            self.conn_params = self.build_conn_params()
+        except ValueError as error:
+            self.error('error on creating connection params : {0}', error)
+            return False
+
         if not self.connect():
-            self.error('failed to connect to {0}'.format(hide_password(self.configuration)))
+            self.error('failed to connect to {0}'.format(hide_password(self.conn_params)))
             return False
 
         try:
@@ -904,51 +943,51 @@ class Service(SimpleService):
     def check_queries(self):
         cursor = self.conn.cursor()
 
-        self.server_version = detect_server_version(cursor, query_factory(SERVER_VERSION))
+        self.server_version = detect_server_version(cursor, query_factory(QUERY_NAME_SERVER_VERSION))
         self.debug('server version: {0}'.format(self.server_version))
 
-        self.is_superuser = check_if_superuser(cursor, query_factory(IF_SUPERUSER))
+        self.is_superuser = check_if_superuser(cursor, query_factory(QUERY_NAME_IF_SUPERUSER))
         self.debug('superuser: {0}'.format(self.is_superuser))
 
-        self.databases = discover(cursor, query_factory(DATABASES))
+        self.databases = discover(cursor, query_factory(QUERY_NAME_DATABASES))
         self.debug('discovered databases {0}'.format(self.databases))
         if self.databases_to_poll:
             to_poll = self.databases_to_poll.split()
             self.databases = [db for db in self.databases if db in to_poll] or self.databases
 
-        self.secondaries = discover(cursor, query_factory(STANDBY))
+        self.secondaries = discover(cursor, query_factory(QUERY_NAME_STANDBY))
         self.debug('discovered secondaries: {0}'.format(self.secondaries))
 
         if self.server_version >= 94000:
-            self.replication_slots = discover(cursor, query_factory(REPLICATION_SLOT))
+            self.replication_slots = discover(cursor, query_factory(QUERY_NAME_REPLICATION_SLOT))
             self.debug('discovered replication slots: {0}'.format(self.replication_slots))
 
         cursor.close()
 
     def populate_queries(self):
-        self.queries[query_factory(DATABASE)] = METRICS[DATABASE]
-        self.queries[query_factory(BACKENDS)] = METRICS[BACKENDS]
-        self.queries[query_factory(LOCKS)] = METRICS[LOCKS]
-        self.queries[query_factory(BGWRITER)] = METRICS[BGWRITER]
-        self.queries[query_factory(DIFF_LSN, self.server_version)] = METRICS[WAL_WRITES]
-        self.queries[query_factory(STANDBY_DELTA, self.server_version)] = METRICS[STANDBY_DELTA]
+        self.queries[query_factory(QUERY_NAME_DATABASE)] = METRICS[QUERY_NAME_DATABASE]
+        self.queries[query_factory(QUERY_NAME_BACKENDS)] = METRICS[QUERY_NAME_BACKENDS]
+        self.queries[query_factory(QUERY_NAME_LOCKS)] = METRICS[QUERY_NAME_LOCKS]
+        self.queries[query_factory(QUERY_NAME_BGWRITER)] = METRICS[QUERY_NAME_BGWRITER]
+        self.queries[query_factory(QUERY_NAME_DIFF_LSN, self.server_version)] = METRICS[QUERY_NAME_WAL_WRITES]
+        self.queries[query_factory(QUERY_NAME_STANDBY_DELTA, self.server_version)] = METRICS[QUERY_NAME_STANDBY_DELTA]
 
         if self.do_index_stats:
-            self.queries[query_factory(INDEX_STATS)] = METRICS[INDEX_STATS]
+            self.queries[query_factory(QUERY_NAME_INDEX_STATS)] = METRICS[QUERY_NAME_INDEX_STATS]
         if self.do_table_stats:
-            self.queries[query_factory(TABLE_STATS)] = METRICS[TABLE_STATS]
+            self.queries[query_factory(QUERY_NAME_TABLE_STATS)] = METRICS[QUERY_NAME_TABLE_STATS]
 
         if self.is_superuser:
-            self.queries[query_factory(ARCHIVE, self.server_version)] = METRICS[ARCHIVE]
+            self.queries[query_factory(QUERY_NAME_ARCHIVE, self.server_version)] = METRICS[QUERY_NAME_ARCHIVE]
 
             if self.server_version >= 90400:
-                self.queries[query_factory(WAL, self.server_version)] = METRICS[WAL]
+                self.queries[query_factory(QUERY_NAME_WAL, self.server_version)] = METRICS[QUERY_NAME_WAL]
 
             if self.server_version >= 100000:
-                self.queries[query_factory(REPSLOT_FILES, self.server_version)] = METRICS[REPSLOT_FILES]
+                self.queries[query_factory(QUERY_NAME_REPSLOT_FILES, self.server_version)] = METRICS[QUERY_NAME_REPSLOT_FILES]
 
         if self.server_version >= 90400:
-            self.queries[query_factory(AUTOVACUUM)] = METRICS[AUTOVACUUM]
+            self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
 
     def create_dynamic_charts(self):
         for database_name in self.databases[::-1]:

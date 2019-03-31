@@ -99,7 +99,7 @@ void grouping_free_des(RRDR *r) {
 void grouping_add_des(RRDR *r, calculated_number value) {
     struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
 
-    if(isnormal(value)) {
+    if(calculated_number_isnumber(value)) {
         if(likely(g->count > 0)) {
             // we have at least a number so far
 
@@ -128,7 +128,7 @@ void grouping_add_des(RRDR *r, calculated_number value) {
 calculated_number grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
 
-    if(unlikely(!g->count || !isnormal(g->level))) {
+    if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

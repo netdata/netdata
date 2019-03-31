@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: nvidia-smi netdata python.d module
 # Original Author: Steven Noonan (tycho)
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 
 import subprocess
 import threading
