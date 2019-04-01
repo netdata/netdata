@@ -49,7 +49,7 @@ Following charts are drawn:
 
 ### configuration
 
-For all available options please see module [configuration file](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postgres/postgres.conf).
+For all available options please see module [configuration file](postgres.conf).
 
 ```yaml
 socket:
