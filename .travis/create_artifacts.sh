@@ -24,7 +24,7 @@ mv "${BASENAME}.tar.gz" artifacts/
 echo "--- Create self-extractor ---"
 ./packaging/makeself/build-x86_64-static.sh
 
-# Needed fo GCS
+# Needed for GCS
 echo "--- Copy artifacts to separate directory ---"
 #shellcheck disable=SC2164
 cp packaging/version artifacts/latest-version.txt

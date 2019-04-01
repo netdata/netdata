@@ -495,7 +495,9 @@ function renderStreamedHosts(options) {
     }
 
     var master = options.hosts[0].hostname;
-    var sorted = options.hosts.sort(function (a, b) {
+    // We sort a clone of options.hosts, to keep the master as the first element
+    // for future calls.
+    var sorted = options.hosts.slice(0).sort(function (a, b) {
         if (a.hostname === master) {
             return -1;
         }
@@ -4042,6 +4044,14 @@ function runOnceOnDashboardWithjQuery() {
     // ------------------------------------------------------------------------
     // sidebar / affix
 
+    if (shouldShowSignInBanner()) {
+        const el = document.getElementById("sign-in-banner");
+        if (el) {
+            el.style.display = "initial";
+            el.classList.add(`theme-${netdataTheme}`);
+        }
+    }
+
     $('#sidebar')
         .affix({
             offset: {
@@ -4359,12 +4369,6 @@ function finalizePage() {
         // do not to give errors on netdata demo servers for 60 seconds
         NETDATA.options.current.retries_on_data_failures = 60;
 
-        if (urlOptions.nowelcome !== true) {
-            setTimeout(function () {
-                $('#welcomeModal').modal();
-            }, 1000);
-        }
-
         // google analytics when this is used for the home page of the demo sites
         // this does not run on user's installations
         setTimeout(function () {
@@ -4402,6 +4406,12 @@ function finalizePage() {
     if (netdataSnapshotData !== null) {
         NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
     }
+
+    //if (urlOptions.nowelcome !== true) {
+    //    setTimeout(function () {
+    //        $('#welcomeModal').modal();
+    //    }, 2000);
+    //}
 
     // var netdataEnded = performance.now();
     // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
@@ -4683,6 +4693,26 @@ function signInDidClick(e) {
     signIn();
 }
 
+function shouldShowSignInBanner() {
+    if (isSignedIn()) {
+        return false;
+    }
+
+    return localStorage.getItem("signInBannerClosed") != "true";
+}
+
+function closeSignInBanner() {
+    localStorage.setItem("signInBannerClosed", "true");
+    const el = document.getElementById("sign-in-banner");
+    if (el) {
+        el.style.display = "none";
+    }
+}
+
+function closeSignInBannerDidClick(e) {
+    closeSignInBanner();
+}
+
 function signOutDidClick(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -4744,7 +4774,7 @@ function clearCloudLocalStorageItems() {
 }
 
 function signIn() {
-    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?origin=${encodeURIComponent(window.location.origin + "/")}`;
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`;
     window.open(url);
 }
 
@@ -4777,7 +4807,7 @@ function renderAccountUI() {
         container.setAttribute("data-original-title", "sign in");
         container.setAttribute("data-placement", "bottom");
         container.innerHTML = (
-            `<a href="#" class="btn" onclick="signInDidClick(event); return false">
+            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
                 <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
             </a>`
         )
@@ -4800,6 +4830,7 @@ function handleMessage(e) {
 }
 
 function handleSignInMessage(e) {
+    closeSignInBanner();
     localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
 
     cloudAccountID = e.data.accountID;

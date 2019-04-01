@@ -46,6 +46,7 @@ dist_healthconfig_DATA = \
     health.d/ipfs.conf \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
+    health.d/kubelet.conf \
     health.d/lighttpd.conf \
     health.d/linux_power_supply.conf \
     health.d/load.conf \
@@ -78,5 +79,6 @@ dist_healthconfig_DATA = \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
     health.d/web_log.conf \
+    health.d/x509check.conf \
     health.d/zfs.conf \
     $(NULL)

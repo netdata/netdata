@@ -443,6 +443,18 @@ netdataDashboard.menu = {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
         info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
+    },
+
+    'xenstat': {
+        title: 'Xen Node',
+        icon: '<i class="fas fa-server"></i>',
+        info: 'General statistics for the Xen node. Data collected using <b>xenstat</b> library</a>.'
+    },
+
+    'xendomain': {
+        title: '',
+        icon: '<i class="fas fa-th-large"></i>',
+        info: 'Xen domain resource utilization metrics. Netdata reads this information using <b>xenstat</b> library which gives access to the resource usage information (CPU, memory, disk I/O, network) for a virtual machine.'
     }
 };
 
