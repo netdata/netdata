@@ -22,6 +22,7 @@ collectors/node.d.plugin/fronius/ @ktsaou @gmosx @ccremer @cakrit
 collectors/node.d.plugin/snmp/ @ktsaou @gmosx @cakrit
 collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer @cakrit
 collectors/python.d.plugin/ @ilyam8
+collectors/cups.plugin/ @simonnagl @ktsaou @vlvkobal @cakrit
 daemon/ @ktsaou @mfundul @cakrit
 database/ @ktsaou @mfundul
 docs/ @cakrit
