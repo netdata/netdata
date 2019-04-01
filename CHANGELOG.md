@@ -2,10 +2,26 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
+
+**Closed issues:**
+
+- feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
+- Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
+
 **Merged pull requests:**
 
+- netdata/packaging/installer: fix sha256sum failure on freeBSD [\#5760](https://github.com/netdata/netdata/pull/5760) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- postgres module: connect via uri [\#5758](https://github.com/netdata/netdata/pull/5758) ([ilyam8](https://github.com/ilyam8))
+- libapache2-mod-proxy-html was a transitional package for apache2-bin [\#5753](https://github.com/netdata/netdata/pull/5753) ([piiiggg](https://github.com/piiiggg))
+- Fix the Polyverse reinstall that caused APK broken state [\#5751](https://github.com/netdata/netdata/pull/5751) ([archisgore](https://github.com/archisgore))
 - fix go.d.plugin config.tar.gz checksum [\#5750](https://github.com/netdata/netdata/pull/5750) ([ilyam8](https://github.com/ilyam8))
+- Correct typo in ceph README [\#5742](https://github.com/netdata/netdata/pull/5742) ([cakrit](https://github.com/cakrit))
 - Fix some misspells in docs and code [\#5549](https://github.com/netdata/netdata/pull/5549) ([JoeWrightss](https://github.com/JoeWrightss))
+- Added RocketChat default recipient for roles [\#5545](https://github.com/netdata/netdata/pull/5545) ([tctovsli](https://github.com/tctovsli))
+- Add simonnagl as CODEOWNER for cups.plugin [\#5453](https://github.com/netdata/netdata/pull/5453) ([simonnagl](https://github.com/simonnagl))
 
 ## [v1.14.0-rc0](https://github.com/netdata/netdata/tree/v1.14.0-rc0) (2019-03-30)
 
