@@ -775,7 +775,7 @@ install_go() {
 		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
-		if ! (cd "${tmp}" && sha256sum -c "sha256sums.txt"); then
+		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
 			run_failed "go.d.plugin package files checksum validation failed."
 			return 1
 		fi

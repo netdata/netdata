@@ -157,7 +157,7 @@ progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
 
 download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
 download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
-if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
 fi
 
