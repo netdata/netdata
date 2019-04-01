@@ -79,10 +79,10 @@ update() {
 		info "Newest version is already installed"
 	else
 		download "${NETDATA_TARBALL_URL}" "${dir}/netdata-latest.tar.gz"
-		if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
+		if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
 			failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
 		fi
-		NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
+		NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
 		tar -xf netdata-latest.tar.gz >&3 2>&3
 		rm netdata-latest.tar.gz >&3 2>&3
 		cd netdata-*
