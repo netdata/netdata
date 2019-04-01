@@ -13,6 +13,7 @@ plugin|language|O/S|description
 [fping.plugin](../fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
 [freeipmi.plugin](../freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.
 [nfacct.plugin](../nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.
+[xenstat.plugin](../xenstat.plugin/)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.
 [node.d.plugin](../node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.
 [python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
 

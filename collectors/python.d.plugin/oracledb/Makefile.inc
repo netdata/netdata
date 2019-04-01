@@ -5,9 +5,9 @@
 # IT IS REQUIRED TO REFERENCE ALL FILES RELATIVE TO THE PARENT
 
 # install these files
-dist_python_DATA       += linux_power_supply/linux_power_supply.chart.py
-dist_pythonconfig_DATA += linux_power_supply/linux_power_supply.conf
+dist_python_DATA       += oracledb/oracledb.chart.py
+dist_pythonconfig_DATA += oracledb/oracledb.conf
 
 # do not install these files, but include them in the distribution
-dist_noinst_DATA       += linux_power_supply/README.md linux_power_supply/Makefile.inc
+dist_noinst_DATA       += oracledb/README.md oracledb/Makefile.inc
 

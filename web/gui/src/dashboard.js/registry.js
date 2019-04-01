@@ -11,7 +11,7 @@ NETDATA.registry = {
     machines: null,       // the user's other URLs
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
-
+    anonymous_statistics_checked: false,
     MASKED_DATA: "***",
 
     isUsingGlobalRegistry: function() {
@@ -84,8 +84,16 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
-                if (dataLayer) {
-                    if (data.anonymous_statistics) dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                if (!NETDATA.registry.anonymous_statistics_checked) {
+                    NETDATA.registry.anonymous_statistics_checked=true;
+                    if (data.anonymous_statistics) {
+                        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=false;j.src=
+                            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                        })(window,document,'script','dataLayer','GTM-N6CBMJD');
+                        dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                    }
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
