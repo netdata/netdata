@@ -40,14 +40,13 @@ class RuntimeCounters:
 
     def calc_next(self):
         self.start_mono = monotonic()
+
         if self.runs == 0:
             self.next = self.start_mono - (self.start_mono % 1) + 1
             return self.next
 
-        while True:
+        while self.start_mono > self.next:
             self.next += self.update_every + self.penalty
-            if self.start_mono < self.next:
-                break
         return self.next
 
     def sleep_until_next(self):
