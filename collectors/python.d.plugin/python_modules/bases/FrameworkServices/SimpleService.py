@@ -45,10 +45,9 @@ class RuntimeCounters:
             return self.next
 
         while True:
-            self.next = self.next + self.update_every + self.penalty
-            if self.start_mono > self.next:
-                continue
-            break
+            self.next += self.update_every + self.penalty
+            if self.start_mono < self.next:
+                break
         return self.next
 
     def sleep_until_next(self):
