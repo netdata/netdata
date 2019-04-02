@@ -2,6 +2,7 @@ os: linux
 dist: trusty
 sudo: true
 language: c
+compiler: gcc
 services:
 - docker
 
@@ -9,12 +10,6 @@ services:
 matrix:
   allow_failures:
     env: ALLOW_SOFT_FAILURE_HERE=true
-
-# Update the system before doing anything else
-#
-addons:
-  apt:
-    update: true
 
 # Install dependencies for all, once
 #
