@@ -529,7 +529,7 @@ static void get_disk_config(struct disk *d) {
     }
 }
 
-static struct disk * get_disk(unsigned long major, unsigned long minor, char *disk) {
+static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
