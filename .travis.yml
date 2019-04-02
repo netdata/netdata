@@ -70,7 +70,7 @@ jobs:
     # Ensure netdata code builds successfully
   - stage: Build process
 
-  - name: Standard netdata build
+  - name: C
     script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
 
