@@ -10,9 +10,15 @@ matrix:
   allow_failures:
     env: ALLOW_SOFT_FAILURE_HERE=true
 
+# Update the system before doing anything else
+#
+addons:
+  apt:
+    update: true
+
 # Install dependencies for all, once
 #
-install:
+before_script:
 - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
 - source tests/installer/slack.sh
 
