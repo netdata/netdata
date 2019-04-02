@@ -80,6 +80,7 @@ jobs:
     - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
 
   - stage: Artifacts validation
+
     name: Unit Testing
     script:
     - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
@@ -104,6 +105,7 @@ jobs:
 
 
   - stage: Packaging for release
+
     name: Create release (only on special commit msg)
     install:
     - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
@@ -122,6 +124,7 @@ jobs:
 
     # This is the nightly pre-execution step
   - stage: Nightly operations
+
   - name: Run coverity scan
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
 
@@ -139,6 +142,7 @@ jobs:
     # This is the nightly execution step
     #
   - stage: Nightly release
+
     before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
     install:
     - sudo apt install -y --only-upgrade docker-ce
