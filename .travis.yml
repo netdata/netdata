@@ -86,8 +86,12 @@ jobs:
     after_deploy: rm -f .travis/gcs-credentials.json
 
   - stage: Integrity testing
-    name: Kickstart files integrity testing
+    name: Kickstart: Files integrity testing
     script: ./tests/installer/checksums.sh
+  - name: Kickstart: Execution integrity
+    script:
+    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
+    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it --install /tmp
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
