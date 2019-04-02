@@ -318,7 +318,9 @@ static inline int is_major_enabled(int major) {
 static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
     //info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
 
-    int found = 0;
+    int found = 0, preferred = 0;
+
+    char *first_result = mallocz(result_size);
 
     DIR *dir = opendir(path);
     if (!dir) {
@@ -397,9 +399,13 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
             snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
 
-            found = 1;
+            if(!found) {
+                strncpyz(first_result, result, result_size);
+                found = 1;
+            }
 
             if(simple_pattern_matches(preferred_ids, result)) {
+                preferred = 1;
                 break;
             }
         }
@@ -411,6 +417,10 @@ failed:
 
     if(!found)
         result[0] = '\0';
+    else if(!preferred)
+        strncpyz(result, first_result, result_size - 1);
+
+    freez(first_result);
 
     return found;
 }
