@@ -27,7 +27,7 @@ stages:
 # Mandatory runs, we always want these executed
 - name: Code quality, linting, syntax, code style
 - name: Build process
-- name: Build artifacts validation
+- name: Artifacts validation
 
   # Nightly operations
 - name: Nightly operations
