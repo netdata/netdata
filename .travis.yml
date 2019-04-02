@@ -8,6 +8,8 @@ services:
 
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
+  exclude:
+    - compiler: gcc
   allow_failures:
     env: ALLOW_SOFT_FAILURE_HERE=true
 
