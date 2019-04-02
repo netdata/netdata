@@ -16,7 +16,7 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
 CLEANFILES= \
-	$(srcdir)/netdata-v*.*.*.tar.gz
+	$(srcdir)/$(distdir).tar.gz
 
 EXTRA_DIST = \
 	.gitignore \
