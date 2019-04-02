@@ -1,3 +1,4 @@
+os: linux
 dist: trusty
 sudo: true
 language: c
@@ -11,7 +12,7 @@ matrix:
 
 # Install dependencies for all, once
 #
-before_install:
+install:
 - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
 - source tests/installer/slack.sh
 
@@ -142,7 +143,6 @@ jobs:
     install:
     - sudo apt install -y --only-upgrade docker-ce
     - docker info
-    - source tests/installer/slack.sh
 
   - name: Build & Publish docker images
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images ${TRAVIS_TAG}"
