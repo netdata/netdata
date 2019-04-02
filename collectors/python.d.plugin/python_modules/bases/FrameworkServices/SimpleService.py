@@ -31,17 +31,25 @@ class RuntimeCounters:
 
         self.start_mono = 0
         self.start_real = 0
+        self.last_update = 0
+        self.next = 0
+        self.elapsed = 0
         self.retries = 0
         self.penalty = 0
-        self.elapsed = 0
-        self.prev_update = 0
-
-        self.runs = 1
+        self.runs = 0
 
     def calc_next(self):
-        freq = 1 if self.start_mono == 0 else self.update_every
         self.start_mono = monotonic()
-        return self.start_mono - (self.start_mono % freq) + freq + self.penalty
+        if self.runs == 0:
+            self.next = self.start_mono - (self.start_mono % 1) + 1
+            return self.next
+
+        while True:
+            self.next = self.next + self.update_every + self.penalty
+            if self.start_mono > self.next:
+                continue
+            break
+        return self.next
 
     def sleep_until_next(self):
         next_time = self.calc_next()
@@ -184,8 +192,11 @@ class SimpleService(PythonDLimitedLogger, object):
             job.sleep_until_next()
 
             since = 0
-            if job.prev_update:
-                since = int((job.start_real - job.prev_update) * 1e6)
+            if job.runs > 0:
+                since = int((job.start_real - job.last_update) * 1e6)
+
+            job.last_update = job.start_real
+            job.runs += 1
 
             try:
                 updated = self.update(interval=since)
@@ -193,13 +204,10 @@ class SimpleService(PythonDLimitedLogger, object):
                 self.error('update() unhandled exception: {error}'.format(error=error))
                 updated = False
 
-            job.runs += 1
-
             if not updated:
                 job.handle_retries()
             else:
                 job.elapsed = int((monotonic() - job.start_mono) * 1e3)
-                job.prev_update = job.start_real
                 job.retries, job.penalty = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=since,
