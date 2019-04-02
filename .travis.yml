@@ -28,6 +28,10 @@ jobs:
   - name: check checksums for kickstart files
     script: ./tests/installer/checksums.sh
     env: LOCAL_ONLY="true"
+  - name: Kickstart: Script execution integrity
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
+  - name: Kickstart-static64: Script execution integrity
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it --install /tmp
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
@@ -86,8 +90,12 @@ jobs:
     after_deploy: rm -f .travis/gcs-credentials.json
 
   - stage: Integrity testing
-    name: Kickstart files integrity testing
+    name: Kickstart: Files integrity testing
     script: ./tests/installer/checksums.sh
+  - name: Kickstart: Execution integrity
+    script:
+    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
+    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it --install /tmp
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
