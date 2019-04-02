@@ -28,10 +28,12 @@ jobs:
   - name: check checksums for kickstart files
     script: ./tests/installer/checksums.sh
     env: LOCAL_ONLY="true"
-  - name: Kickstart: Script execution integrity
+  - name: Kickstart Script execution integrity
     script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
-  - name: Kickstart-static64: Script execution integrity
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it --install /tmp
+  - name: Kickstart-static64 Script execution integrity
+    before_script: rm -rf /tmp/kickstart-static64-temp && mkdir -p /tmp/kickstart-static64-temp
+    script: docker run -it -v "${PWD}:/code:rw" -v "/tmp/kickstart-static64-temp:/opt" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it
+    after_script: rm -rf /tmp/kickstart-static64-temp
   - name: coverity
     install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
@@ -90,12 +92,14 @@ jobs:
     after_deploy: rm -f .travis/gcs-credentials.json
 
   - stage: Integrity testing
-    name: Kickstart: Files integrity testing
+    name: Kickstart Files integrity testing
     script: ./tests/installer/checksums.sh
-  - name: Kickstart: Execution integrity
+  - name: Kickstart Execution integrity
+    before_script: rm -rf /tmp/kickstart-static64-temp && mkdir -p /tmp/kickstart-static64-temp
     script:
     - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it --install /tmp
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/kickstart-static64-temp:/opt" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it
+    after_script: rm -rf /tmp/kickstart-static64-temp
 
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
