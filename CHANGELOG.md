@@ -4,15 +4,25 @@
 
 **Fixed bugs:**
 
+- Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
+- smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
+- Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
 
 **Closed issues:**
 
+- Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
 
 **Merged pull requests:**
 
+- netdata/packaging/ci: fix travis syntax [\#5780](https://github.com/netdata/netdata/pull/5780) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/ci: Add kickstart execution integrity tests [\#5778](https://github.com/netdata/netdata/pull/5778) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata: Add another global owner [\#5777](https://github.com/netdata/netdata/pull/5777) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/kickstart: fix kickstart [\#5771](https://github.com/netdata/netdata/pull/5771) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix smstools3 error handling [\#5770](https://github.com/netdata/netdata/pull/5770) ([cakrit](https://github.com/cakrit))
+- netdata/packaging: Remove .tar.gz on distclean [\#5763](https://github.com/netdata/netdata/pull/5763) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: fix sha256sum failure on freeBSD [\#5760](https://github.com/netdata/netdata/pull/5760) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - postgres module: connect via uri [\#5758](https://github.com/netdata/netdata/pull/5758) ([ilyam8](https://github.com/ilyam8))
 - libapache2-mod-proxy-html was a transitional package for apache2-bin [\#5753](https://github.com/netdata/netdata/pull/5753) ([piiiggg](https://github.com/piiiggg))
