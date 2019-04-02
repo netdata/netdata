@@ -1740,7 +1740,7 @@ send_syslog() {
 # SMS sender
 
 send_sms() {
-	local recipients="${1}" exitcode sent=0
+	local recipients="${1}" errcode errmessage sent=0
 
     # Human readable SMS
     local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
