@@ -4,6 +4,13 @@ The [SMS Server Tools 3](http://smstools3.kekekasvi.com/) is a SMS Gateway softw
 
 To have netdata send notifications via SMS Server Tools 3, you'll first need to [install](http://smstools3.kekekasvi.com/index.php?p=compiling) and [configure](http://smstools3.kekekasvi.com/index.php?p=configure) smsd.
 
+Ensure that the user `netdata` can execute `sendsms`. Any user executing `sendsms` needs to:
+
+* Have write permissions to `/tmp` and `/var/spool/sms/outgoing`
+* Be a member of group `smsd`
+
+To ensure that the steps above are successful, just `su netdata` and execute `sendsms phone message`.
+
 You then just need to configure the recipient phone numbers in `health_alarm_notify.conf`:
 
 ```sh

@@ -1740,7 +1740,7 @@ send_syslog() {
 # SMS sender
 
 send_sms() {
-	local recipients="${1}" exitcode sent=0
+	local recipients="${1}" errcode errmessage sent=0
 
     # Human readable SMS
     local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
@@ -1751,12 +1751,13 @@ send_sms() {
 	if [ "${SEND_SMS}" = "YES" ] && [ -n "${sendsms}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
 		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
 		for phone in ${recipients}; do
-			exitcode=$($sendsms $phone "$msg")
-			if [ ${exitcode} -eq 0 ]; then
+			errmessage=$($sendsms $phone "$msg" 2>&1)
+			errcode=$?
+			if [ ${errcode} -eq 0 ]; then
 				info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${exitcode}."
+				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${errcode}: ${errmessage}."
 			fi
 		done
 
