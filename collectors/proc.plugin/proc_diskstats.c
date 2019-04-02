@@ -11,6 +11,7 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_VIRTUAL   3
 
+#define DEFAULT_PREFERRED_IDS "*"
 #define DEFAULT_EXCLUDED_DISKS "loop* ram*"
 
 static struct disk {
@@ -164,6 +165,7 @@ static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         globals_initialized = 0,
         global_cleanup_removed_disks = 1;
 
+static SIMPLE_PATTERN *preferred_ids = NULL;
 static SIMPLE_PATTERN *excluded_disks = NULL;
 
 static unsigned long long int bcache_read_number_with_units(const char *filename) {
@@ -394,8 +396,12 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
             //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
             snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
+
             found = 1;
-            break;
+
+            if(simple_pattern_matches(preferred_ids, result)) {
+                break;
+            }
         }
     }
     closedir(dir);
@@ -523,7 +529,7 @@ static void get_disk_config(struct disk *d) {
     }
 }
 
-static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
+static struct disk * get_disk(unsigned long major, unsigned long minor, char *disk) {
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
@@ -834,6 +840,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         path_to_veritas_volume_groups = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/vx/dsk", buffer);
 
         name_disks_by_id = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
+
+        preferred_ids = simple_pattern_create(
+                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
+        );
 
         excluded_disks = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
