@@ -126,7 +126,14 @@ jobs:
 
 
 
-#  - stage: Publish release
+  - stage: Publish release
+  - name: Build & Publish docker images
+    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images ${TRAVIS_TAG}"
+    script:
+    - packaging/docker/build.sh
+    - packaging/docker/publish.sh
+    env: ALLOW_SOFT_FAILURE_HERE=true
+
 
 
 

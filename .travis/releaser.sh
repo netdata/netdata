@@ -63,10 +63,6 @@ if [[ $(git describe) =~ -rc* ]]; then
 	exit 0
 fi
 
-echo "---- CREATING TAGGED DOCKER CONTAINERS ----"
-./packaging/docker/build.sh
-./packaging/docker/publish.sh
-
 echo "---- CREATING RELEASE ARTIFACTS -----"
 # Artifacts are stored in `artifacts/` directory
 ./.travis/create_artifacts.sh
