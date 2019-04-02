@@ -1,7 +1,7 @@
 ---
 name: Feature request
 about: Suggest an idea for our project
-
+labels: "feature request", "needs triage"
 ---
 
 <!---
