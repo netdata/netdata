@@ -7,6 +7,7 @@
 - Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
+- Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
 - Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
 
 **Closed issues:**
@@ -26,6 +27,7 @@
 - netdata/packaging: Remove .tar.gz on distclean [\#5763](https://github.com/netdata/netdata/pull/5763) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: fix sha256sum failure on freeBSD [\#5760](https://github.com/netdata/netdata/pull/5760) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - postgres module: connect via uri [\#5758](https://github.com/netdata/netdata/pull/5758) ([ilyam8](https://github.com/ilyam8))
+- Fix unix socket access on FreeBSD [\#5756](https://github.com/netdata/netdata/pull/5756) ([vlvkobal](https://github.com/vlvkobal))
 - libapache2-mod-proxy-html was a transitional package for apache2-bin [\#5753](https://github.com/netdata/netdata/pull/5753) ([piiiggg](https://github.com/piiiggg))
 - Fix the Polyverse reinstall that caused APK broken state [\#5751](https://github.com/netdata/netdata/pull/5751) ([archisgore](https://github.com/archisgore))
 - fix go.d.plugin config.tar.gz checksum [\#5750](https://github.com/netdata/netdata/pull/5750) ([ilyam8](https://github.com/ilyam8))
