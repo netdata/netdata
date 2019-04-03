@@ -203,7 +203,6 @@ class Chart:
     def del_dimension(self, dimension_id):
         if dimension_id not in self:
             return
-
         idx = self.dimensions.index(dimension_id)
         dimension = self.dimensions[idx]
         dimension.params['hidden'] = 'hidden'
@@ -212,11 +211,12 @@ class Chart:
         self.dimensions.remove(dimension)
 
     def hide_dimension(self, dimension_id, reverse=False):
-        if dimension_id in self:
-            idx = self.dimensions.index(dimension_id)
-            dimension = self.dimensions[idx]
-            dimension.params['hidden'] = 'hidden' if not reverse else str()
-            self.refresh()
+        if dimension_id not in self:
+            return
+        idx = self.dimensions.index(dimension_id)
+        dimension = self.dimensions[idx]
+        dimension.params['hidden'] = 'hidden' if not reverse else str()
+        self.refresh()
 
     def create(self):
         """
