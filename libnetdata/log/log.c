@@ -19,11 +19,300 @@ const char *stdaccess_filename = NULL;
 const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 
-void syslog_init(void) {
+// ----------------------------------------------------------------------------
+// Log facility(https://tools.ietf.org/html/rfc5424)
+//
+// The facilities accepted in the Netdata are in according with the following
+// header files for their respective operate system:
+// 	sys/syslog.h (Linux )
+// 	sys/sys/syslog.h (FreeBSD)
+// 	bsd/sys/syslog.h (darwin-xnu)
+
+int log_facility_id(char *facility_name)
+{
+	if ( !(strcmp(facility_name,"auth") ) )
+	{
+		return LOG_AUTH;
+	}
+	else if  ( !(strcmp(facility_name,"authpriv") ) )
+	{
+		return LOG_AUTHPRIV;
+	}
+#ifdef __FreeBSD__
+	else if ( !(strcmp(facility_name,"console") ) )
+	{
+		return LOG_CONSOLE;
+	}
+#endif
+	else if ( !(strcmp(facility_name,"cron") ) )
+	{
+		return LOG_CRON;
+	}
+	else if ( !(strcmp(facility_name,"daemon") ) )
+	{
+		return LOG_DAEMON;
+	}
+	else if ( !(strcmp(facility_name,"ftp") ) )
+	{
+		return LOG_FTP;
+	}
+#ifdef __APPLE__
+	else if ( !(strcmp(facility_name,"install") ) )
+	{
+		return LOG_INSTALL;
+	}
+#endif
+	else if ( !(strcmp(facility_name,"kern") ) )
+	{
+		return LOG_KERN;
+	}
+	else if ( !(strcmp(facility_name,"lpr") ) )
+	{
+		return LOG_LPR;
+	}
+	else if ( !(strcmp(facility_name,"mail") ) )
+	{
+		return LOG_MAIL;
+	}
+	/*
+	else if ( !(strcmp(facility_name,"mark") ) )
+	{
+		//this is internal for all OS
+		return INTERNAL_MARK;
+	}
+	*/
+#ifdef __APPLE__
+	else if ( !(strcmp(facility_name,"netinfo") ) )
+	{
+		return LOG_NETINFO;
+	}
+	else if ( !(strcmp(facility_name,"ras") ) )
+	{
+		return LOG_RAS;
+	}
+	else if ( !(strcmp(facility_name,"remoteauth") ) )
+	{
+		return LOG_REMOTEAUTH;
+	}
+#endif
+	else if ( !(strcmp(facility_name,"news") ) )
+	{
+		return LOG_NEWS;
+	}
+#ifdef __FreeBSD__
+	else if ( !(strcmp(facility_name,"ntp") ) )
+	{
+		return LOG_NTP;
+	}
+#endif
+	else if ( !(strcmp(facility_name,"security") ) )
+	{
+		//FreeBSD is the unique that does not consider
+		//this facility deprecated. We are keeping
+		//it for other OS while they are kept in their headers.
+#ifdef __FreeBSD__
+		return LOG_SECURITY;
+#else
+		return LOG_AUTH;
+#endif
+	}
+	else if ( !(strcmp(facility_name,"syslog") ) )
+	{
+		return LOG_SYSLOG;
+	}
+	else if ( !(strcmp(facility_name,"user") ) )
+	{
+		return LOG_USER;
+	}
+	else if ( !(strcmp(facility_name,"uucp") ) )
+	{
+		return LOG_UUCP;
+	}
+	else if ( !(strcmp(facility_name,"local0") ) )
+	{
+		return LOG_LOCAL0;
+	}
+	else if ( !(strcmp(facility_name,"local1") ) )
+	{
+		return LOG_LOCAL1;
+	}
+	else if ( !(strcmp(facility_name,"local2") ) )
+	{
+		return LOG_LOCAL2;
+	}
+	else if ( !(strcmp(facility_name,"local3") ) )
+	{
+		return LOG_LOCAL3;
+	}
+	else if ( !(strcmp(facility_name,"local4") ) )
+	{
+		return LOG_LOCAL4;
+	}
+	else if ( !(strcmp(facility_name,"local5") ) )
+	{
+		return LOG_LOCAL5;
+	}
+	else if ( !(strcmp(facility_name,"local6") ) )
+	{
+		return LOG_LOCAL6;
+	}
+	else if ( !(strcmp(facility_name,"local7") ) )
+	{
+		return LOG_LOCAL7;
+	}
+#ifdef __APPLE__
+	else if ( !(strcmp(facility_name,"launchd") ) )
+	{
+		return LOG_LAUNCHD;
+	}
+#endif
+
+	return LOG_DAEMON;
+}
+
+//we do not need to use this now, but I already created this function to be
+//used case necessary.
+char *log_facility_name(int code)
+{
+	char *defvalue = { "daemon" };
+	switch(code)
+	{
+		case LOG_AUTH:
+			{
+				return "auth";
+			}
+		case LOG_AUTHPRIV:
+			{
+				return "authpriv";
+			}
+#ifdef __FreeBSD__
+		case LOG_CONSOLE:
+			{
+				return "console";
+			}
+#endif
+		case LOG_CRON:
+			{
+				return "cron";
+			}
+		case LOG_DAEMON:
+			{
+				return defvalue;
+			}
+		case LOG_FTP:
+			{
+				return "ftp";
+			}
+#ifdef __APPLE__
+		case LOG_INSTALL:
+			{
+				return "install";
+			}
+#endif
+		case LOG_KERN:
+			{
+				return "kern";
+			}
+		case LOG_LPR:
+			{
+				return "lpr";
+			}
+		case LOG_MAIL:
+			{
+				return "mail";
+			}
+#ifdef __APPLE__
+		case LOG_NETINFO:
+			{
+				return "netinfo" ;
+			}
+		case LOG_RAS:
+			{
+				return "ras";
+			}
+		case LOG_REMOTEAUTH:
+			{
+				return "remoteauth";
+			}
+#endif
+		case LOG_NEWS:
+			{
+				return "news";
+			}
+#ifdef __FreeBSD__
+		case LOG_NTP:
+			{
+				return "ntp" ;
+			}
+		case LOG_SECURITY:
+			{
+				return "security";
+			}
+#endif
+		case LOG_SYSLOG:
+			{
+				return "syslog";
+			}
+		case LOG_USER:
+			{
+				return "user";
+			}
+		case LOG_UUCP:
+			{
+				return "uucp";
+			}
+		case LOG_LOCAL0:
+			{
+				return "local0";
+			}
+		case LOG_LOCAL1:
+			{
+				return "local1";
+			}
+		case LOG_LOCAL2:
+			{
+				return "local2";
+			}
+		case LOG_LOCAL3:
+			{
+				return "local3";
+			}
+		case LOG_LOCAL4:
+			{
+				return "local4" ;
+			}
+		case LOG_LOCAL5:
+			{
+				return "local5";
+			}
+		case LOG_LOCAL6:
+			{
+				return "local6";
+			}
+		case LOG_LOCAL7:
+			{
+				return "local7" ;
+			}
+#ifdef __APPLE__
+		case LOG_LAUNCHD:
+			{
+				return "launchd";
+			}
+#endif
+	}
+
+	return defvalue;
+}	
+
+// ----------------------------------------------------------------------------
+
+//void syslog_init(void) {
+void syslog_init(int facility) {
     static int i = 0;
 
     if(!i) {
-        openlog(program_name, LOG_PID, LOG_DAEMON);
+        //openlog(program_name, LOG_PID, LOG_DAEMON);
+        openlog(program_name, LOG_PID, facility);
         i = 1;
     }
 }
@@ -70,7 +359,11 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
     if(!strcmp(filename, "syslog")) {
         filename = "/dev/null";
         devnull = 1;
-        syslog_init();
+
+	char deffacility[8];
+    	snprintfz(deffacility,8,"%s","daemon");
+        syslog_init(log_facility_id(config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility)));
+        //syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
     else if(enabled_syslog) *enabled_syslog = 0;
