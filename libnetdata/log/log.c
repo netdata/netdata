@@ -18,6 +18,7 @@ FILE *stdaccess = NULL;
 const char *stdaccess_filename = NULL;
 const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
+const char *facility_log = NULL;
 
 // ----------------------------------------------------------------------------
 // Log facility(https://tools.ietf.org/html/rfc5424)
@@ -28,84 +29,209 @@ const char *stdout_filename = NULL;
 // 	sys/sys/syslog.h (FreeBSD)
 // 	bsd/sys/syslog.h (darwin-xnu)
 
+#define LOG_AUTH_KEY "auth"
+#define LOG_AUTHPRIV_KEY "authpriv"
+#ifdef __FreeBSD__
+# define LOG_CONSOLE_KEY "console"
+#endif
+#define LOG_CRON_KEY "cron"
+#define LOG_DAEMON_KEY "daemon"
+#define LOG_FTP_KEY "ftp"
+#ifdef __APPLE__
+# define LOG_INSTALL_KEY "install"
+#endif
+#define LOG_KERN_KEY "kern"
+#define LOG_LPR_KEY "lpr"
+#define LOG_MAIL_KEY "mail"
+//#define LOG_INTERNAL_MARK_KEY "mark"
+#ifdef __APPLE__
+# define LOG_NETINFO_KEY "netinfo"
+# define LOG_RAS_KEY "ras"
+# define LOG_REMOTEAUTH_KEY "remoteauth"
+#endif
+#define LOG_NEWS_KEY "news"
+#ifdef __FreeBSD__
+# define LOG_NTP_KEY "ntp"
+#endif
+#define LOG_SECURITY_KEY "security"
+#define LOG_SYSLOG_KEY "syslog"
+#define LOG_USER_KEY "user"
+#define LOG_UUCP_KEY "uucp"
+#ifdef __APPLE__
+# define LOG_LAUNCHD_KEY "launchd"
+#endif
+#define LOG_LOCAL0_KEY "local0"
+#define LOG_LOCAL1_KEY "local1"
+#define LOG_LOCAL2_KEY "local2"
+#define LOG_LOCAL3_KEY "local3"
+#define LOG_LOCAL4_KEY "local4"
+#define LOG_LOCAL5_KEY "local5"
+#define LOG_LOCAL6_KEY "local6"
+#define LOG_LOCAL7_KEY "local7"
+
 static int log_facility_id(char *facility_name)
 {
-	if ( !(strcmp(facility_name,"auth") ) )
+	static int 
+		hash_auth = 0,
+		hash_authpriv = 0,
+#ifdef __FreeBSD__
+		hash_console = 0,
+#endif
+		hash_cron = 0,
+		hash_daemon = 0,
+		hash_ftp = 0,
+#ifdef __APPLE__
+		hash_install = 0,
+#endif
+		hash_kern = 0,
+		hash_lpr = 0,
+		hash_mail = 0,
+//		hash_mark = 0,
+#ifdef __APPLE__
+		hash_netinfo = 0,
+		hash_ras = 0,
+		hash_remoteauth = 0,
+#endif
+		hash_news = 0,
+#ifdef __FreeBSD__
+		hash_ntp = 0,
+#endif
+		hash_security = 0,
+		hash_syslog = 0,
+		hash_user = 0,
+		hash_uucp = 0,
+#ifdef __APPLE__
+		hash_launchd = 0,
+#endif
+		hash_local0 = 0,
+		hash_local1 = 0,
+		hash_local2 = 0,
+		hash_local3 = 0,
+		hash_local4 = 0,
+		hash_local5 = 0,
+		hash_local6 = 0,
+		hash_local7 = 0;
+
+	if(unlikely(!hash_auth))
+	{
+		hash_auth = simple_hash(LOG_AUTH_KEY);
+		hash_authpriv = simple_hash(LOG_AUTHPRIV_KEY);
+#ifdef __FreeBSD__
+		hash_console = simple_hash(LOG_CONSOLE_KEY);
+#endif
+		hash_cron = simple_hash(LOG_CRON_KEY);
+		hash_daemon = simple_hash(LOG_DAEMON_KEY);
+		hash_ftp = simple_hash(LOG_FTP_KEY);
+#ifdef __APPLE__
+		hash_install = simple_hash(LOG_INSTALL_KEY);
+#endif
+		hash_kern = simple_hash(LOG_KERN_KEY);
+		hash_lpr = simple_hash(LOG_LPR_KEY);
+		hash_mail = simple_hash(LOG_MAIL_KEY);
+//		hash_mark = simple_uhash();
+#ifdef __APPLE__
+		hash_netinfo = simple_hash(LOG_NETINFO_KEY);
+		hash_ras = simple_hash(LOG_RAS_KEY);
+		hash_remoteauth = simple_hash(LOG_REMOTEAUTH_KEY);
+#endif
+		hash_news = simple_hash(LOG_NEWS_KEY);
+#ifdef __FreeBSD__
+		hash_ntp = simple_hash(LOG_NTP_KEY);
+#endif
+		hash_security = simple_hash(LOG_SECURITY_KEY);
+		hash_syslog = simple_hash(LOG_SYSLOG_KEY);
+		hash_user = simple_hash(LOG_USER_KEY);
+		hash_uucp = simple_hash(LOG_UUCP_KEY);
+#ifdef __APPLE__
+		hash_launchd = simple_hash(LOG_LAUNCHD_KEY);
+#endif
+		hash_local0 = simple_hash(LOG_LOCAL0_KEY);
+		hash_local1 = simple_hash(LOG_LOCAL1_KEY);
+		hash_local2 = simple_hash(LOG_LOCAL2_KEY);
+		hash_local3 = simple_hash(LOG_LOCAL3_KEY);
+		hash_local4 = simple_hash(LOG_LOCAL4_KEY);
+		hash_local5 = simple_hash(LOG_LOCAL5_KEY);
+		hash_local6 = simple_hash(LOG_LOCAL6_KEY);
+		hash_local7 = simple_hash(LOG_LOCAL7_KEY);
+	}
+
+	int hash = simple_hash(facility_name);
+	if ( hash == hash_auth )
 	{
 		return LOG_AUTH;
 	}
-	else if  ( !(strcmp(facility_name,"authpriv") ) )
+	else if  ( hash == hash_authpriv )
 	{
 		return LOG_AUTHPRIV;
 	}
 #ifdef __FreeBSD__
-	else if ( !(strcmp(facility_name,"console") ) )
+	else if ( hash == hash_console )
 	{
 		return LOG_CONSOLE;
 	}
 #endif
-	else if ( !(strcmp(facility_name,"cron") ) )
+	else if ( hash == hash_cron )
 	{
 		return LOG_CRON;
 	}
-	else if ( !(strcmp(facility_name,"daemon") ) )
+	else if ( hash == hash_daemon )
 	{
 		return LOG_DAEMON;
 	}
-	else if ( !(strcmp(facility_name,"ftp") ) )
+	else if ( hash == hash_ftp )
 	{
 		return LOG_FTP;
 	}
 #ifdef __APPLE__
-	else if ( !(strcmp(facility_name,"install") ) )
+	else if ( hash == hash_install )
 	{
 		return LOG_INSTALL;
 	}
 #endif
-	else if ( !(strcmp(facility_name,"kern") ) )
+	else if ( hash == hash_kern )
 	{
 		return LOG_KERN;
 	}
-	else if ( !(strcmp(facility_name,"lpr") ) )
+	else if ( hash == hash_lpr )
 	{
 		return LOG_LPR;
 	}
-	else if ( !(strcmp(facility_name,"mail") ) )
+	else if ( hash == hash_mail )
 	{
 		return LOG_MAIL;
 	}
 	/*
-	else if ( !(strcmp(facility_name,"mark") ) )
+	else if ( hash == hash_mark )
 	{
 		//this is internal for all OS
 		return INTERNAL_MARK;
 	}
 	*/
 #ifdef __APPLE__
-	else if ( !(strcmp(facility_name,"netinfo") ) )
+	else if ( hash == hash_netinfo )
 	{
 		return LOG_NETINFO;
 	}
-	else if ( !(strcmp(facility_name,"ras") ) )
+	else if ( hash == hash_ras )
 	{
 		return LOG_RAS;
 	}
-	else if ( !(strcmp(facility_name,"remoteauth") ) )
+	else if ( hash == hash_remoteauth )
 	{
 		return LOG_REMOTEAUTH;
 	}
 #endif
-	else if ( !(strcmp(facility_name,"news") ) )
+	else if ( hash == hash_news )
 	{
 		return LOG_NEWS;
 	}
 #ifdef __FreeBSD__
-	else if ( !(strcmp(facility_name,"ntp") ) )
+	else if ( hash == hash_ntp )
 	{
 		return LOG_NTP;
 	}
 #endif
-	else if ( !(strcmp(facility_name,"security") ) )
+	else if ( hash == hash_security )
 	{
 		//FreeBSD is the unique that does not consider
 		//this facility deprecated. We are keeping
@@ -116,52 +242,52 @@ static int log_facility_id(char *facility_name)
 		return LOG_AUTH;
 #endif
 	}
-	else if ( !(strcmp(facility_name,"syslog") ) )
+	else if ( hash == hash_syslog )
 	{
 		return LOG_SYSLOG;
 	}
-	else if ( !(strcmp(facility_name,"user") ) )
+	else if ( hash == hash_user )
 	{
 		return LOG_USER;
 	}
-	else if ( !(strcmp(facility_name,"uucp") ) )
+	else if ( hash == hash_uucp )
 	{
 		return LOG_UUCP;
 	}
-	else if ( !(strcmp(facility_name,"local0") ) )
+	else if ( hash == hash_local0 )
 	{
 		return LOG_LOCAL0;
 	}
-	else if ( !(strcmp(facility_name,"local1") ) )
+	else if ( hash == hash_local1 )
 	{
 		return LOG_LOCAL1;
 	}
-	else if ( !(strcmp(facility_name,"local2") ) )
+	else if ( hash == hash_local2 )
 	{
 		return LOG_LOCAL2;
 	}
-	else if ( !(strcmp(facility_name,"local3") ) )
+	else if ( hash == hash_local3 )
 	{
 		return LOG_LOCAL3;
 	}
-	else if ( !(strcmp(facility_name,"local4") ) )
+	else if ( hash == hash_local4 )
 	{
 		return LOG_LOCAL4;
 	}
-	else if ( !(strcmp(facility_name,"local5") ) )
+	else if ( hash == hash_local5 )
 	{
 		return LOG_LOCAL5;
 	}
-	else if ( !(strcmp(facility_name,"local6") ) )
+	else if ( hash == hash_local6 )
 	{
 		return LOG_LOCAL6;
 	}
-	else if ( !(strcmp(facility_name,"local7") ) )
+	else if ( hash == hash_local7 )
 	{
 		return LOG_LOCAL7;
 	}
 #ifdef __APPLE__
-	else if ( !(strcmp(facility_name,"launchd") ) )
+	else if ( hash == hash_launchd )
 	{
 		return LOG_LAUNCHD;
 	}
@@ -172,6 +298,7 @@ static int log_facility_id(char *facility_name)
 
 //we do not need to use this now, but I already created this function to be
 //used case necessary.
+/*
 char *log_facility_name(int code)
 {
 	char *defvalue = { "daemon" };
@@ -303,6 +430,7 @@ char *log_facility_name(int code)
 
 	return defvalue;
 }	
+*/
 
 // ----------------------------------------------------------------------------
 
@@ -360,9 +488,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         filename = "/dev/null";
         devnull = 1;
 
-	char deffacility[8];
-    	snprintfz(deffacility,8,"%s","daemon");
-        syslog_init(log_facility_id(config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility)));
+		syslog_init(log_facility_id(facility_log));
         //syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
