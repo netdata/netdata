@@ -2,7 +2,7 @@
 # BASH Lib: Simple incoming webhook for slack integration.
 # 
 # The script expects the following parameters to be defined by the upper layer:
-# SLACK_INCOMING_WEBHOOK_URL
+# SLACK_NOTIFY_WEBHOOK_URL
 # SLACK_BOT_NAME
 # SLACK_CHANNEL
 #
@@ -16,7 +16,7 @@ post_message() {
 
 	case "$TYPE" in
 		"PLAIN_MESSAGE")
-			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_INCOMING_WEBHOOK_URL}
+			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_NOTIFY_WEBHOOK_URL}
 			;;
 		"TRAVIS_MESSAGE")
 			EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
@@ -48,7 +48,7 @@ post_message() {
 				}]
 			}"
 			echo "Sending ${POST_MESSAGE}"
-			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_INCOMING_WEBHOOK_URL}"
+			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_NOTIFY_WEBHOOK_URL}"
 			;;
 	esac
 }
