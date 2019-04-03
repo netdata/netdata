@@ -73,12 +73,12 @@ jobs:
   - name: Run 'make dist' validation
     before_script: mkdir /tmp/netdata-makedist-test
     script:
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/usr/local/netdata/usr --sysconfdir=/usr/local/netdata/etc --localstatedir=/usr/local/netdata/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make dist
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-v*.*.*.tar.gz
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make distclean && make clean
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make dist
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-v*.*.*.tar.gz
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
     after_script: rm -rf /tmp/netdata-makedist-test
     after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
 
