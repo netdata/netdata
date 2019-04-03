@@ -8,6 +8,7 @@
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
+- netdata/packaging: Fix non compatible function declaration [\#5789](https://github.com/netdata/netdata/pull/5789) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
 
 **Closed issues:**
