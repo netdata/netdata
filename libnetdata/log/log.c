@@ -28,7 +28,7 @@ const char *stdout_filename = NULL;
 // 	sys/sys/syslog.h (FreeBSD)
 // 	bsd/sys/syslog.h (darwin-xnu)
 
-int log_facility_id(char *facility_name)
+static int log_facility_id(char *facility_name)
 {
 	if ( !(strcmp(facility_name,"auth") ) )
 	{
