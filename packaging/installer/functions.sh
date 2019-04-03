@@ -680,7 +680,7 @@ portable_add_user_to_group() {
 }
 
 
-function safe_sha256sum() {
+safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
