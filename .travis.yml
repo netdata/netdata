@@ -36,7 +36,7 @@ stages:
   # Scheduled releases
 - name: Packaging for release
   if: branch = master AND type != pull_request AND type != cron
-- name: Publish release
+- name: Publish for release
   if: branch = master AND type != pull_request AND type != cron
 
 
@@ -71,11 +71,15 @@ jobs:
     env: DEVEL="true"
 
   - name: Run 'make dist' validation
+    before_script: mkdir /tmp/netdata-makedist-test
     script:
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/usr/local/netdata/usr --sysconfdir=/usr/local/netdata/etc --localstatedir=/usr/local/netdata/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" make dist
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/usr/local/netdata/usr --sysconfdir=/usr/local/netdata/etc --localstatedir=/usr/local/netdata/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make dist
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-v*.*.*.tar.gz
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/:rw" -w /code "netdata/os-test:ubuntu1804" make distclean && make clean
+    after_script: rm -rf /tmp/netdata-makedist-test
     after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
 
 
@@ -114,23 +118,36 @@ jobs:
     - sudo apt install -y --only-upgrade docker-ce
     - sudo pip install git-semver
     - docker info
-    before_script: post_message "TRAVIS_MESSAGE" "Starting .travis/releaser.sh"
-    script: ".travis/releaser.sh"
-    after_failure: post_message "TRAVIS_MESSAGE" "@here .travis/releaser.sh failed"
+    before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation and release TAG process"
+    script: .travis/changelog_and_tag_release.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "@here Changelog and tag generation for release failed"
     git:
       depth: false
 
 
 
-  - stage: Publish release
+  - stage: Publish for release
+
   - name: Build & Publish docker images
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images"
     script:
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "@here Docker image publishing failed "
+    after_failure: post_message "TRAVIS_MESSAGE" "@here Docker image publishing failed"
     env: ALLOW_SOFT_FAILURE_HERE=true
 
+  - name: Generate release artifacts
+    script: .travis/create_artifacts.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "@here Release artifacts generation failed"
+    # We dont publish artifacts on release candidates
+    if: tag IS present AND NOT (tag =~ -rc*)
+
+  - name: Create release draft
+    before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
+    script: .travis/draft_release.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "@here Draft release submission failed"
+    # We dont publish a draft release on release candidates
+    if: tag IS present AND NOT (tag =~ -rc*)
 
 
 
