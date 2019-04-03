@@ -20,6 +20,18 @@ error() {
 	echo >&3 "$(date) : ERROR: " "${@}"
 }
 
+function safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
 # this is what we will do if it fails (head-less only)
 fatal() {
 	error "FAILED TO UPDATE NETDATA : ${1}"
@@ -80,7 +92,7 @@ update() {
 	else
 		download "${NETDATA_TARBALL_URL}" "${dir}/netdata-latest.tar.gz"
 		if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
-			failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
+			fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
 		fi
 		NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
 		tar -xf netdata-latest.tar.gz >&3 2>&3
