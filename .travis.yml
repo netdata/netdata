@@ -46,14 +46,15 @@ jobs:
   include:
     # Do code quality, syntax checking and other pre-build activities
   - stage: Code quality, linting, syntax, code style
-
-  - name: Run shellchecking on BASH
+    name: Run shellchecking on BASH
     script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
 
+    # This falls under same stage defined earlier
   - name: Run checksum checks on kickstart files
     script: ./tests/installer/checksums.sh
     env: LOCAL_ONLY="true"
 
+    # This falls under same stage defined earlier
   - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
     script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
 
@@ -61,8 +62,7 @@ jobs:
 
     # Ensure netdata code builds successfully
   - stage: Build process
-
-  - name: Standard netdata build
+    name: Standard netdata build
     script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
 
