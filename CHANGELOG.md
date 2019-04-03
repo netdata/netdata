@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Typo in netdata-updater [\#5781](https://github.com/netdata/netdata/issues/5781)
 - Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
@@ -16,11 +17,14 @@
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
+- support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
 
 **Merged pull requests:**
 
+- netdata/packaging/docker: Change password [\#5790](https://github.com/netdata/netdata/pull/5790) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/updater: fix updater [\#5785](https://github.com/netdata/netdata/pull/5785) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: fix travis syntax [\#5780](https://github.com/netdata/netdata/pull/5780) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add preferred disk id pattern [\#5779](https://github.com/netdata/netdata/pull/5779) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging/ci: Add kickstart execution integrity tests [\#5778](https://github.com/netdata/netdata/pull/5778) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata: Add another global owner [\#5777](https://github.com/netdata/netdata/pull/5777) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/kickstart: fix kickstart [\#5771](https://github.com/netdata/netdata/pull/5771) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
