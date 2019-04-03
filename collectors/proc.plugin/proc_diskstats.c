@@ -418,7 +418,7 @@ failed:
     if(!found)
         result[0] = '\0';
     else if(!preferred)
-        strncpyz(result, first_result, result_size - 1);
+        strncpyz(result, first_result, result_size);
 
     freez(first_result);
 
