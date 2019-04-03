@@ -17,6 +17,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging/updater: fix updater [\#5785](https://github.com/netdata/netdata/pull/5785) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: fix travis syntax [\#5780](https://github.com/netdata/netdata/pull/5780) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: Add kickstart execution integrity tests [\#5778](https://github.com/netdata/netdata/pull/5778) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata: Add another global owner [\#5777](https://github.com/netdata/netdata/pull/5777) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
