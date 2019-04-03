@@ -86,6 +86,7 @@ jobs:
     - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
     - $HOME/netdata/usr/sbin/netdata -W unittest
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+    after_success: post_message "TRAVIS_MESSAGE" "Unit tests succeeded"
 
   - name: Build/install on ubuntu 14.04 (not containerized)
     script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
