@@ -19,7 +19,7 @@ CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{co
                "{chart_type} {priority} {update_every} '{hidden} obsolete'\n"
 
 
-DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden}'\n"
+DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden} {obsolete}'\n"
 DIMENSION_SET = "SET '{id}' = {value}\n"
 
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
@@ -200,12 +200,23 @@ class Chart:
         self.dimensions.append(dim)
         return dim
 
+    def del_dimension(self, dimension_id):
+        if dimension_id not in self:
+            return
+        idx = self.dimensions.index(dimension_id)
+        dimension = self.dimensions[idx]
+        dimension.params['hidden'] = 'hidden'
+        dimension.params['obsolete'] = 'obsolete'
+        self.create()
+        self.dimensions.remove(dimension)
+
     def hide_dimension(self, dimension_id, reverse=False):
-        if dimension_id in self:
-            idx = self.dimensions.index(dimension_id)
-            dimension = self.dimensions[idx]
-            dimension.params['hidden'] = 'hidden' if not reverse else str()
-            self.refresh()
+        if dimension_id not in self:
+            return
+        idx = self.dimensions.index(dimension_id)
+        dimension = self.dimensions[idx]
+        dimension.params['hidden'] = 'hidden' if not reverse else str()
+        self.refresh()
 
     def create(self):
         """
@@ -288,6 +299,7 @@ class Dimension:
         if not isinstance(self.params.get('divisor'), int):
             self.params['divisor'] = 1
         self.params.setdefault('hidden', '')
+        self.params.setdefault('obsolete', '')
 
     def __getattr__(self, item):
         try:
