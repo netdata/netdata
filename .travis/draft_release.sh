@@ -30,6 +30,13 @@ fi
 # Load the tag, if any
 GIT_TAG=$(git describe)
 
+if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
+	echo "Beta mode, i was about to run for release (${GIT_TAG}), but i am emulating, so bye"
+	exit 0
+fi;
+
+
+
 echo "---- CREATING RELEASE DRAFT WITH ASSETS -----"
 # Download hub
 HUB_VERSION=${HUB_VERSION:-"2.5.1"}
