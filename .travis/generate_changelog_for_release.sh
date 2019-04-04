@@ -18,6 +18,11 @@ else
 	OPTS="--future-release ${GIT_TAG}"
 fi
 
+
+echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do"
+exit 0
+
+
 echo "--- Creating changelog ---"
 git checkout master
 git pull

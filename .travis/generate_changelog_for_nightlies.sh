@@ -33,6 +33,10 @@ else
 fi
 
 echo "We got $COMMITS_SINCE_RELEASE changes since $LAST_TAG, re-generating changelog"
+
+echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do here"
+exit 0
+
 git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
 git checkout master

@@ -37,10 +37,10 @@ if [ -z "${GIT_TAG}" ]; then
 	exit 0
 fi
 
-if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
-	echo "Beta mode -- nothing to do on the changelog generator and tagging script for (${GIT_TAG}), bye"
+#if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
+	echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing to do on the changelog generator and tagging script for (${GIT_TAG}), bye"
 	exit 0
-fi
+#fi
 
 echo "--- Initialize git configuration ---"
 export GIT_MAIL="bot@netdata.cloud"
