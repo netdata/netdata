@@ -345,6 +345,9 @@ class Service(SimpleService):
         self.poller = NvidiaSMIPoller(poll)
 
     def get_data(self):
+        if not self.poller.is_started():
+            self.poller.start()
+
         if not self.poller.is_alive():
             self.debug('poller is off')
             return None
@@ -390,7 +393,6 @@ class Service(SimpleService):
             return False
 
         self.create_charts(gpus)
-        self.poller.start()
 
         return True
 
