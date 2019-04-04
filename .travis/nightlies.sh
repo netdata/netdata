@@ -32,10 +32,10 @@ if [ "${COMMITS_SINCE_RELEASE}" == "${PREVIOUS_NIGHTLY_COUNT}" ]; then
 	exit 0
 fi
 
-if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
+#if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
 	echo "Beta mode -- nothing to do on the nightlies script, bye"
 	exit 0
-fi
+#fi
 
 
 echo "--- Running Changelog generation ---"

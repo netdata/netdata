@@ -8,10 +8,10 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
-if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
-	echo "Beta mode, not running anything here"
+#if [ "${TRAVIS_REPO_SLUG}" == "paulkatsoulakis/netdata" ]; then
+	echo "Beta mode on ${TRAVIS_REPO_SLUG}, not running anything here"
 	exit 0
-fi;
+#fi;
 
 # Everything from this directory will be uploaded to GCS
 mkdir -p artifacts
