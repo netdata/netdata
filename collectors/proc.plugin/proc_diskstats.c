@@ -17,6 +17,7 @@
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
     char *device;           // the device of the disk (before being looked up)
+    uint32_t hash;
     unsigned long major;
     unsigned long minor;
     int sector_size;
@@ -543,13 +544,14 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
+    uint32_t hash = simple_hash(disk);
 
     // search for it in our RAM list.
     // this is sequential, but since we just walk through
     // and the number of disks / partitions in a system
     // should not be that many, it should be acceptable
     for(d = disk_root; d ; d = d->next)
-        if(unlikely(d->major == major && d->minor == minor))
+        if(unlikely(d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk)))
             return d;
 
     // not found
@@ -558,6 +560,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     d->disk = get_disk_name(major, minor, disk);
     d->device = strdupz(disk);
+    d->hash = hash;
     d->major = major;
     d->minor = minor;
     d->type = DISK_TYPE_UNKNOWN; // Default type. Changed later if not correct.
