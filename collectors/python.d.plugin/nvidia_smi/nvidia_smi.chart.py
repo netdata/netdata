@@ -26,10 +26,11 @@ FAN_SPEED = 'fan_speed'
 GPU_UTIL = 'gpu_utilization'
 MEM_UTIL = 'mem_utilization'
 ENCODER_UTIL = 'encoder_utilization'
-MEM_ALLOCATED = 'mem_allocated'
+MEM_USAGE = 'mem_usage'
 TEMPERATURE = 'temperature'
 CLOCKS = 'clocks'
 POWER = 'power'
+PROCESSES_MEM = 'processes_mem'
 
 ORDER = [
     PCI_BANDWIDTH,
@@ -37,10 +38,11 @@ ORDER = [
     GPU_UTIL,
     MEM_UTIL,
     ENCODER_UTIL,
-    MEM_ALLOCATED,
+    MEM_USAGE,
     TEMPERATURE,
     CLOCKS,
     POWER,
+    PROCESSES_MEM,
 ]
 
 
@@ -80,10 +82,11 @@ def gpu_charts(gpu):
                 ['decoder_util', 'decoder'],
             ]
         },
-        MEM_ALLOCATED: {
-            'options': [None, 'Memory Allocated', 'MiB', fam, 'nvidia_smi.memory_allocated', 'line'],
+        MEM_USAGE: {
+            'options': [None, 'Memory Usage', 'MiB', fam, 'nvidia_smi.memory_allocated', 'stacked'],
             'lines': [
-                ['fb_memory_usage', 'used'],
+                ['fb_memory_free', 'free'],
+                ['fb_memory_used', 'used'],
             ]
         },
         TEMPERATURE: {
@@ -106,6 +109,10 @@ def gpu_charts(gpu):
             'lines': [
                 ['power_draw', 'power', 1, 100],
             ]
+        },
+        PROCESSES_MEM: {
+            'options': [None, 'Memory Used by Each Process', 'MiB', fam, 'nvidia_smi.processes_mem', 'stacked'],
+            'lines': []
         },
     }
 
@@ -260,8 +267,12 @@ class GPU:
         return self.root.find('utilization').find('decoder_util').text.split()[0]
 
     @handle_attr_error
-    def fb_memory_usage(self):
+    def fb_memory_used(self):
         return self.root.find('fb_memory_usage').find('used').text.split()[0]
+
+    @handle_attr_error
+    def fb_memory_free(self):
+        return self.root.find('fb_memory_usage').find('free').text.split()[0]
 
     @handle_attr_error
     def temperature(self):
@@ -288,6 +299,18 @@ class GPU:
     def power_draw(self):
         return float(self.root.find('power_readings').find('power_draw').text.split()[0]) * 100
 
+    @handle_attr_error
+    def processes(self):
+        p_nodes = self.root.find('processes').findall('process_info')
+        ps = []
+        for p in p_nodes:
+            ps.append({
+                'pid': p.find('pid').text,
+                'process_name': p.find('process_name').text,
+                'used_memory': int(p.find('used_memory').text.split()[0]),
+            })
+        return ps
+
     def data(self):
         data = {
             'rx_util': self.rx_util(),
@@ -297,7 +320,8 @@ class GPU:
             'memory_util': self.memory_util(),
             'encoder_util': self.encoder_util(),
             'decoder_util': self.decoder_util(),
-            'fb_memory_usage': self.fb_memory_usage(),
+            'fb_memory_used': self.fb_memory_used(),
+            'fb_memory_free': self.fb_memory_free(),
             'gpu_temp': self.temperature(),
             'graphics_clock': self.graphics_clock(),
             'video_clock': self.video_clock(),
@@ -305,6 +329,8 @@ class GPU:
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
         }
+        processes = self.processes() or []
+        data.update({'process_mem_{0}'.format(p['pid']): p['used_memory'] for p in processes})
 
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
@@ -325,6 +351,8 @@ class Service(SimpleService):
             return None
 
         last_data = self.poller.data()
+        if not last_data:
+            return None
 
         parsed = self.parse_xml(last_data)
         if parsed is None:
@@ -332,7 +360,15 @@ class Service(SimpleService):
 
         data = dict()
         for idx, root in enumerate(parsed.findall('gpu')):
-            data.update(GPU(idx, root).data())
+            gpu = GPU(idx, root)
+            data.update(gpu.data())
+            ps = gpu.processes() or []
+            
+            chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
+            for p in ps:
+                dim_name = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
+                if dim_name not in chart:
+                    chart.add_dimension([dim_name, '{0} {1}'.format(p['pid'], p['process_name'])])
 
         return data or None
 
@@ -363,7 +399,7 @@ class Service(SimpleService):
         try:
             return et.fromstring(data)
         except et.ParseError as error:
-            self.error(error)
+            self.error('xml parse failed: "{0}", error: {1}'.format(data, error))
 
         return None
 
