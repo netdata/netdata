@@ -30,19 +30,20 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
+echo "--- Changelog generator and tagger script starting ---"
+# If tagger script hasn't produced a TAG, there is nothing to do so bail out happy
+if [ -z "${GIT_TAG}" ]; then
+	echo "GIT_TAG is empty, nothing to do for now (Value: $GIT_TAG)"
+	exit 0
+fi
+
+echo "--- Initialize git configuration ---"
 export GIT_MAIL="bot@netdata.cloud"
 export GIT_USER="netdatabot"
-echo "--- Initialize git configuration ---"
 git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
 git checkout master
 git pull
-
-echo "---- FIGURING OUT TAGS ----"
-# tagger.sh is sourced since we need environment variables it sets
-#shellcheck source=/dev/null
-source .travis/tagger.sh || exit 0
-# variable GIT_TAG is produced by tagger.sh script
 
 echo "---- UPDATE VERSION FILE ----"
 echo "$GIT_TAG" >packaging/version
