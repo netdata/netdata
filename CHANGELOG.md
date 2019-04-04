@@ -8,6 +8,7 @@
 - Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
+- centos6: python.d.plugin zombie process after netdata restart [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
 - netdata/packaging: Fix non compatible function declaration [\#5789](https://github.com/netdata/netdata/pull/5789) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
@@ -21,6 +22,8 @@
 
 **Merged pull requests:**
 
+- python.d.plugin zombie fix [\#5797](https://github.com/netdata/netdata/pull/5797) ([ilyam8](https://github.com/ilyam8))
+- python.d.plugin: allow delete dimension in runtime [\#5795](https://github.com/netdata/netdata/pull/5795) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/docker: Change password [\#5790](https://github.com/netdata/netdata/pull/5790) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/updater: fix updater [\#5785](https://github.com/netdata/netdata/pull/5785) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: fix travis syntax [\#5780](https://github.com/netdata/netdata/pull/5780) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -206,7 +209,6 @@
 **Fixed bugs:**
 
 - Installer at  https://my-netdata.io/kickstart.sh isnt updated to master branch? [\#5492](https://github.com/netdata/netdata/issues/5492)
-- zombie processes exist after restart netdata [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Verbose curl output causes unwanted emails from netdata-updater cronjob [\#5484](https://github.com/netdata/netdata/issues/5484)
 - Invalid URL [\#5479](https://github.com/netdata/netdata/issues/5479)
 - \[FIX\] RocketChat notifications not working [\#5470](https://github.com/netdata/netdata/issues/5470)
