@@ -486,7 +486,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         filename = "/dev/null";
         devnull = 1;
 
-		syslog_init(log_facility_id(facility_log));
+	syslog_init(log_facility_id(facility_log));
         if(enabled_syslog) *enabled_syslog = 1;
     }
     else if(enabled_syslog) *enabled_syslog = 0;
