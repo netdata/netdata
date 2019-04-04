@@ -336,7 +336,6 @@ class GPU:
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
         )
 
-
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         super(Service, self).__init__(configuration=configuration, name=name)
@@ -363,7 +362,7 @@ class Service(SimpleService):
             gpu = GPU(idx, root)
             data.update(gpu.data())
             ps = gpu.processes() or []
-            
+
             chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
             for p in ps:
                 dim_name = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
