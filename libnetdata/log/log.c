@@ -434,12 +434,10 @@ char *log_facility_name(int code)
 
 // ----------------------------------------------------------------------------
 
-//void syslog_init(void) {
 void syslog_init(int facility) {
     static int i = 0;
 
     if(!i) {
-        //openlog(program_name, LOG_PID, LOG_DAEMON);
         openlog(program_name, LOG_PID, facility);
         i = 1;
     }
@@ -489,7 +487,6 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         devnull = 1;
 
 		syslog_init(log_facility_id(facility_log));
-        //syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
     else if(enabled_syslog) *enabled_syslog = 0;
