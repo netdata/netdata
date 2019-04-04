@@ -205,6 +205,7 @@ class ModuleChecker(multiprocessing.Process):
         task = self.task_queue.get()
 
         if task is END_TASK_MARKER:
+            # TODO: find better solution, understand why heartbeat thread doesn't work
             heartbeat()
             self.task_queue.task_done()
             self.result_queue.put(END_TASK_MARKER)
