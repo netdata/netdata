@@ -200,12 +200,13 @@ class Chart:
         self.dimensions.append(dim)
         return dim
 
-    def del_dimension(self, dimension_id):
+    def del_dimension(self, dimension_id, hide=True):
         if dimension_id not in self:
             return
         idx = self.dimensions.index(dimension_id)
         dimension = self.dimensions[idx]
-        dimension.params['hidden'] = 'hidden'
+        if hide:
+            dimension.params['hidden'] = 'hidden'
         dimension.params['obsolete'] = 'obsolete'
         self.create()
         self.dimensions.remove(dimension)
