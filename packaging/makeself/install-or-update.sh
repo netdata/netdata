@@ -69,27 +69,28 @@ then
 fi
 
 # -----------------------------------------------------------------------------
-progress "Add user netdata to required user groups"
+progress "Attempt to create user/group netdata/netadata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
-if [ "${UID}" -eq 0 ]; then
-        if ! portable_add_group netdata; then
-		run_failed "Failed to add netdata group"
-		NETDATA_GROUP="root"
-        fi
-        if ! portable_add_user netdata "/opt/netdata"; then
-		run_failed "Failed to add netdata user"
-		NETDATA_USER="root"
-        fi
+# Default user/group
+NETDATA_USER="root"
+NETDATA_GROUP="root"
 
-        for g in ${NETDATA_WANTED_GROUPS}; do
-                # shellcheck disable=SC2086
-                portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}" || run_failed "Failed to add netdata user to secondary groups"
-        done
+if portable_add_group netdata; then
+	if portable_add_user netdata "/opt/netdata"; then
+		progress "Add user netdata to required user groups"
+		for g in ${NETDATA_WANTED_GROUPS}; do
+			# shellcheck disable=SC2086
+			portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}" || run_failed "Failed to add netdata user to secondary groups"
+		done
+		NETDATA_USER="netdata"
+		NETDATA_GROUP="netdata"
+	else
+		run_failed "I could not add user netdata, will be using root"
+	fi
 else
-	run_failed "Failed to add netdata user and group"
-        run_failed "The installer does not run as root."
+		run_failed "I could not add group netdata, so no user netdata will be created as well. Netdata run as root:root"
 fi
 
 # -----------------------------------------------------------------------------
