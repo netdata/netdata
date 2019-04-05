@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- Kickstart-static64.sh installation problems [\#5807](https://github.com/netdata/netdata/issues/5807)
+- Netdata Installer : $NETDATA\_USER not defined ? [\#5803](https://github.com/netdata/netdata/issues/5803)
 - Typo in netdata-updater [\#5781](https://github.com/netdata/netdata/issues/5781)
 - Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
@@ -17,15 +19,18 @@
 **Closed issues:**
 
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
+- How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
 - support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
 
 **Merged pull requests:**
 
+- netdata/packaging/installer: Update README [\#5811](https://github.com/netdata/netdata/pull/5811) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python.d.plugin zombie fix [\#5797](https://github.com/netdata/netdata/pull/5797) ([ilyam8](https://github.com/ilyam8))
 - Add memory free and per process memory usage to nvidia\_smi [\#5796](https://github.com/netdata/netdata/pull/5796) ([huww98](https://github.com/huww98))
 - python.d.plugin: allow delete dimension in runtime [\#5795](https://github.com/netdata/netdata/pull/5795) ([ilyam8](https://github.com/ilyam8))
+- Support configurable syslog facilities [\#5792](https://github.com/netdata/netdata/pull/5792) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging/docker: Change password [\#5790](https://github.com/netdata/netdata/pull/5790) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/updater: fix updater [\#5785](https://github.com/netdata/netdata/pull/5785) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: fix travis syntax [\#5780](https://github.com/netdata/netdata/pull/5780) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
