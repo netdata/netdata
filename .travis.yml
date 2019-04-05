@@ -22,6 +22,8 @@ install:
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
 
+
+
 # Define the stage sequence and conditionals
 #
 stages:
@@ -30,15 +32,19 @@ stages:
 - name: Build process
 - name: Artifacts validation
 
+
   # Nightly operations
 - name: Nightly operations
   if: branch = pipeline-redesign-master AND type = cron
+
 - name: Nightly release
   if: branch = pipeline-redesign-master AND type = cron
+
 
   # Scheduled releases
 - name: Packaging for release
   if: branch = pipeline-redesign-master AND type != pull_request AND type != cron
+
 - name: Publish for release
   if: branch = pipeline-redesign-master AND type != pull_request AND type != cron AND commit_message ~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
@@ -76,7 +82,7 @@ jobs:
   - name: Docker container build process (alpine installation)
     script: packaging/docker/build.sh
     env: DEVEL="true"
-    after_failure: post_message "TRAVIS_MESSAGE" ""
+    after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
 
   - name: Run 'make dist' validation
     before_script: mkdir /tmp/netdata-makedist-test
@@ -100,7 +106,6 @@ jobs:
     - $HOME/netdata/usr/sbin/netdata -W unittest
     env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
     after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
-    after_success: post_message "TRAVIS_MESSAGE" "Unit testing successful"
 
   - name: Build/install on ubuntu 14.04 (not containerized)
     script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
