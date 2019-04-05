@@ -32,15 +32,15 @@ stages:
 
   # Nightly operations
 - name: Nightly operations
-  if: branch = master AND type = cron
+  if: branch = pipeline-redesign-master AND type = cron
 - name: Nightly release
-  if: branch = master AND type = cron
+  if: branch = pipeline-redesign-master AND type = cron
 
   # Scheduled releases
 - name: Packaging for release
-  if: branch = master AND type != pull_request AND type != cron
+  if: branch = pipeline-redesign-master AND type != pull_request AND type != cron
 - name: Publish for release
-  if: branch = master AND type != pull_request AND type != cron AND commit_message ~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
+  if: branch = pipeline-redesign-master AND type != pull_request AND type != cron AND commit_message ~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
 
 
