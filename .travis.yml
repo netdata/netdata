@@ -22,8 +22,6 @@ install:
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
 
-
-
 # Define the stage sequence and conditionals
 #
 stages:
@@ -32,14 +30,11 @@ stages:
 - name: Build process
 - name: Artifacts validation
 
-
   # Nightly operations
 - name: Nightly operations
   if: branch = pipeline-redesign-master AND type = cron
-
 - name: Nightly release
   if: branch = pipeline-redesign-master AND type = cron
-
 
   # Scheduled releases
 - name: Packaging for release
