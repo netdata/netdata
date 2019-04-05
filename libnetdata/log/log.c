@@ -69,7 +69,7 @@ const char *facility_log = NULL;
 #define LOG_LOCAL6_KEY "local6"
 #define LOG_LOCAL7_KEY "local7"
 
-static int log_facility_id(char *facility_name)
+static int log_facility_id(const char *facility_name)
 {
 	static int 
 		hash_auth = 0,
@@ -434,11 +434,11 @@ char *log_facility_name(int code)
 
 // ----------------------------------------------------------------------------
 
-void syslog_init(int facility) {
+void syslog_init() {
     static int i = 0;
 
     if(!i) {
-        openlog(program_name, LOG_PID, facility);
+        openlog(program_name, LOG_PID,log_facility_id(facility_log));
         i = 1;
     }
 }
@@ -486,7 +486,7 @@ static FILE *open_log_file(int fd, FILE *fp, const char *filename, int *enabled_
         filename = "/dev/null";
         devnull = 1;
 
-	syslog_init(log_facility_id(facility_log));
+	syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
     else if(enabled_syslog) *enabled_syslog = 0;
