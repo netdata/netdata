@@ -10,6 +10,7 @@
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
 - centos6: python.d.plugin zombie process after netdata restart [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
+- netdata/packaging/installer: HoS situation - Fix broken install-or-update script [\#5806](https://github.com/netdata/netdata/pull/5806) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix non compatible function declaration [\#5789](https://github.com/netdata/netdata/pull/5789) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
 
@@ -23,6 +24,7 @@
 **Merged pull requests:**
 
 - python.d.plugin zombie fix [\#5797](https://github.com/netdata/netdata/pull/5797) ([ilyam8](https://github.com/ilyam8))
+- Add memory free and per process memory usage to nvidia\_smi [\#5796](https://github.com/netdata/netdata/pull/5796) ([huww98](https://github.com/huww98))
 - python.d.plugin: allow delete dimension in runtime [\#5795](https://github.com/netdata/netdata/pull/5795) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/docker: Change password [\#5790](https://github.com/netdata/netdata/pull/5790) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/updater: fix updater [\#5785](https://github.com/netdata/netdata/pull/5785) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
