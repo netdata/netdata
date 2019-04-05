@@ -364,15 +364,24 @@ class Service(SimpleService):
         for idx, root in enumerate(parsed.findall('gpu')):
             gpu = GPU(idx, root)
             data.update(gpu.data())
-            ps = gpu.processes() or []
-
-            chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
-            for p in ps:
-                dim_name = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
-                if dim_name not in chart:
-                    chart.add_dimension([dim_name, '{0} {1}'.format(p['pid'], p['process_name'])])
+            self.updateProcessesMemChart(gpu)
 
         return data or None
+
+    def updateProcessesMemChart(self, gpu):
+        ps = gpu.processes()
+        if not ps:
+            return
+        chart = self.charts['gpu{0}_{1}'.format(gpu.num, PROCESSES_MEM)]
+        dim_ids = []
+        for p in ps:
+            dim_id = 'gpu{0}_process_mem_{1}'.format(gpu.num, p['pid'])
+            dim_ids.append(dim_id)
+            if dim_id not in chart:
+                chart.add_dimension([dim_id, '{0} {1}'.format(p['pid'], p['process_name'])])
+        for dim in chart:
+            if dim.id not in dim_ids:
+                chart.del_dimension(dim.id)
 
     def check(self):
         if not self.poller.has_smi():
