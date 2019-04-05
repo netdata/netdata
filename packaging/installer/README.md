@@ -253,7 +253,7 @@ cd netdata
 
 * If you don't want to run it straight-away, add `--dont-start-it` option.
 
-* If you have problems with the latest version and you want a stable install, add `--stable-channel` option
+* You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
 * If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
 
