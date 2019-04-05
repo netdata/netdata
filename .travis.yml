@@ -40,8 +40,7 @@ stages:
 - name: Packaging for release
   if: branch = master AND type != pull_request AND type != cron
 - name: Publish for release
-  # We run this step on every commit on master, not cron, not PR AND there is a TAG set by the packaging step
-  if: branch = master AND type != pull_request AND type != cron AND tag IS present AND NOt (tag =~ -rc*)
+  if: branch = master AND type != pull_request AND type != cron
 
 
 
@@ -153,17 +152,19 @@ jobs:
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Docker image publishing failed"
     env: ALLOW_SOFT_FAILURE_HERE=true
+    if: tag IS present AND NOT (tag =~ -rc*)
 
   - name: Generate release artifacts
     before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for release"
     script: .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Release artifacts generation failed"
+    if: tag IS present AND NOT (tag =~ -rc*)
 
   - name: Create release draft
     before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
     script: .travis/draft_release.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Draft release submission failed"
-
+    if: tag IS present AND NOT (tag =~ -rc*)
 
 
     # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
