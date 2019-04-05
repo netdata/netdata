@@ -12,6 +12,9 @@ matrix:
 #
 install:
 - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+- sudo apt install -y --only-upgrade docker-ce
+- sudo pip install git-semver
+- docker info
 - source tests/installer/slack.sh
 
 # Setup notification system
@@ -125,10 +128,6 @@ jobs:
   - stage: Packaging for release
 
     name: Generate changelog and TAG the release (only on special commit msg)
-    install:
-    - sudo apt install -y --only-upgrade docker-ce
-    - sudo pip install git-semver
-    - docker info
     before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated"
     script:
     - .travis/tagger.sh
