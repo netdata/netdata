@@ -56,10 +56,13 @@ The `kickstart.sh` script:
 
 The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to change the installation directory, enable/disable plugins, etc (check below).
 
-For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata. Example:
+For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata. 
+You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
+
+Example:
 
 ```bash
-  bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it
+  bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --stable-channel
 ```
 
 If you don't want to receive automatic updates, add `--no-updates` when executing `kickstart.sh` script.
@@ -102,12 +105,13 @@ Verify the integrity of the script with this:
 *It should print `OK, VALID` if the script is the one we ship.*
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
+You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
 Example:
 
 ```bash
 
-  bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it
+  bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --stable-channel
 
 ```
 
@@ -248,6 +252,8 @@ cd netdata
 ```
 
 * If you don't want to run it straight-away, add `--dont-start-it` option.
+
+* You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
 * If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
 
