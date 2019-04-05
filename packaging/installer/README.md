@@ -57,7 +57,7 @@ The `kickstart.sh` script:
 The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to change the installation directory, enable/disable plugins, etc (check below).
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata. 
-If you facing problems with the standard install, you can also append `--stable-channel` to fetch and install the last known stable version
+You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
 Example:
 
@@ -105,7 +105,7 @@ Verify the integrity of the script with this:
 *It should print `OK, VALID` if the script is the one we ship.*
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
-If you facing problems with the standard install, you can also append `--stable-channel` to fetch and install the last known stable version
+You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
 Example:
 
