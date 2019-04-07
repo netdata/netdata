@@ -178,7 +178,7 @@ jobs:
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
 
     # This is generating the changelog for nightly release and publish it
-  - name: Generate nightly changlog
+  - name: Generate nightly changelog
     before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies"
     script: ".travis/nightlies.sh"
     after_failure: post_message "TRAVIS_MESSAGE" "@here Nightly changelog generation failed"
