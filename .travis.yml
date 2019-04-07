@@ -130,8 +130,6 @@ jobs:
     before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated"
     script: .travis/tagger.sh && .travis/generate_changelog_and_tag_release.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Packaging for release failed"
-    git:
-      depth: false
 
   - name: Run labeler on github issues
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
@@ -141,8 +139,6 @@ jobs:
     # We only publish if a TAG has been set during packaging
   - stage: Publish for release
 
-    git:
-      depth: false
     name: Build & Publish docker images
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images"
     script:
@@ -206,8 +202,6 @@ jobs:
     before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies"
     script: .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Nightly artifacts generation failed"
-    git:
-      depth: false
     before_deploy: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
     deploy:
       provider: gcs
