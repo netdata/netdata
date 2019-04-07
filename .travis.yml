@@ -147,20 +147,23 @@ jobs:
     name: Build & Publish docker images
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images"
     script:
-    - .travis/is_release_candidate.sh && packaging/docker/build.sh
-    - .travis/is_release_candidate.sh && packaging/docker/publish.sh
+    - packaging/docker/build.sh
+    - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Docker image publishing failed"
     env: ALLOW_SOFT_FAILURE_HERE=true
+    if: NOT .travis/is_release_candidate.sh
 
   - name: Generate release artifacts
     before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for release"
-    script: .travis/is_release_candidate.sh && .travis/create_artifacts.sh
+    script: .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Release artifacts generation failed"
+    if: NOT .travis/is_release_candidate.sh
 
   - name: Create release draft
     before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
-    script: .travis/is_release_candidate.sh && .travis/draft_release.sh
+    script: .travis/draft_release.sh
     after_failure: post_message "TRAVIS_MESSAGE" "@here Draft release submission failed"
+    if: NOT .travis/is_release_candidate.sh
 
 
     # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
