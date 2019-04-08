@@ -130,7 +130,7 @@ You can restrict access by following [official caddy guide](https://caddyserver.
 The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your choosing. 
 
 ```
-Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PASSWORD> [-s]
+Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PASS> [-s]
 	-s skip build, just push the image
 Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
 ```
