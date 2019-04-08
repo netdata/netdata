@@ -180,6 +180,7 @@ void read_cgroup_plugin_configuration() {
         cgroup_enable_blkio_merged_ops =
         cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
         cgroup_search_in_devices = 0;
+        cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
         cgroup_used_memory_without_cache = CONFIG_BOOLEAN_NO; //unified cgroups use different values
 
         //TODO: can there be more than 1 cgroup2 mount point?
@@ -597,7 +598,7 @@ static inline void cgroup2_read_cpuacct_stat(struct cpuacct_stat *cp) {
             return;
         }
 
-        unsigned long i, lines = procfile_lines(ff);
+        unsigned long lines = procfile_lines(ff);
 
         if(unlikely(lines < 3)) {
             error("CGROUP: file '%s' should have 3+ lines.", cp->filename);
