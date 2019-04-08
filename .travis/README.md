@@ -4,7 +4,7 @@
 
 - GITHUB_TOKEN - GitHub token with push access to repository
 - DOCKER_USERNAME - Username (netdatabot) with write access to docker hub repository
-- DOCKER_PASSWORD - Password to docker hub
+- DOCKER_PASS - Password to docker hub
 - encrypted_8daf19481253_key - key needed by openssl to decrypt GCS credentials file
 - encrypted_8daf19481253_iv - IV needed by openssl to decrypt GCS credentials file
 - COVERITY_SCAN_TOKEN - Token to allow coverity test analysis uploads

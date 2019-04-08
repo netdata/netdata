@@ -23,6 +23,7 @@ DEFAULT_CONNECT_TIMEOUT = 2       # seconds
 DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
 
 
+CONN_PARAM_DSN = 'dsn'
 CONN_PARAM_HOST = 'host'
 CONN_PARAM_PORT = 'port'
 CONN_PARAM_DATABASE = 'database'
@@ -823,6 +824,10 @@ class Service(SimpleService):
 
     def build_conn_params(self):
         conf = self.configuration
+
+        # connection URIs: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
+        if conf.get(CONN_PARAM_DSN):
+            return {'dsn': conf[CONN_PARAM_DSN]}
 
         params = {
             CONN_PARAM_HOST: conf.get(CONN_PARAM_HOST),

@@ -111,6 +111,18 @@ set_tarball_urls() {
 	fi
 }
 
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 umask 022
 
@@ -157,7 +169,7 @@ progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
 
 download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
 download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
-if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
 fi
 

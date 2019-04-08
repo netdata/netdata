@@ -54,6 +54,7 @@ extern FILE *stdaccess;
 extern const char *stdaccess_filename;
 extern const char *stderr_filename;
 extern const char *stdout_filename;
+extern const char *facility_log;
 
 extern int access_log_syslog;
 extern int error_log_syslog;

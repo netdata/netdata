@@ -8,6 +8,11 @@
 
 set -e
 
+if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
+	echo "This mechanism currently can only run on BASH version 4 and above"
+	exit 1
+fi
+
 WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
@@ -32,7 +37,7 @@ fi
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 
 # There is no reason to continue if we cannot log in to docker hub
-if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASSWORD+x} ]; then
+if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASS+x} ]; then
     echo "No docker hub username or password found, aborting without publishing"
     exit 1
 fi
@@ -49,14 +54,14 @@ fi
 echo "Docker image publishing in progress.."
 echo "Version       : ${VERSION}"
 echo "Repository    : ${REPOSITORY}"
-echo "Architectures : ${ARCHS}"
+echo "Architectures : ${ARCHS[*]}"
 echo "Manifest list : ${MANIFEST_LIST}"
 
 # Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
 # Login to docker hub to allow futher operations
-echo "$DOCKER_PASSWORD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
+echo "$DOCKER_PASS" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
 for ARCH in ${ARCHS[@]}; do

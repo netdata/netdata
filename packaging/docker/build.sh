@@ -8,6 +8,11 @@
 
 set -e
 
+if [ "${BASH_VERSINFO[0]}" -lt "4" ]; then
+	echo "This mechanism currently can only run on BASH version 4 and above"
+	exit 1
+fi
+
 VERSION="$1"
 REPOSITORY="${REPOSITORY:-netdata}"
 declare -A ARCH_MAP
@@ -40,7 +45,7 @@ fi
 echo "Docker image build in progress.."
 echo "Version       : ${VERSION}"
 echo "Repository    : ${REPOSITORY}"
-echo "Architectures : ${ARCHS}"
+echo "Architectures : ${ARCHS[*]}"
 
 docker run --rm --privileged multiarch/qemu-user-static:register --reset
 

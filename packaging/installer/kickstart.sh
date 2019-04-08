@@ -204,6 +204,19 @@ dependencies() {
 	fi
 }
 
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
 umask 022
 
 sudo=""
@@ -275,7 +288,7 @@ set_tarball_urls "${RELEASE_CHANNEL}"
 
 download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
 download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
-if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
 run tar -xf netdata-latest.tar.gz

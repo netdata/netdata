@@ -15,6 +15,9 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/m4/ltoptions.m4 \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
+CLEANFILES= \
+	$(srcdir)/$(distdir).tar.gz
+
 EXTRA_DIST = \
 	.gitignore \
 	.codacy.yml \

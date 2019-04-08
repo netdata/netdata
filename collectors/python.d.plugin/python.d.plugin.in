@@ -131,6 +131,12 @@ JOB_BASE_CONF = {
 }
 
 
+def heartbeat():
+    if IS_ATTY:
+        return
+    safe_print('\n')
+
+
 class HeartBeat(threading.Thread):
     def __init__(self, every):
         threading.Thread.__init__(self)
@@ -140,9 +146,7 @@ class HeartBeat(threading.Thread):
     def run(self):
         while True:
             time.sleep(self.every)
-            if IS_ATTY:
-                continue
-            safe_print('\n')
+            heartbeat()
 
 
 def load_module(name):
@@ -201,6 +205,8 @@ class ModuleChecker(multiprocessing.Process):
         task = self.task_queue.get()
 
         if task is END_TASK_MARKER:
+            # TODO: find better solution, understand why heartbeat thread doesn't work
+            heartbeat()
             self.task_queue.task_done()
             self.result_queue.put(END_TASK_MARKER)
             return False
