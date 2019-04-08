@@ -41,7 +41,8 @@ stages:
   if: branch = pipeline-redesign-master AND type != pull_request AND type != cron
 
 - name: Publish for release
-  if: branch = pipeline-redesign-master AND type != pull_request AND type != cron
+  if: branch = pipeline-redesign-master AND type != pull_request AND type != cron AND commit_message =~ /(\[
+  \]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
 
 
