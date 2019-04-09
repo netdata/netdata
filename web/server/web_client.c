@@ -565,11 +565,11 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "This host does not maintain a database");
-        return 400;
-    }
+    //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
+    //    buffer_flush(w->response.data);
+    //    buffer_strcat(w->response.data, "This host does not maintain a database");
+    //    return 400;
+    //}
 
     return func(host, w, url);
 }
