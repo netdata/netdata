@@ -56,6 +56,18 @@ To provide a sane default for this setting, netdata uses the following pattern l
 
 So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
 
+### unified cgroups (cgroups v2) support
+
+Basic unified cgroups metrics are supported. To use them instead of v1 cgroups add:
+
+```
+[plugin:cgroups]
+	use unified cgroups = yes
+	path to unified cgroups = /sys/fs/cgroup
+```
+
+Unified cgroups use same name pattern matching as v1 cgroups. `cgroup_enable_systemd_services_detailed_memory` is currently unsupported when using unified cgroups.
+
 
 ### enabled cgroups
 
