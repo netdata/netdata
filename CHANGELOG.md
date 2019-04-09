@@ -10,6 +10,7 @@
 - Kickstart installer fails to due missing function [\#5768](https://github.com/netdata/netdata/issues/5768)
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
+- netdata/packaging/build: Build getting broken sporadically at times in py2-psycopg2 package [\#5713](https://github.com/netdata/netdata/issues/5713)
 - centos6: python.d.plugin zombie process after netdata restart [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
 - netdata/packaging/installer: HoS situation - Fix broken install-or-update script [\#5806](https://github.com/netdata/netdata/pull/5806) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -18,14 +19,19 @@
 
 **Closed issues:**
 
+- update  /packaging/docker/README.md  in Mac OS run build [\#5818](https://github.com/netdata/netdata/issues/5818)
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
+- feature: kubelet collector improvements [\#5720](https://github.com/netdata/netdata/issues/5720)
 - How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
 - support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
+- CoreDNS monitoring [\#4861](https://github.com/netdata/netdata/issues/4861)
+- Netdata's cgroup tracking does not work with version 2 cgroups. [\#3750](https://github.com/netdata/netdata/issues/3750)
 
 **Merged pull requests:**
 
+- Return responses even in memory mode none [\#5819](https://github.com/netdata/netdata/pull/5819) ([cakrit](https://github.com/cakrit))
 - netdata/packaging/installer: Update README [\#5811](https://github.com/netdata/netdata/pull/5811) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python.d.plugin zombie fix [\#5797](https://github.com/netdata/netdata/pull/5797) ([ilyam8](https://github.com/ilyam8))
 - Add memory free and per process memory usage to nvidia\_smi [\#5796](https://github.com/netdata/netdata/pull/5796) ([huww98](https://github.com/huww98))
@@ -50,6 +56,7 @@
 - Fix some misspells in docs and code [\#5549](https://github.com/netdata/netdata/pull/5549) ([JoeWrightss](https://github.com/JoeWrightss))
 - Added RocketChat default recipient for roles [\#5545](https://github.com/netdata/netdata/pull/5545) ([tctovsli](https://github.com/tctovsli))
 - Add simonnagl as CODEOWNER for cups.plugin [\#5453](https://github.com/netdata/netdata/pull/5453) ([simonnagl](https://github.com/simonnagl))
+- unified cgroup support [\#5407](https://github.com/netdata/netdata/pull/5407) ([skrzyp1](https://github.com/skrzyp1))
 
 ## [v1.14.0-rc0](https://github.com/netdata/netdata/tree/v1.14.0-rc0) (2019-03-30)
 
@@ -65,7 +72,6 @@
 
 **Closed issues:**
 
-- support AWS Timestream as a back-end [\#5722](https://github.com/netdata/netdata/issues/5722)
 - netdata/packaging/installer: Finish up netdata installer refactoring [\#5705](https://github.com/netdata/netdata/issues/5705)
 - Feature: Netdata alarms as POST events to a configurable endpoint in health\_alarm\_notify.conf [\#5702](https://github.com/netdata/netdata/issues/5702)
 - feature cgroups plugin: make containers priority user configurable [\#5697](https://github.com/netdata/netdata/issues/5697)
