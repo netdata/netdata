@@ -192,11 +192,9 @@ jobs:
   - stage: Nightly release
 
     name: Build & Publish docker images
-    install:
-    - sudo apt install -y --only-upgrade docker-ce
-    - docker info
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies"
     script:
+    - docker info
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
