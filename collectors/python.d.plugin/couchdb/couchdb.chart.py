@@ -351,7 +351,7 @@ class Service(UrlService):
                 try:
                     for m in metrics_list:
                         value = value[m]
-                except KeyError as e:
+                except (KeyError, TypeError) as e:
                     self.debug('cannot process ' + metric + ' for ' + db
                                + ": " + str(e))
                     continue
@@ -367,7 +367,7 @@ class Service(UrlService):
             try:
                 for m in metrics_list:
                     value = value[m]
-            except KeyError as e:
+            except (KeyError, TypeError) as e:
                 self.debug('cannot process ' + metric + ': ' + str(e))
                 continue
             # strip off .value from end of stat
