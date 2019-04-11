@@ -15,7 +15,7 @@ run cd ioping-netdata || exit 1
 export CFLAGS="-static"
 
 run make clean
-run make -j${SYSTEM_CPUS}
+run make -j$(find_processors)
 run mkdir -p ${NETDATA_INSTALL_PATH}/bin/
 run install -m 0755 ioping ${NETDATA_INSTALL_PATH}/bin/
 
