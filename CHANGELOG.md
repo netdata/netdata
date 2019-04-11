@@ -4,6 +4,9 @@
 
 **Fixed bugs:**
 
+- python module autodetection\_retry don't work as expected [\#5832](https://github.com/netdata/netdata/issues/5832)
+- CouchDB collector exception [\#5830](https://github.com/netdata/netdata/issues/5830)
+- macOS: python.d.plugin crashes on start [\#5821](https://github.com/netdata/netdata/issues/5821)
 - Kickstart-static64.sh installation problems [\#5807](https://github.com/netdata/netdata/issues/5807)
 - Netdata Installer : $NETDATA\_USER not defined ? [\#5803](https://github.com/netdata/netdata/issues/5803)
 - Typo in netdata-updater [\#5781](https://github.com/netdata/netdata/issues/5781)
@@ -19,18 +22,25 @@
 
 **Closed issues:**
 
+- last\_collected\_secs health check for phpfpm [\#5820](https://github.com/netdata/netdata/issues/5820)
 - update  /packaging/docker/README.md  in Mac OS run build [\#5818](https://github.com/netdata/netdata/issues/5818)
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
 - feature: kubelet collector improvements [\#5720](https://github.com/netdata/netdata/issues/5720)
 - How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
+- SSL support for Elasticsearch plugin [\#5179](https://github.com/netdata/netdata/issues/5179)
 - support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
 - CoreDNS monitoring [\#4861](https://github.com/netdata/netdata/issues/4861)
 - Netdata's cgroup tracking does not work with version 2 cgroups. [\#3750](https://github.com/netdata/netdata/issues/3750)
 
 **Merged pull requests:**
 
+- python.d.plugin: py2 fix crash on macos [\#5838](https://github.com/netdata/netdata/pull/5838) ([ilyam8](https://github.com/ilyam8))
+- python.d.plugin: autodetection retry fix [\#5837](https://github.com/netdata/netdata/pull/5837) ([ilyam8](https://github.com/ilyam8))
+- phpfpm collector: add last\_collected\_secs health check [\#5836](https://github.com/netdata/netdata/pull/5836) ([ilyam8](https://github.com/ilyam8))
+- elasticsearch: update config file [\#5834](https://github.com/netdata/netdata/pull/5834) ([ilyam8](https://github.com/ilyam8))
+- couchdb: \_fetch\_data TypeError fix [\#5833](https://github.com/netdata/netdata/pull/5833) ([ilyam8](https://github.com/ilyam8))
 - Return responses even in memory mode none [\#5819](https://github.com/netdata/netdata/pull/5819) ([cakrit](https://github.com/cakrit))
 - netdata/packaging/installer: Update README [\#5811](https://github.com/netdata/netdata/pull/5811) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python.d.plugin zombie fix [\#5797](https://github.com/netdata/netdata/pull/5797) ([ilyam8](https://github.com/ilyam8))
