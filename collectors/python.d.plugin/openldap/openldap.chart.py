@@ -141,7 +141,7 @@ class Service(SimpleService):
         self.username = configuration.get('username')
         self.password = configuration.get('password')
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
-        self.tls = configuration.get('tls', DEFAULT_TLS)
+        self.use_tls = configuration.get('use_tls', DEFAULT_TLS)
         self.cert_check = configuration.get('cert_check', DEFAULT_CERT_CHECK)
         self.alive = False
         self.conn = None
@@ -154,12 +154,12 @@ class Service(SimpleService):
 
     def connect(self):
         try:
-            if self.tls:
+            if self.use_tls:
                 self.conn = ldap.initialize('ldaps://%s:%s' % (self.server, self.port))
             else:
                 self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
-            if self.tls and not self.cert_check:
+            if self.use_tls and not self.cert_check:
                 self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             if self.username and self.password:
                 self.conn.simple_bind(self.username, self.password)
