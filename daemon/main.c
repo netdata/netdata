@@ -79,7 +79,7 @@ struct netdata_static_thread static_threads[] = {
     {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 
-void web_server_threading_selection(void) {
+static void web_server_threading_selection(void) {
     web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
 
     int static_threaded = (web_server_mode == WEB_SERVER_MODE_STATIC_THREADED);
@@ -91,7 +91,7 @@ void web_server_threading_selection(void) {
     }
 }
 
-void web_server_config_options(void) {
+static void web_server_config_options(void) {
     web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
     web_client_first_request_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
     web_client_streaming_rate_t = config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
@@ -319,7 +319,7 @@ int help(int exitcode) {
 }
 
 // TODO: Remove this function with the nix major release.
-void remove_option(int opt_index, int *argc, char **argv) {
+static void remove_option(int opt_index, int *argc, char **argv) {
     int i;
 
     // remove the options.
@@ -344,7 +344,7 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-void log_init(void) {
+static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
@@ -355,9 +355,9 @@ void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
 
-	char deffacility[8];
-	snprintfz(deffacility,7,"%s","daemon");
-	facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
+    char deffacility[8];
+    snprintfz(deffacility,7,"%s","daemon");
+    facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -580,7 +580,7 @@ static void get_system_timezone(void) {
     netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
 }
 
-void set_global_environment() {
+static void set_global_environment() {
     {
         char b[16];
         snprintfz(b, 15, "%d", default_rrd_update_every);
