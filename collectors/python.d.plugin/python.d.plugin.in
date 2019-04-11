@@ -651,6 +651,8 @@ class Plugin:
 
         job.post_check(int(self.min_update_every))
         self.checked_jobs[job.module_name].append(check_name)
+        JobRunner(job).start()
+
         return stop_retrying
 
 
