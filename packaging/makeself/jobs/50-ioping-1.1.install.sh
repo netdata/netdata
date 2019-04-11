@@ -3,14 +3,7 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
-if [ -d ioping-netdata ]
-    then
-    run rm -rf ioping-netdata || exit 1
-fi
-
-run git clone https://github.com/netdata/ioping.git ioping-netdata
-
-run cd ioping-netdata || exit 1
+fetch "netdata-ioping-43d15a5" "https://github.com/netdata/ioping/tarball/master"
 
 export CFLAGS="-static"
 
