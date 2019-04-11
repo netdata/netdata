@@ -33,16 +33,13 @@ echo "Travis knows TRAVIS_COMMIT_MESSAGE: ${TRAVIS_COMMIT_MESSAGE}"
 echo "GIT last commit message: ${LAST_COMMIT_MESSAGE}"
 
 case "${LAST_COMMIT_MESSAGE}" in
-*"[netdata patch release]"*)
-*"[netdata minor release]"*)
-*"[netdata major release]"*)
-*"[netdata release candidate]"*)
-	echo "this is indeed a relase request, notifying travis"
-	;;
+*"[netdata patch release]"*|*"[netdata minor release]"*|*"[netdata major release]"*|*"[netdata release candidate]"*|*"[netdata release candidate]"*)
+echo "this is indeed a relase request, notifying travis"
+;;
 *)
-	echo "No special keyword detected, this is not a release request"
-	exit $IS_NOT_RELEASE
-	;;
+echo "No special keyword detected, this is not a release request"
+exit $IS_NOT_RELEASE
+;;
 esac
 
 exit $IS_RELEASE
