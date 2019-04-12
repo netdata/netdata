@@ -58,6 +58,11 @@ function docker_get_name_api() {
 		warning "Can't find ${DOCKER_HOST}"
 		return 1
 	fi
+	if ! command -v jq >/dev/null 2>&1; then
+		warning "Can't find jq command line tool. jq is required for netdata to retrieve docker container name using ${DOCKER_HOST} API, falling back to docker ps"
+		return 1
+	fi
+
 	info "Running API command: /containers/${id}/json"
 	JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\\r\\n" | nc -U "${DOCKER_HOST}" | grep '^{.*')
 	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
