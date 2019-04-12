@@ -88,6 +88,8 @@ jobs:
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make dist
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-v*.*.*.tar.gz
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
+    git:
+      depth: false
     after_script: rm -rf /tmp/netdata-makedist-test
     after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
 
