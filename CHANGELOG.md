@@ -7,6 +7,7 @@
 - python module autodetection\_retry don't work as expected [\#5832](https://github.com/netdata/netdata/issues/5832)
 - CouchDB collector exception [\#5830](https://github.com/netdata/netdata/issues/5830)
 - macOS: python.d.plugin crashes on start [\#5821](https://github.com/netdata/netdata/issues/5821)
+- Errorneous netdata version [\#5808](https://github.com/netdata/netdata/issues/5808)
 - Kickstart-static64.sh installation problems [\#5807](https://github.com/netdata/netdata/issues/5807)
 - Netdata Installer : $NETDATA\_USER not defined ? [\#5803](https://github.com/netdata/netdata/issues/5803)
 - Typo in netdata-updater [\#5781](https://github.com/netdata/netdata/issues/5781)
@@ -14,6 +15,7 @@
 - smstools 3 notifications error handling [\#5767](https://github.com/netdata/netdata/issues/5767)
 - netdata-installer.sh: sha256sum binaries do not exist in FreeBSD [\#5747](https://github.com/netdata/netdata/issues/5747)
 - netdata/packaging/build: Build getting broken sporadically at times in py2-psycopg2 package [\#5713](https://github.com/netdata/netdata/issues/5713)
+- netdata-updater broke [\#5529](https://github.com/netdata/netdata/issues/5529)
 - centos6: python.d.plugin zombie process after netdata restart [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
 - netdata/packaging/installer: HoS situation - Fix broken install-or-update script [\#5806](https://github.com/netdata/netdata/pull/5806) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -24,10 +26,12 @@
 
 - last\_collected\_secs health check for phpfpm [\#5820](https://github.com/netdata/netdata/issues/5820)
 - update  /packaging/docker/README.md  in Mac OS run build [\#5818](https://github.com/netdata/netdata/issues/5818)
+- feature: LDAPS support for openldap-collector [\#5783](https://github.com/netdata/netdata/issues/5783)
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
 - feature: kubelet collector improvements [\#5720](https://github.com/netdata/netdata/issues/5720)
 - How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
+- Status of netdata/binary-packages [\#5671](https://github.com/netdata/netdata/issues/5671)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
 - SSL support for Elasticsearch plugin [\#5179](https://github.com/netdata/netdata/issues/5179)
 - support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
@@ -36,6 +40,7 @@
 
 **Merged pull requests:**
 
+- Openldap tls support rebased [\#5859](https://github.com/netdata/netdata/pull/5859) ([ekartsonakis](https://github.com/ekartsonakis))
 - python.d.plugin: py2 fix crash on macos [\#5838](https://github.com/netdata/netdata/pull/5838) ([ilyam8](https://github.com/ilyam8))
 - python.d.plugin: autodetection retry fix [\#5837](https://github.com/netdata/netdata/pull/5837) ([ilyam8](https://github.com/ilyam8))
 - phpfpm collector: add last\_collected\_secs health check [\#5836](https://github.com/netdata/netdata/pull/5836) ([ilyam8](https://github.com/ilyam8))
