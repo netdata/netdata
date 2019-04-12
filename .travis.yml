@@ -6,7 +6,7 @@ services:
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
-    env: ALLOW_SOFT_FAILURE_HERE=true
+    - env: ALLOW_SOFT_FAILURE_HERE=true
 
 # Install dependencies for all, once
 #
