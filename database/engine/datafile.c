@@ -35,7 +35,8 @@ void datafile_list_delete(struct rrdengine_instance *ctx, struct rrdengine_dataf
 }
 
 
-static void datafile_init(struct rrdengine_datafile *datafile, unsigned tier, unsigned fileno)
+static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_instance *ctx,
+                          unsigned tier, unsigned fileno)
 {
     assert(tier == 1);
     datafile->tier = tier;
@@ -45,12 +46,13 @@ static void datafile_init(struct rrdengine_datafile *datafile, unsigned tier, un
     datafile->extents.first = datafile->extents.last = NULL; /* will be populated by journalfile */
     datafile->journalfile = NULL;
     datafile->next = NULL;
+    datafile->ctx = ctx;
 }
 
 static void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, RRDENG_FILEPATH "/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
-                    datafile->tier, datafile->fileno);
+    (void) snprintf(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 int destroy_data_file(struct rrdengine_datafile *datafile)
@@ -61,16 +63,14 @@ int destroy_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_ftruncate: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_ftruncate: %s", uv_strerror(ret));
     }
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_close: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_close: %s", uv_strerror(ret));
     }
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
@@ -78,8 +78,7 @@ int destroy_data_file(struct rrdengine_datafile *datafile)
     generate_datafilepath(datafile, path, sizeof(path));
     fd = uv_fs_unlink(NULL, &req, path, NULL);
     if (fd < 0) {
-        fprintf(stderr, "uv_fs_fsunlink: %s\n", uv_strerror(fd));
-        exit(fd);
+        fatal("uv_fs_fsunlink: %s", uv_strerror(fd));
     }
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
@@ -100,8 +99,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_CREAT | UV_FS_O_RDWR | UV_FS_O_TRUNC,
                     S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
-        fprintf(stderr, "uv_fs_fsopen: %s\n", uv_strerror(fd));
-        exit(fd);
+        fatal("uv_fs_fsopen: %s", uv_strerror(fd));
     }
     assert(req.result >= 0);
     file = req.result;
@@ -109,8 +107,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        return UV_ENOMEM;
+        fatal("posix_memalign:%s", strerror(ret));
     }
     (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ);
@@ -120,12 +117,10 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_write: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_write: %s", uv_strerror(ret));
     }
     if (req.result < 0) {
-        fprintf(stderr, "uv_fs_write: %s\n", uv_strerror((int)req.result));
-        exit(req.result);
+        fatal("uv_fs_write: %s", uv_strerror((int)req.result));
     }
     uv_fs_req_cleanup(&req);
     free(superblock);
@@ -145,14 +140,13 @@ static int check_data_file_superblock(uv_file file)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        return UV_ENOMEM;
+        fatal("posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_read: %s\n", uv_strerror(ret));
+        error("uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -162,7 +156,7 @@ static int check_data_file_superblock(uv_file file)
     if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
         superblock->tier != 1) {
-        fprintf(stderr, "File has invalid superblock.\n");
+        error("File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -184,14 +178,14 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_RDWR, S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
         /* if (UV_ENOENT != fd) */
-        fprintf(stderr, "uv_fs_fsopen: %s\n", uv_strerror(fd));
+        error("uv_fs_fsopen: %s", uv_strerror(fd));
         uv_fs_req_cleanup(&req);
         return fd;
     }
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
-    fprintf(stderr, "Initializing data file \"%s\".\n", path);
+    info("Initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -205,7 +199,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    fprintf(stderr, "Data file \"%s\" initialized (size:%"PRIu64").\n", path, file_size);
+    info("Data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
     return 0;
 
     error:
@@ -236,34 +230,26 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;
 
-    ret = uv_fs_scandir(NULL, &req, RRDENG_FILEPATH, 0, NULL);
+    ret = uv_fs_scandir(NULL, &req, ctx->dbfiles_path, 0, NULL);
     assert(ret >= 0);
     assert(req.result >= 0);
-    fprintf(stderr, "Found %d files in path %s\n", ret, RRDENG_FILEPATH);
+    info("Found %d files in path %s", ret, ctx->dbfiles_path);
 
-    datafiles = calloc(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
-    if (!datafiles) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
+    datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        fprintf(stderr, "Scanning file \"%s\"\n", dent.name);
+        info("Scanning file \"%s\"", dent.name);
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &no);
         if (2 == ret) {
-            fprintf(stderr, "Matched file \"%s\"\n", dent.name);
-            datafile = malloc(sizeof(*datafile));
-            if (!datafile) {
-                fprintf(stderr, "malloc failed.\n");
-                exit(UV_ENOMEM);
-            }
-            datafile_init(datafile, tier, no);
+            info("Matched file \"%s\"", dent.name);
+            datafile = mallocz(sizeof(*datafile));
+            datafile_init(datafile, ctx, tier, no);
             datafiles[matched_files++] = datafile;
         }
     }
     uv_fs_req_cleanup(&req);
 
     if (matched_files == MAX_DATAFILES) {
-        fprintf(stderr, "Warning: hit maximum database engine file limit of %u files\n", MAX_DATAFILES);
+        error("Warning: hit maximum database engine file limit of %u files", MAX_DATAFILES);
     }
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
@@ -274,11 +260,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             ++failed_to_load;
             continue;
         }
-        journalfile = malloc(sizeof(*journalfile));
-        if (!datafile) {
-            fprintf(stderr, "malloc failed.\n");
-            exit(UV_ENOMEM);
-        }
+        journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
         ret = load_journal_file(ctx, journalfile, datafile);
@@ -292,7 +274,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         ctx->disk_space += datafile->pos + journalfile->pos;
     }
     if (failed_to_load) {
-        fprintf(stderr, "%u files failed to load.\n", failed_to_load);
+        error("%u files failed to load.", failed_to_load);
     }
     free(datafiles);
 
@@ -306,21 +288,13 @@ void create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, uns
     struct rrdengine_journalfile *journalfile;
     int ret;
 
-    fprintf(stderr, "Creating new data and journal files.\n");
-    datafile = malloc(sizeof(*datafile));
-    if (!datafile) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
-    datafile_init(datafile, tier, fileno);
+    info("Creating new data and journal files.");
+    datafile = mallocz(sizeof(*datafile));
+    datafile_init(datafile, ctx, tier, fileno);
     ret = create_data_file(datafile);
     assert(!ret);
 
-    journalfile = malloc(sizeof(*journalfile));
-    if (!journalfile) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
+    journalfile = mallocz(sizeof(*journalfile));
     datafile->journalfile = journalfile;
     journalfile_init(journalfile, datafile);
     ret = create_journal_file(journalfile, datafile);
@@ -338,7 +312,7 @@ int init_data_files(struct rrdengine_instance *ctx)
 
     ret = scan_data_files(ctx);
     if (0 == ret) {
-        fprintf(stderr, "Data files not found, creating.\n");
+        info("Data files not found, creating.");
         create_new_datafile_pair(ctx, 1, 1);
     }
     return 0;

@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <lz4.h>
 #include <Judy.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -28,9 +30,7 @@
 struct rrdengine_instance;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
-#define DISK_QUOTA (64000000) /* stay below N MB of disk space e.g. 64MB, configurable */
 
-#define RRDENG_FILEPATH "/tmp"
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
@@ -120,7 +120,11 @@ struct rrdengine_instance {
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
     struct rrdengine_datafile_list datafiles;
+    char dbfiles_path[FILENAME_MAX+1];
     uint64_t disk_space;
+    uint64_t max_disk_space;
+    unsigned long max_cache_pages;
+    unsigned long cache_pages_low_watermark;
 };
 
 extern void sanity_check(void);

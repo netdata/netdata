@@ -5,10 +5,9 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
     struct generic_io_descriptor *io_descr;
 
-    fprintf(stderr, "%s: Journal block was written to disk.\n", __func__);
+    debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
-        fprintf(stderr, "%s: uv_fs_write: %s\n", __func__, uv_strerror((int)req->result));
-        exit(req->result);
+        fatal("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     }
     io_descr = req->data;
 
@@ -32,11 +31,7 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
     /* care with outstanding transactions when switching journal files */
     journalfile = ctx->datafiles.last->journalfile;
 
-    io_descr = malloc(sizeof(*io_descr));
-    if (unlikely(NULL == io_descr)) {
-        fprintf(stderr, "%s: malloc failed.\n", __func__);
-        exit(UV_ENOMEM);
-    }
+    io_descr = mallocz(sizeof(*io_descr));
     pos = ctx->commit_log.buf_pos;
     size = ctx->commit_log.buf_size;
     if (pos < size) {
@@ -80,8 +75,7 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
         buf_size = ALIGN_BYTES_CEILING(size);
         ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
         if (unlikely(ret)) {
-            fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-            exit(UV_ENOMEM);
+            fatal("posix_memalign:%s", strerror(ret));
         }
         buf_pos = ctx->commit_log.buf_pos = 0;
         ctx->commit_log.buf_size =  buf_size;
@@ -93,8 +87,8 @@ void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned s
 
 static void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintf(str, maxlen, RRDENG_FILEPATH "/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                    datafile->tier, datafile->fileno);
+    (void) snprintf(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
@@ -112,15 +106,14 @@ int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrden
 
     ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_ftruncate: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_ftruncate: %s", uv_strerror(ret));
     }
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_close(NULL, &req, journalfile->file, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_close: %s\n", uv_strerror(ret));
+        fatal("uv_fs_close: %s", uv_strerror(ret));
         exit(ret);
     }
     assert(0 == req.result);
@@ -129,8 +122,7 @@ int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrden
     generate_journalfilepath(datafile, path, sizeof(path));
     fd = uv_fs_unlink(NULL, &req, path, NULL);
     if (fd < 0) {
-        fprintf(stderr, "uv_fs_fsunlink: %s\n", uv_strerror(fd));
-        exit(fd);
+        fatal("uv_fs_fsunlink: %s", uv_strerror(fd));
     }
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
@@ -151,8 +143,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_CREAT | UV_FS_O_RDWR | UV_FS_O_TRUNC,
                     S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
-        fprintf(stderr, "uv_fs_fsopen: %s\n", uv_strerror(fd));
-        exit(fd);
+        fatal("uv_fs_fsopen: %s", uv_strerror(fd));
     }
     assert(req.result >= 0);
     file = req.result;
@@ -160,8 +151,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        exit(UV_ENOMEM);
+        fatal("posix_memalign:%s", strerror(ret));
     }
     (void) strncpy(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ);
     (void) strncpy(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ);
@@ -170,12 +160,10 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
 
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_write: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_write: %s", uv_strerror(ret));
     }
     if (req.result < 0) {
-        fprintf(stderr, "uv_fs_write: %s\n", uv_strerror((int)req.result));
-        exit(req.result);
+        fatal("uv_fs_write: %s", uv_strerror((int)req.result));
     }
     uv_fs_req_cleanup(&req);
     free(superblock);
@@ -195,14 +183,13 @@ static int check_journal_file_superblock(uv_file file)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        exit(UV_ENOMEM);
+        fatal("posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_read: %s\n", uv_strerror(ret));
+        error("uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -211,7 +198,7 @@ static int check_journal_file_superblock(uv_file file)
 
     if (strncmp(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ)) {
-        fprintf(stderr, "File has invalid superblock.\n");
+        error("File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -236,15 +223,11 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
     if (payload_length > max_size) {
-        fprintf(stderr, "Corrupted transaction payload.\n");
+        error("Corrupted transaction payload.");
         return;
     }
 
-    extent = malloc(sizeof(*extent) + count * sizeof(extent->pages[0]));
-    if (unlikely(NULL == extent)) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
+    extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
     extent->offset = jf_metric_data->extent_offset;
     extent->size = jf_metric_data->extent_size;
     extent->number_of_pages = count;
@@ -280,7 +263,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->id = &page_index->id;
         descr->extent = extent;
         extent->pages[i] = descr;
-        pg_cache_insert(ctx, descr);
+        pg_cache_insert(ctx, page_index, descr);
     }
     df_extent_insert(extent);
 }
@@ -305,35 +288,35 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
     *id = 0;
     jf_header = buf;
     if (STORE_PADDING == jf_header->type) {
-        fprintf(stderr, "Skipping padding.\n");
+        debug(D_RRDENGINE, "Skipping padding.");
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
-        fprintf(stderr, "Corrupted transaction record, skipping.\n");
+        error("Corrupted transaction record, skipping.");
         return 0;
     }
     *id = jf_header->id;
     payload_length = jf_header->payload_length;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
     if (size_bytes > max_size) {
-        fprintf(stderr, "Corrupted transaction record, skipping.\n");
+        error("Corrupted transaction record, skipping.");
         return 0;
     }
     jf_trailer = buf + sizeof(*jf_header) + payload_length;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     ret = crc32cmp(jf_trailer->checksum, crc);
-    fprintf(stderr, "Transaction %"PRIu64" was read from disk. CRC32 check: %s\n", *id, ret ? "FAILED" : "SUCCEEDED");
+    debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
         return size_bytes;
     }
     switch (jf_header->type) {
     case STORE_METRIC_DATA:
-        fprintf(stderr, "Replaying transaction %"PRIu64"\n", jf_header->id);
+        debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
         restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:
-        fprintf(stderr, "Unknown transaction type. Skipping record.\n");
+        error("Unknown transaction type. Skipping record.");
         break;
     }
 
@@ -365,8 +348,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     max_id = 1;
     ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        exit(UV_ENOMEM);
+        fatal("posix_memalign:%s", strerror(ret));
     }
 
     for (pos = sizeof(struct rrdeng_jf_sb) ; pos < file_size ; pos += READAHEAD_BYTES) {
@@ -374,9 +356,8 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
         iov = uv_buf_init(buf, size_bytes);
         ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
         if (ret < 0) {
-            fprintf(stderr, "uv_fs_read: %s\n", uv_strerror(ret));
-            uv_fs_req_cleanup(&req);
-            exit(ret);
+            fatal("uv_fs_read: %s", uv_strerror(ret));
+            /*uv_fs_req_cleanup(&req);*/
         }
         assert(req.result >= 0);
         uv_fs_req_cleanup(&req);
@@ -414,14 +395,14 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_RDWR, S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
         /* if (UV_ENOENT != fd) */
-        fprintf(stderr, "uv_fs_fsopen: %s\n", uv_strerror(fd));
+        error("uv_fs_fsopen: %s", uv_strerror(fd));
         uv_fs_req_cleanup(&req);
         return fd;
     }
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
-    fprintf(stderr, "Loading journal file \"%s\".\n", path);
+    info("Loading journal file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -439,7 +420,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 
     ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
 
-    fprintf(stderr, "Journal file \"%s\" loaded (size:%"PRIu64").\n", path, file_size);
+    info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
     return 0;
 
     error:
