@@ -4,7 +4,7 @@
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author  : Pawel Krupa (paulfantom)
+# Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud)
 #
 set -e
 
@@ -32,7 +32,6 @@ fi
 echo "Opening dist archive ${DIST_FILE}"
 tar -xovf "${DIST_FILE}"
 NETDATA_DIST_FOLDER=$(echo ${DIST_FILE} | cut -d. -f1,2,3)
-
 if [ ! -d ${NETDATA_DIST_FOLDER} ]; then
 	echo "I could not locate folder ${NETDATA_DIST_FOLDER}, something went wrong failing the test"
 	exit 1
@@ -40,7 +39,7 @@ fi
 
 echo "Entering ${NETDATA_DIST_FOLDER} and starting docker compilation"
 cd ${NETDATA_DIST_FOLDER}
-docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://127.0.0.1:19999/api/v1/info' | grep version"
+docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://127.0.0.1:19999/api/v1/info' | grep version && make clean"
 
 echo "Installation completed with no errors! Removing temporary folders"
 cd -

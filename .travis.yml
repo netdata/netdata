@@ -82,6 +82,10 @@ jobs:
   - name: Run 'make dist' validation
     before_script: mkdir /tmp/netdata-makedist-test
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
