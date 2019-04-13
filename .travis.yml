@@ -231,14 +231,40 @@ jobs:
     - echo "packaging/version:" && cat packaging/version
     - .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly artifacts generation failed"
-    before_deploy: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
+    before_deploy:
+      echo "Preparing creds under ${TRAVIS_REPO_SLUG}";
+      if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+         openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
+      else
+         openssl aes-256-cbc -K $encrypted_beta_key -iv $encrypted_beta_iv -in .travis/gcs-beta-credentials.json.enc -out .travis/gcs-beta-credentials.json -d;
+      fi;
     deploy:
-      provider: gcs
-      edge:
-        branch: gcs-ng
-      project_id: netdata-storage
-      credentials: .travis/gcs-credentials.json
-      bucket: "netdata-nightlies"
-      skip_cleanup: true
-      local_dir: "artifacts"
+      # Beta storage, used for testing purposes
+      - provider: gcs
+        edge:
+          branch: gcs-ng
+        project_id: netdata-storage
+        credentials: .travis/gcs-beta-credentials.json
+        bucket: "netdata-beta-nightlies"
+        skip_cleanup: true
+        local_dir: "artifacts"
+        on:
+          # Only deploy on netdata/netdata, master branch, when artifacts directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: master
+          condition: -d "artifacts"
+      # Production storage
+      - provider: gcs
+        edge:
+          branch: gcs-ng
+        project_id: netdata-storage
+        credentials: .travis/gcs-credentials.json
+        bucket: "netdata-nightlies"
+        skip_cleanup: true
+        local_dir: "artifacts"
+        on:
+          # Only deploy on netdata/netdata, master branch, when artifacts directory is created
+          repo: netdata/netdata
+          branch: master
+          condition: -d "artifacts"
     after_deploy: rm -f .travis/gcs-credentials.json
