@@ -202,6 +202,9 @@
 #endif
 #define abs(x) (((x) < 0)? (-(x)) : (x))
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 #define GUID_LEN 36
 
 extern void netdata_fix_chart_id(char *s);
