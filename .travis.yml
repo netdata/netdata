@@ -237,7 +237,7 @@ jobs:
          openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
       else
          echo "Beta deployment stage in progress";
-         openssl aes-256-cbc -K $encrypted_dev_key -iv $encrypted_dev_iv -in .travis/gcs-dev-credentials.json.enc -out .travis/gcs-dev-credentials.json -d;
+         openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
       fi;
     deploy:
       # Beta storage, used for testing purposes
@@ -245,7 +245,7 @@ jobs:
         edge:
           branch: gcs-ng
         project_id: netdata-storage
-        credentials: .travis/gcs-dev-credentials.json
+        credentials: .travis/gcs-credentials.json
         bucket: "netdata-dev-nightlies"
         skip_cleanup: true
         local_dir: "artifacts"
