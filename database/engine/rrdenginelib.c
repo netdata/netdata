@@ -31,18 +31,17 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
 
     ret = uv_fs_fstat(NULL, &req, file, NULL);
     if (ret < 0) {
-        fprintf(stderr, "uv_fs_fstat: %s\n", uv_strerror(ret));
-        exit(ret);
+        fatal("uv_fs_fstat: %s\n", uv_strerror(ret));
     }
     assert(req.result == 0);
     s = req.ptr;
     if (!(s->st_mode & S_IFREG)) {
-        fprintf(stderr, "Not a regular file.\n");
+        error("Not a regular file.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }
     if (s->st_size < min_size) {
-        fprintf(stderr, "File length is too short.\n");
+        error("File length is too short.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }

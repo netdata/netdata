@@ -38,6 +38,9 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
 
         case RRD_MEMORY_MODE_ALLOC:
             return RRD_MEMORY_MODE_ALLOC_NAME;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            return RRD_MEMORY_MODE_DBENGINE_NAME;
     }
 
     return RRD_MEMORY_MODE_SAVE_NAME;
@@ -55,6 +58,9 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
 
     else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_ALLOC_NAME)))
         return RRD_MEMORY_MODE_ALLOC;
+
+    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_DBENGINE_NAME)))
+        return RRD_MEMORY_MODE_DBENGINE;
 
     return RRD_MEMORY_MODE_SAVE;
 }
@@ -140,7 +146,8 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
     snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
     ret = config_get(config_section, "cache directory", n);
 
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+       host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         int r = mkdir(ret, 0775);
         if(r != 0 && errno != EEXIST)
             error("Cannot create directory '%s'", ret);

@@ -80,11 +80,7 @@ struct rrdeng_page_cache_descr *pg_cache_create_descr(void)
 {
     struct rrdeng_page_cache_descr *descr;
 
-    descr = malloc(sizeof(*descr));
-    if (unlikely(descr == NULL)) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
+    descr = mallocz(sizeof(*descr));
     descr->page = NULL;
     descr->page_length = 0;
     descr->start_time = INVALID_TIME;
@@ -218,19 +214,19 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
 }
 /*
  * This function will block until it reserves #number populated pages.
- * It will trigger evictions or dirty page flushing if the PAGE_CACHE_MAX_PAGES limit is hit.
+ * It will trigger evictions or dirty page flushing if the ctx->max_cache_pages limit is hit.
  */
 static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    assert(number < PAGE_CACHE_MAX_PAGES);
+    assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= PAGE_CACHE_MAX_PAGES + 1)
-        fprintf(stderr, "=================================\nPage cache full. Reserving %u pages.\n=================================\n",
+    if (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1)
+        debug(D_RRDENGINE, "=================================\nPage cache full. Reserving %u pages.\n=================================",
                 number);
-    while (pg_cache->populated_pages + number >= PAGE_CACHE_MAX_PAGES + 1) {
+    while (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1) {
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
             /* failed to evict */
             struct completion compl;
@@ -243,7 +239,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             cmd.completion = &compl;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
             /* wait for some pages to be flushed */
-            fprintf(stderr, "%s: waiting for pages to be written to disk before evicting.\n", __func__);
+            debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
             wait_for_completion(&compl);
             destroy_completion(&compl);
 
@@ -256,7 +252,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
 /*
  * This function will attempt to reserve #number populated pages.
- * It may trigger evictions if the PAGE_CACHE_LOW_WATERMARK limit is hit.
+ * It may trigger evictions if the ctx->cache_pages_low_watermark limit is hit.
  * Returns 0 on failure and 1 on success.
  */
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
@@ -266,22 +262,22 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     unsigned count = 0;
     int ret = 0;
 
-    assert(number < PAGE_CACHE_MAX_PAGES);
+    assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= PAGE_CACHE_LOW_WATERMARK + 1) {
-        fprintf(stderr,
-                "=================================\nPage cache full. Trying to reserve %u pages.\n=================================\n",
-                number);
+    if (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1) {
+        debug(D_RRDENGINE,
+              "=================================\nPage cache full. Trying to reserve %u pages.\n=================================",
+              number);
         do {
             if (!pg_cache_try_evict_one_page_unsafe(ctx))
                 break;
             ++count;
-        } while (pg_cache->populated_pages + number >= PAGE_CACHE_LOW_WATERMARK + 1);
-        fprintf(stderr, "Evicted %u pages.\n", count);
+        } while (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1);
+        debug(D_RRDENGINE, "Evicted %u pages.", count);
     }
 
-    if (pg_cache->populated_pages + number < PAGE_CACHE_MAX_PAGES + 1) {
+    if (pg_cache->populated_pages + number < ctx->max_cache_pages + 1) {
         pg_cache->populated_pages += number;
         ret = 1; /* success */
     }
@@ -356,7 +352,7 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
     uv_rwlock_wrlock(&page_index->lock);
-    ret = JudyLDel(&page_index->JudyL_array, (Word_t)descr->start_time, PJE0);
+    ret = JudyLDel(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     assert(1 == ret);
     uv_rwlock_wrunlock(&page_index->lock);
 
@@ -366,14 +362,16 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
 
     uv_mutex_lock(&descr->mutex);
     while (!pg_cache_try_get_unsafe(descr, 1)) {
-        fprintf(stderr, "%s: Waiting for locked page:\n", __func__);
-        print_page_cache_descr(descr);
+        debug(D_RRDENGINE, "%s: Waiting for locked page:", __func__);
+        if(unlikely(debug_flags & D_RRDENGINE))
+            print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
     }
     /* even a locked page could be dirty */
     while (unlikely(descr->flags & RRD_PAGE_DIRTY)) {
-        fprintf(stderr, "%s: Found dirty page, waiting for it to be flushed:\n", __func__);
-        print_page_cache_descr(descr);
+        debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
+        if(unlikely(debug_flags & D_RRDENGINE))
+            print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
     }
     uv_mutex_unlock(&descr->mutex);
@@ -388,6 +386,7 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
     }
     pg_cache_put(descr);
     pg_cache_destroy_descr(descr);
+    pg_cache_update_metric_times(page_index);
 }
 
 static inline int is_page_in_time_range(struct rrdeng_page_cache_descr *descr, usec_t start_time, usec_t end_time)
@@ -406,7 +405,56 @@ static inline int is_point_in_time_in_page(struct rrdeng_page_cache_descr *descr
     return (point_in_time >= descr->start_time && point_in_time <= descr->end_time);
 }
 
-void pg_cache_insert(struct rrdengine_instance *ctx, struct rrdeng_page_cache_descr *descr)
+/* Update metric oldest and latest timestamps efficiently when adding new values */
+void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_cache_descr *descr)
+{
+    usec_t oldest_time = page_index->oldest_time;
+    usec_t latest_time = page_index->latest_time;
+
+    if (unlikely(oldest_time == INVALID_TIME || descr->start_time < oldest_time)) {
+        page_index->oldest_time = descr->start_time;
+    }
+    if (likely(descr->end_time > latest_time || latest_time == INVALID_TIME)) {
+        page_index->latest_time = descr->end_time;
+    }
+}
+
+/* Update metric oldest and latest timestamps when removing old values */
+void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
+{
+    Pvoid_t *firstPValue, *lastPValue;
+    Word_t firstIndex, lastIndex;
+    struct rrdeng_page_cache_descr *descr;
+    usec_t oldest_time;
+    usec_t latest_time;
+
+    uv_rwlock_rdlock(&page_index->lock);
+    /* Find first page in range */
+    firstIndex = (Word_t)0;
+    firstPValue = JudyLFirst(page_index->JudyL_array, &firstIndex, PJE0);
+    if (likely(NULL != firstPValue)) {
+        descr = *firstPValue;
+        oldest_time = descr->start_time;
+    }
+    lastIndex = (Word_t)-1;
+    lastPValue = JudyLLast(page_index->JudyL_array, &lastIndex, PJE0);
+    if (likely(NULL != lastPValue)) {
+        descr = *lastPValue;
+        latest_time = descr->end_time;
+    }
+    uv_rwlock_rdunlock(&page_index->lock);
+
+    if (unlikely(NULL == firstPValue)) {
+        assert(NULL == lastPValue);
+        page_index->oldest_time = page_index->latest_time = INVALID_TIME;
+    }
+    page_index->oldest_time = oldest_time;
+    page_index->latest_time = latest_time;
+}
+
+/* If index is NULL lookup by UUID (descr->id) */
+void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
+                     struct rrdeng_page_cache_descr *descr)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -418,15 +466,20 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct rrdeng_page_cache_de
             pg_cache_replaceQ_insert(ctx, descr);
     }
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
-    assert(NULL != PValue);
-    page_index = *PValue;
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    if (unlikely(NULL == index)) {
+        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
+        assert(NULL != PValue);
+        page_index = *PValue;
+        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    } else {
+        page_index = index;
+    }
 
     uv_rwlock_wrlock(&page_index->lock);
-    PValue = JudyLIns(&page_index->JudyL_array, (Word_t)descr->start_time, PJE0);
+    PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     *PValue = descr;
+    pg_cache_add_new_metric_time(page_index, descr);
     uv_rwlock_wrunlock(&page_index->lock);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
@@ -437,8 +490,10 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct rrdeng_page_cache_de
 /*
  * Searches for a page and triggers disk I/O if necessary and possible.
  * Does not get a reference.
+ * Returns page index pointer for given metric UUID.
  */
-void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time)
+struct pg_cache_page_index *
+        pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_cache_descr *descr = NULL, *preload_array[PAGE_CACHE_MAX_PRELOAD_PAGES];
@@ -456,14 +511,14 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
     }
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
     if (NULL == PValue) {
-        fprintf(stderr, "%s: No page was found to attempt preload.\n", __func__);
-        return;
+        debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
+        return NULL;
     }
 
     uv_rwlock_rdlock(&page_index->lock);
     /* Find first page in range */
     found = 0;
-    Index = (Word_t)start_time;
+    Index = (Word_t)(start_time / USEC_PER_SEC);
     PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
     if (likely(NULL != PValue)) {
         descr = *PValue;
@@ -472,7 +527,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
         }
     }
     if (!found) {
-        Index = (Word_t)start_time;
+        Index = (Word_t)(start_time / USEC_PER_SEC);
         PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
         if (likely(NULL != PValue)) {
             descr = *PValue;
@@ -483,8 +538,8 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
     }
     if (!found) {
         uv_rwlock_rdunlock(&page_index->lock);
-        fprintf(stderr, "%s: No page was found to attempt preload.\n", __func__);
-        return;
+        debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
+        return page_index;
     }
 
     for (count = 0 ;
@@ -501,7 +556,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
             if (flags & RRD_PAGE_POPULATED) {
                 /* success */
                 uv_mutex_unlock(&descr->mutex);
-                fprintf(stderr, "%s: Page was found in memory.\n", __func__);
+                debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
                 continue;
             }
         }
@@ -554,7 +609,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
     }
     if (failed_to_reserve) {
-        fprintf(stderr, "%s: Failed to reserve enough memory, canceling I/O.\n", __func__);
+        debug(D_RRDENGINE, "%s: Failed to reserve enough memory, canceling I/O.", __func__);
         for (i = 0 ; i < count ; ++i) {
             descr = preload_array[i];
             if (NULL == descr) {
@@ -565,15 +620,19 @@ void pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_t
     }
     if (!count) {
         /* no such page */
-        fprintf(stderr, "%s: No page was eligible to attempt preload.\n", __func__);
+        debug(D_RRDENGINE, "%s: No page was eligible to attempt preload.", __func__);
     }
+    return page_index;
 }
 
 /*
  * Searches for a page and gets a reference.
  * When point_in_time is INVALID_TIME get any page.
+ * If index is NULL lookup by UUID (id).
  */
-struct rrdeng_page_cache_descr *pg_cache_lookup(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time)
+struct rrdeng_page_cache_descr *
+        pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
+                        usec_t point_in_time)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_cache_descr *descr = NULL;
@@ -583,21 +642,24 @@ struct rrdeng_page_cache_descr *pg_cache_lookup(struct rrdengine_instance *ctx, 
     struct pg_cache_page_index *page_index;
     Word_t Index;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        page_index = *PValue;
+    if (unlikely(NULL == index)) {
+        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
+        if (likely(NULL != PValue)) {
+            page_index = *PValue;
+        }
+        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+        if (NULL == PValue) {
+            return NULL;
+        }
+    } else {
+        page_index = index;
     }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
-        return NULL;
-    }
-
     pg_cache_reserve_pages(ctx, 1);
 
     uv_rwlock_rdlock(&page_index->lock);
     while (1) {
-        Index = (Word_t)point_in_time;
+        Index = (Word_t)(point_in_time / USEC_PER_SEC);
         PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
         if (likely(NULL != PValue)) {
             descr = *PValue;
@@ -617,7 +679,7 @@ struct rrdeng_page_cache_descr *pg_cache_lookup(struct rrdengine_instance *ctx, 
         if ((flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 0)) {
             /* success */
             uv_mutex_unlock(&descr->mutex);
-            fprintf(stderr, "%s: Page was found in memory.\n", __func__);
+            debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
             break;
         }
         if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
@@ -629,8 +691,9 @@ struct rrdeng_page_cache_descr *pg_cache_lookup(struct rrdengine_instance *ctx, 
             cmd.read_page.page_cache_descr = descr;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
-            fprintf(stderr, "%s: Waiting for page to be asynchronously read from disk:\n", __func__);
-            print_page_cache_descr(descr);
+            debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
+            if(unlikely(debug_flags & D_RRDENGINE))
+                print_page_cache_descr(descr);
             while (!(descr->flags & RRD_PAGE_POPULATED)) {
                 pg_cache_wait_event_unsafe(descr);
             }
@@ -642,8 +705,9 @@ struct rrdeng_page_cache_descr *pg_cache_lookup(struct rrdengine_instance *ctx, 
             return descr;
         }
         uv_rwlock_rdunlock(&page_index->lock);
-        fprintf(stderr, "%s: Waiting for page to be unlocked:", __func__);
-        print_page_cache_descr(descr);
+        debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
+        if(unlikely(debug_flags & D_RRDENGINE))
+            print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
         uv_mutex_unlock(&descr->mutex);
 
@@ -662,15 +726,12 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
 {
     struct pg_cache_page_index *page_index;
 
-    page_index = malloc(sizeof(*page_index));
-    if (unlikely(NULL == page_index)) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
-
+    page_index = mallocz(sizeof(*page_index));
     page_index->JudyL_array = (Pvoid_t) NULL;
     uuid_copy(page_index->id, *id);
     assert(0 == uv_rwlock_init(&page_index->lock));
+    page_index->oldest_time = INVALID_TIME;
+    page_index->latest_time = INVALID_TIME;
 
     return page_index;
 }

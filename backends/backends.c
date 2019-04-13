@@ -62,8 +62,8 @@ calculated_number backend_calculate_value_from_stored_data(
     (void)host;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rrdset_first_entry_t(st);
-    time_t last_t  = rrdset_last_entry_t(st);
+    time_t first_t = rd->state->query_ops.oldest_time(rd);
+    time_t last_t  = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
 
     // step back a little, to make sure we have complete data collection

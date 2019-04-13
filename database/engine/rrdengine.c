@@ -20,8 +20,6 @@ void sanity_check(void)
 
     /* page count must fit in 8 bits */
     BUILD_BUG_ON(MAX_PAGES_PER_EXTENT > 255);
-
-    BUILD_BUG_ON(PAGE_CACHE_LOW_WATERMARK > PAGE_CACHE_MAX_PAGES);
 }
 
 void read_extent_cb(uv_fs_t* req)
@@ -41,7 +39,7 @@ void read_extent_cb(uv_fs_t* req)
     uLong crc;
 
     if (req->result < 0) {
-        fprintf(stderr, "%s: uv_fs_read: %s\n", __func__, uv_strerror((int)req->result));
+        error("%s: uv_fs_read: %s", __func__, uv_strerror((int)req->result));
         goto cleanup;
     }
     xt_io_descr = req->data;
@@ -57,8 +55,8 @@ void read_extent_cb(uv_fs_t* req)
     crc = crc32(crc, xt_io_descr->buf, xt_io_descr->bytes - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
     datafile = xt_io_descr->descr_array[0]->extent->datafile;
-    fprintf(stderr, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: %s\n", __func__,
-            xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno, ret ? "FAILED" : "SUCCEEDED");
+    debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u-%u. CRC32 check: %s", __func__,
+          xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
         /* TODO: handle errors */
         exit(UV_EIO);
@@ -70,21 +68,16 @@ void read_extent_cb(uv_fs_t* req)
         for (i = 0 ; i < count ; ++i) {
             uncompressed_payload_length += header->descr[i].page_length;
         }
-        uncompressed_buf = malloc(uncompressed_payload_length);
-        if (!uncompressed_buf) {
-            fprintf(stderr, "malloc failed.\n");
-            exit(UV_ENOMEM);
-        }
+        uncompressed_buf = mallocz(uncompressed_payload_length);
         ret = LZ4_decompress_safe(xt_io_descr->buf + payload_offset, uncompressed_buf,
                                   payload_length, uncompressed_payload_length);
-        fprintf(stderr, "LZ4 decompressed %d bytes to %d bytes.\n", payload_length, ret);
+        debug(D_RRDENGINE, "LZ4 decompressed %d bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
 
     ret = posix_memalign(&page, RRDFILE_ALIGNMENT, RRDENG_BLOCK_SIZE);
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        exit(UV_ENOMEM);
+        fatal("posix_memalign:%s", strerror(ret));
     }
     for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
         descr = xt_io_descr->descr_array[i];
@@ -109,7 +102,7 @@ void read_extent_cb(uv_fs_t* req)
         descr->page = page;
         descr->flags |= RRD_PAGE_POPULATED;
         descr->flags &= ~RRD_PAGE_READ_PENDING;
-        fprintf(stderr, "%s: Waking up waiters.\n", __func__);
+        debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
         if (xt_io_descr->release_descr) {
             pg_cache_put_unsafe(descr);
         } else {
@@ -145,16 +138,12 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     pos = descr[0]->extent->offset;
     size_bytes = descr[0]->extent->size;
 
-    xt_io_descr = malloc(sizeof(*xt_io_descr));
-    if (unlikely(NULL == xt_io_descr)) {
-        fprintf(stderr, "%s: malloc failed.\n", __func__);
-        return;
-    }
+    xt_io_descr = mallocz(sizeof(*xt_io_descr));
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        free(xt_io_descr);
-        return;
+        fatal("posix_memalign:%s", strerror(ret));
+        /* free(xt_io_descr);
+        return;*/
     }
     for (i = 0 ; i < count; ++i) {
         uv_mutex_lock(&descr[i]->mutex);
@@ -240,13 +229,13 @@ void flush_pages_cb(uv_fs_t* req)
     Word_t commit_id;
 
     if (req->result < 0) {
-        fprintf(stderr, "%s: uv_fs_write: %s\n", __func__, uv_strerror((int)req->result));
+        error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
         goto cleanup;
     }
     xt_io_descr = req->data;
     datafile = xt_io_descr->descr_array[0]->extent->datafile;
-    fprintf(stderr, "%s: Extent at offset %"PRIu64"(%u) was written to datafile %u-%u. Waking up waiters.\n",
-            __func__, xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
+    debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was written to datafile %u-%u. Waking up waiters.",
+          __func__, xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
 
     count = xt_io_descr->descr_count;
     for (i = 0 ; i < count ; ++i) {
@@ -302,9 +291,9 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    if (force)
-        fprintf(stderr, "Asynchronous flushing of extent has been forced by page pressure.\n");
-
+    if (force) {
+        debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
+    }
     uv_rwlock_rdlock(&pg_cache->commited_page_index.lock);
     for (Index = 0, count = 0, uncompressed_payload_length = 0,
          PValue = JudyLFirst(pg_cache->commited_page_index.JudyL_array, &Index, PJE0),
@@ -329,16 +318,12 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     uv_rwlock_rdunlock(&pg_cache->commited_page_index.lock);
 
     if (!count) {
-        fprintf(stderr, "%s: no pages eligible for flushing.\n", __func__);
+        debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
         if (completion)
             complete(completion);
         return 0;
     }
-    xt_io_descr = malloc(sizeof(*xt_io_descr));
-    if (unlikely(NULL == xt_io_descr)) {
-        fprintf(stderr, "%s: malloc failed.\n", __func__);
-        exit(UV_ENOMEM);
-    }
+    xt_io_descr = mallocz(sizeof(*xt_io_descr));
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     switch (compression_algorithm) {
     case RRD_NO_COMPRESSION:
@@ -347,19 +332,14 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     default: /* Compress */
         assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
         max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
-        compressed_buf = malloc(max_compressed_size);
-        if (!compressed_buf) {
-            printf("malloc failed.\n");
-            exit(UV_ENOMEM);
-        }
+        compressed_buf = mallocz(max_compressed_size);
         size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
         break;
     }
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
-        fprintf(stderr, "posix_memalign:%s\n", strerror(ret));
-        free(xt_io_descr);
-        exit(UV_ENOMEM);
+        fatal("posix_memalign:%s", strerror(ret));
+        /* free(xt_io_descr);*/
     }
     (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_cache_descr *) * count);
     xt_io_descr->descr_count = count;
@@ -370,11 +350,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    extent = malloc(sizeof(*extent) + count * sizeof(extent->pages[0]));
-    if (unlikely(NULL == extent)) {
-        fprintf(stderr, "malloc failed.\n");
-        exit(UV_ENOMEM);
-    }
+    extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
     datafile = ctx->datafiles.last;  /* TODO: check for exceeded size quota */
     extent->offset = datafile->pos;
     extent->number_of_pages = count;
@@ -410,7 +386,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     default: /* Compress */
         compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
                                                uncompressed_payload_length, max_compressed_size);
-        fprintf(stderr, "LZ4 compressed %"PRIu32" bytes to %d bytes.\n", uncompressed_payload_length, compressed_size);
+        debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
         (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
         free(compressed_buf);
         size_bytes = payload_offset + compressed_size + sizeof(*trailer);
@@ -454,14 +430,13 @@ static void after_delete_old_data(uv_work_t *req, int status)
     datafile_list_delete(ctx, datafile);
     destroy_journal_file(journalfile, datafile);
     destroy_data_file(datafile);
-    fprintf(stderr,
-            "Deleted data file \""DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".\n",
-            datafile->tier, datafile->fileno);
+    info("Deleted data file \""DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
+         datafile->tier, datafile->fileno);
     free(journalfile);
     free(datafile);
 
     ctx->disk_space -= bytes;
-    fprintf(stderr, "Reclaimed %u bytes of disk space.\n", bytes);
+    info("Reclaimed %u bytes of disk space.", bytes);
 
     /* unfreeze command processing */
     wc->now_deleting.data = NULL;
@@ -499,12 +474,12 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     uint8_t out_of_space, only_one_datafile;
 
     out_of_space = 0;
-    if (unlikely(ctx->disk_space > DISK_QUOTA)) {
+    if (unlikely(ctx->disk_space > ctx->max_disk_space)) {
         out_of_space = 1;
     }
     datafile = ctx->datafiles.last;
     current_size = datafile->pos;
-    target_size = DISK_QUOTA / TARGET_DATAFILES;
+    target_size = ctx->max_disk_space / TARGET_DATAFILES;
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
@@ -519,9 +494,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             /* already deleting data */
             return;
         }
-        fprintf(stderr,
-                "Deleting data file \""DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".\n",
-                ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+        info("Deleting data file \""DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
+             ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
         wc->now_deleting.data = ctx;
         uv_queue_work(wc->loop, &wc->now_deleting, delete_old_data, after_delete_old_data);
     }
@@ -593,7 +567,7 @@ void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-    fprintf(stderr, "%s called, active=%d.\n", __func__, uv_is_active((uv_handle_t *)handle));
+    debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
 void timer_cb(uv_timer_t* handle)
@@ -605,21 +579,21 @@ void timer_cb(uv_timer_t* handle)
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     rrdeng_test_quota(wc);
-    fprintf(stderr, "%s: timeout reached.\n", __func__);
+    debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting.data)) {
         unsigned total_bytes, bytes_written;
 
         /* There is free space so we can write to disk */
-        fprintf(stderr, "Flushing pages to disk.\n");
+        debug(D_RRDENGINE, "Flushing pages to disk.");
         for (total_bytes = bytes_written = do_flush_pages(wc, 0, NULL) ;
              bytes_written && (total_bytes < DATAFILE_IDEAL_IO_SIZE) ;
              total_bytes += bytes_written) {
             bytes_written = do_flush_pages(wc, 0, NULL);
         }
     }
-    fprintf(stderr, "Page Statistics: total=%u, populated=%u, commited=%u API consumers=%u/producers=%u\n",
-            pg_cache->page_descriptors, pg_cache->populated_pages, pg_cache->commited_page_index.nr_commited_pages,
-            pg_cache->consumers, pg_cache->producers);
+    debug(D_RRDENGINE, "Page Statistics: total=%u, populated=%u, commited=%u API consumers=%u/producers=%u",
+          pg_cache->page_descriptors, pg_cache->populated_pages, pg_cache->commited_page_index.nr_commited_pages,
+          pg_cache->consumers, pg_cache->producers);
 }
 
 /* Flushes dirty pages when timer expires */
@@ -632,11 +606,10 @@ void rrdeng_worker(void* arg)
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
     uv_loop_t* loop;
-    int shutdown, fd, error;
+    int shutdown;
     enum rrdeng_opcode opcode;
     uv_timer_t timer_req;
     struct rrdeng_cmd cmd;
-    unsigned current_cmd_batch_size;
 
     rrdeng_init_cmd_queue(wc);
 
@@ -659,13 +632,8 @@ void rrdeng_worker(void* arg)
     shutdown = 0;
     while (shutdown == 0 || uv_loop_alive(loop)) {
         uv_run(loop, UV_RUN_DEFAULT);
-        current_cmd_batch_size = 0;
         /* wait for commands */
         do {
-            if (unlikely(wc->now_deleting.data)) {
-                /* postpone commands until after deletion */
-                break;
-            }
             cmd = rrdeng_deq_cmd(wc);
             opcode = cmd.opcode;
 
@@ -675,6 +643,12 @@ void rrdeng_worker(void* arg)
                 break;
             case RRDENG_SHUTDOWN:
                 shutdown = 1;
+                if (unlikely(wc->now_deleting.data)) {
+                    /* postpone shutdown until after deletion */
+                    info("Postponing shutting RRD engine event loop down until after datafile deletion is finished.");
+                    rrdeng_enq_cmd(wc, &cmd);
+                    break;
+                }
                 /*
                  * uv_async_send after uv_close does not seem to crash in linux at the moment,
                  * it is however undocumented behaviour and we need to be aware if this becomes
@@ -683,7 +657,7 @@ void rrdeng_worker(void* arg)
                 uv_close((uv_handle_t *)&wc->async, NULL);
                 assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
-                fprintf(stderr, "Shutting down RRD engine event loop.\n");
+                info("Shutting down RRD engine event loop.");
                 while (do_flush_pages(wc, 1, NULL)) {
                     ; /* Force flushing of all commited pages. */
                 }
@@ -710,16 +684,16 @@ void rrdeng_worker(void* arg)
                 break;
             }
             default:
-                fprintf(stderr, "default.\n");
+                debug(D_RRDENGINE, "%s: default.", __func__);
                 break;
             }
-        } while ((opcode != RRDENG_NOOP) && (current_cmd_batch_size  < CMD_BATCH_SIZE));
+        } while (opcode != RRDENG_NOOP);
     }
     /* cleanup operations of the event loop */
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    fprintf(stderr, "Shutting down RRD engine event loop complete.\n");
+    info("Shutting down RRD engine event loop complete.");
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
@@ -752,7 +726,7 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
     fprintf(stderr, "\n********** CREATED %d METRIC PAGES ***********\n\n", NR_PAGES);
     failed_validations = 0;
     for (i = 0 ; i < NR_PAGES ; ++i) {
-        buf = rrdeng_get_latest_page(ctx, &uuid[i], &handle[i]);
+        buf = rrdeng_get_latest_page(ctx, &uuid[i], (void **)&handle[i]);
         if (NULL == buf) {
             ++failed_validations;
             fprintf(stderr, "Page %d was LOST.\n", i);
@@ -782,90 +756,18 @@ void rrdengine_main(void)
     uv_buf_t iov;
     static uv_loop_t* loop;
     uv_async_t async;
-    char *data = "LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents.\n";
+    char *data = "LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents.";
     uv_work_t work_req;
     const volatile int* flag;
-    struct rrdengine_instance ctx;
+    struct rrdengine_instance *ctx;
 
-    ret = rrdeng_init(&ctx);
+    ret = rrdeng_init(&ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
     if (ret) {
         exit(ret);
     }
-    basic_functional_test(&ctx);
+    basic_functional_test(ctx);
 
-    rrdeng_exit(&ctx);
-    fprintf(stderr, "Hello world!\n");
-    exit(0);
-
-    fd = open("tmpfile.txt", O_DIRECT | O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-    if (fd == -1) {
-        perror("open");
-        exit(fd);
-    }
-
-    alignment = fpathconf(fd, _PC_REC_XFER_ALIGN);
-    if (alignment == -1) {
-        perror("fpathconf");
-        exit(alignment);
-    }
-    printf("Alignment = %ld\n", alignment);
-    if (alignment > RRDENG_BLOCK_SIZE || (RRDENG_BLOCK_SIZE % alignment != 0)) {
-        printf("File alignment incompatible with RRD engine block size.\n");
-    }
-
-    ret = posix_memalign(&block, alignment, RRDENG_BLOCK_SIZE);
-    if (ret) {
-        printf("posix_memalign:%s\n", strerror(ret));
-        exit(ret);
-    }
-    strcpy((char *) block, "Test file contents.\n");
-
-    memset(&aio_desc, 0, sizeof(aio_desc));
-    aio_desc.aio_fildes = fd;
-    aio_desc.aio_offset = 0;
-    aio_desc.aio_buf = block;
-    aio_desc.aio_nbytes = RRDENG_BLOCK_SIZE;
-
-    ret = aio_write(&aio_desc);
-    if (ret == -1) {
-        perror("aio_write");
-        exit(ret);
-    }
-    ret = aio_error(&aio_desc);
-    switch (ret) {
-    case 0:
-        printf("aio_error: request completed\n");
-        break;
-    case EINPROGRESS:
-        printf("aio_error:%s\n", strerror(ret));
-        aio_descp = &aio_desc;
-        ret = aio_suspend((const struct aiocb *const *)&aio_descp, 1, NULL);
-        if (ret == -1) {
-            /* should handle catching signals here */
-            perror("aio_suspend");
-            exit(ret);
-        }
-        break;
-    case ECANCELED:
-        printf("aio_error:%s\n", strerror(ret));
-        break;
-    default:
-        printf("aio_error:%s\n", strerror(ret));
-        exit(ret);
-        break;
-    }
-    ret = aio_return(&aio_desc);
-    if (ret == -1) {
-        perror("aio_return");
-        exit(ret);
-    }
-
-    fd = close(fd);
-    if (fd == -1) {
-        perror("close");
-        exit(fd);
-    }
-    free(block);
-
+    rrdeng_exit(ctx);
+    fprintf(stderr, "Hello world!");
     exit(0);
 }

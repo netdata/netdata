@@ -124,6 +124,12 @@ AC_ARG_ENABLE(
     ,
     [enable_lto="detect"]
 )
+AC_ARG_ENABLE(
+    [dbengine],
+    [AS_HELP_STRING([--disable-dbengine], [enable netdata dbengine @<:@default autodetect@:>@])],
+    ,
+    [enable_dbengine="detect"]
+)
 
 
 # -----------------------------------------------------------------------------
@@ -236,29 +242,14 @@ AC_MSG_RESULT([${with_math}])
 
 
 # -----------------------------------------------------------------------------
-# librt Posix Realtime extensions
-
-AC_CHECK_LIB(
-    [rt],
-    [aio_write],
-    [RT_LIBS="-lrt"]
-)
-test -z "${RT_LIBS}" && AC_MSG_ERROR([librt required but not found])
-
-OPTIONAL_RT_CLFAGS="${RT_CFLAGS}"
-OPTIONAL_RT_LIBS="${RT_LIBS}"
-
-
-# -----------------------------------------------------------------------------
 # libuv multi-platform support library with a focus on asynchronous I/O
-# TODO: Should add check that libuv version >= 1?
+# TODO: check version, uv_fs_scandir_next only available in version >= 1.0
 
 AC_CHECK_LIB(
     [uv],
-    [uv_fs_write],
+    [uv_fs_scandir_next],
     [UV_LIBS="-luv"]
 )
-test -z "${UV_LIBS}" && AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
 
 OPTIONAL_UV_CLFAGS="${UV_CFLAGS}"
 OPTIONAL_UV_LIBS="${UV_LIBS}"
@@ -272,7 +263,6 @@ AC_CHECK_LIB(
     [LZ4_decompress_safe],
     [LZ4_LIBS="-llz4"]
 )
-test -z "${LZ4_LIBS}" && AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
 OPTIONAL_LZ4_CLFAGS="${LZ4_CFLAGS}"
 OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
@@ -286,7 +276,6 @@ AC_CHECK_LIB(
     [JudyLIns],
     [JUDY_LIBS="-lJudy"]
 )
-test -z "${JUDY_LIBS}" && AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
 OPTIONAL_JUDY_CLFAGS="${JUDY_CFLAGS}"
 OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
@@ -327,6 +316,43 @@ PKG_CHECK_MODULES(
 AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [crypto],
+    [SHA256_Init],
+    [SSL_LIBS="-lcrypto -lssl"]
+)
+
+OPTIONAL_SSL_CLFAGS="${SSL_CFLAGS}"
+OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+
+# -----------------------------------------------------------------------------
+# DB engine
+test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
+    AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
+    AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+AC_MSG_CHECKING([if netdata dbengine should be used])
+if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}"; then
+    enable_dbengine="yes"
+    AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
+else
+    enable_dbengine="no"
+fi
+AC_MSG_RESULT([${enable_dbengine}])
+AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -719,10 +745,10 @@ CPPFLAGS="\
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
 AC_SUBST([OPTIONAL_RT_CLFAGS])
-AC_SUBST([OPTIONAL_RT_LIBS])
 AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
+AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
