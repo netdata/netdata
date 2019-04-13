@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- netdata/packaging: In particular cases netdata binary produces broken version string [\#5855](https://github.com/netdata/netdata/issues/5855)
 - python module autodetection\_retry don't work as expected [\#5832](https://github.com/netdata/netdata/issues/5832)
 - CouchDB collector exception [\#5830](https://github.com/netdata/netdata/issues/5830)
 - macOS: python.d.plugin crashes on start [\#5821](https://github.com/netdata/netdata/issues/5821)
@@ -40,6 +41,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging/installer: Dont use --always in git describe. [\#5860](https://github.com/netdata/netdata/pull/5860) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Openldap tls support rebased [\#5859](https://github.com/netdata/netdata/pull/5859) ([ekartsonakis](https://github.com/ekartsonakis))
 - python.d.plugin: py2 fix crash on macos [\#5838](https://github.com/netdata/netdata/pull/5838) ([ilyam8](https://github.com/ilyam8))
 - python.d.plugin: autodetection retry fix [\#5837](https://github.com/netdata/netdata/pull/5837) ([ilyam8](https://github.com/ilyam8))
