@@ -86,7 +86,8 @@ jobs:
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make dist
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-v*.*.*.tar.gz
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
+    - .travis/run_install_with_dist_file.sh
     - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
     git:
       depth: false
