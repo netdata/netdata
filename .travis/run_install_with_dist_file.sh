@@ -42,5 +42,7 @@ cd ${NETDATA_DIST_FOLDER}
 docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://127.0.0.1:19999/api/v1/info' | grep version && make clean"
 
 echo "Installation completed with no errors! Removing temporary folders"
+
+# TODO: Travis give me a permission denied on some files here, i made it a soft error until i figure out what is wrong
 cd -
-rm -rf ${NETDATA_DIST_FOLDER}
+rm -rf ${NETDATA_DIST_FOLDER} || echo "I could not remove temporary directory, make sure you delete ${NETDATA_DIST_FOLDER} by yourself if this wasn't run over ephemeral storage"
