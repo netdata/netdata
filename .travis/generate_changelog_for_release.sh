@@ -11,17 +11,16 @@ ORGANIZATION=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $1}')
 PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
-
 if [ -z ${GIT_TAG+x} ]; then
 	OPTS=""
 else
 	OPTS="--future-release ${GIT_TAG}"
 fi
 
-
-echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do"
-exit 0
-
+if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+	echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do"
+	exit 0
+fi
 
 echo "--- Creating changelog ---"
 git checkout master
@@ -35,4 +34,3 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--unreleased-label "**Next release**" \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
 	--no-compare-link ${OPTS}
-
