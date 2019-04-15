@@ -33,7 +33,7 @@ for file in kickstart.sh kickstart-static64.sh; do
 		if [ "$KICKSTART_MD5" == "$CALCULATED_MD5" ]; then
 			echo "${KICKSTART_URL} looks fine"
 		else
-			post_message "Attention @group , ${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
+			post_message "Attention <!here> , ${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
 		fi
 	fi
 
