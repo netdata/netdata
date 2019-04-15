@@ -440,6 +440,16 @@ class AtaNormalized(BaseAtaSmartAttribute):
         return self.normalized_value
 
 
+class Ata1(BaseAtaSmartAttribute):
+    def value(self):
+        return min(int(self.normalized_value), int(self.raw_value))
+
+
+class Ata7(BaseAtaSmartAttribute):
+    def value(self):
+        return min(int(self.normalized_value), int(self.raw_value))
+
+
 class Ata9(BaseAtaSmartAttribute):
     def value(self):
         value = int(self.raw_value)
@@ -475,6 +485,10 @@ class SCSIRaw(BaseSCSISmartAttribute):
 def ata_attribute_factory(value):
     name = value[0]
 
+    if name == ATTR1:
+        return Ata1(*value)
+    if name == ATTR7:
+        return Ata7(*value)
     if name == ATTR9:
         return Ata9(*value)
     elif name == ATTR190:
@@ -482,7 +496,6 @@ def ata_attribute_factory(value):
     elif name == ATTR194:
         return Ata194(*value)
     elif name in [
-        ATTR1,
         ATTR7,
         ATTR202,
         ATTR206,
