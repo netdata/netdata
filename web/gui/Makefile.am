@@ -4,7 +4,6 @@
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
-	dashboard.js \
 	version.txt \
 	$(NULL)
 
