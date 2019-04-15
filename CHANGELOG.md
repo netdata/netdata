@@ -43,6 +43,7 @@
 
 - netdata/packaging/installer: Dont use --always in git describe. [\#5860](https://github.com/netdata/netdata/pull/5860) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Openldap tls support rebased [\#5859](https://github.com/netdata/netdata/pull/5859) ([ekartsonakis](https://github.com/ekartsonakis))
+- netdata/web/gui/dashboard: do not remove the dashboard upon make clean [\#5853](https://github.com/netdata/netdata/pull/5853) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python.d.plugin: py2 fix crash on macos [\#5838](https://github.com/netdata/netdata/pull/5838) ([ilyam8](https://github.com/ilyam8))
 - python.d.plugin: autodetection retry fix [\#5837](https://github.com/netdata/netdata/pull/5837) ([ilyam8](https://github.com/ilyam8))
 - phpfpm collector: add last\_collected\_secs health check [\#5836](https://github.com/netdata/netdata/pull/5836) ([ilyam8](https://github.com/ilyam8))
