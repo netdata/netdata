@@ -726,7 +726,7 @@ RRDR *rrd2rrdr(
 
         before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * st->update_every ));
     }
-    size_t before_slot = rrdset_time2slot(st, before_wanted);
+    size_t before_slot;// = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
@@ -748,7 +748,7 @@ RRDR *rrd2rrdr(
             after_wanted = first_entry_t - (first_entry_t % ( ((aligned)?group:1) * st->update_every )) + ( ((aligned)?group:1) * st->update_every );
         }
     }
-    size_t after_slot  = rrdset_time2slot(st, after_wanted);
+    size_t after_slot;//  = rrdset_time2slot(st, after_wanted);
 
     // check if they are reversed
     if(unlikely(after_wanted > before_wanted)) {
@@ -784,11 +784,13 @@ RRDR *rrd2rrdr(
     if(before_wanted > last_entry_t)
         error("INTERNAL CHECK: before_wanted %u is too big, maximum %u", (uint32_t)before_wanted, (uint32_t)last_entry_t);
 
+/*
     if(before_slot >= (size_t)st->entries)
         error("INTERNAL CHECK: before_slot is invalid %zu, expected 0 to %ld", before_slot, st->entries - 1);
 
     if(after_slot >= (size_t)st->entries)
         error("INTERNAL CHECK: after_slot is invalid %zu, expected 0 to %ld", after_slot, st->entries - 1);
+*/
 
     if(points_wanted > (before_wanted - after_wanted) / group / st->update_every + 1)
         error("INTERNAL CHECK: points_wanted %ld is more than points %ld", points_wanted, (before_wanted - after_wanted) / group / st->update_every + 1);

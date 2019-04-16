@@ -65,6 +65,8 @@ calculated_number backend_calculate_value_from_stored_data(
     time_t first_t = rd->state->query_ops.oldest_time(rd);
     time_t last_t  = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
+    time_t now;
+    struct rrddim_query_handle handle;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
@@ -105,6 +107,7 @@ calculated_number backend_calculate_value_from_stored_data(
     size_t counter = 0;
     calculated_number sum = 0;
 
+/*
     long    start_at_slot = rrdset_time2slot(st, before),
             stop_at_slot  = rrdset_time2slot(st, after),
             slot, stop_now = 0;
@@ -126,7 +129,22 @@ calculated_number backend_calculate_value_from_stored_data(
 
         counter++;
     }
+*/
+    rd->state->query_ops.init(rd, &handle, before, after);
+    for(now = before ; now >= after ; now -= update_every) {
 
+        storage_number n = rd->state->query_ops.load_metric(&handle, now);
+
+        if(unlikely(!does_storage_number_exist(n))) {
+            // not collected
+            continue;
+        }
+
+        calculated_number value = unpack_storage_number(n);
+        sum += value;
+
+        counter++;
+    }
     if(unlikely(!counter)) {
         debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
               host->hostname, st->id, rd->id,
