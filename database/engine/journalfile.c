@@ -212,11 +212,11 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                                     void *buf, unsigned max_size)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    unsigned i, count, payload_length, descr_size;
+    unsigned i, count, payload_length, descr_size, valid_pages;
     struct rrdeng_page_cache_descr *descr;
     struct extent_info *extent;
     /* persistent structures */
-    struct rrdeng_jf_store_metric_data *jf_metric_data;
+    struct rrdeng_jf_store_data *jf_metric_data;
 
     jf_metric_data = buf;
     count = jf_metric_data->number_of_pages;
@@ -234,11 +234,16 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     extent->datafile = journalfile->datafile;
     extent->next = NULL;
 
-    for (i = 0 ; i < count ; ++i) {
+    for (i = 0, valid_pages = 0 ; i < count ; ++i) {
         uuid_t *temp_id;
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index;
 
+        if (PAGE_METRICS != jf_metric_data->descr[i].type) {
+            error("Unknown page type encountered.");
+            continue;
+        }
+        ++valid_pages;
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -265,7 +270,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         extent->pages[i] = descr;
         pg_cache_insert(ctx, page_index, descr);
     }
-    df_extent_insert(extent);
+    if (likely(valid_pages))
+        df_extent_insert(extent);
 }
 
 /*
@@ -281,7 +287,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
     /* persistent structures */
     struct rrdeng_df_extent_header *df_header;
     struct rrdeng_jf_transaction_header *jf_header;
-    struct rrdeng_jf_store_metric_data *jf_metric_data;
+    struct rrdeng_jf_store_data *jf_metric_data;
     struct rrdeng_jf_transaction_trailer *jf_trailer;
     uLong crc;
 
@@ -311,7 +317,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
         return size_bytes;
     }
     switch (jf_header->type) {
-    case STORE_METRIC_DATA:
+    case STORE_DATA:
         debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
         restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
