@@ -32,9 +32,17 @@ struct rrdeng_df_sb {
 } __attribute__ ((packed));
 
 /*
+ * Page types
+ */
+#define PAGE_METRICS    (0)
+#define PAGE_LOGS       (1) /* reserved */
+
+/*
  * Data file page descriptor
  */
 struct rrdeng_extent_page_descr {
+    uint8_t type;
+
     uint8_t uuid[UUID_SZ];
     uint32_t page_length;
     uint64_t start_time;
@@ -73,7 +81,7 @@ struct rrdeng_jf_sb {
  * Transaction record types
  */
 #define STORE_PADDING       (0)
-#define STORE_METRIC_DATA   (1)
+#define STORE_DATA          (1)
 #define STORE_LOGS          (2) /* reserved */
 
 /*
@@ -81,7 +89,7 @@ struct rrdeng_jf_sb {
  */
 struct rrdeng_jf_transaction_header {
     /* when set to STORE_PADDING jump to start of next block */
-    uint8_t type; /* TODO: type has to be per page */
+    uint8_t type;
 
     uint32_t reserved; /* reserved for future use */
     uint64_t id;
@@ -96,9 +104,9 @@ struct rrdeng_jf_transaction_trailer {
 } __attribute__ ((packed));
 
 /*
- * Journal file STORE_METRIC_DATA action
+ * Journal file STORE_DATA action
  */
-struct rrdeng_jf_store_metric_data { /* TODO: this has nothing to do with metrics */
+struct rrdeng_jf_store_data {
     /* data file extent information */
     uint64_t extent_offset;
     uint32_t extent_size;

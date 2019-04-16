@@ -166,7 +166,7 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     assert (-1 != ret);
 }
 
-static void commit_metric_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)
+static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     unsigned count, payload_length, descr_size, size_bytes;
@@ -174,7 +174,7 @@ static void commit_metric_data_extent(struct rrdengine_worker_config* wc, struct
     /* persistent structures */
     struct rrdeng_df_extent_header *df_header;
     struct rrdeng_jf_transaction_header *jf_header;
-    struct rrdeng_jf_store_metric_data *jf_metric_data;
+    struct rrdeng_jf_store_data *jf_metric_data;
     struct rrdeng_jf_transaction_trailer *jf_trailer;
     uLong crc;
 
@@ -187,7 +187,7 @@ static void commit_metric_data_extent(struct rrdengine_worker_config* wc, struct
     buf = wal_get_transaction_buffer(wc, size_bytes);
 
     jf_header = buf;
-    jf_header->type = STORE_METRIC_DATA;
+    jf_header->type = STORE_DATA;
     jf_header->reserved = 0;
     jf_header->id = ctx->commit_log.transaction_id++;
     jf_header->payload_length = payload_length;
@@ -207,11 +207,11 @@ static void commit_metric_data_extent(struct rrdengine_worker_config* wc, struct
 static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t type, void *data)
 {
     switch (type) {
-    case STORE_METRIC_DATA:
-        commit_metric_data_extent(wc, (struct extent_io_descriptor *)data);
+    case STORE_DATA:
+        commit_data_extent(wc, (struct extent_io_descriptor *)data);
         break;
     default:
-        assert(type == STORE_METRIC_DATA);
+        assert(type == STORE_DATA);
         break;
     }
 }
@@ -362,6 +362,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
 
         descr = xt_io_descr->descr_array[i];
+        header->descr[i].type = PAGE_METRICS;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time = descr->start_time;
@@ -407,7 +408,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, ALIGN_BYTES_CEILING(size_bytes));
     ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, flush_pages_cb);
     assert (-1 != ret);
-    do_commit_transaction(wc, STORE_METRIC_DATA, xt_io_descr);
+    do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
     rrdeng_test_quota(wc);
@@ -669,7 +670,7 @@ void rrdeng_worker(void* arg)
                 do_read_extent(wc, cmd.read_extent.page_cache_descr, cmd.read_extent.page_count, 1);
                 break;
             case RRDENG_COMMIT_PAGE:
-                do_commit_transaction(wc, STORE_METRIC_DATA, NULL);
+                do_commit_transaction(wc, STORE_DATA, NULL);
                 break;
             case RRDENG_FLUSH_PAGES: {
                 unsigned total_bytes, bytes_written;
