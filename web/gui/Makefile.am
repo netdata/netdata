@@ -68,6 +68,19 @@ dist_web_DATA = \
 	version.txt \
 	$(NULL)
 
+
+webconsoledir=$(webdir)/console
+dist_webconsole_DATA = \
+	console/index.html \
+	console/main.bundle.js \
+	console/main.css \
+	$(NULL)
+
+webstaticdir=$(webdir)/static/img
+dist_webstatic_DATA = \
+    static/img/netdata-logomark.svg \
+	$(NULL)
+
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
 	lib/bootstrap-3.3.7.min.js \
