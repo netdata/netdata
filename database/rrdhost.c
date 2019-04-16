@@ -228,9 +228,14 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
+        char dbenginepath[FILENAME_MAX + 1];
         int ret;
 
-        ret = rrdeng_init(&host->rrdeng_ctx, host->cache_dir, host->page_cache_mb, host->disk_space_mb);
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if(ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+        ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
         if(ret) {
             error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
                   host->hostname, host->machine_guid, host->cache_dir);
