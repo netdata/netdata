@@ -236,6 +236,7 @@ jobs:
       if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
          openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
       else
+         echo "Beta deployment stage in progress";
          openssl aes-256-cbc -K $encrypted_beta_key -iv $encrypted_beta_iv -in .travis/gcs-beta-credentials.json.enc -out .travis/gcs-beta-credentials.json -d;
       fi;
     deploy:
