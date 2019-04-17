@@ -77,7 +77,7 @@ Briefly we currently evaluate the following activities:
 TBD
 
 ## Nightly operations
-TBD
+At this stage we run scheduled jobs and execute the nightly changelog generator
 
 ## Nightly release
 TBD
