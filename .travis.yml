@@ -89,6 +89,11 @@ jobs:
       bucket: "netdata-nightlies"
       skip_cleanup: true
       local_dir: "artifacts"
+      on:
+        # Only deploy on netdata/netdata, master branch, when artifacts directory is created
+        repo: netdata/netdata
+        branch: master
+        condition: -d "artifacts"
     after_deploy: rm -f .travis/gcs-credentials.json
 
   - stage: Integrity testing
