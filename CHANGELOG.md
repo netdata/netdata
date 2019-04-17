@@ -4,9 +4,11 @@
 
 **Fixed bugs:**
 
+- Follow up adjustment of plugin permissions [\#5858](https://github.com/netdata/netdata/issues/5858)
 - netdata/packaging: In particular cases netdata binary produces broken version string [\#5855](https://github.com/netdata/netdata/issues/5855)
 - python module autodetection\_retry don't work as expected [\#5832](https://github.com/netdata/netdata/issues/5832)
 - CouchDB collector exception [\#5830](https://github.com/netdata/netdata/issues/5830)
+- Segfault when using postgres plugin [\#5829](https://github.com/netdata/netdata/issues/5829)
 - macOS: python.d.plugin crashes on start [\#5821](https://github.com/netdata/netdata/issues/5821)
 - Errorneous netdata version [\#5808](https://github.com/netdata/netdata/issues/5808)
 - Kickstart-static64.sh installation problems [\#5807](https://github.com/netdata/netdata/issues/5807)
@@ -19,20 +21,25 @@
 - netdata-updater broke [\#5529](https://github.com/netdata/netdata/issues/5529)
 - centos6: python.d.plugin zombie process after netdata restart [\#5491](https://github.com/netdata/netdata/issues/5491)
 - Socket proxying through unix socket doesnt work in FreeBSD 12 [\#5178](https://github.com/netdata/netdata/issues/5178)
+- netdata/packaging/ci: Do not trigger deployment if certain conditions are not met [\#5816](https://github.com/netdata/netdata/pull/5816) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: HoS situation - Fix broken install-or-update script [\#5806](https://github.com/netdata/netdata/pull/5806) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix non compatible function declaration [\#5789](https://github.com/netdata/netdata/pull/5789) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Make netdata.spec more futureproof [\#5766](https://github.com/netdata/netdata/pull/5766) ([nichivo](https://github.com/nichivo))
 
 **Closed issues:**
 
+- API Key not enabled [\#5869](https://github.com/netdata/netdata/issues/5869)
 - last\_collected\_secs health check for phpfpm [\#5820](https://github.com/netdata/netdata/issues/5820)
 - update  /packaging/docker/README.md  in Mac OS run build [\#5818](https://github.com/netdata/netdata/issues/5818)
 - feature: LDAPS support for openldap-collector [\#5783](https://github.com/netdata/netdata/issues/5783)
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
 - feature: kubelet collector improvements [\#5720](https://github.com/netdata/netdata/issues/5720)
 - How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
+- feature: openvpn module - use management interface [\#5699](https://github.com/netdata/netdata/issues/5699)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Status of netdata/binary-packages [\#5671](https://github.com/netdata/netdata/issues/5671)
+- Full integration with netdata of the new database implementation [\#5641](https://github.com/netdata/netdata/issues/5641)
+- Ensure that `jq` is available in netdata installations  [\#5621](https://github.com/netdata/netdata/issues/5621)
 - Can I check monthly or daily reports or history [\#5287](https://github.com/netdata/netdata/issues/5287)
 - SSL support for Elasticsearch plugin [\#5179](https://github.com/netdata/netdata/issues/5179)
 - support filtering disk naming by id [\#4957](https://github.com/netdata/netdata/issues/4957)
@@ -41,9 +48,14 @@
 
 **Merged pull requests:**
 
+- Fix segmentation fault in streaming [\#5882](https://github.com/netdata/netdata/pull/5882) ([vlvkobal](https://github.com/vlvkobal))
+- netdata/packaging/ci: Use proper notifier in slack message [\#5866](https://github.com/netdata/netdata/pull/5866) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: Dont use --always in git describe. [\#5860](https://github.com/netdata/netdata/pull/5860) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Openldap tls support rebased [\#5859](https://github.com/netdata/netdata/pull/5859) ([ekartsonakis](https://github.com/ekartsonakis))
+- netdata/packaging/installer: correlate permissions amongst plugins to 0750 [\#5856](https://github.com/netdata/netdata/pull/5856) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/web/gui/dashboard: do not remove the dashboard upon make clean [\#5853](https://github.com/netdata/netdata/pull/5853) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- installer: include go.d.plugin version v0.4.0 [\#5849](https://github.com/netdata/netdata/pull/5849) ([ilyam8](https://github.com/ilyam8))
+- netdata/collectors/cgroups.plugin: When jq not available, prompt the user he may have to install jq [\#5848](https://github.com/netdata/netdata/pull/5848) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python.d.plugin: py2 fix crash on macos [\#5838](https://github.com/netdata/netdata/pull/5838) ([ilyam8](https://github.com/ilyam8))
 - python.d.plugin: autodetection retry fix [\#5837](https://github.com/netdata/netdata/pull/5837) ([ilyam8](https://github.com/ilyam8))
 - phpfpm collector: add last\_collected\_secs health check [\#5836](https://github.com/netdata/netdata/pull/5836) ([ilyam8](https://github.com/ilyam8))
