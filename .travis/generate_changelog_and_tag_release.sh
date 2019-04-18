@@ -31,7 +31,7 @@ if [ ! -f .gitignore ]; then
 fi
 
 echo "--- Executing Tagging facility to determine TAG ---"
-.travis/tagger.sh
+source .travis/tagger.sh
 
 echo "--- Changelog generator and tagger script starting ---"
 # If tagger script hasn't produced a TAG, there is nothing to do so bail out happy
