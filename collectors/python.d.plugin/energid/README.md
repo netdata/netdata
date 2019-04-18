@@ -9,23 +9,28 @@ with many others forks including bitcoind itself.
 Introduces several new charts:
 
 1. **Blockchain Index**
-    - blocks
-    - headers
+ * blocks
+ * headers
+
 2. **Blockchain Difficulty**
-    - diff
+ * diff
+
 3. **MemPool** in MiB
-    - Max
-    - Usage
-    - TX Size
+ * Max
+ * Usage
+ * TX Size
+
 4. **Secure Memory* in KiB
-    - Total
-    - Locked
-    - Used
+ * Total
+ * Locked
+ * Used
+
 5. **Network**
-    - Connections
+ * Connections
+
 6. **UTXO** (Unspent Transaction Output)
-    - UTXO
-    - Xfers (related transactions)
+ * UTXO
+ * Xfers (related transactions)
 
 Configuration is needed, disabled by default.
 

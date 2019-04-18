@@ -127,7 +127,6 @@ class Service(UrlService):
 
         for i, (_, handler) in enumerate(self.methods.items()):
             r = result[i]
-            assert(r['id'] == i)
             data.update(handler(r['result']))
 
         return data
