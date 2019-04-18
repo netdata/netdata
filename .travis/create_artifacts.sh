@@ -13,6 +13,9 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 	exit 0
 fi;
 
+echo "Pulling latest code"
+git pull
+
 # Everything from this directory will be uploaded to GCS
 mkdir -p artifacts
 BASENAME="netdata-$(git describe)"

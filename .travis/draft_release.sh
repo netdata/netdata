@@ -22,6 +22,9 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
+echo "Pulling latest code"
+git pull
+
 if [[ $(git describe) =~ -rc* ]]; then
 	echo "This is a release candidate tag, we do not generate a release draft"
 	exit 0
