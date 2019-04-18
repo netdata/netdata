@@ -163,7 +163,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
                     .plugin = st->plugin_name ? st->plugin_name : "",
                     .module = st->module_name ? st->module_name : ""
             };
-            sprintf(name, "%s%s", col.plugin, col.module);
+            sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
             st->last_accessed_time = now;
         }

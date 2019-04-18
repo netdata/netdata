@@ -22,117 +22,23 @@ if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ]; then
 	exit 0
 fi
 
-# -------------------------------------------------------------------------------------------------
-# detect the operating system
-
-OS_DETECTION="unknown"
-NAME="unknown"
-VERSION="unknown"
-VERSION_ID="unknown"
-ID="unknown"
-ID_LIKE="unknown"
-
-if [ -f "/etc/os-release" ]; then
-	OS_DETECTION="/etc/os-release"
-	eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
-fi
-
-if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
-	if [ -f "/etc/lsb-release" ]; then
-		if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="/etc/lsb-release"; else OS_DETECTION="Mixed"; fi
-		DISTRIB_ID="unknown"
-		DISTRIB_RELEASE="unknown"
-		DISTRIB_CODENAME="unknown"
-		eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-		if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
-		if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
-		if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
-	elif [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-		if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
-		if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
-		if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-		if [ "${ID}" = "unknown" ]; then ID="$(lsb_release -cs 2>/dev/null)"; fi
-	fi
-fi
-
-# -------------------------------------------------------------------------------------------------
-# detect the kernel
-
-KERNEL_NAME="$(uname -s)"
-KERNEL_VERSION="$(uname -r)"
-ARCHITECTURE="$(uname -m)"
-
-# -------------------------------------------------------------------------------------------------
-# detect the virtualization
-
-VIRTUALIZATION="unknown"
-VIRT_DETECTION="none"
-CONTAINER="unknown"
-CONT_DETECTION="none"
-
-if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-	VIRTUALIZATION="$(systemd-detect-virt -v)"
-	VIRT_DETECTION="systemd-detect-virt"
-	CONTAINER="$(systemd-detect-virt -c)"
-	CONT_DETECTION="systemd-detect-virt"
-else
-	if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
-		VIRTUALIZATION="hypervisor"
-		VIRT_DETECTION="/proc/cpuinfo"
-	fi
-fi
-
-# -------------------------------------------------------------------------------------------------
-# detect containers with heuristics
-
-if [ "${CONTAINER}" = "unknown" ]; then
-	if [ -f /proc/1/sched ] ; then
-		IFS='(, ' read -r process _ </proc/1/sched
-		if [ "${process}" = "netdata" ]; then
-			CONTAINER="container"
-			CONT_DETECTION="process"
-		fi
-	fi
-	# ubuntu and debian supply /bin/running-in-container
-	# https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
-	if /bin/running-in-container >/dev/null 2>&1; then
-		CONTAINER="container"
-		CONT_DETECTION="/bin/running-in-container"
-	fi
-
-	# lxc sets environment variable 'container'
-	#shellcheck disable=SC2154
-	if [ -n "${container}" ]; then
-		CONTAINER="lxc"
-		CONT_DETECTION="containerenv"
-	fi
-
-	# docker creates /.dockerenv
-	# http://stackoverflow.com/a/25518345
-	if [ -f "/.dockerenv" ]; then
-		CONTAINER="docker"
-		CONT_DETECTION="dockerenv"
-	fi
-fi
-
-# -------------------------------------------------------------------------------------------------
-# check netdata version
-
-if [ -z "${NETDATA_VERSION}" ]; then
-	NETDATA_VERSION="uknown"
-	netdata -V >/dev/null 2>&1 && NETDATA_VERSION="$(netdata -V 2>&1 | cut -d ' ' -f 2)"
-fi
-
-# -------------------------------------------------------------------------------------------------
-# check netdata unique id
-if [ -z "${NETDATA_REGISTRY_UNIQUE_ID}" ] ; then
-	if [ -f "@registrydir_POST@/netdata.public.unique.id" ]; then
-		NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
-	else
-		NETDATA_REGISTRY_UNIQUE_ID="unknown"
-	fi
-fi
-
+echo "&av=${NETDATA_VERSION}\
+&ec=${ACTION}\
+&ea=${ACTION_RESULT}\
+&el=${ACTION_DATA}\
+&cd1=${NETDATA_SYSTEM_OS_NAME}\
+&cd2=${NETDATA_SYSTEM_OS_ID}\
+&cd3=${NETDATA_SYSTEM_OS_ID_LIKE}\
+&cd4=${NETDATA_SYSTEM_OS_VERSION}\
+&cd5=${NETDATA_SYSTEM_OS_VERSION_ID}\
+&cd6=${NETDATA_SYSTEM_OS_DETECTION}\
+&cd7=${NETDATA_SYSTEM_KERNEL_NAME}\
+&cd8=${NETDATA_SYSTEM_KERNEL_VERSION}\
+&cd9=${NETDATA_SYSTEM_ARCHITECTURE}\
+&cd10=${NETDATA_SYSTEM_VIRTUALIZATION}\
+&cd11=${NETDATA_SYSTEM_VIRT_DETECTION}\
+&cd12=${NETDATA_SYSTEM_CONTAINER}\
+&cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}" >> /tmp/as.log
 
 # -------------------------------------------------------------------------------------------------
 # send the anonymous statistics to GA
@@ -152,19 +58,19 @@ if [ -n "$(command -v curl 2>/dev/null)" ]; then
 		--data-urlencode "ec=${ACTION}" \
 		--data-urlencode "ea=${ACTION_RESULT}" \
 		--data-urlencode "el=${ACTION_DATA}" \
-		--data-urlencode "cd1=${NAME}" \
-		--data-urlencode "cd2=${ID}" \
-		--data-urlencode "cd3=${ID_LIKE}" \
-		--data-urlencode "cd4=${VERSION}" \
-		--data-urlencode "cd5=${VERSION_ID}" \
-		--data-urlencode "cd6=${OS_DETECTION}" \
-		--data-urlencode "cd7=${KERNEL_NAME}" \
-		--data-urlencode "cd8=${KERNEL_VERSION}" \
-		--data-urlencode "cd9=${ARCHITECTURE}" \
-		--data-urlencode "cd10=${VIRTUALIZATION}" \
-		--data-urlencode "cd11=${VIRT_DETECTION}" \
-		--data-urlencode "cd12=${CONTAINER}" \
-		--data-urlencode "cd13=${CONT_DETECTION}" \
+		--data-urlencode "cd1=${NETDATA_SYSTEM_OS_NAME}" \
+		--data-urlencode "cd2=${NETDATA_SYSTEM_OS_ID}" \
+		--data-urlencode "cd3=${NETDATA_SYSTEM_OS_ID_LIKE}" \
+		--data-urlencode "cd4=${NETDATA_SYSTEM_OS_VERSION}" \
+		--data-urlencode "cd5=${NETDATA_SYSTEM_OS_DETECTION}" \
+		--data-urlencode "cd6=${NETDATA_SYSTEM_OS_DETECTION}" \
+		--data-urlencode "cd7=${NETDATA_SYSTEM_KERNEL_NAME}" \
+		--data-urlencode "cd8=${NETDATA_SYSTEM_KERNEL_VERSION}" \
+		--data-urlencode "cd9=${NETDATA_SYSTEM_ARCHITECTURE}" \
+		--data-urlencode "cd10=${NETDATA_SYSTEM_VIRTUALIZATION}" \
+		--data-urlencode "cd11=${NETDATA_SYSTEM_VIRT_DETECTION}" \
+		--data-urlencode "cd12=${NETDATA_SYSTEM_CONTAINER}" \
+		--data-urlencode "cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}" \
 		"https://www.google-analytics.com/collect" >/dev/null 2>&1
 else
 	wget -q -O - --timeout=1 "https://www.google-analytics.com/collect?\
@@ -181,18 +87,18 @@ else
 &ec=${ACTION}\
 &ea=${ACTION_RESULT}\
 &el=${ACTION_DATA}\
-&cd1=${NAME}\
-&cd2=${ID}\
-&cd3=${ID_LIKE}\
-&cd4=${VERSION}\
-&cd5=${VERSION_ID}\
-&cd6=${OS_DETECTION}\
-&cd7=${KERNEL_NAME}\
-&cd8=${KERNEL_VERSION}\
-&cd9=${ARCHITECTURE}\
-&cd10=${VIRTUALIZATION}\
-&cd11=${VIRT_DETECTION}\
-&cd12=${CONTAINER}\
-&cd13=${CONT_DETECTION}\
+&cd1=${NETDATA_SYSTEM_OS_NAME}\
+&cd2=${NETDATA_SYSTEM_OS_ID}\
+&cd3=${NETDATA_SYSTEM_OS_ID_LIKE}\
+&cd4=${NETDATA_SYSTEM_OS_VERSION}\
+&cd5=${NETDATA_SYSTEM_OS_VERSION_ID}\
+&cd6=${NETDATA_SYSTEM_OS_DETECTION}\
+&cd7=${NETDATA_SYSTEM_KERNEL_NAME}\
+&cd8=${NETDATA_SYSTEM_KERNEL_VERSION}\
+&cd9=${NETDATA_SYSTEM_ARCHITECTURE}\
+&cd10=${NETDATA_SYSTEM_VIRTUALIZATION}\
+&cd11=${NETDATA_SYSTEM_VIRT_DETECTION}\
+&cd12=${NETDATA_SYSTEM_CONTAINER}\
+&cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}\
 " > /dev/null 2>&1
 fi
