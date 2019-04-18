@@ -8,84 +8,90 @@
 - encrypted_8daf19481253_key - key needed by openssl to decrypt GCS credentials file
 - encrypted_8daf19481253_iv - IV needed by openssl to decrypt GCS credentials file
 - COVERITY_SCAN_TOKEN - Token to allow coverity test analysis uploads
+- SLACK_USERNAME - This is required for the slack notifications triggered by travis pipeline
+- SLACK_CHANNEL - This is the channel that Travis will be posting messages
+- SLACK_NOTIFY_WEBHOOK_URL - This is the incoming URL webhook as provided by slack integration. Visit Apps integration in slack to generate the required hook
+- SLACK_BOT_NAME - This is the name your bot will appear with on slack
 
-## Stages
+## CI workflow details
+Our CI pipeline is designed to help us identify and mitigate risks at all stages of implementation.
+To accommodate this need, we used [Travis CI](http://www.travis-ci.com) as our CI/CD tool.
+Our main areas of concern are:
+1) Only push code that is working. That means fail fast so that we can improve before we reach the public
 
-### Test
+2) Reduce the time to market to minimum, by streamlining the release process.
+   That means a lot of testing, a lot of consistency checks, a lot of validations
 
-Unit tests and coverage tests are executed here. Stage consists of 2 parallel jobs:
-  - C tests - executed every time
-  - dashboard.js - test if source files create the same file as it is in current repo
-  - coverity test - executed only when pipeline was triggered from cron
+3) Generated artifacts consistency. We should not allow broken software to reach the public.
+   When this happens, it's embarassing and we struggle to eliminate it.
 
-### Build
+4) We are an innovative company, so we love to automate :)
 
-Stage is executed every time and consists of 5 parallel jobs which execute containerized and non-containerized
-installations of netdata. Jobs are run on following operating systems:
-  - OSX
-  - ubuntu 14.04
-  - ubuntu 16.04 (containerized)
-  - CentOS 6 (containerized)
-  - CentOS 7 (containerized)
-  - alpine (containerized)
 
-Images for system containers are stored on dockerhub and are created from Dockerfiles located in 
-[netdata/helper-images](https://github.com/netdata/helper-images) repository.
+Having said that, here's a brief introduction to Netdata's improved CI/CD pipeline with Travis.
+Our CI/CD lifecycle contains three different execution entry points:
+1) A user opens a pull request to netdata/master: Travis will run a pipeline on the branch under that PR
+2) A merge or commit happens on netdata/master. This will trigger travis to run, but we have two distinct cases in this scenario:
+   a) A user merges a pull request to netdata/master: Travis will run on master, after the merge.
+   b) A user runs a commit/merge with a special keyword (mentioned later).
+      This triggers a release for either minor, major or release candidate versions, depending the keyword
+3) A scheduled job runs on master once per day: Travis will run on master at the scheduled interval
 
-### Packaging
+To accommodate all three entry points our CI/CD workflow has a set of steps that run on all three entry points.
+Once all these steps are successfull, then our pipeline executes another subset of steps for entry points 2 and 3.
+In travis terms the "steps" are "Stages" and within each stage we execute a set of activities called "jobs" in travis.
 
-This stage is executed only on "master" brach and allows us to create a new tag just looking at git commit message.
-It executes one script called `releaser.sh` which is responsible for creating a release on GitHub by using
-[hub](https://github.com/github/hub). This script is also executing other scripts which can also be used in other
-CI jobs:
-  - `.travis/tagger.sh`
-  - `.travis/generate_changelog.sh`
-  - `packaging/docker/build.sh`
-  - `.travis/create_artifacts.sh`
+### Always run: Stages that running on all three execution entry points
 
-Alternatively new release can be also created by pushing new tag to master branch.
-Additionally this step is also executing `.travis/labeler.sh` which is a temporary workaround to automatically label 
-issues and PR. This script should be replaced with GitHub Actions when they are available to public.
+## Code quality, linting, syntax, code style
+At this early stage we iterate through a set of basic quality control checks:
+- Shell checking: Run linters for our various BASH scripts
+- Checksum validators: Run validators to ensure our installers and documentation are in sync
+- Dashboard validator: We provide a pre-generated dashboard.js script file that we need to make sure its up to date. We validate that.
 
-##### tagger.sh
+## Build process
+At this stage, basically, we build :-)
+We do a baseline check of our build artifacts to guarantee they are not broken
+Briefly our activities include:
+- Verify docker builds successfully
+- Run the standard netdata installer, to make sure we build & run properly
+- Do the same through 'make dist', as this is our stable channel for our kickstart files
 
-Script responsible to find out what will be the next tag based on a keyword in last commit message. Keywords are:
- - `[netdata patch release]` to bump patch number
- - `[netdata minor release]` to bump minor number
- - `[netdata major release]` to bump major number
- - `[netdata release candidate]` to create a new release candidate (appends or modifies suffix `-rcX` of previous tag)
-All keywords MUST be surrounded with square brackets.
-Tag is then stored in `GIT_TAG` variable.
+## Artifacts validation
+At this point we know our software is building, we need to go through the a set of checks, to guarantee
+that our product meets certain epxectations. At the current stage, we are focusing on basic capabilities
+like installing in different distributions, running the full lifecycle of install-run-update-install and so on.
+We are still working on enriching this with more and more use cases, to get us closer to achieving full stability of our software.
+Briefly we currently evaluate the following activities:
+- Basic software unit testing
+- Non containerized build and install on ubuntu 14.04
+- Non containerized build and install on ubuntu 18.04
+- Running the full netdata lifecycle (install, update, uninstall) on ubuntu 18.04
+- Build and install on CentOS 6
+- Build and install on CentOS 7
+(More to come)
 
-##### generate_changelog.sh
+### Nightly operations: Stages that run daily under cronjob
+The nightly stages are related to the daily nightly activities, that produce our daily latest releases.
+We also maintain a couple of cronjobs that run during the night to provide us with deeper insights,
+like for example coverity scanning or extended kickstart checksum checks
 
-Automatic changelog generator which updates our CHANGELOG.md file based on GitHub features (mostly labels and pull
-requests). Internally it uses
-[github-changelog-generator](https://github.com/github-changelog-generator/github-changelog-generator) and more
-information can be found on that project site.
+## Nightly operations
+At this stage we run scheduled jobs and execute the nightly changelog generator, coverity scans,
+labeler for our issues and extended kickstart files checksum validations.
 
-##### build.sh and create_artifacts.sh
+## Nightly release
+During this stage we are building and publishing latest docker images, prepare the nightly artifacts
+and deploy them (the artifacts) to our google cloud service provider.
 
-Scripts used to build new container images and provide release artifacts (tar.gz and makeself archives)
 
-### Nightlies
+### Publishing
+Publishing is responsible for executing the major/minor/patch releases and is separated
+in two stages: packaging preparation process and publishing.
 
-##### Tarball and self-extractor build AND Nightly docker images
+## Packaging for release
+During packaging we are preparing the release changelog information and run the labeler.
 
-As names might suggest those two jobs are responsible for nightly netdata package creation and are run every day (in
-cron). Combined they produce:
-  - docker images
-  - tar.gz archive (soon to be removed)
-  - self-extracting package
-
-This is achieved by running 2 scripts described earlier:
-  - `create_artifacts.sh`
-  - `build.sh`
-
-Artifacts are pushed to GCS and container images are stored in docker hub.
-
-##### Changelog generation
-
-This job is responsible for regenerating changelog every day by executing `generate_changelog.sh` script. This is done
-only once a day due to github rate limiter.
-
+## Publish for release
+The publishing stage is the most complex part in publishing. This is the stage were we generate and publish docker images,
+prepare the release artifacts and get ready with the release draft.

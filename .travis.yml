@@ -1,113 +1,275 @@
-dist: trusty
 sudo: true
 language: c
 services:
 - docker
 
-stages:
-- test
-- build
-- name: packaging
-  if: branch = master AND type != pull_request AND type != cron
-- name: nightlies
-  if: branch = master AND type = cron
-- name: Integrity testing
-  if: branch = master AND type = cron
+# This is a hook to help us introduce "soft" errors on our process
+matrix:
+  allow_failures:
+    - env: ALLOW_SOFT_FAILURE_HERE=true
 
-jobs:
-  include:
-  - stage: test
-    name: C
-    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto && $HOME/netdata/usr/sbin/netdata -W unittest
-    env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
-  - name: dashboard.js
-    script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
-  - name: lint .sh.in files
-    script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
-  - name: check checksums for kickstart files
-    script: ./tests/installer/checksums.sh
-    env: LOCAL_ONLY="true"
-  - name: Kickstart Script execution integrity
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
-  - name: Kickstart-static64 Script execution integrity
-    before_script: rm -rf /tmp/kickstart-static64-temp && mkdir -p /tmp/kickstart-static64-temp
-    script: docker run -it -v "${PWD}:/code:rw" -v "/tmp/kickstart-static64-temp:/opt" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it
-    after_script: rm -rf /tmp/kickstart-static64-temp
-  - name: coverity
-    install: sudo apt-get install -y zlib1g-dev uuid-dev libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev
-    script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
-    if: type = cron
+# Install dependencies for all, once
+#
+install:
+- sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+- sudo apt install -y --only-upgrade docker-ce
+- sudo pip install git-semver
+- docker info
+- source tests/installer/slack.sh
 
-  - stage: build
-# TODO: enable when travis OSX become stable. Probably after 12.01.2019
-#   name: OSX
-#   install: brew install fakeroot ossp-uuid
-#   script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
-#   os: osx
-# - name: ubuntu 14.04 (not containerized)
-    name: ubuntu 14.04 (not containerized)
-    install: sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot
-    script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
-  - name: build container (alpine installation)
-    script: ./packaging/docker/build.sh
-    env: DEVEL="true"
-  - name: ubuntu 18.04 + lifecycle
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats
-  - name: CentOS 7
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-  - name: CentOS 6
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-
-  - stage: packaging
-    name: Create release (only on special commit msg)
-    install:
-    - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot python-pip
-    - sudo apt install -y --only-upgrade docker-ce
-    - docker info
-    before_script: sudo pip install git-semver
-    script: ".travis/releaser.sh && .travis/labeler.sh" # labeler should be replaced with GitHub Actions when they hit GA
-    git:
-      depth: false
-
-  - stage: nightlies
-    name: Nightly build
-    before_install: openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d
-    install:
-    - sudo apt-get install -y gnupg libcap2-bin zlib1g-dev uuid-dev fakeroot
-    - sudo apt install -y --only-upgrade docker-ce
-    - docker info
-    script: ".travis/nightlies.sh"
-    git:
-      depth: false
-    deploy:
-      provider: gcs
-      edge:
-        branch: gcs-ng
-      project_id: netdata-storage
-      credentials: .travis/gcs-credentials.json
-      bucket: "netdata-nightlies"
-      skip_cleanup: true
-      local_dir: "artifacts"
-      on:
-        # Only deploy on netdata/netdata, master branch, when artifacts directory is created
-        repo: netdata/netdata
-        branch: master
-        condition: -d "artifacts"
-    after_deploy: rm -f .travis/gcs-credentials.json
-
-  - stage: Integrity testing
-    name: Kickstart Files integrity testing
-    script: ./tests/installer/checksums.sh
-  - name: Kickstart Execution integrity
-    before_script: rm -rf /tmp/kickstart-static64-temp && mkdir -p /tmp/kickstart-static64-temp
-    script:
-    - docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" packaging/installer/kickstart.sh --dont-wait --dont-start-it --install /tmp
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/kickstart-static64-temp:/opt" -w /code "netdata/os-test:centos7" packaging/installer/kickstart-static64.sh --dont-wait --dont-start-it
-    after_script: rm -rf /tmp/kickstart-static64-temp
-
+# Setup notification system
+#
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
-  slack:
-    rooms:
-      - secure: "NuW1p7s+WGLcyhEceeiLRSV1JgAc6N47zgdSsYoxrjSFRQHDfc8jensypDcEJwgs1K2Hcve9iKRaAddEHEw7AkS6rie9gFR5HmmbKXfW2GFMqOr6maYTFsvaECPqiWk1n9/XnRLsAi5kZ8HxH+a8ldb/eaVoFQesY1jPXgh11BM5DwvpXjEtwg0WGASsKiymvnXFS3KcC+sR7Lln2GX1a8vfCX2I3TEmOedKMlSHUy5JilGGC3AWA0SWS8tR8PUH0u3dHL5j0RNIr1RO3Yx24QgUpg/YpvKymnW/iIIEOq2vb2mBhhiKEQjJ1djUL4VSPzjIDpUzThVpKaHk3syOp6W9qZEHKhR/sqjc5Yk2XRjsw1cM0nS60gaCgxtKhEMKWcjtvWf04oJAVrmcUwcYXj0eA+jgRCZl5VhyufK/fUJavjOfsQGjwhdjxQfwDCw33W17ypJUt4GZngdb6jbIhEOcKHSLQDu1vuHTw82hJJkthkmR59PX30qJdl/MEGcfVLdN/fkCokjR/qwfmkNwQm+wYSKsK/Jq4RgBT0/oZwY3e8nkCq2ov7lBbDO3/0rzQKWZ9Uy//tnoCM3vGhDwGHQxsHshv7g6KwdhYTcmm7WWWIucfLupcjFUO1HbRuJ+7ZnvxRRwKiV+MGkFT2SNJkS8q1/jCu9KGbmktd0WUSE="
+
+# Define the stage sequence and conditionals
+#
+stages:
+# Mandatory runs, we always want these executed
+- name: Code quality, linting, syntax, code style
+- name: Build process
+- name: Artifacts validation
+
+  # Nightly operations
+- name: Nightly operations
+  if: branch = master AND type = cron
+- name: Nightly release
+  if: branch = master AND type = cron
+
+  # Scheduled releases
+- name: Packaging for release
+  if: branch = master AND type != pull_request AND type != cron
+
+- name: Publish for release
+  if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
+
+
+
+# Define stage implementation details
+#
+jobs:
+  include:
+    # Do code quality, syntax checking and other pre-build activities
+  - stage: Code quality, linting, syntax, code style
+
+    name: Run shellchecking on BASH
+    script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+
+    # This falls under same stage defined earlier
+  - name: Run checksum checks on kickstart files
+    script: ./tests/installer/checksums.sh
+    env: LOCAL_ONLY="true"
+
+    # This falls under same stage defined earlier
+  - name: Web Dashboard pre-generated file consistency checks (dashboard.js)
+    script: cp web/gui/dashboard.js /tmp/dashboard.js && ./build/build.sh && diff /tmp/dashboard.js web/gui/dashboard.js
+
+
+
+    # Ensure netdata code builds successfully
+  - stage: Build process
+
+    name: Standard netdata build
+    script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
+    env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
+
+  - name: Docker container build process (alpine installation)
+    script: packaging/docker/build.sh
+    env: DEVEL="true"
+    after_failure: post_message "TRAVIS_MESSAGE" "Docker build process failed"
+
+  - name: Run 'make dist' validation
+    before_script: mkdir /tmp/netdata-makedist-test
+    script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make dist
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
+    - .travis/run_install_with_dist_file.sh
+    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
+    git:
+      depth: false
+    after_script: rm -rf /tmp/netdata-makedist-test
+    after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
+
+
+
+  - stage: Artifacts validation
+
+    name: Unit Testing
+    script:
+    - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
+    - $HOME/netdata/usr/sbin/netdata -W unittest
+    env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+    after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
+
+  - name: Build/install on ubuntu 14.04 (not containerized)
+    script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
+    after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 14.04"
+
+  - name: Build/Install for ubuntu 18.04 (not containerized)
+    script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
+    after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
+
+  - name: Run netdata lifecycle, on ubuntu 18.04 (Containerized)
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata lifecycle test script failed on ubuntu 18.04"
+
+  - name: Build/install for CentOS 6 (Containerized)
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+    after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 6"
+
+  - name: Build/install for CentOS 7 (Containerized)
+    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+    after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
+
+
+
+  - stage: Packaging for release
+
+    name: Generate changelog and TAG the release (only on special commit msg)
+    before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated"
+    script: .travis/generate_changelog_and_tag_release.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Packaging for release failed"
+    git:
+      depth: false
+
+  - name: Run labeler on github issues
+    script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
+
+
+
+    # We only publish if a TAG has been set during packaging
+  - stage: Publish for release
+
+    name: Build & Publish docker images
+    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images"
+    script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
+    - packaging/docker/build.sh
+    - packaging/docker/publish.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
+    git:
+      depth: false
+    env: ALLOW_SOFT_FAILURE_HERE=true
+    # We don't run on release candidates
+    if: tag !~ /(-rc)/
+
+  - name: Generate release artifacts
+    before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for release"
+    script: .travis/create_artifacts.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Release artifacts generation failed"
+    git:
+     depth: false
+    # We don't run on release candidates
+    if: tag !~ /(-rc)/
+
+  - name: Create release draft
+    before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
+    script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
+    - .travis/draft_release.sh
+    git:
+      depth: false
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
+    # We don't run on release candidates
+    if: tag !~ /(-rc)/
+
+
+
+    # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
+  - stage: Nightly operations
+
+    name: Run coverity scan
+    # Just notify people that Nightly ops triggered, use the first step as a hook to do that
+    before_script: post_message "TRAVIS_MESSAGE" "Starting nightly operations"
+    script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
+
+  - name: Kickstart files integrity testing (extended)
+    script: ./tests/installer/checksums.sh
+
+  - name: Run labeler on github issues
+    script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
+
+    # This is generating the changelog for nightly release and publish it
+  - name: Generate nightly changelog
+    before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies"
+    script: ".travis/nightlies.sh"
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly changelog generation failed"
+    git:
+      depth: false
+
+
+
+    # This is the nightly execution step
+    #
+  - stage: Nightly release
+
+    name: Build & Publish docker images
+    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies"
+    script:
+    - docker info
+    - packaging/docker/build.sh
+    - packaging/docker/publish.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
+    env: ALLOW_SOFT_FAILURE_HERE=true
+
+  - name: Create nightly release artifacts, publish to GCS
+    before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies"
+    script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
+    - .travis/create_artifacts.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly artifacts generation failed"
+    before_deploy:
+      echo "Preparing creds under ${TRAVIS_REPO_SLUG}";
+      if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+         openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
+      else
+         echo "Beta deployment stage in progress";
+         openssl aes-256-cbc -K $encrypted_8daf19481253_key -iv $encrypted_8daf19481253_iv -in .travis/gcs-credentials.json.enc -out .travis/gcs-credentials.json -d;
+      fi;
+    deploy:
+      # Beta storage, used for testing purposes
+      - provider: gcs
+        edge:
+          branch: gcs-ng
+        project_id: netdata-storage
+        credentials: .travis/gcs-credentials.json
+        bucket: "netdata-dev-nightlies"
+        skip_cleanup: true
+        local_dir: "artifacts"
+        on:
+          # Only deploy on netdata/netdata, master branch, when artifacts directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: master
+          condition: -d "artifacts"
+      # Production storage
+      - provider: gcs
+        edge:
+          branch: gcs-ng
+        project_id: netdata-storage
+        credentials: .travis/gcs-credentials.json
+        bucket: "netdata-nightlies"
+        skip_cleanup: true
+        local_dir: "artifacts"
+        on:
+          # Only deploy on netdata/netdata, master branch, when artifacts directory is created
+          repo: netdata/netdata
+          branch: master
+          condition: -d "artifacts"
+    after_deploy: rm -f .travis/gcs-credentials.json

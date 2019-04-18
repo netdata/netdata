@@ -31,8 +31,13 @@ if [ -z ${GIT_TAG+x} ]; then
 else
 	OPTS="--future-release ${GIT_TAG}"
 fi
-
 echo "We got $COMMITS_SINCE_RELEASE changes since $LAST_TAG, re-generating changelog"
+
+if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+	echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do here"
+	exit 0
+fi
+
 git config user.email "${GIT_MAIL}"
 git config user.name "${GIT_USER}"
 git checkout master
