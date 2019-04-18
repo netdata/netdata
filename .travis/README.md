@@ -2,17 +2,16 @@
 
 ## Variables needed by travis
 
-  - GITHUB_TOKEN - GitHub token with push access to repository
-  - DOCKER_USERNAME - Username (netdatabot) with write access to docker hub repository
-  - DOCKER_PASS - Password to docker hub
-  - encrypted_8daf19481253_key - key needed by openssl to decrypt GCS credentials file
-  - encrypted_8daf19481253_iv - IV needed by openssl to decrypt GCS credentials file
-  - COVERITY_SCAN_TOKEN - Token to allow coverity test analysis uploads
-  - SLACK_USERNAME - This is required for the slack notifications triggered by travis pipeline
-  - SLACK_CHANNEL - This is the channel that Travis will be posting messages
-  - SLACK_NOTIFY_WEBHOOK_URL - This is the incoming URL webhook as provided by slack integration.
-                             Visit Apps integration in slack to generate the required hook
-  - SLACK_BOT_NAME - This is the name your bot will appear with on slack
+- GITHUB_TOKEN - GitHub token with push access to repository
+- DOCKER_USERNAME - Username (netdatabot) with write access to docker hub repository
+- DOCKER_PASS - Password to docker hub
+- encrypted_8daf19481253_key - key needed by openssl to decrypt GCS credentials file
+- encrypted_8daf19481253_iv - IV needed by openssl to decrypt GCS credentials file
+- COVERITY_SCAN_TOKEN - Token to allow coverity test analysis uploads
+- SLACK_USERNAME - This is required for the slack notifications triggered by travis pipeline
+- SLACK_CHANNEL - This is the channel that Travis will be posting messages
+- SLACK_NOTIFY_WEBHOOK_URL - This is the incoming URL webhook as provided by slack integration. Visit Apps integration in slack to generate the required hook
+- SLACK_BOT_NAME - This is the name your bot will appear with on slack
 
 ## CI workflow details
 Our CI pipeline is designed to help us identify and mitigate risks at all stages of implementation.
@@ -46,17 +45,17 @@ In travis terms the "steps" are "Stages" and within each stage we execute a set 
 
 ## Code quality, linting, syntax, code style
 At this early stage we iterate through a set of basic quality control checks:
-  - Shell checking: Run linters for our various BASH scripts
-  - Checksum validators: Run validators to ensure our installers and documentation are in sync
-  - Dashboard validator: We provide a pre-generated dashboard.js script file that we need to make sure its up to date. We validate that.
+- Shell checking: Run linters for our various BASH scripts
+- Checksum validators: Run validators to ensure our installers and documentation are in sync
+- Dashboard validator: We provide a pre-generated dashboard.js script file that we need to make sure its up to date. We validate that.
 
 ## Build process
 At this stage, basically, we build :-)
 We do a baseline check of our build artifacts to guarantee they are not broken
 Briefly our activities include:
-  - Verify docker builds successfully
-  - Run the standard netdata installer, to make sure we build & run properly
-  - Do the same through 'make dist', as this is our stable channel for our kickstart files
+- Verify docker builds successfully
+- Run the standard netdata installer, to make sure we build & run properly
+- Do the same through 'make dist', as this is our stable channel for our kickstart files
 
 ## Artifacts validation
 At this point we know our software is building, we need to go through the a set of checks, to guarantee
@@ -64,12 +63,12 @@ that our product meets certain epxectations. At the current stage, we are focusi
 like installing in different distributions, running the full lifecycle of install-run-update-install and so on.
 We are still working on enriching this with more and more use cases, to get us closer to achieving full stability of our software.
 Briefly we currently evaluate the following activities:
-  - Basic software unit testing
-  - Non containerized build and install on ubuntu 14.04
-  - Non containerized build and install on ubuntu 18.04
-  - Running the full netdata lifecycle (install, update, uninstall) on ubuntu 18.04
-  - Build and install on CentOS 6
-  - Build and install on CentOS 7
+- Basic software unit testing
+- Non containerized build and install on ubuntu 14.04
+- Non containerized build and install on ubuntu 18.04
+- Running the full netdata lifecycle (install, update, uninstall) on ubuntu 18.04
+- Build and install on CentOS 6
+- Build and install on CentOS 7
 (More to come)
 
 ### Nightly operations: Stages that run daily under cronjob
