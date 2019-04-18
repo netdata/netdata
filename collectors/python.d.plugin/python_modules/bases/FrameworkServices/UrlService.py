@@ -88,13 +88,13 @@ class UrlService(SimpleService):
             self.error('build_manager() error:', str(error))
             return None
 
-    def _get_raw_data(self, url=None, manager=None):
+    def _get_raw_data(self, url=None, manager=None, **kwargs):
         """
         Get raw data from http request
         :return: str
         """
         try:
-            status, data = self._get_raw_data_with_status(url, manager)
+            status, data = self._get_raw_data_with_status(url, manager, **kwargs)
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
             self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
             return None
@@ -105,7 +105,7 @@ class UrlService(SimpleService):
             self.debug('Url: {url}. Http response status code: {code}'.format(url=url or self.url, code=status))
             return None
 
-    def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True):
+    def _get_raw_data_with_status(self, url=None, manager=None, retries=1, redirect=True, **kwargs):
         """
         Get status and response body content from http request. Does not catch exceptions
         :return: int, str
@@ -123,6 +123,7 @@ class UrlService(SimpleService):
             retries=retry,
             headers=manager.headers,
             redirect=redirect,
+            **kwargs
         )
         if isinstance(response.data, str):
             return response.status, response.data
