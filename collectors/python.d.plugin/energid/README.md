@@ -32,7 +32,11 @@ Introduces several new charts:
  * UTXO
  * Xfers (related transactions)
 
-Configuration is needed, disabled by default.
+Configuration is needed in most cases of secure deployment to specify RPC credentials.
+However, Energi, Bitcoin and Dash daemons are checked on startup by default.
+
+It may be desired to increase retry count for production use due to possibly long
+daemon startup.
 
 ### Configuration
 
