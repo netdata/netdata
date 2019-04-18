@@ -164,15 +164,6 @@ jobs:
     # We don't run on release candidates
     if: tag !~ /(-rc)/
 
-  - name: Generate release artifacts
-    before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for release"
-    script: .travis/create_artifacts.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "<!here> Release artifacts generation failed"
-    git:
-     depth: false
-    # We don't run on release candidates
-    if: tag !~ /(-rc)/
-
   - name: Create release draft
     before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
     script:
@@ -180,6 +171,7 @@ jobs:
     - echo "Last commit:" && git log -1
     - echo "GIT Describe:" && git describe
     - echo "packaging/version:" && cat packaging/version
+    - echo "Generating release artifacts" && .travis/create_artifacts.sh # Could/should be a common storage to put this and share between jobs
     - .travis/draft_release.sh
     git:
       depth: false
