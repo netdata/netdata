@@ -717,7 +717,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return 400;
+    if (!netdata_ready) return 503;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
