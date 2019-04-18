@@ -19,7 +19,7 @@ fi
 
 echo "Initiating dist archive contents validation"
 DIST_FILE_FROM_GIT="netdata-$(git describe).tar.gz"
-DIST_FILE_FROM_FILE="netdata-$(cat packaging/version | tr -d '\n').tar.bgz"
+DIST_FILE_FROM_FILE="netdata-$(tr -d '\n' < packaging/version).tar.bgz"
 if [ -f ${DIST_FILE_FROM_GIT} ]; then
 	DIST_FILE="${DIST_FILE_FROM_GIT}"
 elif [ -f ${DIST_FILE_FROM_FILE} ]; then
