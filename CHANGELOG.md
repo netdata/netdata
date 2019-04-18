@@ -1,6 +1,6 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.14.0](https://github.com/netdata/netdata/tree/v1.14.0) (2019-04-18)
 
 **Fixed bugs:**
 
@@ -10,6 +10,7 @@
 - CouchDB collector exception [\#5830](https://github.com/netdata/netdata/issues/5830)
 - Segfault when using postgres plugin [\#5829](https://github.com/netdata/netdata/issues/5829)
 - macOS: python.d.plugin crashes on start [\#5821](https://github.com/netdata/netdata/issues/5821)
+- Travis: Nightlies job fails when no changes in the code [\#5815](https://github.com/netdata/netdata/issues/5815)
 - Errorneous netdata version [\#5808](https://github.com/netdata/netdata/issues/5808)
 - Kickstart-static64.sh installation problems [\#5807](https://github.com/netdata/netdata/issues/5807)
 - Netdata Installer : $NETDATA\_USER not defined ? [\#5803](https://github.com/netdata/netdata/issues/5803)
@@ -33,8 +34,10 @@
 - update  /packaging/docker/README.md  in Mac OS run build [\#5818](https://github.com/netdata/netdata/issues/5818)
 - feature: LDAPS support for openldap-collector [\#5783](https://github.com/netdata/netdata/issues/5783)
 - Add execution of updated kickstart scripts to the CI pipeline [\#5769](https://github.com/netdata/netdata/issues/5769)
+- netdata/packaging/ci: re-design travis pipeline [\#5761](https://github.com/netdata/netdata/issues/5761)
 - feature: kubelet collector improvements [\#5720](https://github.com/netdata/netdata/issues/5720)
 - How can i set syslog facility for netdata daemon? [\#5717](https://github.com/netdata/netdata/issues/5717)
+- netdata/packaging: Master issue - overall building pipelines cleanup: improvements, bug fixes, etc [\#5716](https://github.com/netdata/netdata/issues/5716)
 - feature: openvpn module - use management interface [\#5699](https://github.com/netdata/netdata/issues/5699)
 - feature: postgres module add connection via URI [\#5684](https://github.com/netdata/netdata/issues/5684)
 - Status of netdata/binary-packages [\#5671](https://github.com/netdata/netdata/issues/5671)
@@ -48,6 +51,7 @@
 
 **Merged pull requests:**
 
+- Pipeline redesign master [\#5885](https://github.com/netdata/netdata/pull/5885) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix segmentation fault in streaming [\#5882](https://github.com/netdata/netdata/pull/5882) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging/ci: Use proper notifier in slack message [\#5866](https://github.com/netdata/netdata/pull/5866) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: Dont use --always in git describe. [\#5860](https://github.com/netdata/netdata/pull/5860) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
