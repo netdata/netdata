@@ -732,7 +732,11 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
     buffer_strcat(wb, "\t\"alarms\": {\n");
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
-    buffer_strcat(wb, "\t}\n");
+    buffer_strcat(wb, "\t},\n");
+
+    buffer_strcat(wb, "\t\"collectors\": [");
+    chartcollectors2json(host, wb);
+    buffer_strcat(wb, "\n\t]\n");
 
     buffer_strcat(wb, "}");
     return 200;
