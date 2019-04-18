@@ -74,21 +74,27 @@ Briefly we currently evaluate the following activities:
 
 
 ### Nightly operations: Stages that run daily under cronjob
-TBD
+The nightly stages are related to the daily nightly activities, that produce our daily latest releases.
+We also maintain a couple of cronjobs that run during the night to provide us with deeper insights,
+like for example coverity scanning or extended kickstart checksum checks
 
 ## Nightly operations
-At this stage we run scheduled jobs and execute the nightly changelog generator
+At this stage we run scheduled jobs and execute the nightly changelog generator, coverity scans,
+labeler for our issues and extended kickstart files checksum validations.
 
 ## Nightly release
-TBD
+During this stage we are building and publishing latest docker images, prepare the nightly artifacts
+and deploy them (the artifacts) to our google cloud service provider.
 
 
 ### Publishing
-TBD
+Publishing is responsible for executing the major/minor/patch releases and is separated
+in two stages: packaging preparation process and publishing.
 
 ## Packaging for release
-TBD
+During packaging we are preparing the release changelog information and run the labeler.
 
 ## Publish for release
-TBD
+The publishing stage is the most complex part in publishing. This is the stage were we generate and publish docker images,
+prepare the release artifacts and get ready with the release draft.
 

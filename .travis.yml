@@ -158,6 +158,8 @@ jobs:
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
+    git:
+      depth: false
     env: ALLOW_SOFT_FAILURE_HERE=true
     # We don't run on release candidates
     if: tag !~ /(-rc)/
@@ -166,6 +168,8 @@ jobs:
     before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for release"
     script: .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Release artifacts generation failed"
+    git:
+     depth: false
     # We don't run on release candidates
     if: tag !~ /(-rc)/
 
