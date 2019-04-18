@@ -632,6 +632,7 @@ pythondir="${libexecdir}/netdata/python.d"
 configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
+binariesdir="${libexecdir}/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
 
 AC_SUBST([build_target])
@@ -644,6 +645,7 @@ AC_SUBST([pythondir])
 AC_SUBST([configdir])
 AC_SUBST([libconfigdir])
 AC_SUBST([logdir])
+AC_SUBST([binariesdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
@@ -654,6 +656,7 @@ CPPFLAGS="\
 	-DCONFIG_DIR=\"\\\"${configdir}\\\"\" \
 	-DLIBCONFIG_DIR=\"\\\"${libconfigdir}\\\"\" \
 	-DLOG_DIR=\"\\\"${logdir}\\\"\" \
+	-DBINARIES_DIR=\"\\\"${binariesdir}\\\"\" \
 	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
 	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
 	-DWEB_DIR=\"\\\"${webdir}\\\"\" \

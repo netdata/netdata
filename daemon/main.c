@@ -460,6 +460,7 @@ static void get_netdata_configured_variables() {
     netdata_configured_cache_dir        = config_get(CONFIG_SECTION_GLOBAL, "cache directory",        netdata_configured_cache_dir);
     netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_GLOBAL, "lib directory",          netdata_configured_varlib_dir);
     netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
+    netdata_configured_libexec_dir      = config_get(CONFIG_SECTION_GLOBAL, "libexec directory",      netdata_configured_libexec_dir);
 
     {
         pluginsd_initialize_plugin_directories();
@@ -593,6 +594,7 @@ void set_global_environment() {
     setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
     setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_primary_plugins_dir),      1);
+    setenv("NETDATA_LIBEXEC_DIR"      , verify_required_directory(netdata_configured_libexec_dir),      1);
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
     setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
     setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);

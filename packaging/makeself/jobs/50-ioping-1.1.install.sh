@@ -9,10 +9,10 @@ export CFLAGS="-static"
 
 run make clean
 run make -j$(find_processors)
-run mkdir -p ${NETDATA_INSTALL_PATH}/bin/
-run install -m 0755 ioping ${NETDATA_INSTALL_PATH}/bin/
+run mkdir -p ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/
+run install -o root -g root -m 4755 ioping ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/
 
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
 then
-    run strip ${NETDATA_INSTALL_PATH}/bin/ioping
+    run strip ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/ioping
 fi

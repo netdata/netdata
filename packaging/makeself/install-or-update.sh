@@ -214,10 +214,10 @@ then
 fi
 
 # fix the ioping binary
-if [ -f bin/ioping ]
+if [ -f usr/libexec/netdata/ioping ]
 then
-    run chown root:${NETDATA_GROUP} bin/ioping
-    run chmod 4750 bin/ioping
+    run chown root:${NETDATA_GROUP} usr/libexec/netdata/ioping
+    run chmod 4750 usr/libexec/netdata/ioping
 fi
 
 

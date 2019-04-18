@@ -480,6 +480,7 @@ add_definitions(
         -DCONFIG_DIR="/etc/netdata"
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
         -DLOG_DIR="/var/log/netdata"
+        -DBINARIES_DIR="/usr/libexec/netdata"
         -DPLUGINS_DIR="/usr/libexec/netdata/plugins.d"
         -DWEB_DIR="/usr/share/netdata/web"
         -DVARLIB_DIR="/var/lib/netdata"
