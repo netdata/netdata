@@ -125,6 +125,16 @@ class Service(UrlService):
         }
 
     def _get_data(self):
+        #
+        # Bitcoin family speak JSON-RPC version 1.0 for maximum compatibility,
+        # but uses JSON-RPC 1.1/2.0 standards for parts of the 1.0 standard that were
+        # unspecified (HTTP errors and contents of 'error').
+        #
+        # 1.0 spec: https://www.jsonrpc.org/specification_v1
+        # 2.0 spec: https://www.jsonrpc.org/specification
+        #
+        # The call documentation: https://github.com/energicryptocurrency/core-api-documentation
+        #
         batch = []
 
         for i, method in enumerate(METHODS):
