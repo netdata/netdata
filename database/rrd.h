@@ -872,9 +872,13 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t last_entry_t  = 0;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
         }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
         return last_entry_t;
     } else {
         return (time_t)st->last_updated.tv_sec;
@@ -886,9 +890,13 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
         time_t first_entry_t = ULONG_MAX;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
             first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
         }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
         if (unlikely(ULONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
     } else {
