@@ -51,6 +51,7 @@
   },
   "scripts": {
     "lint-md": "remark .",
-    "lint-md-path": "remark"
+    "lint-md-path": "remark",
+    "fix-md": "remark collectors --output"
   }
 }
