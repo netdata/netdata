@@ -11,18 +11,23 @@ Introduces several new charts:
 1.  **Blockchain Index**
     * blocks
     * headers
+    
 2.  **Blockchain Difficulty**
     * diff
+    
 3.  **MemPool** in MiB
     * Max
     * Usage
     * TX Size
-4.  **Secure Memory* in KiB
+    
+4.  **Secure Memory** in KiB
     * Total
     * Locked
     * Used
+    
 5.  **Network**
     * Connections
+    
 6.  **UTXO** (Unspent Transaction Output)
     * UTXO
     * Xfers (related transactions)
