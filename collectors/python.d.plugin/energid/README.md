@@ -1,6 +1,7 @@
 # energid
 
-A collector for [Energi Core](https://github.com/energicryptocurrency/energi) node instance monitoring.
+A collector for [Energi Core](https://github.com/energicryptocurrency/energi)
+node instance monitoring.
 
 As Energi Core Gen 1 & 2 are based on the original Bitcoin code and
 supports very similar JSON RPC, there is quite high chance the module works
@@ -9,29 +10,35 @@ with many others forks including bitcoind itself.
 Introduces several new charts:
 
 1.  **Blockchain Index**
-    *   blocks
-    *   headers
-2.  **Blockchain Difficulty**
-    *   diff
-3.  **MemPool** in MiB
-    *   Max
-    *   Usage
-    *   TX Size
-4.  **Secure Memory** in KiB
-    *   Total
-    *   Locked
-    *   Used
-5.  **Network**
-    *   Connections
-6.  **UTXO** (Unspent Transaction Output)
-    *   UTXO
-    *   Xfers (related transactions)
+    * blocks
+    * headers
 
-Configuration is needed in most cases of secure deployment to specify RPC credentials.
-However, Energi, Bitcoin and Dash daemons are checked on startup by default.
+1.  **Blockchain Difficulty**
+    * diff
 
-It may be desired to increase retry count for production use due to possibly long
-daemon startup.
+1.  **MemPool** in MiB
+    * Max
+    * Usage
+    * TX Size
+
+1.  **Secure Memory** in KiB
+    * Total
+    * Locked
+    * Used
+
+1.  **Network**
+    * Connections
+
+1.  **UTXO** (Unspent Transaction Output)
+    * UTXO
+    * Xfers (related transactions)
+
+Configuration is needed in most cases of secure deployment to specify RPC
+credentials. However, Energi, Bitcoin and Dash daemons are checked on
+startup by default.
+
+It may be desired to increase retry count for production use due to possibly
+long daemon startup.
 
 ## Configuration
 
