@@ -107,6 +107,8 @@ METHODS = {
     },
 }
 
+JSON_RPC_VERSION = '1.1'
+
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -139,7 +141,7 @@ class Service(UrlService):
 
         for i, method in enumerate(METHODS):
             batch.append({
-                'version': '1.1',
+                'version': JSON_RPC_VERSION,
                 'id': i,
                 'method': method,
                 'params': [],

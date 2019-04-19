@@ -38,7 +38,7 @@ However, Energi, Bitcoin and Dash daemons are checked on startup by default.
 It may be desired to increase retry count for production use due to possibly long
 daemon startup.
 
-## Configuration
+### Configuration
 
 Sample:
 ```yaml
