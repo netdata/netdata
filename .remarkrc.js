@@ -4,11 +4,18 @@ const fs = require("fs");
 const path = require("path");
 
 exports.settings = {
+  gfm: true,
   commonmark: true,
-  emphasis: "_",
+  looseTable: false,
+  spacedTable: false,
+  paddedTable: false,
+  fences: true,
+  rule: '-',
+  ruleRepetition: 3,
+  emphasis: "*",
   strong: "*",
   bullet: "-",
-  listItemIndent: "tab",
+  listItemIndent: 'tab',
   incrementListMarker: true
 };
 
