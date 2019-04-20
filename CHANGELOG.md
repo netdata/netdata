@@ -1,5 +1,17 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Closed issues:**
+
+- Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
+- "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
+
+**Merged pull requests:**
+
+- NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
+- Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
+
 ## [v1.14.0](https://github.com/netdata/netdata/tree/v1.14.0) (2019-04-18)
 
 **Fixed bugs:**
