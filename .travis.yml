@@ -249,7 +249,7 @@ jobs:
           # Only deploy on netdata/netdata, master branch, when artifacts directory is created
           repo: ${TRAVIS_REPO_SLUG}
           branch: master
-          condition: -d "artifacts" AND ${TRAVIS_REPO_SLUG} != "netdata/netdata"
+          condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
 
       # Production storage
       - provider: gcs
@@ -264,5 +264,5 @@ jobs:
           # Only deploy on netdata/netdata, master branch, when artifacts directory is created
           repo: netdata/netdata
           branch: master
-          condition: -d "artifacts" AND ${TRAVIS_REPO_SLUG} = "netdata/netdata"
+          condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} = "netdata/netdata"
     after_deploy: rm -f .travis/gcs-credentials.json
