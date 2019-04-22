@@ -173,32 +173,37 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;
+    handle->now = start_time;
+    handle->dt = rd->rrdset->update_every;
     handle->ctx = ctx;
     handle->descr = NULL;
     handle->page_index = pg_cache_preload(ctx, rd->state->rrdeng_uuid,
                                           start_time * USEC_PER_SEC, end_time * USEC_PER_SEC);
 }
 
-storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t point_in_time_sec)
+storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
     struct page_cache *pg_cache;
     struct rrdeng_page_cache_descr *descr;
-    storage_number *page;
+    storage_number *page, ret;
     unsigned position;
     usec_t point_in_time;
 
     handle = &rrdimm_handle->rrdeng;
-    ctx = handle->ctx;
-    pg_cache = &ctx->pg_cache;
-    point_in_time = point_in_time_sec * USEC_PER_SEC;
-
-    assert(INVALID_TIME != point_in_time);
-    if (unlikely(NULL == handle->page_index)) {
+    if (unlikely(INVALID_TIME == handle->now)) {
         return SN_EMPTY_SLOT;
     }
+    ctx = handle->ctx;
+    pg_cache = &ctx->pg_cache;
+    point_in_time = handle->now * USEC_PER_SEC;
     descr = handle->descr;
+
+    if (unlikely(NULL == handle->page_index)) {
+        ret = SN_EMPTY_SLOT;
+        goto out;
+    }
     if (unlikely(NULL == descr ||
                  point_in_time < descr->start_time ||
                  point_in_time > descr->end_time)) {
@@ -214,7 +219,8 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         }
         descr = pg_cache_lookup(ctx, handle->page_index, &handle->page_index->id, point_in_time);
         if (NULL == descr) {
-            return SN_EMPTY_SLOT;
+            ret = SN_EMPTY_SLOT;
+            goto out;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
@@ -225,39 +231,44 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     }
     if (unlikely(INVALID_TIME == descr->start_time ||
                  INVALID_TIME == descr->end_time)) {
-        return SN_EMPTY_SLOT;
+        ret = SN_EMPTY_SLOT;
+        goto out;
     }
     page = descr->page;
     if (unlikely(descr->start_time == descr->end_time)) {
-        return page[0];
+        ret = page[0];
+        goto out;
     }
     position = ((uint64_t)(point_in_time - descr->start_time)) * (descr->page_length / sizeof(storage_number)) /
                (descr->end_time - descr->start_time + 1);
-    return page[position];
+    ret = page[position];
+
+out:
+    handle->now += handle->dt;
+    if (unlikely(handle->now > rrdimm_handle->end_time)) {
+        handle->now = INVALID_TIME;
+        if (descr) {
+#ifdef NETDATA_INTERNAL_CHECKS
+            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+            --pg_cache->consumers; /* DEBUG STAT */
+            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+#endif
+            pg_cache_put(descr);
+        }
+    }
+
+    return ret;
 }
 
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_final(struct rrddim_query_handle *rrdimm_handle)
+int rrdeng_load_metric_finished(struct rrddim_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle;
-    struct rrdengine_instance *ctx;
-    struct rrdeng_page_cache_descr *descr;
 
     handle = &rrdimm_handle->rrdeng;
-    ctx = handle->ctx;
-    descr = handle->descr;
-    if (descr) {
-        struct page_cache *pg_cache = &ctx->pg_cache;
-#ifdef NETDATA_INTERNAL_CHECKS
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        --pg_cache->consumers; /* DEBUG STAT */
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
-#endif
-
-        pg_cache_put(descr);
-    }
+    return (INVALID_TIME == handle->now);
 }
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)

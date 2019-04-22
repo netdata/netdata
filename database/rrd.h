@@ -264,12 +264,15 @@ struct rrddim_query_handle {
         struct {
             long slot;
             long last_slot;
+            uint8_t finished;
         } slotted;                         // state the legacy code uses
 #ifdef ENABLE_DBENGINE
         struct rrdeng_query_handle {
             struct rrdeng_page_cache_descr *descr;
             struct rrdengine_instance *ctx;
             struct pg_cache_page_index *page_index;
+            time_t now; //TODO: remove now to implement next point iteration
+            time_t dt; //TODO: remove dt to implement next point iteration
         } rrdeng; // state the database engine uses
 #endif
     };
@@ -298,14 +301,14 @@ struct rrddim_volatile {
 
     // function pointers that handle database queries
     struct rrddim_query_ops {
-        // run this before starting a series of load_metric() database queries
+        // run this before starting a series of next_metric() database queries
         void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
         // run this to load each metric number from the database
-        storage_number (*load_metric)(struct rrddim_query_handle *handle, time_t point_in_time);
+        storage_number (*next_metric)(struct rrddim_query_handle *handle);
 
-        // run this after finishing a series of load_metric() database queries
-        void (*finalize)(struct rrddim_query_handle *handle);
+        // run this to test if the series of next_metric() database queries is finished
+        int (*is_finished)(struct rrddim_query_handle *handle);
 
         // get the timestamp of the last entry of this metric
         time_t (*latest_time)(RRDDIM *rd);
@@ -889,7 +892,7 @@ static inline time_t rrdset_last_entry_t(RRDSET *st) {
 static inline time_t rrdset_first_entry_t(RRDSET *st) {
     if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         RRDDIM *rd;
-        time_t first_entry_t = ULONG_MAX;
+        time_t first_entry_t = LONG_MAX;
 
         int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
         rrddim_foreach_read(rd, st) {
@@ -897,7 +900,7 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
         }
         if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
 
-        if (unlikely(ULONG_MAX == first_entry_t)) return 0;
+        if (unlikely(LONG_MAX == first_entry_t)) return 0;
         return first_entry_t;
     } else {
         return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
