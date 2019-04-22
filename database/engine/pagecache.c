@@ -425,8 +425,8 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
     Pvoid_t *firstPValue, *lastPValue;
     Word_t firstIndex, lastIndex;
     struct rrdeng_page_cache_descr *descr;
-    usec_t oldest_time;
-    usec_t latest_time;
+    usec_t oldest_time = INVALID_TIME;
+    usec_t latest_time = INVALID_TIME;
 
     uv_rwlock_rdlock(&page_index->lock);
     /* Find first page in range */
@@ -447,6 +447,7 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
     if (unlikely(NULL == firstPValue)) {
         assert(NULL == lastPValue);
         page_index->oldest_time = page_index->latest_time = INVALID_TIME;
+        return;
     }
     page_index->oldest_time = oldest_time;
     page_index->latest_time = latest_time;

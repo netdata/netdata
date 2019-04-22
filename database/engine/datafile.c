@@ -249,7 +249,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     uv_fs_req_cleanup(&req);
 
     if (matched_files == MAX_DATAFILES) {
-        error("Warning: hit maximum database engine file limit of %u files", MAX_DATAFILES);
+        error("Warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
     }
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {

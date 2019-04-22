@@ -65,7 +65,6 @@ calculated_number backend_calculate_value_from_stored_data(
     time_t first_t = rd->state->query_ops.oldest_time(rd);
     time_t last_t  = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
-    time_t now;
     struct rrddim_query_handle handle;
     storage_number n;
 
@@ -144,6 +143,7 @@ calculated_number backend_calculate_value_from_stored_data(
 
         counter++;
     }
+    rd->state->query_ops.finalize(&handle);
     if(unlikely(!counter)) {
         debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
               host->hostname, st->id, rd->id,

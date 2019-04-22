@@ -310,6 +310,9 @@ struct rrddim_volatile {
         // run this to test if the series of next_metric() database queries is finished
         int (*is_finished)(struct rrddim_query_handle *handle);
 
+        // run this after finishing a series of load_metric() database queries
+        void (*finalize)(struct rrddim_query_handle *handle);
+
         // get the timestamp of the last entry of this metric
         time_t (*latest_time)(RRDDIM *rd);
 

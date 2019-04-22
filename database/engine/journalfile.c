@@ -349,7 +349,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
 
     file = journalfile->file;
     file_size = journalfile->pos;
-    data_file_size = journalfile->datafile->pos;
+    //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
     ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);

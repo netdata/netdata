@@ -30,7 +30,7 @@ void read_extent_cb(uv_fs_t* req)
     struct rrdeng_page_cache_descr *descr;
     int i, j, ret;
     unsigned count, pos;
-    void *page, *payload, *uncompressed_buf;
+    void *page, *payload, *uncompressed_buf = NULL;
     uint32_t payload_length, payload_offset, offset, page_offset, uncompressed_payload_length;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
@@ -38,11 +38,11 @@ void read_extent_cb(uv_fs_t* req)
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
+    xt_io_descr = req->data;
     if (req->result < 0) {
         error("%s: uv_fs_read: %s", __func__, uv_strerror((int)req->result));
         goto cleanup;
     }
-    xt_io_descr = req->data;
 
     header = xt_io_descr->buf;
     payload_length = header->payload_length;
@@ -71,7 +71,7 @@ void read_extent_cb(uv_fs_t* req)
         uncompressed_buf = mallocz(uncompressed_payload_length);
         ret = LZ4_decompress_safe(xt_io_descr->buf + payload_offset, uncompressed_buf,
                                   payload_length, uncompressed_payload_length);
-        debug(D_RRDENGINE, "LZ4 decompressed %d bytes to %d bytes.", payload_length, ret);
+        debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
 
@@ -228,11 +228,11 @@ void flush_pages_cb(uv_fs_t* req)
     unsigned count;
     Word_t commit_id;
 
+    xt_io_descr = req->data;
     if (req->result < 0) {
         error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
         goto cleanup;
     }
-    xt_io_descr = req->data;
     datafile = xt_io_descr->descr_array[0]->extent->datafile;
     debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was written to datafile %u-%u. Waking up waiters.",
           __func__, xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
@@ -274,12 +274,12 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 {
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
-    int i, ret, compressed_size, max_compressed_size;
+    int i, ret, compressed_size, max_compressed_size = 0;
     unsigned count, size_bytes, pos;
     uint32_t uncompressed_payload_length, payload_offset;
     struct rrdeng_page_cache_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
-    void *compressed_buf;
+    void *compressed_buf = NULL;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     Pvoid_t *PValue;
     Word_t Index;
