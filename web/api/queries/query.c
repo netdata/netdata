@@ -483,6 +483,7 @@ static inline void do_dimension(
             values_in_group_non_zero = 0;
         }
     }
+    rd->state->query_ops.finalize(&handle);
 
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
@@ -515,15 +516,15 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
         , time_t before_requested
         , long points_requested
         , long points_wanted
-        , size_t after_slot
-        , size_t before_slot
+        //, size_t after_slot
+        //, size_t before_slot
         , const char *msg
         ) {
     info("INTERNAL ERROR: rrd2rrdr() on %s update every %d with %s grouping %s (group: %ld, resampling_time: %ld, resampling_group: %ld), "
          "after (got: %zu, want: %zu, req: %zu, db: %zu), "
          "before (got: %zu, want: %zu, req: %zu, db: %zu), "
          "duration (got: %zu, want: %zu, req: %zu, db: %zu), "
-         "slot (after: %zu, before: %zu, delta: %zu), "
+         //"slot (after: %zu, before: %zu, delta: %zu), "
          "points (got: %ld, want: %ld, req: %ld, db: %ld), "
          "%s"
          , r->st->name
@@ -555,9 +556,11 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
          , (size_t)((rrdset_last_entry_t(r->st) - rrdset_first_entry_t(r->st)) + r->st->update_every)
 
          // slot
+         /*
          , after_slot
          , before_slot
          , (after_slot > before_slot) ? (r->st->entries - after_slot + before_slot) : (before_slot - after_slot)
+          */
 
          // points
          , r->rows
@@ -719,7 +722,7 @@ RRDR *rrd2rrdr(
 
         before_wanted = last_entry_t - (last_entry_t % ( ((aligned)?group:1) * st->update_every ));
     }
-    size_t before_slot;// = rrdset_time2slot(st, before_wanted);
+    //size_t before_slot = rrdset_time2slot(st, before_wanted);
 
     // we need to estimate the number of points, for having
     // an integer number of values per point
@@ -741,7 +744,7 @@ RRDR *rrd2rrdr(
             after_wanted = first_entry_t - (first_entry_t % ( ((aligned)?group:1) * st->update_every )) + ( ((aligned)?group:1) * st->update_every );
         }
     }
-    size_t after_slot;//  = rrdset_time2slot(st, after_wanted);
+    //size_t after_slot = rrdset_time2slot(st, after_wanted);
 
     // check if they are reversed
     if(unlikely(after_wanted > before_wanted)) {
@@ -945,27 +948,27 @@ RRDR *rrd2rrdr(
     #ifdef NETDATA_INTERNAL_CHECKS
 
     if(r->internal.log)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, r->internal.log);
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ r->internal.log);
 
     if(r->rows != points_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'points' is not wanted 'points'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ "got 'points' is not wanted 'points'");
 
     if(aligned && (r->before % group) != 0)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'before' is not aligned but alignment is required");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ "'before' is not aligned but alignment is required");
 
     // 'after' should not be aligned, since we start inside the first group
     //if(aligned && (r->after % group) != 0)
     //    rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
     if(r->before != before_requested)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "chart is not aligned to requested 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ "chart is not aligned to requested 'before'");
 
     if(r->before != before_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'before' is not wanted 'before'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ "got 'before' is not wanted 'before'");
 
     // reported 'after' varies, depending on group
     if(r->after != after_wanted)
-        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "got 'after' is not wanted 'after'");
+        rrd2rrdr_log_request_response_metdata(r, group_method, aligned, group, resampling_time_requested, resampling_group, after_wanted, after_requested, before_wanted, before_requested, points_requested, points_wanted, /*after_slot, before_slot,*/ "got 'after' is not wanted 'after'");
 
     #endif
 

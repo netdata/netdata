@@ -96,9 +96,13 @@ static void rrddim_collect_init(RRDDIM *rd) {
     rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
 }
 static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
+    (void)point_in_time;
+
     rd->values[rd->rrdset->current_entry] = number;
 }
 static void rrddim_collect_finalize(RRDDIM *rd) {
+    (void)rd;
+
     return;
 }
 
@@ -131,6 +135,12 @@ static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handl
 
 static int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
     return handle->slotted.finished;
+}
+
+static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
+    (void)handle;
+
+    return;
 }
 
 static time_t rrddim_query_latest_time(RRDDIM *rd) {
@@ -305,10 +315,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 #ifdef ENABLE_DBENGINE
         rd->state->collect_ops.init         = rrdeng_store_metric_init;
         rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
-        rd->state->collect_ops.finalize     = rrdeng_store_metric_final;
+        rd->state->collect_ops.finalize     = rrdeng_store_metric_finalize;
         rd->state->query_ops.init           = rrdeng_load_metric_init;
         rd->state->query_ops.next_metric    = rrdeng_load_metric_next;
-        rd->state->query_ops.is_finished    = rrdeng_load_metric_finished;
+        rd->state->query_ops.is_finished    = rrdeng_load_metric_is_finished;
+        rd->state->query_ops.finalize       = rrdeng_load_metric_finalize;
         rd->state->query_ops.latest_time    = rrdeng_metric_latest_time;
         rd->state->query_ops.oldest_time    = rrdeng_metric_oldest_time;
 #endif
@@ -319,6 +330,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         rd->state->query_ops.init           = rrddim_query_init;
         rd->state->query_ops.next_metric    = rrddim_query_next_metric;
         rd->state->query_ops.is_finished    = rrddim_query_is_finished;
+        rd->state->query_ops.finalize       = rrddim_query_finalize;
         rd->state->query_ops.latest_time    = rrddim_query_latest_time;
         rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
     }
@@ -397,6 +409,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
+        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);

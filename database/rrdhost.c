@@ -235,7 +235,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         ret = mkdir(dbenginepath, 0775);
         if(ret != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
-        ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+        else
+            ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
         if(ret) {
             error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
                   host->hostname, host->machine_guid, host->cache_dir);

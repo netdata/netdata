@@ -128,7 +128,7 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 /*
  * Releases the database reference from the handle for storing metrics.
  */
-void rrdeng_store_metric_final(RRDDIM *rd)
+void rrdeng_store_metric_finalize(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
     struct rrdengine_instance *ctx;
@@ -247,28 +247,39 @@ out:
     handle->now += handle->dt;
     if (unlikely(handle->now > rrdimm_handle->end_time)) {
         handle->now = INVALID_TIME;
-        if (descr) {
-#ifdef NETDATA_INTERNAL_CHECKS
-            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-            --pg_cache->consumers; /* DEBUG STAT */
-            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
-#endif
-            pg_cache_put(descr);
-        }
     }
-
     return ret;
 }
 
-/*
- * Releases the database reference from the handle for loading metrics.
- */
-int rrdeng_load_metric_finished(struct rrddim_query_handle *rrdimm_handle)
+int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle;
 
     handle = &rrdimm_handle->rrdeng;
     return (INVALID_TIME == handle->now);
+}
+
+/*
+ * Releases the database reference from the handle for loading metrics.
+ */
+void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
+{
+    struct rrdeng_query_handle *handle;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_cache_descr *descr;
+
+    handle = &rrdimm_handle->rrdeng;
+    ctx = handle->ctx;
+    descr = handle->descr;
+    if (descr) {
+        struct page_cache *pg_cache = &ctx->pg_cache;
+#ifdef NETDATA_INTERNAL_CHECKS
+        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+        --pg_cache->consumers; /* DEBUG STAT */
+        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+#endif
+        pg_cache_put(descr);
+    }
 }
 
 time_t rrdeng_metric_latest_time(RRDDIM *rd)
