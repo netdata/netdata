@@ -67,6 +67,7 @@ calculated_number backend_calculate_value_from_stored_data(
     time_t update_every = st->update_every;
     time_t now;
     struct rrddim_query_handle handle;
+    storage_number n;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
@@ -130,10 +131,8 @@ calculated_number backend_calculate_value_from_stored_data(
         counter++;
     }
 */
-    rd->state->query_ops.init(rd, &handle, before, after);
-    for(now = before ; now >= after ; now -= update_every) {
-
-        storage_number n = rd->state->query_ops.load_metric(&handle, now);
+    for(rd->state->query_ops.init(rd, &handle, before, after) ; !rd->state->query_ops.is_finished(&handle) ; ) {
+        n = rd->state->query_ops.next_metric(&handle);
 
         if(unlikely(!does_storage_number_exist(n))) {
             // not collected

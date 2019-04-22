@@ -381,13 +381,9 @@ static inline void do_dimension(
         , long points_wanted
         , RRDDIM *rd
         , long dim_id_in_rrdr
-        , long after_slot
-        , long before_slot
         , time_t after_wanted
         , time_t before_wanted
 ){
-    (void) before_slot;
-
     RRDSET *st = r->st;
 
     time_t
@@ -397,13 +393,11 @@ static inline void do_dimension(
         min_date = 0;
 
     long
-        slot = after_slot,
         group_size = r->group,
         points_added = 0,
         values_in_group = 0,
         values_in_group_non_zero = 0,
-        rrdr_line = -1,
-        entries = st->entries;
+        rrdr_line = -1;
 
     RRDR_VALUE_FLAGS
         group_value_flags = RRDR_VALUE_NOTHING;
@@ -412,9 +406,9 @@ static inline void do_dimension(
 
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
-    rd->state->query_ops.init(rd, &handle, now, now + dt * points_wanted);
-    for( ; points_added < points_wanted ; now += dt, slot++ ) {
-        if(unlikely(slot >= entries)) slot = 0;
+
+    for(rd->state->query_ops.init(rd, &handle, now, now + dt * points_wanted) ;
+        points_added < points_wanted && !rd->state->query_ops.is_finished(&handle) ; now += dt) {
 
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
@@ -432,7 +426,7 @@ static inline void do_dimension(
 
         // read the value from the database
         //storage_number n = rd->values[slot];
-        storage_number n = rd->state->query_ops.load_metric(&handle, now);
+        storage_number n = rd->state->query_ops.next_metric(&handle);
         calculated_number value = NAN;
         if(likely(does_storage_number_exist(n))) {
 
@@ -489,7 +483,6 @@ static inline void do_dimension(
             values_in_group_non_zero = 0;
         }
     }
-    rd->state->query_ops.finalize(&handle);
 
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
@@ -907,8 +900,6 @@ RRDR *rrd2rrdr(
                 , points_wanted
                 , rd
                 , c
-                , after_slot
-                , before_slot
                 , after_wanted
                 , before_wanted
                 );
