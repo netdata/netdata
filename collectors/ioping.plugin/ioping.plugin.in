@@ -191,7 +191,7 @@ then
 	fatal "destination is not configured - nothing to do."
 fi
 
-if [ -z "${ioping}" ]
+if [ ! -f "${ioping}" ]
 then
 	fatal "ioping command is not found. Please set its full path in '${NETDATA_USER_CONFIG_DIR}/${plugin}.conf'"
 fi
