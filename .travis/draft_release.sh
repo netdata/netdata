@@ -23,10 +23,6 @@ if [ ! -f .gitignore ]; then
 fi
 
 echo "--- Initialize git configuration ---"
-export GIT_MAIL="bot@netdata.cloud"
-export GIT_USER="netdatabot"
-git config user.email "${GIT_MAIL}"
-git config user.name "${GIT_USER}"
 git checkout master
 git pull
 
