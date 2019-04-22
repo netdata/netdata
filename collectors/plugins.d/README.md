@@ -65,7 +65,7 @@ Example:
 
 	# charts.d = yes
 	# fping = yes
-  # ioping = yes
+	# ioping = yes
 	# node.d = yes
 	# python.d = yes
 ```

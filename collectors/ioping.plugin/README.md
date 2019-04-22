@@ -12,14 +12,14 @@ The supplied plugin can install it, by running:
 
 The `-e` option can be supplied to indicate where the netdata environment file is installed. The default path is `/etc/netdata/.environment`.
 
-The above will download, build and install the right version as `/usr/libexec/netdata/ioping`.
+The above will download, build and install the right version as `/usr/libexec/netdata/plugins.d/ioping`.
 
 Then you need to edit `/etc/netdata/ioping.conf` (to edit it on your system run
 `/etc/netdata/edit-config ioping.conf`) like this:
 
 ```sh
 # uncomment the following line - it should already be there
-ioping="/usr/libexec/netdata/ioping"
+ioping="/usr/libexec/netdata/plugins.d/ioping"
 
 # set here the directory/file/device, you need to ping
 destination="destination"

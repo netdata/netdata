@@ -195,7 +195,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 progress "fix plugin permissions"
 
-for x in apps.plugin freeipmi.plugin cgroup-network
+for x in apps.plugin freeipmi.plugin ioping cgroup-network
 do
     f="usr/libexec/netdata/plugins.d/${x}"
 
@@ -211,13 +211,6 @@ if [ -f bin/fping ]
 then
     run chown root:${NETDATA_GROUP} bin/fping
     run chmod 4750 bin/fping
-fi
-
-# fix the ioping binary
-if [ -f usr/libexec/netdata/ioping ]
-then
-    run chown root:${NETDATA_GROUP} usr/libexec/netdata/ioping
-    run chmod 4750 usr/libexec/netdata/ioping
 fi
 
 

@@ -685,7 +685,6 @@ if [ "${UID}" -eq 0 ]; then
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
-    run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name ioping -exec chown root:root {} \; -exec chmod 4755 {} \;
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
 		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
@@ -717,6 +716,11 @@ if [ "${UID}" -eq 0 ]; then
     if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin" ]; then
         run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
         run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
+    fi
+
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then
+        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
+        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
     fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
@@ -990,6 +994,7 @@ NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
+NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 # This value is meant to be populated by autoupdater (if enabled)
