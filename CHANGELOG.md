@@ -2,15 +2,25 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
+- Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
+- netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
+- \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
+
 **Closed issues:**
 
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
+- Tengine monitoring [\#4886](https://github.com/netdata/netdata/issues/4886)
+- Monitor disk access latency \(e.g. ioping\) [\#4660](https://github.com/netdata/netdata/issues/4660)
 
 **Merged pull requests:**
 
 - NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
 - Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
+- Add ioping plugin [\#5725](https://github.com/netdata/netdata/pull/5725) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.14.0](https://github.com/netdata/netdata/tree/v1.14.0) (2019-04-18)
 
