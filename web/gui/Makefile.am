@@ -72,8 +72,6 @@ dist_web_DATA = \
 webconsoledir=$(webdir)/console
 dist_webconsole_DATA = \
 	console/index.html \
-	console/main.bundle.js \
-	console/main.css \
 	$(NULL)
 
 webstaticdir=$(webdir)/static/img
