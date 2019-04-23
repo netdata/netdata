@@ -122,7 +122,7 @@ jobs:
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata lifecycle test script failed on ubuntu 18.04"
 
   - name: Run netdata lifecycle from stable to current, on CentOS 7 (Containerized)
-    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" bats --tap tests/updater_checks.bats
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on CentOS 7"
 
   - name: Build/install for CentOS 6 (Containerized)
