@@ -151,13 +151,15 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(unlikely(strcmp(st->id, st->name))) {
-        // they differ
-        name = strchr(st->name, '.');
-        if(name)
-            name++;
-        else
-            name = "";
+    if(likely(st->name)) {
+        if(unlikely(strcmp(st->id, st->name))) {
+            // they differ
+            name = strchr(st->name, '.');
+            if(name)
+                name++;
+            else
+                name = "";
+        }
     }
 
     // info("CHART '%s' '%s'", st->id, name);

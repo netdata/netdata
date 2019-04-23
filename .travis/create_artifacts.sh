@@ -8,6 +8,19 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
+if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+	echo "Beta mode on ${TRAVIS_REPO_SLUG}, not running anything here"
+	exit 0
+fi;
+
+echo "--- Initialize git configuration ---"
+export GIT_MAIL="bot@netdata.cloud"
+export GIT_USER="netdatabot"
+git config user.email "${GIT_MAIL}"
+git config user.name "${GIT_USER}"
+git checkout master
+git pull
+
 # Everything from this directory will be uploaded to GCS
 mkdir -p artifacts
 BASENAME="netdata-$(git describe)"

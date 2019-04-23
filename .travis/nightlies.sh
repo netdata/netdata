@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# This is the nightlies orchastration script
-# It runs the following activities in order:
-# 1) Generate changelog
-# 2) Build docker images
-# 3) Publish docker images
-# 4) Generate the rest of the artifacts (Source code .tar.gz file and makeself binary generation)
+# This is the nightly changelog generation script
+# It is responsible for two major activities:
+# 1) Update packaging/version with the current nightly version
+# 2) Generate the changelog for the mentioned version
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -34,14 +32,12 @@ if [ "${COMMITS_SINCE_RELEASE}" == "${PREVIOUS_NIGHTLY_COUNT}" ]; then
 	exit 0
 fi
 
+if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
+	echo "Beta mode -- nothing to do for ${TRAVIS_REPO_SLUG} on the nightlies script, bye"
+	exit 0
+fi
+
 echo "--- Running Changelog generation ---"
-.travis/generate_changelog.sh "${LAST_TAG}" "${COMMITS_SINCE_RELEASE}" || echo "Changelog generation has failed, this is a soft error, process continues"
-
-echo "--- Build && publish docker images ---"
-# Do not fail artifacts creation if docker fails. We will be restructuring this on a follow up PR
-packaging/docker/build.sh && packaging/docker/publish.sh || echo "Failed to build and publish docker images"
-
-echo "--- Build artifacts ---"
-.travis/create_artifacts.sh
+.travis/generate_changelog_for_nightlies.sh "${LAST_TAG}" "${COMMITS_SINCE_RELEASE}" || echo "Changelog generation has failed, this is a soft error, process continues"
 
 exit "${FAIL}"
