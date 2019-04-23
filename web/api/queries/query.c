@@ -403,12 +403,12 @@ static inline void do_dimension(
         group_value_flags = RRDR_VALUE_NOTHING;
 
     struct rrddim_query_handle handle;
+    uint8_t initialized_query;
 
     calculated_number min = r->min, max = r->max;
     size_t db_points_read = 0;
 
-    for(rd->state->query_ops.init(rd, &handle, now, now + dt * points_wanted) ;
-        points_added < points_wanted && !rd->state->query_ops.is_finished(&handle) ; now += dt) {
+    for(initialized_query = 0 ; points_added < points_wanted ; now += dt) {
 
         // make sure we return data in the proper time range
         if(unlikely(now > before_wanted)) {
@@ -424,6 +424,10 @@ static inline void do_dimension(
             continue;
         }
 
+        if (unlikely(!initialized_query)) {
+            rd->state->query_ops.init(rd, &handle, now, before_wanted);
+            initialized_query = 1;
+        }
         // read the value from the database
         //storage_number n = rd->values[slot];
         storage_number n = rd->state->query_ops.next_metric(&handle);
@@ -483,7 +487,8 @@ static inline void do_dimension(
             values_in_group_non_zero = 0;
         }
     }
-    rd->state->query_ops.finalize(&handle);
+    if (likely(initialized_query))
+        rd->state->query_ops.finalize(&handle);
 
     r->internal.db_points_read += db_points_read;
     r->internal.result_points_generated += points_added;
