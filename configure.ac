@@ -37,6 +37,7 @@ m4_ifdef([AM_SILENT_RULES], [
 AC_CANONICAL_HOST
 AC_PROG_CC
 AM_PROG_CC_C_O
+AC_PROG_CXX
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
@@ -577,6 +578,12 @@ AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"
 
 
 # -----------------------------------------------------------------------------
+# AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core
+
+OPTIONAL_KINESIS_LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core -lssl -lcrypto -lpthread -lcurl"
+
+
+# -----------------------------------------------------------------------------
 # check for setns() - cgroup-network
 
 AC_CHECK_FUNC([setns])
@@ -675,6 +682,7 @@ AC_SUBST([OPTIONAL_CUPS_CFLAGS])
 AC_SUBST([OPTIONAL_CUPS_LIBS])
 AC_SUBST([OPTIONAL_XENSTAT_CFLAGS])
 AC_SUBST([OPTIONAL_XENSTAT_LIBS])
+AC_SUBST([OPTIONAL_KINESIS_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -685,6 +693,7 @@ AC_CONFIG_FILES([
     backends/Makefile
     backends/opentsdb/Makefile
     backends/prometheus/Makefile
+    backends/aws_kinesis/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile

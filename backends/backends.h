@@ -48,5 +48,6 @@ extern int discard_response(BUFFER *b, const char *backend);
 #include "backends/graphite/graphite.h"
 #include "backends/json/json.h"
 #include "backends/opentsdb/opentsdb.h"
+#include "backends/aws_kinesis/aws_kinesis.h"
 
 #endif /* NETDATA_BACKENDS_H */

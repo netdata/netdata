@@ -410,6 +410,10 @@ BACKENDS_PLUGIN_FILES = \
     backends/opentsdb/opentsdb.h \
     backends/prometheus/backend_prometheus.c \
     backends/prometheus/backend_prometheus.h \
+    backends/aws_kinesis/aws_kinesis.c \
+    backends/aws_kinesis/aws_kinesis.h \
+    backends/aws_kinesis/aws_kinesis_put_record.cc \
+    backends/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
 DAEMON_FILES = \
@@ -470,8 +474,9 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_KINESIS_LIBS) \
 	$(NULL)
-
+# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)

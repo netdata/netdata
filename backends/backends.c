@@ -234,6 +234,7 @@ void *backends_main(void *ptr) {
 
     int default_port = 0;
     int sock = -1;
+    int do_kinesis = 0;
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
@@ -263,6 +264,11 @@ void *backends_main(void *ptr) {
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
     hosts_pattern  = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
+    // TODO: move Kinesis configuration to a separate .config file
+    const char *kinesis_region            = config_get(CONFIG_SECTION_BACKEND, "kinesis region", "us-east-1");
+    const char *kinesis_auth_key_id       = config_get(CONFIG_SECTION_BACKEND, "kinesis auth key id", "");
+    const char *kinesis_secure_key        = config_get(CONFIG_SECTION_BACKEND, "kinesis secure key", "");
+    const char *kinesis_stream_name       = config_get(CONFIG_SECTION_BACKEND, "kinesis stream name", "");
 
     // ------------------------------------------------------------------------
     // validate configuration options
@@ -314,6 +320,17 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_collected_json_plaintext;
         else
             backend_request_formatter = format_dimension_stored_json_plaintext;
+
+    }
+    else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+
+        do_kinesis = 1;
+
+        backend_response_checker = process_kinesis_response;
+        if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+            backend_request_formatter = format_dimension_collected_kinesis_plaintext;
+        else
+            backend_request_formatter = format_dimension_stored_kinesis_plaintext;
 
     }
     else {
@@ -497,103 +514,116 @@ void *backends_main(void *ptr) {
         // to add incrementally data to buffer
         after = before;
 
-        // ------------------------------------------------------------------------
-        // if we are connected, receive a response, without blocking
+        if(do_kinesis) {
+            static unsigned long long partition_key_seq = 0;
+            char partition_key[KINESIS_PARTITION_KEY_LEN + 1];
 
-        if(likely(sock != -1)) {
-            errno = 0;
+            snprintf(partition_key, KINESIS_PARTITION_KEY_LEN, "netdata_%llu", partition_key_seq++);
 
-            // loop through to collect all data
-            while(sock != -1 && errno != EWOULDBLOCK) {
-                buffer_need_bytes(response, 4096);
+            // while(there is data in buffer) {
+                put_record(kinesis_region, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_tostring(b), buffer_strlen(b));
+                buffer_flush(b);
+            // }
+        }
+        else {
+            // ------------------------------------------------------------------------
+            // if we are connected, receive a response, without blocking
 
-                ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
-                if(likely(r > 0)) {
-                    // we received some data
-                    response->len += r;
-                    chart_received_bytes += r;
-                    chart_receptions++;
+            if(likely(sock != -1)) {
+                errno = 0;
+
+                // loop through to collect all data
+                while(sock != -1 && errno != EWOULDBLOCK) {
+                    buffer_need_bytes(response, 4096);
+
+                    ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+                    if(likely(r > 0)) {
+                        // we received some data
+                        response->len += r;
+                        chart_received_bytes += r;
+                        chart_receptions++;
+                    }
+                    else if(r == 0) {
+                        error("BACKEND: '%s' closed the socket", destination);
+                        close(sock);
+                        sock = -1;
+                    }
+                    else {
+                        // failed to receive data
+                        if(errno != EAGAIN && errno != EWOULDBLOCK) {
+                            error("BACKEND: cannot receive data from backend '%s'.", destination);
+                        }
+                    }
                 }
-                else if(r == 0) {
-                    error("BACKEND: '%s' closed the socket", destination);
+
+                // if we received data, process them
+                if(buffer_strlen(response))
+                    backend_response_checker(response);
+            }
+
+            // ------------------------------------------------------------------------
+            // if we are not connected, connect to a backend server
+
+            if(unlikely(sock == -1)) {
+                // usec_t start_ut = now_monotonic_usec();
+                size_t reconnects = 0;
+
+                sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
+
+                chart_backend_reconnects += reconnects;
+                // chart_backend_latency += now_monotonic_usec() - start_ut;
+            }
+
+            if(unlikely(netdata_exit)) break;
+
+            // ------------------------------------------------------------------------
+            // if we are connected, send our buffer to the backend server
+
+            if(likely(sock != -1)) {
+                size_t len = buffer_strlen(b);
+                // usec_t start_ut = now_monotonic_usec();
+                int flags = 0;
+    #ifdef MSG_NOSIGNAL
+                flags += MSG_NOSIGNAL;
+    #endif
+
+                ssize_t written = send(sock, buffer_tostring(b), len, flags);
+                // chart_backend_latency += now_monotonic_usec() - start_ut;
+                if(written != -1 && (size_t)written == len) {
+                    // we sent the data successfully
+                    chart_transmission_successes++;
+                    chart_sent_bytes += written;
+                    chart_sent_metrics = chart_buffered_metrics;
+
+                    // reset the failures count
+                    failures = 0;
+
+                    // empty the buffer
+                    buffer_flush(b);
+                }
+                else {
+                    // oops! we couldn't send (all or some of the) data
+                    error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                    chart_transmission_failures++;
+
+                    if(written != -1)
+                        chart_sent_bytes += written;
+
+                    // increment the counter we check for data loss
+                    failures++;
+
+                    // close the socket - we will re-open it next time
                     close(sock);
                     sock = -1;
                 }
-                else {
-                    // failed to receive data
-                    if(errno != EAGAIN && errno != EWOULDBLOCK) {
-                        error("BACKEND: cannot receive data from backend '%s'.", destination);
-                    }
-                }
-            }
-
-            // if we received data, process them
-            if(buffer_strlen(response))
-                backend_response_checker(response);
-        }
-
-        // ------------------------------------------------------------------------
-        // if we are not connected, connect to a backend server
-
-        if(unlikely(sock == -1)) {
-            // usec_t start_ut = now_monotonic_usec();
-            size_t reconnects = 0;
-
-            sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
-
-            chart_backend_reconnects += reconnects;
-            // chart_backend_latency += now_monotonic_usec() - start_ut;
-        }
-
-        if(unlikely(netdata_exit)) break;
-
-        // ------------------------------------------------------------------------
-        // if we are connected, send our buffer to the backend server
-
-        if(likely(sock != -1)) {
-            size_t len = buffer_strlen(b);
-            // usec_t start_ut = now_monotonic_usec();
-            int flags = 0;
-#ifdef MSG_NOSIGNAL
-            flags += MSG_NOSIGNAL;
-#endif
-
-            ssize_t written = send(sock, buffer_tostring(b), len, flags);
-            // chart_backend_latency += now_monotonic_usec() - start_ut;
-            if(written != -1 && (size_t)written == len) {
-                // we sent the data successfully
-                chart_transmission_successes++;
-                chart_sent_bytes += written;
-                chart_sent_metrics = chart_buffered_metrics;
-
-                // reset the failures count
-                failures = 0;
-
-                // empty the buffer
-                buffer_flush(b);
             }
             else {
-                // oops! we couldn't send (all or some of the) data
-                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                error("BACKEND: failed to update database backend '%s'", destination);
                 chart_transmission_failures++;
-
-                if(written != -1)
-                    chart_sent_bytes += written;
 
                 // increment the counter we check for data loss
                 failures++;
-
-                // close the socket - we will re-open it next time
-                close(sock);
-                sock = -1;
             }
-        }
-        else {
-            error("BACKEND: failed to update database backend '%s'", destination);
-            chart_transmission_failures++;
-
-            // increment the counter we check for data loss
-            failures++;
         }
 
         if(failures > buffer_on_failures) {
