@@ -213,6 +213,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'ioping': {
+        title: 'ioping',
+        icon: '<i class="fas fa-exchange-alt"></i>',
+        info: 'Disk latency statistics, via <b>ioping</b>. <b>ioping</b> is a program to read/write data probes from/to a disk.'
+    },
+
     'httpcheck': {
         title: 'Http Check',
         icon: '<i class="fas fa-heartbeat"></i>',

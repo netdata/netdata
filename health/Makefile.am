@@ -39,6 +39,7 @@ dist_healthconfig_DATA = \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/fping.conf \
+    health.d/ioping.conf \
     health.d/fronius.conf \
     health.d/haproxy.conf \
     health.d/httpcheck.conf \

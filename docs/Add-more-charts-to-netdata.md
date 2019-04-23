@@ -65,6 +65,7 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# node.d = yes
 	# python.d = yes
 	# fping = yes
+	# ioping = yes
 	# charts.d = yes
 	# apps = yes
 	# xenstat = yes
@@ -94,7 +95,7 @@ sudo su -s /bin/bash netdata
 ```
 
 Similarly, you can use `charts.d.plugin` for BASH plugins and `node.d.plugin` for node.js plugins.
-Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`) use the native netdata plugin API and can be run directly.
+Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`, `ioping.plugin`) use the native netdata plugin API and can be run directly.
 
 If you need to configure a netdata plugin or module, all user supplied configuration is kept at `/etc/netdata` while the stock versions of all files is at `/usr/lib/netdata/conf.d`.
 To copy a stock file and edit it, run `/etc/netdata/edit-config`. Running this command without an argument, will list the available stock files.
@@ -113,6 +114,7 @@ plugin | language | plugin<br/>configuration | modules<br/>configuration |
 `charts.d.plugin`<br/>(external plugin orchestrator for BASH modules)|`BASH`|`charts.d.conf`|a file for each module in `/etc/netdata/charts.d/`
 `diskspace.plugin`<br/>(internal plugin for collecting Linux mount points usage)|`C`|`netdata.conf` section `[plugin:diskspace]`|N/A
 `fping.plugin`<br/>(external plugin for collecting network latencies)|`C`|`fping.conf`|This plugin is a wrapper for the `fping` command.
+`ioping.plugin`<br/>(external plugin for collecting disk latencies)|`C`|`ioping.conf`|This plugin is a wrapper for the `ioping` command.
 `freeipmi.plugin`<br/>(external plugin for collecting IPMI h/w sensors)|`C`|`netdata.conf` section `[plugin:freeipmi]`
 `idlejitter.plugin`<br/>(internal plugin for monitoring CPU jitter)|`C`|N/A|N/A
 `macos.plugin`<br/>(internal plugin for monitoring MacOS system resources)|`C`|`netdata.conf` section `[plugin:macos]`|one section for each module `[plugin:macos:MODULE]`. Each module may provide additional sections in the form of `[plugin:macos:MODULE:SUBSECTION]`.
@@ -318,6 +320,7 @@ xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisor
 application|language|notes|
 :---------:|:------:|:----|
 apps|C|`apps.plugin` collects resource usage statistics for all processes running in the system. It groups the entire process tree and reports dozens of metrics for CPU utilization, memory footprint, disk I/O, swap memory, network connections, open files and sockets, etc. It reports metrics for application groups, users and user groups.<br/>&nbsp;<br/>[Documentation of `apps.plugin`](../collectors/apps.plugin/).<br/>&nbsp;<br/>netdata plugin: [`apps_plugin.c`](../collectors/apps.plugin)<br/>configuration file: [`apps_groups.conf`](../collectors/apps.plugin)|
+ioping|C|Charts disk latency statistics for a directory/file/device, using the `ioping` command. A recent (probably unreleased) version of ioping is required. The plugin supplied can install it in `/usr/local`.<br/>&nbsp;<br/>netdata plugin: [ioping.plugin](../collectors/ioping.plugin) (this is a shell wrapper to start ioping - once ioping is started, netdata and ioping communicate directly - it can also install the right version of ioping)<br/>configuration file: [ioping.conf](../collectors/ioping.plugin)|
 cpu_apps|BASH<br/>Shell Script|Collects the CPU utilization of select apps.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [cpu_apps.chart.sh](../collectors/charts.d.plugin/cpu_apps)<br/>configuration file: [charts.d/cpu_apps.conf](../collectors/charts.d.plugin/cpu_apps)|
 load_average|BASH<br/>Shell Script|Collects the current system load average.<br/><br/>DEPRECATED IN FAVOR OF THE NETDATA INTERNAL ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [load_average.chart.sh](../collectors/charts.d.plugin/load_average)<br/>configuration file: [charts.d/load_average.conf](../collectors/charts.d.plugin/load_average)|
 mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applications.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [mem_apps.chart.sh](../collectors/charts.d.plugin/mem_apps)<br/>configuration file: [charts.d/mem_apps.conf](../collectors/charts.d.plugin/mem_apps)|
