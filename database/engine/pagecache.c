@@ -645,6 +645,7 @@ struct rrdeng_page_cache_descr *
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index;
     Word_t Index;
+    uint8_t page_not_in_cache;
 
     if (unlikely(NULL == index)) {
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -661,6 +662,7 @@ struct rrdeng_page_cache_descr *
     }
     pg_cache_reserve_pages(ctx, 1);
 
+    page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
     while (1) {
         Index = (Word_t)(point_in_time / USEC_PER_SEC);
@@ -713,6 +715,8 @@ struct rrdeng_page_cache_descr *
         debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
         if(unlikely(debug_flags & D_RRDENGINE))
             print_page_cache_descr(descr);
+        if (!(flags & RRD_PAGE_POPULATED))
+            page_not_in_cache = 1;
         pg_cache_wait_event_unsafe(descr);
         uv_mutex_unlock(&descr->mutex);
 
@@ -724,7 +728,10 @@ struct rrdeng_page_cache_descr *
     if (!(flags & RRD_PAGE_DIRTY))
         pg_cache_replaceQ_set_hot(ctx, descr);
     pg_cache_release_pages(ctx, 1);
-    rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
+    if (page_not_in_cache)
+        rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
+    else
+        rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
     return descr;
 }
 

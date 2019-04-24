@@ -18,7 +18,7 @@ struct rrdeng_page_cache_descr;
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 
 typedef uintptr_t rrdeng_stats_t;
-#define rrd_stat_atomic_add(p, n) do {(void) __atomic_fetch_add(p, n, __ATOMIC_RELAXED);} while(0);
+#define rrd_stat_atomic_add(p, n) do {(void) __atomic_fetch_add(p, n, __ATOMIC_RELAXED);} while(0)
 
 struct completion {
     uv_mutex_t mutex;
